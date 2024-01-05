@@ -1,0 +1,12 @@
+// Test the contract
+new ret in {
+  // Define a contract named `loopback`
+  contract loopback(@input, return) = {
+    return!(input)
+  }
+
+  loopback!("Hello, world!", *ret) |
+  for(@msg <- ret) {
+    stdout!(msg)
+  }
+}

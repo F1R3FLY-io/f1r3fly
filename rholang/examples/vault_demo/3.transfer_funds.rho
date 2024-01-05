@@ -1,0 +1,41 @@
+new
+  rl(`rho:registry:lookup`), RevVaultCh,
+  stdout(`rho:io:stdout`)
+in {
+
+  rl!(`rho:rchain:revVault`, *RevVaultCh) |
+  for (@(_, RevVault) <- RevVaultCh) {
+
+    stdout!(("3.transfer_funds.rho")) |
+
+    // REPLACE THE REV ADDRESSES HERE vvv
+    match (
+      "%FROM",
+      "%TO",
+      100
+    ) {
+      (from, to, amount) => {
+
+        new vaultCh, targetVaultCh, revVaultkeyCh, deployerId(`rho:rchain:deployerId`) in {
+          @RevVault!("findOrCreate", from, *vaultCh) |
+          // make sure the target vault it created and the transfer would be done
+          @RevVault!("findOrCreate", to, *targetVaultCh) |
+          @RevVault!("deployerAuthKey", *deployerId, *revVaultkeyCh) |
+          for (@(true, vault) <- vaultCh & key <- revVaultkeyCh & @(true, _) <- targetVaultCh) {
+
+            stdout!(("Beginning transfer of ", amount, "REV from", from, "to", to)) |
+
+            new resultCh in {
+              @vault!("transfer", to, amount, *key, *resultCh) |
+              for (@result <- resultCh) {
+
+                stdout!(("Finished transfer of ", amount, "REV to", to, "result was:", result))
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+}

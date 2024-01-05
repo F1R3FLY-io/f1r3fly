@@ -1,0 +1,22 @@
+new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in {
+   AddData!("uri1", *addData) |
+   GetData!("uri2", *getData) |
+   for (@add <- addData; @get <- getData) {
+     contract callAddData(@key, @data) = {
+       add!(key, data, ack)
+     } |
+     contract callGetData(@key, result) = {
+       get!(key, result)
+     } |
+     new key, data in {
+       key!("myKey") | data!("myData".hexToBytes()) |
+       callAddData!(*key, *data) |
+       for (_ <- ack) {
+         callGetData!(*key, ret) |
+         for (@data <- ret) {
+           stdout!(data)
+         }
+       }
+     }
+   }
+ }

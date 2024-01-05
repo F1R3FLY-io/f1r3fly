@@ -1,0 +1,130 @@
+;; -*- Coding: utf-8; Mode: Scheme; -*-
+;;
+;; Simple test harness. This needs improvement.
+
+;; One test is whether macro expansion still works.
+;;
+;; Here's what I'm going for:
+;;
+;; CL-USER> (defmacro test-form (form answer)
+;;            `(let ((result ,form))
+;;               (if (equal result ,answer)
+;;                   (format t "Form ~A = ~A passed.~%" ',form ,answer)
+;;                   (format t "Form ~A = ~A failed (produced ~A).~%" ',form ,answer result))))
+;; TEST-FORM
+;; CL-USER> (test-form (+ 1 2) 3)
+;; Form (+ 1 2) = 3 passed.
+;; NIL
+;; CL-USER> (test-form (+ 1 2) 4)
+;; Form (+ 1 2) = 4 failed (produced 3).
+;; NIL
+
+;; Make an actor that emulates a counter. It can be incremented, decremented,
+;; and reset to zero.
+(defOprn increment)
+(defOprn decrement)
+(defOprn reset)
+(defOprn value)
+
+(defActor Counter (slots& value 0)
+  (method (increment & delta)
+     (let* [[delta (if (null? delta) 1 (head delta))]
+            [new-value (+ value delta)]]
+       (update value new-value)
+       new-value))
+  (method (decrement & delta)
+     (let* [[delta (if (null? delta) 1 (head delta))]
+            [new-value (- value delta)]]
+       (update value new-value)
+       new-value))
+  (method (reset)
+     (let []
+       (update value 0)
+       0))
+  (pure (value) value))
+
+;; Counters for logical sets of tests.
+(define failures (new Counter))
+(define successes (new Counter))
+
+;; Counters for total test success and failure counts.
+(define total-failures (new Counter))
+(define total-successes (new Counter))
+
+;; Call this at the end of a logical group of test. It will print out if there
+;; were any failures in that group and accumulate total successes and failure
+;; counts before resetting the counters.
+(defProc (record-and-reset)
+  (seq
+    (if (> (value failures) 0)
+        (display "Successes: " (value successes) ". Failures: " (value failures) ".\n")
+        (display "All sub-tests passed.\n"))
+    (increment total-successes (value successes))
+    (increment total-failures (value failures))
+    (reset successes)
+    (reset failures)))
+
+;; From the docs:
+;;
+;;   The method that is built by defExpander is defined in the context of
+;;   the prototypical RequestExpr [. . .]
+;;
+(defExpander (test-form e)
+  (let [[form (head msg)]
+        [answer (nth msg 1)]
+        [color-red "\033[31m"]
+        [color-green "\033[32m"]
+        [color-normal "\033[39m"]]
+    (new LetExpr (TX (TX 'res (e form e))
+                     (TX 'exp (e answer e)))
+         (SqX
+          (new IfExpr
+               (e (new RequestExpr 'or
+                       (TX (new RequestExpr '= (TX 'res 'exp))
+                           (new RequestExpr 'same? (TX 'res 'exp)))) e)
+               (SqX
+                (e (new RequestExpr 'display
+                        (TX (Q color-green)
+                            "Form " (Q form) " = " (Q answer) " passed.\n"
+                            (Q color-normal)))
+                   e)
+                (e (new RequestExpr 'increment '[successes]) e))
+               (SqX
+                (e (new RequestExpr 'display
+                        (TX (Q color-red)
+                            "Form " (Q form) " = " (Q answer) " failed (expected " 'exp " but got " 'res ").\n"
+                            (Q color-normal)))
+                   e)
+                (e (new RequestExpr 'increment '[failures]) e)
+                ))
+          ;; Return #niv to declutter the output.
+          '#niv))))
+
+
+(load "tests/equiv.ros" 'silent)
+(load "tests/reader-iso-8859-1.ros" 'silent)
+(load "tests/reader-utf-8.ros" 'silent)
+(load "tests/fold-tests.rbl" 'silent)
+
+;;; tests for tuplespace
+(load "tests/namespace-util-tests.rbl" 'silent)
+(load "tests/consume-tests.rbl" 'silent)
+(load "tests/produce-tests.rbl" 'silent)
+
+;;; tests for transtion specification
+(load "tests/transition-spec.rbl"
+ 'silent)
+
+;; Returning 1 or 0, not (value total-failures) on the off chance that
+;;
+;;    (= 0 (mod (value total-failures) 256))
+;;
+(exit (if (> (value total-failures) 0) 1 0))
+
+
+;; Local Variables:
+;; indent-tabs-mode: nil
+;; fill-column: 79
+;; comment-column: 37
+;; End:
+

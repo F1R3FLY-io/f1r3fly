@@ -1,0 +1,467 @@
+// This describes the Interface for Export / Import of Rosette object code. This is used
+// between Rosette and Roscala for interchanging compiled object code.
+
+
+syntax = "proto3";
+
+package ObjectCodePB;
+
+// Object code export contains Rosette Objects, and CodeBlocks.
+message ObjectCode {
+    repeated Object objects = 1;
+    repeated CodeBlock code_block = 2;
+}
+
+// A single code block contains a litvec with objects on which the code operates,
+// and the codevec with the actual opCodes that are executed by the VM.
+message CodeBlock {
+    uint64 object_id = 1;
+    LitVec litvec = 2;
+    CodeVec codevec = 3;
+}
+
+// This message contains the actual executable opCodes
+message CodeVec {
+    // Opcodes are serialized in binary
+    repeated uint32 opcodes = 1;
+}
+
+message LitVec {
+    // Items within a Litvec are accessed by index and must be stored in the same order as
+    // they originally existed at compile time.
+
+    repeated Object ob = 1;
+}
+
+message Ctxt {
+
+    Location tag = 1; // Must be a Location
+    uint32 nargs = 2;
+    uint32 outstanding = 3;
+    uint32 pc = 4;
+
+    // Context registers
+    Object rslt = 10;
+    Object trgt = 12;
+    Object argvec = 13; // Must be a Tuple
+    Object env = 14;
+    Object code = 15; // Must be a Code
+    Object ctxt = 16; // Must be a Ctxt
+    Object self2 = 17;
+    Object selfenv = 18;
+    Object rcvr = 19;
+    Object monitor = 20;
+
+}
+
+message Location {
+    string text = 1;
+    uint32 value = 2;
+
+    enum PBLocationType {
+        LT_CtxtRegister = 0;
+        LT_ArgRegister = 1;
+        LT_LexVariable = 2;
+        LT_GlobalVariable = 3;
+        LT_BitField = 4;
+        LT_Limbo = 5;
+        LT_BitField00 = 6;
+        LT_AddrVariable = 7;
+    }
+
+    PBLocationType type = 3;
+
+    message LocCtxt {
+        enum PBLocationCtxt {
+            LCT_RSLT = 0;
+            LCT_TRGT = 1;
+            LCT_ARGVEC = 2;
+            LCT_ENV = 3;
+            LCT_CODE = 4;
+            LCT_CTXT = 5;
+            LCT_SELF = 6;
+            LCT_SELFENV = 7;
+            LCT_RCVR = 8;
+            LCT_MONITOR = 9;
+        }
+        PBLocationCtxt reg = 1;
+    }
+    message LocArg {
+        uint32 arg = 1;
+    }
+    message LocLexVar {
+        bool indirect = 1;
+        uint32 level = 2;
+        uint32 offset = 3;
+    }
+    message LocAddrVar {
+        bool indirect = 1;
+        uint32 level = 2;
+        uint32 offset = 3;
+    }
+    message LocGlobalVar {
+        uint32 offset = 1;
+    }
+    message LocBitField {
+        bool indirect = 1;
+        bool signed = 2;
+        uint32 level = 3;
+        uint32 offset = 4;
+        uint32 span = 5;
+    }
+    message LocBitField00 {
+        bool signed = 1;
+        uint32 offset = 2;
+        uint32 span = 3;
+    }
+    message LocLimbo {
+    }
+
+    oneof loc {
+        LocCtxt ctxt = 4;
+        LocArg arg = 5;
+        LocLexVar lexvar = 6;
+        LocAddrVar addrvar = 7;
+        LocGlobalVar globalvar = 8;
+        LocBitField bitfield = 9;
+        LocBitField00 bitfield00 = 10;
+        LocLimbo limbo = 11;
+    }
+}
+
+// Rather than implement all 100+ object types existing in Rosette, We will only implement those
+// used in loading boot.rbl, plus any deemed necessary by the Roscala VM guys.
+
+// Note: Some of the fields in the Rosette Object messages are inconsistent and do not follow the
+//       style conventions in https://developers.google.com/protocol-buffers/docs/style. This is
+//       because it was decided to have them match the fields in the Rosette objects instead.
+
+message Actor {
+    Object extension = 1;
+}
+message BlockExpr {
+    Object subExprs = 1;
+    Object implicit = 2;
+}
+message Char {
+    uint32 value = 1;
+}
+message Code {
+    // Handle by reference. ID in parent Object.
+}
+message ComplexPattern {
+    Object patvec = 1;
+    Object offsetvec = 2;
+    Object expr = 3;
+}
+message ConstPattern {
+    Object val = 1;
+}
+message ExpandedLocation {
+    Location loc = 1;
+}
+message Fixnum {
+    int32 value = 1;
+}
+message Float {
+    double value = 1;
+}
+message FreeExpr {
+    Object freeids = 1;
+    Object body = 2;
+}
+message GotoExpr {
+    Object label = 1;
+}
+message IdAmprRestPattern {
+    Object expr = 1;
+}
+message IdPattern {
+    Object symbol = 1;
+}
+message IdVecPattern {
+    Object expr = 1;
+}
+message IfExpr {
+    Object condition = 1;
+    Object truebranch = 2;
+    Object falsebranch = 3;
+}
+message LabelExpr {
+    Object label = 1;
+    Object body = 2;
+}
+message LetExpr {
+    Object bindings = 1;
+    Object body = 2;
+}
+message LetrecExpr {
+    Object bindings = 1;
+    Object body = 2;
+}
+message MethodExpr {
+    Object identity = 1;
+    Object formals = 2;
+    Object body = 3;
+}
+message Niv {
+}
+message NullExpr {
+}
+message Prim {
+    Object id = 1;
+//    Object fn = 2;
+    uint32 minargs = 3;
+    uint32 maxargs = 4;
+    uint32 primnum = 5;
+}
+message Proc {
+    Object env = 1;
+    Object code = 2;
+    Object id = 3;
+    Object source = 4;
+}
+message ProcExpr {
+    Object identity = 1;
+    Object formals = 2;
+    Object body = 3;
+}
+message QuoteExpr {
+    Object expr = 1;
+}
+message RBLBool {
+    bool value = 1;
+}
+message RBLstring {
+    string value = 1;
+}
+message RblTable {
+    // The tbl is a Tuple that appears to contain the key/val pairs in consecutive elements.
+    //  Rosette internally keeps a hash of these for quick access.
+
+    // message Entry {
+    //     Object key = 1;
+    //     Object val = 2;
+    // }
+
+    Object tbl = 1;
+}
+message ReflectiveMethodExpr {
+    Object identity = 1;
+    Object formals = 2;
+    Object body = 3;
+}
+message RequestExpr {
+    Object target = 1;
+    Object msg = 2;
+}
+message SendExpr {
+    Object target = 1;
+    Object msg = 2;
+}
+message SeqExpr {
+    Object subexprs = 1;
+}
+message SetExpr {
+    Object trgt = 1;
+    Object val = 2;
+}
+message StdExtension {
+    repeated Object elements = 1;
+}
+message StdMeta {
+    Object extension = 1;
+}
+message StdMthd {
+    Object code = 1;
+    Object id = 2;
+    Object source = 3;
+}
+message Symbol {
+    string name = 1;
+}
+message Sysval {
+    string value = 1;
+}
+message TblObject {
+    Object validextent = 1;
+    Object keyvec = 2;
+}
+message Template {
+    Object keytuple = 1;
+    Object pat = 2;
+    Object keymeta = 3;
+}
+message Tuple {
+    repeated Object elements = 1;
+}
+message TupleExpr {
+    Object rest = 1;
+    repeated Object elements = 2;
+}
+message IndexedMeta {
+    Object extension = 1;
+}
+message StdOprn {
+    Object extension = 1;
+}
+message TopEnv {
+
+}
+message MIActor {
+    Object extension = 1;
+}
+message AtomicDescriptor {
+    uint32 _offset = 1;
+    uint32 _align_to = 2;
+    uint32 _size = 3;
+
+    Object mnemonic = 4;
+    Object imported = 5;
+    Object freestructongc = 6;
+
+    Object _signed = 7;
+}
+message ReflectiveMthd {
+    Object code = 1;
+    Object id = 2;
+    Object source = 3;
+}
+message ProductType {
+    repeated Object elements = 1;
+}
+message SumType {
+    repeated Object elements = 1;
+}
+message MultiMethod {
+    repeated Object elements = 1;
+}
+
+
+// The OT_ prefix avoids conflicts with various Rosette #define macros
+enum ObType {
+    OT_NOT_SET = 0;
+
+    OT_ACTOR = 1;
+    OT_BLOCK_EXPR = 2;
+    OT_CHAR = 3;
+    OT_CODE = 4;
+    OT_COMPLEX_PATTERN = 5;
+    OT_CONST_PATTERN = 6;
+    OT_EXPANDED_LOCATION = 7;
+    OT_FIXNUM = 8;
+    OT_FLOAT = 9;
+    OT_FREE_EXPR = 10;
+    OT_GOTO_EXPR = 11;
+    OT_ID_AMPR_REST_PATTERN = 12;
+    OT_ID_PATTERN = 13;
+    OT_ID_VEC_PATTERN = 14;
+    OT_IF_EXPR = 15;
+    OT_LABEL_EXPR = 16;
+    OT_LET_EXPR = 17;
+    OT_LET_REC_EXPR = 18;
+    OT_METHOD_EXPR = 19;
+    OT_NIV = 20;
+    OT_NULL_EXPR = 21;
+    OT_PRIM = 22;
+    OT_PROC = 23;
+    OT_PROC_EXPR = 24;
+    OT_QUOTE_EXPR = 25;
+    OT_RBL_BOOL = 26;
+    OT_RBL_STRING = 27;
+    OT_RBL_TABLE = 28;
+    OT_REFLECTIVE_METHOD_EXPR = 29;
+    OT_REQUEST_EXPR = 30;
+    OT_SEND_EXPR = 31;
+    OT_SEQ_EXPR = 32;
+    OT_SET_EXPR = 33;
+    OT_STD_EXTENSION = 34;
+    OT_STD_META = 35;
+    OT_STD_METHOD = 36;
+    OT_SYMBOL = 37;
+    OT_SYSVAL = 38;
+    OT_TBL_OBJECT = 39;
+    OT_TEMPLATE = 40;
+    OT_TUPLE = 41;
+    OT_TUPLE_EXPR = 42;
+    OT_INDEXED_META = 43;
+    OT_STD_OPRN = 44;
+    OT_TOP_ENV = 45;
+    OT_MI_ACTOR = 46;
+    OT_ATOMIC_DESCRIPTOR = 47;
+    OT_REFLECTIVE_MTHD = 48;
+    OT_PRODUCT_TYPE = 49;
+    OT_SUM_TYPE = 50;
+    OT_MULTI_METHOD = 51;
+
+    OT_CTXT = 900;
+
+    OT_UNKNOWN = 999;
+}
+
+message Object {
+    ObType type = 1;
+    uint64 object_id = 2;
+    Object meta = 3;
+    Object parent = 4;
+    bool looped = 5;
+    bool reference = 6;
+
+    // One and only one of these should be populated. These contain information specific to the
+    // Object type.
+    oneof object {
+        Ctxt ctxt = 8;
+
+        Actor actor = 10;
+        BlockExpr block_expr = 11;
+        Char char = 12;
+        Code code = 13;
+        ComplexPattern complex_pattern = 14;
+        ConstPattern const_pattern = 15;
+        ExpandedLocation expanded_location = 16;
+        Fixnum fixnum = 17;
+        Float float = 18;
+        FreeExpr free_expr = 19;
+        GotoExpr goto_expr = 20;
+        IdAmprRestPattern id_ampr_rest_pattern = 21;
+        IdPattern id_pattern = 22;
+        IdVecPattern id_vec_pattern = 23;
+        IfExpr if_expr = 24;
+        LabelExpr label_expr = 25;
+        LetExpr let_expr = 26;
+        LetrecExpr let_rec_expr = 27;
+        MethodExpr method_expr = 28;
+        Niv niv = 29;
+        NullExpr null_expr = 30;
+        Prim prim = 31;
+        Proc proc = 32;
+        ProcExpr proc_expr = 33;
+        QuoteExpr quote_expr = 34;
+        RBLBool rbl_bool = 35;
+        RBLstring rbl_string = 36;
+        RblTable rbl_table = 37;
+        ReflectiveMethodExpr reflective_method_expr = 38;
+        RequestExpr request_expr = 39;
+        SendExpr send_expr = 40;
+        SeqExpr seq_expr = 41;
+        SetExpr set_expr = 42;
+        StdExtension std_extension = 43;
+        StdMeta std_meta = 44;
+        StdMthd std_mthd = 45;
+        Symbol symbol = 46;
+        Sysval sysval = 47;
+        TblObject tbl_object = 48;
+        Template template = 49;
+        Tuple tuple = 50;
+        TupleExpr tuple_expr = 51;
+        IndexedMeta indexed_meta = 52;
+        StdOprn std_oprn = 53;
+        TopEnv top_env = 54;
+        MIActor mi_actor = 55;
+        AtomicDescriptor atomic_descriptor = 56;
+        ReflectiveMthd reflective_mthd = 57;
+        ProductType product_type = 58;
+        SumType sum_type = 59;
+        MultiMethod multi_method = 60;
+    }
+}

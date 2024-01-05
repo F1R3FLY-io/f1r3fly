@@ -1,0 +1,25 @@
+new simpleInsertTest, simpleInsertTestReturnID,
+     ri(`rho:registry:insertArbitrary`),
+     stdout(`rho:io:stdout`),
+     stdoutAck(`rho:io:stdoutAck`), ack in {
+         simpleInsertTest!(*simpleInsertTestReturnID) |
+         for(@idFromTest1 <- simpleInsertTestReturnID) {
+             ack!(idFromTest1)
+         } |
+
+         contract simpleInsertTest(registryIdentifier) = {
+             stdout!("REGISTRY_SIMPLE_INSERT_TEST: create arbitrary process X to store in the registry") |
+             new X, Y, innerAck in {
+                 stdoutAck!(*X, *innerAck) |
+                 for(_ <- innerAck){
+                     stdout!("REGISTRY_SIMPLE_INSERT_TEST: adding X to the registry and getting back a new identifier") |
+                     ri!(*X, *Y) |
+                     for(@uri <- Y) {
+                         stdout!("REGISTRY_SIMPLE_INSERT_TEST: got an identifier for X from the registry") |
+                         stdout!(uri) |
+                         registryIdentifier!(uri)
+                     }
+                 }
+             }
+         }
+     }

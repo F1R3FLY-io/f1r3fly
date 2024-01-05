@@ -1,0 +1,41 @@
+new
+  rl(`rho:registry:lookup`), RhoSpecCh,
+  AuthKeyCh,
+  stdlog(`rho:io:stdlog`),
+  testSuccess,
+  testFailure,
+  ackCh,
+  protectedChannel
+in {
+  stdlog!("info", "Starting AuthKey test") |
+  rl!(`rho:id:zphjgsfy13h1k85isc8rtwtgt3t9zzt5pjd5ihykfmyapfc4wt3x5h`, *RhoSpecCh) |
+  rl!(`rho:rchain:authKey`, *AuthKeyCh) |
+  for(@(_, RhoSpec) <- RhoSpecCh & @(_, AuthKey) <- AuthKeyCh) {
+    stdlog!("info", "RhoSpec and AuthKey found") |
+    @RhoSpec!("testSuite",
+      [
+        ("pass the check for a matching key", *testSuccess),
+        ("fail the check for a non-matching key", *testFailure),
+      ]) |
+
+    contract testSuccess(rhoSpec, _, ackCh) = {
+      new keyShape, ret, checkOk in {
+        @AuthKey!("make", *keyShape, *ret) |
+        for (key <- ret) {
+          @AuthKey!("check", *key, *keyShape, *checkOk) |
+          rhoSpec!("assert", (true, "== <-", *checkOk), "check succeeded", *ackCh)
+        }
+      }
+    } |
+
+    contract testFailure(rhoSpec, _, ackCh) = {
+      new keyShape, notQuiteTheShape, ret, checkOk in {
+        @AuthKey!("make", *keyShape, *ret) |
+        for (key <- ret) {
+          @AuthKey!("check", *key, *notQuiteTheShape, *checkOk) |
+          rhoSpec!("assert", (false, "== <-", *checkOk), "check failed", *ackCh)
+        }
+      }
+    }
+  }
+}

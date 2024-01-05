@@ -1,0 +1,26 @@
+new map, stdout(`rho:io:stdout`) in {
+   // Create a map
+   map!({}) |
+
+   // Insert a key-value pair into the map
+   for(@m <- map) {
+     map!(m.set('key1', 'value1')) |
+     stdout!("Inserted 'key1' with 'value1' into the map.")
+   } |
+
+   // Retrieve the value associated with a key from the map
+   for(m <- map) {
+     new lookupResponse in {
+       m!("get", 'key1', *lookupResponse) |
+       for(@value <- lookupResponse) {
+         stdout!(value)
+       }
+     }
+   } |
+
+   // Remove a key-value pair from the map
+   for(@m <- map) {
+     map!(m.delete('key1')) |
+     stdout!("Removed 'key1' from the map.")
+   }
+ }

@@ -1,0 +1,71 @@
+new updateTestResult in {
+  // Start test in the passing state
+  @"testResult"!(true) |
+  
+  // AND together the assertions
+  contract updateTestResult(@bool, return) = {
+    for(@r <- @"testResult") {
+      match [r, bool] {
+        [true, true] => { @"testResult"!(true) | return!(true) }
+        _ => { @"testResult"!(false) | return!(false) }
+      }
+    }
+  } |
+  
+  contract @"CellDemo"(_) = {
+    new MakeCell in {
+      // Makes a single cell in which you can store values
+      contract MakeCell(@init, get, set) = {
+        new valueStore in {
+          // Store the initial value in the db
+          valueStore!(init) |
+          
+          // Listen on the get channel for an ack channel
+          contract get(ack) = {
+            // Destructively read the current value out of the db
+            for(@value <- valueStore) {
+              // Write the value back in and send it on the ack channel
+              valueStore!(value) | ack!(value)
+            }
+          } |
+          
+          // Listen on the set channel for a new value and an ack channel
+          contract set(@newValue, ack) = {
+            // Destructively read the current value out of the db and discard it
+            for(_ <- valueStore) {
+              // Write the new value into the database and notify caller that we're done
+              valueStore!(newValue) | ack!(true)
+            }
+          }
+        }
+      } |
+
+      // Cell usage.
+      new myGet, mySet in {
+        // Start the cell with the value 123
+        MakeCell!(123, *myGet, *mySet) |
+        new ack in {
+          // Get the value
+          myGet!(*ack) |
+          for (@result <- ack) {
+            // It should be 123
+            updateTestResult!(result == 123, *ack) |
+            for (_ <- ack) {
+              // Set the value to 456
+              mySet!(456, *ack) |
+              for (_ <- ack) {
+                // Get the value
+                myGet!(*ack) |
+                for (@result <- ack) {
+                  // It should be 456
+                  updateTestResult!(result == 456, *ack)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } |
+  @"CellDemo"!(Nil)
+}

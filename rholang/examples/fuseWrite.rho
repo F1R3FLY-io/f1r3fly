@@ -1,0 +1,39 @@
+new MapStore, stdout(`rho:io:stdout`) in {
+   contract MapStore(@action, @key, @value, return) = {
+     new map(`rho:registry:RHO_MAP`) in {
+       match action {
+         "create" => {
+           stdout!("create called") |
+           map!({key: value}) |
+           return!(("Created map with key", key, "and value", value))
+         }
+         "update" => {
+           for(@m <- map) {
+             map!(m.set(key, value)) |
+             return!(("Updated map with key", key, "and value", value))
+           }
+         }
+         "delete" => {
+           for(@m <- map) {
+             map!(m.delete(key)) |
+             return!(("Deleted key", key, "from map"))
+           }
+         }
+         _ => {
+           return!(("Invalid action"))
+         }
+       }
+     }
+   } |
+
+   // Test the contract
+   new ret in {
+     stdout!("asfdadfadsfadsdas") |
+     MapStore!("create", "key1", "value1", *ret) |
+     for(@msg <- ret) { 
+        stdout!(msg) |
+        stdout!("this actually got hit")
+        } |
+     stdout!("asfdadfadsfadsdas")
+   }
+ }

@@ -1,0 +1,9 @@
+new orExample, stdout(`rho:io:stdout`) in {
+  contract orExample(@record) = {
+    match record {
+     {{"name" : {name /\ String},  "age": {age /\ {Int \/ String}}}} => stdout!(["Hello, ", name, " aged ", age])
+    }
+  } |
+  orExample!({"name" : "Joe", "age": 40}) |
+  orExample!({"name": "Bob", "age": "41"})
+}

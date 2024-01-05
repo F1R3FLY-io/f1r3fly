@@ -1,0 +1,15 @@
+new simpleLookupTest,
+     rl(`rho:registry:lookup`),
+     stdout(`rho:io:stdout`),
+     stdoutAck(`rho:io:stdoutAck`), ack in {
+         contract simpleLookupTest(@uri, result) = {
+             stdout!("REGISTRY_SIMPLE_LOOKUP_TEST: looking up X in the registry using identifier") |
+             new lookupResponse in {
+                 rl!(uri, *lookupResponse) |
+                 for(@val <- lookupResponse) {
+                     stdout!("REGISTRY_SIMPLE_LOOKUP_TEST: got X from the registry using identifier") |
+                     stdoutAck!(val, *result)
+                 }
+             }
+         }
+     }

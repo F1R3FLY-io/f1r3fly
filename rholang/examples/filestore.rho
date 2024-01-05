@@ -1,0 +1,20 @@
+new AddData, GetData, store, stdout(`rho:io:stdout`) in {
+   contract AddData(@key, @data, ack) = {
+     for (@map <- store) {
+       store!(map.set(key, data)) | ack!(Nil)
+     }
+   } |
+   contract GetData(@key, ret) = {
+     for (@map <- store) {
+       ret!(map.get(key))
+     }
+   } |
+   store!(new Map()) |
+   new uriAddData, uriGetData, register(`rho:registry:insertArbitrary`) in {
+     register!(bundle+{*AddData}, *uriAddData) |
+     register!(bundle+{*GetData}, *uriGetData) |
+     for (@uri1 <- uriAddData; @uri2 <- uriGetData) {
+       stdout!({"AddData URI": uri1, "GetData URI": uri2})
+     }
+   }
+ }

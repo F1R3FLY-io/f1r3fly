@@ -1,0 +1,10 @@
+[Unit]
+Description=RChain Node
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/rnode run --data-dir=/var/lib/rnode
+User=rnode
+
+[Install]
+WantedBy=multi-user.target
