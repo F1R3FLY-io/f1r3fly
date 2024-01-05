@@ -18,16 +18,19 @@ import coop.rchain.rholang.interpreter.RholangAndScalaDispatcher.RhoDispatch
 import coop.rchain.rholang.interpreter.Substitute.{charge => _, _}
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors._
-import coop.rchain.rholang.interpreter.matcher.SpatialMatcher.spatialMatchResult
+// import coop.rchain.rholang.interpreter.matcher.SpatialMatcher.spatialMatchResult
 import coop.rchain.rspace.util.unpackOptionWithPeek
 import coop.rchain.models.syntax._
-import coop.rchain.shared.{Base16, Serialize}
+import coop.rchain.shared.{Base16, Log, Serialize}
 import monix.eval.Coeval
 import scalapb.GeneratedMessage
 
 import scala.collection.SortedSet
 import scala.collection.immutable.BitSet
 import scala.util.Try
+
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+import cats.effect.Concurrent
 
 /** Reduce is the interface for evaluating Rholang expressions.
   *
@@ -42,7 +45,7 @@ trait Reduce[M[_]] {
 
 }
 
-class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
+class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
     space: RhoTuplespace[M],
     dispatcher: => RhoDispatch[M],
     urnMap: Map[String, Par],
@@ -69,11 +72,15 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
   ): M[Unit] =
     updateMergeableChannels(chan) *>
       space.produce(chan, data, persist = persistent) >>= { produceResult =>
-      continue(
-        unpackOptionWithPeek(produceResult),
-        produce(chan, data, persistent),
-        persistent
-      )
+      {
+        // Log[M].debug("produceResult in Reduce produce: " + produceResult) *>
+        //   Sync[M].delay(println("produceResult in Reduce produce: " + produceResult)) *>
+        continue(
+          unpackOptionWithPeek(produceResult),
+          produce(chan, data, persistent),
+          persistent
+        )
+      }
     }
 
   /**
@@ -99,27 +106,42 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
         persist = persistent,
         if (peek) SortedSet(sources.indices: _*) else SortedSet.empty[Int]
       ) >>= { consumeResult =>
-      continue(
-        unpackOptionWithPeek(consumeResult),
-        consume(binds, body, persistent, peek),
-        persistent
-      )
+      {
+        // Log[M].debug(
+        //   "consumeResult in Reduce consume: " + consumeResult + "\npeek in Reduce consume: " + peek
+        // ) *>
+        // Sync[M].delay(println("consumeResult in Reduce consume: " + consumeResult)) *>
+        continue(
+          unpackOptionWithPeek(consumeResult),
+          consume(binds, body, persistent, peek),
+          persistent
+        )
+      }
     }
   }
 
   private[this] def continue(res: Application, repeatOp: M[Unit], persistent: Boolean): M[Unit] =
     res match {
-      case Some((continuation, dataList, _)) if persistent =>
+      case Some((continuation, dataList, _)) if persistent => {
+        // Log[M].debug("Calling dispatchAndRun with repeatOp in Reduce") *>
         dispatchAndRun(continuation, dataList)(
           repeatOp
         )
-      case Some((continuation, dataList, peek)) if peek =>
+      }
+      case Some((continuation, dataList, peek)) if peek => {
+        // Log[M].debug("Calling dispatchAndRun with producePeeks in Reduce") *>
         dispatchAndRun(continuation, dataList)(
           producePeeks(dataList): _*
         )
-      case Some((continuation, dataList, _)) =>
+      }
+      case Some((continuation, dataList, _)) => {
+        // Log[M].debug("Calling dispatch in Reduce") *>
         dispatch(continuation, dataList)
-      case None => Sync[M].unit
+      }
+      case None => {
+        // Log[M].debug("returning None in Reduce") *>
+        Sync[M].unit
+      }
     }
 
   private[this] def dispatchAndRun(
@@ -351,9 +373,11 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
         cases match {
           case Nil => ().asRight[(Par, Seq[MatchCase])].pure[M]
           case singleCase +: caseRem =>
+            val rspacePlusPlus = new RSpacePlusPlus_RhoTypes[M]()
             for {
-              pattern     <- substituteAndCharge[Par, M](singleCase.pattern, depth = 1, env)
-              matchResult <- spatialMatchResult[M](target, pattern)
+              pattern <- substituteAndCharge[Par, M](singleCase.pattern, depth = 1, env)
+              // matchResult <- spatialMatchResult[M](target, pattern)
+              matchResult <- rspacePlusPlus.spatialMatchResult(target, pattern)
               res <- matchResult match {
                       case None =>
                         (target, caseRem).asLeft[Unit].pure[M]
@@ -606,11 +630,13 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
           } yield GBool(b1 || b2)
 
         case EMatchesBody(EMatches(target, pattern)) =>
+          val rspacePlusPlus = new RSpacePlusPlus_RhoTypes[M]()
           for {
             evaledTarget <- evalExpr(target)
             substTarget  <- substituteAndCharge[Par, M](evaledTarget, depth = 0, env)
             substPattern <- substituteAndCharge[Par, M](pattern, depth = 1, env)
-            matchResult  <- spatialMatchResult[M](substTarget, substPattern)
+            // matchResult  <- spatialMatchResult[M](substTarget, substPattern)
+            matchResult <- rspacePlusPlus.spatialMatchResult(substTarget, substPattern)
           } yield GBool(matchResult.isDefined)
 
         case EPercentPercentBody(EPercentPercent(p1, p2)) =>

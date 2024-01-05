@@ -9,6 +9,9 @@ import coop.rchain.models._
 import coop.rchain.rholang.interpreter.RhoRuntime.RhoTuplespace
 import coop.rchain.rholang.interpreter.accounting._
 
+import coop.rchain.shared.Log
+import cats.effect.Concurrent
+
 trait Dispatch[M[_], A, K] {
   def dispatch(continuation: K, dataList: Seq[A]): M[Unit]
 }
@@ -45,7 +48,7 @@ class RholangAndScalaDispatcher[M[_]] private (
 object RholangAndScalaDispatcher {
   type RhoDispatch[F[_]] = Dispatch[F, ListParWithRandom, TaggedContinuation]
 
-  def apply[M[_]: Sync: Parallel: _cost](
+  def apply[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       tuplespace: RhoTuplespace[M],
       dispatchTable: => Map[Long, Seq[ListParWithRandom] => M[Unit]],
       urnMap: Map[String, Par],

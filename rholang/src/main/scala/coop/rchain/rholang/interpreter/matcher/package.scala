@@ -37,6 +37,19 @@ package object matcher {
   ): F[Stream[(FreeMap, A)]] =
     StreamT.run(f.run(emptyMap))
 
+  /*
+
+The `runFirst` function performs the following steps:
+
+1. It starts with a `MatcherMonadT[F, A]`, which represents a computation that produces a stream of `(FreeMap, A)` pairs within the monad `F`.
+2. It calls `f.run(emptyMap)`, which runs the computation with an initial empty state (`emptyMap`).
+3. `StreamT.dropTail` is applied to the result, which removes the tail of the stream, effectively turning it into a stream that produces at most one element.
+4. `StreamT.run` is then called on the result of `dropTail`, which flattens the stream out of the `StreamT` transformer, yielding an `F[Stream[(FreeMap, A)]]`.
+5. Finally, it maps over the resulting stream and takes the `headOption`, which extracts the first element of the stream if it exists, resulting in an `F[Option[(FreeMap, A)]]`.
+
+The `runFirst` function is used to run the computation and get the first result of the stream, along with the state associated with that result, all within the context of the monad `F`.
+
+   */
   private[rholang] def runFirst[F[_]: Monad, A](
       f: MatcherMonadT[F, A]
   ): F[Option[(FreeMap, A)]] =

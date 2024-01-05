@@ -26,6 +26,8 @@ import java.nio.file.{Files, Path}
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable.{BitSet, Seq}
 
+import rspacePlusPlus.{ISpacePlusPlus, RSpacePlusPlus_RhoTypes}
+
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(value = 1)
 @Warmup(iterations = 1)
@@ -116,22 +118,24 @@ object BasicBench {
     implicit val kvm                                            = RholangCLI.mkRSpaceStoreManager[Task](dbDir).runSyncUnsafe()
     val rSpaceStore                                             = kvm.rSpaceStores.runSyncUnsafe()
 
-    val testSpace: ISpace[
-      Task,
-      Par,
-      BindPattern,
-      ListParWithRandom,
-      TaggedContinuation
-    ] =
-      RSpace
-        .create[
-          Task,
-          Par,
-          BindPattern,
-          ListParWithRandom,
-          TaggedContinuation
-        ](rSpaceStore)
-        .unsafeRunSync
+    // val testSpace: ISpace[
+    //   Task,
+    //   Par,
+    //   BindPattern,
+    //   ListParWithRandom,
+    //   TaggedContinuation
+    // ] =
+    //   RSpace
+    //     .create[
+    //       Task,
+    //       Par,
+    //       BindPattern,
+    //       ListParWithRandom,
+    //       TaggedContinuation
+    //     ](rSpaceStore)
+    //     .unsafeRunSync
+
+    val testSpace = new RSpacePlusPlus_RhoTypes[Task]()
 
     implicit val cost = CostAccounting.initialCost[Task](Cost.UNSAFE_MAX).unsafeRunSync
 

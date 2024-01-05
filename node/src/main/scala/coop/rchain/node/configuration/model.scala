@@ -99,8 +99,9 @@ final case class DevConf(
 )
 
 sealed trait Command
-final case class Eval(files: List[String], printUnmatchedSendsOnly: Boolean) extends Command
-final case object Repl                                                       extends Command
+final case class Eval(files: List[String], printUnmatchedSendsOnly: Boolean, language: String)
+    extends Command
+final case object Repl extends Command
 final case class Deploy(
     phloLimit: Long,
     phloPrice: Long,

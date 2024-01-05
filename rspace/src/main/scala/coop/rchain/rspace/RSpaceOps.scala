@@ -134,6 +134,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
       channels: Seq[C],
       wc: WaitingContinuation[P, K]
   ): F[MaybeActionResult] =
+    // println("Hit storeWaitingContinuation");
     for {
       _ <- store.putContinuation(channels, wc)
       _ <- channels.traverse(channel => store.putJoin(channel, channels))
@@ -227,6 +228,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
   ): F[MaybeActionResult] =
     ContextShift[F].evalOn(scheduler) {
       (for {
+        toMap      <- storeAtom.get().toMap
+        _          <- Sync[F].delay(println("toMap: " + toMap))
         produceRef <- Sync[F].delay(Produce(channel, data, persist))
         result <- produceLockF(channel)(
                    lockedProduce(channel, data, persist, produceRef)
@@ -416,14 +419,17 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
         case channels :: remaining =>
           for {
             matchCandidates <- fetchMatchingContinuations(channels)
+            // _               = println("matchCandidates: " + matchCandidates);
             channelToIndexedDataList <- channels.traverse { c: C =>
                                          fetchMatchingData(c)
                                        }
+            // _ = println("channelToIndexedDataList: " + channelToIndexedDataList);
             firstMatch <- extractFirstMatch(
                            channels,
                            matchCandidates,
                            channelToIndexedDataList.toMap
                          )
+            // _ = println("firstMatch: " + firstMatch)
           } yield firstMatch match {
             case None             => remaining.asLeft[MaybeProduceCandidate]
             case produceCandidate => produceCandidate.asRight[Seq[CandidateChannels]]

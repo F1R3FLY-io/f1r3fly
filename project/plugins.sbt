@@ -1,6 +1,8 @@
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 // Yes it's weird to do the following, but it's what is mandated by the scalapb documentation
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.11"
+libraryDependencies += "net.java.dev.jna"     % "jna"             % "5.13.0"
+libraryDependencies += "net.java.dev.jna"     % "jna-platform"    % "5.13.0"
 
 addSbtPlugin("com.typesafe.sbt"       % "sbt-license-report"   % "1.2.0")
 addSbtPlugin("org.wartremover"        % "sbt-wartremover"      % "3.1.5")

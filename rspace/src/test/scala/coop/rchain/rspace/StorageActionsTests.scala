@@ -274,6 +274,8 @@ trait StorageActionsTests[F[_]]
 
     for {
       r1 <- space.produce(produceKey1.head, "datum1", persist = false)
+      // map <- space.toMap
+      // _   = println(map)
       d1 <- store.getData(produceKey1.head)
       _ = d1 shouldBe List(
         Datum.create(produceKey1.head, "datum1", persist = false)
@@ -674,8 +676,10 @@ trait StorageActionsTests[F[_]]
       _  = r1 shouldBe None
 
       // Data exists so the write will not "stick"
-      r2            <- space.consume(key, List(Wildcard), new StringsCaptor, persist = true)
-      _             = r2 shouldBe defined
+      r2 <- space.consume(key, List(Wildcard), new StringsCaptor, persist = true)
+      _  = r2 shouldBe defined
+      _  = println("\n" + r2 + "\n")
+      // Some((ContResult(<function1>,true,List(ch1),List(Wildcard),false),List(Result(ch1,datum,datum,false))))
       insertActions <- store.changes.map(collectActions[InsertAction])
       _             = insertActions shouldBe empty
 
@@ -719,8 +723,10 @@ trait StorageActionsTests[F[_]]
 
         r4 <- space.produce(key.head, "datum2", persist = false)
         _  = r4 shouldBe defined
-        _  <- store.getData(key.head).map(_ shouldBe Nil)
-        _  <- store.getContinuations(key).map(_ should not be empty)
+        _  = println("\n" + r4 + "\n")
+        // Some((ContResult(<function1>,true,List(ch1),List(Wildcard),false),List(Result(ch1,datum2,datum2,false))))
+        _ <- store.getData(key.head).map(_ shouldBe Nil)
+        _ <- store.getContinuations(key).map(_ should not be empty)
 
         _ = runK(unpackOption(r4))
       } yield getK(r4).continuation.results should contain theSameElementsAs List(List("datum2"))
@@ -851,6 +857,8 @@ trait StorageActionsTests[F[_]]
             ))
         _ <- store.getContinuations(List("ch1")) map (_ shouldBe Nil)
         _ = r4 shouldBe defined
+        _ = println("\n" + r4 + "\n")
+        // Some((ContResult(<function1>,true,List(ch1),List(Wildcard),false),List(Result(ch1,datum2,datum2,false))))
 
         _ = runK(unpackOption(r4))
         _ = getK(r4).continuation.results should contain oneOf (List("datum1"), List("datum2"), List(

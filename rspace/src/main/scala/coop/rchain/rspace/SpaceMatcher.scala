@@ -81,10 +81,16 @@ private[rspace] trait SpaceMatcher[F[_], C, P, A, K] extends ISpace[F, C, P, A, 
               case (channel, pattern) +: tail =>
                 for {
                   maybeTuple <- channelToIndexedData.get(channel) match {
-                                 case Some(indexedData) =>
+                                 case Some(indexedData) => {
+                                   //  println(
+                                   //    "Calling findMatchingDataCandidate in extractDataCandidates"
+                                   //  );
                                    findMatchingDataCandidate(channel, indexedData, pattern, Nil)
-                                 case None =>
+                                 }
+                                 case None => {
+                                   //  println("Returning None in extractDataCandidates");
                                    none[(ConsumeCandidate[C, A], Seq[(Datum[A], Int)])].pure[F]
+                                 }
                                }
                   dataCandidates <- maybeTuple match {
                                      case Some((cand, rem)) =>
@@ -121,6 +127,7 @@ private[rspace] trait SpaceMatcher[F[_], C, P, A, K] extends ISpace[F, C, P, A, 
                                           channelToIndexedData,
                                           Nil
                                         ).map(_.sequence)
+                  // _ = println("\nmaybeDataCandidates: " + maybeDataCandidates);
                   produceCandidates <- maybeDataCandidates match {
                                         case None =>
                                           extractFirstMatch(

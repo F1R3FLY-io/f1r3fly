@@ -52,10 +52,10 @@ abstract class RhoBenchBaseState {
 
   def createRuntime =
     for {
-      kvm                         <- RholangCLI.mkRSpaceStoreManager[Task](dbDir)
-      store                       <- kvm.rSpaceStores
-      spaces                      <- Resources.createRuntimes[Task](store)
-      (runtime, replayRuntime, _) = spaces
+      kvm                      <- RholangCLI.mkRSpaceStoreManager[Task](dbDir)
+      store                    <- kvm.rSpaceStores
+      spaces                   <- Resources.createRuntimes[Task](store)
+      (runtime, replayRuntime) = spaces
     } yield (runtime, replayRuntime)
 
   @Setup(value = Level.Iteration)

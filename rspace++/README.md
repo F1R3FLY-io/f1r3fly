@@ -1,12 +1,74 @@
-## Notes: Rust + Scala
-
-- Using `jna`, `prost`, `heed`, `dashmap`
+# RSpace++
 
 ## Quickstart
 
-1. `cd rspace++` & run `cargo build && cargo build --release`
-2. `cd ..` to be in root directory and run `sbt rspacePlusPlus/run`. &nbsp; `rspacePlusPlus/run` if already in sbt shell
-3. Run Scala tests: In root directory run `sbt rspacePlusPlus/test`. &nbsp; `rspacePlusPlus/test` if already in sbt shell
+Starting standalone node using RSpace++
+1. `sbt clean compile stage` May need to run: `chmod +x ./scripts/build_rspace++.sh` first
+2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release  run --standalone` in one terminal
+3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release eval rholang/examples/stdout.rho`
+
+Standing up network using RSpace++
+1. `sbt ";clean ;compile ;project node ;assembly"`
+2. `./scripts/start_shard.sh` May need to run: `chmod +x ./scripts/start_shard.sh` first
+
+Standing up network using RSpace++ (Under Docker)
+1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell). May need to run: `chmod +x ./scripts/build_rspace++_docker.sh` first
+2. `docker compose -f docker/shard.yml up`
+
+### Working Rholang Contracts using RSpace++ (under standalone node)
+
+I have classified these as "working" if the output and deployment cost matches that of the old RSpace code.
+
+- `block-data.rho`
+- `dupe.rho`
+- `hello_world_again.rho`
+- `longfast.rho`
+- `longslow.rho`
+- `shortfast.rho`
+- `shortslow.rho`
+- `stderr.rho`
+- `stderrAck.rho`
+- `stdout.rho`
+- `stdoutAck.rho`
+- `tut-bytearray-methods.rho`
+- `tut-hash-functions.rho`
+- `tut-hello-again.rho`
+- `tut-hello.rho`
+- `tut-lists-methods.rho`
+- `tut-maps-methods.rho`
+- `tut-parens.rho`
+- `tut-philosophers.rho`
+- `tut-prime.rho`
+- `tut-rcon-or.rho`
+- `tut-rcon.rho`
+- `tut-registry.rho` (Apparently this doesn't work with the old RSpace code)
+- `tut-sets-methods.rho`
+- `tut-strings-methods.rho`
+- `tut-tuples-methods.rho`
+
+### Testing Scala (using RSpace++)
+
+- Run Rholang Reduce tests: `sbt "rholang/testOnly coop.rchain.rholang.interpreter.ReduceSpec"`
+- Run basic RSpace-Bench Benchmark: `sbt "rspaceBench/jmh:run -i 10 -wi 10 -f1 -t1 .BasicBench."`
+
+### Testing Rust (within rspace++ directory)
+
+- Run all Spatial Matcher Tests: `cargo test matcher::match_test -- --test-threads=1`
+- Run Storage Actions Tests: `cargo test --test storage_actions_test`
+
+## Scala and Rust Notes
+
+- Using Scala: `jna`; Rust: `prost`, `heed`, `dashmap`, `blake3`, `serde`. See `Cargo.toml` for complete list of crates.
+
+## Rust
+
+- Within rspace++ directory, `cargo build --release -p rspace_plus_plus_rhotypes` to build `rspace_plus_plus` library. Outputs to `rspace++/target/release/`. Scala code pulls from here.
+
+#### Notes
+
+- `rustc <path_to_file>` to compile single rust file
+- Run specific test file sequentially: `cargo test --test my_test_file -- --test-threads=1`
+- Add `-- --nocapture` flag to print output during tests. Example: `cargo test --test my_test_file -- --nocapture`
 
 ## Scala
 
@@ -22,40 +84,10 @@
 
 - `sbt compile` will compile entire project, also builds Rust library in `rspace++/target/release/`. This is where JNA pulls library 
 
-- Integrating new rspace++ into rnode setup, I think, will happen in `node/src/main/scala/coop/rchain/node/runtime/Setup.scala`
-
 - `scalafmt <file_path>` to format `.scala` file
 
-## Rust
+### Notes
 
-- Run sample code: `cargo run` within `rspace++` directory
-- `rustc <path_to_file>` to compile single rust file
-- `cargo build --release` to build `rspace_plus_plus` library. Outputs to `rspace++/target/release/`. Scala code pulls from here.
-- `cargo build` to build corresponding `.proto` file for Rust. Outputs to `rspace++/target/debug/`
-
-<br>
-
-- Run tests sequentially: `cargo test -- --test-threads=1` within `rspace++` directory.
-- Run specific test file sequentially: `cargo test --test my_test_file -- --test-threads=1` within `rspace++` directory.
-- `cargo test --test my_test_file -- --test-threads=1` tests all the functions in a single file
-
-## Backlog
-
-1. Wire in RSpace++ into existing RSpace and Rholang tests
-2. Handle continuation data type. Currently string. See RhoTypes.proto. See original code and tutorial. Talk to Greg
-3. Revist core database code and reduce cloning? Utilize references?
-4. Re-implement concurrency and sequential testing in `rspace_test.rs` 
-5. `space_print` function in `lib.rs` should not require channel parameter
-6. Create proto message and function to handle rholang processes
-7. Add changelog. See `changelog` branch
-8. Remove console logs throughout database code?
-9. Implement common syntax for all crate imports
-
-## Completed
-
-- Rename cityMatchCase to getCityField and cityPattern to cityMatchCase (plus other two cases)
-- Refactor "Setup" code in Rust test files to be one shared file throughout
-- Create convenient name schema for proto messages throught Rust, Scala and test code
-- Optimize loops marked with TODO: in memory databases
-- Get working correct return types from Rust functions in Scala
-- Rewrite Rust rspace unit tests to match current API
+- In Rust, `*const u8` is a raw pointer to a sequence of bytes of type `u8`. The `*` indicates that it's a pointer, which means it holds a memory address that points to the beginning of the sequence of bytes. The `const` keyword means that the pointer is immutable, and cannot be used to modify the bytes it points to. The `u8` type represents an unsigned 8-bit integer, which means it can hold values between 0 and 255.
+- In Rust, `usize` is an unsigned integer type that is guaranteed to be the same size as a pointer on the target platform. `usize` is commonly used to represent sizes and indices in memory, such as the size of a buffer or the index of an element in an array.
+- In Rust, `&[u8]` is a reference to a slice of bytes. The `&` symbol indicates that it's a reference, which means it's a pointer to a block of memory that holds the slice of bytes. The `[]` syntax indicates that it's a slice, which means it represents a contiguous sequence of elements of type `u8`. Slices are dynamically sized, which means they can hold a variable number of elements. A slice can be created from an array, a vector, a string, or any other data structure that provides a contiguous block of memory.

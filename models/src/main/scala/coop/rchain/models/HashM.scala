@@ -98,6 +98,7 @@ object HashM extends HashMDerivation {
   }
 
   implicit val Env: HashM[Map[String, Par]] = opaqueHash
+  implicit val Env1: HashM[Map[Int, Par]]   = opaqueHash
   implicit val ParHash: HashM[Par]          = gen[Par]
   implicit val ExprHash                     = gen[Expr]
   implicit val VarHash                      = gen[Var]

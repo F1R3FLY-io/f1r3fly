@@ -10,9 +10,12 @@ import coop.rchain.models._
 import coop.rchain.rholang.interpreter.RhoRuntime.RhoTuplespace
 import coop.rchain.rholang.interpreter.accounting._
 
+import coop.rchain.shared.Log
+import cats.effect.Concurrent
+
 object RholangOnlyDispatcher {
 
-  def apply[F[_]: Sync: Parallel: _cost](
+  def apply[F[_]: Sync: Parallel: Log: Concurrent: _cost](
       tuplespace: RhoTuplespace[F],
       urnMap: Map[String, Par],
       mergeChs: Ref[F, Set[Par]]
@@ -27,7 +30,7 @@ object RholangOnlyDispatcher {
     (dispatcher, reducer)
   }
 
-  def apply[F[_]: Sync: Parallel: _cost](
+  def apply[F[_]: Sync: Parallel: Log: Concurrent: _cost](
       tuplespace: RhoTuplespace[F],
       urnMap: Map[String, Par] = Map.empty
   ): (Dispatch[F, ListParWithRandom, TaggedContinuation], DebruijnInterpreter[F]) = {

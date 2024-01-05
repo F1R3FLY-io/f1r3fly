@@ -22,7 +22,7 @@ trap 'sleep 3; pkill java' SIGINT
 # shellcheck disable=SC2012
 rnode=$(ls -t ./node/target/scala-2.12/rnode-assembly-*.jar | head -1) 2>&1 # grab most recent jar file
 
-runRnode="java --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar ${rnode}"
+runRnode="java -Djna.library.path=./rspace++/target/release --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar ${rnode}"
 rNodeParams="--no-upnp --host localhost"
 
 # jar file execution configuration:

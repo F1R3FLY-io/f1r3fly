@@ -10,15 +10,19 @@ private[matcher] object ParSpatialMatcherUtils {
     par.withExprs(noFrees(par.exprs))
 
   def noFrees(exprs: Seq[Expr]): Seq[Expr] =
+    // println("calling no free");
     exprs.filter({ (expr) =>
-      expr.exprInstance match {
-        case EVarBody(EVar(v)) =>
-          v.varInstance match {
-            case FreeVar(_)  => false
-            case Wildcard(_) => false
-            case _           => true
-          }
-        case _ => true
+      {
+        // println(expr);
+        expr.exprInstance match {
+          case EVarBody(EVar(v)) =>
+            v.varInstance match {
+              case FreeVar(_)  => false
+              case Wildcard(_) => false
+              case _           => true
+            }
+          case _ => true
+        }
       }
     })
 
@@ -38,6 +42,10 @@ private[matcher] object ParSpatialMatcherUtils {
     val unfMax     = math.min(max.unforgeables, par.unforgeables.size - minPrune.unforgeables)
     val bundleMax  = math.min(max.bundles, par.bundles.size - minPrune.bundles)
 
+    // println("min.sends: " + min.sends)
+    // println("par.sends.size: " + par.sends.size)
+    // println("maxPrune.sends: " + maxPrune.sends)
+    // println(par.sends.size - maxPrune.sends)
     val sendMin    = math.max(min.sends, par.sends.size - maxPrune.sends)
     val receiveMin = math.max(min.receives, par.receives.size - maxPrune.receives)
     val newMin     = math.max(min.news, par.news.size - maxPrune.news)
@@ -46,8 +54,13 @@ private[matcher] object ParSpatialMatcherUtils {
     val unfMin     = math.max(min.unforgeables, par.unforgeables.size - maxPrune.unforgeables)
     val bundleMin  = math.max(min.bundles, par.bundles.size - maxPrune.bundles)
 
+    // println("sendMin: " + sendMin)
+    // println("sendMax: " + sendMax)
+
     for {
-      subSends    <- minMaxSubsets(par.sends, sendMin, sendMax)
+
+      subSends <- minMaxSubsets(par.sends, sendMin, sendMax)
+      // _           = println("\n subSends: " + subSends)
       subReceives <- minMaxSubsets(par.receives, receiveMin, receiveMax)
       subNews     <- minMaxSubsets(par.news, newMin, newMax)
       subExprs    <- minMaxSubsets(par.exprs, exprMin, exprMax)
@@ -98,6 +111,9 @@ private[matcher] object ParSpatialMatcherUtils {
       }
 
     def worker(as: Seq[A], minSize: Int, maxSize: Int): Stream[(Seq[A], Seq[A], Int)] =
+      // println("\n as: " + as)
+      // println("minSize: " + minSize)
+      // println("maxSize: " + maxSize)
       if (maxSize < 0)
         Stream.empty
       else if (minSize > maxSize)

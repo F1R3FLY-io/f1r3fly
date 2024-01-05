@@ -3,10 +3,13 @@ name = "rspace_plus_plus"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["libs/rspace_rhotypes"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+# [lib]
+# crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 bincode = "1.0"
@@ -15,6 +18,24 @@ serde = "1.0.156"
 serde_json = "1.0"
 dashmap = "5.4.0"
 prost = "0.11.9"
+bit-set = "0.5.3"
+monadic = "0.5.5"
+futures = "0.3"
+state = "0.6.0"
+itertools = "0.10.2"
+blake2 = "0.10.6"
+tokio = { version = "1", features = ["full"] }
+rand = "0.8.5"
+blake3 = "1.5.0"
+async-trait = "0.1.74"
+
+[dependencies.uuid]
+version = "1.4.0"
+features = [
+	"v4",                # Lets you generate random UUIDs
+	"fast-rng",          # Use a faster (but still sufficiently random) RNG
+	"macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 
 [dev-dependencies]
 test-env-helpers = "0.2.2"

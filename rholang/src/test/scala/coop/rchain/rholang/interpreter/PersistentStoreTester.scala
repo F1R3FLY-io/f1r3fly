@@ -17,23 +17,27 @@ import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration._
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 final case class TestFixture(space: RhoISpace[Task], reducer: DebruijnInterpreter[Task])
 
 trait PersistentStoreTester {
   implicit val ms: Metrics.Source = Metrics.BaseSource
 
   def withTestSpace[R](f: TestFixture => R): R = {
-    implicit val logF: Log[Task]           = new Log.NOPLog[Task]
+    // implicit val logF: Log[Task]           = new Log.NOPLog[Task]
+    implicit val log                       = Log.log[Task]
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
-    implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
+    // implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
 
     implicit val cost = CostAccounting.emptyCost[Task].unsafeRunSync
-    implicit val m    = matchListPar[Task]
-    implicit val kvm  = InMemoryStoreManager[Task]
-    val store         = kvm.rSpaceStores.unsafeRunSync
-    val space = RSpace
-      .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
-      .unsafeRunSync
+    // implicit val m    = matchListPar[Task]
+    // implicit val kvm  = InMemoryStoreManager[Task]
+    // val store         = kvm.rSpaceStores.unsafeRunSync
+    // val space = RSpace
+    //   .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+    //   .unsafeRunSync
+    val space   = new RSpacePlusPlus_RhoTypes[Task]()
     val reducer = RholangOnlyDispatcher(space)._2
     cost.set(Cost.UNSAFE_MAX).runSyncUnsafe(1.second)
 
@@ -42,7 +46,8 @@ trait PersistentStoreTester {
   }
 
   def fixture[R](f: (RhoISpace[Task], Reduce[Task]) => Task[R]): R = {
-    implicit val logF: Log[Task]           = new Log.NOPLog[Task]
+    // implicit val logF: Log[Task]           = new Log.NOPLog[Task]
+    implicit val log                       = Log.log[Task]
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
     implicit val kvm                       = InMemoryStoreManager[Task]

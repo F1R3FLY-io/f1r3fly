@@ -125,7 +125,7 @@ class ReplaySpec extends FlatSpec with Matchers {
     } yield res
 
     resources.use {
-      case (runtime, replayRuntime, _) =>
+      case (runtime, replayRuntime) =>
         // Execute operation
         op(runtime, replayRuntime)
     }

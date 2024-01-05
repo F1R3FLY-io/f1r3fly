@@ -22,6 +22,8 @@ import java.io.PrintWriter
 import java.nio.file.{Files, Path}
 import scala.io._
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 /**
   * The `merge-balance-main` would generate a csv file and the format is like below
   *
@@ -161,17 +163,19 @@ object MergeBalanceMain {
     implicit val span: NoopSpan[Task]              = NoopSpan[Task]()
     implicit val metrics: Metrics.MetricsNOP[Task] = new Metrics.MetricsNOP[Task]()
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
+    // implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
 
     val task: Task[Vector[Account]] = for {
       accountMap        <- getVaultMap(stateBalanceFile, transactionBalanceFile).pure[Task]
       rnodeStoreManager <- RNodeKeyValueStoreManager[Task](dataDir, legacyRSpaceDirSupport)
       blockStore        <- KeyValueBlockStore[Task](rnodeStoreManager)
       store             <- rnodeStoreManager.rSpaceStores
-      spaces <- RSpace
-                 .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-                   store
-                 )
+      // spaces <- RSpace
+      //            .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //              store
+      //            )
+      spaces <- RSpacePlusPlus_RhoTypes
+                 .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
       (rSpacePlay, rSpaceReplay) = spaces
       runtimes                   <- RhoRuntime.createRuntimes[Task](rSpacePlay, rSpaceReplay, true, Seq.empty, Par())
       (rhoRuntime, _)            = runtimes

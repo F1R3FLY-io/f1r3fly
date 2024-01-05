@@ -57,6 +57,7 @@ class RSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, K](
                     channelToIndexedData,
                     Nil
                   ).map(_.sequence)
+        // _  = println("options: " + options);
         wk = WaitingContinuation(patterns, continuation, persist, peeks, consumeRef)
         result <- options.fold(storeWaitingContinuation(channels, wk))(
                    dataCandidates =>
@@ -116,6 +117,7 @@ class RSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, K](
                       channel,
                       Datum(data, persist, produceRef)
                     )
+        // _ = println("extracted: " + extracted);
         r <- extracted.fold(storeData(channel, data, persist, produceRef))(processMatchFound)
       } yield r
     }

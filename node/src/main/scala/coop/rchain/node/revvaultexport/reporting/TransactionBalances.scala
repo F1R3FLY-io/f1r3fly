@@ -36,6 +36,8 @@ import coop.rchain.shared.{Base16, Log}
 import java.nio.file.{Files, Path}
 import scala.concurrent.ExecutionContext
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 object TransactionBalances {
   final case class TransactionBlockInfo(
       transaction: TransactionInfo,
@@ -207,27 +209,30 @@ object TransactionBalances {
       blockMes  = block.get
     } yield blockMes
 
+  // NOTE: Removed "implicit scheduler: ExecutionContext" parameter
   def main[F[_]: Concurrent: Parallel: ContextShift](
       dataDir: Path,
       walletPath: Path,
       bondPath: Path,
       targetBlockHash: String
-  )(implicit scheduler: ExecutionContext): F[GlobalVaultsInfo] = {
+  )(): F[GlobalVaultsInfo] = {
     val oldRSpacePath                           = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
     val legacyRSpaceDirSupport                  = Files.exists(oldRSpacePath)
     implicit val metrics: Metrics.MetricsNOP[F] = new Metrics.MetricsNOP[F]()
     import coop.rchain.rholang.interpreter.storage._
-    implicit val span: NoopSpan[F]                           = NoopSpan[F]()
-    implicit val log: Log[F]                                 = Log.log
-    implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    implicit val span: NoopSpan[F] = NoopSpan[F]()
+    implicit val log: Log[F]       = Log.log
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     for {
       rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir, legacyRSpaceDirSupport)
       blockStore        <- KeyValueBlockStore(rnodeStoreManager)
       store             <- rnodeStoreManager.rSpaceStores
-      spaces <- RSpace
-                 .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-                   store
-                 )
+      // spaces <- RSpace
+      //            .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //              store
+      //            )
+      spaces <- RSpacePlusPlus_RhoTypes
+                 .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
       (rSpacePlay, rSpaceReplay) = spaces
       runtimes <- RhoRuntime
                    .createRuntimes[F](

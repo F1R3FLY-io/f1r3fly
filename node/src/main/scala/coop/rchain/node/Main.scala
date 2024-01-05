@@ -131,8 +131,9 @@ object Main {
     implicit val time: Time[F] = effects.time
 
     val program = subcommand(options) match {
-      case Eval(files, printUnmatchedSendsOnly) =>
-        new ReplRuntime().evalProgram[F](files, printUnmatchedSendsOnly)
+      case Eval(files, printUnmatchedSendsOnly, language) => {
+        new ReplRuntime().evalProgram[F](files, printUnmatchedSendsOnly, language)
+      }
       case Repl => new ReplRuntime().replProgram[F].as(())
       case Deploy(
           phlo,
@@ -189,8 +190,13 @@ object Main {
 
   private def subcommand(options: commandline.Options): Command =
     options.subcommand match {
-      case Some(options.eval) =>
-        Eval(options.eval.fileNames(), options.eval.printUnmatchedSendsOnly())
+      case Some(options.eval) => {
+        Eval(
+          options.eval.fileNames(),
+          options.eval.printUnmatchedSendsOnly(),
+          options.eval.language()
+        )
+      }
       case Some(options.repl) => Repl
       case Some(options.deploy) =>
         import options.deploy._

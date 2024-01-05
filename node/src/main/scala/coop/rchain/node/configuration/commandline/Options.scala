@@ -602,6 +602,7 @@ final case class Options(arguments: Seq[String]) extends ScallopConf(arguments) 
 
     val fileNames               = trailArg[List[String]](required = true)(stringListConverter)
     val printUnmatchedSendsOnly = opt[Boolean](required = false)
+    val language                = opt[String](required = false, default = Some("rholang"))
   }
   addSubcommand(eval)
 

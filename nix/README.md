@@ -23,7 +23,6 @@ sh <(curl -L https://nixos.org/nix/install)
 sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
-
 Test `nix` installation
 
 ```sh
@@ -260,3 +259,8 @@ clean
 ```sh
 git clean -fdx
 ```
+
+### Using Maven locally and under Nix:
+
+* [Installing Maven on MacOS: https://www.digitalocean.com/community/tutorials/install-maven-mac-os](https://www.digitalocean.com/community/tutorials/install-maven-mac-os])
+

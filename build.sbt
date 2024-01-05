@@ -8,6 +8,8 @@ import sys.process._
 //allow stopping sbt tasks using ctrl+c without killing sbt itself
 Global / cancelable := true
 
+Global / scalaVersion := "3.3.0"
+
 //disallow any unresolved version conflicts at all for faster feedback
 //Global / conflictManager := ConflictManager.strict
 //resolve all version conflicts explicitly
@@ -27,12 +29,14 @@ val javaOpens = List(
   "--add-opens",
   "java.base/sun.nio.ch=ALL-UNNAMED"
 )
-inThisBuild(List(
-  Test / javaOptions := javaOpens,
-  IntegrationTest / javaOptions := javaOpens
-))
+inThisBuild(
+  List(
+    Test / javaOptions := javaOpens,
+    IntegrationTest / javaOptions := javaOpens
+  )
+)
 
-lazy val ensureDockerBuildx = taskKey[Unit]("Ensure that docker buildx configuration exists")
+lazy val ensureDockerBuildx    = taskKey[Unit]("Ensure that docker buildx configuration exists")
 lazy val dockerBuildWithBuildx = taskKey[Unit]("Build docker images using buildx")
 lazy val dockerBuildxSettings = Seq(
   ensureDockerBuildx := {
@@ -43,15 +47,21 @@ lazy val dockerBuildxSettings = Seq(
   dockerBuildWithBuildx := {
     streams.value.log("Building and pushing image with Buildx")
     dockerAliases.value.foreach(
-      alias => Process("docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
-        alias + " .", baseDirectory.value / "target" / "docker"/ "stage").!
+      alias =>
+        Process(
+          "docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
+            alias + " .",
+          baseDirectory.value / "target" / "docker" / "stage"
+        ).!
     )
   },
-  publish in Docker := Def.sequential(
-    publishLocal in Docker,
-    ensureDockerBuildx,
-    dockerBuildWithBuildx
-  ).value
+  publish in Docker := Def
+    .sequential(
+      publishLocal in Docker,
+      ensureDockerBuildx,
+      dockerBuildWithBuildx
+    )
+    .value
 )
 
 lazy val projectSettings = Seq(
@@ -109,14 +119,18 @@ lazy val projectSettings = Seq(
   IntegrationTest / fork := true,
   IntegrationTest / parallelExecution := false,
   IntegrationTest / testForkedParallel := false,
+  // assemblyMergeStrategy in assembly := {
+  //   // For some reason, all artifacts from 'io.netty' group contain this file with different contents.
+  //   // Discarding it as it's not needed.
+  //   case path if path.endsWith("io.netty.versions.properties") => MergeStrategy.discard
+  //   // The scala compiler includes native bindings for jansi under the same path jansi does.
+  //   // This should pick the ones provided by jansi.
+  //   case path if path.startsWith("META-INF/native/") && path.contains("jansi") => MergeStrategy.last
+  //   case path                                                                  => MergeStrategy.defaultMergeStrategy(path)
+  // }
   assemblyMergeStrategy in assembly := {
-    // For some reason, all artifacts from 'io.netty' group contain this file with different contents.
-    // Discarding it as it's not needed.
-    case path if path.endsWith("io.netty.versions.properties") => MergeStrategy.discard
-    // The scala compiler includes native bindings for jansi under the same path jansi does.
-    // This should pick the ones provided by jansi.
-    case path if path.startsWith("META-INF/native/") && path.contains("jansi") => MergeStrategy.last
-    case path                                                                  => MergeStrategy.defaultMergeStrategy(path)
+    case PathList("META-INF", _*) => MergeStrategy.discard
+    case _                        => MergeStrategy.first
   }
 ) ++
 // skip api doc generation if SKIP_DOC env variable is defined
@@ -337,10 +351,19 @@ lazy val models = (project in file("models"))
   )
   .dependsOn(shared % "compile->compile;test->test", rspace)
 
+lazy val runCargoBuildDocker = taskKey[Unit]("Builds Rust library for RSpace++ Docker")
 lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
+    runCargoBuildDocker := {
+      import scala.sys.process._
+      val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
+      if (exitCode != 0) {
+        throw new Exception("Rust build script failed with exit code " + exitCode)
+      }
+    },
+    (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
     version := git.gitDescribedVersion.value.getOrElse({
       val v = "0.0.0-unknown"
       System.err.println("Could not get version from `git describe`.")
@@ -381,10 +404,10 @@ lazy val node = (project in file("node"))
     discoveredMainClasses in Compile := Seq(),
     mainClass in assembly := Some("coop.rchain.node.Main"),
     assemblyMergeStrategy in assembly := {
-      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
-      case x if x.endsWith("scala/annotation/nowarn.class") => MergeStrategy.discard
+      case x if x.endsWith("io.netty.versions.properties")   => MergeStrategy.first
+      case x if x.endsWith("scala/annotation/nowarn.class")  => MergeStrategy.discard
       case x if x.endsWith("scala/annotation/nowarn$.class") => MergeStrategy.discard
-      case x if x.endsWith("module-info.class") => MergeStrategy.discard
+      case x if x.endsWith("module-info.class")              => MergeStrategy.discard
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
@@ -398,7 +421,11 @@ lazy val node = (project in file("node"))
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
     dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
-    dockerEntrypoint := List("/opt/docker/bin/rnode", "--profile=docker", "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"),
+    dockerEntrypoint := List(
+      "/opt/docker/bin/rnode",
+      "--profile=docker",
+      "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"
+    ),
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerCommands ++= {
@@ -406,7 +433,7 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("USER", (Docker/daemonUser).value),
+        Cmd("USER", (Docker / daemonUser).value),
         ExecCmd("CMD", "run")
       )
     },
@@ -418,7 +445,7 @@ lazy val node = (project in file("node"))
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED"
     ),
-        // Replace unsupported character `+`
+    // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
     mappings in Docker ++= {
       val base = (defaultLinuxInstallLocation in Docker).value
@@ -426,7 +453,6 @@ lazy val node = (project in file("node"))
         .map { case (f, p) => f -> s"$base/$p" }
     },
     dockerBuildxSettings,
-
 // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
@@ -434,13 +460,12 @@ lazy val node = (project in file("node"))
       val version = scalaBinaryVersion.value match {
         case "2.10" => "1.0.3"
         case "2.11" => "1.6.7"
-        case _ ⇒ "2.5.11"
+        case _      ⇒ "2.5.11"
       }
       "com.lihaoyi" % "ammonite" % version % "test" cross CrossVersion.full
     },
-
-    (Test/sourceGenerators) += Def.task {
-      val file = (Test/sourceManaged).value / "amm.scala"
+    (Test / sourceGenerators) += Def.task {
+      val file = (Test / sourceManaged).value / "amm.scala"
       IO.write(file, """object amm extends App { ammonite.AmmoniteMain.main(args) }""")
       Seq(file)
     }.taskValue
@@ -479,13 +504,19 @@ lazy val rholang = (project in file("rholang"))
     // TODO: investigate if still needed?
     // mainClass in assembly := Some("coop.rchain.rho2rose.Rholang2RosetteCompiler"),
     //constrain the resource usage so that we hit SOE-s and OOME-s more quickly should they happen
-    javaOptions in Test ++= Seq("-Xss240k", "-XX:MaxJavaStackTraceDepth=10000", "-Xmx128m")
+    javaOptions in Test ++= Seq(
+      "-Xss240k",
+      "-XX:MaxJavaStackTraceDepth=10000",
+      "-Xmx128m",
+      "-Djna.library.path=../rspace++/target/release/"
+    )
   )
   .dependsOn(
     models % "compile->compile;test->test",
     rspace % "compile->compile;test->test",
     shared % "compile->compile;test->test",
-    crypto
+    crypto,
+    rspacePlusPlus
   )
 
 lazy val rholangCLI = (project in file("rholang-cli"))
@@ -516,13 +547,13 @@ lazy val blockStorage = (project in file("block-storage"))
 lazy val rspacePlusPlus = (project in file("rspace++"))
   .settings(commonSettings: _*)
   .settings(
-    name := "rspace++",
+    name := "rspacePlusPlus",
     version := "0.1.0-SNAPSHOT",
-    // mainClass := Some("BuildRustLibrary"),
     dependencyOverrides += "org.scalactic" %% "scalactic" % "3.2.15",
     dependencyOverrides += "org.scalatest" %% "scalatest" % "3.2.15" % "test",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
-      "net.java.dev.jna" % "jna" % "5.13.0",
+      "net.java.dev.jna" % "jna"          % "5.13.0",
+      "net.java.dev.jna" % "jna-platform" % "5.13.0",
       circeParser,
       circeGenericExtras
     ),
@@ -530,6 +561,7 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
     )
   )
+  .dependsOn(models, rspace)
 
 lazy val rspace = (project in file("rspace"))
   .configs(IntegrationTest extend Test)
@@ -584,10 +616,11 @@ lazy val rspaceBench = (project in file("rspace-bench"))
     dependencyClasspath in Jmh := (dependencyClasspath in Test).value,
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail),
     compile in Jmh := (compile in Jmh).dependsOn(compile in Test).value,
-    run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated
+    run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated,
+    javaOptions in Jmh += "-Djna.library.path=../rspace++/target/release/"
   )
   .enablePlugins(JmhPlugin)
-  .dependsOn(rspace % "test->test", rholang % "test->test", models % "test->test")
+  .dependsOn(rspace % "test->test", rholang % "test->test", models % "test->test", rspacePlusPlus)
 
 lazy val rchain = (project in file("."))
   .settings(commonSettings: _*)
@@ -608,10 +641,13 @@ lazy val rchain = (project in file("."))
     shared
   )
 
-lazy val runCargoBuild = taskKey[Unit]("Builds Rust library for rspace++")
+lazy val runCargoBuild = taskKey[Unit]("Builds Rust library for RSpace++")
 runCargoBuild := {
   import scala.sys.process._
-  Seq("./scripts/build_rspace++.sh") !
+  val exitCode = Seq("./scripts/build_rspace++.sh").!
+  if (exitCode != 0) {
+    throw new Exception("Rust build script failed with exit code " + exitCode)
+  }
 }
 
 (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value

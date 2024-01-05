@@ -31,6 +31,13 @@ import coop.rchain.rspace.{Match, RSpace, _}
 import coop.rchain.shared.Log
 import monix.execution.Scheduler
 
+import rspacePlusPlus.{
+  IReplaySpacePlusPlus,
+  ISpacePlusPlus,
+  RSpacePlusPlus_RhoTypes,
+  TuplespacePlusPlus
+}
+
 trait RhoRuntime[F[_]] extends HasCost[F] {
 
   /**
@@ -271,9 +278,13 @@ object RhoRuntime {
       mergeChs: Ref[F, Set[Par]]
   ) = new RhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
 
-  type RhoTuplespace[F[_]]   = TCPAK[F, Tuplespace]
-  type RhoISpace[F[_]]       = TCPAK[F, ISpace]
-  type RhoReplayISpace[F[_]] = TCPAK[F, IReplaySpace]
+  type RhoTuplespace[F[_]]   = TCPAK[F, TuplespacePlusPlus]
+  type RhoISpace[F[_]]       = TCPAK[F, ISpacePlusPlus]
+  type RhoReplayISpace[F[_]] = TCPAK[F, IReplaySpacePlusPlus]
+
+  // type RhoTuplespace[F[_]]   = TCPAK[F, Tuplespace]
+  // type RhoISpace[F[_]]       = TCPAK[F, ISpace]
+  // type RhoReplayISpace[F[_]] = TCPAK[F, IReplaySpace]
   type ISpaceAndReplay[F[_]] = (RhoISpace[F], RhoReplayISpace[F])
 
   type RhoHistoryRepository[F[_]] =
@@ -632,15 +643,16 @@ object RhoRuntime {
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
-      implicit scheduler: Scheduler
+      // implicit scheduler: Scheduler
   ): F[RhoRuntime[F]] = {
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     for {
-      space <- RSpace
-                .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-                  stores
-                )
+      // space <- RSpace
+      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //             stores
+      //           )
+      space <- RSpacePlusPlus_RhoTypes.create[F]
       runtime <- createRhoRuntime[F](
                   space,
                   mergeableTagName,

@@ -22,6 +22,8 @@ import java.io.File
 import java.nio.file.{Files, Path}
 import scala.reflect.io.Directory
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 object Resources {
   val logger: Logger = Logger(this.getClass.getName.stripSuffix("$"))
 
@@ -40,21 +42,24 @@ object Resources {
     )
 
   def mkRhoISpace[F[_]: Concurrent: Parallel: ContextShift: KeyValueStoreManager: Metrics: Span: Log](
-      implicit scheduler: Scheduler
+      // implicit scheduler: Scheduler
   ): F[RhoISpace[F]] = {
     import coop.rchain.rholang.interpreter.storage._
 
-    implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
 
     for {
-      store <- KeyValueStoreManager[F].rSpaceStores
-      space <- RSpace.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+      // store <- KeyValueStoreManager[F].rSpaceStores
+      // space <- RSpace.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+      space <- RSpacePlusPlus_RhoTypes
+                .create[F]
     } yield space
   }
 
+  // NOTE: Removed "implicit scheduler" parameter
   def mkRuntime[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String
-  )(implicit scheduler: Scheduler): Resource[F, RhoRuntime[F]] =
+  ): Resource[F, RhoRuntime[F]] =
     mkTempDir(prefix)
       .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
       .evalMap(_.rSpaceStores)
@@ -64,8 +69,8 @@ object Resources {
       prefix: String,
       initRegistry: Boolean = false
   )(
-      implicit scheduler: Scheduler
-  ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] =
+      // implicit scheduler: Scheduler
+  ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F])] =
     mkTempDir(prefix)
       .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
       .evalMap(_.rSpaceStores)
@@ -76,20 +81,22 @@ object Resources {
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
-      implicit scheduler: Scheduler
-  ): F[(RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] = {
+      // implicit scheduler: Scheduler
+  ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] = {
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     for {
-      hrstores <- RSpace
-                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-                     stores
-                   )
+      // hrstores <- RSpace
+      //              .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //                stores
+      //              )
+      hrstores <- RSpacePlusPlus_RhoTypes
+                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
       (space, replay) = hrstores
       runtimes <- RhoRuntime
                    .createRuntimes[F](space, replay, initRegistry, additionalSystemProcesses, Par())
       (runtime, replayRuntime) = runtimes
-    } yield (runtime, replayRuntime, space.historyRepo)
+    } yield (runtime, replayRuntime)
   }
 
 }
