@@ -2,6 +2,7 @@ use crate::rspace::history::history::History;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
+use crate::rspace::state::rspace_importer::RSpaceImporter;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 pub trait HistoryRepository<C, P, A, K> {
@@ -27,7 +28,7 @@ pub trait HistoryRepository<C, P, A, K> {
         Value = Vec<u8>,
     >;
 
-    // fn importer(&self) -> dyn RSpacePlusPlusImporter;
+    fn importer(&self) -> dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Vec<u8>>;
 
     // fn get_history_reader(&self, state_hash: blake3::Hash) -> dyn HistoryReader;
 
