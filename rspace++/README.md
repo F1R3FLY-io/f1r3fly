@@ -3,16 +3,16 @@
 ## Quickstart
 
 Starting standalone node using RSpace++
-1. `sbt clean compile stage` May need to run: `chmod +x ./scripts/build_rspace++.sh` first
+1. `sbt clean compile stage`
 2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release  run --standalone` in one terminal
 3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release eval rholang/examples/stdout.rho`
 
 Standing up network using RSpace++
 1. `sbt ";clean ;compile ;project node ;assembly"`
-2. `./scripts/start_shard.sh` May need to run: `chmod +x ./scripts/start_shard.sh` first
+2. `./scripts/start_shard.sh`
 
 Standing up network using RSpace++ (Under Docker)
-1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell). May need to run: `chmod +x ./scripts/build_rspace++_docker.sh` first
+1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell)
 2. `docker compose -f docker/shard.yml up`
 
 ### Working Rholang Contracts using RSpace++ (under standalone node)

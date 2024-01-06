@@ -19,7 +19,7 @@ use std::hash::Hash;
 // NOTE: 'store' field and methods are public for testing purposes. Production should be private?
 #[repr(C)]
 pub struct RSpace<C: Clone + Ord, P, A, K, M: Match<P, A>> {
-    history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+    // history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
     pub store: InMemConcHotStore<C, P, A, K>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     two_step_lock: TwoStepLock<C>,
@@ -39,11 +39,11 @@ impl<
     > RSpace<C, P, A, K, M>
 {
     pub fn create(
-        history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+        // history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
         matcher: M,
     ) -> RSpace<C, P, A, K, M> {
         RSpace {
-            history_repository,
+            // history_repository: HistoryRepository::,
             store: InMemConcHotStore::create(),
             space_matcher: SpaceMatcher::create(matcher),
             two_step_lock: TwoStepLock::new(),
