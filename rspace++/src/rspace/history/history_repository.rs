@@ -1,4 +1,5 @@
 use crate::rspace::history::history::History;
+use crate::rspace::history::history_reader::HistoryReader;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
@@ -30,11 +31,10 @@ pub trait HistoryRepository<C, P, A, K> {
 
     fn importer(&self) -> dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Vec<u8>>;
 
-    // fn get_history_reader(&self, state_hash: blake3::Hash) -> dyn HistoryReader;
-
-    // def getSerializeC: Serialize[C]
+    fn get_history_reader(
+        &self,
+        state_hash: blake3::Hash,
+    ) -> dyn HistoryReader<blake3::Hash, C, P, A, K>;
 
     fn root(&self) -> blake3::Hash;
 }
-
-// struct HistoryRepository<C, P, A, K> {}
