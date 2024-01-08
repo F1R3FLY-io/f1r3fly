@@ -98,7 +98,7 @@ rspacePlusPlus/
 .sbtopts
 
 # cmake
-build
+/build
 
 # direnv
 .direnv
