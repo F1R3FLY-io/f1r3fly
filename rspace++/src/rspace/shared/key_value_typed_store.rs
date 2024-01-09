@@ -20,6 +20,7 @@ pub trait KeyValueTypedStore<K, V> {
 }
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreCodec.scala
+#[derive(Clone)]
 pub struct KeyValueTypedStoreInstance<U: KeyValueStore, K, V> {
     pub store: U,
     pub _marker: PhantomData<(K, V)>,

@@ -26,8 +26,8 @@ pub struct KeyValueStoreOps<T: KeyValueStore> {
     store: T,
 }
 
-impl<T: KeyValueStore> KeyValueStoreOps<T> {
-    pub fn to_typed_store(store: T) -> impl KeyValueTypedStore<Bytes, Bytes> {
+impl<T: KeyValueStore + Clone> KeyValueStoreOps<T> {
+    pub fn to_typed_store(store: T) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
         KeyValueTypedStoreInstance {
             store,
             _marker: PhantomData,

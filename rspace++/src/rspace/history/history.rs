@@ -18,10 +18,11 @@ pub trait History {
 pub struct HistoryInstance;
 
 impl HistoryInstance {
-    pub fn create<U: KeyValueStore>(
+    pub fn create<U: KeyValueStore + Clone>(
         root: blake3::Hash,
         store: U,
     ) -> RadixHistory<impl KeyValueTypedStore<Bytes, Bytes>> {
-        RadixHistory::create(root, RadixHistoryInstance::create_store(store))
+        let typed_store = RadixHistoryInstance::create_store(store);
+        RadixHistoryInstance::create(root, typed_store)
     }
 }

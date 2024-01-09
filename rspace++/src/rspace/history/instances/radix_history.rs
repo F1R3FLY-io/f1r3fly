@@ -7,21 +7,13 @@ use bytes::Bytes;
 pub struct RadixHistoryInstance;
 
 impl RadixHistoryInstance {
-    pub fn create_store<U: KeyValueStore>(store: U) -> impl KeyValueTypedStore<Bytes, Bytes> {
-        KeyValueStoreOps::to_typed_store(store)
-    }
-}
-
-pub struct RadixHistory<T: KeyValueTypedStore<Bytes, Bytes>> {
-    root_hash: blake3::Hash,
-    root_node: Node,
-    imple: RadixTreeImpl<T>,
-    store: T,
-}
-
-impl<T: KeyValueTypedStore<Bytes, Bytes>> RadixHistory<T> {
-    pub fn create(root: blake3::Hash, store: T) -> RadixHistory<T> {
-        let imple = RadixTreeImpl { store };
+    pub fn create<T: KeyValueTypedStore<Bytes, Bytes> + Clone>(
+        root: blake3::Hash,
+        store: T,
+    ) -> RadixHistory<T> {
+        let imple = RadixTreeImpl {
+            store: store.clone(),
+        };
         let node = imple.load_node(Bytes::copy_from_slice(root.as_bytes()), Some(true));
 
         RadixHistory {
@@ -31,4 +23,17 @@ impl<T: KeyValueTypedStore<Bytes, Bytes>> RadixHistory<T> {
             store,
         }
     }
+
+    pub fn create_store<U: KeyValueStore + Clone>(
+        store: U,
+    ) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
+        KeyValueStoreOps::to_typed_store(store)
+    }
+}
+
+pub struct RadixHistory<T: KeyValueTypedStore<Bytes, Bytes>> {
+    root_hash: blake3::Hash,
+    root_node: Node,
+    imple: RadixTreeImpl<T>,
+    store: T,
 }

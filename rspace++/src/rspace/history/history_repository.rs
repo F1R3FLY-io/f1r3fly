@@ -48,10 +48,10 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
 }
 
 impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
-    fn lmdb_repository<T: KeyValueStore>(
-        history_key_value_store: T,
-        roots_key_value_store: T,
-        cold_key_value_store: T,
+    fn lmdb_repository<U: KeyValueStore + Clone>(
+        history_key_value_store: U,
+        roots_key_value_store: U,
+        cold_key_value_store: U,
     ) -> impl HistoryRepository<C, P, A, K> {
         // Roots store
         let roots_repository = RootRepository {
