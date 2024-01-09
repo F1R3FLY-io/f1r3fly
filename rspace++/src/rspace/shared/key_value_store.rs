@@ -22,12 +22,12 @@ pub trait KeyValueStore {
 }
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
-pub struct KeyValueStoreOps<T: KeyValueStore> {
-    store: T,
+pub struct KeyValueStoreOps<U: KeyValueStore> {
+    store: U,
 }
 
-impl<T: KeyValueStore + Clone> KeyValueStoreOps<T> {
-    pub fn to_typed_store(store: T) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
+impl<U: KeyValueStore + Clone> KeyValueStoreOps<U> {
+    pub fn to_typed_store<K: Clone, V: Clone>(store: U) -> impl KeyValueTypedStore<K, V> + Clone {
         KeyValueTypedStoreInstance {
             store,
             _marker: PhantomData,

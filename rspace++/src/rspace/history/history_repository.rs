@@ -1,3 +1,4 @@
+use crate::rspace::history::cold_store::ColdStoreInstances;
 use crate::rspace::history::history::{History, HistoryInstance};
 use crate::rspace::history::history_reader::HistoryReader;
 use crate::rspace::history::root_repository::RootRepository;
@@ -62,5 +63,8 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
 
         // History store
         let history = HistoryInstance::create(current_root, history_key_value_store);
+
+        // Cold store
+        let cold_store = ColdStoreInstances::cold_store(cold_key_value_store);
     }
 }

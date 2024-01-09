@@ -27,7 +27,7 @@ impl RadixHistoryInstance {
     pub fn create_store<U: KeyValueStore + Clone>(
         store: U,
     ) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
-        KeyValueStoreOps::to_typed_store(store)
+        KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store)
     }
 }
 

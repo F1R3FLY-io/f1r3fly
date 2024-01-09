@@ -6,3 +6,4 @@ mod instances;
 mod radix_tree;
 mod roots_store;
 mod root_repository;
+mod cold_store;
