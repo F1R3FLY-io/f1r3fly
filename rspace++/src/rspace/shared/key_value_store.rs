@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-trait KeyValueStoreTrait {
+pub trait KeyValueStore {
     fn get<T, F>(&self, keys: Vec<Cursor<Vec<u8>>>, from_buffer: F) -> Vec<Option<T>>
     where
         F: Fn(Cursor<Vec<u8>>) -> T;
@@ -15,5 +15,3 @@ trait KeyValueStoreTrait {
     where
         F: FnOnce(Box<dyn Iterator<Item = (Cursor<Vec<u8>>, Cursor<Vec<u8>>)>>) -> T;
 }
-
-pub struct KeyValueStore {}

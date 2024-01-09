@@ -1,9 +1,13 @@
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_reader::HistoryReader;
+use crate::rspace::history::root_repository::RootRepository;
+use crate::rspace::history::roots_store::RootsStoreInstances;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
+use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use std::marker::PhantomData;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 pub trait HistoryRepository<C, P, A, K> {
@@ -37,4 +41,20 @@ pub trait HistoryRepository<C, P, A, K> {
     ) -> dyn HistoryReader<blake3::Hash, C, P, A, K>;
 
     fn root(&self) -> blake3::Hash;
+}
+
+pub struct HistoryRepositoryInstances<C, P, A, K> {
+    _marker: PhantomData<(C, P, A, K)>,
+}
+
+impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
+    fn lmdb_repository<T: KeyValueStore>(
+        history_key_value_store: T,
+        roots_key_value_store: T,
+        cold_key_value_store: T,
+    ) -> impl HistoryRepository<C, P, A, K> {
+        let roots_repository = RootRepository {
+            roots_store: RootsStoreInstances::roots_store(roots_key_value_store),
+        };
+    }
 }
