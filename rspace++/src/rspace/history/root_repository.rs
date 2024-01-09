@@ -10,7 +10,7 @@ impl<T: RootsStore> RootRepository<T> {
         todo!()
     }
 
-    fn current_root(&self) -> blake3::Hash {
+    pub fn current_root(&self) -> blake3::Hash {
         todo!()
     }
 

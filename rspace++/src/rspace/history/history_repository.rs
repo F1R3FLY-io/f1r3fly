@@ -1,4 +1,4 @@
-use crate::rspace::history::history::History;
+use crate::rspace::history::history::{History, HistoryInstance};
 use crate::rspace::history::history_reader::HistoryReader;
 use crate::rspace::history::root_repository::RootRepository;
 use crate::rspace::history::roots_store::RootsStoreInstances;
@@ -53,8 +53,14 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
         roots_key_value_store: T,
         cold_key_value_store: T,
     ) -> impl HistoryRepository<C, P, A, K> {
+        // Roots store
         let roots_repository = RootRepository {
             roots_store: RootsStoreInstances::roots_store(roots_key_value_store),
         };
+
+        let current_root = roots_repository.current_root();
+
+        // History store
+        let history = HistoryInstance::create(current_root, history_key_value_store);
     }
 }

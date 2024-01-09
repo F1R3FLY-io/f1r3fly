@@ -1,4 +1,5 @@
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
+use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 pub enum Item {
@@ -8,17 +9,24 @@ pub enum Item {
 }
 
 struct Leaf {
-    prefix: Vec<u8>,
-    value: Vec<u8>,
+    prefix: Bytes,
+    value: Bytes,
 }
 
 struct NodePtr {
-    prefix: Vec<u8>,
-    ptr: Vec<u8>,
+    prefix: Bytes,
+    ptr: Bytes,
 }
 
 pub type Node = Vec<Item>;
 
-pub struct RadixTreeImpl {
-    store: dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>,
+pub struct RadixTreeImpl<T: KeyValueTypedStore<Bytes, Bytes>> {
+    pub store: T,
+}
+
+impl<T: KeyValueTypedStore<Bytes, Bytes>> RadixTreeImpl<T> {
+    pub fn load_node(&self, node_ptr: Bytes, no_assert: Option<bool>) -> Node {
+        let no_assert = no_assert.unwrap_or(false);
+        todo!()
+    }
 }
