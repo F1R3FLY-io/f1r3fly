@@ -6,8 +6,10 @@ use crate::rspace::history::roots_store::RootsStoreInstances;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
 use crate::rspace::shared::key_value_store::KeyValueStore;
+use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use bytes::Bytes;
 use std::marker::PhantomData;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
@@ -31,10 +33,10 @@ pub trait HistoryRepository<C, P, A, K> {
     ) -> dyn RSpaceExporter<
         KeyHash = blake3::Hash,
         NodePath = Vec<(blake3::Hash, Option<u8>)>,
-        Value = Vec<u8>,
+        Value = Bytes,
     >;
 
-    fn importer(&self) -> dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Vec<u8>>;
+    fn importer(&self) -> dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes>;
 
     fn get_history_reader(
         &self,
@@ -56,15 +58,22 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
     ) -> impl HistoryRepository<C, P, A, K> {
         // Roots store
         let roots_repository = RootRepository {
-            roots_store: RootsStoreInstances::roots_store(roots_key_value_store),
+            roots_store: RootsStoreInstances::roots_store(roots_key_value_store.clone()),
         };
 
         let current_root = roots_repository.current_root();
 
         // History store
-        let history = HistoryInstance::create(current_root, history_key_value_store);
+        let history = HistoryInstance::create(current_root, history_key_value_store.clone());
 
         // Cold store
-        let cold_store = ColdStoreInstances::cold_store(cold_key_value_store);
+        let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());
+
+        // RSpace importer/exporter / directly operates on Store (lmdb)
+        let exporter = RSpaceExporterStore::create(
+            history_key_value_store,
+            cold_key_value_store,
+            roots_key_value_store,
+        );
     }
 }
