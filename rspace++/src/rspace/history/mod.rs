@@ -7,3 +7,4 @@ mod radix_tree;
 mod roots_store;
 mod root_repository;
 mod cold_store;
+mod history_repository_impl;

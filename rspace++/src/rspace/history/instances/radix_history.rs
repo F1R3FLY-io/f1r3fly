@@ -1,12 +1,13 @@
+use crate::rspace::history::history::History;
 use crate::rspace::history::radix_tree::{Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
-pub struct RadixHistoryInstance;
+pub struct RadixHistoryInstances;
 
-impl RadixHistoryInstance {
+impl RadixHistoryInstances {
     pub fn create<T: KeyValueTypedStore<Bytes, Bytes> + Clone>(
         root: blake3::Hash,
         store: T,
@@ -36,4 +37,25 @@ pub struct RadixHistory<T: KeyValueTypedStore<Bytes, Bytes>> {
     root_node: Node,
     imple: RadixTreeImpl<T>,
     store: T,
+}
+
+impl<T: KeyValueTypedStore<Bytes, Bytes>> History for RadixHistory<T> {
+    fn read(&self, key: Bytes) -> Option<Bytes> {
+        todo!()
+    }
+
+    fn process(
+        &self,
+        actions: Vec<crate::rspace::history::history_action::HistoryAction>,
+    ) -> Box<dyn History> {
+        todo!()
+    }
+
+    fn root(&self) -> blake3::Hash {
+        todo!()
+    }
+
+    fn reset(&self, root: blake3::Hash) -> Box<dyn History> {
+        todo!()
+    }
 }
