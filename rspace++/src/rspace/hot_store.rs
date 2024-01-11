@@ -1,16 +1,15 @@
-// use crate::rspace::history_reader_base::{HistoryReaderBase, HistoryReaderBaseImpl};
-use crate::rspace::internal::{Datum, Row, WaitingContinuation};
-use dashmap::DashMap;
-use std::collections::HashMap;
-use std::fmt::Debug;
-// use futures::channel::oneshot;
-use std::hash::Hash;
-use std::sync::{Arc, Mutex};
-// use tokio::sync::Mutex;
+use crate::rspace::history::history_reader::HistoryReaderBase;
 use crate::rspace::hot_store_action::{
     DeleteAction, DeleteContinuations, DeleteData, DeleteJoins, HotStoreAction, InsertAction,
     InsertContinuations, InsertData, InsertJoins,
 };
+use crate::rspace::internal::{Datum, Row, WaitingContinuation};
+use dashmap::DashMap;
+use futures::channel::oneshot;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
 pub trait HotStore<C, P, A, K> {
@@ -32,7 +31,8 @@ pub trait HotStore<C, P, A, K> {
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
 }
 
-struct HotStoreState<C, P, A, K> {
+#[derive(Default)]
+struct HotStoreState<C: Eq + Hash, P, A, K> {
     continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
     installed_continuations: DashMap<Vec<C>, WaitingContinuation<P, K>>,
     data: DashMap<C, Vec<Datum<A>>>,
@@ -40,21 +40,22 @@ struct HotStoreState<C, P, A, K> {
     installed_joins: DashMap<C, Vec<Vec<C>>>,
 }
 
-// struct HistoryStoreCache<C, P, A, K> {
-//     continuations: DashMap<Vec<C>, oneshot::Sender<Vec<WaitingContinuation<P, K>>>>,
-//     datums: DashMap<C, oneshot::Sender<Vec<Datum<A>>>>,
-//     joins: DashMap<C, oneshot::Sender<Vec<Vec<C>>>>,
-// }
+#[derive(Default)]
+struct HistoryStoreCache<C: Eq + Hash, P, A, K> {
+    continuations: DashMap<Vec<C>, oneshot::Sender<Vec<WaitingContinuation<P, K>>>>,
+    datums: DashMap<C, oneshot::Sender<Vec<Datum<A>>>>,
+    joins: DashMap<C, oneshot::Sender<Vec<Vec<C>>>>,
+}
 
-pub struct InMemConcHotStore<C, P, A, K> {
+struct InMemHotStore<C: Eq + Hash, P, A, K> {
     hot_store_state: Arc<Mutex<HotStoreState<C, P, A, K>>>,
-    // history_store_cache: Arc<Mutex<HistoryStoreCache<C, P, A, K>>>,
-    // history_reader_base: Arc<Mutex<HistoryReaderBaseImpl<C, P, A, K>>>,
+    history_store_cache: Arc<Mutex<HistoryStoreCache<C, P, A, K>>>,
+    history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
 impl<C: Hash + Eq + Clone + Debug, P: Clone + Debug, A: Clone + Debug, K: Clone + Debug>
-    HotStore<C, P, A, K> for InMemConcHotStore<C, P, A, K>
+    HotStore<C, P, A, K> for InMemHotStore<C, P, A, K>
 {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         // This is STUBBED out. Ideally this comes from history store
@@ -483,61 +484,106 @@ impl<C: Hash + Eq + Clone + Debug, P: Clone + Debug, A: Clone + Debug, K: Clone 
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-impl<C: Hash + Eq + Debug, P: Debug, A: Debug, K: Debug> InMemConcHotStore<C, P, A, K> {
-    pub fn create() -> InMemConcHotStore<C, P, A, K> {
-        InMemConcHotStore {
-            hot_store_state: Arc::new(Mutex::new(HotStoreState {
-                continuations: DashMap::new(),
-                installed_continuations: DashMap::new(),
-                data: DashMap::new(),
-                joins: DashMap::new(),
-                installed_joins: DashMap::new(),
-            })),
+// impl<C: Hash + Eq + Debug, P: Debug, A: Debug, K: Debug> InMemHotStore<C, P, A, K> {
+//     pub fn create() -> InMemHotStore<C, P, A, K> {
+//         InMemHotStore {
+//             hot_store_state: Arc::new(Mutex::new(HotStoreState {
+//                 continuations: DashMap::new(),
+//                 installed_continuations: DashMap::new(),
+//                 data: DashMap::new(),
+//                 joins: DashMap::new(),
+//                 installed_joins: DashMap::new(),
+//             })),
+//         }
+//     }
+
+//     pub fn print(&self) {
+//         let state = self.hot_store_state.lock().unwrap();
+//         println!("\nCurrent Store:");
+
+//         println!("Continuations:");
+//         for entry in state.continuations.iter() {
+//             let (key, value) = entry.pair();
+//             println!("Key: {:?}, Value: {:?}", key, value);
+//         }
+
+//         println!("\nInstalled Continuations:");
+//         for entry in state.installed_continuations.iter() {
+//             let (key, value) = entry.pair();
+//             println!("Key: {:?}, Value: {:?}", key, value);
+//         }
+
+//         println!("\nData:");
+//         for entry in state.data.iter() {
+//             let (key, value) = entry.pair();
+//             println!("Key: {:?}, Value: {:?}", key, value);
+//         }
+
+//         println!("\nJoins:");
+//         for entry in state.joins.iter() {
+//             let (key, value) = entry.pair();
+//             println!("Key: {:?}, Value: {:?}", key, value);
+//         }
+
+//         println!("\nInstalled Joins:");
+//         for entry in state.installed_joins.iter() {
+//             let (key, value) = entry.pair();
+//             println!("Key: {:?}, Value: {:?}", key, value);
+//         }
+//         println!();
+//     }
+
+//     pub fn clear(&self) {
+//         let mut state = self.hot_store_state.lock().unwrap();
+//         state.continuations = DashMap::new();
+//         state.installed_continuations = DashMap::new();
+//         state.data = DashMap::new();
+//         state.joins = DashMap::new();
+//         state.installed_joins = DashMap::new();
+//     }
+// }
+
+pub struct HotStoreInstances;
+
+impl HotStoreInstances {
+    fn create_from_mhs_and_hr<
+        C: Eq + Hash + Default + Clone + Debug,
+        P: Default + Clone + Debug,
+        A: Default + Clone + Debug,
+        K: Default + Clone + Debug,
+    >(
+        hot_store_state_ref: Arc<Mutex<HotStoreState<C, P, A, K>>>,
+        history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> impl HotStore<C, P, A, K> {
+        InMemHotStore {
+            hot_store_state: hot_store_state_ref,
+            history_store_cache: Arc::new(Mutex::new(HistoryStoreCache::default())),
+            history_reader_base,
         }
     }
 
-    pub fn print(&self) {
-        let state = self.hot_store_state.lock().unwrap();
-        println!("\nCurrent Store:");
-
-        println!("Continuations:");
-        for entry in state.continuations.iter() {
-            let (key, value) = entry.pair();
-            println!("Key: {:?}, Value: {:?}", key, value);
-        }
-
-        println!("\nInstalled Continuations:");
-        for entry in state.installed_continuations.iter() {
-            let (key, value) = entry.pair();
-            println!("Key: {:?}, Value: {:?}", key, value);
-        }
-
-        println!("\nData:");
-        for entry in state.data.iter() {
-            let (key, value) = entry.pair();
-            println!("Key: {:?}, Value: {:?}", key, value);
-        }
-
-        println!("\nJoins:");
-        for entry in state.joins.iter() {
-            let (key, value) = entry.pair();
-            println!("Key: {:?}, Value: {:?}", key, value);
-        }
-
-        println!("\nInstalled Joins:");
-        for entry in state.installed_joins.iter() {
-            let (key, value) = entry.pair();
-            println!("Key: {:?}, Value: {:?}", key, value);
-        }
-        println!();
+    fn create_from_hs_and_hr<
+        C: Eq + Hash + Default + Clone + Debug,
+        P: Default + Clone + Debug,
+        A: Default + Clone + Debug,
+        K: Default + Clone + Debug,
+    >(
+        cache: HotStoreState<C, P, A, K>,
+        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> impl HotStore<C, P, A, K> {
+        let cache = Arc::new(Mutex::new(cache));
+        let store = HotStoreInstances::create_from_mhs_and_hr(cache, history_reader);
+        store
     }
 
-    pub fn clear(&self) {
-        let mut state = self.hot_store_state.lock().unwrap();
-        state.continuations = DashMap::new();
-        state.installed_continuations = DashMap::new();
-        state.data = DashMap::new();
-        state.joins = DashMap::new();
-        state.installed_joins = DashMap::new();
+    pub fn create_from_hr<
+        C: Eq + Hash + Default + Clone + Debug + 'static,
+        P: Default + Clone + Debug + 'static,
+        A: Default + Clone + Debug + 'static,
+        K: Default + Clone + Debug + 'static,
+    >(
+        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> Box<dyn HotStore<C, P, A, K>> {
+        Box::new(HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader))
     }
 }

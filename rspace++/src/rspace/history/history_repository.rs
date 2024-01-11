@@ -54,12 +54,12 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
     _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
-    fn lmdb_repository<U: KeyValueStore + Clone>(
+impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepositoryInstances<C, P, A, K> {
+    pub fn lmdb_repository<U: KeyValueStore + Clone + 'static>(
         history_key_value_store: U,
         roots_key_value_store: U,
         cold_key_value_store: U,
-    ) -> impl HistoryRepository<C, P, A, K> {
+    ) -> Box<dyn HistoryRepository<C, P, A, K>> {
         // Roots store
         let roots_repository = RootRepository {
             roots_store: RootsStoreInstances::roots_store(roots_key_value_store.clone()),
@@ -85,13 +85,13 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
             roots_key_value_store,
         );
 
-        HistoryRepositoryImpl {
+        Box::new(HistoryRepositoryImpl {
             current_history: history,
             roots_repository,
             leaf_store: cold_store,
             rspace_exporter: exporter,
             rspace_importer: importer,
             _marker: PhantomData,
-        }
+        })
     }
 }

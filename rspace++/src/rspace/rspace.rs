@@ -2,9 +2,11 @@ use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::concurrent::two_step_lock::TwoStepLock;
 use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
-use crate::rspace::hot_store::{HotStore, InMemConcHotStore};
+use crate::rspace::history::history_repository::HistoryRepositoryInstances;
+use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
 use crate::rspace::matcher::r#match::Match;
+use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
@@ -19,8 +21,8 @@ use std::hash::Hash;
 // NOTE: 'store' field and methods are public for testing purposes. Production should be private?
 #[repr(C)]
 pub struct RSpace<C: Clone + Ord, P, A, K, M: Match<P, A>> {
-    // history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
-    pub store: InMemConcHotStore<C, P, A, K>,
+    history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+    pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     two_step_lock: TwoStepLock<C>,
 }
@@ -38,18 +40,6 @@ impl<
         M: Match<P, A>,
     > RSpace<C, P, A, K, M>
 {
-    pub fn create(
-        // history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
-        matcher: M,
-    ) -> RSpace<C, P, A, K, M> {
-        RSpace {
-            // history_repository: HistoryRepository::,
-            store: InMemConcHotStore::create(),
-            space_matcher: SpaceMatcher::create(matcher),
-            two_step_lock: TwoStepLock::new(),
-        }
-    }
-
     fn locked_consume(
         &self,
         channels: Vec<C>,
@@ -414,10 +404,10 @@ impl<
         }
     }
 
-    pub fn clear(&self) -> () {
-        self.two_step_lock.clean_up();
-        self.store.clear()
-    }
+    // pub fn clear(&self) -> () {
+    //     self.two_step_lock.clean_up();
+    //     self.store.clear()
+    // }
 
     fn wrap_result(
         &self,
@@ -555,5 +545,78 @@ impl<
                 }
             }
         }
+    }
+}
+
+pub struct RSpaceInstances;
+
+#[derive(Default)]
+pub struct RSpaceStore<U: KeyValueStore> {
+    history: U,
+    roots: U,
+    cold: U,
+}
+
+impl RSpaceInstances {
+    /**
+     * Creates [[RSpace]] from [[HistoryRepository]] and [[HotStore]].
+     */
+    pub fn apply<
+        C: Clone + Ord + Hash + Debug,
+        P: Clone + Debug,
+        A: Clone + Debug,
+        K: Clone + Debug,
+        M: Match<P, A>,
+    >(
+        history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+        store: Box<dyn HotStore<C, P, A, K>>,
+        matcher: M,
+    ) -> RSpace<C, P, A, K, M> {
+        RSpace {
+            history_repository,
+            store,
+            space_matcher: SpaceMatcher::create(matcher),
+            two_step_lock: TwoStepLock::new(),
+        }
+    }
+
+    pub fn create<
+        C: Clone + Ord + Default + Debug + Hash + 'static,
+        P: Clone + Debug + Default + 'static,
+        A: Clone + Debug + Default + 'static,
+        K: Clone + Debug + Default + 'static,
+        U: KeyValueStore + Clone + 'static,
+        M: Match<P, A>,
+    >(
+        store: RSpaceStore<U>,
+        matcher: M,
+    ) -> RSpace<C, P, A, K, M> {
+        let setup = RSpaceInstances::create_history_repo::<C, P, A, K, U, M>(store);
+        let (history_reader, store) = setup;
+        let space = RSpaceInstances::apply(history_reader, store, matcher);
+        space
+    }
+
+    /**
+     * Creates [[HistoryRepository]] and [[HotStore]].
+     */
+    pub fn create_history_repo<
+        C: Clone + Eq + Hash + Debug + Default + 'static,
+        P: Clone + Default + Debug + 'static,
+        A: Clone + Default + Debug + 'static,
+        K: Clone + Default + Debug + 'static,
+        U: KeyValueStore + Clone + 'static,
+        M: Match<P, A>,
+    >(
+        store: RSpaceStore<U>,
+    ) -> (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>) {
+        let history_repo =
+            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold);
+
+        let history_reader = history_repo.get_history_reader(history_repo.root());
+
+        let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
+
+        (history_repo, hot_store)
     }
 }
