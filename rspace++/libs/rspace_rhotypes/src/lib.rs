@@ -1,11 +1,12 @@
 use prost::Message;
-use rspace_plus_plus::rspace::hot_store::HotStore;
 use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::fold_match::FoldMatch;
 use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances, RSpaceStore};
+use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use std::path::PathBuf;
 
 #[derive(Clone)]
 struct SpaceMatcher;
@@ -62,10 +63,11 @@ pub struct Space {
 
 #[no_mangle]
 pub extern "C" fn space_new() -> *mut Space {
-    let kvm = mk_rspace_store_manager()
+    let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+    let store = kvm.r_space_stores();
 
     Box::into_raw(Box::new(Space {
-        rspace: RSpaceInstances::create(rspace_store, SpaceMatcher),
+        rspace: RSpaceInstances::create(store, SpaceMatcher),
     }))
 }
 

@@ -404,10 +404,10 @@ impl<
         }
     }
 
-    // pub fn clear(&self) -> () {
-    //     self.two_step_lock.clean_up();
-    //     self.store.clear()
-    // }
+    pub fn clear(&self) -> () {
+        self.two_step_lock.clean_up();
+        self.store.clear()
+    }
 
     fn wrap_result(
         &self,
@@ -584,13 +584,12 @@ impl RSpaceInstances {
         P: Clone + Debug + Default + 'static,
         A: Clone + Debug + Default + 'static,
         K: Clone + Debug + Default + 'static,
-        U: KeyValueStore + Clone,
         M: Match<P, A>,
     >(
         store: RSpaceStore,
         matcher: M,
     ) -> RSpace<C, P, A, K, M> {
-        let setup = RSpaceInstances::create_history_repo::<C, P, A, K, U>(store);
+        let setup = RSpaceInstances::create_history_repo::<C, P, A, K>(store);
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
         space
@@ -604,7 +603,6 @@ impl RSpaceInstances {
         P: Clone + Default + Debug + 'static,
         A: Clone + Default + Debug + 'static,
         K: Clone + Default + Debug + 'static,
-        U: KeyValueStore + Clone,
     >(
         store: RSpaceStore,
     ) -> (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>) {

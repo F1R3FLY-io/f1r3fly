@@ -1,7 +1,6 @@
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::instances::radix_history::{RadixHistory, RadixHistoryInstances};
 use crate::rspace::shared::key_value_store::KeyValueStore;
-use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/History.scala

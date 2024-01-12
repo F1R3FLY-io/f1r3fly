@@ -29,6 +29,9 @@ pub trait HotStore<C, P, A, K> {
 
     fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
+
+    fn print(&self) -> ();
+    fn clear(&self) -> ();
 }
 
 #[derive(Default)]
@@ -481,67 +484,53 @@ impl<C: Hash + Eq + Clone + Debug, P: Clone + Debug, A: Clone + Debug, K: Clone 
         }
         map
     }
+
+    fn print(&self) {
+        let state = self.hot_store_state.lock().unwrap();
+        println!("\nCurrent Store:");
+
+        println!("Continuations:");
+        for entry in state.continuations.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nInstalled Continuations:");
+        for entry in state.installed_continuations.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nData:");
+        for entry in state.data.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nJoins:");
+        for entry in state.joins.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nInstalled Joins:");
+        for entry in state.installed_joins.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+        println!();
+    }
+
+    // TODO: Update with better implementation
+    fn clear(&self) {
+        let mut state = self.hot_store_state.lock().unwrap();
+        state.continuations = DashMap::new();
+        state.installed_continuations = DashMap::new();
+        state.data = DashMap::new();
+        state.joins = DashMap::new();
+        state.installed_joins = DashMap::new();
+    }
 }
-
-// See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-// impl<C: Hash + Eq + Debug, P: Debug, A: Debug, K: Debug> InMemHotStore<C, P, A, K> {
-//     pub fn create() -> InMemHotStore<C, P, A, K> {
-//         InMemHotStore {
-//             hot_store_state: Arc::new(Mutex::new(HotStoreState {
-//                 continuations: DashMap::new(),
-//                 installed_continuations: DashMap::new(),
-//                 data: DashMap::new(),
-//                 joins: DashMap::new(),
-//                 installed_joins: DashMap::new(),
-//             })),
-//         }
-//     }
-
-//     pub fn print(&self) {
-//         let state = self.hot_store_state.lock().unwrap();
-//         println!("\nCurrent Store:");
-
-//         println!("Continuations:");
-//         for entry in state.continuations.iter() {
-//             let (key, value) = entry.pair();
-//             println!("Key: {:?}, Value: {:?}", key, value);
-//         }
-
-//         println!("\nInstalled Continuations:");
-//         for entry in state.installed_continuations.iter() {
-//             let (key, value) = entry.pair();
-//             println!("Key: {:?}, Value: {:?}", key, value);
-//         }
-
-//         println!("\nData:");
-//         for entry in state.data.iter() {
-//             let (key, value) = entry.pair();
-//             println!("Key: {:?}, Value: {:?}", key, value);
-//         }
-
-//         println!("\nJoins:");
-//         for entry in state.joins.iter() {
-//             let (key, value) = entry.pair();
-//             println!("Key: {:?}, Value: {:?}", key, value);
-//         }
-
-//         println!("\nInstalled Joins:");
-//         for entry in state.installed_joins.iter() {
-//             let (key, value) = entry.pair();
-//             println!("Key: {:?}, Value: {:?}", key, value);
-//         }
-//         println!();
-//     }
-
-//     pub fn clear(&self) {
-//         let mut state = self.hot_store_state.lock().unwrap();
-//         state.continuations = DashMap::new();
-//         state.installed_continuations = DashMap::new();
-//         state.data = DashMap::new();
-//         state.joins = DashMap::new();
-//         state.installed_joins = DashMap::new();
-//     }
-// }
 
 pub struct HotStoreInstances;
 

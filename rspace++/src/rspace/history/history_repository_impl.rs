@@ -2,7 +2,6 @@ use crate::rspace::history::cold_store::PersistedData;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::root_repository::RootRepository;
-use crate::rspace::history::roots_store::RootsStore;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
