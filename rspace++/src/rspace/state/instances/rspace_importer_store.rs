@@ -9,10 +9,10 @@ use crate::rspace::{
 pub struct RSpaceImporterStore;
 
 impl RSpaceImporterStore {
-    pub fn create<U: KeyValueStore>(
-        history_store: U,
-        value_store: U,
-        roots_store: U,
+    pub fn create(
+        history_store: Box<dyn KeyValueStore>,
+        value_store: Box<dyn KeyValueStore>,
+        roots_store: Box<dyn KeyValueStore>,
     ) -> impl RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes> {
         RSpaceImporterImpl {
             source_history_store: history_store,
@@ -22,19 +22,19 @@ impl RSpaceImporterStore {
     }
 }
 
-struct RSpaceImporterImpl<U: KeyValueStore> {
-    source_history_store: U,
-    source_value_store: U,
-    source_roots_store: U,
+struct RSpaceImporterImpl {
+    source_history_store: Box<dyn KeyValueStore>,
+    source_value_store: Box<dyn KeyValueStore>,
+    source_roots_store: Box<dyn KeyValueStore>,
 }
 
-impl<U: KeyValueStore> RSpaceImporter for RSpaceImporterImpl<U> {
+impl RSpaceImporter for RSpaceImporterImpl {
     fn get_history_item(&self, hash: Self::KeyHash) -> Option<Bytes> {
         todo!()
     }
 }
 
-impl<U: KeyValueStore> TrieImporter for RSpaceImporterImpl<U> {
+impl TrieImporter for RSpaceImporterImpl {
     type KeyHash = blake3::Hash;
 
     type Value = Bytes;

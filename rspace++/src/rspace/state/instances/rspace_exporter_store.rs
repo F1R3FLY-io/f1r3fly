@@ -8,10 +8,10 @@ use bytes::Bytes;
 pub struct RSpaceExporterStore;
 
 impl RSpaceExporterStore {
-    pub fn create<U: KeyValueStore>(
-        history_store: U,
-        value_store: U,
-        roots_store: U,
+    pub fn create(
+        history_store: Box<dyn KeyValueStore>,
+        value_store: Box<dyn KeyValueStore>,
+        roots_store: Box<dyn KeyValueStore>,
     ) -> impl RSpaceExporter<
         KeyHash = blake3::Hash,
         NodePath = Vec<(blake3::Hash, Option<u8>)>,
@@ -25,19 +25,19 @@ impl RSpaceExporterStore {
     }
 }
 
-struct RSpaceExporterImpl<U: KeyValueStore> {
-    source_history_store: U,
-    source_value_store: U,
-    source_roots_store: U,
+struct RSpaceExporterImpl {
+    source_history_store: Box<dyn KeyValueStore>,
+    source_value_store: Box<dyn KeyValueStore>,
+    source_roots_store: Box<dyn KeyValueStore>,
 }
 
-impl<U: KeyValueStore> RSpaceExporter for RSpaceExporterImpl<U> {
+impl RSpaceExporter for RSpaceExporterImpl {
     fn get_root(&self) -> blake3::Hash {
         todo!()
     }
 }
 
-impl<U: KeyValueStore> TrieExporter for RSpaceExporterImpl<U> {
+impl TrieExporter for RSpaceExporterImpl {
     type KeyHash = blake3::Hash;
 
     type NodePath = Vec<(Self::KeyHash, Option<u8>)>;

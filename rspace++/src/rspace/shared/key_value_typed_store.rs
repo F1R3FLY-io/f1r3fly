@@ -16,16 +16,17 @@ pub trait KeyValueTypedStore<K, V> {
     fn collect(&self) -> ();
 
     fn to_map(&self) -> BTreeMap<K, V>;
+
+    fn clone_box(&self) -> Box<dyn KeyValueTypedStore<K, V>>;
 }
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreCodec.scala
-#[derive(Clone)]
-pub struct KeyValueTypedStoreInstance<U: KeyValueStore, K, V> {
-    pub store: U,
+pub struct KeyValueTypedStoreInstance<K, V> {
+    pub store: Box<dyn KeyValueStore>,
     pub _marker: PhantomData<(K, V)>,
 }
 
-impl<U: KeyValueStore, K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<U, K, V> {
+impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V> {
     fn get(&self, keys: Vec<K>) -> Vec<Option<V>> {
         todo!()
     }
@@ -48,5 +49,15 @@ impl<U: KeyValueStore, K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInst
 
     fn to_map(&self) -> BTreeMap<K, V> {
         todo!()
+    }
+
+    fn clone_box(&self) -> Box<dyn KeyValueTypedStore<K, V>> {
+        todo!()
+    }
+}
+
+impl<K, V> Clone for Box<dyn KeyValueTypedStore<K, V>> {
+    fn clone(&self) -> Box<dyn KeyValueTypedStore<K, V>> {
+        self.clone_box()
     }
 }

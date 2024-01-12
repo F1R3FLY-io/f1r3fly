@@ -5,6 +5,7 @@ use rspace_plus_plus::rspace::matcher::fold_match::FoldMatch;
 use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances, RSpaceStore};
+use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 
 #[derive(Clone)]
 struct SpaceMatcher;
@@ -61,7 +62,7 @@ pub struct Space {
 
 #[no_mangle]
 pub extern "C" fn space_new() -> *mut Space {
-    let rspace_store: RSpaceStore<_> = RSpaceStore::default();
+    let kvm = mk_rspace_store_manager()
 
     Box::into_raw(Box::new(Space {
         rspace: RSpaceInstances::create(rspace_store, SpaceMatcher),

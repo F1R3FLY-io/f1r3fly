@@ -577,10 +577,10 @@ impl HotStoreInstances {
     }
 
     pub fn create_from_hr<
-        C: Eq + Hash + Default + Clone + Debug + 'static,
-        P: Default + Clone + Debug + 'static,
-        A: Default + Clone + Debug + 'static,
-        K: Default + Clone + Debug + 'static,
+        C: Eq + Hash + Default + Clone + Debug,
+        P: Default + Clone + Debug,
+        A: Default + Clone + Debug,
+        K: Default + Clone + Debug,
     >(
         history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
     ) -> impl HotStore<C, P, A, K> {

@@ -25,6 +25,8 @@ pub trait KeyValueStore {
         f: fn(Box<dyn Iterator<Item = (Cursor<Bytes>, Cursor<Bytes>)>>) -> Box<dyn Any>,
     ) -> Box<dyn Any>;
 
+    fn clone_box(&self) -> Box<dyn KeyValueStore>;
+
     // fn to_typed_store(&self) -> Box<dyn KeyValueTypedStore<Box<dyn Any>, Box<dyn Any>>> {
     //     Box::new(KeyValueTypedStoreInstance {
     //         store: Box::new(self),
@@ -33,13 +35,19 @@ pub trait KeyValueStore {
     // }
 }
 
+impl Clone for Box<dyn KeyValueStore> {
+    fn clone(&self) -> Box<dyn KeyValueStore> {
+        self.clone_box()
+    }
+}
+
 // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
     pub fn to_typed_store<K: Clone, V: Clone>(
-        store: impl KeyValueStore + Clone,
-    ) -> impl KeyValueTypedStore<K, V> + Clone {
+        store: Box<dyn KeyValueStore>,
+    ) -> impl KeyValueTypedStore<K, V> {
         KeyValueTypedStoreInstance {
             store,
             _marker: PhantomData,

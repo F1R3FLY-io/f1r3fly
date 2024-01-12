@@ -9,7 +9,7 @@ pub struct ColdStoreInstances;
 
 impl ColdStoreInstances {
     pub fn cold_store(
-        store: impl KeyValueStore + Clone,
+        store: Box<dyn KeyValueStore>,
     ) -> Box<dyn KeyValueTypedStore<blake3::Hash, PersistedData>> {
         Box::new(KeyValueStoreOps::to_typed_store::<blake3::Hash, PersistedData>(store))
     }

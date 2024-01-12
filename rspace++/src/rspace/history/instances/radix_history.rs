@@ -11,8 +11,8 @@ pub struct RadixHistoryInstances;
 impl RadixHistoryInstances {
     pub fn create(
         root: blake3::Hash,
-        store: impl KeyValueTypedStore<Bytes, Bytes> + Clone,
-    ) -> RadixHistory<impl KeyValueTypedStore<Bytes, Bytes>> {
+        store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
+    ) -> RadixHistory {
         let imple = RadixTreeImpl {
             store: store.clone(),
         };
@@ -27,20 +27,20 @@ impl RadixHistoryInstances {
     }
 
     pub fn create_store(
-        store: impl KeyValueStore + Clone,
-    ) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
-        KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store)
+        store: Box<dyn KeyValueStore>,
+    ) -> Box<dyn KeyValueTypedStore<Bytes, Bytes>> {
+        Box::new(KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store))
     }
 }
 
-pub struct RadixHistory<T: KeyValueTypedStore<Bytes, Bytes>> {
+pub struct RadixHistory {
     root_hash: blake3::Hash,
     root_node: Node,
-    imple: RadixTreeImpl<T>,
-    store: T,
+    imple: RadixTreeImpl,
+    store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
 }
 
-impl<T: KeyValueTypedStore<Bytes, Bytes>> History for RadixHistory<T> {
+impl History for RadixHistory {
     fn read(&self, key: Bytes) -> Option<Bytes> {
         todo!()
     }

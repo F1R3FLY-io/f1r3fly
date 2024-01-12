@@ -9,6 +9,6 @@ pub mod rspace;
 mod space_matcher;
 mod checkpoint;
 mod hot_store_action;
-mod shared;
+pub mod shared;
 mod hot_store_trie_action;
 mod state;

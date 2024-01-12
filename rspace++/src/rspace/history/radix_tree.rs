@@ -20,11 +20,11 @@ struct NodePtr {
 
 pub type Node = Vec<Item>;
 
-pub struct RadixTreeImpl<T: KeyValueTypedStore<Bytes, Bytes>> {
-    pub store: T,
+pub struct RadixTreeImpl {
+    pub store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
 }
 
-impl<T: KeyValueTypedStore<Bytes, Bytes>> RadixTreeImpl<T> {
+impl RadixTreeImpl {
     pub fn load_node(&self, node_ptr: Bytes, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
         todo!()
