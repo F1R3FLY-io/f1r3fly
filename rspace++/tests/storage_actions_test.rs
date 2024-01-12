@@ -1,18 +1,21 @@
 // See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
 #[cfg(test)]
 mod tests {
-    use rspace_plus_plus::rspace::hot_store::HotStore;
     use rspace_plus_plus::rspace::internal::Datum;
     use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
     use rspace_plus_plus::rspace::matcher::r#match::Match;
-    use rspace_plus_plus::rspace::rspace::RSpace;
+    use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+    use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+    use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
     use serde::Serialize;
     use std::collections::{BTreeSet, HashSet, LinkedList};
     use std::hash::Hash;
+    use std::path::PathBuf;
 
     // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-    #[derive(Clone, Debug, Serialize)]
+    #[derive(Clone, Debug, Serialize, Default)]
     enum Pattern<'a> {
+        #[default]
         Wildcard,
         StringMatch(&'a str),
     }
@@ -35,7 +38,7 @@ mod tests {
     }
 
     // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-    #[derive(Clone, Debug, Serialize)]
+    #[derive(Clone, Debug, Serialize, Default)]
     struct StringsCaptor<'a> {
         res: LinkedList<Vec<&'a str>>,
     }
@@ -92,10 +95,19 @@ mod tests {
         cloned_results
     }
 
+    fn create_rspace(
+    ) -> RSpace<&'static str, Pattern<'static>, &'static str, StringsCaptor<'static>, StringMatch>
+    {
+        let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+        let store = kvm.r_space_stores();
+
+        RSpaceInstances::create(store, StringMatch)
+    }
+
     // NOTE: Not implementing test checks for Scala's side 'insertData' and 'insertContinuations'
     #[test]
     fn produce_should_persist_data_in_store() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -110,7 +122,7 @@ mod tests {
 
     #[test]
     fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_store() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -136,7 +148,7 @@ mod tests {
 
     #[test]
     fn consuming_on_one_channel_should_persist_continuation_in_store() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
         let patterns = vec![Pattern::Wildcard];
@@ -153,7 +165,7 @@ mod tests {
 
     #[test]
     fn consuming_on_three_channels_should_persist_continuation_in_store() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let key = vec!["ch1", "ch2", "ch3"];
         let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
@@ -171,7 +183,7 @@ mod tests {
 
     #[test]
     fn producing_then_consuming_on_same_channel_should_return_continuation_and_data() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -204,7 +216,7 @@ mod tests {
     #[test]
     fn producing_then_consuming_on_same_channel_with_peek_should_return_continuation_and_data_and_remove_peeked_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -237,7 +249,7 @@ mod tests {
     #[test]
     fn consuming_then_producing_on_same_channel_with_peek_should_return_continuation_and_data_and_remove_peeked_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -267,7 +279,7 @@ mod tests {
     #[test]
     fn consuming_then_producing_on_same_channel_with_persistent_flag_should_return_continuation_and_data_and_not_insert_persistent_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "ch1";
         let key = vec![channel];
 
@@ -296,7 +308,7 @@ mod tests {
 
     #[test]
     fn producing_three_times_then_consuming_three_times_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let possible_cont_results = vec![
             vec!["datum1".to_string()],
             vec!["datum2".to_string()],
@@ -352,7 +364,7 @@ mod tests {
     #[test]
     fn producing_on_channel_then_consuming_on_that_channel_and_another_then_producing_on_other_channel_should_return_continuation_and_all_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let produce_key_1 = vec!["ch1"];
         let produce_key_2 = vec!["ch2"];
         let consume_key = vec!["ch1", "ch2"];
@@ -402,7 +414,7 @@ mod tests {
 
     #[test]
     fn producing_on_three_channels_then_consuming_once_should_return_cont_and_all_data() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let produce_key_1 = vec!["ch1"];
         let produce_key_2 = vec!["ch2"];
         let produce_key_3 = vec!["ch3"];
@@ -462,7 +474,7 @@ mod tests {
     #[test]
     fn producing_then_consuming_three_times_on_same_channel_should_return_three_pairs_of_conts_and_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let captor = StringsCaptor::new();
         let key = vec!["ch1"];
 
@@ -516,7 +528,7 @@ mod tests {
     #[test]
     fn consuming_then_producing_three_times_on_same_channel_should_return_conts_each_paired_with_distinct_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let _ = rspace.consume(
             vec!["ch1"],
             vec![Pattern::Wildcard],
@@ -572,7 +584,7 @@ mod tests {
     #[test]
     fn consuming_then_producing_three_times_on_same_channel_with_non_trivial_matches_should_return_three_conts_each_paired_with_matching_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let _ = rspace.consume(
             vec!["ch1"],
             vec![Pattern::StringMatch("datum1")],
@@ -609,7 +621,7 @@ mod tests {
 
     #[test]
     fn consuming_on_two_channels_then_producing_on_each_should_return_cont_with_both_data() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let r1 = rspace.consume(
             vec!["ch1", "ch2"],
             vec![Pattern::Wildcard, Pattern::Wildcard],
@@ -632,7 +644,7 @@ mod tests {
 
     #[test]
     fn joined_consume_with_same_channel_given_twice_followed_by_produce_should_not_error() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channels = vec!["ch1", "ch1"];
 
         let r1 = rspace.consume(
@@ -657,7 +669,7 @@ mod tests {
     #[test]
     fn consuming_then_producing_twice_on_same_channel_with_different_patterns_should_return_cont_with_expected_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channels = vec!["ch1", "ch2"];
 
         let r1 = rspace.consume(
@@ -699,7 +711,7 @@ mod tests {
 
     #[test]
     fn consuming_and_producing_with_non_trivial_matches_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let r1 = rspace.consume(
             vec!["ch1", "ch2"],
@@ -728,7 +740,7 @@ mod tests {
 
     #[test]
     fn consuming_and_producing_twice_with_non_trivial_matches_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let _ = rspace.consume(
             vec!["ch1"],
@@ -760,7 +772,7 @@ mod tests {
     #[test]
     fn consuming_on_two_channels_then_consuming_on_one_then_producing_on_both_separately_should_return_cont_paired_with_one_data(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let _ = rspace.consume(
             vec!["ch1", "ch2"],
@@ -805,7 +817,7 @@ mod tests {
     /* Persist tests */
     #[test]
     fn producing_then_persistent_consume_on_same_channel_should_return_cont_and_data() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let key = vec!["ch1"];
 
         let r1 = rspace.produce(key[0], "datum", false);
@@ -842,7 +854,7 @@ mod tests {
     #[test]
     fn producing_then_persistent_consume_then_producing_again_on_same_channel_should_return_cont_for_first_and_second_produce(
     ) {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let key = vec!["ch1"];
 
         let r1 = rspace.produce(key[0], "datum1", false);
@@ -890,7 +902,7 @@ mod tests {
     //       This is doable because of the way they setup their 'StringsCaptor' instance
     #[test]
     fn doing_persistent_consume_and_producing_multiple_times_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let r1 = rspace.consume(
             vec!["ch1"],
@@ -929,7 +941,7 @@ mod tests {
 
     #[test]
     fn consuming_and_doing_persistent_produce_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let r1 = rspace.consume(
             vec!["ch1"],
@@ -954,7 +966,7 @@ mod tests {
 
     #[test]
     fn consuming_then_persistent_produce_then_consuming_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let r1 = rspace.consume(
             vec!["ch1"],
@@ -993,7 +1005,7 @@ mod tests {
 
     #[test]
     fn doing_persistent_produce_and_consuming_twice_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
 
         let r1 = rspace.produce("ch1", "datum1", true);
         let d1 = rspace.store.get_data(&"ch1");
@@ -1033,7 +1045,7 @@ mod tests {
 
     #[test]
     fn producing_three_times_then_doing_persistent_consume_should_work() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let expected_data = vec![
             Datum::create("ch1", "datum1", false),
             Datum::create("ch1", "datum2", false),
@@ -1115,7 +1127,7 @@ mod tests {
 
     #[test]
     fn persistent_produce_should_be_available_for_multiple_matches() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let channel = "chan";
 
         let r1 = rspace.produce(channel, "datum", true);
@@ -1138,7 +1150,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "RUST ERROR: channels.length must equal patterns.length")]
     fn consuming_with_different_pattern_and_channel_lengths_should_error() {
-        let rspace = RSpace::<&str, Pattern, &str, StringsCaptor, StringMatch>::create(StringMatch);
+        let rspace = create_rspace();
         let r1 = rspace.consume(
             vec!["ch1", "ch2"],
             vec![Pattern::Wildcard],
