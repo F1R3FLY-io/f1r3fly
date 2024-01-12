@@ -1,11 +1,11 @@
 use crate::rspace::history::roots_store::RootsStore;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootRepository.scala
-pub struct RootRepository<T: RootsStore> {
-    pub roots_store: T,
+pub struct RootRepository {
+    pub roots_store: Box<dyn RootsStore>,
 }
 
-impl<T: RootsStore> RootRepository<T> {
+impl RootRepository {
     fn commit(&self, root: blake3::Hash) -> () {
         todo!()
     }

@@ -550,11 +550,10 @@ impl<
 
 pub struct RSpaceInstances;
 
-#[derive(Default)]
-pub struct RSpaceStore<U: KeyValueStore> {
-    history: U,
-    roots: U,
-    cold: U,
+pub struct RSpaceStore {
+    pub history: Box<dyn KeyValueStore>,
+    pub roots: Box<dyn KeyValueStore>,
+    pub cold: Box<dyn KeyValueStore>,
 }
 
 impl RSpaceInstances {
@@ -581,17 +580,17 @@ impl RSpaceInstances {
     }
 
     pub fn create<
-        C: Clone + Ord + Default + Debug + Hash + 'static,
-        P: Clone + Debug + Default + 'static,
-        A: Clone + Debug + Default + 'static,
-        K: Clone + Debug + Default + 'static,
-        U: KeyValueStore + Clone + 'static,
+        C: Clone + Ord + Default + Debug + Hash,
+        P: Clone + Debug + Default,
+        A: Clone + Debug + Default,
+        K: Clone + Debug + Default,
+        U: KeyValueStore + Clone,
         M: Match<P, A>,
     >(
-        store: RSpaceStore<U>,
+        store: RSpaceStore,
         matcher: M,
     ) -> RSpace<C, P, A, K, M> {
-        let setup = RSpaceInstances::create_history_repo::<C, P, A, K, U, M>(store);
+        let setup = RSpaceInstances::create_history_repo::<C, P, A, K, U>(store);
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
         space
@@ -601,17 +600,19 @@ impl RSpaceInstances {
      * Creates [[HistoryRepository]] and [[HotStore]].
      */
     pub fn create_history_repo<
-        C: Clone + Eq + Hash + Debug + Default + 'static,
-        P: Clone + Default + Debug + 'static,
-        A: Clone + Default + Debug + 'static,
-        K: Clone + Default + Debug + 'static,
-        U: KeyValueStore + Clone + 'static,
-        M: Match<P, A>,
+        C: Clone + Eq + Hash + Debug + Default,
+        P: Clone + Default + Debug,
+        A: Clone + Default + Debug,
+        K: Clone + Default + Debug,
+        U: KeyValueStore + Clone,
     >(
-        store: RSpaceStore<U>,
-    ) -> (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>) {
-        let history_repo =
-            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold);
+        store: RSpaceStore,
+    ) -> (impl HistoryRepository<C, P, A, K>, impl HotStore<C, P, A, K>) {
+        let history_repo = HistoryRepositoryInstances::lmdb_repository::<U>(
+            store.history,
+            store.roots,
+            store.cold,
+        );
 
         let history_reader = history_repo.get_history_reader(history_repo.root());
 

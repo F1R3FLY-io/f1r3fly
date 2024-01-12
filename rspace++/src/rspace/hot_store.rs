@@ -583,7 +583,7 @@ impl HotStoreInstances {
         K: Default + Clone + Debug + 'static,
     >(
         history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> Box<dyn HotStore<C, P, A, K>> {
-        Box::new(HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader))
+    ) -> impl HotStore<C, P, A, K> {
+        HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader)
     }
 }

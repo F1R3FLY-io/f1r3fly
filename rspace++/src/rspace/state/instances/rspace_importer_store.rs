@@ -13,19 +13,19 @@ impl RSpaceImporterStore {
         history_store: U,
         value_store: U,
         roots_store: U,
-    ) -> impl RSpaceImporter {
+    ) -> impl RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes> {
         RSpaceImporterImpl {
-            history_store,
-            value_store,
-            roots_store,
+            source_history_store: history_store,
+            source_value_store: value_store,
+            source_roots_store: roots_store,
         }
     }
 }
 
 struct RSpaceImporterImpl<U: KeyValueStore> {
-    history_store: U,
-    value_store: U,
-    roots_store: U,
+    source_history_store: U,
+    source_value_store: U,
+    source_roots_store: U,
 }
 
 impl<U: KeyValueStore> RSpaceImporter for RSpaceImporterImpl<U> {

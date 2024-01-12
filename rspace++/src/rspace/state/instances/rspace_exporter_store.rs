@@ -12,7 +12,11 @@ impl RSpaceExporterStore {
         history_store: U,
         value_store: U,
         roots_store: U,
-    ) -> impl RSpaceExporter {
+    ) -> impl RSpaceExporter<
+        KeyHash = blake3::Hash,
+        NodePath = Vec<(blake3::Hash, Option<u8>)>,
+        Value = Bytes,
+    > {
         RSpaceExporterImpl {
             source_history_store: history_store,
             source_value_store: value_store,

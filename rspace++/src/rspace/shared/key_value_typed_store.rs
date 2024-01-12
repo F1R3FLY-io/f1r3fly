@@ -1,6 +1,5 @@
 use crate::rspace::shared::key_value_store::KeyValueStore;
-use dashmap::DashMap;
-use std::marker::PhantomData;
+use std::{collections::BTreeMap, marker::PhantomData};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStore.scala
 pub trait KeyValueTypedStore<K, V> {
@@ -16,7 +15,7 @@ pub trait KeyValueTypedStore<K, V> {
     // TODO: Update this to match scala
     fn collect(&self) -> ();
 
-    fn to_map(&self) -> DashMap<K, V>;
+    fn to_map(&self) -> BTreeMap<K, V>;
 }
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreCodec.scala
@@ -47,7 +46,7 @@ impl<U: KeyValueStore, K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInst
         todo!()
     }
 
-    fn to_map(&self) -> DashMap<K, V> {
+    fn to_map(&self) -> BTreeMap<K, V> {
         todo!()
     }
 }

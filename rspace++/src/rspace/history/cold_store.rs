@@ -8,10 +8,10 @@ use bytes::Bytes;
 pub struct ColdStoreInstances;
 
 impl ColdStoreInstances {
-    pub fn cold_store<U: KeyValueStore + Clone>(
-        store: U,
-    ) -> impl KeyValueTypedStore<blake3::Hash, PersistedData> {
-        KeyValueStoreOps::to_typed_store::<blake3::Hash, PersistedData>(store)
+    pub fn cold_store(
+        store: impl KeyValueStore + Clone,
+    ) -> Box<dyn KeyValueTypedStore<blake3::Hash, PersistedData>> {
+        Box::new(KeyValueStoreOps::to_typed_store::<blake3::Hash, PersistedData>(store))
     }
 }
 

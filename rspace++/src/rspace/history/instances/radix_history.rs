@@ -1,4 +1,5 @@
 use crate::rspace::history::history::History;
+use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::radix_tree::{Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
@@ -8,10 +9,10 @@ use bytes::Bytes;
 pub struct RadixHistoryInstances;
 
 impl RadixHistoryInstances {
-    pub fn create<T: KeyValueTypedStore<Bytes, Bytes> + Clone>(
+    pub fn create(
         root: blake3::Hash,
-        store: T,
-    ) -> RadixHistory<T> {
+        store: impl KeyValueTypedStore<Bytes, Bytes> + Clone,
+    ) -> RadixHistory<impl KeyValueTypedStore<Bytes, Bytes>> {
         let imple = RadixTreeImpl {
             store: store.clone(),
         };
@@ -25,8 +26,8 @@ impl RadixHistoryInstances {
         }
     }
 
-    pub fn create_store<U: KeyValueStore + Clone>(
-        store: U,
+    pub fn create_store(
+        store: impl KeyValueStore + Clone,
     ) -> impl KeyValueTypedStore<Bytes, Bytes> + Clone {
         KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store)
     }
@@ -44,10 +45,7 @@ impl<T: KeyValueTypedStore<Bytes, Bytes>> History for RadixHistory<T> {
         todo!()
     }
 
-    fn process(
-        &self,
-        actions: Vec<crate::rspace::history::history_action::HistoryAction>,
-    ) -> Box<dyn History> {
+    fn process(&self, actions: Vec<HistoryAction>) -> Box<dyn History> {
         todo!()
     }
 

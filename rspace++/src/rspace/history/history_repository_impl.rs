@@ -6,40 +6,26 @@ use crate::rspace::history::roots_store::RootsStore;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use bytes::Bytes;
 use std::marker::PhantomData;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepositoryImpl.scala
-pub struct HistoryRepositoryImpl<
-    C,
-    P,
-    A,
-    K,
-    H: History,
-    R: RootsStore,
-    T: KeyValueTypedStore<blake3::Hash, PersistedData>,
-    E: RSpaceExporter,
-    I: RSpaceImporter,
-> {
-    pub current_history: H,
-    pub roots_repository: RootRepository<R>,
-    pub leaf_store: T,
-    pub rspace_exporter: E,
-    pub rspace_importer: I,
+pub struct HistoryRepositoryImpl<C, P, A, K> {
+    pub current_history: Box<dyn History>,
+    pub roots_repository: RootRepository,
+    pub leaf_store: Box<dyn KeyValueTypedStore<blake3::Hash, PersistedData>>,
+    pub rspace_exporter: Box<
+        dyn RSpaceExporter<
+            KeyHash = blake3::Hash,
+            NodePath = Vec<(blake3::Hash, Option<u8>)>,
+            Value = Bytes,
+        >,
+    >,
+    pub rspace_importer: Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes>>,
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<
-        C,
-        P,
-        A,
-        K,
-        H: History,
-        R: RootsStore,
-        T: KeyValueTypedStore<blake3::Hash, PersistedData>,
-        E: RSpaceExporter,
-        I: RSpaceImporter,
-    > HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K, H, R, T, E, I>
-{
+impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K> {
     fn checkpoint(
         &self,
         actions: Vec<crate::rspace::hot_store_action::HotStoreAction<C, P, A, K>>,

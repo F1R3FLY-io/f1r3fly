@@ -12,7 +12,7 @@ pub trait RootsStore {
 pub struct RootsStoreInstances;
 
 impl RootsStoreInstances {
-    pub fn roots_store<T: KeyValueStore>(store: T) -> impl RootsStore {
+    pub fn roots_store<U: KeyValueStore + Clone>(store: &U) -> impl RootsStore {
         struct RootsStoreInstance;
 
         impl RootsStore for RootsStoreInstance {
