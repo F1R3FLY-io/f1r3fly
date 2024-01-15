@@ -1,5 +1,9 @@
 use super::{key_value_store::KeyValueStore, key_value_store_manager::KeyValueStoreManager};
+use async_trait::async_trait;
+use futures::channel::oneshot;
+use std::sync::Arc;
 use std::{collections::BTreeMap, path::PathBuf};
+use tokio::sync::Mutex;
 
 // See shared/src/main/scala/coop/rchain/store/LmdbDirStoreManager.scala
 pub struct LmdbDirStoreManagerInstances;
@@ -12,6 +16,9 @@ impl LmdbDirStoreManagerInstances {
         LmdbDirStoreManager {
             dir_path,
             db_instance_mapping,
+            managers_state: Arc::new(Mutex::new(StoreState {
+                envs: BTreeMap::new(),
+            })),
         }
     }
 }
@@ -51,14 +58,64 @@ impl LmdbEnvConfig {
     }
 }
 
+// The idea for this class is to manage multiple of key-value lmdb databases.
+// For LMDB this allows control which databases are part of the same environment (file).
 struct LmdbDirStoreManager {
     dir_path: PathBuf,
     db_instance_mapping: BTreeMap<Db, LmdbEnvConfig>,
+    managers_state: Arc<Mutex<StoreState>>,
 }
 
+struct StoreState {
+    envs: BTreeMap<String, oneshot::Receiver<Box<dyn KeyValueStoreManager>>>,
+}
+
+#[async_trait]
 impl KeyValueStoreManager for LmdbDirStoreManager {
-    fn store(&self, name: String) -> Box<dyn KeyValueStore> {
-        todo!()
+    // fn store(&self, name: String) -> Box<dyn KeyValueStore> {
+    //     let mapping = &self.db_instance_mapping;
+    //     let db_instance_mapping: BTreeMap<&String, (&Db, &LmdbEnvConfig)> = mapping
+    //         .into_iter()
+    //         .map(|(db, cfg)| (&db.id, (db, cfg)))
+    //         .collect();
+
+    //     let (sender, receiver) = oneshot::channel::<Box<dyn KeyValueStoreManager>>();
+
+    //     todo!()
+    // }
+
+    async fn store(&self, db_name: String) -> Box<dyn KeyValueStore> {
+        let mapping = &self.db_instance_mapping;
+        let db_instance_mapping: BTreeMap<&String, (&Db, &LmdbEnvConfig)> = mapping
+            .into_iter()
+            .map(|(db, cfg)| (&db.id, (db, cfg)))
+            .collect();
+
+        let (sender, receiver) = oneshot::channel::<Box<dyn KeyValueStoreManager>>();
+        let mut state = self.managers_state.lock().await;
+
+        let (db, cfg) = self.db_instance_mapping.get(&db_name).unwrap(); // Simplified for example purposes
+        let man_name = &cfg.name;
+
+        let (is_new, receiver) = match state.envs.get(man_name) {
+            Some(receiver) => (false, receiver.clone()),
+            None => {
+                state.envs.insert(man_name.clone(), new_receiver);
+                (true, new_receiver)
+            }
+        };
+
+        drop(state); // Explicitly drop the lock
+
+        if is_new {
+            create_lmdb_manager(cfg.clone(), new_sender).await;
+        }
+
+        let manager = receiver.await.unwrap(); // Simplified error handling
+        let database_name = db.name_override.unwrap_or_else(|| db.id.clone());
+        let database = manager.store(database_name).await; // Assuming store is an async method
+
+        database
     }
 
     fn shutdown(&self) -> () {
