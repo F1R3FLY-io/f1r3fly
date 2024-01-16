@@ -4,29 +4,34 @@ use async_trait::async_trait;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStoreManager.scala
 #[async_trait]
-pub trait KeyValueStoreManager {
-    async fn store(&self, name: String) -> Box<dyn KeyValueStore>;
+pub trait KeyValueStoreManager: Send + Sync {
+    async fn store(&self, name: String) -> Result<Box<dyn KeyValueStore>, KVSManagerError>;
 
     fn shutdown(&self) -> ();
 
-    async fn r_space_stores(&self) -> RSpaceStore {
+    async fn r_space_stores(&self) -> Result<RSpaceStore, KVSManagerError> {
         self.get_stores("rspace").await
     }
 
-    async fn eval_stores(&self) -> RSpaceStore {
+    async fn eval_stores(&self) -> Result<RSpaceStore, KVSManagerError> {
         self.get_stores("eval").await
     }
 
     // TODO: This function should be private
-    async fn get_stores(&self, db_prefix: &str) -> RSpaceStore {
-        let history = self.store(format!("{}-history", db_prefix)).await;
-        let roots = self.store(format!("{}-roots", db_prefix)).await;
-        let cold = self.store(format!("{}-cold", db_prefix)).await;
+    async fn get_stores(&self, db_prefix: &str) -> Result<RSpaceStore, KVSManagerError> {
+        let history = self.store(format!("{}-history", db_prefix)).await?;
+        let roots = self.store(format!("{}-roots", db_prefix)).await?;
+        let cold = self.store(format!("{}-cold", db_prefix)).await?;
 
-        RSpaceStore {
+        Ok(RSpaceStore {
             history,
             roots,
             cold,
-        }
+        })
     }
+}
+
+#[derive(Debug)]
+pub struct KVSManagerError {
+    pub message: String,
 }

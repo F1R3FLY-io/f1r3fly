@@ -63,8 +63,13 @@ pub struct Space {
 
 #[no_mangle]
 pub extern "C" fn space_new() -> *mut Space {
-    let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
-    let store = kvm.r_space_stores();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let store = rt
+        .block_on(async {
+            let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+            kvm.r_space_stores().await
+        })
+        .unwrap();
 
     Box::into_raw(Box::new(Space {
         rspace: RSpaceInstances::create(store, SpaceMatcher),

@@ -5,7 +5,7 @@ use bytes::Bytes;
 use std::{any::Any, io::Cursor, marker::PhantomData};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
-pub trait KeyValueStore {
+pub trait KeyValueStore: Send + Sync {
     fn get(
         &self,
         keys: Vec<Cursor<Bytes>>,
