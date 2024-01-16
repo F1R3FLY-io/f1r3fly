@@ -98,8 +98,13 @@ mod tests {
     fn create_rspace(
     ) -> RSpace<&'static str, Pattern<'static>, &'static str, StringsCaptor<'static>, StringMatch>
     {
-        let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
-        let store = kvm.r_space_stores();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let store = rt
+            .block_on(async {
+                let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+                kvm.r_space_stores().await
+            })
+            .unwrap();
 
         RSpaceInstances::create(store, StringMatch)
     }

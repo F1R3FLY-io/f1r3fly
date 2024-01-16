@@ -7,7 +7,7 @@ use async_trait::async_trait;
 pub trait KeyValueStoreManager: Send + Sync {
     async fn store(&self, name: String) -> Result<Box<dyn KeyValueStore>, KVSManagerError>;
 
-    fn shutdown(&self) -> ();
+    async fn shutdown(&self) -> ();
 
     async fn r_space_stores(&self) -> Result<RSpaceStore, KVSManagerError> {
         self.get_stores("rspace").await
