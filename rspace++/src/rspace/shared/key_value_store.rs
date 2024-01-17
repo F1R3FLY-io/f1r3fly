@@ -1,29 +1,19 @@
 use crate::rspace::shared::key_value_typed_store::{
     KeyValueTypedStore, KeyValueTypedStoreInstance,
 };
-use bytes::Bytes;
-use std::{any::Any, io::Cursor, marker::PhantomData};
+use async_trait::async_trait;
+use std::marker::PhantomData;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
+#[async_trait]
 pub trait KeyValueStore: Send + Sync {
-    fn get(
-        &self,
-        keys: Vec<Cursor<Bytes>>,
-        from_buffer: fn(Cursor<Bytes>) -> Box<dyn Any>,
-    ) -> Vec<Option<Box<dyn Any>>>;
+    async fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error>;
 
-    fn put(
-        &self,
-        kv_pairs: Vec<(Cursor<Bytes>, Box<dyn Any>)>,
-        to_buffer: fn(Box<dyn Any>) -> Cursor<Bytes>,
-    ) -> ();
+    async fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error>;
 
-    fn delete(&self, keys: Vec<Cursor<Bytes>>) -> i32;
+    async fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error>;
 
-    fn iterate(
-        &self,
-        f: fn(Box<dyn Iterator<Item = (Cursor<Bytes>, Cursor<Bytes>)>>) -> Box<dyn Any>,
-    ) -> Box<dyn Any>;
+    async fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error>;
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
 }

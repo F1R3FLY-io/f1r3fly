@@ -66,7 +66,7 @@ pub extern "C" fn space_new() -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let store = rt
         .block_on(async {
-            let kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+            let mut kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
             kvm.r_space_stores().await
         })
         .unwrap();

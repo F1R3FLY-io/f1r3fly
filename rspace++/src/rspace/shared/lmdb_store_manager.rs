@@ -1,10 +1,10 @@
 use super::{
-    key_value_store::KeyValueStore,
-    key_value_store_manager::{KVSManagerError, KeyValueStoreManager},
+    key_value_store::KeyValueStore, key_value_store_manager::KeyValueStoreManager,
+    lmdb_key_value_store::LmdbKeyValueStore,
 };
 use async_trait::async_trait;
 use futures::channel::oneshot;
-use heed::{types::ByteSlice, Database, Env, EnvOpenOptions};
+use heed::{types::SerdeBincode, Database, Env, EnvOpenOptions};
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -20,7 +20,7 @@ pub struct LmdbStoreManager {
 #[derive(Clone)]
 struct DbEnv {
     env: Env,
-    db: Database<ByteSlice, ByteSlice>,
+    db: Database<SerdeBincode<Vec<u8>>, SerdeBincode<Vec<u8>>>,
 }
 
 impl LmdbStoreManager {
@@ -48,7 +48,7 @@ impl LmdbStoreManager {
             let sender = self.env_sender.take().ok_or_else(|| {
                 heed::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    "LMDB environment sender unavailable",
+                    "LMDB_Store_Manager: LMDB environment sender unavailable",
                 ))
             })?;
             let _ = sender.send(env); // Send the environment to the receiver
@@ -58,13 +58,13 @@ impl LmdbStoreManager {
         let receiver = self.env_receiver.take().ok_or_else(|| {
             heed::Error::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "LMDB environment receiver unavailable",
+                "LMDB_Store_Manager: LMDB environment receiver unavailable",
             ))
         })?;
         let env = receiver.await.or_else(|_| {
             Err(heed::Error::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "LMDB environment was not received",
+                "LMDB_Store_Manager: LMDB environment was not received",
             )))
         })?;
 
@@ -93,8 +93,9 @@ impl LmdbStoreManager {
 
 #[async_trait]
 impl KeyValueStoreManager for LmdbStoreManager {
-    async fn store(&self, name: String) -> Result<Box<dyn KeyValueStore>, KVSManagerError> {
-        todo!()
+    async fn store(&mut self, name: String) -> Result<Box<dyn KeyValueStore>, heed::Error> {
+        let db_env = self.get_current_env(&name).await?;
+        Ok(Box::new(LmdbKeyValueStore::new(db_env.env, db_env.db)))
     }
 
     async fn shutdown(&mut self) -> Result<(), heed::Error> {
@@ -107,7 +108,7 @@ impl KeyValueStoreManager for LmdbStoreManager {
             let env = receiver.await.map_err(|_| {
                 heed::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    "Failed to receive LMDB environment for shutdown",
+                    "LMDB_Store_Manager: Failed to receive LMDB environment for shutdown",
                 ))
             })?;
             drop(env);

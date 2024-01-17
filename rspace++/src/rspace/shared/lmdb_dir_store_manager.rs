@@ -1,8 +1,5 @@
 use super::lmdb_store_manager::LmdbStoreManager;
-use super::{
-    key_value_store::KeyValueStore, key_value_store_manager::KVSManagerError,
-    key_value_store_manager::KeyValueStoreManager,
-};
+use super::{key_value_store::KeyValueStore, key_value_store_manager::KeyValueStoreManager};
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use std::sync::Arc;
@@ -28,9 +25,9 @@ impl Db {
 }
 
 // Mega, giga and tera bytes
-const MB: usize = 1024 * 1024;
-const GB: usize = 1024 * MB;
-const TB: usize = 1024 * GB;
+pub const MB: usize = 1024 * 1024;
+pub const GB: usize = 1024 * MB;
+pub const TB: usize = 1024 * GB;
 
 #[derive(Clone)]
 pub struct LmdbEnvConfig {
@@ -59,7 +56,7 @@ struct StoreState {
 
 #[async_trait]
 impl KeyValueStoreManager for LmdbDirStoreManager {
-    async fn store(&self, db_name: String) -> Result<Box<dyn KeyValueStore>, KVSManagerError> {
+    async fn store(&mut self, db_name: String) -> Result<Box<dyn KeyValueStore>, heed::Error> {
         let db_instance_mapping: BTreeMap<&String, (&Db, &LmdbEnvConfig)> = self
             .db_mapping
             .iter()
@@ -71,9 +68,13 @@ impl KeyValueStoreManager for LmdbDirStoreManager {
         let action = {
             let mut state = self.managers_state.lock().await;
 
-            let (db, cfg) = db_instance_mapping.get(&db_name).ok_or(KVSManagerError {
-                message: format!("LMDB_Dir_Store_Manager: Key {} was not found", db_name),
+            let (db, cfg) = db_instance_mapping.get(&db_name).ok_or({
+                heed::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("LMDB_Dir_Store_Manager: Key {} was not found", db_name),
+                ))
             })?;
+
             let man_name = cfg.name.to_string();
 
             let is_new = !state.envs.contains_key(&man_name);
@@ -89,13 +90,20 @@ impl KeyValueStoreManager for LmdbDirStoreManager {
             self.create_lmdb_manager(man_cfg, sender)?;
         }
 
-        let manager = {
+        let mut manager = {
             let mut state = self.managers_state.lock().await;
-            let receiver = state.envs.get_mut(&man_cfg.name).ok_or(KVSManagerError {
-                message: format!("LMDB_Dir_Store_Manager: Receiver not found"),
+            let receiver = state.envs.get_mut(&man_cfg.name).ok_or({
+                heed::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("LMDB_Dir_Store_Manager: Receiver not found"),
+                ))
             })?;
-            receiver.await.map_err(|_| KVSManagerError {
-                message: format!("LMDB_Dir_Store_Manager: Failed to receive manager"),
+
+            receiver.await.map_err(|_| {
+                heed::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("LMDB_Dir_Store_Manager: Failed to receive manager"),
+                ))
             })?
         };
 
@@ -135,12 +143,16 @@ impl LmdbDirStoreManager {
         &self,
         config: &LmdbEnvConfig,
         sender: oneshot::Sender<Box<dyn KeyValueStoreManager>>,
-    ) -> Result<(), KVSManagerError> {
+    ) -> Result<(), heed::Error> {
         let manager: Box<dyn KeyValueStoreManager> =
             LmdbStoreManager::new(self.dir_path.join(&config.name), config.max_env_size);
-        sender.send(manager).map_err(|_| KVSManagerError {
-            message: "LMDB_Dir_Store_Manager: Failed to send manager".to_string(),
+        sender.send(manager).map_err(|_| {
+            heed::Error::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "LMDB_Dir_Store_Manager: Failed to send manager",
+            ))
         })?;
+
         Ok(())
     }
 }
