@@ -9,24 +9,6 @@ use std::sync::Arc;
 use std::{collections::BTreeMap, path::PathBuf};
 use tokio::sync::Mutex;
 
-// See shared/src/main/scala/coop/rchain/store/LmdbDirStoreManager.scala
-pub struct LmdbDirStoreManagerInstances;
-
-impl LmdbDirStoreManagerInstances {
-    pub fn create(
-        dir_path: PathBuf,
-        db_instance_mapping: BTreeMap<Db, LmdbEnvConfig>,
-    ) -> impl KeyValueStoreManager {
-        LmdbDirStoreManager {
-            dir_path,
-            db_mapping: db_instance_mapping,
-            managers_state: Arc::new(Mutex::new(StoreState {
-                envs: BTreeMap::new(),
-            })),
-        }
-    }
-}
-
 /**
  * Specification for LMDB database: unique identifier and database name
  *
@@ -46,25 +28,26 @@ impl Db {
 }
 
 // Mega, giga and tera bytes
-const MB: i64 = 1024 * 1024;
-const GB: i64 = 1024 * MB;
-const TB: i64 = 1024 * GB;
+const MB: usize = 1024 * 1024;
+const GB: usize = 1024 * MB;
+const TB: usize = 1024 * GB;
 
 #[derive(Clone)]
 pub struct LmdbEnvConfig {
     pub name: String,
-    pub max_env_size: i64,
+    pub max_env_size: usize,
 }
 
 impl LmdbEnvConfig {
-    pub fn new(name: String, max_env_size: i64) -> Self {
+    pub fn new(name: String, max_env_size: usize) -> Self {
         LmdbEnvConfig { name, max_env_size }
     }
 }
 
+// See shared/src/main/scala/coop/rchain/store/LmdbDirStoreManager.scala
 // The idea for this class is to manage multiple of key-value lmdb databases.
 // For LMDB this allows control which databases are part of the same environment (file).
-struct LmdbDirStoreManager {
+pub struct LmdbDirStoreManager {
     dir_path: PathBuf,
     db_mapping: BTreeMap<Db, LmdbEnvConfig>,
     managers_state: Arc<Mutex<StoreState>>,
@@ -122,17 +105,32 @@ impl KeyValueStoreManager for LmdbDirStoreManager {
         database.await
     }
 
-    async fn shutdown(&self) -> () {
+    async fn shutdown(&mut self) -> Result<(), heed::Error> {
         let mut state = self.managers_state.lock().await;
         for manager_future in state.envs.values_mut() {
-            if let Ok(manager) = manager_future.await {
-                manager.shutdown().await;
+            if let Ok(mut manager) = manager_future.await {
+                let _ = manager.shutdown().await;
             }
         }
+
+        Ok(())
     }
 }
 
 impl LmdbDirStoreManager {
+    pub fn new(
+        dir_path: PathBuf,
+        db_instance_mapping: BTreeMap<Db, LmdbEnvConfig>,
+    ) -> impl KeyValueStoreManager {
+        LmdbDirStoreManager {
+            dir_path,
+            db_mapping: db_instance_mapping,
+            managers_state: Arc::new(Mutex::new(StoreState {
+                envs: BTreeMap::new(),
+            })),
+        }
+    }
+
     fn create_lmdb_manager(
         &self,
         config: &LmdbEnvConfig,
@@ -141,7 +139,7 @@ impl LmdbDirStoreManager {
         let manager: Box<dyn KeyValueStoreManager> =
             LmdbStoreManager::new(self.dir_path.join(&config.name), config.max_env_size);
         sender.send(manager).map_err(|_| KVSManagerError {
-            message: "LMDB_Dir_Store_Manager: Failed to send managerd".to_string(),
+            message: "LMDB_Dir_Store_Manager: Failed to send manager".to_string(),
         })?;
         Ok(())
     }

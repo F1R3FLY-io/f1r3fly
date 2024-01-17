@@ -26,13 +26,6 @@ pub trait KeyValueStore: Send + Sync {
     ) -> Box<dyn Any>;
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
-
-    // fn to_typed_store(&self) -> Box<dyn KeyValueTypedStore<Box<dyn Any>, Box<dyn Any>>> {
-    //     Box::new(KeyValueTypedStoreInstance {
-    //         store: Box::new(self),
-    //         _marker: PhantomData,
-    //     })
-    // }
 }
 
 impl Clone for Box<dyn KeyValueStore> {
