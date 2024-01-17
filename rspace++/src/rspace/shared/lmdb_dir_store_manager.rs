@@ -1,3 +1,4 @@
+use super::lmdb_store_manager::LmdbStoreManager;
 use super::{
     key_value_store::KeyValueStore, key_value_store_manager::KVSManagerError,
     key_value_store_manager::KeyValueStoreManager,
@@ -45,18 +46,18 @@ impl Db {
 }
 
 // Mega, giga and tera bytes
-const MB: u64 = 1024 * 1024;
-const GB: u64 = 1024 * MB;
-const TB: u64 = 1024 * GB;
+const MB: i64 = 1024 * 1024;
+const GB: i64 = 1024 * MB;
+const TB: i64 = 1024 * GB;
 
 #[derive(Clone)]
 pub struct LmdbEnvConfig {
     pub name: String,
-    pub max_env_size: u64,
+    pub max_env_size: i64,
 }
 
 impl LmdbEnvConfig {
-    pub fn new(name: String, max_env_size: u64) -> Self {
+    pub fn new(name: String, max_env_size: i64) -> Self {
         LmdbEnvConfig { name, max_env_size }
     }
 }
@@ -137,7 +138,8 @@ impl LmdbDirStoreManager {
         config: &LmdbEnvConfig,
         sender: oneshot::Sender<Box<dyn KeyValueStoreManager>>,
     ) -> Result<(), KVSManagerError> {
-        let manager: Box<dyn KeyValueStoreManager> = todo!();
+        let manager: Box<dyn KeyValueStoreManager> =
+            LmdbStoreManager::new(self.dir_path.join(&config.name), config.max_env_size);
         sender.send(manager).map_err(|_| KVSManagerError {
             message: "LMDB_Dir_Store_Manager: Failed to send managerd".to_string(),
         })?;
