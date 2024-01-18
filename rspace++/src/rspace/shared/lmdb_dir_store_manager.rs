@@ -3,7 +3,7 @@ use super::{key_value_store::KeyValueStore, key_value_store_manager::KeyValueSto
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use std::sync::Arc;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 use tokio::sync::Mutex;
 
 /**
@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
  * @param id unique identifier
  * @param nameOverride name to use as database name instead of [[id]]
  */
-#[derive(Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub struct Db {
     id: String,
     name_override: Option<String>,
@@ -46,18 +46,18 @@ impl LmdbEnvConfig {
 // For LMDB this allows control which databases are part of the same environment (file).
 pub struct LmdbDirStoreManager {
     dir_path: PathBuf,
-    db_mapping: BTreeMap<Db, LmdbEnvConfig>,
+    db_mapping: HashMap<Db, LmdbEnvConfig>,
     managers_state: Arc<Mutex<StoreState>>,
 }
 
 struct StoreState {
-    envs: BTreeMap<String, oneshot::Receiver<Box<dyn KeyValueStoreManager>>>,
+    envs: HashMap<String, oneshot::Receiver<Box<dyn KeyValueStoreManager>>>,
 }
 
 #[async_trait]
 impl KeyValueStoreManager for LmdbDirStoreManager {
     async fn store(&mut self, db_name: String) -> Result<Box<dyn KeyValueStore>, heed::Error> {
-        let db_instance_mapping: BTreeMap<&String, (&Db, &LmdbEnvConfig)> = self
+        let db_instance_mapping: HashMap<&String, (&Db, &LmdbEnvConfig)> = self
             .db_mapping
             .iter()
             .map(|(db, cfg)| (&db.id, (db, cfg)))
@@ -92,17 +92,17 @@ impl KeyValueStoreManager for LmdbDirStoreManager {
 
         let mut manager = {
             let mut state = self.managers_state.lock().await;
-            let receiver = state.envs.get_mut(&man_cfg.name).ok_or({
+            let receiver = state.envs.remove(&man_cfg.name).ok_or({
                 heed::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     format!("LMDB_Dir_Store_Manager: Receiver not found"),
                 ))
             })?;
 
-            receiver.await.map_err(|_| {
+            receiver.await.map_err(|e| {
                 heed::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    format!("LMDB_Dir_Store_Manager: Failed to receive manager"),
+                    format!("LMDB_Dir_Store_Manager: Failed to receive manager, {}", e),
                 ))
             })?
         };
@@ -128,13 +128,13 @@ impl KeyValueStoreManager for LmdbDirStoreManager {
 impl LmdbDirStoreManager {
     pub fn new(
         dir_path: PathBuf,
-        db_instance_mapping: BTreeMap<Db, LmdbEnvConfig>,
+        db_instance_mapping: HashMap<Db, LmdbEnvConfig>,
     ) -> impl KeyValueStoreManager {
         LmdbDirStoreManager {
             dir_path,
             db_mapping: db_instance_mapping,
             managers_state: Arc::new(Mutex::new(StoreState {
-                envs: BTreeMap::new(),
+                envs: HashMap::new(),
             })),
         }
     }
@@ -144,12 +144,11 @@ impl LmdbDirStoreManager {
         config: &LmdbEnvConfig,
         sender: oneshot::Sender<Box<dyn KeyValueStoreManager>>,
     ) -> Result<(), heed::Error> {
-        let manager: Box<dyn KeyValueStoreManager> =
-            LmdbStoreManager::new(self.dir_path.join(&config.name), config.max_env_size);
+        let manager = LmdbStoreManager::new(self.dir_path.join(&config.name), config.max_env_size);
         sender.send(manager).map_err(|_| {
             heed::Error::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "LMDB_Dir_Store_Manager: Failed to send manager",
+                format!("Failed to send LMDB manager for {}", config.name),
             ))
         })?;
 

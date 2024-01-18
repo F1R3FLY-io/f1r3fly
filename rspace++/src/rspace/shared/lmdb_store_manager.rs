@@ -61,11 +61,11 @@ impl LmdbStoreManager {
                 "LMDB_Store_Manager: LMDB environment receiver unavailable",
             ))
         })?;
-        let env = receiver.await.or_else(|_| {
-            Err(heed::Error::Io(std::io::Error::new(
+        let env = receiver.await.map_err(|_| {
+            heed::Error::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "LMDB_Store_Manager: LMDB environment was not received",
-            )))
+            ))
         })?;
 
         // Open or create the database

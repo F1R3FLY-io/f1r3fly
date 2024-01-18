@@ -102,7 +102,7 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let store = rt
             .block_on(async {
-                let mut kvm = mk_rspace_store_manager(PathBuf::default(), 1 * GB);
+                let mut kvm = mk_rspace_store_manager("./tests/lmdb".into(), 1 * GB);
                 kvm.r_space_stores().await
             })
             .unwrap();
