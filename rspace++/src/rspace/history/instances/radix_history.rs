@@ -19,10 +19,10 @@ pub struct EmptyRootHash {
 
 impl EmptyRootHash {
     pub fn new() -> Self {
-        let hash_bytes = hash_node(&EmptyNode::new().node).1;
+        let hash_bytes = hash_node(&EmptyNode::new().node).0;
         let hash_array: [u8; 32] = match hash_bytes.try_into() {
             Ok(array) => array,
-            Err(_) => panic!("Expected a Blake3 hash of length 32"),
+            Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
         };
         let hash = blake3::Hash::from_bytes(hash_array);
 

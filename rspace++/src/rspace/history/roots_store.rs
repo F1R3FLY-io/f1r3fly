@@ -29,7 +29,7 @@ impl RootsStoreInstances {
                     Some(b) => {
                         let hash_array: [u8; 32] = match b.try_into() {
                             Ok(array) => array,
-                            Err(_) => panic!("Expected a Blake3 hash of length 32"),
+                            Err(_) => panic!("Roots_Store: Expected a Blake3 hash of length 32"),
                         };
                         Some(blake3::Hash::from(hash_array))
                     }
