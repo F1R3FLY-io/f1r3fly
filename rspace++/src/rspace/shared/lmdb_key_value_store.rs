@@ -59,7 +59,7 @@ impl KeyValueStore for LmdbKeyValueStore {
     }
 
     fn clone_box(&self) -> Box<dyn KeyValueStore> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
@@ -71,6 +71,15 @@ impl LmdbKeyValueStore {
         LmdbKeyValueStore {
             env: env_arc,
             db: db_arc,
+        }
+    }
+}
+
+impl Clone for LmdbKeyValueStore {
+    fn clone(&self) -> Self {
+        Self {
+            db: self.db.clone(),
+            env: self.env.clone(),
         }
     }
 }
