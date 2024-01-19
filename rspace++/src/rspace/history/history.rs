@@ -1,5 +1,5 @@
 use crate::rspace::history::history_action::HistoryAction;
-use crate::rspace::history::instances::radix_history::{RadixHistory, RadixHistoryInstances};
+use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use bytes::Bytes;
 
@@ -18,7 +18,7 @@ pub struct HistoryInstances;
 
 impl HistoryInstances {
     pub fn create(root: blake3::Hash, store: Box<dyn KeyValueStore>) -> RadixHistory {
-        let typed_store = RadixHistoryInstances::create_store(store.to_owned());
-        RadixHistoryInstances::create(root, typed_store)
+        let typed_store = RadixHistory::create_store(store.to_owned());
+        RadixHistory::create(root, typed_store)
     }
 }

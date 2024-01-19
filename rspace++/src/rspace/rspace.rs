@@ -589,7 +589,7 @@ impl RSpaceInstances {
         store: RSpaceStore,
         matcher: M,
     ) -> RSpace<C, P, A, K, M> {
-        let setup = RSpaceInstances::create_history_repo::<C, P, A, K>(store);
+        let setup = RSpaceInstances::create_history_repo(store);
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
         space

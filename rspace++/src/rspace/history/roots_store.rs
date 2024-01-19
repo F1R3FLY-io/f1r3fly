@@ -4,9 +4,9 @@ use crate::rspace::shared::key_value_store::KeyValueStore;
 pub trait RootsStore {
     fn current_root(&self) -> Option<blake3::Hash>;
 
-    fn validate_and_set_current_root(&self, key: blake3::Hash) -> Option<blake3::Hash>;
+    fn validate_and_set_current_root(&self, key: &blake3::Hash) -> Option<blake3::Hash>;
 
-    fn record_root(&self, key: blake3::Hash) -> ();
+    fn record_root(&self, key: &blake3::Hash) -> ();
 }
 
 pub struct RootsStoreInstances;
@@ -20,11 +20,11 @@ impl RootsStoreInstances {
                 todo!()
             }
 
-            fn validate_and_set_current_root(&self, key: blake3::Hash) -> Option<blake3::Hash> {
+            fn validate_and_set_current_root(&self, key: &blake3::Hash) -> Option<blake3::Hash> {
                 todo!()
             }
 
-            fn record_root(&self, key: blake3::Hash) -> () {
+            fn record_root(&self, key: &blake3::Hash) -> () {
                 todo!()
             }
         }

@@ -1,14 +1,36 @@
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_action::HistoryAction;
-use crate::rspace::history::radix_tree::{Node, RadixTreeImpl};
+use crate::rspace::history::radix_tree::{hash_node, EmptyNode, Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
-pub struct RadixHistoryInstances;
+pub struct RadixHistory {
+    root_hash: blake3::Hash,
+    root_node: Node,
+    imple: RadixTreeImpl,
+    store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
+}
 
-impl RadixHistoryInstances {
+pub struct EmptyRootHash {
+    pub hash: blake3::Hash,
+}
+
+impl EmptyRootHash {
+    pub fn new() -> Self {
+        let hash_bytes = hash_node(&EmptyNode::new().node).1;
+        let hash_array: [u8; 32] = match hash_bytes.try_into() {
+            Ok(array) => array,
+            Err(_) => panic!("Expected a Blake3 hash of length 32"),
+        };
+        let hash = blake3::Hash::from_bytes(hash_array);
+
+        EmptyRootHash { hash }
+    }
+}
+
+impl RadixHistory {
     pub fn create(
         root: blake3::Hash,
         store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
@@ -31,13 +53,6 @@ impl RadixHistoryInstances {
     ) -> Box<dyn KeyValueTypedStore<Bytes, Bytes>> {
         Box::new(KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store))
     }
-}
-
-pub struct RadixHistory {
-    root_hash: blake3::Hash,
-    root_node: Node,
-    imple: RadixTreeImpl,
-    store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
 }
 
 impl History for RadixHistory {
