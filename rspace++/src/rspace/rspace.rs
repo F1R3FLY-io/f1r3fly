@@ -16,6 +16,8 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use super::shared::key_value_store::KvStoreError;
+
 // See rspace/src/main/scala/coop/rchain/rspace/RSpace.scala
 // NOTE: 'space_matcher' field is added on Rust side to behave like Scala's 'extend'
 // NOTE: 'store' field and methods are public for testing purposes. Production should be private?
@@ -579,7 +581,7 @@ impl RSpaceInstances {
         }
     }
 
-    pub fn create<
+    pub async fn create<
         C: Clone + Ord + Default + Debug + Hash + 'static,
         P: Clone + Debug + Default + 'static,
         A: Clone + Debug + Default + 'static,
@@ -588,31 +590,33 @@ impl RSpaceInstances {
     >(
         store: RSpaceStore,
         matcher: M,
-    ) -> RSpace<C, P, A, K, M> {
-        let setup = RSpaceInstances::create_history_repo(store);
+    ) -> Result<RSpace<C, P, A, K, M>, KvStoreError> {
+        let setup = RSpaceInstances::create_history_repo(store).await?;
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
-        space
+        Ok(space)
     }
 
     /**
      * Creates [[HistoryRepository]] and [[HotStore]].
      */
-    pub fn create_history_repo<
+    pub async fn create_history_repo<
         C: Clone + Eq + Hash + Debug + Default + 'static,
         P: Clone + Default + Debug + 'static,
         A: Clone + Default + Debug + 'static,
         K: Clone + Default + Debug + 'static,
     >(
         store: RSpaceStore,
-    ) -> (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>) {
+    ) -> Result<(Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>), KvStoreError>
+    {
         let history_repo =
-            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold);
+            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)
+                .await?;
 
         let history_reader = history_repo.get_history_reader(history_repo.root());
 
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
-        (Box::new(history_repo), Box::new(hot_store))
+        Ok((Box::new(history_repo), Box::new(hot_store)))
     }
 }

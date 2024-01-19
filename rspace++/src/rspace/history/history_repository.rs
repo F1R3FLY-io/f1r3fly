@@ -6,7 +6,7 @@ use crate::rspace::history::root_repository::RootRepository;
 use crate::rspace::history::roots_store::RootsStoreInstances;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
-use crate::rspace::shared::key_value_store::KeyValueStore;
+use crate::rspace::shared::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
@@ -55,17 +55,17 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
 }
 
 impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
-    pub fn lmdb_repository(
+    pub async fn lmdb_repository(
         history_key_value_store: Box<dyn KeyValueStore>,
         roots_key_value_store: Box<dyn KeyValueStore>,
         cold_key_value_store: Box<dyn KeyValueStore>,
-    ) -> impl HistoryRepository<C, P, A, K> {
+    ) -> Result<impl HistoryRepository<C, P, A, K>, KvStoreError> {
         // Roots store
         let roots_repository = RootRepository {
-            roots_store: Box::new(RootsStoreInstances::roots_store(&roots_key_value_store)),
+            roots_store: Box::new(RootsStoreInstances::roots_store(roots_key_value_store.clone())),
         };
 
-        let current_root = roots_repository.current_root();
+        let current_root = roots_repository.current_root().await?;
 
         // History store
         let history = HistoryInstances::create(current_root, history_key_value_store.clone());
@@ -85,13 +85,13 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
             roots_key_value_store,
         );
 
-        HistoryRepositoryImpl {
+        Ok(HistoryRepositoryImpl {
             current_history: Box::new(history),
             roots_repository,
             leaf_store: cold_store,
             rspace_exporter: Box::new(exporter),
             rspace_importer: Box::new(importer),
             _marker: PhantomData,
-        }
+        })
     }
 }

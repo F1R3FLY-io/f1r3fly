@@ -64,16 +64,16 @@ pub struct Space {
 #[no_mangle]
 pub extern "C" fn space_new() -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let store = rt
+    let rspace = rt
         .block_on(async {
             let mut kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
-            kvm.r_space_stores().await
+            let store = kvm.r_space_stores().await.unwrap();
+
+            RSpaceInstances::create(store, SpaceMatcher).await
         })
         .unwrap();
 
-    Box::into_raw(Box::new(Space {
-        rspace: RSpaceInstances::create(store, SpaceMatcher),
-    }))
+    Box::into_raw(Box::new(Space { rspace }))
 }
 
 #[no_mangle]

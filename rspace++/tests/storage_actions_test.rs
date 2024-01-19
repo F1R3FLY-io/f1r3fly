@@ -100,14 +100,16 @@ mod tests {
     ) -> RSpace<&'static str, Pattern<'static>, &'static str, StringsCaptor<'static>, StringMatch>
     {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let store = rt
+        let rspace = rt
             .block_on(async {
                 let mut kvm = mk_rspace_store_manager("./tests/lmdb".into(), 1 * GB);
-                kvm.r_space_stores().await
+                let store = kvm.r_space_stores().await.unwrap();
+
+                RSpaceInstances::create(store, StringMatch).await
             })
             .unwrap();
 
-        RSpaceInstances::create(store, StringMatch)
+        rspace
     }
 
     // NOTE: Not implementing test checks for Scala's side 'insertData' and 'insertContinuations'
