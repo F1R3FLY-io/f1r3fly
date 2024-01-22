@@ -20,7 +20,7 @@ object ServerApp extends IOApp {
       case Left(help) => IO(System.err.println(help)).as(ExitCode.Error)
       case Right(port) =>
         Console
-          .create[IO]
+          .create[IO](blocker)
           .flatMap(implicit console => Server.start[IO](port, blocker).compile.drain)
           .as(ExitCode.Success)
     }

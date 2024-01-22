@@ -19,7 +19,7 @@ object Console {
 
   def apply[F[_]](implicit F: Console[F]): F.type = F
 
-  def create[F[_]: Sync: ContextShift]: F[Console[F]] = Blocker[F].use { blocker =>
+  def create[F[_]: Sync: ContextShift](blocker: Blocker): F[Console[F]] =
     Sync[F].delay {
       new Console[F] {
         private[this] val reader =
@@ -58,5 +58,4 @@ object Console {
             }
       }
     }
-  }
 }
