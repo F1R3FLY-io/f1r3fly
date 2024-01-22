@@ -500,8 +500,11 @@ lazy val rholangCLI = (project in file("rholang-cli"))
   .dependsOn(rholang)
 
 lazy val rholangServer = (project in file("rholang-server"))
+  .enablePlugins(NativeImagePlugin)
   .settings(commonSettings)
   .settings(
+    nativeImageJvm := "graalvm-java17",
+    nativeImageVersion := "22.3.3",
     libraryDependencies ++= List(
       fs2Io,
       "org.jline"          % "jline"         % "3.12.1",
