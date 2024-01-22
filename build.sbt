@@ -507,7 +507,7 @@ lazy val rholangServer = (project in file("rholang-server"))
     nativeImageVersion := "22.3.3",
     libraryDependencies ++= List(
       fs2Io,
-      "org.jline"          % "jline"         % "3.12.1",
+      "org.jline"          % "jline"         % "3.21.0",
       "org.scodec"        %% "scodec-stream" % "2.0.3",
       "io.chrisdavenport" %% "fuuid"         % "0.7.0",
       "com.comcast"       %% "ip4s-core"     % "2.0.4",
