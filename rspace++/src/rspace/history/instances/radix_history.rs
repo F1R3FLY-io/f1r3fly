@@ -4,13 +4,14 @@ use crate::rspace::history::radix_tree::{hash_node, EmptyNode, Node, RadixTreeIm
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use bytes::Bytes;
+use dashmap::DashMap;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
 pub struct RadixHistory {
     root_hash: blake3::Hash,
     root_node: Node,
     imple: RadixTreeImpl,
-    store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
+    store: Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>,
 }
 
 pub struct EmptyRootHash {
@@ -33,12 +34,13 @@ impl EmptyRootHash {
 impl RadixHistory {
     pub fn create(
         root: blake3::Hash,
-        store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
+        store: Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>,
     ) -> RadixHistory {
         let imple = RadixTreeImpl {
             store: store.clone(),
+            cache: DashMap::new(),
         };
-        let node = imple.load_node(Bytes::copy_from_slice(root.as_bytes()), Some(true));
+        let node = imple.load_node(root.as_bytes().to_vec(), Some(true));
 
         RadixHistory {
             root_hash: root,
@@ -50,8 +52,8 @@ impl RadixHistory {
 
     pub fn create_store(
         store: Box<dyn KeyValueStore>,
-    ) -> Box<dyn KeyValueTypedStore<Bytes, Bytes>> {
-        Box::new(KeyValueStoreOps::to_typed_store::<Bytes, Bytes>(store))
+    ) -> Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>> {
+        Box::new(KeyValueStoreOps::to_typed_store::<Vec<u8>, Vec<u8>>(store))
     }
 }
 

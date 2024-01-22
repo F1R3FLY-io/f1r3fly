@@ -4,6 +4,7 @@ use crate::rspace::shared::key_value_typed_store::{
 use async_trait::async_trait;
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
@@ -87,7 +88,7 @@ impl From<heed::Error> for KvStoreError {
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
-    pub fn to_typed_store<K: Clone + 'static, V: Clone + 'static>(
+    pub fn to_typed_store<K: Clone + Debug + 'static, V: Clone + 'static>(
         store: Box<dyn KeyValueStore>,
     ) -> impl KeyValueTypedStore<K, V> {
         KeyValueTypedStoreInstance {

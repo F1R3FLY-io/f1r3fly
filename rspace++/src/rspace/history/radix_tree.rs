@@ -1,9 +1,9 @@
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
-use bytes::Bytes;
-use serde::Serialize;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Item {
     EmptyItem,
 
@@ -35,12 +35,54 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
 }
 
 pub struct RadixTreeImpl {
-    pub store: Box<dyn KeyValueTypedStore<Bytes, Bytes>>,
+    pub store: Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>,
+    pub cache: DashMap<Vec<u8>, Node>,
 }
 
 impl RadixTreeImpl {
-    pub fn load_node(&self, node_ptr: Bytes, no_assert: Option<bool>) -> Node {
+    fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
+        let get_result = self.store.get_one(&node_ptr);
+
+        match get_result {
+            Some(bytes) => bincode::deserialize(&bytes).ok(),
+            None => None,
+        }
+    }
+
+    pub fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
-        todo!()
+
+        let error_msg = |node_ptr: &[u8]| {
+            assert!(
+                no_assert,
+                "Missing node in database. ptr={:?}",
+                node_ptr
+                    .iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<Vec<_>>()
+            );
+        };
+
+        let cache_miss = |node_ptr: Vec<u8>| {
+            let store_node_opt = self.load_node_from_store(&node_ptr);
+
+            let node_opt = store_node_opt
+                .map(|node| self.cache.insert(node_ptr.clone(), node))
+                .unwrap_or_else(|| {
+                    error_msg(&node_ptr);
+                    None
+                });
+
+            match node_opt {
+                Some(node) => node,
+                None => EmptyNode::new().node,
+            }
+        };
+
+        let cache_node_opt = self.cache.get(&node_ptr);
+        match cache_node_opt {
+            Some(node) => node.to_vec(),
+            None => cache_miss(node_ptr),
+        }
     }
 }
