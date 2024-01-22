@@ -499,6 +499,20 @@ lazy val rholangCLI = (project in file("rholang-cli"))
   )
   .dependsOn(rholang)
 
+lazy val rholangServer = (project in file("rholang-server"))
+  .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= List(
+      fs2Io,
+      "org.jline"          % "jline"         % "3.12.1",
+      "org.scodec"        %% "scodec-stream" % "2.0.3",
+      "io.chrisdavenport" %% "fuuid"         % "0.7.0",
+      "com.comcast"       %% "ip4s-core"     % "2.0.4",
+      "com.monovore"      %% "decline"       % "2.3.0"
+    )
+  )
+  .dependsOn(rholang)
+
 lazy val blockStorage = (project in file("block-storage"))
   .settings(commonSettings: _*)
   .settings(
@@ -602,6 +616,7 @@ lazy val rchain = (project in file("."))
     regex,
     rholang,
     rholangCLI,
+    rholangServer,
     rspace,
     rspaceBench,
     rspacePlusPlus,
@@ -614,4 +629,4 @@ runCargoBuild := {
   Seq("./scripts/build_rspace++.sh") !
 }
 
-(compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+// (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
