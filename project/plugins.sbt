@@ -23,5 +23,7 @@ addSbtPlugin("com.sksamuel.scapegoat" %% "sbt-scapegoat"       % "1.2.2")
 
 addSbtPlugin("com.github.sbt"         % "sbt-release"          % "1.1.0")
 
+addSbtPlugin("org.scalameta"          % "sbt-native-image"     % "0.3.2")
+
 addDependencyTreePlugin
 

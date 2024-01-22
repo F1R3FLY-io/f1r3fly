@@ -530,6 +530,23 @@ lazy val rholangCLI = (project in file("rholang-cli"))
   )
   .dependsOn(rholang)
 
+lazy val rholangServer = (project in file("rholang-server"))
+  .enablePlugins(NativeImagePlugin)
+  .settings(commonSettings)
+  .settings(
+    nativeImageJvm := "graalvm-java17",
+    nativeImageVersion := "22.3.3",
+    libraryDependencies ++= List(
+      fs2Io,
+      "org.jline"          % "jline"         % "3.21.0",
+      "org.scodec"        %% "scodec-stream" % "2.0.3",
+      "io.chrisdavenport" %% "fuuid"         % "0.7.0",
+      "com.comcast"       %% "ip4s-core"     % "2.0.4",
+      "com.monovore"      %% "decline"       % "2.3.0"
+    )
+  )
+  .dependsOn(rholang)
+
 lazy val blockStorage = (project in file("block-storage"))
   .settings(commonSettings: _*)
   .settings(
@@ -635,6 +652,7 @@ lazy val rchain = (project in file("."))
     regex,
     rholang,
     rholangCLI,
+    rholangServer,
     rspace,
     rspaceBench,
     rspacePlusPlus,
@@ -650,4 +668,4 @@ runCargoBuild := {
   }
 }
 
-(compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+// (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
