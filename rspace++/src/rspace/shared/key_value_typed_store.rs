@@ -26,7 +26,7 @@ pub struct KeyValueTypedStoreInstance<K, V> {
     pub _marker: PhantomData<(K, V)>,
 }
 
-impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V> {
+impl<K: 'static, V: 'static> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V> {
     fn get(&self, keys: Vec<K>) -> Vec<Option<V>> {
         todo!()
     }
@@ -52,12 +52,21 @@ impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V> {
     }
 
     fn clone_box(&self) -> Box<dyn KeyValueTypedStore<K, V>> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
 impl<K, V> Clone for Box<dyn KeyValueTypedStore<K, V>> {
     fn clone(&self) -> Box<dyn KeyValueTypedStore<K, V>> {
         self.clone_box()
+    }
+}
+
+impl<K, V> Clone for KeyValueTypedStoreInstance<K, V> {
+    fn clone(&self) -> Self {
+        Self {
+            store: self.store.clone(),
+            _marker: PhantomData,
+        }
     }
 }

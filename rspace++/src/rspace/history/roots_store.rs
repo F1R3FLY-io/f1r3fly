@@ -8,7 +8,7 @@ pub trait RootsStore {
 
     fn validate_and_set_current_root(&self, key: &blake3::Hash) -> Option<blake3::Hash>;
 
-    fn record_root(&self, key: &blake3::Hash) -> ();
+    async fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError>;
 }
 
 pub struct RootsStoreInstances;
@@ -43,7 +43,17 @@ impl RootsStoreInstances {
                 todo!()
             }
 
-            fn record_root(&self, key: &blake3::Hash) -> () {
+            async fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError> {
+                let tag: Vec<u8> = "tag".as_bytes().to_vec();
+                let current_root_name: Vec<u8> = "current-root".as_bytes().to_vec();
+
+                let bytes = blake3::Hash::as_bytes(key);
+
+                self.store.put_one(bytes.to_vec(), tag).await?;
+                self.store
+                    .put_one(current_root_name, bytes.to_vec())
+                    .await?;
+
                 todo!()
             }
         }

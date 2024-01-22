@@ -87,7 +87,7 @@ impl From<heed::Error> for KvStoreError {
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
-    pub fn to_typed_store<K: Clone, V: Clone>(
+    pub fn to_typed_store<K: Clone + 'static, V: Clone + 'static>(
         store: Box<dyn KeyValueStore>,
     ) -> impl KeyValueTypedStore<K, V> {
         KeyValueTypedStoreInstance {
