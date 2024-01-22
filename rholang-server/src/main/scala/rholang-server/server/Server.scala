@@ -98,7 +98,7 @@ object Server {
                              ) *> Console[F].info(s"Unregistered client ${cc.id}")
                          }
                      )
-                _ <- handleClient(cs, cc, cl, blocker)
+                _ <- handleClient(cs, cc, cl)
               } yield ()
             }
             .parJoinUnbounded
@@ -107,10 +107,9 @@ object Server {
   private def handleClient[F[_]: Concurrent: ContextShift: Console](
       clients: Clients[F],
       clientState: ConnectedClient[F],
-      clientSocket: Socket[F],
-      blocker: Blocker
+      clientSocket: Socket[F]
   ): Stream[F, Nothing] = {
-    logNewClient(clientState, clientSocket, blocker) ++
+    logNewClient(clientState, clientSocket) ++
       Stream
         .eval(
           clientState.messageSocket.write1(Protocol.Alert("Welcome to FS2 Chat!"))
@@ -130,8 +129,7 @@ object Server {
 
   private def logNewClient[F[_]: Sync: ContextShift: Console](
       clientState: ConnectedClient[F],
-      clientSocket: Socket[F],
-      blocker: Blocker
+      clientSocket: Socket[F]
   ): Stream[F, Nothing] =
     Stream
       .eval(clientSocket.remoteAddress.flatMap { clientAddress =>
