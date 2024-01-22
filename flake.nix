@@ -105,11 +105,6 @@
               help = "Kubernetes TUI";
             }
             {
-              name = "terraform";
-              package = terraform;
-              help = "Infrastructure-as-Code CLI";
-            }
-            {
               name = "tilt";
               package = tilt;
               help = "Hands-off Kubernetes development tooling";
