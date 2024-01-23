@@ -2,6 +2,7 @@ use crate::rspace::shared::key_value_typed_store::{
     KeyValueTypedStore, KeyValueTypedStoreInstance,
 };
 use async_trait::async_trait;
+use serde::Serialize;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
@@ -88,7 +89,10 @@ impl From<heed::Error> for KvStoreError {
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
-    pub fn to_typed_store<K: Clone + Debug + 'static, V: Clone + 'static>(
+    pub fn to_typed_store<
+        K: Clone + Debug + Serialize + 'static + Send + Sync,
+        V: Clone + Send + Sync + 'static,
+    >(
         store: Box<dyn KeyValueStore>,
     ) -> impl KeyValueTypedStore<K, V> {
         KeyValueTypedStoreInstance {

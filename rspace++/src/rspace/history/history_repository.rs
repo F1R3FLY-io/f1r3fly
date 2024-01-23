@@ -68,7 +68,7 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
         let current_root = roots_repository.current_root().await?;
 
         // History store
-        let history = HistoryInstances::create(current_root, history_key_value_store.clone());
+        let history = HistoryInstances::create(current_root, history_key_value_store.clone()).await;
 
         // Cold store
         let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());

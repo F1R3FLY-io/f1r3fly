@@ -1,6 +1,8 @@
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 #[derive(Clone, Serialize, Deserialize)]
@@ -35,13 +37,14 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
 }
 
 pub struct RadixTreeImpl {
-    pub store: Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>,
+    pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>> + Sync>>>,
     pub cache: DashMap<Vec<u8>, Node>,
 }
 
 impl RadixTreeImpl {
-    fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
-        let get_result = self.store.get_one(&node_ptr);
+    async fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
+        let store_lock = self.store.lock().unwrap();
+        let get_result = store_lock.get_one(&node_ptr).await;
 
         match get_result {
             Some(bytes) => bincode::deserialize(&bytes).ok(),
@@ -49,7 +52,7 @@ impl RadixTreeImpl {
         }
     }
 
-    pub fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
+    pub async fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
 
         let error_msg = |node_ptr: &[u8]| {
@@ -63,8 +66,8 @@ impl RadixTreeImpl {
             );
         };
 
-        let cache_miss = |node_ptr: Vec<u8>| {
-            let store_node_opt = self.load_node_from_store(&node_ptr);
+        let cache_miss = |node_ptr: Vec<u8>| async move {
+            let store_node_opt = self.load_node_from_store(&node_ptr).await;
 
             let node_opt = store_node_opt
                 .map(|node| self.cache.insert(node_ptr.clone(), node))
@@ -82,7 +85,7 @@ impl RadixTreeImpl {
         let cache_node_opt = self.cache.get(&node_ptr);
         match cache_node_opt {
             Some(node) => node.to_vec(),
-            None => cache_miss(node_ptr),
+            None => cache_miss(node_ptr).await,
         }
     }
 }

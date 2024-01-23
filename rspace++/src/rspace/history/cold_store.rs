@@ -1,6 +1,9 @@
-use crate::rspace::shared::{
-    key_value_store::{KeyValueStore, KeyValueStoreOps},
-    key_value_typed_store::KeyValueTypedStore,
+use crate::rspace::{
+    hashing::serializable_blake3_hash::SerializableBlake3Hash,
+    shared::{
+        key_value_store::{KeyValueStore, KeyValueStoreOps},
+        key_value_typed_store::KeyValueTypedStore,
+    },
 };
 use bytes::Bytes;
 
@@ -10,8 +13,8 @@ pub struct ColdStoreInstances;
 impl ColdStoreInstances {
     pub fn cold_store(
         store: Box<dyn KeyValueStore>,
-    ) -> Box<dyn KeyValueTypedStore<blake3::Hash, PersistedData>> {
-        Box::new(KeyValueStoreOps::to_typed_store::<blake3::Hash, PersistedData>(store))
+    ) -> Box<dyn KeyValueTypedStore<SerializableBlake3Hash, PersistedData>> {
+        Box::new(KeyValueStoreOps::to_typed_store::<SerializableBlake3Hash, PersistedData>(store))
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::rspace::hashing::serializable_blake3_hash::SerializableBlake3Hash;
 use crate::rspace::history::cold_store::PersistedData;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_repository::HistoryRepository;
@@ -12,7 +13,7 @@ use std::marker::PhantomData;
 pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub current_history: Box<dyn History>,
     pub roots_repository: RootRepository,
-    pub leaf_store: Box<dyn KeyValueTypedStore<blake3::Hash, PersistedData>>,
+    pub leaf_store: Box<dyn KeyValueTypedStore<SerializableBlake3Hash, PersistedData>>,
     pub rspace_exporter: Box<
         dyn RSpaceExporter<
             KeyHash = blake3::Hash,
