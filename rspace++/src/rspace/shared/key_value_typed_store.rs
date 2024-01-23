@@ -11,6 +11,7 @@ use super::key_value_store::KvStoreError;
 pub trait KeyValueTypedStore<K, V>
 where
     K: Debug + Clone + Send + Sync,
+    V: Debug,
 {
     async fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
 
@@ -27,14 +28,15 @@ where
     fn to_map(&self) -> BTreeMap<K, V>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
-    async fn get_one(&self, key: &K) -> Result<V, KvStoreError> {
+    async fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
         let mut values = self.get(vec![key.clone()]).await?;
         let first_value = values.remove(0);
 
         match first_value {
-            Some(value) => Ok(value),
+            Some(value) => Ok(Some(value)),
             None => {
-                panic!("Key_Value_Store: key not found: {:?}", key);
+                Ok(None)
+                // panic!("Key Value Typed Store: key not found: {:?}", key);
             }
         }
     }
@@ -51,7 +53,7 @@ pub struct KeyValueTypedStoreInstance<K, V> {
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
     K: Debug + Clone + Send + Sync + Serialize + 'static,
-    V: Send + Sync + for<'a> Deserialize<'a> + 'static,
+    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static,
 {
     async fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
         let keys_bytes = keys
@@ -64,7 +66,7 @@ where
             .into_iter()
             .map(|value_bytes_opt| match value_bytes_opt {
                 Some(bytes) => bincode::deserialize(&bytes)
-                    .expect("Radix Tree: Failed to deserialize value bytes"),
+                    .expect("Key Value Typed Store: Failed to deserialize value bytes"),
                 None => None,
             })
             .collect();

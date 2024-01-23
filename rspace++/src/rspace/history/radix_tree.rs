@@ -50,11 +50,14 @@ impl RadixTreeImpl {
         let get_result = store_lock.get_one(&node_ptr).await;
 
         match get_result {
-            Ok(bytes) => {
-                let deserialized = bincode::deserialize(&bytes)
-                    .expect("Radix Tree: Failed to deserialize node bytes");
-                deserialized
-            }
+            Ok(bytes_opt) => match bytes_opt {
+                Some(bytes) => {
+                    let deserialized = bincode::deserialize(&bytes)
+                        .expect("Radix Tree: Failed to deserialize node bytes");
+                    deserialized
+                }
+                None => None,
+            },
             Err(err) => {
                 println!("Radix Tree: {}", err);
                 None

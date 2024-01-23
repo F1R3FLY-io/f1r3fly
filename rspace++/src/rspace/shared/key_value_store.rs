@@ -100,7 +100,7 @@ impl KeyValueStoreOps {
     pub fn to_typed_store<K, V>(store: Box<dyn KeyValueStore>) -> impl KeyValueTypedStore<K, V>
     where
         K: Clone + Debug + Send + Sync + Serialize + 'static,
-        V: Clone + Send + Sync + for<'a> Deserialize<'a> + 'static,
+        V: Clone + Debug + Send + Sync + for<'a> Deserialize<'a> + 'static,
     {
         KeyValueTypedStoreInstance {
             store,

@@ -18,24 +18,24 @@ impl ColdStoreInstances {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum PersistedData {
     Joins(JoinsLeaf),
     Data(DataLeaf),
     Continuations(ContinuationsLeaf),
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct JoinsLeaf {
     bytes: Vec<u8>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct DataLeaf {
     bytes: Vec<u8>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct ContinuationsLeaf {
     bytes: Vec<u8>,
 }
