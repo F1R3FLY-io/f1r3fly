@@ -2,7 +2,7 @@ use crate::rspace::shared::key_value_typed_store::{
     KeyValueTypedStore, KeyValueTypedStoreInstance,
 };
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
@@ -54,6 +54,7 @@ pub enum KvStoreError {
     SerializationError(serde_json::Error),
     DeserializationError(serde_json::Error),
     HeedError(heed::Error),
+    BoxBincodeError(Box<bincode::ErrorKind>),
 }
 
 impl fmt::Display for KvStoreError {
@@ -64,6 +65,7 @@ impl fmt::Display for KvStoreError {
             KvStoreError::DeserializationError(e) => write!(f, "Deserialization error: {}", e),
             KvStoreError::IoError(e) => write!(f, "I/O error: {}", e),
             KvStoreError::HeedError(e) => write!(f, "Heed error: {}", e),
+            KvStoreError::BoxBincodeError(e) => write!(f, "Bincode error: {}", e),
         }
     }
 }
@@ -85,13 +87,19 @@ impl From<heed::Error> for KvStoreError {
     }
 }
 
+impl From<Box<bincode::ErrorKind>> for KvStoreError {
+    fn from(error: Box<bincode::ErrorKind>) -> Self {
+        KvStoreError::BoxBincodeError(error)
+    }
+}
+
 // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
     pub fn to_typed_store<
         K: Clone + Debug + Serialize + 'static + Send + Sync,
-        V: Clone + Send + Sync + 'static,
+        V: Clone + for<'a> Deserialize<'a> + Send + Sync + 'static,
     >(
         store: Box<dyn KeyValueStore>,
     ) -> impl KeyValueTypedStore<K, V> {

@@ -6,6 +6,7 @@ use crate::rspace::{
     },
 };
 use bytes::Bytes;
+use serde::Deserialize;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/ColdStore.scala
 pub struct ColdStoreInstances;
@@ -18,24 +19,24 @@ impl ColdStoreInstances {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub enum PersistedData {
     Joins(JoinsLeaf),
     Data(DataLeaf),
     Continuations(ContinuationsLeaf),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct JoinsLeaf {
-    bytes: Bytes,
+    bytes: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct DataLeaf {
-    bytes: Bytes,
+    bytes: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct ContinuationsLeaf {
-    bytes: Bytes,
+    bytes: Vec<u8>,
 }

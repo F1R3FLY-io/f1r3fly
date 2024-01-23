@@ -43,12 +43,22 @@ pub struct RadixTreeImpl {
 
 impl RadixTreeImpl {
     async fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
-        let store_lock = self.store.lock().unwrap();
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Radix Tree: Failed to acquire lock on store");
         let get_result = store_lock.get_one(&node_ptr).await;
 
         match get_result {
-            Some(bytes) => bincode::deserialize(&bytes).ok(),
-            None => None,
+            Ok(bytes) => {
+                let deserialized = bincode::deserialize(&bytes)
+                    .expect("Radix Tree: Failed to deserialize node bytes");
+                deserialized
+            }
+            Err(err) => {
+                println!("Radix Tree: {}", err);
+                None
+            }
         }
     }
 
