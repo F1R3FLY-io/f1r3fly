@@ -35,7 +35,10 @@ pub trait HotStore<C, P, A, K> {
 }
 
 #[derive(Default)]
-struct HotStoreState<C: Eq + Hash, P, A, K> {
+struct HotStoreState<C, P, A, K>
+where
+    C: Eq + Hash,
+{
     continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
     installed_continuations: DashMap<Vec<C>, WaitingContinuation<P, K>>,
     data: DashMap<C, Vec<Datum<A>>>,
@@ -44,21 +47,31 @@ struct HotStoreState<C: Eq + Hash, P, A, K> {
 }
 
 #[derive(Default)]
-struct HistoryStoreCache<C: Eq + Hash, P, A, K> {
+struct HistoryStoreCache<C, P, A, K>
+where
+    C: Eq + Hash,
+{
     continuations: DashMap<Vec<C>, oneshot::Sender<Vec<WaitingContinuation<P, K>>>>,
     datums: DashMap<C, oneshot::Sender<Vec<Datum<A>>>>,
     joins: DashMap<C, oneshot::Sender<Vec<Vec<C>>>>,
 }
 
-struct InMemHotStore<C: Eq + Hash, P, A, K> {
+struct InMemHotStore<C, P, A, K>
+where
+    C: Eq + Hash,
+{
     hot_store_state: Arc<Mutex<HotStoreState<C, P, A, K>>>,
     history_store_cache: Arc<Mutex<HistoryStoreCache<C, P, A, K>>>,
     history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-impl<C: Hash + Eq + Clone + Debug, P: Clone + Debug, A: Clone + Debug, K: Clone + Debug>
-    HotStore<C, P, A, K> for InMemHotStore<C, P, A, K>
+impl<C, P, A, K> HotStore<C, P, A, K> for InMemHotStore<C, P, A, K>
+where
+    C: Clone + Debug + Hash + Eq,
+    P: Clone + Debug,
+    A: Clone + Debug,
+    K: Clone + Debug,
 {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         // This is STUBBED out. Ideally this comes from history store
@@ -535,15 +548,16 @@ impl<C: Hash + Eq + Clone + Debug, P: Clone + Debug, A: Clone + Debug, K: Clone 
 pub struct HotStoreInstances;
 
 impl HotStoreInstances {
-    fn create_from_mhs_and_hr<
-        C: Eq + Hash + Default + Clone + Debug,
+    fn create_from_mhs_and_hr<C, P, A, K>(
+        hot_store_state_ref: Arc<Mutex<HotStoreState<C, P, A, K>>>,
+        history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> impl HotStore<C, P, A, K>
+    where
+        C: Default + Clone + Debug + Eq + Hash,
         P: Default + Clone + Debug,
         A: Default + Clone + Debug,
         K: Default + Clone + Debug,
-    >(
-        hot_store_state_ref: Arc<Mutex<HotStoreState<C, P, A, K>>>,
-        history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> impl HotStore<C, P, A, K> {
+    {
         InMemHotStore {
             hot_store_state: hot_store_state_ref,
             history_store_cache: Arc::new(Mutex::new(HistoryStoreCache::default())),
@@ -551,28 +565,30 @@ impl HotStoreInstances {
         }
     }
 
-    fn create_from_hs_and_hr<
-        C: Eq + Hash + Default + Clone + Debug,
+    fn create_from_hs_and_hr<C, P, A, K>(
+        cache: HotStoreState<C, P, A, K>,
+        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> impl HotStore<C, P, A, K>
+    where
+        C: Default + Clone + Debug + Eq + Hash,
         P: Default + Clone + Debug,
         A: Default + Clone + Debug,
         K: Default + Clone + Debug,
-    >(
-        cache: HotStoreState<C, P, A, K>,
-        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> impl HotStore<C, P, A, K> {
+    {
         let cache = Arc::new(Mutex::new(cache));
         let store = HotStoreInstances::create_from_mhs_and_hr(cache, history_reader);
         store
     }
 
-    pub fn create_from_hr<
-        C: Eq + Hash + Default + Clone + Debug,
+    pub fn create_from_hr<C, P, A, K>(
+        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
+    ) -> impl HotStore<C, P, A, K>
+    where
+        C: Default + Clone + Debug + Eq + Hash,
         P: Default + Clone + Debug,
         A: Default + Clone + Debug,
         K: Default + Clone + Debug,
-    >(
-        history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> impl HotStore<C, P, A, K> {
+    {
         HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader)
     }
 }

@@ -6,11 +6,12 @@ use std::{
 };
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/MaximumBipartiteMatch.scala
-pub struct MaximumBipartiteMatch<
+pub struct MaximumBipartiteMatch<P, T, R>
+where
     P: Debug + Clone,
     T: Debug + Clone + Hash + Eq,
-    R: Clone + std::fmt::Debug,
-> {
+    R: Debug + Clone,
+{
     match_function: Box<dyn FnMut(P, T) -> Option<R>>,
     matches: BTreeMap<Candidate<T>, (Pattern<P, T>, R)>,
     seen_targets: BTreeSet<Candidate<T>>,
@@ -25,11 +26,11 @@ struct Indexed<A> {
     index: usize,
 }
 
-impl<
-        P: std::fmt::Debug + Clone,
-        T: Debug + Clone + Hash + Eq + Ord,
-        R: Clone + std::fmt::Debug,
-    > MaximumBipartiteMatch<P, T, R>
+impl<P, T, R> MaximumBipartiteMatch<P, T, R>
+where
+    P: Debug + Clone,
+    T: Debug + Clone + Hash + Eq + Ord,
+    R: Debug + Clone,
 {
     pub fn new(match_function: Box<dyn FnMut(P, T) -> Option<R>>) -> Self {
         MaximumBipartiteMatch {

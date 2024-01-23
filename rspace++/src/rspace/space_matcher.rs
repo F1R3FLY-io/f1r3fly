@@ -14,13 +14,13 @@ pub struct SpaceMatcher<C, P, A, K, M: Match<P, A>> {
 
 type MatchingDataCandidate<C, A> = (ConsumeCandidate<C, A>, Vec<(Datum<A>, i32)>);
 
-impl<
-        C: Clone + Hash + Eq + Debug,
-        P: Clone + Debug,
-        A: Clone + Debug,
-        K: Clone,
-        M: Match<P, A>,
-    > SpaceMatcher<C, P, A, K, M>
+impl<C, P, A, K, M> SpaceMatcher<C, P, A, K, M>
+where
+    C: Clone + Debug + Hash + Eq,
+    P: Clone + Debug,
+    A: Clone + Debug,
+    K: Clone,
+    M: Match<P, A>,
 {
     pub fn create(matcher: M) -> SpaceMatcher<C, P, A, K, M> {
         SpaceMatcher {

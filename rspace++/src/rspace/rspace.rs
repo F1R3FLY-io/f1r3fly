@@ -22,7 +22,11 @@ use super::shared::key_value_store::KvStoreError;
 // NOTE: 'space_matcher' field is added on Rust side to behave like Scala's 'extend'
 // NOTE: 'store' field and methods are public for testing purposes. Production should be private?
 #[repr(C)]
-pub struct RSpace<C: Clone + Ord, P, A, K, M: Match<P, A>> {
+pub struct RSpace<C, P, A, K, M>
+where
+    C: Clone + Ord,
+    M: Match<P, A>,
+{
     history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
@@ -34,13 +38,13 @@ type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResu
 
 // NOTE: Currently NOT implementing any 'Log' functions
 // NOTE: Implementing 'RSpaceOps' functions in this file
-impl<
-        C: Hash + Eq + Clone + Debug + Serialize + Ord,
-        P: Clone + Debug + Serialize,
-        A: Clone + Debug + Serialize,
-        K: Clone + Debug + Serialize,
-        M: Match<P, A>,
-    > RSpace<C, P, A, K, M>
+impl<C, P, A, K, M> RSpace<C, P, A, K, M>
+where
+    C: Clone + Debug + Serialize + Hash + Ord + Eq,
+    P: Clone + Debug + Serialize,
+    A: Clone + Debug + Serialize,
+    K: Clone + Debug + Serialize,
+    M: Match<P, A>,
 {
     fn locked_consume(
         &self,
@@ -562,17 +566,18 @@ impl RSpaceInstances {
     /**
      * Creates [[RSpace]] from [[HistoryRepository]] and [[HotStore]].
      */
-    pub fn apply<
-        C: Clone + Ord + Hash + Debug,
+    pub fn apply<C, P, A, K, M>(
+        history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+        store: Box<dyn HotStore<C, P, A, K>>,
+        matcher: M,
+    ) -> RSpace<C, P, A, K, M>
+    where
+        C: Clone + Debug + Ord + Hash,
         P: Clone + Debug,
         A: Clone + Debug,
         K: Clone + Debug,
         M: Match<P, A>,
-    >(
-        history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
-        store: Box<dyn HotStore<C, P, A, K>>,
-        matcher: M,
-    ) -> RSpace<C, P, A, K, M> {
+    {
         RSpace {
             history_repository,
             store,
@@ -581,16 +586,17 @@ impl RSpaceInstances {
         }
     }
 
-    pub async fn create<
-        C: Clone + Ord + Default + Debug + Hash + 'static,
+    pub async fn create<C, P, A, K, M>(
+        store: RSpaceStore,
+        matcher: M,
+    ) -> Result<RSpace<C, P, A, K, M>, KvStoreError>
+    where
+        C: Clone + Debug + Default + Ord + Hash + 'static,
         P: Clone + Debug + Default + 'static,
         A: Clone + Debug + Default + 'static,
         K: Clone + Debug + Default + 'static,
         M: Match<P, A>,
-    >(
-        store: RSpaceStore,
-        matcher: M,
-    ) -> Result<RSpace<C, P, A, K, M>, KvStoreError> {
+    {
         let setup = RSpaceInstances::create_history_repo(store).await?;
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
@@ -600,14 +606,14 @@ impl RSpaceInstances {
     /**
      * Creates [[HistoryRepository]] and [[HotStore]].
      */
-    pub async fn create_history_repo<
-        C: Clone + Eq + Hash + Debug + Default + 'static,
-        P: Clone + Default + Debug + 'static,
-        A: Clone + Default + Debug + 'static,
-        K: Clone + Default + Debug + 'static,
-    >(
+    pub async fn create_history_repo<C, P, A, K>(
         store: RSpaceStore,
     ) -> Result<(Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>), KvStoreError>
+    where
+        C: Clone + Debug + Default + Eq + Hash + 'static,
+        P: Clone + Debug + Default + 'static,
+        A: Clone + Debug + Default + 'static,
+        K: Clone + Debug + Default + 'static,
     {
         let history_repo =
             HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)

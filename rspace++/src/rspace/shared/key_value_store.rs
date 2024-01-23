@@ -97,12 +97,11 @@ impl From<Box<bincode::ErrorKind>> for KvStoreError {
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
-    pub fn to_typed_store<
-        K: Clone + Debug + Serialize + 'static + Send + Sync,
-        V: Clone + for<'a> Deserialize<'a> + Send + Sync + 'static,
-    >(
-        store: Box<dyn KeyValueStore>,
-    ) -> impl KeyValueTypedStore<K, V> {
+    pub fn to_typed_store<K, V>(store: Box<dyn KeyValueStore>) -> impl KeyValueTypedStore<K, V>
+    where
+        K: Clone + Debug + Send + Sync + Serialize + 'static,
+        V: Clone + Send + Sync + for<'a> Deserialize<'a> + 'static,
+    {
         KeyValueTypedStoreInstance {
             store,
             _marker: PhantomData,

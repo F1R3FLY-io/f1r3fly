@@ -30,7 +30,10 @@ pub struct Datum<A> {
     pub source: Produce,
 }
 
-impl<A: Clone + Serialize> Datum<A> {
+impl<A> Datum<A>
+where
+    A: Clone + Serialize,
+{
     pub fn create<C: Serialize>(channel: C, a: A, persist: bool) -> Datum<A> {
         Datum {
             a: a.clone(),

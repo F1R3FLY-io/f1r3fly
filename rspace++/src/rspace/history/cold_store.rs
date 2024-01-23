@@ -5,7 +5,6 @@ use crate::rspace::{
         key_value_typed_store::KeyValueTypedStore,
     },
 };
-use bytes::Bytes;
 use serde::Deserialize;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/ColdStore.scala
