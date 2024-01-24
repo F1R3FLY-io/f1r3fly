@@ -42,6 +42,13 @@ pub struct RadixTreeImpl {
 }
 
 impl RadixTreeImpl {
+    pub fn new(store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>) -> Self {
+        RadixTreeImpl {
+            store,
+            cache: DashMap::new(),
+        }
+    }
+
     fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
         let store_lock = self
             .store

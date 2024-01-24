@@ -1,6 +1,11 @@
 use crate::rspace::{
     hashing::serializable_blake3_hash::SerializableBlake3Hash,
-    history::{cold_store::PersistedData, history::History, history_reader::HistoryReader},
+    history::{
+        cold_store::PersistedData,
+        history::History,
+        history_reader::{HistoryReader, HistoryReaderBase},
+    },
+    internal::{Datum, WaitingContinuation},
     shared::key_value_typed_store::KeyValueTypedStore,
 };
 use std::{
@@ -32,35 +37,47 @@ impl<Key, C, P, A, K> HistoryReader<Key, C, P, A, K> for RSpaceHistoryReaderImpl
         todo!()
     }
 
-    fn get_data_proj(
-        &self,
-        key: Key,
-        proj: fn(
-            crate::rspace::internal::Datum<A>,
-            bytes::Bytes,
-        ) -> crate::rspace::internal::Datum<A>,
-    ) -> Vec<crate::rspace::internal::Datum<A>> {
+    fn get_data_proj(&self, key: Key, proj: fn(Datum<A>, Vec<u8>) -> Datum<A>) -> Vec<Datum<A>> {
         todo!()
     }
 
     fn get_continuations_proj(
         &self,
         key: Key,
-        proj: fn(
-            crate::rspace::internal::WaitingContinuation<P, K>,
-            bytes::Bytes,
-        ) -> crate::rspace::internal::WaitingContinuation<P, K>,
-    ) -> Vec<crate::rspace::internal::WaitingContinuation<P, K>> {
+        proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
+    ) -> Vec<WaitingContinuation<P, K>> {
         todo!()
     }
 
-    fn get_joins_proj(&self, key: Key, proj: fn(Vec<C>, bytes::Bytes) -> Vec<C>) -> Vec<Vec<C>> {
+    fn get_joins_proj(&self, key: Key, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>> {
         todo!()
     }
 
-    fn base(
-        &self,
-    ) -> Box<dyn crate::rspace::history::history_reader::HistoryReaderBase<C, P, A, K>> {
-        todo!()
+    fn base(&self) -> Box<dyn HistoryReaderBase<C, P, A, K>> {
+        struct HistoryReader;
+
+        impl<C, P, A, K> HistoryReaderBase<C, P, A, K> for HistoryReader {
+            fn get_data_proj(
+                &self,
+                key: C,
+                proj: fn(Datum<A>, Vec<u8>) -> Datum<A>,
+            ) -> Vec<Datum<A>> {
+                todo!()
+            }
+
+            fn get_continuations_proj(
+                &self,
+                key: Vec<C>,
+                proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
+            ) -> Vec<WaitingContinuation<P, K>> {
+                todo!()
+            }
+
+            fn get_joins_proj(&self, key: C, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>> {
+                todo!()
+            }
+        }
+
+        Box::new(HistoryReader)
     }
 }

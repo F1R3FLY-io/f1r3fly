@@ -1,5 +1,4 @@
 use crate::rspace::internal::{Datum, WaitingContinuation};
-use bytes::Bytes;
 
 /**
 * Reader for particular history (state verified on blockchain)
@@ -16,15 +15,15 @@ pub trait HistoryReader<Key, C, P, A, K> {
     // Get current root which reader reads from
     fn root(&self) -> Key;
 
-    fn get_data_proj(&self, key: Key, proj: fn(Datum<A>, Bytes) -> Datum<A>) -> Vec<Datum<A>>;
+    fn get_data_proj(&self, key: Key, proj: fn(Datum<A>, Vec<u8>) -> Datum<A>) -> Vec<Datum<A>>;
 
     fn get_continuations_proj(
         &self,
         key: Key,
-        proj: fn(WaitingContinuation<P, K>, Bytes) -> WaitingContinuation<P, K>,
+        proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
     ) -> Vec<WaitingContinuation<P, K>>;
 
-    fn get_joins_proj(&self, key: Key, proj: fn(Vec<C>, Bytes) -> Vec<C>) -> Vec<Vec<C>>;
+    fn get_joins_proj(&self, key: Key, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>>;
 
     /**                                                                                                                                                                                                              
      * Defaults                                                                                                                                                                                                       
@@ -51,15 +50,15 @@ pub trait HistoryReader<Key, C, P, A, K> {
  * History reader base, version of a reader which accepts non-serialized and hashed keys
  */
 pub trait HistoryReaderBase<C, P, A, K> {
-    fn get_data_proj(&self, key: C, proj: fn(Datum<A>, Bytes) -> Datum<A>) -> Vec<Datum<A>>;
+    fn get_data_proj(&self, key: C, proj: fn(Datum<A>, Vec<u8>) -> Datum<A>) -> Vec<Datum<A>>;
 
     fn get_continuations_proj(
         &self,
         key: Vec<C>,
-        proj: fn(WaitingContinuation<P, K>, Bytes) -> WaitingContinuation<P, K>,
+        proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
     ) -> Vec<WaitingContinuation<P, K>>;
 
-    fn get_joins_proj(&self, key: C, proj: fn(Vec<C>, Bytes) -> Vec<C>) -> Vec<Vec<C>>;
+    fn get_joins_proj(&self, key: C, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>>;
 
     /**                                                                                                                                                                                                              
      * Defaults                                                                                                                                                                                                       

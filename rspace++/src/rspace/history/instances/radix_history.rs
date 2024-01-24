@@ -38,10 +38,7 @@ impl RadixHistory {
         root: blake3::Hash,
         store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
     ) -> RadixHistory {
-        let imple = RadixTreeImpl {
-            store: store.clone(),
-            cache: DashMap::new(),
-        };
+        let imple = RadixTreeImpl::new(store.clone());
         let node = imple.load_node(root.as_bytes().to_vec(), Some(true));
 
         RadixHistory {
@@ -73,6 +70,14 @@ impl History for RadixHistory {
     }
 
     fn reset(&self, root: blake3::Hash) -> Box<dyn History> {
-        todo!()
+        let imple = RadixTreeImpl::new(self.store.clone());
+        let node = imple.load_node(root.as_bytes().to_vec(), Some(true));
+
+        Box::new(RadixHistory {
+            root_hash: root,
+            root_node: node,
+            imple,
+            store: self.store.clone(),
+        })
     }
 }
