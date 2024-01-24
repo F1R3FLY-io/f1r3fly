@@ -69,7 +69,7 @@ impl History for RadixHistory {
     }
 
     fn root(&self) -> blake3::Hash {
-        todo!()
+        self.root_hash
     }
 
     fn reset(&self, root: blake3::Hash) -> Box<dyn History> {

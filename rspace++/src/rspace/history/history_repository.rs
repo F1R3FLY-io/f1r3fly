@@ -13,6 +13,7 @@ use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use bytes::Bytes;
 use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 pub trait HistoryRepository<C, P, A, K> {
@@ -28,7 +29,7 @@ pub trait HistoryRepository<C, P, A, K> {
 
     fn reset(&self, root: blake3::Hash) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
-    fn history(&self) -> Box<dyn History>;
+    fn history(&self) -> Arc<Mutex<Box<dyn History>>>;
 
     fn exporter(
         &self,
@@ -54,7 +55,7 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
     _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
+impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepositoryInstances<C, P, A, K> {
     pub async fn lmdb_repository(
         history_key_value_store: Box<dyn KeyValueStore>,
         roots_key_value_store: Box<dyn KeyValueStore>,
@@ -86,9 +87,9 @@ impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K> {
         );
 
         Ok(HistoryRepositoryImpl {
-            current_history: Box::new(history),
+            current_history: Arc::new(Mutex::new(Box::new(history))),
             roots_repository,
-            leaf_store: cold_store,
+            leaf_store: Arc::new(Mutex::new(cold_store)),
             rspace_exporter: Box::new(exporter),
             rspace_importer: Box::new(importer),
             _marker: PhantomData,
