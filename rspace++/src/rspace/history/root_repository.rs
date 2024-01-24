@@ -7,15 +7,15 @@ pub struct RootRepository {
 }
 
 impl RootRepository {
-    async fn commit(&self, root: &blake3::Hash) -> Result<(), KvStoreError> {
-        self.roots_store.record_root(root).await
+    fn commit(&self, root: &blake3::Hash) -> Result<(), KvStoreError> {
+        self.roots_store.record_root(root)
     }
 
-    pub async fn current_root(&self) -> Result<blake3::Hash, KvStoreError> {
-        match self.roots_store.current_root().await {
+    pub fn current_root(&self) -> Result<blake3::Hash, KvStoreError> {
+        match self.roots_store.current_root() {
             None => {
                 let empty_root_hash = EmptyRootHash::new();
-                self.roots_store.record_root(&empty_root_hash.hash).await?;
+                self.roots_store.record_root(&empty_root_hash.hash)?;
                 Ok(empty_root_hash.hash)
             }
             Some(root) => Ok(root),

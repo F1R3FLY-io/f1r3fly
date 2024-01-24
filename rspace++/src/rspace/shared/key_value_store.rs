@@ -1,7 +1,6 @@
 use crate::rspace::shared::key_value_typed_store::{
     KeyValueTypedStore, KeyValueTypedStoreInstance,
 };
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
@@ -9,21 +8,20 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
-#[async_trait]
 pub trait KeyValueStore: Send + Sync {
-    async fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error>;
+    fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error>;
 
-    async fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error>;
+    fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error>;
 
-    async fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error>;
+    fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error>;
 
-    async fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error>;
+    fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error>;
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
-    async fn get_one(&self, key: Vec<u8>) -> Option<Vec<u8>> {
-        let values = self.get(vec![key]).await;
+    fn get_one(&self, key: Vec<u8>) -> Option<Vec<u8>> {
+        let values = self.get(vec![key]);
         let first_value = values.map(|mut v| v.remove(0));
 
         match first_value {
@@ -35,8 +33,8 @@ pub trait KeyValueStore: Send + Sync {
         }
     }
 
-    async fn put_one(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), KvStoreError> {
-        self.put(vec![(key, value)]).await?;
+    fn put_one(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), KvStoreError> {
+        self.put(vec![(key, value)])?;
         Ok(())
     }
 }

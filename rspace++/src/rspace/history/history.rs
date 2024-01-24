@@ -17,8 +17,8 @@ pub trait History {
 pub struct HistoryInstances;
 
 impl HistoryInstances {
-    pub async fn create(root: blake3::Hash, store: Box<dyn KeyValueStore>) -> RadixHistory {
+    pub fn create(root: blake3::Hash, store: Box<dyn KeyValueStore>) -> RadixHistory {
         let typed_store = RadixHistory::create_store(store.to_owned());
-        RadixHistory::create(root, typed_store).await
+        RadixHistory::create(root, typed_store)
     }
 }

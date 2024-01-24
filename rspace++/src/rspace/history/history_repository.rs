@@ -66,10 +66,10 @@ impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepositoryInstances<
             roots_store: Box::new(RootsStoreInstances::roots_store(roots_key_value_store.clone())),
         };
 
-        let current_root = roots_repository.current_root().await?;
+        let current_root = roots_repository.current_root()?;
 
         // History store
-        let history = HistoryInstances::create(current_root, history_key_value_store.clone()).await;
+        let history = HistoryInstances::create(current_root, history_key_value_store.clone());
 
         // Cold store
         let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());

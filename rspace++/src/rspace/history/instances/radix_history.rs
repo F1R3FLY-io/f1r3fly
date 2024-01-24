@@ -13,7 +13,7 @@ pub struct RadixHistory {
     root_hash: blake3::Hash,
     root_node: Node,
     imple: RadixTreeImpl,
-    store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>> + Sync>>>,
+    store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
 }
 
 pub struct EmptyRootHash {
@@ -34,15 +34,15 @@ impl EmptyRootHash {
 }
 
 impl RadixHistory {
-    pub async fn create(
+    pub fn create(
         root: blake3::Hash,
-        store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>> + Sync>>>,
+        store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
     ) -> RadixHistory {
         let imple = RadixTreeImpl {
             store: store.clone(),
             cache: DashMap::new(),
         };
-        let node = imple.load_node(root.as_bytes().to_vec(), Some(true)).await;
+        let node = imple.load_node(root.as_bytes().to_vec(), Some(true));
 
         RadixHistory {
             root_hash: root,
@@ -54,7 +54,7 @@ impl RadixHistory {
 
     pub fn create_store(
         store: Box<dyn KeyValueStore>,
-    ) -> Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>> + Sync>>> {
+    ) -> Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>> {
         Arc::new(Mutex::new(Box::new(KeyValueStoreOps::to_typed_store::<Vec<u8>, Vec<u8>>(store))))
     }
 }

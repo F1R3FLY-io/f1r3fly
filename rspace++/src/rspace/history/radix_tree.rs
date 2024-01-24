@@ -37,17 +37,17 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
 }
 
 pub struct RadixTreeImpl {
-    pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>> + Sync>>>,
+    pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
     pub cache: DashMap<Vec<u8>, Node>,
 }
 
 impl RadixTreeImpl {
-    async fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
+    fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
         let store_lock = self
             .store
             .lock()
             .expect("Radix Tree: Failed to acquire lock on store");
-        let get_result = store_lock.get_one(&node_ptr).await;
+        let get_result = store_lock.get_one(&node_ptr);
 
         match get_result {
             Ok(bytes_opt) => match bytes_opt {
@@ -65,7 +65,7 @@ impl RadixTreeImpl {
         }
     }
 
-    pub async fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
+    pub fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
 
         let error_msg = |node_ptr: &[u8]| {
@@ -79,8 +79,8 @@ impl RadixTreeImpl {
             );
         };
 
-        let cache_miss = |node_ptr: Vec<u8>| async move {
-            let store_node_opt = self.load_node_from_store(&node_ptr).await;
+        let cache_miss = |node_ptr: Vec<u8>| {
+            let store_node_opt = self.load_node_from_store(&node_ptr);
 
             let node_opt = store_node_opt
                 .map(|node| self.cache.insert(node_ptr.clone(), node))
@@ -98,7 +98,7 @@ impl RadixTreeImpl {
         let cache_node_opt = self.cache.get(&node_ptr);
         match cache_node_opt {
             Some(node) => node.to_vec(),
-            None => cache_miss(node_ptr).await,
+            None => cache_miss(node_ptr),
         }
     }
 }

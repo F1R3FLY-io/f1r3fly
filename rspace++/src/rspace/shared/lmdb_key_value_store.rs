@@ -1,19 +1,19 @@
 use super::key_value_store::KeyValueStore;
-use async_trait::async_trait;
 use heed::types::SerdeBincode;
 use heed::{Database, Env};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct LmdbKeyValueStore {
     env: Arc<Env>,
     db: Arc<Mutex<Database<SerdeBincode<Vec<u8>>, SerdeBincode<Vec<u8>>>>>,
 }
 
-#[async_trait]
 impl KeyValueStore for LmdbKeyValueStore {
-    async fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error> {
-        let db = self.db.lock().await;
+    fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error> {
+        let db = self
+            .db
+            .lock()
+            .expect("LMDB Key Value Store: Failed to acquire lock on db");
         let reader = self.env.read_txn()?;
         let results = keys
             .into_iter()
@@ -23,8 +23,11 @@ impl KeyValueStore for LmdbKeyValueStore {
         results
     }
 
-    async fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error> {
-        let db = self.db.lock().await;
+    fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error> {
+        let db = self
+            .db
+            .lock()
+            .expect("LMDB Key Value Store: Failed to acquire lock on db");
         let mut writer = self.env.write_txn()?;
         for (key, value) in kv_pairs {
             db.put(&mut writer, &key, &value)?;
@@ -33,8 +36,11 @@ impl KeyValueStore for LmdbKeyValueStore {
         Ok(())
     }
 
-    async fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error> {
-        let db = self.db.lock().await;
+    fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error> {
+        let db = self
+            .db
+            .lock()
+            .expect("LMDB Key Value Store: Failed to acquire lock on db");
         let mut writer = self.env.write_txn()?;
         let mut delete_count = 0;
         for key in &keys {
@@ -46,8 +52,11 @@ impl KeyValueStore for LmdbKeyValueStore {
         Ok(delete_count)
     }
 
-    async fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error> {
-        let db = self.db.lock().await;
+    fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error> {
+        let db = self
+            .db
+            .lock()
+            .expect("LMDB Key Value Store: Failed to acquire lock on db");
         let reader = self.env.read_txn()?;
         let iter = db.iter(&reader)?;
         for result in iter {

@@ -10,10 +10,10 @@ use super::key_value_store::KvStoreError;
 #[async_trait]
 pub trait KeyValueTypedStore<K, V>
 where
-    K: Debug + Clone + Send + Sync,
+    K: Debug + Clone,
     V: Debug,
 {
-    async fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
+    fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
 
     fn put(&self, kv_pairs: Vec<(K, V)>) -> ();
 
@@ -28,8 +28,8 @@ where
     fn to_map(&self) -> BTreeMap<K, V>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
-    async fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
-        let mut values = self.get(vec![key.clone()]).await?;
+    fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
+        let mut values = self.get(vec![key.clone()])?;
         let first_value = values.remove(0);
 
         match first_value {
@@ -49,19 +49,18 @@ pub struct KeyValueTypedStoreInstance<K, V> {
     pub _marker: PhantomData<(K, V)>,
 }
 
-#[async_trait]
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
-    K: Debug + Clone + Send + Sync + Serialize + 'static,
-    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static,
+    K: Debug + Clone + Serialize + 'static,
+    V: Debug + for<'a> Deserialize<'a> + 'static,
 {
-    async fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
+    fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
         let keys_bytes = keys
             .into_iter()
             .map(|key| bincode::serialize(&key))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let values_bytes = self.store.get(keys_bytes).await?;
+        let values_bytes = self.store.get(keys_bytes)?;
         let values: Vec<Option<V>> = values_bytes
             .into_iter()
             .map(|value_bytes_opt| match value_bytes_opt {

@@ -1,14 +1,12 @@
 use crate::rspace::shared::key_value_store::{KeyValueStore, KvStoreError};
-use async_trait::async_trait;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootsStore.scala
-#[async_trait]
 pub trait RootsStore {
-    async fn current_root(&self) -> Option<blake3::Hash>;
+    fn current_root(&self) -> Option<blake3::Hash>;
 
     fn validate_and_set_current_root(&self, key: &blake3::Hash) -> Option<blake3::Hash>;
 
-    async fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError>;
+    fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError>;
 }
 
 pub struct RootsStoreInstances;
@@ -19,11 +17,10 @@ impl RootsStoreInstances {
             store: Box<dyn KeyValueStore>,
         }
 
-        #[async_trait]
         impl RootsStore for RootsStoreInstance {
-            async fn current_root(&self) -> Option<blake3::Hash> {
+            fn current_root(&self) -> Option<blake3::Hash> {
                 let current_root_name: Vec<u8> = "current-root".as_bytes().to_vec();
-                let bytes = self.store.get_one(current_root_name).await;
+                let bytes = self.store.get_one(current_root_name);
 
                 let maybe_decoded = match bytes {
                     Some(b) => {
@@ -43,16 +40,14 @@ impl RootsStoreInstances {
                 todo!()
             }
 
-            async fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError> {
+            fn record_root(&self, key: &blake3::Hash) -> Result<(), KvStoreError> {
                 let tag: Vec<u8> = "tag".as_bytes().to_vec();
                 let current_root_name: Vec<u8> = "current-root".as_bytes().to_vec();
 
                 let bytes = blake3::Hash::as_bytes(key);
 
-                self.store.put_one(bytes.to_vec(), tag).await?;
-                self.store
-                    .put_one(current_root_name, bytes.to_vec())
-                    .await?;
+                self.store.put_one(bytes.to_vec(), tag)?;
+                self.store.put_one(current_root_name, bytes.to_vec())?;
 
                 todo!()
             }
