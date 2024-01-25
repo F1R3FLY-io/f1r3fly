@@ -629,4 +629,4 @@ runCargoBuild := {
   Seq("./scripts/build_rspace++.sh") !
 }
 
-// (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+(compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
