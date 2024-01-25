@@ -19,6 +19,13 @@ Global / serverConnectionType := ConnectionType.Tcp
 Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
+
+inThisBuild(List(
+  publish / skip := true,
+  publishMavenStyle := true,
+  publishTo := Option("GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly")
+))
+
 val javaOpens = List(
   "--add-opens",
   "java.base/sun.security.util=ALL-UNNAMED",
