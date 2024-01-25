@@ -57,7 +57,6 @@ lazy val dockerBuildxSettings = Seq(
 lazy val projectSettings = Seq(
   organization := "coop.rchain",
   scalaVersion := "2.12.15",
-  version := "0.2.0", // or whatever version number you want
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -131,6 +130,7 @@ lazy val projectSettings = Seq(
 // a namespace for generative tests (or other tests that take a long time)
 lazy val SlowcookerTest = config("slowcooker") extend (Test)
 
+/*
 // changlog update and git tag
 lazy val release = taskKey[Unit]("Run benchmark, tag new release, and update changelog")
 
@@ -174,6 +174,7 @@ release := {
     throw new IllegalStateException("Benchmark tests failed")
   }
 }
+*/
 
 lazy val benchmark = taskKey[Unit]("Run benchmark, and update changelog")
 
@@ -207,7 +208,6 @@ lazy val commonSettings = projectSettings ++ compilerSettings ++ profilerSetting
 lazy val shared = (project in file("shared"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     libraryDependencies ++= commonDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -234,7 +234,6 @@ lazy val shared = (project in file("shared"))
 lazy val graphz = (project in file("graphz"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     libraryDependencies ++= commonDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -275,7 +274,6 @@ lazy val casper = (project in file("casper"))
 lazy val comm = (project in file("comm"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     dependencyOverrides += "org.slf4j" % "slf4j-api" % "1.7.25",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ protobufDependencies ++ Seq(
       grpcNetty,
@@ -341,12 +339,6 @@ lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
-    version := git.gitDescribedVersion.value.getOrElse({
-      val v = "0.0.0-unknown"
-      System.err.println("Could not get version from `git describe`.")
-      System.err.println("Using the fallback version: " + v)
-      v
-    }),
     name := "rnode",
     maintainer := "F1r3fly.io LCA https://f1r3fly.io/",
     packageSummary := "F1R3FLY Node",
@@ -520,7 +512,6 @@ lazy val blockStorage = (project in file("block-storage"))
   .settings(commonSettings: _*)
   .settings(
     name := "block-storage",
-    version := "0.0.1-SNAPSHOT",
     libraryDependencies ++= commonDependencies ++ protobufLibDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -534,7 +525,6 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
   .settings(commonSettings: _*)
   .settings(
     name := "rspace++",
-    version := "0.1.0-SNAPSHOT",
     // mainClass := Some("BuildRustLibrary"),
     dependencyOverrides += "org.scalactic" %% "scalactic" % "3.2.15",
     dependencyOverrides += "org.scalatest" %% "scalatest" % "3.2.15" % "test",
@@ -558,7 +548,6 @@ lazy val rspace = (project in file("rspace"))
     ),
     Defaults.itSettings,
     name := "rspace",
-    version := "0.2.1-SNAPSHOT",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
       catsCore,
       fs2Core,
@@ -591,6 +580,7 @@ lazy val rspace = (project in file("rspace"))
 lazy val rspaceBench = (project in file("rspace-bench"))
   .settings(
     commonSettings,
+    version := (ThisBuild / version).value,
     libraryDependencies ++= commonDependencies,
     libraryDependencies += "com.esotericsoftware" % "kryo" % "5.0.3",
     dependencyOverrides ++= Seq(
