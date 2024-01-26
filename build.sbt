@@ -62,7 +62,7 @@ lazy val dockerBuildxSettings = Seq(
 )
 
 lazy val projectSettings = Seq(
-  organization := "coop.rchain",
+  organization := "f1r3fly-io",
   scalaVersion := "2.12.15",
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
@@ -389,7 +389,8 @@ lazy val node = (project in file("node"))
         oldStrategy(x)
     },
     /* Dockerization */
-    dockerUsername := Some(organization.value),
+    dockerRepository := Option("ghcr.io"),
+    dockerUsername := Option(organization.value),
     dockerAliases ++=
       sys.env
         .get("DRONE_BUILD_NUMBER")
