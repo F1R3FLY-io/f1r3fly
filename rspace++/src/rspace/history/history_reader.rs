@@ -11,7 +11,7 @@ use crate::rspace::internal::{Datum, WaitingContinuation};
 *
 * See rspace/src/main/scala/coop/rchain/rspace/history/HistoryReader.scala
 */
-pub trait HistoryReader<Key, C, P, A, K> {
+pub trait HistoryReader<Key, C: Clone, P: Clone, A: Clone, K: Clone> {
     // Get current root which reader reads from
     fn root(&self) -> Key;
 
@@ -49,7 +49,7 @@ pub trait HistoryReader<Key, C, P, A, K> {
 /**
  * History reader base, version of a reader which accepts non-serialized and hashed keys
  */
-pub trait HistoryReaderBase<C, P, A, K> {
+pub trait HistoryReaderBase<C: Clone, P: Clone, A: Clone, K: Clone> {
     fn get_data_proj(&self, key: C, proj: fn(Datum<A>, Vec<u8>) -> Datum<A>) -> Vec<Datum<A>>;
 
     fn get_continuations_proj(

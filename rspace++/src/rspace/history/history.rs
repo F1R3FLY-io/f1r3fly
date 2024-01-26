@@ -4,7 +4,7 @@ use crate::rspace::shared::key_value_store::KeyValueStore;
 use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/History.scala
-pub trait History {
+pub trait History: Send + Sync {
     fn read(&self, key: Bytes) -> Option<Bytes>;
 
     fn process(&self, actions: Vec<HistoryAction>) -> Box<dyn History>;

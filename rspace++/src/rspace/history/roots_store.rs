@@ -1,7 +1,7 @@
 use crate::rspace::shared::key_value_store::{KeyValueStore, KvStoreError};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootsStore.scala
-pub trait RootsStore {
+pub trait RootsStore: Send + Sync {
     fn current_root(&self) -> Option<blake3::Hash>;
 
     fn validate_and_set_current_root(&self, key: &blake3::Hash) -> Option<blake3::Hash>;

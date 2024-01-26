@@ -8,10 +8,10 @@ use super::key_value_store::KvStoreError;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStore.scala
 #[async_trait]
-pub trait KeyValueTypedStore<K, V>
+pub trait KeyValueTypedStore<K, V>: Send + Sync
 where
-    K: Debug + Clone,
-    V: Debug,
+    K: Debug + Clone + Send + Sync,
+    V: Debug + Send + Sync,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
 
@@ -51,8 +51,8 @@ pub struct KeyValueTypedStoreInstance<K, V> {
 
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
-    K: Debug + Clone + Serialize + 'static,
-    V: Debug + for<'a> Deserialize<'a> + 'static,
+    K: Debug + Clone + Send + Sync + Serialize + 'static,
+    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
         let keys_bytes = keys

@@ -32,7 +32,9 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     }
 }
 
-impl<Key, C, P, A, K> HistoryReader<Key, C, P, A, K> for RSpaceHistoryReaderImpl<C, P, A, K> {
+impl<Key, C: Clone, P: Clone, A: Clone, K: Clone> HistoryReader<Key, C, P, A, K>
+    for RSpaceHistoryReaderImpl<C, P, A, K>
+{
     fn root(&self) -> Key {
         todo!()
     }
@@ -56,7 +58,7 @@ impl<Key, C, P, A, K> HistoryReader<Key, C, P, A, K> for RSpaceHistoryReaderImpl
     fn base(&self) -> Box<dyn HistoryReaderBase<C, P, A, K>> {
         struct HistoryReader;
 
-        impl<C, P, A, K> HistoryReaderBase<C, P, A, K> for HistoryReader {
+        impl<C: Clone, P: Clone, A: Clone, K: Clone> HistoryReaderBase<C, P, A, K> for HistoryReader {
             fn get_data_proj(
                 &self,
                 key: C,

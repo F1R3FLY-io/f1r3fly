@@ -2,12 +2,12 @@ use super::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::internal::{Datum, WaitingContinuation};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStoreTrieAction.scala
-pub enum HotStoreTrieAction<C, P, A, K> {
+pub enum HotStoreTrieAction<C: Clone, P: Clone, A: Clone, K: Clone> {
     TrieInsertAction(TrieInsertAction<C, P, A, K>),
     TrieDeleteAction(TrieDeleteAction),
 }
 
-pub enum TrieInsertAction<C, P, A, K> {
+pub enum TrieInsertAction<C: Clone, P: Clone, A: Clone, K: Clone> {
     TrieInsertProduce(TrieInsertProduce<A>),
     TrieInsertJoins(TrieInsertJoins<C>),
     TrieInsertConsume(TrieInsertConsume<P, K>),
@@ -16,34 +16,34 @@ pub enum TrieInsertAction<C, P, A, K> {
     TrieInsertBinaryConsume(TrieInsertBinaryConsume),
 }
 
-pub struct TrieInsertProduce<A> {
+pub struct TrieInsertProduce<A: Clone> {
     hash: Blake3Hash,
     data: Vec<Datum<A>>,
 }
 
-impl<A> TrieInsertProduce<A> {
+impl<A: Clone> TrieInsertProduce<A> {
     pub fn new(hash: Blake3Hash, data: Vec<Datum<A>>) -> Self {
         TrieInsertProduce { hash, data }
     }
 }
 
-pub struct TrieInsertJoins<C> {
+pub struct TrieInsertJoins<C: Clone> {
     hash: Blake3Hash,
     joins: Vec<Vec<C>>,
 }
 
-impl<C> TrieInsertJoins<C> {
+impl<C: Clone> TrieInsertJoins<C> {
     pub fn new(hash: Blake3Hash, joins: Vec<Vec<C>>) -> Self {
         TrieInsertJoins { hash, joins }
     }
 }
 
-pub struct TrieInsertConsume<P, K> {
+pub struct TrieInsertConsume<P: Clone, K: Clone> {
     hash: Blake3Hash,
     continuations: Vec<WaitingContinuation<P, K>>,
 }
 
-impl<P, K> TrieInsertConsume<P, K> {
+impl<P: Clone, K: Clone> TrieInsertConsume<P, K> {
     pub fn new(hash: Blake3Hash, continuations: Vec<WaitingContinuation<P, K>>) -> Self {
         TrieInsertConsume {
             hash,

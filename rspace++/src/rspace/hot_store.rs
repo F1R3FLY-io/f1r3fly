@@ -12,7 +12,7 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-pub trait HotStore<C, P, A, K> {
+pub trait HotStore<C: Clone, P: Clone, A: Clone, K: Clone> {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
     fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
     fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
@@ -38,6 +38,9 @@ pub trait HotStore<C, P, A, K> {
 struct HotStoreState<C, P, A, K>
 where
     C: Eq + Hash,
+    A: Clone,
+    P: Clone,
+    K: Clone,
 {
     continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
     installed_continuations: DashMap<Vec<C>, WaitingContinuation<P, K>>,
@@ -50,6 +53,9 @@ where
 struct HistoryStoreCache<C, P, A, K>
 where
     C: Eq + Hash,
+    A: Clone,
+    P: Clone,
+    K: Clone,
 {
     continuations: DashMap<Vec<C>, oneshot::Sender<Vec<WaitingContinuation<P, K>>>>,
     datums: DashMap<C, oneshot::Sender<Vec<Datum<A>>>>,
@@ -59,6 +65,9 @@ where
 struct InMemHotStore<C, P, A, K>
 where
     C: Eq + Hash,
+    A: Clone,
+    P: Clone,
+    K: Clone,
 {
     hot_store_state: Arc<Mutex<HotStoreState<C, P, A, K>>>,
     history_store_cache: Arc<Mutex<HistoryStoreCache<C, P, A, K>>>,

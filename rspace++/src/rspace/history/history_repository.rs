@@ -11,11 +11,12 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use serde::Serialize;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
-pub trait HistoryRepository<C, P, A, K> {
+pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync {
     fn checkpoint(
         &self,
         actions: Vec<HotStoreAction<C, P, A, K>>,
@@ -60,7 +61,13 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
     _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepositoryInstances<C, P, A, K> {
+impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K>
+where
+    C: Clone + Send + Sync + Serialize + 'static,
+    P: Clone + Send + Sync + 'static,
+    A: Clone + Send + Sync + 'static,
+    K: Clone + Send + Sync + 'static,
+{
     pub async fn lmdb_repository(
         history_key_value_store: Box<dyn KeyValueStore>,
         roots_key_value_store: Box<dyn KeyValueStore>,

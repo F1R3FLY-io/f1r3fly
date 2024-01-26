@@ -17,6 +17,7 @@ use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use bytes::Bytes;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -41,26 +42,30 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<C: Serialize, P, A, K> HistoryRepositoryImpl<C, P, A, K> {
-    fn transform(hot_store_action: HotStoreAction<C, P, A, K>) -> HotStoreTrieAction<C, P, A, K> {
+impl<C: Clone + Serialize, P: Clone, A: Clone, K: Clone> HistoryRepositoryImpl<C, P, A, K> {
+    fn transform(
+        &self,
+        hot_store_action: &HotStoreAction<C, P, A, K>,
+    ) -> HotStoreTrieAction<C, P, A, K> {
         match hot_store_action {
             HotStoreAction::Insert(InsertData(i)) => {
                 let key = hash(&i.channel);
-                let trie_insert_action =
-                    TrieInsertAction::TrieInsertProduce(TrieInsertProduce::new(key, i.data));
+                let trie_insert_action = TrieInsertAction::TrieInsertProduce(
+                    TrieInsertProduce::new(key, i.data.clone()),
+                );
                 HotStoreTrieAction::TrieInsertAction(trie_insert_action)
             }
             HotStoreAction::Insert(InsertContinuations(i)) => {
                 let key = hash_from_vec(&i.channels);
                 let trie_insert_action = TrieInsertAction::TrieInsertConsume(
-                    TrieInsertConsume::new(key, i.continuations),
+                    TrieInsertConsume::new(key, i.continuations.clone()),
                 );
                 HotStoreTrieAction::TrieInsertAction(trie_insert_action)
             }
             HotStoreAction::Insert(InsertJoins(i)) => {
                 let key = hash(&i.channel);
                 let trie_insert_action =
-                    TrieInsertAction::TrieInsertJoins(TrieInsertJoins::new(key, i.joins));
+                    TrieInsertAction::TrieInsertJoins(TrieInsertJoins::new(key, i.joins.clone()));
                 HotStoreTrieAction::TrieInsertAction(trie_insert_action)
             }
             HotStoreAction::Delete(DeleteData(d)) => {
@@ -85,19 +90,28 @@ impl<C: Serialize, P, A, K> HistoryRepositoryImpl<C, P, A, K> {
     }
 }
 
-impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepository<C, P, A, K>
-    for HistoryRepositoryImpl<C, P, A, K>
+impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K>
+where
+    C: Clone + Send + Sync + Serialize + 'static,
+    P: Clone + Send + Sync + 'static,
+    A: Clone + Send + Sync + 'static,
+    K: Clone + Send + Sync + 'static,
 {
     fn checkpoint(
         &self,
-        actions: Vec<crate::rspace::hot_store_action::HotStoreAction<C, P, A, K>>,
+        actions: Vec<HotStoreAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
+        let trie_actions: Vec<_> = actions
+            .par_iter()
+            .map(|action| self.transform(action))
+            .collect();
+
         todo!()
     }
 
     fn do_checkpoint(
         &self,
-        actions: Vec<crate::rspace::hot_store_trie_action::HotStoreTrieAction<C, P, A, K>>,
+        actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
         todo!()
     }

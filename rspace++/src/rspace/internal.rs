@@ -24,7 +24,7 @@ pub struct ContResult<C, P, K> {
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Datum<A> {
+pub struct Datum<A: Clone> {
     pub a: A,
     pub persist: bool,
     pub source: Produce,
@@ -45,7 +45,7 @@ where
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Clone, Debug)]
-pub struct WaitingContinuation<P, K> {
+pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
     pub continuation: K,
     pub persist: bool,
@@ -55,7 +55,7 @@ pub struct WaitingContinuation<P, K> {
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Clone, Debug)]
-pub struct ConsumeCandidate<C, A> {
+pub struct ConsumeCandidate<C, A: Clone> {
     pub channel: C,
     pub datum: Datum<A>,
     pub removed_datum: A,
@@ -64,7 +64,7 @@ pub struct ConsumeCandidate<C, A> {
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Debug)]
-pub struct ProduceCandidate<C, P, A, K> {
+pub struct ProduceCandidate<C, P: Clone, A: Clone, K: Clone> {
     pub channels: Vec<C>,
     pub continuation: WaitingContinuation<P, K>,
     pub continuation_index: i32,
@@ -73,7 +73,7 @@ pub struct ProduceCandidate<C, P, A, K> {
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Debug)]
-pub struct Row<P, A, K> {
+pub struct Row<P: Clone, A: Clone, K: Clone> {
     pub data: Vec<Datum<A>>,
     pub wks: Vec<WaitingContinuation<P, K>>,
 }
