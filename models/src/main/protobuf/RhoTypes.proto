@@ -5,6 +5,8 @@
  */
 syntax = "proto3";
 
+package rhoapi;
+
 // If you are building for other languages "scalapb.proto"
 // can be manually obtained here:
 // https://raw.githubusercontent.com/scalapb/ScalaPB/master/protobuf/scalapb/scalapb.proto

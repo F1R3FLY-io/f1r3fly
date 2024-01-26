@@ -150,7 +150,7 @@ message DeployDataProto {
 
 message ProcessedDeployProto {
     DeployDataProto deploy        = 1 [(scalapb.field).no_box = true];
-    PCost cost                    = 2 [(scalapb.field).no_box = true];
+    rhoapi.PCost cost             = 2 [(scalapb.field).no_box = true];
     repeated EventProto deployLog = 3; //the new terms and comm. rule reductions from this deploy
     bool errored                  = 5; //true if deploy encountered a user error
     string systemDeployError      = 6;

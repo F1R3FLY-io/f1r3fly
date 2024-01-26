@@ -73,14 +73,14 @@ service DeployService {
 
 message EventInfoResponse{
   oneof message{
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     BlockEventInfo result = 2;
   }
 }
 
 message ExploratoryDeployResponse{
   oneof message{
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     DataWithBlockInfo result = 2;
   }
 }
@@ -88,7 +88,7 @@ message ExploratoryDeployResponse{
 // doDeploy
 message DeployResponse {
   oneof message {
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     string result      = 2;
   }
 }
@@ -96,7 +96,7 @@ message DeployResponse {
 // getBlock
 message BlockResponse {
   oneof message {
-    ServiceError error  = 1;
+    servicemodelapi.ServiceError error  = 1;
     BlockInfo blockInfo = 2;
   }
 }
@@ -104,7 +104,7 @@ message BlockResponse {
 // visualizeDag
 message VisualizeBlocksResponse {
   oneof message {
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     string content     = 2;
   }
 }
@@ -112,7 +112,7 @@ message VisualizeBlocksResponse {
 // machineVerifiableDag
 message MachineVerifyResponse {
   oneof message {
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     string content     = 2;
   }
 }
@@ -120,7 +120,7 @@ message MachineVerifyResponse {
 // showMainChain & getBlocks
 message BlockInfoResponse {
   oneof message {
-    ServiceError error        = 1;
+    servicemodelapi.ServiceError error        = 1;
     LightBlockInfo blockInfo  = 2;
   }
 }
@@ -128,7 +128,7 @@ message BlockInfoResponse {
 // listenForDataAtName
 message ListeningNameDataResponse {
   oneof message {
-    ServiceError error                = 1;
+    servicemodelapi.ServiceError error                = 1;
     ListeningNameDataPayload payload  = 2;
   }
 }
@@ -141,20 +141,20 @@ message ListeningNameDataPayload {
 // listenForDataAtPar
 message RhoDataResponse {
   oneof message {
-    ServiceError error     = 1;
+    servicemodelapi.ServiceError error     = 1;
     RhoDataPayload payload = 2;
   }
 }
 
 message RhoDataPayload {
-  repeated Par par     = 1;
+  repeated rhoapi.Par par     = 1;
   LightBlockInfo block = 2 [(scalapb.field).no_box = true];
 }
 
 // listenForContinuationAtName
 message ContinuationAtNameResponse {
   oneof message {
-    ServiceError error                 = 1;
+    servicemodelapi.ServiceError error                 = 1;
     ContinuationAtNamePayload payload  = 2;
   }
 }
@@ -167,7 +167,7 @@ message ContinuationAtNamePayload {
 // findDeploy
 message FindDeployResponse {
   oneof message {
-    ServiceError error        = 1;
+    servicemodelapi.ServiceError error        = 1;
     LightBlockInfo blockInfo  = 2;
   }
 }
@@ -175,7 +175,7 @@ message FindDeployResponse {
 // previewPrivateNames
 message PrivateNamePreviewResponse {
   oneof message {
-    ServiceError error                 = 1;
+    servicemodelapi.ServiceError error                 = 1;
     PrivateNamePreviewPayload payload  = 2;
   }
 }
@@ -187,7 +187,7 @@ message PrivateNamePreviewPayload {
 // lastFinalizedBlock
 message LastFinalizedBlockResponse {
   oneof message {
-    ServiceError error   = 1;
+    servicemodelapi.ServiceError error   = 1;
     BlockInfo blockInfo  = 2;
   }
 }
@@ -195,21 +195,21 @@ message LastFinalizedBlockResponse {
 // isFinalized
 message IsFinalizedResponse {
   oneof message {
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     bool isFinalized   = 2;
   }
 }
 
 message BondStatusResponse {
   oneof message {
-    ServiceError error = 1;
+    servicemodelapi.ServiceError error = 1;
     bool isBonded   = 2;
   }
 }
 
 message StatusResponse {
   oneof message {
-    ServiceError error  = 1;
+    servicemodelapi.ServiceError error  = 1;
     Status status = 2;
   }
 }
