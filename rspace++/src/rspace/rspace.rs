@@ -591,10 +591,10 @@ impl RSpaceInstances {
         matcher: M,
     ) -> Result<RSpace<C, P, A, K, M>, KvStoreError>
     where
-        C: Clone + Debug + Default + Ord + Hash + Serialize + Send + Sync + 'static,
-        P: Clone + Debug + Default + Send + Sync + 'static,
-        A: Clone + Debug + Default + Send + Sync + 'static,
-        K: Clone + Debug + Default + Send + Sync + 'static,
+        C: Clone + Debug + Default + Send + Sync + Serialize + Ord + Hash + 'static,
+        P: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        A: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        K: Clone + Debug + Default + Send + Sync + Serialize + 'static,
         M: Match<P, A>,
     {
         let setup = RSpaceInstances::create_history_repo(store).await?;
@@ -610,10 +610,10 @@ impl RSpaceInstances {
         store: RSpaceStore,
     ) -> Result<(Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>), KvStoreError>
     where
-        C: Clone + Debug + Default + Eq + Hash + Serialize + Send + Sync + 'static,
-        P: Clone + Debug + Default + Send + Sync + 'static,
-        A: Clone + Debug + Default + Send + Sync + 'static,
-        K: Clone + Debug + Default + Send + Sync + 'static,
+        C: Clone + Debug + Default + Send + Sync + Serialize + Eq + Hash + 'static,
+        P: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        A: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        K: Clone + Debug + Default + Send + Sync + Serialize + 'static,
     {
         let history_repo =
             HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)

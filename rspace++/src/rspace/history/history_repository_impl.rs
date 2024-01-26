@@ -1,3 +1,4 @@
+use super::history_action::HistoryAction;
 use super::history_reader::HistoryReader;
 use super::instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl;
 use crate::rspace::hashing::blake3_hash::Blake3Hash;
@@ -42,7 +43,75 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
-impl<C: Clone + Serialize, P: Clone, A: Clone, K: Clone> HistoryRepositoryImpl<C, P, A, K> {
+type ColdAction = (Blake3Hash, Option<PersistedData>);
+
+impl<C, P, A, K> HistoryRepositoryImpl<C, P, A, K>
+where
+    C: Clone + Send + Sync + Serialize,
+    P: Clone + Send + Sync + Serialize,
+    A: Clone + Send + Sync + Serialize,
+    K: Clone + Send + Sync + Serialize,
+{
+    fn measure(&self, actions: Vec<HotStoreAction<C, P, A, K>>) -> () {
+        todo!()
+    }
+
+    fn compute_measure(&self, actions: Vec<HotStoreAction<C, P, A, K>>) -> Vec<String> {
+        actions
+            .into_par_iter()
+            .map(|action| match action {
+                HotStoreAction::Insert(InsertData(i)) => {
+                    let key = hash(&i.channel).bytes();
+                    let mut data = bincode::serialize(&i.data)
+                        .expect("History Repository Impl: Unable to serialize datums");
+                    data.sort();
+
+                    format!("{};insert-data;{};{}", hex::encode(key), data.len(), i.data.len())
+                }
+                HotStoreAction::Insert(InsertContinuations(i)) => {
+                    let key = hash_from_vec(&i.channels).bytes();
+                    let mut data = bincode::serialize(&i.continuations)
+                        .expect("History Repository Impl: Unable to serialize continuations");
+                    data.sort();
+
+                    format!(
+                        "{};insert-continuation;{};{}",
+                        hex::encode(key),
+                        data.len(),
+                        i.continuations.len()
+                    )
+                }
+                HotStoreAction::Insert(InsertJoins(i)) => {
+                    let key = hash(&i.channel).bytes();
+                    let mut data = bincode::serialize(&i.joins)
+                        .expect("History Repository Impl: Unable to serialize joins");
+                    data.sort();
+
+                    format!("{};insert-join;{};", hex::encode(key), data.len())
+                }
+                HotStoreAction::Delete(DeleteData(d)) => {
+                    let key = hash(&d.channel).bytes();
+                    format!("{};delete-data;0", hex::encode(key))
+                }
+                HotStoreAction::Delete(DeleteContinuations(d)) => {
+                    let key = hash_from_vec(&d.channels).bytes();
+                    format!("{};delete-continuation;0", hex::encode(key))
+                }
+                HotStoreAction::Delete(DeleteJoins(d)) => {
+                    let key = hash(&d.channel).bytes();
+                    format!("{};delete-join;0", hex::encode(key))
+                }
+            })
+            .collect()
+    }
+
+    fn calculate_storage_actions(
+        &self,
+        action: HotStoreTrieAction<C, P, A, K>,
+    ) -> (ColdAction, HistoryAction) {
+        todo!()
+    }
+
     fn transform(
         &self,
         hot_store_action: &HotStoreAction<C, P, A, K>,
@@ -93,9 +162,9 @@ impl<C: Clone + Serialize, P: Clone, A: Clone, K: Clone> HistoryRepositoryImpl<C
 impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K>
 where
     C: Clone + Send + Sync + Serialize + 'static,
-    P: Clone + Send + Sync + 'static,
-    A: Clone + Send + Sync + 'static,
-    K: Clone + Send + Sync + 'static,
+    P: Clone + Send + Sync + Serialize + 'static,
+    A: Clone + Send + Sync + Serialize + 'static,
+    K: Clone + Send + Sync + Serialize + 'static,
 {
     fn checkpoint(
         &self,

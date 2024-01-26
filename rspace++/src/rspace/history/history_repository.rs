@@ -64,9 +64,9 @@ pub struct HistoryRepositoryInstances<C, P, A, K> {
 impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K>
 where
     C: Clone + Send + Sync + Serialize + 'static,
-    P: Clone + Send + Sync + 'static,
-    A: Clone + Send + Sync + 'static,
-    K: Clone + Send + Sync + 'static,
+    P: Clone + Send + Sync + Serialize + 'static,
+    A: Clone + Send + Sync + Serialize + 'static,
+    K: Clone + Send + Sync + Serialize + 'static,
 {
     pub async fn lmdb_repository(
         history_key_value_store: Box<dyn KeyValueStore>,
