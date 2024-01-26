@@ -5,8 +5,8 @@ use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-use std::path::PathBuf;
 
 #[derive(Clone)]
 struct SpaceMatcher;
@@ -66,7 +66,7 @@ pub extern "C" fn space_new() -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            let mut kvm = mk_rspace_store_manager(PathBuf::default(), 1024);
+            let mut kvm = mk_rspace_store_manager("../rspace++/lmdb".into(), 1 * GB);
             let store = kvm.r_space_stores().await.unwrap();
 
             RSpaceInstances::create(store, SpaceMatcher).await
@@ -266,8 +266,8 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                 a: Some(datum.a),
                 persist: datum.persist,
                 source: Some(ProduceProto {
-                    channel_hash: datum.source.channel_hash.as_bytes().to_vec(),
-                    hash: datum.source.hash.as_bytes().to_vec(),
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
                     persistent: datum.source.persistent,
                 }),
             })
@@ -290,9 +290,9 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                         .source
                         .channel_hashes
                         .iter()
-                        .map(|hash| hash.as_bytes().to_vec())
+                        .map(|hash| hash.bytes())
                         .collect(),
-                    hash: wk.source.hash.as_bytes().to_vec(),
+                    hash: wk.source.hash.bytes(),
                     persistent: wk.source.persistent,
                 }),
             })

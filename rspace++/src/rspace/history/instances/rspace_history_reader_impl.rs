@@ -1,5 +1,5 @@
 use crate::rspace::{
-    hashing::serializable_blake3_hash::SerializableBlake3Hash,
+    hashing::blake3_hash::Blake3Hash,
     history::{
         cold_store::PersistedData,
         history::History,
@@ -15,14 +15,14 @@ use std::{
 
 pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
     target_history: Box<dyn History>,
-    leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<SerializableBlake3Hash, PersistedData>>>>,
+    leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
     _marker: PhantomData<(C, P, A, K)>,
 }
 
 impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     pub fn new(
         target_history: Box<dyn History>,
-        leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<SerializableBlake3Hash, PersistedData>>>>,
+        leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
     ) -> Self {
         RSpaceHistoryReaderImpl {
             target_history,

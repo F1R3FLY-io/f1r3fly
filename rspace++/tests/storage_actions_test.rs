@@ -11,7 +11,6 @@ mod tests {
     use serde::Serialize;
     use std::collections::{BTreeSet, HashSet, LinkedList};
     use std::hash::Hash;
-    use std::path::PathBuf;
 
     // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
     #[derive(Clone, Debug, Serialize, Default)]

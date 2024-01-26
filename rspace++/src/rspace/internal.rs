@@ -23,7 +23,7 @@ pub struct ContResult<C, P, K> {
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Datum<A> {
     pub a: A,
     pub persist: bool,

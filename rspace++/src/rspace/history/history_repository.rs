@@ -11,7 +11,6 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use bytes::Bytes;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
@@ -33,15 +32,21 @@ pub trait HistoryRepository<C, P, A, K> {
 
     fn exporter(
         &self,
-    ) -> Box<
-        dyn RSpaceExporter<
-            KeyHash = blake3::Hash,
-            NodePath = Vec<(blake3::Hash, Option<u8>)>,
-            Value = Bytes,
+    ) -> Arc<
+        Mutex<
+            Box<
+                dyn RSpaceExporter<
+                    KeyHash = blake3::Hash,
+                    NodePath = Vec<(blake3::Hash, Option<u8>)>,
+                    Value = bytes::Bytes,
+                >,
+            >,
         >,
     >;
 
-    fn importer(&self) -> Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes>>;
+    fn importer(
+        &self,
+    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = bytes::Bytes>>>>;
 
     fn get_history_reader(
         &self,
@@ -88,10 +93,10 @@ impl<C: 'static, P: 'static, A: 'static, K: 'static> HistoryRepositoryInstances<
 
         Ok(HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(Box::new(history))),
-            roots_repository,
+            roots_repository: Arc::new(Mutex::new(roots_repository)),
             leaf_store: Arc::new(Mutex::new(cold_store)),
-            rspace_exporter: Box::new(exporter),
-            rspace_importer: Box::new(importer),
+            rspace_exporter: Arc::new(Mutex::new(Box::new(exporter))),
+            rspace_importer: Arc::new(Mutex::new(Box::new(importer))),
             _marker: PhantomData,
         })
     }

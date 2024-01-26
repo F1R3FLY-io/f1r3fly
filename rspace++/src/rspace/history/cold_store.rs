@@ -1,5 +1,5 @@
 use crate::rspace::{
-    hashing::serializable_blake3_hash::SerializableBlake3Hash,
+    hashing::blake3_hash::Blake3Hash,
     shared::{
         key_value_store::{KeyValueStore, KeyValueStoreOps},
         key_value_typed_store::KeyValueTypedStore,
@@ -13,8 +13,8 @@ pub struct ColdStoreInstances;
 impl ColdStoreInstances {
     pub fn cold_store(
         store: Box<dyn KeyValueStore>,
-    ) -> Box<dyn KeyValueTypedStore<SerializableBlake3Hash, PersistedData>> {
-        Box::new(KeyValueStoreOps::to_typed_store::<SerializableBlake3Hash, PersistedData>(store))
+    ) -> Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>> {
+        Box::new(KeyValueStoreOps::to_typed_store::<Blake3Hash, PersistedData>(store))
     }
 }
 

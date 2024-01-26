@@ -22,7 +22,7 @@ impl RootRepository {
         }
     }
 
-    fn validate_and_set_current_root(&self, root: &blake3::Hash) -> () {
+    pub fn validate_and_set_current_root(&self, root: &blake3::Hash) -> () {
         match self.roots_store.validate_and_set_current_root(root) {
             Some(_) => (),
             None => panic!("unknown root"),
