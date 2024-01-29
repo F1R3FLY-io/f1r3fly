@@ -1,5 +1,7 @@
-use super::history_action::HistoryAction;
+use super::cold_store::{ContinuationsLeaf, DataLeaf, JoinsLeaf};
+use super::history_action::{DeleteAction, HistoryAction, InsertAction};
 use super::history_reader::HistoryReader;
+use super::history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT};
 use super::instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl;
 use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
@@ -13,6 +15,9 @@ use crate::rspace::hot_store_action::InsertAction::{InsertContinuations, InsertD
 use crate::rspace::hot_store_trie_action::{
     HotStoreTrieAction, TrieDeleteAction, TrieDeleteConsume, TrieDeleteJoins, TrieDeleteProduce,
     TrieInsertAction, TrieInsertConsume, TrieInsertJoins, TrieInsertProduce,
+};
+use crate::rspace::serializers::serializers::{
+    encode_binary, encode_continuations, encode_datums, encode_joins,
 };
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
@@ -62,18 +67,12 @@ where
             .map(|action| match action {
                 HotStoreAction::Insert(InsertData(i)) => {
                     let key = hash(&i.channel).bytes();
-                    let mut data = bincode::serialize(&i.data)
-                        .expect("History Repository Impl: Unable to serialize datums");
-                    data.sort();
-
+                    let data = encode_datums(&i.data);
                     format!("{};insert-data;{};{}", hex::encode(key), data.len(), i.data.len())
                 }
                 HotStoreAction::Insert(InsertContinuations(i)) => {
                     let key = hash_from_vec(&i.channels).bytes();
-                    let mut data = bincode::serialize(&i.continuations)
-                        .expect("History Repository Impl: Unable to serialize continuations");
-                    data.sort();
-
+                    let data = encode_continuations(&i.continuations);
                     format!(
                         "{};insert-continuation;{};{}",
                         hex::encode(key),
@@ -83,10 +82,7 @@ where
                 }
                 HotStoreAction::Insert(InsertJoins(i)) => {
                     let key = hash(&i.channel).bytes();
-                    let mut data = bincode::serialize(&i.joins)
-                        .expect("History Repository Impl: Unable to serialize joins");
-                    data.sort();
-
+                    let data = encode_joins(&i.joins);
                     format!("{};insert-join;{};", hex::encode(key), data.len())
                 }
                 HotStoreAction::Delete(DeleteData(d)) => {
@@ -109,7 +105,122 @@ where
         &self,
         action: HotStoreTrieAction<C, P, A, K>,
     ) -> (ColdAction, HistoryAction) {
-        todo!()
+        match action {
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertProduce(i)) => {
+                let data = encode_datums(&i.data);
+                let data_leaf = DataLeaf { bytes: data };
+                let data_leaf_encoded = bincode::serialize(&data_leaf)
+                    .expect("History Repository Impl: Unable to serialize DataLeaf");
+                let data_hash = Blake3Hash::new(&data_leaf_encoded);
+
+                (
+                    (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_DATUM, &i.hash.bytes()),
+                        hash: data_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertConsume(i)) => {
+                let data = encode_continuations(&i.continuations);
+                let continuations_leaf = ContinuationsLeaf { bytes: data };
+                let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
+                    .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
+                let continuations_hash = Blake3Hash::new(&continuations_leaf_encoded);
+
+                (
+                    (
+                        continuations_hash.clone(),
+                        Some(PersistedData::Continuations(continuations_leaf)),
+                    ),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_KONT, &i.hash.bytes()),
+                        hash: continuations_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertJoins(i)) => {
+                let data = encode_joins(&i.joins);
+                let joins_leaf = JoinsLeaf { bytes: data };
+                let joins_leaf_encoded = bincode::serialize(&joins_leaf)
+                    .expect("History Repository Impl: Unable to serialize JoinsLeaf");
+                let joins_hash = Blake3Hash::new(&joins_leaf_encoded);
+
+                (
+                    (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_JOINS, &i.hash.bytes()),
+                        hash: joins_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryProduce(i)) => {
+                let data = encode_binary(&i.data);
+                let data_leaf = DataLeaf { bytes: data };
+                let data_leaf_encoded = bincode::serialize(&data_leaf)
+                    .expect("History Repository Impl: Unable to serialize DataLeaf");
+                let data_hash = Blake3Hash::new(&data_leaf_encoded);
+
+                (
+                    (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_DATUM, &i.hash.bytes()),
+                        hash: data_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryConsume(i)) => {
+                let data = encode_binary(&i.continuations);
+                let continuations_leaf = ContinuationsLeaf { bytes: data };
+                let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
+                    .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
+                let continuations_hash = Blake3Hash::new(&continuations_leaf_encoded);
+
+                (
+                    (
+                        continuations_hash.clone(),
+                        Some(PersistedData::Continuations(continuations_leaf)),
+                    ),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_KONT, &i.hash.bytes()),
+                        hash: continuations_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryJoins(i)) => {
+                let data = encode_binary(&i.joins);
+                let joins_leaf = JoinsLeaf { bytes: data };
+                let joins_leaf_encoded = bincode::serialize(&joins_leaf)
+                    .expect("History Repository Impl: Unable to serialize JoinsLeaf");
+                let joins_hash = Blake3Hash::new(&joins_leaf_encoded);
+
+                (
+                    (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
+                    HistoryAction::Insert(InsertAction {
+                        key: prepend_bytes(PREFIX_JOINS, &i.hash.bytes()),
+                        hash: joins_hash,
+                    }),
+                )
+            }
+            HotStoreTrieAction::TrieDeleteAction(TrieDeleteAction::TrieDeleteProduce(d)) => (
+                (d.hash.clone(), None),
+                HistoryAction::Delete(DeleteAction {
+                    key: prepend_bytes(PREFIX_DATUM, &d.hash.bytes()),
+                }),
+            ),
+            HotStoreTrieAction::TrieDeleteAction(TrieDeleteAction::TrieDeleteConsume(d)) => (
+                (d.hash.clone(), None),
+                HistoryAction::Delete(DeleteAction {
+                    key: prepend_bytes(PREFIX_KONT, &d.hash.bytes()),
+                }),
+            ),
+            HotStoreTrieAction::TrieDeleteAction(TrieDeleteAction::TrieDeleteJoins(d)) => (
+                (d.hash.clone(), None),
+                HistoryAction::Delete(DeleteAction {
+                    key: prepend_bytes(PREFIX_JOINS, &d.hash.bytes()),
+                }),
+            ),
+        }
     }
 
     fn transform(
@@ -253,4 +364,11 @@ where
             .expect("History Repository Impl: Unable to acquire history lock");
         history_lock.root()
     }
+}
+
+fn prepend_bytes(element: u8, _bytes: &[u8]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.push(element);
+    bytes.extend(_bytes.iter().cloned());
+    bytes
 }

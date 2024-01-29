@@ -17,8 +17,8 @@ pub enum TrieInsertAction<C: Clone, P: Clone, A: Clone, K: Clone> {
 }
 
 pub struct TrieInsertProduce<A: Clone> {
-    hash: Blake3Hash,
-    data: Vec<Datum<A>>,
+    pub hash: Blake3Hash,
+    pub data: Vec<Datum<A>>,
 }
 
 impl<A: Clone> TrieInsertProduce<A> {
@@ -28,8 +28,8 @@ impl<A: Clone> TrieInsertProduce<A> {
 }
 
 pub struct TrieInsertJoins<C: Clone> {
-    hash: Blake3Hash,
-    joins: Vec<Vec<C>>,
+    pub hash: Blake3Hash,
+    pub joins: Vec<Vec<C>>,
 }
 
 impl<C: Clone> TrieInsertJoins<C> {
@@ -39,8 +39,8 @@ impl<C: Clone> TrieInsertJoins<C> {
 }
 
 pub struct TrieInsertConsume<P: Clone, K: Clone> {
-    hash: Blake3Hash,
-    continuations: Vec<WaitingContinuation<P, K>>,
+    pub hash: Blake3Hash,
+    pub continuations: Vec<WaitingContinuation<P, K>>,
 }
 
 impl<P: Clone, K: Clone> TrieInsertConsume<P, K> {
@@ -53,18 +53,18 @@ impl<P: Clone, K: Clone> TrieInsertConsume<P, K> {
 }
 
 pub struct TrieInsertBinaryProduce {
-    hash: Blake3Hash,
-    data: Vec<Vec<u8>>,
+    pub hash: Blake3Hash,
+    pub data: Vec<Vec<u8>>,
 }
 
 pub struct TrieInsertBinaryJoins {
-    hash: Blake3Hash,
-    joins: Vec<Vec<u8>>,
+    pub hash: Blake3Hash,
+    pub joins: Vec<Vec<u8>>,
 }
 
 pub struct TrieInsertBinaryConsume {
-    hash: Blake3Hash,
-    continuations: Vec<Vec<u8>>,
+    pub hash: Blake3Hash,
+    pub continuations: Vec<Vec<u8>>,
 }
 
 pub enum TrieDeleteAction {
@@ -74,7 +74,7 @@ pub enum TrieDeleteAction {
 }
 
 pub struct TrieDeleteProduce {
-    hash: Blake3Hash,
+    pub hash: Blake3Hash,
 }
 
 impl TrieDeleteProduce {
@@ -84,7 +84,7 @@ impl TrieDeleteProduce {
 }
 
 pub struct TrieDeleteJoins {
-    hash: Blake3Hash,
+    pub hash: Blake3Hash,
 }
 
 impl TrieDeleteJoins {
@@ -94,7 +94,7 @@ impl TrieDeleteJoins {
 }
 
 pub struct TrieDeleteConsume {
-    hash: Blake3Hash,
+    pub hash: Blake3Hash,
 }
 
 impl TrieDeleteConsume {

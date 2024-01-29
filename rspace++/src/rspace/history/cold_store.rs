@@ -5,7 +5,7 @@ use crate::rspace::{
         key_value_typed_store::KeyValueTypedStore,
     },
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/ColdStore.scala
 pub struct ColdStoreInstances;
@@ -25,17 +25,17 @@ pub enum PersistedData {
     Continuations(ContinuationsLeaf),
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct JoinsLeaf {
-    bytes: Vec<u8>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JoinsLeaf {
+    pub bytes: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct DataLeaf {
-    bytes: Vec<u8>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DataLeaf {
+    pub bytes: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct ContinuationsLeaf {
-    bytes: Vec<u8>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ContinuationsLeaf {
+    pub bytes: Vec<u8>,
 }

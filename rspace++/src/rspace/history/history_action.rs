@@ -1,3 +1,5 @@
+use crate::rspace::hashing::blake3_hash::Blake3Hash;
+
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryAction.scala
 type KeyPath = Vec<u8>;
 
@@ -10,9 +12,9 @@ trait HistoryActionTrait {
     fn key(&self) -> &KeyPath;
 }
 
-struct InsertAction {
-    key: KeyPath,
-    hash: blake3::Hash,
+pub struct InsertAction {
+    pub key: KeyPath,
+    pub hash: Blake3Hash,
 }
 
 impl HistoryActionTrait for InsertAction {
@@ -21,8 +23,8 @@ impl HistoryActionTrait for InsertAction {
     }
 }
 
-struct DeleteAction {
-    key: KeyPath,
+pub struct DeleteAction {
+    pub key: KeyPath,
 }
 
 impl HistoryActionTrait for DeleteAction {

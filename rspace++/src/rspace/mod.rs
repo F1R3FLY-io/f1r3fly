@@ -12,3 +12,4 @@ mod hot_store_action;
 pub mod shared;
 mod hot_store_trie_action;
 mod state;
+mod serializers;
