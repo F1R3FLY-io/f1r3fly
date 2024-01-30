@@ -19,7 +19,7 @@ where
 
     fn delete(&self, keys: Vec<K>) -> i32;
 
-    fn contains(&self, keys: Vec<K>) -> Vec<bool>;
+    fn contains(&self, keys: &Vec<K>) -> Vec<bool>;
 
     // def collect[T](pf: PartialFunction[(K, () => V), T]): F[Seq[T]]
     // TODO: Update this to match scala
@@ -34,11 +34,21 @@ where
 
         match first_value {
             Some(value) => Ok(Some(value)),
-            None => {
-                Ok(None)
-                // panic!("Key Value Typed Store: key not found: {:?}", key);
-            }
+            None => Ok(None),
         }
+    }
+
+    fn put_if_absent(&self, kv_pairs: Vec<(K, V)>) -> () {
+        let keys: Vec<K> = kv_pairs.iter().map(|(k, _)| k.clone()).collect();
+        let if_absent = self.contains(&keys);
+        let kv_if_absent: Vec<_> = kv_pairs.into_iter().zip(if_absent).collect();
+        let kv_absent: Vec<_> = kv_if_absent
+            .into_iter()
+            .filter(|(_, is_present)| !is_present)
+            .map(|(kv, _)| kv)
+            .collect();
+
+        self.put(kv_absent);
     }
 }
 
@@ -81,7 +91,7 @@ where
         todo!()
     }
 
-    fn contains(&self, keys: Vec<K>) -> Vec<bool> {
+    fn contains(&self, keys: &Vec<K>) -> Vec<bool> {
         todo!()
     }
 

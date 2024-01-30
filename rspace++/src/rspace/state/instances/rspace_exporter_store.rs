@@ -1,3 +1,4 @@
+use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::shared::trie_exporter::{TrieExporter, TrieNode};
 use crate::rspace::{
     shared::key_value_store::KeyValueStore, state::rspace_exporter::RSpaceExporter,
@@ -12,11 +13,8 @@ impl RSpaceExporterStore {
         history_store: Box<dyn KeyValueStore>,
         value_store: Box<dyn KeyValueStore>,
         roots_store: Box<dyn KeyValueStore>,
-    ) -> impl RSpaceExporter<
-        KeyHash = blake3::Hash,
-        NodePath = Vec<(blake3::Hash, Option<u8>)>,
-        Value = Bytes,
-    > {
+    ) -> impl RSpaceExporter<KeyHash = Blake3Hash, NodePath = Vec<(Blake3Hash, Option<u8>)>, Value = Bytes>
+    {
         RSpaceExporterImpl {
             source_history_store: history_store,
             source_value_store: value_store,
@@ -32,13 +30,13 @@ struct RSpaceExporterImpl {
 }
 
 impl RSpaceExporter for RSpaceExporterImpl {
-    fn get_root(&self) -> blake3::Hash {
+    fn get_root(&self) -> Blake3Hash {
         todo!()
     }
 }
 
 impl TrieExporter for RSpaceExporterImpl {
-    type KeyHash = blake3::Hash;
+    type KeyHash = Blake3Hash;
 
     type NodePath = Vec<(Self::KeyHash, Option<u8>)>;
 
@@ -55,7 +53,7 @@ impl TrieExporter for RSpaceExporterImpl {
 
     fn get_history_items(
         &self,
-        keys: Vec<blake3::Hash>,
+        keys: Vec<Blake3Hash>,
         from_buffer: fn(&[u8]) -> Self::Value,
     ) -> Vec<(Self::KeyHash, Self::Value)> {
         todo!()
@@ -63,7 +61,7 @@ impl TrieExporter for RSpaceExporterImpl {
 
     fn get_data_items(
         &self,
-        keys: Vec<blake3::Hash>,
+        keys: Vec<Blake3Hash>,
         from_buffer: fn(&[u8]) -> Self::Value,
     ) -> Vec<(Self::KeyHash, Self::Value)> {
         todo!()

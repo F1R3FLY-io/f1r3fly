@@ -22,7 +22,9 @@ use crate::rspace::serializers::serializers::{
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use async_trait::async_trait;
 use bytes::Bytes;
+use log::debug;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::marker::PhantomData;
@@ -37,14 +39,14 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
         Mutex<
             Box<
                 dyn RSpaceExporter<
-                    KeyHash = blake3::Hash,
-                    NodePath = Vec<(blake3::Hash, Option<u8>)>,
+                    KeyHash = Blake3Hash,
+                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
                     Value = Bytes,
                 >,
             >,
         >,
     >,
-    pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes>>>>,
+    pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = Bytes>>>>,
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
@@ -57,11 +59,13 @@ where
     A: Clone + Send + Sync + Serialize,
     K: Clone + Send + Sync + Serialize,
 {
-    fn measure(&self, actions: Vec<HotStoreAction<C, P, A, K>>) -> () {
-        todo!()
+    fn measure(&self, actions: &Vec<HotStoreAction<C, P, A, K>>) -> () {
+        for p in self.compute_measure(actions) {
+            debug!("{}", p);
+        }
     }
 
-    fn compute_measure(&self, actions: Vec<HotStoreAction<C, P, A, K>>) -> Vec<String> {
+    fn compute_measure(&self, actions: &Vec<HotStoreAction<C, P, A, K>>) -> Vec<String> {
         actions
             .into_par_iter()
             .map(|action| match action {
@@ -103,7 +107,7 @@ where
 
     fn calculate_storage_actions(
         &self,
-        action: HotStoreTrieAction<C, P, A, K>,
+        action: &HotStoreTrieAction<C, P, A, K>,
     ) -> (ColdAction, HistoryAction) {
         match action {
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertProduce(i)) => {
@@ -270,6 +274,7 @@ where
     }
 }
 
+#[async_trait]
 impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K>
 where
     C: Clone + Send + Sync + Serialize + 'static,
@@ -277,31 +282,101 @@ where
     A: Clone + Send + Sync + Serialize + 'static,
     K: Clone + Send + Sync + Serialize + 'static,
 {
-    fn checkpoint(
+    async fn checkpoint(
         &self,
-        actions: Vec<HotStoreAction<C, P, A, K>>,
+        actions: &Vec<HotStoreAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
         let trie_actions: Vec<_> = actions
             .par_iter()
             .map(|action| self.transform(action))
             .collect();
 
-        todo!()
+        let hr = self.do_checkpoint(trie_actions).await;
+        let _ = self.measure(actions);
+        hr
     }
 
-    fn do_checkpoint(
+    async fn do_checkpoint(
         &self,
-        actions: Vec<HotStoreTrieAction<C, P, A, K>>,
+        trie_actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
-        todo!()
+        let storage_actions: Vec<(ColdAction, HistoryAction)> = trie_actions
+            .par_iter()
+            .map(|a| self.calculate_storage_actions(a))
+            .collect();
+
+        let cold_actions: Vec<(Blake3Hash, PersistedData)> = storage_actions
+            .clone()
+            .into_iter()
+            .filter_map(|(key_data, _)| match key_data {
+                (key, Some(data)) => Some((key, data.clone())),
+                _ => None,
+            })
+            .collect();
+
+        let history_actions: Vec<HistoryAction> = storage_actions
+            .into_iter()
+            .map(|(_, history)| history)
+            .collect();
+
+        // save new root for state after checkpoint
+        let store_root = |root| async move {
+            let roots_repo_lock = self
+                .roots_repository
+                .lock()
+                .expect("History Repository Impl: Unable to acquire roots repository lock");
+            roots_repo_lock.commit(root)
+        };
+
+        // store cold data
+        let store_leaves = async move {
+            let leaf_store_lock = self
+                .leaf_store
+                .lock()
+                .expect("History Repository Impl: Unable to acquire leaf store lock");
+            leaf_store_lock.put_if_absent(cold_actions);
+        };
+
+        // store everything related to history (history data, new root and populate cache for new root)
+        let store_history = {
+            let result_history = {
+                let history_lock = self
+                    .current_history
+                    .lock()
+                    .expect("History Repository Impl: Unable to acquire history lock");
+
+                history_lock.process(history_actions)
+            };
+            result_history
+        };
+        let new_root = store_history.root();
+        store_root(&new_root)
+            .await
+            .expect("History Repository Impl: Unable to store root");
+
+        let combined = async move {
+            let leaves = store_leaves.await;
+            let history = store_history;
+            (leaves, history)
+        };
+        let (_, new_history) = combined.await;
+
+        Box::new(HistoryRepositoryImpl {
+            current_history: Arc::new(Mutex::new(new_history)),
+            roots_repository: self.roots_repository.clone(),
+            leaf_store: self.leaf_store.clone(),
+            rspace_exporter: self.rspace_exporter.clone(),
+            rspace_importer: self.rspace_importer.clone(),
+            _marker: PhantomData,
+        })
     }
 
-    fn reset(&self, root: blake3::Hash) -> Box<dyn HistoryRepository<C, P, A, K>> {
+    fn reset(&self, root: Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>> {
         let roots_lock = self
             .roots_repository
             .lock()
             .expect("History Repository Impl: Unable to acquire roots repository lock");
-        let _ = roots_lock.validate_and_set_current_root(&root);
+        let _ = roots_lock.validate_and_set_current_root(root.clone());
 
         let history_lock = self
             .current_history
@@ -329,8 +404,8 @@ where
         Mutex<
             Box<
                 dyn RSpaceExporter<
-                    KeyHash = blake3::Hash,
-                    NodePath = Vec<(blake3::Hash, Option<u8>)>,
+                    KeyHash = Blake3Hash,
+                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
                     Value = bytes::Bytes,
                 >,
             >,
@@ -341,14 +416,14 @@ where
 
     fn importer(
         &self,
-    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = bytes::Bytes>>>> {
+    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = bytes::Bytes>>>> {
         self.rspace_importer.clone()
     }
 
     fn get_history_reader(
         &self,
-        state_hash: blake3::Hash,
-    ) -> Box<dyn HistoryReader<blake3::Hash, C, P, A, K>> {
+        state_hash: Blake3Hash,
+    ) -> Box<dyn HistoryReader<Blake3Hash, C, P, A, K>> {
         let history_lock = self
             .current_history
             .lock()
@@ -357,7 +432,7 @@ where
         Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone()))
     }
 
-    fn root(&self) -> blake3::Hash {
+    fn root(&self) -> Blake3Hash {
         let history_lock = self
             .current_history
             .lock()

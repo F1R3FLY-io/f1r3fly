@@ -1,9 +1,9 @@
-use bytes::Bytes;
-
 use crate::rspace::{
+    hashing::blake3_hash::Blake3Hash,
     shared::{key_value_store::KeyValueStore, trie_importer::TrieImporter},
     state::rspace_importer::RSpaceImporter,
 };
+use bytes::Bytes;
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/instances/RSpaceImporterStore.scala
 pub struct RSpaceImporterStore;
@@ -13,7 +13,7 @@ impl RSpaceImporterStore {
         history_store: Box<dyn KeyValueStore>,
         value_store: Box<dyn KeyValueStore>,
         roots_store: Box<dyn KeyValueStore>,
-    ) -> impl RSpaceImporter<KeyHash = blake3::Hash, Value = Bytes> {
+    ) -> impl RSpaceImporter<KeyHash = Blake3Hash, Value = Bytes> {
         RSpaceImporterImpl {
             source_history_store: history_store,
             source_value_store: value_store,
@@ -35,7 +35,7 @@ impl RSpaceImporter for RSpaceImporterImpl {
 }
 
 impl TrieImporter for RSpaceImporterImpl {
-    type KeyHash = blake3::Hash;
+    type KeyHash = Blake3Hash;
 
     type Value = Bytes;
 

@@ -1,3 +1,4 @@
+use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::cold_store::ColdStoreInstances;
 use crate::rspace::history::history::{History, HistoryInstances};
 use crate::rspace::history::history_reader::HistoryReader;
@@ -11,23 +12,25 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use async_trait::async_trait;
 use serde::Serialize;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
+#[async_trait]
 pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync {
-    fn checkpoint(
+    async fn checkpoint(
         &self,
-        actions: Vec<HotStoreAction<C, P, A, K>>,
+        actions: &Vec<HotStoreAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
-    fn do_checkpoint(
+    async fn do_checkpoint(
         &self,
         actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
-    fn reset(&self, root: blake3::Hash) -> Box<dyn HistoryRepository<C, P, A, K>>;
+    fn reset(&self, root: Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
     fn history(&self) -> Arc<Mutex<Box<dyn History>>>;
 
@@ -37,8 +40,8 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
         Mutex<
             Box<
                 dyn RSpaceExporter<
-                    KeyHash = blake3::Hash,
-                    NodePath = Vec<(blake3::Hash, Option<u8>)>,
+                    KeyHash = Blake3Hash,
+                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
                     Value = bytes::Bytes,
                 >,
             >,
@@ -47,14 +50,14 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
 
     fn importer(
         &self,
-    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = blake3::Hash, Value = bytes::Bytes>>>>;
+    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = bytes::Bytes>>>>;
 
     fn get_history_reader(
         &self,
-        state_hash: blake3::Hash,
-    ) -> Box<dyn HistoryReader<blake3::Hash, C, P, A, K>>;
+        state_hash: Blake3Hash,
+    ) -> Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>;
 
-    fn root(&self) -> blake3::Hash;
+    fn root(&self) -> Blake3Hash;
 }
 
 pub struct HistoryRepositoryInstances<C, P, A, K> {
