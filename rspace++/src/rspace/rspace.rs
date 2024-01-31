@@ -1,8 +1,11 @@
+use super::hashing::blake3_hash::Blake3Hash;
+use super::history::history_reader::HistoryReader;
+use super::shared::key_value_store::KvStoreError;
 use crate::rspace::checkpoint::Checkpoint;
-use crate::rspace::concurrent::two_step_lock::TwoStepLock;
 use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
+use crate::rspace::history::instances::radix_history::EmptyRootHash;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
 use crate::rspace::matcher::r#match::Match;
@@ -12,11 +15,9 @@ use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
-
-use super::shared::key_value_store::KvStoreError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/RSpace.scala
 // NOTE: 'space_matcher' field is added on Rust side to behave like Scala's 'extend'
@@ -30,20 +31,21 @@ where
     history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
-    two_step_lock: TwoStepLock<C>,
+    installs: HashMap<Vec<C>, Install<P, K>>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
 type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
 
 // NOTE: Currently NOT implementing any 'Log' functions
+// NOTE: Currently NOT implementing any 'produceCounter' operations
 // NOTE: Implementing 'RSpaceOps' functions in this file
 impl<C, P, A, K, M> RSpace<C, P, A, K, M>
 where
-    C: Clone + Debug + Serialize + Hash + Ord + Eq,
-    P: Clone + Debug + Serialize,
-    A: Clone + Debug + Serialize,
-    K: Clone + Debug + Serialize,
+    C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static,
+    P: Clone + Debug + Default + Serialize + 'static,
+    A: Clone + Debug + Default + Serialize + 'static,
+    K: Clone + Debug + Default + Serialize + 'static,
     M: Match<P, A>,
 {
     fn locked_consume(
@@ -203,23 +205,24 @@ where
         self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
     }
 
-    fn create_checkpoint(&self) -> Checkpoint {
+    async fn create_checkpoint(&mut self) -> Checkpoint {
         let changes = self.store.changes();
-        todo!()
+        let next_history = self.history_repository.checkpoint(&changes).await;
+        self.history_repository = next_history;
+
+        let history_reader = self
+            .history_repository
+            .get_history_reader(self.history_repository.root());
+
+        self.create_new_hot_store(history_reader);
+        self.restore_installs();
+
+        Checkpoint {
+            root: self.history_repository.root(),
+        }
     }
 
     /* RSpaceOps */
-
-    fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
-        let mut rng = thread_rng();
-        let mut indexed_vec = t
-            .into_iter()
-            .enumerate()
-            .map(|(i, d)| (d, i as i32))
-            .collect::<Vec<_>>();
-        indexed_vec.shuffle(&mut rng);
-        indexed_vec
-    }
 
     fn store_waiting_continuation(
         &self,
@@ -283,6 +286,12 @@ where
             .collect()
     }
 
+    fn restore_installs(&self) -> () {
+        for (channels, install) in &self.installs {
+            self.install(channels.clone(), install.patterns.clone(), install.continuation.clone());
+        }
+    }
+
     pub fn consume(
         &self,
         channels: Vec<C>,
@@ -307,26 +316,6 @@ where
         }
     }
 
-    // pub async fn produce(
-    //     &self,
-    //     channel: C,
-    //     data: A,
-    //     persist: bool,
-    // ) -> MaybeActionResult<C, P, A, K> {
-    //     let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
-    //     let channel_clone = channel.clone();
-    //     let locked_produce_result = self.two_step_lock.acquire(
-    //         vec![channel_clone.clone()],
-    //         || {
-    //             self.store
-    //                 .get_joins(channel_clone)
-    //                 .map(|joins| joins.into_iter().flatten().collect::<Vec<_>>())
-    //                 .unwrap()
-    //         },
-    //         || self.locked_produce(channel, data, persist, produce_ref),
-    //     );
-    //     locked_produce_result.await
-    // }
     pub fn produce(&self, channel: C, data: A, persist: bool) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
@@ -410,9 +399,28 @@ where
         }
     }
 
-    pub fn clear(&self) -> () {
-        self.two_step_lock.clean_up();
-        self.store.clear()
+    pub fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+        self.store.to_map()
+    }
+
+    fn reset(&mut self, root: Blake3Hash) -> () {
+        let next_history = self.history_repository.reset(&root);
+        self.history_repository = next_history;
+
+        let history_reader = self.history_repository.get_history_reader(root);
+        self.create_new_hot_store(history_reader);
+    }
+
+    pub fn clear(&mut self) -> () {
+        self.reset(EmptyRootHash::new().hash)
+    }
+
+    fn create_new_hot_store(
+        &mut self,
+        history_reader: Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>,
+    ) -> () {
+        let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
+        self.store = next_hot_store;
     }
 
     fn wrap_result(
@@ -552,6 +560,17 @@ where
             }
         }
     }
+
+    fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
+        let mut rng = thread_rng();
+        let mut indexed_vec = t
+            .into_iter()
+            .enumerate()
+            .map(|(i, d)| (d, i as i32))
+            .collect::<Vec<_>>();
+        indexed_vec.shuffle(&mut rng);
+        indexed_vec
+    }
 }
 
 pub struct RSpaceInstances;
@@ -582,7 +601,7 @@ impl RSpaceInstances {
             history_repository,
             store,
             space_matcher: SpaceMatcher::create(matcher),
-            two_step_lock: TwoStepLock::new(),
+            installs: HashMap::new(),
         }
     }
 
@@ -623,6 +642,6 @@ impl RSpaceInstances {
 
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
-        Ok((Box::new(history_repo), Box::new(hot_store)))
+        Ok((Box::new(history_repo), hot_store))
     }
 }

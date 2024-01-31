@@ -2,7 +2,7 @@ pub mod history;
 pub mod history_reader;
 pub mod history_repository;
 mod history_action;
-mod instances;
+pub mod instances;
 mod radix_tree;
 mod roots_store;
 mod root_repository;

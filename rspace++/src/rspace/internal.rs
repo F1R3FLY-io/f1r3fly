@@ -77,3 +77,8 @@ pub struct Row<P: Clone, A: Clone, K: Clone> {
     pub data: Vec<Datum<A>>,
     pub wks: Vec<WaitingContinuation<P, K>>,
 }
+
+pub struct Install<P, K> {
+    pub patterns: Vec<P>,
+    pub continuation: K,
+}

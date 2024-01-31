@@ -69,12 +69,12 @@ impl History for RadixHistory {
         self.root_hash.clone()
     }
 
-    fn reset(&self, root: Blake3Hash) -> Box<dyn History> {
+    fn reset(&self, root: &Blake3Hash) -> Box<dyn History> {
         let imple = RadixTreeImpl::new(self.store.clone());
         let node = imple.load_node(root.bytes(), Some(true));
 
         Box::new(RadixHistory {
-            root_hash: root,
+            root_hash: root.clone(),
             root_node: node,
             imple,
             store: self.store.clone(),

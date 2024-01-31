@@ -371,7 +371,7 @@ where
         })
     }
 
-    fn reset(&self, root: Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>> {
+    fn reset(&self, root: &Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>> {
         let roots_lock = self
             .roots_repository
             .lock()
@@ -428,7 +428,7 @@ where
             .current_history
             .lock()
             .expect("History Repository Impl: Unable to acquire history lock");
-        let history_repo = history_lock.reset(state_hash);
+        let history_repo = history_lock.reset(&state_hash);
         Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone()))
     }
 

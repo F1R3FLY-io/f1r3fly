@@ -12,7 +12,7 @@ pub trait History: Send + Sync {
 
     fn root(&self) -> Blake3Hash;
 
-    fn reset(&self, root: Blake3Hash) -> Box<dyn History>;
+    fn reset(&self, root: &Blake3Hash) -> Box<dyn History>;
 }
 
 pub struct HistoryInstances;
