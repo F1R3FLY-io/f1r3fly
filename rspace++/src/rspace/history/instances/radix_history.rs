@@ -1,10 +1,11 @@
 use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_action::HistoryAction;
+use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::radix_tree::{hash_node, EmptyNode, Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
-use bytes::Bytes;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -47,15 +48,51 @@ impl RadixHistory {
         let hash = Blake3Hash::new(&hash_array);
         hash
     }
+
+    fn has_no_duplicates(&self, actions: &Vec<HistoryAction>) -> bool {
+        let keys: HashSet<_> = actions.iter().map(|action| action.key()).collect();
+        keys.len() == actions.len()
+    }
 }
 
 impl History for RadixHistory {
-    fn read(&self, key: Bytes) -> Option<Bytes> {
-        todo!()
+    fn read(&self, key: Vec<u8>) -> Option<Vec<u8>> {
+        self.imple.read(self.root_node.clone(), key)
     }
 
     fn process(&self, actions: Vec<HistoryAction>) -> Box<dyn History> {
-        todo!()
+        if self.has_no_duplicates(&actions) {
+            panic!("Radix History: Cannot process duplicate actions on one key.")
+        }
+
+        let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions);
+
+        match new_root_node_opt {
+            Some(new_root_node) => {
+                let hash = self.imple.save_node(&new_root_node);
+                let blake_hash = Blake3Hash::new(&hash);
+                let new_history = RadixHistory {
+                    root_hash: blake_hash,
+                    root_node: new_root_node,
+                    imple: self.imple.clone(),
+                    store: self.store.clone(),
+                };
+                self.imple.commit();
+                self.imple.clear_write_cache();
+                self.imple.clear_read_cache();
+                Box::new(new_history)
+            }
+            None => {
+                self.imple.clear_write_cache();
+                self.imple.clear_read_cache();
+                Box::new(RadixHistory {
+                    root_hash: self.root_hash.clone(),
+                    root_node: self.root_node.clone(),
+                    imple: self.imple.clone(),
+                    store: self.store.clone(),
+                })
+            }
+        }
     }
 
     fn root(&self) -> Blake3Hash {

@@ -9,7 +9,7 @@ pub enum HistoryAction {
     Delete(DeleteAction),
 }
 
-trait HistoryActionTrait {
+pub trait HistoryActionTrait {
     fn key(&self) -> &KeyPath;
 }
 
@@ -33,5 +33,14 @@ pub struct DeleteAction {
 impl HistoryActionTrait for DeleteAction {
     fn key(&self) -> &KeyPath {
         &self.key
+    }
+}
+
+impl HistoryActionTrait for HistoryAction {
+    fn key(&self) -> &KeyPath {
+        match self {
+            HistoryAction::Insert(insert_action) => insert_action.key(),
+            HistoryAction::Delete(delete_action) => delete_action.key(),
+        }
     }
 }

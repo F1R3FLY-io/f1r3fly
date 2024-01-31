@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use super::history_action::HistoryAction;
+
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Item {
@@ -36,19 +38,42 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
     (hash.as_bytes().to_vec(), bytes)
 }
 
+/**
+ * Radix Tree implementation
+ */
+#[derive(Clone)]
 pub struct RadixTreeImpl {
     pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
-    pub cache: DashMap<Vec<u8>, Node>,
+    /**
+     * Cache for storing read and decoded nodes.
+     *
+     * Cache stores kv-pairs (hash, node).
+     * Where hash - Blake2b256Hash of serializing nodes data,
+     *       node - deserialized data of this node.
+     */
+    pub cache_r: DashMap<Vec<u8>, Node>,
+    /**
+     * Cache for storing serializing nodes. For subsequent unloading in KVDB
+     *
+     * Cache stores kv-pairs (hash, bytes).
+     * Where hash -  Blake2b256Hash of bytes,
+     *       bytes - serializing data of nodes.
+     */
+    pub cache_w: DashMap<Vec<u8>, Vec<u8>>,
 }
 
 impl RadixTreeImpl {
     pub fn new(store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>) -> Self {
         RadixTreeImpl {
             store,
-            cache: DashMap::new(),
+            cache_r: DashMap::new(),
+            cache_w: DashMap::new(),
         }
     }
 
+    /**
+     * Load and decode serializing data from KVDB.
+     */
     fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
         let store_lock = self
             .store
@@ -72,6 +97,12 @@ impl RadixTreeImpl {
         }
     }
 
+    /**
+     * Load one node from [[cacheR]].
+     *
+     * If there is no such record in cache - load and decode from KVDB, then save to cacheR.
+     * If there is no such record in KVDB - execute assert (if set noAssert flag - return emptyNode).
+     */
     pub fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
 
@@ -90,7 +121,7 @@ impl RadixTreeImpl {
             let store_node_opt = self.load_node_from_store(&node_ptr);
 
             let node_opt = store_node_opt
-                .map(|node| self.cache.insert(node_ptr.clone(), node))
+                .map(|node| self.cache_r.insert(node_ptr.clone(), node))
                 .unwrap_or_else(|| {
                     error_msg(&node_ptr);
                     None
@@ -102,10 +133,60 @@ impl RadixTreeImpl {
             }
         };
 
-        let cache_node_opt = self.cache.get(&node_ptr);
+        let cache_node_opt = self.cache_r.get(&node_ptr);
         match cache_node_opt {
             Some(node) => node.to_vec(),
             None => cache_miss(node_ptr),
         }
+    }
+
+    /**
+     * Clear [[cacheR]] (cache for storing read nodes).
+     */
+    pub fn clear_read_cache(&self) -> () {
+        self.cache_r.clear()
+    }
+
+    /**
+     * Serializing and hashing one [[Node]].
+     *
+     * Serializing data load in [[cacheW]].
+     * If detected collision with older cache data - executing assert
+     */
+    pub fn save_node(&self, node: &Node) -> Vec<u8> {
+        todo!()
+    }
+
+    /**
+     * Save all [[cacheW]] to [[store]]
+     *
+     * If detected collision with older KVDB data - execute Exception
+     */
+    pub fn commit(&self) -> () {
+        todo!()
+    }
+
+    /**
+     * Clear [[cacheW]] (cache for storing data to write in KVDB).
+     */
+    pub fn clear_write_cache(&self) -> () {
+        self.cache_w.clear()
+    }
+
+    /**
+     * Read leaf data with prefix. If data not found, returned [[None]]
+     */
+    pub fn read(&self, start_node: Node, start_prefix: Vec<u8>) -> Option<Vec<u8>> {
+        todo!()
+    }
+
+    /**
+     * Parallel processing of [[HistoryAction]]s in this part of tree (start from curNode).
+     *
+     * New data load to [[cacheW]].
+     * @return Updated curNode. if no action was taken - return [[None]].
+     */
+    pub fn make_actions(&self, curr_node: Node, actions: Vec<HistoryAction>) -> Option<Node> {
+        todo!()
     }
 }
