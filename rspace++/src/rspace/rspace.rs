@@ -1,14 +1,14 @@
 use super::hashing::blake3_hash::Blake3Hash;
 use super::history::history_reader::HistoryReader;
+use super::history::instances::radix_history::RadixHistory;
 use super::shared::key_value_store::KvStoreError;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
-use crate::rspace::history::instances::radix_history::EmptyRootHash;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
-use crate::rspace::matcher::r#match::{Match, Matcher};
+use crate::rspace::matcher::r#match::Match;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
@@ -423,7 +423,7 @@ where
     }
 
     pub fn clear(&mut self) -> () {
-        self.reset(EmptyRootHash::new().hash)
+        self.reset(RadixHistory::empty_root_hash())
     }
 
     fn create_new_hot_store(

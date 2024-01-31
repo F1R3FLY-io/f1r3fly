@@ -16,23 +16,6 @@ pub struct RadixHistory {
     store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
 }
 
-pub struct EmptyRootHash {
-    pub hash: Blake3Hash,
-}
-
-impl EmptyRootHash {
-    pub fn new() -> Self {
-        let hash_bytes = hash_node(&EmptyNode::new().node).0;
-        let hash_array: [u8; 32] = match hash_bytes.try_into() {
-            Ok(array) => array,
-            Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
-        };
-        let hash = Blake3Hash::new(&hash_array);
-
-        EmptyRootHash { hash }
-    }
-}
-
 impl RadixHistory {
     pub fn create(
         root: Blake3Hash,
@@ -53,6 +36,16 @@ impl RadixHistory {
         store: Box<dyn KeyValueStore>,
     ) -> Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>> {
         Arc::new(Mutex::new(Box::new(KeyValueStoreOps::to_typed_store::<Vec<u8>, Vec<u8>>(store))))
+    }
+
+    pub fn empty_root_hash() -> Blake3Hash {
+        let hash_bytes = hash_node(&EmptyNode::new().node).0;
+        let hash_array: [u8; 32] = match hash_bytes.try_into() {
+            Ok(array) => array,
+            Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
+        };
+        let hash = Blake3Hash::new(&hash_array);
+        hash
     }
 }
 

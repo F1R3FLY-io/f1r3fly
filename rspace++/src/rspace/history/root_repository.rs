@@ -1,8 +1,9 @@
-use super::instances::radix_history::EmptyRootHash;
 use crate::rspace::{
     hashing::blake3_hash::Blake3Hash, history::roots_store::RootsStore,
     shared::key_value_store::KvStoreError,
 };
+
+use super::instances::radix_history::RadixHistory;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootRepository.scala
 pub struct RootRepository {
@@ -17,9 +18,9 @@ impl RootRepository {
     pub fn current_root(&self) -> Result<Blake3Hash, KvStoreError> {
         match self.roots_store.current_root() {
             None => {
-                let empty_root_hash = EmptyRootHash::new();
-                self.roots_store.record_root(&empty_root_hash.hash)?;
-                Ok(empty_root_hash.hash)
+                let empty_root_hash = RadixHistory::empty_root_hash();
+                self.roots_store.record_root(&empty_root_hash)?;
+                Ok(empty_root_hash)
             }
             Some(root) => Ok(root),
         }
