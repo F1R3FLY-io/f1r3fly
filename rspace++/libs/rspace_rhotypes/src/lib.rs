@@ -1,56 +1,11 @@
 use prost::Message;
 use rspace_plus_plus::rspace::matcher::exports::*;
-use rspace_plus_plus::rspace::matcher::fold_match::FoldMatch;
-use rspace_plus_plus::rspace::matcher::r#match::Match;
+use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-
-#[derive(Clone)]
-struct SpaceMatcher;
-
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/package.scala - matchListPar
-impl Match<BindPattern, ListParWithRandom> for SpaceMatcher {
-    fn get(&self, pattern: BindPattern, data: ListParWithRandom) -> Option<ListParWithRandom> {
-        let mut spatial_matcher = SpatialMatcherContext::new();
-
-        let fold_match_result =
-            spatial_matcher.fold_match(data.pars, pattern.patterns, pattern.remainder.clone());
-        let match_result = match fold_match_result {
-            Some(pars) => Some((spatial_matcher.free_map, pars)),
-            None => None,
-        };
-
-        match match_result {
-            Some((mut free_map, caught_rem)) => {
-                let remainder_map = match pattern.remainder {
-                    Some(Var {
-                        var_instance: Some(FreeVar(level)),
-                    }) => {
-                        free_map.insert(
-                            level,
-                            vector_par(Vec::new(), false).with_exprs(vec![new_elist_expr(
-                                caught_rem,
-                                Vec::new(),
-                                false,
-                                None,
-                            )]),
-                        );
-                        free_map
-                    }
-                    _ => free_map,
-                };
-                Some(ListParWithRandom {
-                    pars: to_vec(remainder_map, pattern.free_count),
-                    random_state: data.random_state,
-                })
-            }
-            None => None,
-        }
-    }
-}
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -58,7 +13,7 @@ impl Match<BindPattern, ListParWithRandom> for SpaceMatcher {
  */
 #[repr(C)]
 pub struct Space {
-    rspace: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, SpaceMatcher>,
+    rspace: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>,
 }
 
 #[no_mangle]
@@ -69,7 +24,7 @@ pub extern "C" fn space_new() -> *mut Space {
             let mut kvm = mk_rspace_store_manager("../rspace++/lmdb".into(), 1 * GB);
             let store = kvm.r_space_stores().await.unwrap();
 
-            RSpaceInstances::create(store, SpaceMatcher).await
+            RSpaceInstances::create(store, Matcher).await
         })
         .unwrap();
 

@@ -20,6 +20,7 @@ mod tests {
         StringMatch(&'a str),
     }
 
+    #[derive(Clone)]
     struct StringMatch;
 
     impl<'a> Match<Pattern<'a>, &'a str> for StringMatch {

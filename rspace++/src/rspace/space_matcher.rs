@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 // See rspace/src/main/scala/coop/rchain/rspace/SpaceMatcher.scala
 pub struct SpaceMatcher<C, P, A, K, M: Match<P, A>> {
-    matcher: M,
+    pub matcher: M,
     phantom: PhantomData<(C, P, A, K)>,
 }
 

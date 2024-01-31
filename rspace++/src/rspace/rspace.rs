@@ -8,7 +8,7 @@ use crate::rspace::history::history_repository::HistoryRepositoryInstances;
 use crate::rspace::history::instances::radix_history::EmptyRootHash;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
-use crate::rspace::matcher::r#match::Match;
+use crate::rspace::matcher::r#match::{Match, Matcher};
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
@@ -46,7 +46,7 @@ where
     P: Clone + Debug + Default + Serialize + 'static,
     A: Clone + Debug + Default + Serialize + 'static,
     K: Clone + Debug + Default + Serialize + 'static,
-    M: Match<P, A>,
+    M: Clone + Match<P, A>,
 {
     fn locked_consume(
         &self,
@@ -220,6 +220,17 @@ where
         Checkpoint {
             root: self.history_repository.root(),
         }
+    }
+
+    fn spawn(&self) -> Self {
+        let history_repo = &self.history_repository;
+        let next_history = history_repo.reset(&history_repo.root());
+        let history_reader = next_history.get_history_reader(next_history.root());
+        let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
+        let rspace =
+            RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
+        rspace.restore_installs();
+        rspace
     }
 
     /* RSpaceOps */
