@@ -1,7 +1,7 @@
 version: "3.4"
 
 x-rnode: &default-rnode
-  image: coop.rchain/rnode:latest
+  image: ghcr.io/f1r3fly-io/rnode
   user: root
   networks:
     - f1r3fly
@@ -9,7 +9,6 @@ x-rnode: &default-rnode
 services:
   boot:
     <<: *default-rnode
-    container_name: $BOOTSTRAP_HOST
     command:
       [
         "run",
@@ -31,7 +30,6 @@ services:
 
   validator1:
     <<: *default-rnode
-    container_name: $VALIDATOR1_HOST
     command:
       [
         "run",
@@ -53,7 +51,6 @@ services:
 
   validator2:
     <<: *default-rnode
-    container_name: $VALIDATOR2_HOST
     command:
       [
         "run",
@@ -75,7 +72,6 @@ services:
 
   validator3:
     <<: *default-rnode
-    container_name: $VALIDATOR3_HOST
     command:
       [
         "run",
