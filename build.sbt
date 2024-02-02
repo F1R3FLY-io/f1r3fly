@@ -21,6 +21,13 @@ Global / serverConnectionType := ConnectionType.Tcp
 Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
+
+inThisBuild(List(
+  publish / skip := true,
+  publishMavenStyle := true,
+  publishTo := Option("GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly")
+))
+
 val javaOpens = List(
   "--add-opens",
   "java.base/sun.security.util=ALL-UNNAMED",
@@ -65,9 +72,8 @@ lazy val dockerBuildxSettings = Seq(
 )
 
 lazy val projectSettings = Seq(
-  organization := "coop.rchain",
+  organization := "f1r3fly-io",
   scalaVersion := "2.12.15",
-  version := "0.2.0", // or whatever version number you want
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -145,6 +151,7 @@ lazy val projectSettings = Seq(
 // a namespace for generative tests (or other tests that take a long time)
 lazy val SlowcookerTest = config("slowcooker") extend (Test)
 
+/*
 // changlog update and git tag
 lazy val release = taskKey[Unit]("Run benchmark, tag new release, and update changelog")
 
@@ -188,6 +195,7 @@ release := {
     throw new IllegalStateException("Benchmark tests failed")
   }
 }
+*/
 
 lazy val benchmark = taskKey[Unit]("Run benchmark, and update changelog")
 
@@ -221,7 +229,6 @@ lazy val commonSettings = projectSettings ++ compilerSettings ++ profilerSetting
 lazy val shared = (project in file("shared"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     libraryDependencies ++= commonDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -248,7 +255,6 @@ lazy val shared = (project in file("shared"))
 lazy val graphz = (project in file("graphz"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     libraryDependencies ++= commonDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -289,7 +295,6 @@ lazy val casper = (project in file("casper"))
 lazy val comm = (project in file("comm"))
   .settings(commonSettings: _*)
   .settings(
-    version := "0.1",
     dependencyOverrides += "org.slf4j" % "slf4j-api" % "1.7.25",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ protobufDependencies ++ Seq(
       grpcNetty,
@@ -413,7 +418,8 @@ lazy val node = (project in file("node"))
         oldStrategy(x)
     },
     /* Dockerization */
-    dockerUsername := Some(organization.value),
+    dockerRepository := Option("ghcr.io"),
+    dockerUsername := Option(organization.value),
     dockerAliases ++=
       sys.env
         .get("DRONE_BUILD_NUMBER")
@@ -551,7 +557,6 @@ lazy val blockStorage = (project in file("block-storage"))
   .settings(commonSettings: _*)
   .settings(
     name := "block-storage",
-    version := "0.0.1-SNAPSHOT",
     libraryDependencies ++= commonDependencies ++ protobufLibDependencies ++ Seq(
       catsCore,
       catsEffect,
@@ -590,7 +595,6 @@ lazy val rspace = (project in file("rspace"))
     ),
     Defaults.itSettings,
     name := "rspace",
-    version := "0.2.1-SNAPSHOT",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
       catsCore,
       fs2Core,
@@ -623,6 +627,7 @@ lazy val rspace = (project in file("rspace"))
 lazy val rspaceBench = (project in file("rspace-bench"))
   .settings(
     commonSettings,
+    version := (ThisBuild / version).value,
     libraryDependencies ++= commonDependencies,
     libraryDependencies += "com.esotericsoftware" % "kryo" % "5.0.3",
     dependencyOverrides ++= Seq(
@@ -668,4 +673,4 @@ runCargoBuild := {
   }
 }
 
-// (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+(compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
