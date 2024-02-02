@@ -8,23 +8,23 @@ mod tests {
     use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
     use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
     use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
     use std::collections::{BTreeSet, HashSet, LinkedList};
     use std::hash::Hash;
 
     // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-    #[derive(Clone, Debug, Serialize, Default)]
-    enum Pattern<'a> {
+    #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+    enum Pattern {
         #[default]
         Wildcard,
-        StringMatch(&'a str),
+        StringMatch(String),
     }
 
     #[derive(Clone)]
     struct StringMatch;
 
-    impl<'a> Match<Pattern<'a>, &'a str> for StringMatch {
-        fn get(&self, p: Pattern<'a>, a: &'a str) -> Option<&'a str> {
+    impl Match<Pattern, String> for StringMatch {
+        fn get(&self, p: Pattern, a: String) -> Option<String> {
             match p {
                 Pattern::Wildcard => Some(a),
                 Pattern::StringMatch(value) => {
@@ -39,23 +39,23 @@ mod tests {
     }
 
     // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-    #[derive(Clone, Debug, Serialize, Default)]
-    struct StringsCaptor<'a> {
-        res: LinkedList<Vec<&'a str>>,
+    #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+    struct StringsCaptor {
+        res: LinkedList<Vec<String>>,
     }
 
-    impl<'a> StringsCaptor<'a> {
+    impl StringsCaptor {
         fn new() -> Self {
             StringsCaptor {
                 res: LinkedList::new(),
             }
         }
 
-        fn run_k(&mut self, data: Vec<&'a str>) {
+        fn run_k(&mut self, data: Vec<String>) {
             self.res.push_back(data);
         }
 
-        fn results(&self) -> Vec<Vec<&str>> {
+        fn results(&self) -> Vec<Vec<String>> {
             self.res.iter().cloned().collect()
         }
     }
@@ -82,8 +82,8 @@ mod tests {
     }
 
     // See rspace/src/main/scala/coop/rchain/rspace/util/package.scala
-    fn run_k<'a, C, P>(
-        cont: Option<(ContResult<C, P, StringsCaptor<'a>>, Vec<RSpaceResult<C, &'a str>>)>,
+    fn run_k<C, P>(
+        cont: Option<(ContResult<C, P, StringsCaptor>, Vec<RSpaceResult<C, String>>)>,
     ) -> Vec<Vec<String>> {
         let mut cont_unwrapped = cont.unwrap();
         let unpacked_tuple = unpack_tuple(&cont_unwrapped);
@@ -96,9 +96,7 @@ mod tests {
         cloned_results
     }
 
-    fn create_rspace(
-    ) -> RSpace<&'static str, Pattern<'static>, &'static str, StringsCaptor<'static>, StringMatch>
-    {
+    fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, StringMatch> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let rspace = rt
             .block_on(async {
@@ -116,12 +114,12 @@ mod tests {
     #[test]
     fn produce_should_persist_data_in_store() {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
-        let r = rspace.produce(key[0], "datum", false);
+        let r = rspace.produce(key[0].clone(), "datum".to_string(), false);
         let data = rspace.store.get_data(&channel);
-        assert_eq!(data, vec![Datum::create(channel, "datum", false)]);
+        assert_eq!(data, vec![Datum::create(channel, "datum".to_string(), false)]);
 
         let cont = rspace.store.get_continuations(key);
         assert_eq!(cont.len(), 0);
@@ -131,22 +129,25 @@ mod tests {
     #[test]
     fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_store() {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
-        let r1 = rspace.produce(key[0], "datum1", false);
+        let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
         let d1 = rspace.store.get_data(&channel);
-        assert_eq!(d1, vec![Datum::create(channel, "datum1", false)]);
+        assert_eq!(d1, vec![Datum::create(channel.clone(), "datum1".to_string(), false)]);
 
         let wc1 = rspace.store.get_continuations(key.clone());
         assert_eq!(wc1.len(), 0);
         assert!(r1.is_none());
 
-        let r2 = rspace.produce(key[0], "datum2", false);
+        let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
         let d2 = rspace.store.get_data(&channel);
         assert!(check_same_elements(
             d2,
-            vec![Datum::create(channel, "datum1", false), Datum::create(channel, "datum2", false)]
+            vec![
+                Datum::create(channel.clone(), "datum1".to_string(), false),
+                Datum::create(channel, "datum2".to_string(), false)
+            ]
         ));
 
         let wc2 = rspace.store.get_continuations(key.clone());
@@ -157,8 +158,8 @@ mod tests {
     #[test]
     fn consuming_on_one_channel_should_persist_continuation_in_store() {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
         let patterns = vec![Pattern::Wildcard];
 
         let r =
@@ -174,12 +175,12 @@ mod tests {
     #[test]
     fn consuming_on_three_channels_should_persist_continuation_in_store() {
         let rspace = create_rspace();
-        let key = vec!["ch1", "ch2", "ch3"];
+        let key = vec!["ch1".to_string(), "ch2".to_string(), "ch3".to_string()];
         let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
         let r =
             rspace.consume(key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default());
-        let d: Vec<Vec<Datum<&str>>> = key.iter().map(|k| rspace.store.get_data(k)).collect();
+        let d: Vec<Vec<Datum<String>>> = key.iter().map(|k| rspace.store.get_data(k)).collect();
         for seq in &d {
             assert!(seq.is_empty(), "d should be empty");
         }
@@ -192,12 +193,12 @@ mod tests {
     #[test]
     fn producing_then_consuming_on_same_channel_should_return_continuation_and_data() {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
-        let r1 = rspace.produce(channel, "datum", false);
+        let r1 = rspace.produce(channel.clone(), "datum".to_string(), false);
         let d1 = rspace.store.get_data(&channel);
-        assert_eq!(d1, vec![Datum::create(channel, "datum", false)]);
+        assert_eq!(d1, vec![Datum::create(channel.clone(), "datum".to_string(), false)]);
 
         let c1 = rspace.store.get_continuations(key.clone());
         assert_eq!(c1.len(), 0);
@@ -225,12 +226,12 @@ mod tests {
     fn producing_then_consuming_on_same_channel_with_peek_should_return_continuation_and_data_and_remove_peeked_data(
     ) {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
-        let r1 = rspace.produce(channel, "datum", false);
+        let r1 = rspace.produce(channel.clone(), "datum".to_string(), false);
         let d1 = rspace.store.get_data(&channel);
-        assert_eq!(d1, vec![Datum::create(channel, "datum", false)]);
+        assert_eq!(d1, vec![Datum::create(channel.clone(), "datum".to_string(), false)]);
 
         let c1 = rspace.store.get_continuations(key.clone());
         assert_eq!(c1.len(), 0);
@@ -258,8 +259,8 @@ mod tests {
     fn consuming_then_producing_on_same_channel_with_peek_should_return_continuation_and_data_and_remove_peeked_data(
     ) {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
         let r1 = rspace.consume(
             key.clone(),
@@ -272,7 +273,7 @@ mod tests {
         let c1 = rspace.store.get_continuations(key.clone());
         assert_eq!(c1.len(), 1);
 
-        let r2 = rspace.produce(channel, "datum", false);
+        let r2 = rspace.produce(channel.clone(), "datum".to_string(), false);
         let d1 = rspace.store.get_data(&channel);
         assert!(d1.is_empty());
 
@@ -288,8 +289,8 @@ mod tests {
     fn consuming_then_producing_on_same_channel_with_persistent_flag_should_return_continuation_and_data_and_not_insert_persistent_data(
     ) {
         let rspace = create_rspace();
-        let channel = "ch1";
-        let key = vec![channel];
+        let channel = "ch1".to_string();
+        let key = vec![channel.clone()];
 
         let r1 = rspace.consume(
             key.clone(),
@@ -302,7 +303,7 @@ mod tests {
         let c1 = rspace.store.get_continuations(key.clone());
         assert_eq!(c1.len(), 1);
 
-        let r2 = rspace.produce(channel, "datum", true);
+        let r2 = rspace.produce(channel.clone(), "datum".to_string(), true);
         let d1 = rspace.store.get_data(&channel);
         assert!(d1.is_empty());
 
@@ -323,15 +324,15 @@ mod tests {
             vec!["datum3".to_string()],
         ];
 
-        let r1 = rspace.produce("ch1", "datum1", false);
-        let r2 = rspace.produce("ch1", "datum2", false);
-        let r3 = rspace.produce("ch1", "datum3", false);
+        let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+        let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
         assert!(r1.is_none());
         assert!(r2.is_none());
         assert!(r3.is_none());
 
         let r4 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -343,7 +344,7 @@ mod tests {
             .any(|v| cont_results_r4.contains(v)));
 
         let r5 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -355,7 +356,7 @@ mod tests {
             .any(|v| cont_results_r5.contains(v)));
 
         let r6 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -373,14 +374,14 @@ mod tests {
     fn producing_on_channel_then_consuming_on_that_channel_and_another_then_producing_on_other_channel_should_return_continuation_and_all_data(
     ) {
         let rspace = create_rspace();
-        let produce_key_1 = vec!["ch1"];
-        let produce_key_2 = vec!["ch2"];
-        let consume_key = vec!["ch1", "ch2"];
+        let produce_key_1 = vec!["ch1".to_string()];
+        let produce_key_2 = vec!["ch2".to_string()];
+        let consume_key = vec!["ch1".to_string(), "ch2".to_string()];
         let consume_pattern = vec![Pattern::Wildcard, Pattern::Wildcard];
 
-        let r1 = rspace.produce(&produce_key_1[0], "datum1", false);
+        let r1 = rspace.produce(produce_key_1[0].clone(), "datum1".to_string(), false);
         let d1 = rspace.store.get_data(&produce_key_1[0]);
-        assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1", false)]);
+        assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
         let c1 = rspace.store.get_continuations(produce_key_1.clone());
         assert!(c1.is_empty());
@@ -394,7 +395,7 @@ mod tests {
             BTreeSet::default(),
         );
         let d2 = rspace.store.get_data(&produce_key_1[0]);
-        assert_eq!(d2, vec![Datum::create(&produce_key_1[0], "datum1", false)]);
+        assert_eq!(d2, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
         let c2 = rspace.store.get_continuations(produce_key_1.clone());
         let d3 = rspace.store.get_data(&produce_key_2[0]);
@@ -404,7 +405,7 @@ mod tests {
         assert_ne!(c3.len(), 0);
         assert!(r2.is_none());
 
-        let r3 = rspace.produce(&produce_key_2[0], "datum2", false);
+        let r3 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
         let c4 = rspace.store.get_continuations(consume_key);
         let d4 = rspace.store.get_data(&produce_key_1[0]);
         let d5 = rspace.store.get_data(&produce_key_2[0]);
@@ -423,31 +424,31 @@ mod tests {
     #[test]
     fn producing_on_three_channels_then_consuming_once_should_return_cont_and_all_data() {
         let rspace = create_rspace();
-        let produce_key_1 = vec!["ch1"];
-        let produce_key_2 = vec!["ch2"];
-        let produce_key_3 = vec!["ch3"];
-        let consume_key = vec!["ch1", "ch2", "ch3"];
+        let produce_key_1 = vec!["ch1".to_string()];
+        let produce_key_2 = vec!["ch2".to_string()];
+        let produce_key_3 = vec!["ch3".to_string()];
+        let consume_key = vec!["ch1".to_string(), "ch2".to_string(), "ch3".to_string()];
         let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
-        let r1 = rspace.produce(&produce_key_1[0], "datum1", false);
+        let r1 = rspace.produce(produce_key_1[0].clone(), "datum1".to_string(), false);
         let d1 = rspace.store.get_data(&produce_key_1[0]);
-        assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1", false)]);
+        assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
         let c1 = rspace.store.get_continuations(produce_key_1);
         assert!(c1.is_empty());
         assert!(r1.is_none());
 
-        let r2 = rspace.produce(&produce_key_2[0], "datum2", false);
+        let r2 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
         let d2 = rspace.store.get_data(&produce_key_2[0]);
-        assert_eq!(d2, vec![Datum::create(&produce_key_2[0], "datum2", false)]);
+        assert_eq!(d2, vec![Datum::create(&produce_key_2[0], "datum2".to_string(), false)]);
 
         let c2 = rspace.store.get_continuations(produce_key_2);
         assert!(c2.is_empty());
         assert!(r2.is_none());
 
-        let r3 = rspace.produce(produce_key_3[0], "datum3", false);
+        let r3 = rspace.produce(produce_key_3[0].clone(), "datum3".to_string(), false);
         let d3 = rspace.store.get_data(&produce_key_3[0]);
-        assert_eq!(d3, vec![Datum::create(produce_key_3[0], "datum3", false)]);
+        assert_eq!(d3, vec![Datum::create(produce_key_3[0].clone(), "datum3".to_string(), false)]);
 
         let c3 = rspace.store.get_continuations(produce_key_3);
         assert!(c3.is_empty());
@@ -460,7 +461,7 @@ mod tests {
             false,
             BTreeSet::default(),
         );
-        let d4: Vec<Vec<Datum<&str>>> = consume_key
+        let d4: Vec<Vec<Datum<String>>> = consume_key
             .iter()
             .map(|k| rspace.store.get_data(k))
             .collect();
@@ -484,11 +485,11 @@ mod tests {
     ) {
         let rspace = create_rspace();
         let captor = StringsCaptor::new();
-        let key = vec!["ch1"];
+        let key = vec!["ch1".to_string()];
 
-        let r1 = rspace.produce(key[0], "datum1", false);
-        let r2 = rspace.produce(key[0], "datum2", false);
-        let r3 = rspace.produce(key[0], "datum3", false);
+        let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
+        let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
+        let r3 = rspace.produce(key[0].clone(), "datum3".to_string(), false);
         assert!(r1.is_none());
         assert!(r2.is_none());
         assert!(r3.is_none());
@@ -538,30 +539,30 @@ mod tests {
     ) {
         let rspace = create_rspace();
         let _ = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r1 = rspace.produce("ch1", "datum1", false);
-        let r2 = rspace.produce("ch1", "datum2", false);
-        let r3 = rspace.produce("ch1", "datum3", false);
+        let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+        let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
         assert!(r1.is_some());
         assert!(r2.is_some());
         assert!(r3.is_some());
@@ -594,30 +595,30 @@ mod tests {
     ) {
         let rspace = create_rspace();
         let _ = rspace.consume(
-            vec!["ch1"],
-            vec![Pattern::StringMatch("datum1")],
+            vec!["ch1".to_string()],
+            vec![Pattern::StringMatch("datum1".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch1"],
-            vec![Pattern::StringMatch("datum2")],
+            vec!["ch1".to_string()],
+            vec![Pattern::StringMatch("datum2".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch1"],
-            vec![Pattern::StringMatch("datum3")],
+            vec!["ch1".to_string()],
+            vec![Pattern::StringMatch("datum3".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r1 = rspace.produce("ch1", "datum1", false);
-        let r2 = rspace.produce("ch1", "datum2", false);
-        let r3 = rspace.produce("ch1", "datum3", false);
+        let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+        let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
         assert!(r1.is_some());
         assert!(r2.is_some());
         assert!(r3.is_some());
@@ -631,15 +632,15 @@ mod tests {
     fn consuming_on_two_channels_then_producing_on_each_should_return_cont_with_both_data() {
         let rspace = create_rspace();
         let r1 = rspace.consume(
-            vec!["ch1", "ch2"],
+            vec!["ch1".to_string(), "ch2".to_string()],
             vec![Pattern::Wildcard, Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r2 = rspace.produce("ch1", "datum1", false);
-        let r3 = rspace.produce("ch2", "datum2", false);
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r3 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
         assert!(r1.is_none());
         assert!(r2.is_none());
@@ -653,17 +654,20 @@ mod tests {
     #[test]
     fn joined_consume_with_same_channel_given_twice_followed_by_produce_should_not_error() {
         let rspace = create_rspace();
-        let channels = vec!["ch1", "ch1"];
+        let channels = vec!["ch1".to_string(), "ch1".to_string()];
 
         let r1 = rspace.consume(
             channels,
-            vec![Pattern::StringMatch("datum1"), Pattern::StringMatch("datum1")],
+            vec![
+                Pattern::StringMatch("datum1".to_string()),
+                Pattern::StringMatch("datum1".to_string()),
+            ],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
-        let r2 = rspace.produce("ch1", "datum1", false);
-        let r3 = rspace.produce("ch1", "datum1", false);
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
         assert!(r1.is_none());
         assert!(r2.is_none());
@@ -678,27 +682,33 @@ mod tests {
     fn consuming_then_producing_twice_on_same_channel_with_different_patterns_should_return_cont_with_expected_data(
     ) {
         let rspace = create_rspace();
-        let channels = vec!["ch1", "ch2"];
+        let channels = vec!["ch1".to_string(), "ch2".to_string()];
 
         let r1 = rspace.consume(
             channels.clone(),
-            vec![Pattern::StringMatch("datum1"), Pattern::StringMatch("datum2")],
+            vec![
+                Pattern::StringMatch("datum1".to_string()),
+                Pattern::StringMatch("datum2".to_string()),
+            ],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let r2 = rspace.consume(
             channels,
-            vec![Pattern::StringMatch("datum3"), Pattern::StringMatch("datum4")],
+            vec![
+                Pattern::StringMatch("datum3".to_string()),
+                Pattern::StringMatch("datum4".to_string()),
+            ],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r3 = rspace.produce("ch1", "datum3", false);
-        let r4 = rspace.produce("ch2", "datum4", false);
-        let r5 = rspace.produce("ch1", "datum1", false);
-        let r6 = rspace.produce("ch2", "datum2", false);
+        let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
+        let r4 = rspace.produce("ch2".to_string(), "datum4".to_string(), false);
+        let r5 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r6 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
         assert!(r1.is_none());
         assert!(r2.is_none());
@@ -722,28 +732,30 @@ mod tests {
         let rspace = create_rspace();
 
         let r1 = rspace.consume(
-            vec!["ch1", "ch2"],
-            vec![Pattern::Wildcard, Pattern::StringMatch("datum1")],
+            vec!["ch1".to_string(), "ch2".to_string()],
+            vec![Pattern::Wildcard, Pattern::StringMatch("datum1".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
-        let r2 = rspace.produce("ch1", "datum1", false);
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
         assert!(r1.is_none());
         assert!(r2.is_none());
 
-        let d1 = rspace.store.get_data(&"ch2");
+        let d1 = rspace.store.get_data(&"ch2".to_string());
         assert!(d1.is_empty());
-        let d2 = rspace.store.get_data(&"ch1");
-        assert_eq!(d2, vec![Datum::create("ch1", "datum1", false)]);
+        let d2 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), false)]);
 
-        let c1 = rspace.store.get_continuations(vec!["ch1", "ch2"]);
+        let c1 = rspace
+            .store
+            .get_continuations(vec!["ch1".to_string(), "ch2".to_string()]);
         assert!(!c1.is_empty());
-        let j1 = rspace.store.get_joins("ch1");
-        assert_eq!(j1, vec![vec!["ch1", "ch2"]]);
-        let j2 = rspace.store.get_joins("ch2");
-        assert_eq!(j2, vec![vec!["ch1", "ch2"]]);
+        let j1 = rspace.store.get_joins("ch1".to_string());
+        assert_eq!(j1, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
+        let j2 = rspace.store.get_joins("ch2".to_string());
+        assert_eq!(j2, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
     }
 
     #[test]
@@ -751,26 +763,26 @@ mod tests {
         let rspace = create_rspace();
 
         let _ = rspace.consume(
-            vec!["ch1"],
-            vec![Pattern::StringMatch("datum1")],
+            vec!["ch1".to_string()],
+            vec![Pattern::StringMatch("datum1".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch2"],
-            vec![Pattern::StringMatch("datum2")],
+            vec!["ch2".to_string()],
+            vec![Pattern::StringMatch("datum2".to_string())],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r3 = rspace.produce("ch1", "datum1", false);
-        let r4 = rspace.produce("ch2", "datum2", false);
+        let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r4 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
-        let d1 = rspace.store.get_data(&"ch1");
+        let d1 = rspace.store.get_data(&"ch1".to_string());
         assert!(d1.is_empty());
-        let d2 = rspace.store.get_data(&"ch2");
+        let d2 = rspace.store.get_data(&"ch2".to_string());
         assert!(d2.is_empty());
 
         assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
@@ -783,54 +795,56 @@ mod tests {
         let rspace = create_rspace();
 
         let _ = rspace.consume(
-            vec!["ch1", "ch2"],
+            vec!["ch1".to_string(), "ch2".to_string()],
             vec![Pattern::Wildcard, Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         let _ = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
 
-        let r3 = rspace.produce("ch1", "datum1", false);
-        let r4 = rspace.produce("ch2", "datum2", false);
+        let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r4 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
-        let c1 = rspace.store.get_continuations(vec!["ch1", "ch2"]);
+        let c1 = rspace
+            .store
+            .get_continuations(vec!["ch1".to_string(), "ch2".to_string()]);
         assert!(!c1.is_empty());
-        let c2 = rspace.store.get_continuations(vec!["ch1"]);
+        let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!((c2.is_empty()));
-        let c3 = rspace.store.get_continuations(vec!["ch2"]);
+        let c3 = rspace.store.get_continuations(vec!["ch2".to_string()]);
         assert!(c3.is_empty());
 
-        let d1 = rspace.store.get_data(&"ch1");
+        let d1 = rspace.store.get_data(&"ch1".to_string());
         assert!(d1.is_empty());
-        let d2 = rspace.store.get_data(&"ch2");
-        assert_eq!(d2, vec![Datum::create("ch2", "datum2", false)]);
+        let d2 = rspace.store.get_data(&"ch2".to_string());
+        assert_eq!(d2, vec![Datum::create("ch2".to_string(), "datum2".to_string(), false)]);
 
         assert!(r3.is_some());
         assert!(r4.is_none());
         assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
 
-        let j1 = rspace.store.get_joins("ch1");
-        assert_eq!(j1, vec![vec!["ch1", "ch2"]]);
-        let j2 = rspace.store.get_joins("ch2");
-        assert_eq!(j2, vec![vec!["ch1", "ch2"]]);
+        let j1 = rspace.store.get_joins("ch1".to_string());
+        assert_eq!(j1, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
+        let j2 = rspace.store.get_joins("ch2".to_string());
+        assert_eq!(j2, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
     }
 
     /* Persist tests */
     #[test]
     fn producing_then_persistent_consume_on_same_channel_should_return_cont_and_data() {
         let rspace = create_rspace();
-        let key = vec!["ch1"];
+        let key = vec!["ch1".to_string()];
 
-        let r1 = rspace.produce(key[0], "datum", false);
+        let r1 = rspace.produce(key[0].clone(), "datum".to_string(), false);
         let d1 = rspace.store.get_data(&key[0]);
-        assert_eq!(d1, vec![Datum::create(key[0], "datum", false)]);
+        assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum".to_string(), false)]);
         let c1 = rspace.store.get_continuations(key.clone());
         assert!(c1.is_empty());
         assert!(r1.is_none());
@@ -863,11 +877,11 @@ mod tests {
     fn producing_then_persistent_consume_then_producing_again_on_same_channel_should_return_cont_for_first_and_second_produce(
     ) {
         let rspace = create_rspace();
-        let key = vec!["ch1"];
+        let key = vec!["ch1".to_string()];
 
-        let r1 = rspace.produce(key[0], "datum1", false);
+        let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
         let d1 = rspace.store.get_data(&key[0]);
-        assert_eq!(d1, vec![Datum::create(key[0], "datum1", false)]);
+        assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum1".to_string(), false)]);
         let c1 = rspace.store.get_continuations(key.clone());
         assert!(c1.is_empty());
         assert!(r1.is_none());
@@ -896,7 +910,7 @@ mod tests {
         let c2 = rspace.store.get_continuations(key.clone());
         assert!(!c2.is_empty());
 
-        let r4 = rspace.produce(key[0], "datum2", false);
+        let r4 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
         assert!(r4.is_some());
         let d3 = rspace.store.get_data(&key[0]);
         assert!(d3.is_empty());
@@ -913,30 +927,30 @@ mod tests {
         let rspace = create_rspace();
 
         let r1 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             true,
             BTreeSet::default(),
         );
-        let d1 = rspace.store.get_data(&"ch1");
+        let d1 = rspace.store.get_data(&"ch1".to_string());
         assert!(d1.is_empty());
-        let c1 = rspace.store.get_continuations(vec!["ch1"]);
+        let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(!c1.is_empty());
         assert!(r1.is_none());
 
-        let r2 = rspace.produce("ch1", "datum1", false);
-        let d2 = rspace.store.get_data(&"ch1");
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let d2 = rspace.store.get_data(&"ch1".to_string());
         assert!(d2.is_empty());
-        let c2 = rspace.store.get_continuations(vec!["ch1"]);
+        let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(!c2.is_empty());
         assert!(r2.is_some());
         assert!(check_same_elements(run_k(r2.clone()), vec![vec!["datum1".to_string()]]));
 
-        let r3 = rspace.produce("ch1", "datum2", false);
-        let d3 = rspace.store.get_data(&"ch1");
+        let r3 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+        let d3 = rspace.store.get_data(&"ch1".to_string());
         assert!(d3.is_empty());
-        let c3 = rspace.store.get_continuations(vec!["ch1"]);
+        let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(!c3.is_empty());
         assert!(r3.is_some());
         // assert!(check_same_elements(
@@ -952,7 +966,7 @@ mod tests {
         let rspace = create_rspace();
 
         let r1 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -960,15 +974,15 @@ mod tests {
         );
         assert!(r1.is_none());
 
-        let r2 = rspace.produce("ch1", "datum1", true);
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
         assert!(r2.is_some());
         assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-        let r3 = rspace.produce("ch1", "datum1", true);
+        let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
         assert!(r3.is_none());
-        let d1 = rspace.store.get_data(&"ch1");
-        assert_eq!(d1, vec![Datum::create("ch1", "datum1", true)]);
-        let c1 = rspace.store.get_continuations(vec!["ch1"]);
+        let d1 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c1.is_empty());
     }
 
@@ -977,7 +991,7 @@ mod tests {
         let rspace = create_rspace();
 
         let r1 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -985,28 +999,28 @@ mod tests {
         );
         assert!(r1.is_none());
 
-        let r2 = rspace.produce("ch1", "datum1", true);
+        let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
         assert!(r2.is_some());
         assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-        let r3 = rspace.produce("ch1", "datum1", true);
+        let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
         assert!(r3.is_none());
-        let d1 = rspace.store.get_data(&"ch1");
-        assert_eq!(d1, vec![Datum::create("ch1", "datum1", true)]);
-        let c1 = rspace.store.get_continuations(vec!["ch1"]);
+        let d1 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c1.is_empty());
 
         let r4 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
         assert!(r4.is_some());
-        let d2 = rspace.store.get_data(&"ch1");
-        assert_eq!(d2, vec![Datum::create("ch1", "datum1", true)]);
-        let c2 = rspace.store.get_continuations(vec!["ch1"]);
+        let d2 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c2.is_empty());
         assert!(check_same_elements(run_k(r4), vec![vec!["datum1".to_string()]]))
     }
@@ -1015,37 +1029,37 @@ mod tests {
     fn doing_persistent_produce_and_consuming_twice_should_work() {
         let rspace = create_rspace();
 
-        let r1 = rspace.produce("ch1", "datum1", true);
-        let d1 = rspace.store.get_data(&"ch1");
-        assert_eq!(d1, vec![Datum::create("ch1", "datum1", true)]);
-        let c1 = rspace.store.get_continuations(vec!["ch1"]);
+        let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
+        let d1 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c1.is_empty());
         assert!(r1.is_none());
 
         let r2 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
-        let d2 = rspace.store.get_data(&"ch1");
-        assert_eq!(d2, vec![Datum::create("ch1", "datum1", true)]);
-        let c2 = rspace.store.get_continuations(vec!["ch1"]);
+        let d2 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c2.is_empty());
         assert!(r2.is_some());
         assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
         let r3 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,
             BTreeSet::default(),
         );
-        let d3 = rspace.store.get_data(&"ch1");
-        assert_eq!(d3, vec![Datum::create("ch1", "datum1", true)]);
-        let c3 = rspace.store.get_continuations(vec!["ch1"]);
+        let d3 = rspace.store.get_data(&"ch1".to_string());
+        assert_eq!(d3, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
+        let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c3.is_empty());
         assert!(r3.is_some());
         assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
@@ -1055,9 +1069,9 @@ mod tests {
     fn producing_three_times_then_doing_persistent_consume_should_work() {
         let rspace = create_rspace();
         let expected_data = vec![
-            Datum::create("ch1", "datum1", false),
-            Datum::create("ch1", "datum2", false),
-            Datum::create("ch1", "datum3", false),
+            Datum::create("ch1".to_string(), "datum1".to_string(), false),
+            Datum::create("ch1".to_string(), "datum2".to_string(), false),
+            Datum::create("ch1".to_string(), "datum3".to_string(), false),
         ];
         let expected_conts = vec![
             vec!["datum1".to_string()],
@@ -1065,23 +1079,23 @@ mod tests {
             vec!["datum3".to_string()],
         ];
 
-        let r1 = rspace.produce("ch1", "datum1", false);
-        let r2 = rspace.produce("ch1", "datum2", false);
-        let r3 = rspace.produce("ch1", "datum3", false);
+        let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+        let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+        let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
         assert!(r1.is_none());
         assert!(r2.is_none());
         assert!(r3.is_none());
 
         let r4 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             true,
             BTreeSet::default(),
         );
-        let d1 = rspace.store.get_data(&"ch1");
+        let d1 = rspace.store.get_data(&"ch1".to_string());
         assert!(expected_data.iter().any(|datum| d1.contains(datum)));
-        let c1 = rspace.store.get_continuations(vec!["ch1"]);
+        let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c1.is_empty());
         assert!(r4.is_some());
         let cont_results_r4 = run_k(r4);
@@ -1090,15 +1104,15 @@ mod tests {
             .any(|cont| cont_results_r4.contains(cont)));
 
         let r5 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             true,
             BTreeSet::default(),
         );
-        let d2 = rspace.store.get_data(&"ch1");
+        let d2 = rspace.store.get_data(&"ch1".to_string());
         assert!(expected_data.iter().any(|datum| d2.contains(datum)));
-        let c2 = rspace.store.get_continuations(vec!["ch1"]);
+        let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(c2.is_empty());
         assert!(r5.is_some());
         let cont_results_r5 = run_k(r5);
@@ -1107,7 +1121,7 @@ mod tests {
             .any(|cont| cont_results_r5.contains(cont)));
 
         let r6 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             true,
@@ -1120,15 +1134,15 @@ mod tests {
             .any(|cont| cont_results_r6.contains(cont)));
 
         let r7 = rspace.consume(
-            vec!["ch1"],
+            vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             true,
             BTreeSet::default(),
         );
-        let d3 = rspace.store.get_data(&"ch1");
+        let d3 = rspace.store.get_data(&"ch1".to_string());
         assert!(d3.is_empty());
-        let c3 = rspace.store.get_continuations(vec!["ch1"]);
+        let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
         assert!(!c3.is_empty());
         assert!(r7.is_none());
     }
@@ -1136,13 +1150,13 @@ mod tests {
     #[test]
     fn persistent_produce_should_be_available_for_multiple_matches() {
         let rspace = create_rspace();
-        let channel = "chan";
+        let channel = "chan".to_string();
 
-        let r1 = rspace.produce(channel, "datum", true);
+        let r1 = rspace.produce(channel.clone(), "datum".to_string(), true);
         assert!(r1.is_none());
 
         let r2 = rspace.consume(
-            vec![channel, channel],
+            vec![channel.clone(), channel.clone()],
             vec![Pattern::Wildcard, Pattern::Wildcard],
             StringsCaptor::new(),
             false,
@@ -1160,7 +1174,7 @@ mod tests {
     fn consuming_with_different_pattern_and_channel_lengths_should_error() {
         let rspace = create_rspace();
         let r1 = rspace.consume(
-            vec!["ch1", "ch2"],
+            vec!["ch1".to_string(), "ch2".to_string()],
             vec![Pattern::Wildcard],
             StringsCaptor::new(),
             false,

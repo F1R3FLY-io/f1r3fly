@@ -13,7 +13,7 @@ use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
@@ -70,10 +70,10 @@ pub const PREFIX_JOINS: u8 = 0x02;
 
 impl<C, P, A, K> HistoryRepositoryInstances<C, P, A, K>
 where
-    C: Clone + Send + Sync + Serialize + 'static,
-    P: Clone + Send + Sync + Serialize + 'static,
-    A: Clone + Send + Sync + Serialize + 'static,
-    K: Clone + Send + Sync + Serialize + 'static,
+    C: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    P: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    A: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    K: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
 {
     pub async fn lmdb_repository(
         history_key_value_store: Box<dyn KeyValueStore>,

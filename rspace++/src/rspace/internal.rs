@@ -23,7 +23,7 @@ pub struct ContResult<C, P, K> {
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Datum<A: Clone> {
     pub a: A,
     pub persist: bool,
@@ -44,7 +44,7 @@ where
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
     pub continuation: K,

@@ -1,9 +1,9 @@
 use super::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::hashing::stable_hash_provider::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Produce {
     pub channel_hash: Blake3Hash,
     pub hash: Blake3Hash,
@@ -23,7 +23,7 @@ impl Produce {
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Consume {
     pub channel_hashes: Vec<Blake3Hash>,
     pub hash: Blake3Hash,

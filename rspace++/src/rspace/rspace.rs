@@ -14,7 +14,7 @@ use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -621,10 +621,19 @@ impl RSpaceInstances {
         matcher: M,
     ) -> Result<RSpace<C, P, A, K, M>, KvStoreError>
     where
-        C: Clone + Debug + Default + Send + Sync + Serialize + Ord + Hash + 'static,
-        P: Clone + Debug + Default + Send + Sync + Serialize + 'static,
-        A: Clone + Debug + Default + Send + Sync + Serialize + 'static,
-        K: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        C: Clone
+            + Debug
+            + Default
+            + Send
+            + Sync
+            + Serialize
+            + Ord
+            + Hash
+            + for<'a> Deserialize<'a>
+            + 'static,
+        P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
         M: Match<P, A>,
     {
         let setup = RSpaceInstances::create_history_repo(store).await?;
@@ -640,10 +649,19 @@ impl RSpaceInstances {
         store: RSpaceStore,
     ) -> Result<(Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>), KvStoreError>
     where
-        C: Clone + Debug + Default + Send + Sync + Serialize + Eq + Hash + 'static,
-        P: Clone + Debug + Default + Send + Sync + Serialize + 'static,
-        A: Clone + Debug + Default + Send + Sync + Serialize + 'static,
-        K: Clone + Debug + Default + Send + Sync + Serialize + 'static,
+        C: Clone
+            + Debug
+            + Default
+            + Send
+            + Sync
+            + Serialize
+            + for<'a> Deserialize<'a>
+            + Eq
+            + Hash
+            + 'static,
+        P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
     {
         let history_repo =
             HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)

@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use log::debug;
 use rayon::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
@@ -277,10 +277,10 @@ where
 #[async_trait]
 impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K>
 where
-    C: Clone + Send + Sync + Serialize + 'static,
-    P: Clone + Send + Sync + Serialize + 'static,
-    A: Clone + Send + Sync + Serialize + 'static,
-    K: Clone + Send + Sync + Serialize + 'static,
+    C: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    P: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    A: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    K: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
 {
     async fn checkpoint(
         &self,
@@ -441,7 +441,7 @@ where
     }
 }
 
-fn prepend_bytes(element: u8, _bytes: &[u8]) -> Vec<u8> {
+pub fn prepend_bytes(element: u8, _bytes: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.push(element);
     bytes.extend(_bytes.iter().cloned());
