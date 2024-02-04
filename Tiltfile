@@ -7,7 +7,7 @@
 
 custom_build(
   'f1r3fly-image',
-  'sbt ";project node ;set dockerBuildOptions := List(\"--force-rm\", \"-t\", \"$EXPECTED_REF\") ;Docker/publish"',
+  'sbt ";project node ;set dockerBuildOptions := List(\"--force-rm\", \"-t\", \"$EXPECTED_REF\") ;Docker/publishLocal"',
   deps=['casper', 'comm', 'crypto', 'graphz', 'models', 'node', 'regex', 'rholang', 'rspace', 'shared']
 )
 
