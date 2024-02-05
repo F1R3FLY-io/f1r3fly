@@ -4,7 +4,7 @@ pub mod history_repository;
 mod history_action;
 pub mod instances;
 mod radix_tree;
-mod roots_store;
+pub mod roots_store;
 mod root_repository;
 mod cold_store;
 mod history_repository_impl;

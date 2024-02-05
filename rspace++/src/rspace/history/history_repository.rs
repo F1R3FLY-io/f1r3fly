@@ -42,7 +42,7 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
                 dyn RSpaceExporter<
                     KeyHash = Blake3Hash,
                     NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = bytes::Bytes,
+                    Value = Vec<u8>,
                 >,
             >,
         >,

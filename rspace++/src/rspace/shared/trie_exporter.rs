@@ -1,3 +1,5 @@
+use super::key_value_store::KvStoreError;
+
 // See shared/src/main/scala/coop/rchain/state/TrieExporter.scala
 // Defines basic operation to traverse tries and convert to path indexed list
 pub trait TrieExporter {
@@ -23,15 +25,13 @@ pub trait TrieExporter {
     fn get_history_items(
         &self,
         keys: Vec<Self::KeyHash>,
-        from_buffer: fn(&[u8]) -> Self::Value,
-    ) -> Vec<(Self::KeyHash, Self::Value)>;
+    ) -> Result<Vec<(Self::KeyHash, Self::Value)>, KvStoreError>;
 
     // Get data values / from leaf nodes in the trie
     fn get_data_items(
         &self,
         keys: Vec<Self::KeyHash>,
-        from_buffer: fn(&[u8]) -> Self::Value,
-    ) -> Vec<(Self::KeyHash, Self::Value)>;
+    ) -> Result<Vec<(Self::KeyHash, Self::Value)>, KvStoreError>;
 }
 
 pub struct TrieNode<KeyHash> {

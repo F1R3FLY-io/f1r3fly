@@ -41,7 +41,7 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
                 dyn RSpaceExporter<
                     KeyHash = Blake3Hash,
                     NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = Bytes,
+                    Value = Vec<u8>,
                 >,
             >,
         >,
@@ -406,7 +406,7 @@ where
                 dyn RSpaceExporter<
                     KeyHash = Blake3Hash,
                     NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = bytes::Bytes,
+                    Value = Vec<u8>,
                 >,
             >,
         >,
