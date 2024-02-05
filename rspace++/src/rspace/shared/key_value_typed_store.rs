@@ -15,11 +15,11 @@ where
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
 
-    fn put(&self, kv_pairs: Vec<(K, V)>) -> ();
+    fn put(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError>;
 
-    fn delete(&self, keys: Vec<K>) -> i32;
+    fn delete(&self, keys: Vec<K>) -> Result<usize, KvStoreError>;
 
-    fn contains(&self, keys: &Vec<K>) -> Vec<bool>;
+    fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError>;
 
     // def collect[T](pf: PartialFunction[(K, () => V), T]): F[Seq[T]]
     // TODO: Update this to match scala
@@ -38,9 +38,9 @@ where
         }
     }
 
-    fn put_if_absent(&self, kv_pairs: Vec<(K, V)>) -> () {
+    fn put_if_absent(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError> {
         let keys: Vec<K> = kv_pairs.iter().map(|(k, _)| k.clone()).collect();
-        let if_absent = self.contains(&keys);
+        let if_absent = self.contains(&keys)?;
         let kv_if_absent: Vec<_> = kv_pairs.into_iter().zip(if_absent).collect();
         let kv_absent: Vec<_> = kv_if_absent
             .into_iter()
@@ -48,7 +48,7 @@ where
             .map(|(kv, _)| kv)
             .collect();
 
-        self.put(kv_absent);
+        self.put(kv_absent)
     }
 }
 
@@ -62,7 +62,7 @@ pub struct KeyValueTypedStoreInstance<K, V> {
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
     K: Debug + Clone + Send + Sync + Serialize + 'static,
-    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static,
+    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static + Serialize,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
         let keys_bytes = keys
@@ -83,22 +83,58 @@ where
         Ok(values)
     }
 
-    fn put(&self, kv_pairs: Vec<(K, V)>) -> () {
-        todo!()
+    fn put(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError> {
+        let pairs_bytes: Vec<(Vec<u8>, Vec<u8>)> = kv_pairs
+            .iter()
+            .map(|(k, v)| {
+                let serialized_key =
+                    bincode::serialize(k).expect("Key Value Typed Store: Failed to serialize key");
+                let serialized_value = bincode::serialize(v)
+                    .expect("Key Value Typed Store: Failed to serialize value");
+                (serialized_key, serialized_value)
+            })
+            .collect();
+
+        Ok(self.store.put(pairs_bytes)?)
     }
 
-    fn delete(&self, keys: Vec<K>) -> i32 {
-        todo!()
+    fn delete(&self, keys: Vec<K>) -> Result<usize, KvStoreError> {
+        let keys_bytes: Vec<Vec<u8>> = keys
+            .iter()
+            .map(|k| {
+                let serialized_key =
+                    bincode::serialize(k).expect("Key Value Typed Store: Failed to serialize key");
+                serialized_key
+            })
+            .collect();
+
+        let deleted_count = self.store.delete(keys_bytes);
+        Ok(deleted_count?)
     }
 
-    fn contains(&self, keys: &Vec<K>) -> Vec<bool> {
-        todo!()
+    fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError> {
+        let keys_bytes: Vec<Vec<u8>> = keys
+            .iter()
+            .map(|k| {
+                let serialized_key =
+                    bincode::serialize(k).expect("Key Value Typed Store: Failed to serialize key");
+                serialized_key
+            })
+            .collect();
+
+        let results = self.store.get(keys_bytes)?;
+        Ok(results
+            .into_iter()
+            .map(|result| !result.is_none())
+            .collect())
     }
 
+    // Not implemented because unsure if used in 'rspace' code
     fn collect(&self) -> () {
         todo!()
     }
 
+    // Not implemented because unsure if used in 'rspace' code
     fn to_map(&self) -> BTreeMap<K, V> {
         todo!()
     }

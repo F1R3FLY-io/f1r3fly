@@ -18,7 +18,7 @@ impl ColdStoreInstances {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PersistedData {
     Joins(JoinsLeaf),
     Data(DataLeaf),
