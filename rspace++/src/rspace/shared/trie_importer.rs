@@ -6,19 +6,11 @@ pub trait TrieImporter {
     type Value;
 
     // Set history values / branch nodes in the trie
-    fn set_history_items(
-        &self,
-        data: Vec<(Self::KeyHash, Self::Value)>,
-        to_buffer: fn(Self::Value) -> &'static [u8],
-    ) -> ();
+    fn set_history_items(&self, data: Vec<(Self::KeyHash, Self::Value)>) -> ();
 
     // Set data values / leaf nodes in the trie
-    fn set_data_items(
-        &self,
-        data: Vec<(Self::KeyHash, Self::Value)>,
-        to_buffer: fn(Self::Value) -> &'static [u8],
-    ) -> ();
+    fn set_data_items(&self, data: Vec<(Self::KeyHash, Self::Value)>) -> ();
 
     // Set current root hash
-    fn set_root(&self, key: Self::KeyHash) -> ();
+    fn set_root(&self, key: &Self::KeyHash) -> ();
 }

@@ -22,8 +22,8 @@ use crate::rspace::serializers::serializers::{
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
+use crate::rspace::ByteVector;
 use async_trait::async_trait;
-use bytes::Bytes;
 use log::debug;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,8 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
             >,
         >,
     >,
-    pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = Bytes>>>>,
+    pub rspace_importer:
+        Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = ByteVector>>>>,
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
@@ -416,7 +417,7 @@ where
 
     fn importer(
         &self,
-    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = bytes::Bytes>>>> {
+    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = ByteVector>>>> {
         self.rspace_importer.clone()
     }
 

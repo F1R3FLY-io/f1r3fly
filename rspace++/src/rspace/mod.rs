@@ -13,3 +13,6 @@ pub mod shared;
 mod hot_store_trie_action;
 mod state;
 mod serializers;
+
+pub type ByteVector = Vec<u8>;
+pub type ByteBuffer = Vec<u8>;
