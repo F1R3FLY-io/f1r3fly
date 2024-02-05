@@ -1,3 +1,4 @@
+use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -36,6 +37,66 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
     let bytes = bincode::serialize(node).unwrap();
     let hash = blake3::hash(&bytes);
     (hash.as_bytes().to_vec(), bytes)
+}
+
+/**
+ * Data returned after export
+ *
+ * @param nodePrefixes Node prefixes
+ * @param nodeKeys Node KVDB keys
+ * @param nodeValues Node KVDB values
+ * @param leafPrefixes Leaf prefixes
+ * @param leafValues Leaf values (it's pointer for data in datastore)
+ */
+pub struct ExportData {
+    pub node_prefixes: Vec<Vec<u8>>,
+    pub node_keys: Vec<Vec<u8>>,
+    pub node_values: Vec<Vec<u8>>,
+    pub leaf_prefixes: Vec<Vec<u8>>,
+    pub leaf_values: Vec<Vec<u8>>,
+}
+
+/**
+ * Settings for [[ExportData]]
+ *
+ * If false - data will not be exported.
+ */
+pub struct ExportDataSettings {
+    pub flag_node_prefixes: bool,
+    pub flag_node_keys: bool,
+    pub flag_node_values: bool,
+    pub flag_leaf_prefixes: bool,
+    pub flag_leaf_values: bool,
+}
+
+/**
+ * Sequential export algorithm
+ *
+ * @param rootHash Root node hash, starting point
+ * @param lastPrefix Describes the path of root to last processed element (if None - start from root)
+ * @param skipSize Describes how many elements to skip
+ * @param takeSize Describes how many elements to take
+ * @param getNodeDataFromStore Function to get data from storage
+ * @param settings [[ExportDataSettings]]
+ *
+ * @return
+ * Return the data and prefix of the last processed item.
+ * If all bonds in the tree are processed, returns None as prefix.
+ * {{{
+ * prefix - Prefix that describes the path of root to node
+ * decoded - Deserialized data (from parsing)
+ * lastItemIndex - Last processed item index
+ * }}}
+ */
+pub fn sequential_export<K, V, S>(
+    root_hash: Vec<u8>,
+    last_prefix: Option<Vec<u8>>,
+    skip_size: usize,
+    take_size: usize,
+    get_node_data_from_store: fn(&S, &K) -> Result<Option<V>, KvStoreError>,
+    settings: ExportDataSettings,
+) -> (ExportData, Option<Vec<u8>>) {
+    todo!()
 }
 
 /**

@@ -34,8 +34,19 @@ pub trait TrieExporter {
     ) -> Result<Vec<(Self::KeyHash, Self::Value)>, KvStoreError>;
 }
 
+#[derive(Clone)]
 pub struct TrieNode<KeyHash> {
-    hash: KeyHash,
-    is_leaf: bool,
-    path: Vec<(KeyHash, Option<u8>)>,
+    pub hash: KeyHash,
+    pub is_leaf: bool,
+    pub path: Vec<(KeyHash, Option<u8>)>,
+}
+
+impl<KeyHash> TrieNode<KeyHash> {
+    pub fn new(hash: KeyHash, is_leaf: bool, path: Vec<(KeyHash, Option<u8>)>) -> Self {
+        TrieNode {
+            hash,
+            is_leaf,
+            path,
+        }
+    }
 }
