@@ -9,6 +9,7 @@ x-rnode: &default-rnode
 services:
   boot:
     <<: *default-rnode
+    container_name: $BOOTSTRAP_HOST
     command:
       [
         "run",
@@ -33,6 +34,7 @@ services:
 
   validator1:
     <<: *default-rnode
+    container_name: $VALIDATOR1_HOST
     command:
       [
         "run",
@@ -57,6 +59,7 @@ services:
 
   validator2:
     <<: *default-rnode
+    container_name: $VALIDATOR2_HOST
     command:
       [
         "run",
@@ -81,6 +84,7 @@ services:
 
   validator3:
     <<: *default-rnode
+    container_name: $VALIDATOR3_HOST
     command:
       [
         "run",

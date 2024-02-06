@@ -70,16 +70,6 @@
               help = "Java lexical analyzer generator";
             }
             {
-              name = "js";
-              package = holyGraal;
-              help = "JavaScript interpreter from GraalVM";
-            }
-            {
-              name = "native-image";
-              package = holyGraal;
-              help = "Native image builder from GraalVM";
-            }
-            {
               name = "amm";
               package = hematite;
               help = "Ammonite REPL for Scala";
@@ -100,19 +90,19 @@
               help = "Kubernetes CLI";
             }
             {
-              name = "k9s";
-              package = k9s;
-              help = "Kubernetes TUI";
-            }
-            {
-              name = "tilt";
-              package = tilt;
-              help = "Hands-off Kubernetes development tooling";
-            }
-            {
               name = "oci";
               package = oci-cli;
               help = "Oracle Cloud CLI";
+            }
+            {
+              name = "dhall";
+              package = dhall;
+              help = "Dhall configuration language";
+            }
+            {
+              name = "dhall-to-yaml-ng";
+              package = dhall-yaml;
+              help = "Dhall-to-YAML utility";
             }
           ];
           imports = [ typelevel-nix.typelevelShell ];
