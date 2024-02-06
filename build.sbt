@@ -401,11 +401,13 @@ lazy val node = (project in file("node"))
     dockerEntrypoint := List("/opt/docker/bin/rnode", "--profile=docker", "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"),
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
+    dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
     dockerCommands ++= {
       Seq(
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
+        Cmd("RUN", "microdnf install nmap"),
         Cmd("USER", (Docker/daemonUser).value),
         ExecCmd("CMD", "run")
       )
