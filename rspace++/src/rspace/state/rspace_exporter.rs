@@ -1,11 +1,9 @@
 use crate::rspace::{
     hashing::blake3_hash::Blake3Hash,
     history::radix_tree::{sequential_export, ExportData, ExportDataSettings},
-    shared::{
-        key_value_store::KvStoreError,
-        trie_exporter::{TrieExporter, TrieNode},
-    },
+    shared::trie_exporter::{TrieExporter, TrieNode},
 };
+use std::sync::Arc;
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/RSpaceExporter.scala
 pub trait RSpaceExporter: TrieExporter + Send + Sync {
@@ -16,11 +14,11 @@ pub trait RSpaceExporter: TrieExporter + Send + Sync {
 pub struct RSpaceExporterInstance;
 
 impl RSpaceExporterInstance {
-    pub fn traverse_history<K, V, S>(
+    pub fn traverse_history<K, V>(
         start_path: Vec<(Blake3Hash, Option<u8>)>,
         skip: usize,
         take: usize,
-        get_from_history: fn(&S, &K) -> Result<Option<V>, KvStoreError>,
+        get_from_history: Arc<dyn Fn(&K) -> Option<V>>,
     ) -> Vec<TrieNode<Blake3Hash>> {
         let settings = ExportDataSettings {
             flag_node_prefixes: false,

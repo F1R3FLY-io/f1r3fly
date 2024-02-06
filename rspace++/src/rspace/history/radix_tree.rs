@@ -88,12 +88,12 @@ pub struct ExportDataSettings {
  * lastItemIndex - Last processed item index
  * }}}
  */
-pub fn sequential_export<K, V, S>(
+pub fn sequential_export<K, V>(
     root_hash: Vec<u8>,
     last_prefix: Option<Vec<u8>>,
     skip_size: usize,
     take_size: usize,
-    get_node_data_from_store: fn(&S, &K) -> Result<Option<V>, KvStoreError>,
+    get_node_data_from_store: Arc<dyn Fn(&K) -> Option<V>>,
     settings: ExportDataSettings,
 ) -> (ExportData, Option<Vec<u8>>) {
     todo!()

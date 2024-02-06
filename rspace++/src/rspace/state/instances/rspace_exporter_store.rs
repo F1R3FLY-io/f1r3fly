@@ -1,12 +1,13 @@
 use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::history::roots_store::{RootsStore, RootsStoreInstances};
 use crate::rspace::shared::key_value_store::KvStoreError;
-use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::shared::trie_exporter::{TrieExporter, TrieNode};
 use crate::rspace::state::rspace_exporter::RSpaceExporterInstance;
 use crate::rspace::{
     shared::key_value_store::KeyValueStore, state::rspace_exporter::RSpaceExporter,
 };
+use std::sync::Arc;
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/instances/RSpaceExporterStore.scala
 pub struct RSpaceExporterStore;
@@ -74,11 +75,22 @@ impl TrieExporter for RSpaceExporterImpl {
         skip: usize,
         take: usize,
     ) -> Vec<TrieNode<Self::KeyHash>> {
-        let nodes = RSpaceExporterInstance::traverse_history::<
-            Vec<u8>,
-            Vec<u8>,
-            Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>,
-        >(start_path, skip, take, |store, key| store.get_one(key));
+        let source_trie_store = RadixHistory::create_store(self.source_history_store.clone());
+        let nodes = RSpaceExporterInstance::traverse_history(
+            start_path,
+            skip,
+            take,
+            Arc::new(move |key| {
+                Some(
+                    source_trie_store
+                        .lock()
+                        .expect(
+                            "RSpace Exporter Store: Unable to acquire lock on source history trie",
+                        )
+                        .get_one(key),
+                )
+            }),
+        );
         nodes
     }
 
