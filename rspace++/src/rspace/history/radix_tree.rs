@@ -1,5 +1,6 @@
-use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
+use crate::rspace::Byte;
+use crate::rspace::ByteVector;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -12,9 +13,15 @@ use super::history_action::HistoryAction;
 pub enum Item {
     EmptyItem,
 
-    Leaf { prefix: Vec<u8>, value: Vec<u8> },
+    Leaf {
+        prefix: ByteVector,
+        value: ByteVector,
+    },
 
-    NodePtr { prefix: Vec<u8>, ptr: Vec<u8> },
+    NodePtr {
+        prefix: ByteVector,
+        ptr: ByteVector,
+    },
 }
 
 pub type Node = Vec<Item>;
@@ -33,10 +40,43 @@ impl EmptyNode {
     }
 }
 
-pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
+/** Deserialization [[ByteVector]] to [[Node]]
+ */
+fn decode(bv: ByteVector) -> Node {
+    todo!()
+}
+
+fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, ByteVector) {
+    fn go(
+        common: ByteVector,
+        l: ByteVector,
+        r: ByteVector,
+    ) -> (ByteVector, ByteVector, ByteVector) {
+        if r.is_empty() || l.is_empty() {
+            (common, l, r)
+        } else {
+            let (l_head, l_tail) = l.split_first().unwrap();
+            let (r_head, r_tail) = r.split_first().unwrap();
+            if l_head == r_head {
+                let mut new_common = common.clone();
+                new_common.push(*l_head);
+                go(new_common, l_tail.to_vec(), r_tail.to_vec())
+            } else {
+                (common, l, r)
+            }
+        }
+    }
+    go(Vec::new(), b1, b2)
+}
+
+pub fn hash_node(node: &Node) -> (ByteVector, ByteVector) {
     let bytes = bincode::serialize(node).unwrap();
     let hash = blake3::hash(&bytes);
     (hash.as_bytes().to_vec(), bytes)
+}
+
+fn byte_to_int(b: u8) -> usize {
+    b as usize & 0xff
 }
 
 /**
@@ -49,11 +89,11 @@ pub fn hash_node(node: &Node) -> (Vec<u8>, Vec<u8>) {
  * @param leafValues Leaf values (it's pointer for data in datastore)
  */
 pub struct ExportData {
-    pub node_prefixes: Vec<Vec<u8>>,
-    pub node_keys: Vec<Vec<u8>>,
-    pub node_values: Vec<Vec<u8>>,
-    pub leaf_prefixes: Vec<Vec<u8>>,
-    pub leaf_values: Vec<Vec<u8>>,
+    pub node_prefixes: Vec<ByteVector>,
+    pub node_keys: Vec<ByteVector>,
+    pub node_values: Vec<ByteVector>,
+    pub leaf_prefixes: Vec<ByteVector>,
+    pub leaf_values: Vec<ByteVector>,
 }
 
 /**
@@ -88,14 +128,112 @@ pub struct ExportDataSettings {
  * lastItemIndex - Last processed item index
  * }}}
  */
-pub fn sequential_export<K, V>(
-    root_hash: Vec<u8>,
-    last_prefix: Option<Vec<u8>>,
+pub fn sequential_export(
+    root_hash: ByteVector,
+    last_prefix: Option<ByteVector>,
     skip_size: usize,
     take_size: usize,
-    get_node_data_from_store: Arc<dyn Fn(&K) -> Option<V>>,
+    get_node_data_from_store: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     settings: ExportDataSettings,
-) -> (ExportData, Option<Vec<u8>>) {
+) -> (ExportData, Option<ByteVector>) {
+    #[derive(Clone)]
+    struct NodeData {
+        prefix: ByteVector,
+        decoded: Node,
+        last_item_index: Option<Byte>,
+    }
+
+    type Path = Vec<NodeData>; // Sequence used in recursions
+
+    struct NodePathData {
+        hash: ByteVector,        // Hash of node for load
+        node_prefix: ByteVector, // Prefix of this node
+        rest_prefix: ByteVector, // Prefix that describes the rest of the Path
+        path: Path,              // Return path
+    }
+
+    // Create path from root to lastPrefix node
+    let init_node_path = |p: NodePathData| {
+        let process_child_item = |node: Node| {
+            let item_idx = byte_to_int(*p.rest_prefix.first().unwrap());
+            match node.get(item_idx) {
+                Some(Item::NodePtr {
+                    prefix: ptr_prefix,
+                    ptr,
+                }) => {
+                    let (_, rest_prefix_tail) = p.rest_prefix.split_first().unwrap();
+                    let (mut prefix_common, prefix_rest, ptr_prefix_rest) =
+                        common_prefix(rest_prefix_tail.to_vec(), ptr_prefix.to_vec());
+
+                    if ptr_prefix_rest.is_empty() {
+                        let mut prefix_1 = p.node_prefix.clone();
+                        prefix_1.push(*p.rest_prefix.first().unwrap());
+                        prefix_1.append(&mut prefix_common);
+
+                        Ok(NodePathData {
+                            hash: ptr.to_vec(),
+                            node_prefix: prefix_1,
+                            rest_prefix: prefix_rest,
+                            path: {
+                                let mut new_path = Vec::new();
+                                new_path.push(NodeData {
+                                    prefix: p.node_prefix.clone(),
+                                    decoded: node,
+                                    last_item_index: p.rest_prefix.first().copied(),
+                                });
+
+                                new_path.extend(p.path.clone());
+                                new_path
+                            },
+                        })
+                    } else {
+                        let mut prefix_1 = p.node_prefix.clone();
+                        let mut prefix_2 = p.rest_prefix.clone();
+                        prefix_1.append(&mut prefix_2);
+
+                        println!(
+                            "Radix Tree - Export error: node with prefix {} not found.",
+                            hex::encode(prefix_1)
+                        );
+                        Err(Vec::<NodeData>::new())
+                    }
+                }
+                _ => {
+                    let mut prefix_1 = p.node_prefix.clone();
+                    let mut prefix_2 = p.rest_prefix.clone();
+                    prefix_1.append(&mut prefix_2);
+
+                    println!(
+                        "Radix Tree - Export error: node with prefix {} not found.",
+                        hex::encode(prefix_1)
+                    );
+                    Err(Vec::<NodeData>::new())
+                }
+            }
+        };
+
+        let node_opt = get_node_data_from_store(&p.hash);
+        if node_opt.is_none() {
+            println!("Radix Tree - Export error: node with key {} not found.", {
+                hex::encode(p.hash)
+            })
+        }
+        let decoded_node = decode(node_opt.unwrap());
+        if p.rest_prefix.is_empty() {
+            let mut new_path = Vec::new();
+            new_path.push(NodeData {
+                prefix: p.node_prefix,
+                decoded: decoded_node,
+                last_item_index: None,
+            });
+
+            new_path.extend(p.path);
+            Ok(new_path) // Happy end
+        } else {
+            Err(process_child_item(decoded_node)) // Go dipper
+        }
+    };
+
     todo!()
 }
 
@@ -104,7 +242,7 @@ pub fn sequential_export<K, V>(
  */
 #[derive(Clone)]
 pub struct RadixTreeImpl {
-    pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
+    pub store: Arc<Mutex<Box<dyn KeyValueTypedStore<ByteVector, ByteVector>>>>,
     /**
      * Cache for storing read and decoded nodes.
      *
@@ -112,7 +250,7 @@ pub struct RadixTreeImpl {
      * Where hash - Blake2b256Hash of serializing nodes data,
      *       node - deserialized data of this node.
      */
-    pub cache_r: DashMap<Vec<u8>, Node>,
+    pub cache_r: DashMap<ByteVector, Node>,
     /**
      * Cache for storing serializing nodes. For subsequent unloading in KVDB
      *
@@ -120,11 +258,11 @@ pub struct RadixTreeImpl {
      * Where hash -  Blake2b256Hash of bytes,
      *       bytes - serializing data of nodes.
      */
-    pub cache_w: DashMap<Vec<u8>, Vec<u8>>,
+    pub cache_w: DashMap<ByteVector, ByteVector>,
 }
 
 impl RadixTreeImpl {
-    pub fn new(store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>) -> Self {
+    pub fn new(store: Arc<Mutex<Box<dyn KeyValueTypedStore<ByteVector, ByteVector>>>>) -> Self {
         RadixTreeImpl {
             store,
             cache_r: DashMap::new(),
@@ -135,7 +273,7 @@ impl RadixTreeImpl {
     /**
      * Load and decode serializing data from KVDB.
      */
-    fn load_node_from_store(&self, node_ptr: &Vec<u8>) -> Option<Node> {
+    fn load_node_from_store(&self, node_ptr: &ByteVector) -> Option<Node> {
         let store_lock = self
             .store
             .lock()
@@ -164,7 +302,7 @@ impl RadixTreeImpl {
      * If there is no such record in cache - load and decode from KVDB, then save to cacheR.
      * If there is no such record in KVDB - execute assert (if set noAssert flag - return emptyNode).
      */
-    pub fn load_node(&self, node_ptr: Vec<u8>, no_assert: Option<bool>) -> Node {
+    pub fn load_node(&self, node_ptr: ByteVector, no_assert: Option<bool>) -> Node {
         let no_assert = no_assert.unwrap_or(false);
 
         let error_msg = |node_ptr: &[u8]| {
@@ -178,7 +316,7 @@ impl RadixTreeImpl {
             );
         };
 
-        let cache_miss = |node_ptr: Vec<u8>| {
+        let cache_miss = |node_ptr: ByteVector| {
             let store_node_opt = self.load_node_from_store(&node_ptr);
 
             let node_opt = store_node_opt
@@ -214,7 +352,7 @@ impl RadixTreeImpl {
      * Serializing data load in [[cacheW]].
      * If detected collision with older cache data - executing assert
      */
-    pub fn save_node(&self, node: &Node) -> Vec<u8> {
+    pub fn save_node(&self, node: &Node) -> ByteVector {
         todo!()
     }
 
@@ -237,7 +375,7 @@ impl RadixTreeImpl {
     /**
      * Read leaf data with prefix. If data not found, returned [[None]]
      */
-    pub fn read(&self, start_node: Node, start_prefix: Vec<u8>) -> Option<Vec<u8>> {
+    pub fn read(&self, start_node: Node, start_prefix: ByteVector) -> Option<ByteVector> {
         todo!()
     }
 

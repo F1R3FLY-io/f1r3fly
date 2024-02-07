@@ -16,3 +16,4 @@ mod serializers;
 
 pub type ByteVector = Vec<u8>;
 pub type ByteBuffer = Vec<u8>;
+pub type Byte = u8;

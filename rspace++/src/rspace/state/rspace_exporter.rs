@@ -2,6 +2,7 @@ use crate::rspace::{
     hashing::blake3_hash::Blake3Hash,
     history::radix_tree::{sequential_export, ExportData, ExportDataSettings},
     shared::trie_exporter::{TrieExporter, TrieNode},
+    ByteVector,
 };
 use std::sync::Arc;
 
@@ -14,11 +15,11 @@ pub trait RSpaceExporter: TrieExporter + Send + Sync {
 pub struct RSpaceExporterInstance;
 
 impl RSpaceExporterInstance {
-    pub fn traverse_history<K, V>(
+    pub fn traverse_history(
         start_path: Vec<(Blake3Hash, Option<u8>)>,
         skip: usize,
         take: usize,
-        get_from_history: Arc<dyn Fn(&K) -> Option<V>>,
+        get_from_history: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     ) -> Vec<TrieNode<Blake3Hash>> {
         let settings = ExportDataSettings {
             flag_node_prefixes: false,

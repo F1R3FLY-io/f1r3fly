@@ -81,14 +81,11 @@ impl TrieExporter for RSpaceExporterImpl {
             skip,
             take,
             Arc::new(move |key| {
-                Some(
-                    source_trie_store
-                        .lock()
-                        .expect(
-                            "RSpace Exporter Store: Unable to acquire lock on source history trie",
-                        )
-                        .get_one(key),
-                )
+                source_trie_store
+                    .lock()
+                    .expect("RSpace Exporter Store: Unable to acquire lock on source history trie")
+                    .get_one(key)
+                    .expect("RSpace Exporter Store: Failed to call get_one")
             }),
         );
         nodes
