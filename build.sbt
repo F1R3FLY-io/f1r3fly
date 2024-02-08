@@ -411,8 +411,8 @@ lazy val node = (project in file("node"))
         Cmd("RUN", """microdnf install oracle-epel-release-el8.x86_64 && \
                       microdnf install jq p7zip && \
                       curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$(uname -p).tar.gz && \
-                      7za -so x grpcurl_1.8.9_linux_x86_64.tar.gz | 7za x -si -ttar && \
-                      rm -fr LICENSE PaxHeaders.0 grpcurl_1.8.9_linux_x86_64.tar.gz && \
+                      7za -so x grpcurl_1.8.9_linux_$(uname -p).tar.gz | 7za x -si -ttar && \
+                      rm -fr LICENSE PaxHeaders.0 grpcurl_1.8.9_linux_$(uname -p).tar.gz && \
                       chmod a+x grpcurl && \
                       mv grpcurl /usr/local/bin"""),
         Cmd("USER", (Docker/daemonUser).value),
