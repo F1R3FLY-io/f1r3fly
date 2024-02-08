@@ -40,6 +40,11 @@ impl EmptyNode {
     }
 }
 
+enum Either<L, R> {
+    Left(L),
+    Right(R),
+}
+
 /** Deserialization [[ByteVector]] to [[Node]]
  */
 fn decode(bv: ByteVector) -> Node {
@@ -88,6 +93,7 @@ fn byte_to_int(b: u8) -> usize {
  * @param leafPrefixes Leaf prefixes
  * @param leafValues Leaf values (it's pointer for data in datastore)
  */
+#[derive(Clone)]
 pub struct ExportData {
     pub node_prefixes: Vec<ByteVector>,
     pub node_keys: Vec<ByteVector>,
@@ -165,72 +171,75 @@ pub fn sequential_export(
                     let (mut prefix_common, prefix_rest, ptr_prefix_rest) =
                         common_prefix(rest_prefix_tail.to_vec(), ptr_prefix.to_vec());
 
-                    if ptr_prefix_rest.is_empty() {
-                        let mut node_prefix_appended = p.node_prefix.clone();
-                        node_prefix_appended.push(*p.rest_prefix.first().unwrap());
-                        node_prefix_appended.append(&mut prefix_common);
-
-                        Ok(NodePathData {
-                            hash: ptr.to_vec(),
-                            node_prefix: node_prefix_appended,
-                            rest_prefix: prefix_rest,
-                            path: {
-                                let mut new_path = Vec::new();
-                                new_path.push(NodeData {
-                                    prefix: p.node_prefix.clone(),
-                                    decoded: node,
-                                    last_item_index: p.rest_prefix.first().copied(),
-                                });
-
-                                new_path.extend(p.path.clone());
-                                new_path
-                            },
-                        })
-                    } else {
+                    assert!(ptr_prefix_rest.is_empty(), "{}", {
                         let mut node_prefix_cloned = p.node_prefix.clone();
                         let mut rest_prefix_cloned = p.rest_prefix.clone();
                         node_prefix_cloned.append(&mut rest_prefix_cloned);
 
-                        println!(
+                        format!(
                             "Radix Tree - Export error: node with prefix {} not found.",
                             hex::encode(node_prefix_cloned)
-                        );
-                        Err(Vec::<NodeData>::new())
-                    }
+                        )
+                    });
+
+                    let mut node_prefix_appended = p.node_prefix.clone();
+                    node_prefix_appended.push(*p.rest_prefix.first().unwrap());
+                    node_prefix_appended.append(&mut prefix_common);
+
+                    Either::Left(NodePathData {
+                        hash: ptr.to_vec(),
+                        node_prefix: node_prefix_appended,
+                        rest_prefix: prefix_rest,
+                        path: {
+                            let mut new_path = Vec::new();
+                            new_path.push(NodeData {
+                                prefix: p.node_prefix.clone(),
+                                decoded: node,
+                                last_item_index: p.rest_prefix.first().copied(),
+                            });
+
+                            new_path.extend(p.path.clone());
+                            new_path
+                        },
+                    })
                 }
                 _ => {
-                    let mut node_prefix_cloned = p.node_prefix.clone();
-                    let mut rest_prefix_cloned = p.rest_prefix.clone();
-                    node_prefix_cloned.append(&mut rest_prefix_cloned);
+                    assert!(false, "{}", {
+                        let mut node_prefix_cloned = p.node_prefix.clone();
+                        let mut rest_prefix_cloned = p.rest_prefix.clone();
+                        node_prefix_cloned.append(&mut rest_prefix_cloned);
 
-                    println!(
-                        "Radix Tree - Export error: node with prefix {} not found.",
-                        hex::encode(node_prefix_cloned)
-                    );
-                    Err(Vec::<NodeData>::new())
+                        format!(
+                            "Radix Tree - Export error: node with prefix {} not found.",
+                            hex::encode(node_prefix_cloned)
+                        )
+                    });
+
+                    Either::Right(Vec::<NodeData>::new())
                 }
             }
         };
 
         let node_opt = get_node_data_from_store(&p.hash);
         if node_opt.is_none() {
-            println!("Radix Tree - Export error: node with key {} not found.", {
+            Err(format!("Radix Tree - Export error: node with key {} not found.", {
                 hex::encode(p.hash)
-            })
-        }
-        let decoded_node = decode(node_opt.unwrap());
-        if p.rest_prefix.is_empty() {
-            let mut new_path = Vec::new();
-            new_path.push(NodeData {
-                prefix: p.node_prefix,
-                decoded: decoded_node,
-                last_item_index: None,
-            });
-
-            new_path.extend(p.path);
-            Ok(new_path) // Happy end
+            }))
         } else {
-            Err(process_child_item(decoded_node)) // Go dipper
+            let decoded_node = decode(node_opt.unwrap());
+            if p.rest_prefix.is_empty() {
+                let mut new_path = Vec::new();
+                new_path.push(NodeData {
+                    prefix: p.node_prefix,
+                    decoded: decoded_node,
+                    last_item_index: None,
+                });
+
+                new_path.extend(p.path);
+                Ok(Either::Right(new_path)) // Happy end
+            } else {
+                Ok(Either::Left(process_child_item(decoded_node))) // Go dipper
+            }
         }
     };
 
@@ -270,6 +279,7 @@ pub fn sequential_export(
         }
     }
 
+    #[derive(Clone)]
     struct StepData {
         path: Path,           // Path of node from current to root
         skip: usize,          // Skip counter
@@ -325,6 +335,86 @@ pub fn sequential_export(
                 skip: p.skip,
                 take: p.take,
                 exp_data: new_export_data,
+            }
+        }
+    };
+
+    let add_node_ptr = |p: StepData,
+                        ptr_prefix: ByteVector,
+                        ptr: ByteVector,
+                        item_index: Byte,
+                        curr_node_prefix: ByteVector,
+                        new_path: Vec<NodeData>| {
+        let construct_node_ptr_data =
+            |child_path: Vec<NodeData>, child_np: ByteVector, child_nv: ByteVector| {
+                let new_np = if settings.flag_node_prefixes {
+                    let mut new = p.exp_data.node_prefixes.clone();
+                    new.push(child_np);
+                    new
+                } else {
+                    Vec::new()
+                };
+
+                let new_nk = if settings.flag_node_keys {
+                    let mut new = p.exp_data.node_keys.clone();
+                    new.push(ptr.clone());
+                    new
+                } else {
+                    Vec::new()
+                };
+
+                let new_nv = if settings.flag_node_values {
+                    let mut new = p.exp_data.node_values.clone();
+                    new.push(child_nv);
+                    new
+                } else {
+                    Vec::new()
+                };
+
+                let new_data = ExportData {
+                    node_prefixes: new_np,
+                    node_keys: new_nk,
+                    node_values: new_nv,
+                    leaf_prefixes: p.exp_data.leaf_prefixes.clone(),
+                    leaf_values: p.exp_data.leaf_values.clone(),
+                };
+
+                StepData {
+                    path: child_path,
+                    skip: p.skip,
+                    take: p.take - 1,
+                    exp_data: new_data,
+                }
+            };
+
+        let child_node_opt = get_node_data_from_store(&ptr);
+        if child_node_opt.is_none() {
+            Err(format!("Radix Tree - Export error: node with key {} not found.", {
+                hex::encode(ptr)
+            }))
+        } else {
+            let child_nv = child_node_opt.unwrap();
+            let child_decoded = decode(child_nv.clone());
+            let mut child_np = curr_node_prefix;
+            child_np.push(item_index);
+            child_np.append(&mut ptr_prefix.clone());
+            let child_node_data = NodeData {
+                prefix: child_np.clone(),
+                decoded: child_decoded,
+                last_item_index: None,
+            };
+            let mut child_path = vec![child_node_data];
+            child_path.append(&mut new_path.clone());
+
+            if p.skip > 0 {
+                Ok(StepData {
+                    path: child_path,
+                    skip: p.skip - 1,
+                    take: p.take,
+                    exp_data: p.exp_data,
+                })
+            } else {
+                Ok(construct_node_ptr_data(child_path, child_np, child_nv))
             }
         }
     };
