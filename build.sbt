@@ -408,11 +408,12 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("RUN", """microdnf install oracle-epel-release-el8 && \
-                      microdnf install jq p7zip && \
-                      curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$(uname -m).tar.gz && \
-                      7za -so x grpcurl_1.8.9_linux_$(uname -m).tar.gz | 7za x -si -ttar && \
-                      rm -fr LICENSE PaxHeaders.0 grpcurl_1.8.9_linux_$(uname -m).tar.gz && \
+        Cmd("RUN", """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
+                      microdnf update && \
+                      microdnf install gzip && \
+                      curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
+                      tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
+                      rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       chmod a+x grpcurl && \
                       mv grpcurl /usr/local/bin"""),
         Cmd("USER", (Docker/daemonUser).value),
