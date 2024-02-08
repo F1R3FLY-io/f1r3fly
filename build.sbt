@@ -4,6 +4,7 @@ import Rholang._
 import NativePackagerHelper._
 import com.typesafe.sbt.packager.docker._
 import sys.process._
+import javax.print.attribute.standard.RequestingUserName
 
 //allow stopping sbt tasks using ctrl+c without killing sbt itself
 Global / cancelable := true
@@ -407,8 +408,16 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("RUN", "microdnf install nmap"),
+        Cmd("RUN", """microdnf install oracle-epel-release-el8.x86_64 && \
+                      microdnf install jq p7zip && \
+                      curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$(uname -p).tar.gz && \
+                      7za -so x grpcurl_1.8.9_linux_x86_64.tar.gz | 7za x -si -ttar && \
+                      rm -fr LICENSE PaxHeaders.0 grpcurl_1.8.9_linux_x86_64.tar.gz && \
+                      chmod a+x grpcurl && \
+                      mv grpcurl /usr/local/bin"""),
         Cmd("USER", (Docker/daemonUser).value),
+        Cmd("HEALTHCHECK --start-period=30s CMD", """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
+                                  curl -s 127.0.0.1:40403/status | jq -e"""),
         ExecCmd("CMD", "run")
       )
     },
