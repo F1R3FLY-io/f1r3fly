@@ -410,7 +410,7 @@ lazy val node = (project in file("node"))
         Cmd("USER", "root"),
         Cmd("RUN", """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
                       microdnf update && \
-                      microdnf install gzip && \
+                      microdnf install jq gzip && \
                       curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
