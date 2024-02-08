@@ -408,7 +408,7 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("RUN", """microdnf install oracle-epel-release-el8.x86_64 && \
+        Cmd("RUN", """microdnf install oracle-epel-release-el8 && \
                       microdnf install jq p7zip && \
                       curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$(uname -p).tar.gz && \
                       7za -so x grpcurl_1.8.9_linux_$(uname -p).tar.gz | 7za x -si -ttar && \
