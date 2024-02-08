@@ -166,13 +166,13 @@ pub fn sequential_export(
                         common_prefix(rest_prefix_tail.to_vec(), ptr_prefix.to_vec());
 
                     if ptr_prefix_rest.is_empty() {
-                        let mut prefix_1 = p.node_prefix.clone();
-                        prefix_1.push(*p.rest_prefix.first().unwrap());
-                        prefix_1.append(&mut prefix_common);
+                        let mut node_prefix_appended = p.node_prefix.clone();
+                        node_prefix_appended.push(*p.rest_prefix.first().unwrap());
+                        node_prefix_appended.append(&mut prefix_common);
 
                         Ok(NodePathData {
                             hash: ptr.to_vec(),
-                            node_prefix: prefix_1,
+                            node_prefix: node_prefix_appended,
                             rest_prefix: prefix_rest,
                             path: {
                                 let mut new_path = Vec::new();
@@ -187,25 +187,25 @@ pub fn sequential_export(
                             },
                         })
                     } else {
-                        let mut prefix_1 = p.node_prefix.clone();
-                        let mut prefix_2 = p.rest_prefix.clone();
-                        prefix_1.append(&mut prefix_2);
+                        let mut node_prefix_cloned = p.node_prefix.clone();
+                        let mut rest_prefix_cloned = p.rest_prefix.clone();
+                        node_prefix_cloned.append(&mut rest_prefix_cloned);
 
                         println!(
                             "Radix Tree - Export error: node with prefix {} not found.",
-                            hex::encode(prefix_1)
+                            hex::encode(node_prefix_cloned)
                         );
                         Err(Vec::<NodeData>::new())
                     }
                 }
                 _ => {
-                    let mut prefix_1 = p.node_prefix.clone();
-                    let mut prefix_2 = p.rest_prefix.clone();
-                    prefix_1.append(&mut prefix_2);
+                    let mut node_prefix_cloned = p.node_prefix.clone();
+                    let mut rest_prefix_cloned = p.rest_prefix.clone();
+                    node_prefix_cloned.append(&mut rest_prefix_cloned);
 
                     println!(
                         "Radix Tree - Export error: node with prefix {} not found.",
-                        hex::encode(prefix_1)
+                        hex::encode(node_prefix_cloned)
                     );
                     Err(Vec::<NodeData>::new())
                 }
@@ -231,6 +231,101 @@ pub fn sequential_export(
             Ok(new_path) // Happy end
         } else {
             Err(process_child_item(decoded_node)) // Go dipper
+        }
+    };
+
+    /*
+     * Find next non-empty item.
+     *
+     * @param node Node to look for
+     * @param lastIdxOpt Last found index (if this node was not searched - [[None]])
+     * @param settings ExportDataSettings from outer scope
+     * @return [[Some]](idxItem, [[Item]]) if item found, [[None]] if non-empty item not found
+     */
+    fn find_next_non_empty_item(
+        node: Node,
+        last_idx_opt: Option<Byte>,
+        settings: ExportDataSettings,
+    ) -> Option<(Byte, Item)> {
+        if last_idx_opt == Some(0xFF) {
+            None
+        } else {
+            let cur_idx_int = last_idx_opt.map(|b| byte_to_int(b) + 1).unwrap_or(0);
+            let cur_item = node.get(cur_idx_int).unwrap();
+            let cur_idx = cur_idx_int as u8;
+            match cur_item {
+                Item::EmptyItem => find_next_non_empty_item(node, Some(cur_idx), settings),
+                Item::Leaf {
+                    prefix: _,
+                    value: _,
+                } => {
+                    if settings.flag_leaf_prefixes || settings.flag_leaf_values {
+                        Some((cur_idx, cur_item.clone()))
+                    } else {
+                        find_next_non_empty_item(node, Some(cur_idx), settings)
+                    }
+                }
+                Item::NodePtr { prefix: _, ptr: _ } => Some((cur_idx, cur_item.clone())),
+            }
+        }
+    }
+
+    struct StepData {
+        path: Path,           // Path of node from current to root
+        skip: usize,          // Skip counter
+        take: usize,          // Take counter
+        exp_data: ExportData, // Result of export
+    }
+
+    let add_leaf = |p: StepData,
+                    leaf_prefix: ByteVector,
+                    leaf_value: ByteVector,
+                    item_index: Byte,
+                    curr_node_prefix: ByteVector,
+                    new_path: Vec<NodeData>| {
+        if p.skip > 0 {
+            StepData {
+                path: new_path,
+                skip: p.skip,
+                take: p.take,
+                exp_data: p.exp_data,
+            }
+        } else {
+            let new_lp = if settings.flag_leaf_prefixes {
+                let mut new_single_lp = curr_node_prefix;
+                let mut leaf_prefix_copy = leaf_prefix;
+                new_single_lp.push(item_index);
+                new_single_lp.append(&mut leaf_prefix_copy);
+
+                let mut leaf_prefixes_copy = p.exp_data.leaf_prefixes;
+                leaf_prefixes_copy.push(new_single_lp);
+                leaf_prefixes_copy
+            } else {
+                Vec::new()
+            };
+
+            let new_lv = if settings.flag_leaf_values {
+                let mut leaf_values_copied = p.exp_data.leaf_values;
+                leaf_values_copied.push(leaf_value);
+                leaf_values_copied
+            } else {
+                Vec::new()
+            };
+
+            let new_export_data = ExportData {
+                node_prefixes: p.exp_data.node_prefixes,
+                node_keys: p.exp_data.node_keys,
+                node_values: p.exp_data.node_values,
+                leaf_prefixes: new_lp,
+                leaf_values: new_lv,
+            };
+
+            StepData {
+                path: new_path,
+                skip: p.skip,
+                take: p.take,
+                exp_data: new_export_data,
+            }
         }
     };
 
