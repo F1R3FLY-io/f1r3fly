@@ -360,13 +360,13 @@ pub fn sequential_export(
                     Vec::new()
                 };
 
-                let new_export_data = ExportData {
-                    node_prefixes: p.exp_data.node_prefixes,
-                    node_keys: p.exp_data.node_keys,
-                    node_values: p.exp_data.node_values,
-                    leaf_prefixes: new_lp,
-                    leaf_values: new_lv,
-                };
+                let new_export_data = ExportData::new(
+                    p.exp_data.node_prefixes,
+                    p.exp_data.node_keys,
+                    p.exp_data.node_values,
+                    new_lp,
+                    new_lv,
+                );
 
                 StepData::new(new_path, p.skip, p.take, new_export_data)
             }
@@ -415,13 +415,13 @@ pub fn sequential_export(
                         Vec::new()
                     };
 
-                    let new_data = ExportData {
-                        node_prefixes: new_np,
-                        node_keys: new_nk,
-                        node_values: new_nv,
-                        leaf_prefixes: p.exp_data.leaf_prefixes.clone(),
-                        leaf_values: p.exp_data.leaf_values.clone(),
-                    };
+                    let new_data = ExportData::new(
+                        new_np,
+                        new_nk,
+                        new_nv,
+                        p.exp_data.leaf_prefixes.clone(),
+                        p.exp_data.leaf_values.clone(),
+                    );
 
                     StepData::new(child_path, p.skip, p.take - 1, new_data)
                 };
@@ -527,6 +527,58 @@ pub fn sequential_export(
     fn empty_result() -> (ExportData, Option<()>) {
         (empty_export_data(), None)
     }
+
+    let do_export: Box<dyn Fn(ByteVector) -> Result<(ExportData, Option<ByteVector>), String>> =
+        Box::new(|root_node_ser: ByteVector| {
+            let root_params = NodePathData {
+                hash: root_hash.clone(),
+                node_prefix: Vec::new(),
+                rest_prefix: last_prefix.clone().unwrap_or(Vec::new()),
+                path: Vec::new(),
+            };
+
+            let no_root_start = (empty_export_data(), skip_size, take_size); // Start from next node after lastPrefix
+            let skipped_start = (empty_export_data(), skip_size - 1, take_size); // Skipped node start
+            let root_export_data = {
+                let new_np = if settings.flag_node_prefixes {
+                    vec![Vec::<u8>::new()]
+                } else {
+                    Vec::new()
+                };
+
+                let new_nk = if settings.flag_node_keys {
+                    vec![root_hash.clone()]
+                } else {
+                    Vec::new()
+                };
+
+                let new_nv = if settings.flag_leaf_values {
+                    vec![root_node_ser]
+                } else {
+                    Vec::new()
+                };
+
+                ExportData::new(new_np, new_nk, new_nv, Vec::new(), Vec::new())
+            };
+
+            let root_start = (root_export_data, skip_size, take_size - 1); // Take root
+
+            // Defining init data
+            let (init_export_data, init_skip_size, init_take_size) = match last_prefix {
+                Some(_) => no_root_start,
+                None => {
+                    if skip_size > 0 {
+                        skipped_start
+                    } else {
+                        root_start
+                    }
+                }
+            };
+
+            // let path =  root_params
+
+            todo!()
+        });
 
     todo!()
 }
