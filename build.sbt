@@ -417,7 +417,7 @@ lazy val node = (project in file("node"))
                       chmod a+x grpcurl && \
                       mv grpcurl /usr/local/bin"""),
         Cmd("USER", (Docker/daemonUser).value),
-        Cmd("HEALTHCHECK --start-period=30s CMD", """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
+        Cmd("HEALTHCHECK CMD", """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
                                   curl -s 127.0.0.1:40403/status | jq -e"""),
         ExecCmd("CMD", "run")
       )
