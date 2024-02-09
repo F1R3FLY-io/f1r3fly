@@ -102,11 +102,30 @@ pub struct ExportData {
     pub leaf_values: Vec<ByteVector>,
 }
 
+impl ExportData {
+    fn new(
+        node_prefixes: Vec<ByteVector>,
+        node_keys: Vec<ByteVector>,
+        node_values: Vec<ByteVector>,
+        leaf_prefixes: Vec<ByteVector>,
+        leaf_values: Vec<ByteVector>,
+    ) -> Self {
+        ExportData {
+            node_prefixes,
+            node_keys,
+            node_values,
+            leaf_prefixes,
+            leaf_values,
+        }
+    }
+}
+
 /**
  * Settings for [[ExportData]]
  *
  * If false - data will not be exported.
  */
+#[derive(Clone)]
 pub struct ExportDataSettings {
     pub flag_node_prefixes: bool,
     pub flag_node_keys: bool,
@@ -168,8 +187,11 @@ pub fn sequential_export(
         path: Path,              // Return path
     }
 
-    // Create path from root to lastPrefix node
-    // TODO: Define explicit function closure type
+    /*
+     * Create path from root to lastPrefix node
+     *
+     * TODO: Define explicit function closure type
+     */
     let init_node_path = |p: NodePathData| {
         let process_child_item = |node: Node| {
             let item_idx = byte_to_int(*p.rest_prefix.first().unwrap());
@@ -454,6 +476,57 @@ pub fn sequential_export(
             }
         },
     );
+
+    /*
+     * Export one element (Node or Leaf) and recursively move to the next step.
+     */
+    let export_step: Box<
+        dyn Fn(StepData) -> Result<Either<StepData, (ExportData, Option<ByteVector>)>, String>,
+    > = Box::new(|p: StepData| {
+        if p.path.is_empty() {
+            // End of Tree
+            Ok(Either::Right((p.exp_data, None)))
+        } else {
+            let curr_node_data = p.path.first().unwrap();
+            let curr_node_prefix = curr_node_data.prefix.clone();
+            let curr_node = curr_node_data.decoded.clone();
+
+            if (p.skip, p.take) == (0, 0) {
+                // End of skip&take counter
+                Ok(Either::Right((p.exp_data, Some(curr_node_prefix))))
+            } else {
+                let next_not_empty_item_opt = find_next_non_empty_item(
+                    curr_node.clone(),
+                    curr_node_data.last_item_index,
+                    settings.clone(),
+                );
+
+                let new_step_data = match next_not_empty_item_opt {
+                    Some((item_index, item)) => {
+                        add_element(p, item_index, item, curr_node, curr_node_prefix)
+                    }
+                    None => Ok({
+                        let (_, path_tail) = p.path.split_first().unwrap();
+                        StepData::new(path_tail.to_vec(), p.skip, p.take, p.exp_data)
+                    }),
+                };
+
+                Ok(Either::Left(new_step_data?))
+            }
+        }
+    });
+
+    fn init_conditions_exception() -> () {
+        panic!("Export error: invalid initial conditions (skipSize, takeSize)==(0,0).")
+    }
+
+    fn empty_export_data() -> ExportData {
+        ExportData::new(Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+    }
+
+    fn empty_result() -> (ExportData, Option<()>) {
+        (empty_export_data(), None)
+    }
 
     todo!()
 }
