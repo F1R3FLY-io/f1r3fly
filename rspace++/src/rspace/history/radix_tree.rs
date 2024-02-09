@@ -149,6 +149,16 @@ pub fn sequential_export(
         last_item_index: Option<Byte>,
     }
 
+    impl NodeData {
+        fn new(prefix: ByteVector, decoded: Node, last_item_index: Option<Byte>) -> Self {
+            NodeData {
+                prefix,
+                decoded,
+                last_item_index,
+            }
+        }
+    }
+
     type Path = Vec<NodeData>; // Sequence used in recursions
 
     struct NodePathData {
@@ -159,6 +169,7 @@ pub fn sequential_export(
     }
 
     // Create path from root to lastPrefix node
+    // TODO: Define explicit function closure type
     let init_node_path = |p: NodePathData| {
         let process_child_item = |node: Node| {
             let item_idx = byte_to_int(*p.rest_prefix.first().unwrap());
@@ -192,11 +203,11 @@ pub fn sequential_export(
                         rest_prefix: prefix_rest,
                         path: {
                             let mut new_path = Vec::new();
-                            new_path.push(NodeData {
-                                prefix: p.node_prefix.clone(),
-                                decoded: node,
-                                last_item_index: p.rest_prefix.first().copied(),
-                            });
+                            new_path.push(NodeData::new(
+                                p.node_prefix.clone(),
+                                node,
+                                p.rest_prefix.first().copied(),
+                            ));
 
                             new_path.extend(p.path.clone());
                             new_path
@@ -229,11 +240,7 @@ pub fn sequential_export(
             let decoded_node = decode(node_opt.unwrap());
             if p.rest_prefix.is_empty() {
                 let mut new_path = Vec::new();
-                new_path.push(NodeData {
-                    prefix: p.node_prefix,
-                    decoded: decoded_node,
-                    last_item_index: None,
-                });
+                new_path.push(NodeData::new(p.node_prefix, decoded_node, None));
 
                 new_path.extend(p.path);
                 Ok(Either::Right(new_path)) // Happy end
@@ -287,137 +294,166 @@ pub fn sequential_export(
         exp_data: ExportData, // Result of export
     }
 
-    let add_leaf = |p: StepData,
-                    leaf_prefix: ByteVector,
-                    leaf_value: ByteVector,
-                    item_index: Byte,
-                    curr_node_prefix: ByteVector,
-                    new_path: Vec<NodeData>| {
-        if p.skip > 0 {
+    impl StepData {
+        fn new(path: Path, skip: usize, take: usize, exp_data: ExportData) -> Self {
             StepData {
-                path: new_path,
-                skip: p.skip,
-                take: p.take,
-                exp_data: p.exp_data,
-            }
-        } else {
-            let new_lp = if settings.flag_leaf_prefixes {
-                let mut new_single_lp = curr_node_prefix;
-                let mut leaf_prefix_copy = leaf_prefix;
-                new_single_lp.push(item_index);
-                new_single_lp.append(&mut leaf_prefix_copy);
-
-                let mut leaf_prefixes_copy = p.exp_data.leaf_prefixes;
-                leaf_prefixes_copy.push(new_single_lp);
-                leaf_prefixes_copy
-            } else {
-                Vec::new()
-            };
-
-            let new_lv = if settings.flag_leaf_values {
-                let mut leaf_values_copied = p.exp_data.leaf_values;
-                leaf_values_copied.push(leaf_value);
-                leaf_values_copied
-            } else {
-                Vec::new()
-            };
-
-            let new_export_data = ExportData {
-                node_prefixes: p.exp_data.node_prefixes,
-                node_keys: p.exp_data.node_keys,
-                node_values: p.exp_data.node_values,
-                leaf_prefixes: new_lp,
-                leaf_values: new_lv,
-            };
-
-            StepData {
-                path: new_path,
-                skip: p.skip,
-                take: p.take,
-                exp_data: new_export_data,
+                path,
+                skip,
+                take,
+                exp_data,
             }
         }
-    };
+    }
 
-    let add_node_ptr = |p: StepData,
-                        ptr_prefix: ByteVector,
-                        ptr: ByteVector,
-                        item_index: Byte,
-                        curr_node_prefix: ByteVector,
-                        new_path: Vec<NodeData>| {
-        let construct_node_ptr_data =
-            |child_path: Vec<NodeData>, child_np: ByteVector, child_nv: ByteVector| {
-                let new_np = if settings.flag_node_prefixes {
-                    let mut new = p.exp_data.node_prefixes.clone();
-                    new.push(child_np);
-                    new
-                } else {
-                    Vec::new()
-                };
-
-                let new_nk = if settings.flag_node_keys {
-                    let mut new = p.exp_data.node_keys.clone();
-                    new.push(ptr.clone());
-                    new
-                } else {
-                    Vec::new()
-                };
-
-                let new_nv = if settings.flag_node_values {
-                    let mut new = p.exp_data.node_values.clone();
-                    new.push(child_nv);
-                    new
-                } else {
-                    Vec::new()
-                };
-
-                let new_data = ExportData {
-                    node_prefixes: new_np,
-                    node_keys: new_nk,
-                    node_values: new_nv,
-                    leaf_prefixes: p.exp_data.leaf_prefixes.clone(),
-                    leaf_values: p.exp_data.leaf_values.clone(),
-                };
-
-                StepData {
-                    path: child_path,
-                    skip: p.skip,
-                    take: p.take - 1,
-                    exp_data: new_data,
-                }
-            };
-
-        let child_node_opt = get_node_data_from_store(&ptr);
-        if child_node_opt.is_none() {
-            Err(format!("Radix Tree - Export error: node with key {} not found.", {
-                hex::encode(ptr)
-            }))
-        } else {
-            let child_nv = child_node_opt.unwrap();
-            let child_decoded = decode(child_nv.clone());
-            let mut child_np = curr_node_prefix;
-            child_np.push(item_index);
-            child_np.append(&mut ptr_prefix.clone());
-            let child_node_data = NodeData {
-                prefix: child_np.clone(),
-                decoded: child_decoded,
-                last_item_index: None,
-            };
-            let mut child_path = vec![child_node_data];
-            child_path.append(&mut new_path.clone());
-
+    let add_leaf: Box<
+        dyn Fn(StepData, ByteVector, ByteVector, Byte, ByteVector, Vec<NodeData>) -> StepData,
+    > = Box::new(
+        |p: StepData,
+         leaf_prefix: ByteVector,
+         leaf_value: ByteVector,
+         item_index: Byte,
+         curr_node_prefix: ByteVector,
+         new_path: Vec<NodeData>| {
             if p.skip > 0 {
-                Ok(StepData {
-                    path: child_path,
-                    skip: p.skip - 1,
-                    take: p.take,
-                    exp_data: p.exp_data,
-                })
+                StepData::new(new_path, p.skip, p.take, p.exp_data)
             } else {
-                Ok(construct_node_ptr_data(child_path, child_np, child_nv))
+                let new_lp = if settings.flag_leaf_prefixes {
+                    let mut new_single_lp = curr_node_prefix;
+                    let mut leaf_prefix_copy = leaf_prefix;
+                    new_single_lp.push(item_index);
+                    new_single_lp.append(&mut leaf_prefix_copy);
+
+                    let mut leaf_prefixes_copy = p.exp_data.leaf_prefixes;
+                    leaf_prefixes_copy.push(new_single_lp);
+                    leaf_prefixes_copy
+                } else {
+                    Vec::new()
+                };
+
+                let new_lv = if settings.flag_leaf_values {
+                    let mut leaf_values_copied = p.exp_data.leaf_values;
+                    leaf_values_copied.push(leaf_value);
+                    leaf_values_copied
+                } else {
+                    Vec::new()
+                };
+
+                let new_export_data = ExportData {
+                    node_prefixes: p.exp_data.node_prefixes,
+                    node_keys: p.exp_data.node_keys,
+                    node_values: p.exp_data.node_values,
+                    leaf_prefixes: new_lp,
+                    leaf_values: new_lv,
+                };
+
+                StepData::new(new_path, p.skip, p.take, new_export_data)
             }
-        }
-    };
+        },
+    );
+
+    let add_node_ptr: Box<
+        dyn Fn(
+            StepData,
+            ByteVector,
+            ByteVector,
+            Byte,
+            ByteVector,
+            Vec<NodeData>,
+        ) -> Result<StepData, String>,
+    > = Box::new(
+        |p: StepData,
+         ptr_prefix: ByteVector,
+         ptr: ByteVector,
+         item_index: Byte,
+         curr_node_prefix: ByteVector,
+         new_path: Vec<NodeData>| {
+            let construct_node_ptr_data =
+                |child_path: Vec<NodeData>, child_np: ByteVector, child_nv: ByteVector| {
+                    let new_np = if settings.flag_node_prefixes {
+                        let mut new = p.exp_data.node_prefixes.clone();
+                        new.push(child_np);
+                        new
+                    } else {
+                        Vec::new()
+                    };
+
+                    let new_nk = if settings.flag_node_keys {
+                        let mut new = p.exp_data.node_keys.clone();
+                        new.push(ptr.clone());
+                        new
+                    } else {
+                        Vec::new()
+                    };
+
+                    let new_nv = if settings.flag_node_values {
+                        let mut new = p.exp_data.node_values.clone();
+                        new.push(child_nv);
+                        new
+                    } else {
+                        Vec::new()
+                    };
+
+                    let new_data = ExportData {
+                        node_prefixes: new_np,
+                        node_keys: new_nk,
+                        node_values: new_nv,
+                        leaf_prefixes: p.exp_data.leaf_prefixes.clone(),
+                        leaf_values: p.exp_data.leaf_values.clone(),
+                    };
+
+                    StepData::new(child_path, p.skip, p.take - 1, new_data)
+                };
+
+            let child_node_opt = get_node_data_from_store(&ptr);
+            if child_node_opt.is_none() {
+                Err(format!("Radix Tree - Export error: node with key {} not found.", {
+                    hex::encode(ptr)
+                }))
+            } else {
+                let child_nv = child_node_opt.unwrap();
+                let child_decoded = decode(child_nv.clone());
+                let mut child_np = curr_node_prefix;
+                child_np.push(item_index);
+                child_np.append(&mut ptr_prefix.clone());
+
+                let child_node_data = NodeData::new(child_np.clone(), child_decoded, None);
+                let mut child_path = vec![child_node_data];
+                child_path.append(&mut new_path.clone());
+
+                if p.skip > 0 {
+                    Ok(StepData::new(child_path, p.skip - 1, p.take, p.exp_data))
+                } else {
+                    Ok(construct_node_ptr_data(child_path, child_np, child_nv))
+                }
+            }
+        },
+    );
+
+    let add_element: Box<
+        dyn Fn(StepData, u8, Item, Vec<Item>, Vec<u8>) -> Result<StepData, String>,
+    > = Box::new(
+        |p: StepData,
+         item_index: Byte,
+         item: Item,
+         curr_node: Node,
+         curr_node_prefix: ByteVector| {
+            let new_curr_node_data =
+                NodeData::new(curr_node_prefix.clone(), curr_node, Some(item_index));
+            let (_, path_tail) = p.path.split_first().unwrap();
+            let mut new_path = vec![new_curr_node_data];
+            new_path.append(&mut path_tail.to_vec());
+
+            match item {
+                Item::EmptyItem => Ok(StepData::new(new_path, p.skip, p.take, p.exp_data)),
+                Item::Leaf { prefix, value } => {
+                    Ok(add_leaf(p, prefix, value, item_index, curr_node_prefix, new_path))
+                }
+                Item::NodePtr { prefix, ptr } => {
+                    Ok(add_node_ptr(p, prefix, ptr, item_index, curr_node_prefix, new_path)?)
+                }
+            }
+        },
+    );
 
     todo!()
 }
