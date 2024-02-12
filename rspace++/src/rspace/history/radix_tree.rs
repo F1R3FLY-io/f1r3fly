@@ -1,7 +1,9 @@
+use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::Byte;
 use crate::rspace::ByteVector;
 use dashmap::DashMap;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -9,7 +11,7 @@ use std::sync::Mutex;
 use super::history_action::HistoryAction;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub enum Item {
     EmptyItem,
 
@@ -698,8 +700,25 @@ impl RadixTreeImpl {
      * Serializing data load in [[cacheW]].
      * If detected collision with older cache data - executing assert
      */
-    pub fn save_node(&self, node: &Node) -> ByteVector {
-        todo!()
+    pub fn save_node(&self, node: Node) -> ByteVector {
+        let (hash, bytes) = hash_node(&node);
+        let check_collision = |v: Node| {
+            assert!(
+                v == node,
+                "Radix Tree - Collision in cache: record with key = ${} has already existed.",
+                hex::encode(hash.clone())
+            )
+        };
+
+        match self.cache_r.get(&hash) {
+            Some(node) => check_collision(node.value().to_vec()),
+            None => {
+                let _ = self.cache_r.insert(hash.clone(), node);
+            }
+        };
+
+        let _ = self.cache_w.insert(hash.clone(), bytes);
+        hash
     }
 
     /**
@@ -707,8 +726,66 @@ impl RadixTreeImpl {
      *
      * If detected collision with older KVDB data - execute Exception
      */
-    pub fn commit(&self) -> () {
-        todo!()
+    pub fn commit(&self) -> Result<(), KvStoreError> {
+        fn collision_panic(collisions: Vec<(ByteVector, ByteVector)>) -> () {
+            panic!(
+                "Radix Tree - ${} collisions in KVDB (first collision with key = ${}.",
+                collisions.len(),
+                hex::encode(collisions.first().unwrap().0.clone())
+            )
+        }
+
+        let kv_pairs: Vec<(ByteVector, ByteVector)> = self
+            .cache_w
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect();
+
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Radix Tree: Unable to acquire store lock");
+
+        let if_absent: Vec<bool> =
+            store_lock.contains(&kv_pairs.clone().into_iter().map(|(k, _)| k).collect_vec())?;
+        let kv_if_absent: Vec<((ByteVector, ByteVector), bool)> =
+            kv_pairs.into_iter().zip(if_absent.into_iter()).collect();
+
+        let kv_exist: Vec<(ByteVector, ByteVector)> = kv_if_absent
+            .iter()
+            .filter(|&(_, absent)| *absent)
+            .map(|(kv, _)| kv.clone())
+            .collect();
+
+        let value_exist_in_store: Vec<Option<ByteVector>> =
+            store_lock.get(kv_exist.clone().into_iter().map(|(k, _)| k).collect_vec())?;
+
+        let kvv_exist: Vec<((ByteVector, ByteVector), ByteVector)> = kv_exist
+            .into_iter()
+            .zip(
+                value_exist_in_store
+                    .into_iter()
+                    .map(|v| v.unwrap_or_else(|| Vec::new())),
+            )
+            .collect();
+
+        let kv_collision: Vec<(ByteVector, ByteVector)> = kvv_exist
+            .into_iter()
+            .filter(|((_, v1), v2)| v1 != v2)
+            .map(|(kv, _)| kv)
+            .collect();
+
+        if !kv_collision.is_empty() {
+            collision_panic(kv_collision);
+        }
+
+        let kv_absent: Vec<(ByteVector, ByteVector)> = kv_if_absent
+            .into_iter()
+            .filter(|&(_, absent)| !absent)
+            .map(|(kv, _)| kv)
+            .collect();
+
+        store_lock.put(kv_absent)
     }
 
     /**

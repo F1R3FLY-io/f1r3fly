@@ -69,7 +69,7 @@ impl History for RadixHistory {
 
         match new_root_node_opt {
             Some(new_root_node) => {
-                let hash = self.imple.save_node(&new_root_node);
+                let hash = self.imple.save_node(new_root_node.clone());
                 let blake_hash = Blake3Hash::new(&hash);
                 let new_history = RadixHistory {
                     root_hash: blake_hash,
