@@ -650,7 +650,11 @@ impl RadixTreeImpl {
      * If there is no such record in cache - load and decode from KVDB, then save to cacheR.
      * If there is no such record in KVDB - execute assert (if set noAssert flag - return emptyNode).
      */
-    pub fn load_node(&self, node_ptr: ByteVector, no_assert: Option<bool>) -> Node {
+    pub fn load_node(
+        &self,
+        node_ptr: ByteVector,
+        no_assert: Option<bool>,
+    ) -> Result<Node, KvStoreError> {
         let no_assert = no_assert.unwrap_or(false);
 
         let error_msg = |node_ptr: &[u8]| {
@@ -682,8 +686,8 @@ impl RadixTreeImpl {
 
         let cache_node_opt = self.cache_r.get(&node_ptr);
         match cache_node_opt {
-            Some(node) => node.to_vec(),
-            None => cache_miss(node_ptr),
+            Some(node) => Ok(node.to_vec()),
+            None => Ok(cache_miss(node_ptr)),
         }
     }
 
@@ -798,8 +802,51 @@ impl RadixTreeImpl {
     /**
      * Read leaf data with prefix. If data not found, returned [[None]]
      */
-    pub fn read(&self, start_node: Node, start_prefix: ByteVector) -> Option<ByteVector> {
-        todo!()
+    pub fn read(
+        &self,
+        start_node: Node,
+        start_prefix: ByteVector,
+    ) -> Result<Option<ByteVector>, KvStoreError> {
+        type Params = (Node, ByteVector);
+
+        let loops: Box<dyn Fn(Params) -> Result<Either<Params, Option<ByteVector>>, KvStoreError>> =
+            Box::new(|params: Params| {
+                match params {
+                    (_, ref prefix) if prefix.is_empty() => Ok(Either::Right(None)), // Not found
+                    (cur_node, prefix) => match &cur_node[byte_to_int(*prefix.first().unwrap())] {
+                        Item::EmptyItem => Ok(Either::Right(None)), // Not found,
+                        Item::Leaf {
+                            prefix: leaf_prefix,
+                            value,
+                        } => {
+                            let (_, prefix_tail) = prefix.split_first().unwrap();
+                            if leaf_prefix == prefix_tail {
+                                Ok(Either::Right(Some(value.clone()))) // Happy end
+                            } else {
+                                Ok(Either::Right(None)) // Not found
+                            }
+                        }
+                        Item::NodePtr {
+                            prefix: ptr_prefix,
+                            ptr,
+                        } => {
+                            let (_, prefix_tail) = prefix.split_first().unwrap();
+                            let (_, prefix_rest, ptr_prefix_rest) =
+                                common_prefix(prefix_tail.to_vec(), ptr_prefix.to_vec());
+
+                            if ptr_prefix_rest.is_empty() {
+                                // Deeper
+                                self.load_node(ptr.to_vec(), None)
+                                    .map(|n| Ok(Either::Left((n, prefix_rest))))?
+                            } else {
+                                Ok(Either::Right(None)) // Not found
+                            }
+                        }
+                    },
+                }
+            });
+
+        tail_rec_m((start_node, start_prefix), loops)
     }
 
     /**
@@ -810,5 +857,18 @@ impl RadixTreeImpl {
      */
     pub fn make_actions(&self, curr_node: Node, actions: Vec<HistoryAction>) -> Option<Node> {
         todo!()
+    }
+}
+
+fn tail_rec_m<A, B, F>(initial_state: A, mut func: F) -> Result<B, KvStoreError>
+where
+    F: FnMut(A) -> Result<Either<A, B>, KvStoreError>,
+{
+    let mut state = initial_state;
+    loop {
+        match func(state)? {
+            Either::Left(new_state) => state = new_state,
+            Either::Right(final_state) => return Ok(final_state),
+        }
     }
 }

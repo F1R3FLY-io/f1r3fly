@@ -43,9 +43,10 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     fn fetch_data(&self, prefix: u8, key: &Blake3Hash) -> Option<PersistedData> {
         let read_bytes = self
             .target_history
-            .read(prepend_bytes(prefix, &key.bytes()))?;
+            .read(prepend_bytes(prefix, &key.bytes()))
+            .expect("RSpace History Reader Impl: Failed to call read");
 
-        let read_hash = Blake3Hash::new(&read_bytes);
+        let read_hash = Blake3Hash::new(&read_bytes.unwrap());
         let leaf_store_lock = self
             .leaf_store
             .lock()

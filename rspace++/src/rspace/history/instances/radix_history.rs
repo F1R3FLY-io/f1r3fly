@@ -3,6 +3,7 @@ use crate::rspace::history::history::History;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::radix_tree::{hash_node, EmptyNode, Node, RadixTreeImpl};
+use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use std::collections::HashSet;
@@ -23,7 +24,9 @@ impl RadixHistory {
         store: Arc<Mutex<Box<dyn KeyValueTypedStore<Vec<u8>, Vec<u8>>>>>,
     ) -> RadixHistory {
         let imple = RadixTreeImpl::new(store.clone());
-        let node = imple.load_node(root.bytes(), Some(true));
+        let node = imple
+            .load_node(root.bytes(), Some(true))
+            .expect("Radix History: Unable to call load_node");
 
         RadixHistory {
             root_hash: root,
@@ -56,7 +59,7 @@ impl RadixHistory {
 }
 
 impl History for RadixHistory {
-    fn read(&self, key: Vec<u8>) -> Option<Vec<u8>> {
+    fn read(&self, key: Vec<u8>) -> Result<Option<Vec<u8>>, KvStoreError> {
         self.imple.read(self.root_node.clone(), key)
     }
 
@@ -101,7 +104,9 @@ impl History for RadixHistory {
 
     fn reset(&self, root: &Blake3Hash) -> Box<dyn History> {
         let imple = RadixTreeImpl::new(self.store.clone());
-        let node = imple.load_node(root.bytes(), Some(true));
+        let node = imple
+            .load_node(root.bytes(), Some(true))
+            .expect("Radix History: Unable to call load_node");
 
         Box::new(RadixHistory {
             root_hash: root.clone(),
