@@ -1000,6 +1000,148 @@ impl RadixTreeImpl {
     }
 
     /**
+     * Save new leaf value to this part of tree (start from curItems).
+     * Rehash and save all depend node to [[cacheW]].
+     *
+     * If exist leaf with same prefix but different value - update leaf value.
+     * If exist leaf with same prefix and same value - return [[None]].
+     * @return Updated current item.
+     */
+    fn update(
+        &self,
+        curr_item: Item,
+        ins_prefix: ByteVector,
+        ins_value: ByteVector,
+    ) -> Result<Option<Item>, KvStoreError> {
+        let insert_new_node_to_child: Box<
+            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, KvStoreError>,
+        > = Box::new(|child_ptr: ByteVector, child_prefix: ByteVector, ins_prefix: ByteVector| {
+            let mut child_node = self.load_node(child_ptr, None)?;
+            let (ins_prefix_head, ins_prefix_tail) = ins_prefix.split_first().unwrap();
+            let (child_item_idx, child_ins_prefix) =
+                (byte_to_int(*ins_prefix_head), ins_prefix_tail);
+
+            let child_item_opt = self.update(
+                child_node.get(child_item_idx).unwrap().clone(),
+                child_ins_prefix.to_vec(),
+                ins_value.clone(),
+            )?; // Deeper
+
+            match child_item_opt {
+                Some(child_item) => {
+                    let mut updated_child_node = child_node.clone();
+                    updated_child_node.insert(child_item_idx, child_item);
+                    let returned_item =
+                        self.save_node_and_create_item(updated_child_node, child_prefix, false);
+                    Ok(Some(returned_item))
+                }
+                None => Ok(None),
+            }
+        });
+
+        match curr_item {
+            Item::EmptyItem => Ok(Some(Item::Leaf {
+                prefix: ins_prefix,
+                value: ins_value.clone(),
+            })),
+            Item::Leaf {
+                prefix: leaf_prefix,
+                value: leaf_value,
+            } => {
+                assert!(
+                    leaf_prefix.len() == ins_prefix.len(),
+                    "Radix Tree: All Radix keys should be same length."
+                );
+
+                if leaf_prefix == ins_prefix {
+                    if ins_value == leaf_value {
+                        Ok(None)
+                    } else {
+                        Ok(Some(Item::Leaf {
+                            prefix: ins_prefix,
+                            value: ins_value.clone(),
+                        }))
+                    }
+                } else {
+                    // Update Leaf.
+
+                    // Create child node, insert existing and new leaf in this node.
+                    // Intentionally not recursive for speed up.
+                    let (comm_prefix, ins_prefix_rest, leaf_prefix_rest) =
+                        common_prefix(ins_prefix, leaf_prefix);
+
+                    let mut new_node = EmptyNode::new().node;
+                    let (leaf_prefix_rest_head, leaf_prefix_rest_tail) =
+                        leaf_prefix_rest.split_first().unwrap();
+
+                    new_node.insert(
+                        byte_to_int(*leaf_prefix_rest_head),
+                        Item::Leaf {
+                            prefix: leaf_prefix_rest_tail.to_vec(),
+                            value: leaf_value,
+                        },
+                    );
+
+                    let (ins_prefix_rest_head, ins_prefix_rest_tail) =
+                        ins_prefix_rest.split_first().unwrap();
+
+                    new_node.insert(
+                        byte_to_int(*ins_prefix_rest_head),
+                        Item::Leaf {
+                            prefix: ins_prefix_rest_tail.to_vec(),
+                            value: ins_value.clone(),
+                        },
+                    );
+
+                    Ok(Some(self.save_node_and_create_item(new_node, comm_prefix, false)))
+                }
+            }
+            Item::NodePtr {
+                prefix: ptr_prefix,
+                ptr,
+            } => {
+                assert!(
+                    ptr_prefix.len() < ins_prefix.len(),
+                    "Radix Tree: Radix key should be longer than NodePtr key."
+                );
+
+                let (comm_prefix, ins_prefix_rest, ptr_prefix_rest) =
+                    common_prefix(ins_prefix, ptr_prefix);
+
+                if ptr_prefix_rest.is_empty() {
+                    insert_new_node_to_child(ptr, comm_prefix, ins_prefix_rest) // Add new node to existing child node.
+                } else {
+                    // Create child node, insert existing Ptr and new leaf in this node.
+                    let mut new_node = EmptyNode::new().node;
+                    let (ptr_prefix_rest_head, ptr_prefix_rest_tail) =
+                        ptr_prefix_rest.split_first().unwrap();
+
+                    new_node.insert(
+                        byte_to_int(*ptr_prefix_rest_head),
+                        Item::NodePtr {
+                            prefix: ptr_prefix_rest_tail.to_vec(),
+                            ptr: ptr.clone(),
+                        },
+                    );
+
+                    let (ins_prefix_rest_head, ins_prefix_rest_tail) =
+                        ins_prefix_rest.split_first().unwrap();
+
+                    new_node.insert(
+                        byte_to_int(*ins_prefix_rest_head),
+                        Item::NodePtr {
+                            prefix: ins_prefix_rest_tail.to_vec(),
+                            ptr,
+                        },
+                    );
+
+                    Ok(Some(self.save_node_and_create_item(new_node, comm_prefix, false)))
+                }
+            }
+        }
+    }
+
+    /**
      * Parallel processing of [[HistoryAction]]s in this part of tree (start from curNode).
      *
      * New data load to [[cacheW]].
