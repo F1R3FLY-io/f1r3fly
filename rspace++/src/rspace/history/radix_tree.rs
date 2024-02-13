@@ -879,6 +879,126 @@ impl RadixTreeImpl {
         tail_rec_m((start_node, start_prefix), loops)
     }
 
+    fn create_node_from_item(&self, item: Item) -> Node {
+        match item {
+            Item::EmptyItem => EmptyNode::new().node,
+            Item::Leaf {
+                prefix: leaf_prefix,
+                value: leaf_value,
+            } => {
+                assert!(
+                    !leaf_prefix.is_empty(),
+                    "Radix Tree: Impossible to create a node. LeafPrefix should be non empty."
+                );
+
+                let index = byte_to_int(*leaf_prefix.first().unwrap());
+                let (_, leaf_prefix_tail) = leaf_prefix.split_first().unwrap();
+                let mut empty_node = EmptyNode::new().node;
+                empty_node[index] = Item::Leaf {
+                    prefix: leaf_prefix_tail.to_vec(),
+                    value: leaf_value,
+                };
+
+                empty_node
+            }
+            Item::NodePtr {
+                prefix: node_ptr_prefix,
+                ptr,
+            } => {
+                assert!(
+                    !node_ptr_prefix.is_empty(),
+                    "Radix Tree: Impossible to create a node. NodePtrPrefix should be non empty."
+                );
+
+                let index = byte_to_int(*node_ptr_prefix.first().unwrap());
+                let (_, node_ptr_prefix_tail) = node_ptr_prefix.split_first().unwrap();
+                let mut empty_node = EmptyNode::new().node;
+                empty_node[index] = Item::Leaf {
+                    prefix: node_ptr_prefix_tail.to_vec(),
+                    value: ptr,
+                };
+
+                empty_node
+            }
+        }
+    }
+
+    /**
+     * Create node from [[Item]].
+     *
+     * If item is NodePtr and prefix is empty - load child node
+     */
+    fn construct_node_from_item(&self, item: Item) -> Result<Node, KvStoreError> {
+        match item {
+            Item::NodePtr { prefix, ptr } if prefix.is_empty() => self.load_node(ptr, None),
+            _ => Ok(self.create_node_from_item(item)),
+        }
+    }
+
+    /**
+     * Optimize and save Node, create item from this Node
+     */
+    fn save_node_and_create_item(&self, node: Node, prefix: ByteVector, compaction: bool) -> Item {
+        if compaction {
+            let non_empty_items: Vec<Item> = node
+                .clone()
+                .into_iter()
+                .filter(|item| *item != Item::EmptyItem)
+                .take(2)
+                .collect();
+
+            match non_empty_items.len() {
+                0 => Item::EmptyItem, // All items are empty.
+                1 => {
+                    // Only one item is not empty - merge child and parent nodes.
+                    let idx_item = node
+                        .iter()
+                        .position(|item| *item == non_empty_items[0])
+                        .unwrap();
+
+                    match &non_empty_items[0] {
+                        Item::EmptyItem => Item::EmptyItem,
+                        Item::Leaf {
+                            prefix: leaf_prefix,
+                            value,
+                        } => {
+                            let mut new_prefix = prefix.clone();
+                            new_prefix.push(idx_item as u8);
+                            new_prefix.append(&mut leaf_prefix.clone());
+                            Item::Leaf {
+                                prefix: new_prefix,
+                                value: value.clone(),
+                            }
+                        }
+                        Item::NodePtr {
+                            prefix: node_ptr_prefix,
+                            ptr,
+                        } => {
+                            let mut new_prefix = prefix.clone();
+                            new_prefix.push(idx_item as u8);
+                            new_prefix.append(&mut node_ptr_prefix.clone());
+                            Item::NodePtr {
+                                prefix: new_prefix,
+                                ptr: ptr.to_vec(),
+                            }
+                        }
+                    }
+                }
+                2 => Item::NodePtr {
+                    // 2 or more items are not empty.
+                    prefix,
+                    ptr: self.save_node(node),
+                },
+                _ => unreachable!(),
+            }
+        } else {
+            Item::NodePtr {
+                prefix,
+                ptr: self.save_node(node),
+            }
+        }
+    }
+
     /**
      * Parallel processing of [[HistoryAction]]s in this part of tree (start from curNode).
      *
