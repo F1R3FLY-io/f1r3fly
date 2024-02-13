@@ -1142,6 +1142,65 @@ impl RadixTreeImpl {
     }
 
     /**
+     * Delete leaf value from this part of tree (start from curItem).
+     * Rehash and save all depend node to cacheW.
+     *
+     * If not found leaf with  delPrefix - return [[None]].
+     * @return Updated current item.
+     */
+    fn delete(
+        &self,
+        curr_item: Item,
+        del_prefix: ByteVector,
+    ) -> Result<Option<Item>, KvStoreError> {
+        let delete_from_child_node: Box<
+            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, KvStoreError>,
+        > = Box::new(|child_ptr: ByteVector, child_prefix: ByteVector, del_prefix: ByteVector| {
+            let child_node = self.load_node(child_ptr, None)?;
+            let (del_prefix_head, del_prefix_tail) = del_prefix.split_first().unwrap();
+            let (del_item_idx, del_item_prefix) = (byte_to_int(*del_prefix_head), del_prefix_tail);
+            let child_item_opt = self
+                .delete(child_node.get(del_item_idx).unwrap().clone(), del_item_prefix.to_vec())?;
+
+            match child_item_opt {
+                Some(child_item) => {
+                    let mut child_node_updated = child_node.clone();
+                    child_node_updated.insert(del_item_idx, child_item);
+                    Ok(Some(self.save_node_and_create_item(child_node_updated, child_prefix, true)))
+                }
+                None => Ok(None),
+            }
+        });
+
+        match curr_item {
+            Item::EmptyItem => Ok(None), // Not found
+            Item::Leaf {
+                prefix: leaf_prefix,
+                value: _,
+            } => {
+                if leaf_prefix == del_prefix {
+                    Ok(Some(Item::EmptyItem)) // Happy end
+                } else {
+                    Ok(None) // Not found
+                }
+            }
+            Item::NodePtr {
+                prefix: ptr_prefix,
+                ptr,
+            } => {
+                let (comm_prefix, del_prefix_rest, ptr_prefix_rest) =
+                    common_prefix(del_prefix, ptr_prefix);
+
+                if !ptr_prefix_rest.is_empty() || del_prefix_rest.is_empty() {
+                    Ok(None) // Not found
+                } else {
+                    delete_from_child_node(ptr, comm_prefix, del_prefix_rest) // Deeper
+                }
+            }
+        }
+    }
+
+    /**
      * Parallel processing of [[HistoryAction]]s in this part of tree (start from curNode).
      *
      * New data load to [[cacheW]].
