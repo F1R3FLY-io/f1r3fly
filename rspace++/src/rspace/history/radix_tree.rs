@@ -162,7 +162,7 @@ pub fn sequential_export(
     take_size: usize,
     get_node_data_from_store: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     settings: ExportDataSettings,
-) -> (ExportData, Option<ByteVector>) {
+) -> Result<(ExportData, Option<ByteVector>), KvStoreError> {
     #[derive(Clone)]
     struct NodeData {
         prefix: ByteVector,
@@ -191,10 +191,10 @@ pub fn sequential_export(
 
     /*
      * Create path from root to lastPrefix node
-     *
-     * TODO: Define explicit function closure type
      */
-    let init_node_path = |p: NodePathData| {
+    let init_node_path: Box<
+        dyn Fn(NodePathData) -> Result<Either<NodePathData, Path>, KvStoreError>,
+    > = Box::new(|p: NodePathData| {
         let process_child_item = |node: Node| {
             let item_idx = byte_to_int(*p.rest_prefix.first().unwrap());
             match node.get(item_idx) {
@@ -257,9 +257,10 @@ pub fn sequential_export(
 
         let node_opt = get_node_data_from_store(&p.hash);
         if node_opt.is_none() {
-            Err(format!("Radix Tree - Export error: node with key {} not found.", {
-                hex::encode(p.hash)
-            }))
+            Err(KvStoreError::KeyNotFound(format!(
+                "Radix Tree - Export error: node with key {} not found.",
+                { hex::encode(p.hash) }
+            )))
         } else {
             let decoded_node = decode(node_opt.unwrap());
             if p.rest_prefix.is_empty() {
@@ -269,10 +270,10 @@ pub fn sequential_export(
                 new_path.extend(p.path);
                 Ok(Either::Right(new_path)) // Happy end
             } else {
-                Ok(Either::Left(process_child_item(decoded_node))) // Go dipper
+                Ok(process_child_item(decoded_node)) // Go dipper
             }
         }
-    };
+    });
 
     /*
      * Find next non-empty item.
@@ -383,7 +384,7 @@ pub fn sequential_export(
             Byte,
             ByteVector,
             Vec<NodeData>,
-        ) -> Result<StepData, String>,
+        ) -> Result<StepData, KvStoreError>,
     > = Box::new(
         |p: StepData,
          ptr_prefix: ByteVector,
@@ -430,9 +431,10 @@ pub fn sequential_export(
 
             let child_node_opt = get_node_data_from_store(&ptr);
             if child_node_opt.is_none() {
-                Err(format!("Radix Tree - Export error: node with key {} not found.", {
-                    hex::encode(ptr)
-                }))
+                Err(KvStoreError::KeyNotFound(format!(
+                    "Radix Tree - Export error: node with key {} not found.",
+                    { hex::encode(ptr) }
+                )))
             } else {
                 let child_nv = child_node_opt.unwrap();
                 let child_decoded = decode(child_nv.clone());
@@ -454,7 +456,7 @@ pub fn sequential_export(
     );
 
     let add_element: Box<
-        dyn Fn(StepData, u8, Item, Vec<Item>, Vec<u8>) -> Result<StepData, String>,
+        dyn Fn(StepData, u8, Item, Vec<Item>, Vec<u8>) -> Result<StepData, KvStoreError>,
     > = Box::new(
         |p: StepData,
          item_index: Byte,
@@ -483,7 +485,9 @@ pub fn sequential_export(
      * Export one element (Node or Leaf) and recursively move to the next step.
      */
     let export_step: Box<
-        dyn Fn(StepData) -> Result<Either<StepData, (ExportData, Option<ByteVector>)>, String>,
+        dyn Fn(
+            StepData,
+        ) -> Result<Either<StepData, (ExportData, Option<ByteVector>)>, KvStoreError>,
     > = Box::new(|p: StepData| {
         if p.path.is_empty() {
             // End of Tree
@@ -526,63 +530,89 @@ pub fn sequential_export(
         ExportData::new(Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
     }
 
-    fn empty_result() -> (ExportData, Option<()>) {
+    fn empty_result() -> (ExportData, Option<ByteVector>) {
         (empty_export_data(), None)
     }
 
-    let do_export: Box<dyn Fn(ByteVector) -> Result<(ExportData, Option<ByteVector>), String>> =
-        Box::new(|root_node_ser: ByteVector| {
-            let root_params = NodePathData {
-                hash: root_hash.clone(),
-                node_prefix: Vec::new(),
-                rest_prefix: last_prefix.clone().unwrap_or(Vec::new()),
-                path: Vec::new(),
+    let do_export: Box<
+        dyn Fn(ByteVector) -> Result<(ExportData, Option<ByteVector>), KvStoreError>,
+    > = Box::new(|root_node_ser: ByteVector| {
+        let root_params = NodePathData {
+            hash: root_hash.clone(),
+            node_prefix: Vec::new(),
+            rest_prefix: last_prefix.clone().unwrap_or(Vec::new()),
+            path: Vec::new(),
+        };
+
+        let no_root_start = (empty_export_data(), skip_size, take_size); // Start from next node after lastPrefix
+        let skipped_start = (empty_export_data(), skip_size - 1, take_size); // Skipped node start
+        let root_export_data = {
+            let new_np = if settings.flag_node_prefixes {
+                vec![Vec::<u8>::new()]
+            } else {
+                Vec::new()
             };
 
-            let no_root_start = (empty_export_data(), skip_size, take_size); // Start from next node after lastPrefix
-            let skipped_start = (empty_export_data(), skip_size - 1, take_size); // Skipped node start
-            let root_export_data = {
-                let new_np = if settings.flag_node_prefixes {
-                    vec![Vec::<u8>::new()]
-                } else {
-                    Vec::new()
-                };
-
-                let new_nk = if settings.flag_node_keys {
-                    vec![root_hash.clone()]
-                } else {
-                    Vec::new()
-                };
-
-                let new_nv = if settings.flag_leaf_values {
-                    vec![root_node_ser]
-                } else {
-                    Vec::new()
-                };
-
-                ExportData::new(new_np, new_nk, new_nv, Vec::new(), Vec::new())
+            let new_nk = if settings.flag_node_keys {
+                vec![root_hash.clone()]
+            } else {
+                Vec::new()
             };
 
-            let root_start = (root_export_data, skip_size, take_size - 1); // Take root
+            let new_nv = if settings.flag_leaf_values {
+                vec![root_node_ser]
+            } else {
+                Vec::new()
+            };
 
-            // Defining init data
-            let (init_export_data, init_skip_size, init_take_size) = match last_prefix {
-                Some(_) => no_root_start,
-                None => {
-                    if skip_size > 0 {
-                        skipped_start
-                    } else {
-                        root_start
-                    }
+            ExportData::new(new_np, new_nk, new_nv, Vec::new(), Vec::new())
+        };
+
+        let root_start = (root_export_data, skip_size, take_size - 1); // Take root
+
+        // Defining init data
+        let (init_export_data, init_skip_size, init_take_size) = match last_prefix {
+            Some(_) => no_root_start,
+            None => {
+                if skip_size > 0 {
+                    skipped_start
+                } else {
+                    root_start
                 }
-            };
+            }
+        };
 
-            // let path =  root_params
+        let mut state = root_params;
+        let path = loop {
+            match init_node_path(state)? {
+                Either::Left(new_state) => state = new_state,
+                Either::Right(final_state) => break final_state,
+            }
+        };
 
-            todo!()
-        });
+        let start_params: StepData =
+            StepData::new(path, init_skip_size, init_take_size, init_export_data);
 
-    todo!()
+        let mut state = start_params;
+        let r = loop {
+            match export_step(state)? {
+                Either::Left(new_state) => state = new_state,
+                Either::Right(final_state) => break final_state,
+            }
+        };
+
+        Ok(r)
+    });
+
+    if (skip_size, take_size) == (0, 0) {
+        init_conditions_exception()
+    }
+
+    let root_node_ser_opt = get_node_data_from_store(&root_hash);
+    match root_node_ser_opt {
+        Some(bytes) => do_export(bytes),
+        None => Ok(empty_result()),
+    }
 }
 
 /**

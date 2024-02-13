@@ -127,7 +127,8 @@ impl RSpaceExporterInstance {
                 take,
                 get_from_history,
                 settings,
-            );
+            )
+            .expect("RSpace Exporter: Failed to export");
 
             let (data, new_last_prefix_opt) = exp_res;
             let ExportData {
