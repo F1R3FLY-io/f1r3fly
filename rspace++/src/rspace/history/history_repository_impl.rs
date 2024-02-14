@@ -335,7 +335,9 @@ where
                 .leaf_store
                 .lock()
                 .expect("History Repository Impl: Unable to acquire leaf store lock");
-            leaf_store_lock.put_if_absent(cold_actions);
+            leaf_store_lock
+                .put_if_absent(cold_actions)
+                .expect("History Repository Impl: Failed to put if absent");
         };
 
         // store everything related to history (history data, new root and populate cache for new root)

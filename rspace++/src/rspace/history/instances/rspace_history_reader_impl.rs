@@ -67,11 +67,7 @@ where
         self.target_history.root()
     }
 
-    fn get_data_proj(
-        &self,
-        key: &Blake3Hash,
-        proj: fn(Datum<A>, Vec<u8>) -> Datum<A>,
-    ) -> Vec<Datum<A>> {
+    fn get_data_proj(&self, key: &Blake3Hash) -> Vec<Datum<A>> {
         match self.fetch_data(PREFIX_DATUM, key) {
             Some(PersistedData::Data(data_leaf)) => decode_datums(&data_leaf.bytes),
             Some(p) => {
@@ -84,11 +80,7 @@ where
         }
     }
 
-    fn get_continuations_proj(
-        &self,
-        key: &Blake3Hash,
-        proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
-    ) -> Vec<WaitingContinuation<P, K>> {
+    fn get_continuations_proj(&self, key: &Blake3Hash) -> Vec<WaitingContinuation<P, K>> {
         match self.fetch_data(PREFIX_KONT, key) {
             Some(PersistedData::Continuations(continuation_leaf)) => {
                 decode_continuations(&continuation_leaf.bytes)
@@ -103,7 +95,7 @@ where
         }
     }
 
-    fn get_joins_proj(&self, key: &Blake3Hash, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>> {
+    fn get_joins_proj(&self, key: &Blake3Hash) -> Vec<Vec<C>> {
         match self.fetch_data(PREFIX_JOINS, key) {
             Some(PersistedData::Joins(joins_leaf)) => decode_joins(&joins_leaf.bytes),
             Some(p) => {
@@ -128,24 +120,16 @@ where
             A: Clone + for<'de> Deserialize<'de> + 'static,
             K: Clone + for<'de> Deserialize<'de> + 'static,
         {
-            fn get_data_proj(
-                &self,
-                key: &C,
-                proj: fn(Datum<A>, Vec<u8>) -> Datum<A>,
-            ) -> Vec<Datum<A>> {
-                self.outer.get_data_proj(&hash(key), proj)
+            fn get_data_proj(&self, key: &C) -> Vec<Datum<A>> {
+                self.outer.get_data_proj(&hash(key))
             }
 
-            fn get_continuations_proj(
-                &self,
-                key: &Vec<C>,
-                proj: fn(WaitingContinuation<P, K>, Vec<u8>) -> WaitingContinuation<P, K>,
-            ) -> Vec<WaitingContinuation<P, K>> {
-                self.outer.get_continuations_proj(&hash_from_vec(key), proj)
+            fn get_continuations_proj(&self, key: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+                self.outer.get_continuations_proj(&hash_from_vec(key))
             }
 
-            fn get_joins_proj(&self, key: &C, proj: fn(Vec<C>, Vec<u8>) -> Vec<C>) -> Vec<Vec<C>> {
-                self.outer.get_joins_proj(&hash(key), proj)
+            fn get_joins_proj(&self, key: &C) -> Vec<Vec<C>> {
+                self.outer.get_joins_proj(&hash(key))
             }
         }
 

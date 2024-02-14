@@ -1141,7 +1141,7 @@ impl RadixTreeImpl {
         let insert_new_node_to_child: Box<
             dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, KvStoreError>,
         > = Box::new(|child_ptr: ByteVector, child_prefix: ByteVector, ins_prefix: ByteVector| {
-            let mut child_node = self.load_node(child_ptr, None)?;
+            let child_node = self.load_node(child_ptr, None)?;
             let (ins_prefix_head, ins_prefix_tail) = ins_prefix.split_first().unwrap();
             let (child_item_idx, child_ins_prefix) =
                 (byte_to_int(*ins_prefix_head), ins_prefix_tail);
@@ -1359,7 +1359,7 @@ impl RadixTreeImpl {
             let not_exist_insert_action = actions
                 .iter()
                 .find_map(|action| {
-                    if let HistoryAction::Insert(InsertAction) = action {
+                    if let HistoryAction::Insert(_) = action {
                         Some(true)
                     } else {
                         None
