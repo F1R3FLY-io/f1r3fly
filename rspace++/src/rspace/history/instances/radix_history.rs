@@ -68,7 +68,10 @@ impl History for RadixHistory {
             panic!("Radix History: Cannot process duplicate actions on one key.")
         }
 
-        let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions);
+        let new_root_node_opt = self
+            .imple
+            .make_actions(self.root_node.clone(), actions)
+            .expect("Radix History: Failed to make actions");
 
         match new_root_node_opt {
             Some(new_root_node) => {
@@ -80,7 +83,9 @@ impl History for RadixHistory {
                     imple: self.imple.clone(),
                     store: self.store.clone(),
                 };
-                self.imple.commit();
+                self.imple
+                    .commit()
+                    .expect("Radix History: Failed to commit");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
                 Box::new(new_history)

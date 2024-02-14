@@ -1,14 +1,19 @@
+use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::Byte;
 use crate::rspace::ByteVector;
+use bytes::Bytes;
 use dashmap::DashMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use super::history_action::DeleteAction;
 use super::history_action::HistoryAction;
+use super::history_action::InsertAction;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -1206,8 +1211,173 @@ impl RadixTreeImpl {
      * New data load to [[cacheW]].
      * @return Updated curNode. if no action was taken - return [[None]].
      */
-    pub fn make_actions(&self, curr_node: Node, actions: Vec<HistoryAction>) -> Option<Node> {
-        todo!()
+    pub fn make_actions(
+        &self,
+        curr_node: Node,
+        actions: Vec<HistoryAction>,
+    ) -> Result<Option<Node>, KvStoreError> {
+        // If we have 1 action in group.
+        // We can't parallel next and we should use sequential traversing with help update() or delete().
+        let process_one_action: Box<
+            dyn Fn(HistoryAction, Item, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+        > = Box::new(|action: HistoryAction, item: Item, item_idx: i32| {
+            let new_item = match action {
+                HistoryAction::Insert(InsertAction { key, hash }) => {
+                    let (_, key_tail) = key.split_first().unwrap();
+                    self.update(item, key_tail.to_vec(), hash.bytes())
+                }
+                HistoryAction::Delete(DeleteAction { key }) => {
+                    let (_, key_tail) = key.split_first().unwrap();
+                    self.delete(item, key_tail.to_vec())
+                }
+            }?;
+
+            Ok((item_idx, new_item))
+        });
+
+        fn clearing_delete_actions(actions: Vec<HistoryAction>, item: Item) -> Vec<HistoryAction> {
+            let not_exist_insert_action = actions
+                .iter()
+                .find_map(|action| {
+                    if let HistoryAction::Insert(InsertAction) = action {
+                        Some(true)
+                    } else {
+                        None
+                    }
+                })
+                .is_none();
+
+            if item == Item::EmptyItem && not_exist_insert_action {
+                Vec::new()
+            } else {
+                actions
+            }
+        }
+
+        fn trim_keys(actions: Vec<HistoryAction>) -> Vec<HistoryAction> {
+            actions
+                .iter()
+                .map(|action| match action {
+                    HistoryAction::Insert(InsertAction { key, hash }) => {
+                        let (_, key_tail) = key.split_first().unwrap();
+                        HistoryAction::Insert(InsertAction {
+                            key: key_tail.to_vec(),
+                            hash: hash.clone(),
+                        })
+                    }
+                    HistoryAction::Delete(DeleteAction { key }) => {
+                        let (_, key_tail) = key.split_first().unwrap();
+                        HistoryAction::Delete(DeleteAction {
+                            key: key_tail.to_vec(),
+                        })
+                    }
+                })
+                .collect()
+        }
+
+        let process_non_empty_actions: Box<
+            dyn Fn(Vec<HistoryAction>, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+        > = Box::new(|actions: Vec<HistoryAction>, item_idx: i32| {
+            let create_node =
+                self.construct_node_from_item(curr_node.get(item_idx as usize).unwrap().clone())?;
+            let new_actions = trim_keys(actions);
+            let new_node_opt = self.make_actions(create_node, new_actions)?;
+            let new_item = match new_node_opt {
+                Some(new_node) => Some(self.save_node_and_create_item(new_node, Vec::new(), true)),
+                None => None,
+            };
+
+            Ok((item_idx, new_item))
+        });
+
+        // If we have more than 1 action. We can create more parallel processes.
+        let process_several_actions: Box<
+            dyn Fn(Vec<HistoryAction>, Item, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+        > = Box::new(|actions: Vec<HistoryAction>, item: Item, item_idx: i32| {
+            let cleared_actions = clearing_delete_actions(actions, item);
+            if cleared_actions.is_empty() {
+                Ok((item_idx, None))
+            } else {
+                process_non_empty_actions(cleared_actions, item_idx)
+            }
+        });
+
+        // Process actions within each group.
+        let process_grouped_actions: Box<
+            dyn Fn(
+                Vec<(Byte, Vec<HistoryAction>)>,
+                Node,
+            ) -> Vec<Result<(i32, Option<Item>), KvStoreError>>,
+        > = Box::new(|grouped_actions: Vec<(Byte, Vec<HistoryAction>)>, curr_node: Node| {
+            grouped_actions
+                .iter()
+                .map(|grouped_action| match grouped_action {
+                    (group_idx, actions_in_group) => {
+                        let item_idx = byte_to_int(*group_idx);
+                        let item = curr_node[item_idx].clone();
+                        if actions_in_group.len() == 1 {
+                            process_one_action(
+                                actions_in_group.first().unwrap().clone(),
+                                item,
+                                item_idx as i32,
+                            )
+                        } else {
+                            process_several_actions(
+                                actions_in_group.to_vec(),
+                                item,
+                                item_idx as i32,
+                            )
+                        }
+                    }
+                })
+                .collect()
+        });
+
+        // Group the actions by the first byte of the prefix.
+        fn grouping(actions: Vec<HistoryAction>) -> Vec<(Byte, Vec<HistoryAction>)> {
+            let mut groups: HashMap<Byte, Vec<HistoryAction>> = HashMap::new();
+            for action in actions {
+                let first_byte = *action
+                    .key()
+                    .first()
+                    .expect("The length of all prefixes in the subtree must be the same.");
+                groups
+                    .entry(first_byte)
+                    .or_insert_with(Vec::new)
+                    .push(action);
+            }
+            groups.into_iter().collect()
+        }
+
+        // Group the actions by the first byte of the prefix.
+        let grouped_actions = grouping(actions);
+        // Process actions within each group.
+        // TODO: Update to handle parallel execution. See Scala side
+        let new_group_items_results = process_grouped_actions(grouped_actions, curr_node.clone());
+        let mut new_group_items = Vec::with_capacity(new_group_items_results.len());
+        for result in new_group_items_results {
+            let value = result?;
+            new_group_items.push(value);
+        }
+
+        // Update all changed items in current node.
+        let mut new_cur_node = curr_node.clone();
+        for (index, new_item_opt) in new_group_items {
+            new_cur_node = match new_item_opt {
+                Some(new_item) => {
+                    new_cur_node[index as usize] = new_item;
+                    new_cur_node
+                }
+                None => new_cur_node,
+            };
+        }
+
+        // If current node changing return new node, otherwise return none.
+        if new_cur_node != curr_node {
+            Ok(Some(new_cur_node))
+        } else {
+            Ok(None)
+        }
     }
 }
 
