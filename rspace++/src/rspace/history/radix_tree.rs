@@ -3,7 +3,6 @@ use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::Byte;
 use crate::rspace::ByteVector;
-use bytes::Bytes;
 use dashmap::DashMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ use super::history_action::HistoryAction;
 use super::history_action::InsertAction;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub enum Item {
     EmptyItem,
 
@@ -52,10 +51,131 @@ enum Either<L, R> {
     Right(R),
 }
 
+/**
+* Binary codecs for serializing/deserializing Node in Radix tree
+*
+* {{{
+* Coding structure for items:
+*   EmptyItem                   - Empty (not encode)
+
+*   Leaf(prefix,value)    -> [item index] [second byte] [prefix0]..[prefixM] [value0]..[value31]
+*                               where is: [second byte] -> bit7 = 0 (Leaf identifier)
+*                                                          bit6..bit0 - prefix length = M (from 0 to 127)
+*
+*   NodePtr(prefix,ptr)   -> [item index] [second byte] [prefix0]..[prefixM] [ptr0]..[ptr31]
+*                               where is: [second byte] -> bit7 = 1 (NodePtr identifier)
+*                                                          bit6..bit0 - prefix length = M (from 0 to 127)
+*
+* For example encode this Node which contains 2 non-empty items (index 1 and index 2):
+* (0)[Empty] (1)[Leaf(prefix:0xFFFF,value:0x00..0001)] (2)[NodePtr(prefix:empty,value:0xFF..FFFF)] (3)...(255)[Empty].
+* Encoded data = 0x0102FFFF0000000000000000000000000000000000000000000000000000000000000001
+*                  0280FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+* where: item 1 (index_secondByte_prefix_value) = 01_02_FFFF_00..0001
+*        item 2 (index_secondByte_prefix_value) = 02_80_empty_FF..FFFF
+* }}}
+*/
+
+// Default size for non-empty item data
+const DEF_SIZE: usize = 32;
+// 2 bytes: first - item index, second - second byte
+const HEAD_SIZE: usize = 2;
+
+/** Serialization [[Node]] to [[ByteVector]]
+ */
+pub fn encode(node: &Node) -> ByteVector {
+    // Calculate the size of the serialized data
+    let calc_size = node.iter().fold(0, |acc, item| match item {
+        Item::EmptyItem => acc,
+        Item::Leaf { prefix, value } => {
+            assert!(
+                prefix.len() <= 127,
+                "Error during serialization: size of prefix more than 127."
+            );
+            assert!(
+                value.len() == DEF_SIZE,
+                "Error during serialization: size of leafValue not equal 32."
+            );
+            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+        }
+        Item::NodePtr { prefix, ptr } => {
+            assert!(
+                prefix.len() <= 127,
+                "Error during serialization: size of prefix more than 127."
+            );
+            assert!(
+                ptr.len() == DEF_SIZE,
+                "Error during serialization: size of ptrPrefix not equal 32."
+            );
+            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+        }
+    });
+
+    let mut buf = Vec::with_capacity(calc_size);
+
+    for (idx, item) in node.iter().enumerate() {
+        match item {
+            Item::EmptyItem => {
+                // EmptyItem - not encoded
+            }
+            Item::Leaf { prefix, value } => {
+                buf.push(idx as u8); // item index
+                buf.push(prefix.len() as u8); // second byte with Leaf identifier
+                buf.extend_from_slice(prefix);
+                buf.extend_from_slice(value);
+            }
+            Item::NodePtr { prefix, ptr } => {
+                buf.push(idx as u8); // item index
+                buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
+                buf.extend_from_slice(prefix);
+                buf.extend_from_slice(ptr);
+            }
+        }
+    }
+
+    assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
+    buf
+}
+
 /** Deserialization [[ByteVector]] to [[Node]]
  */
-fn decode(bv: ByteVector) -> Node {
-    todo!()
+pub fn decode(encoded: ByteVector) -> Node {
+    let mut node = EmptyNode::new().node;
+    let mut pos = 0;
+    let max_size = encoded.len();
+
+    while pos < max_size {
+        let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
+        assert_eq!(
+            node[idx_item],
+            Item::EmptyItem,
+            "Error during deserialization: wrong index of item."
+        );
+
+        let second_byte = encoded[pos + 1]; // Take second byte
+        let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
+        let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
+
+        let val_or_ptr =
+            &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
+
+        pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
+
+        let item = if (second_byte & 0x80) == 0 {
+            Item::Leaf {
+                prefix: prefix.to_vec(),
+                value: val_or_ptr.to_vec(),
+            }
+        } else {
+            Item::NodePtr {
+                prefix: prefix.to_vec(),
+                ptr: val_or_ptr.to_vec(),
+            }
+        };
+
+        node[idx_item] = item;
+    }
+
+    node
 }
 
 fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, ByteVector) {
@@ -82,7 +202,7 @@ fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, Byt
 }
 
 pub fn hash_node(node: &Node) -> (ByteVector, ByteVector) {
-    let bytes = bincode::serialize(node).unwrap();
+    let bytes = encode(node);
     let hash = blake3::hash(&bytes);
     (hash.as_bytes().to_vec(), bytes)
 }
