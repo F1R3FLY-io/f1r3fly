@@ -1,4 +1,5 @@
 use prost::Message;
+use rspace_plus_plus::rspace::hashing::blake3_hash::Blake3Hash;
 use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
@@ -7,6 +8,7 @@ use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreMana
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::CheckpointProto;
+use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::Datums;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -226,6 +228,72 @@ pub extern "C" fn install(
 }
 
 #[no_mangle]
+pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let checkpoint = unsafe { (*rspace).rspace.create_checkpoint().await };
+
+        let checkpoint_proto = CheckpointProto {
+            root: checkpoint.root.bytes(),
+        };
+
+        let mut bytes = checkpoint_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_len: usize) -> () {
+    let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
+    let root = Blake3Hash::new(root_slice);
+
+    let _ = unsafe { (*rspace).rspace.reset(root) };
+}
+
+#[no_mangle]
+pub extern "C" fn get_data(
+    rspace: *mut Space,
+    channel_pointer: *const u8,
+    channel_bytes_len: usize,
+) -> *const u8 {
+    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
+    let channel = Par::decode(channel_slice).unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let datums = unsafe { (*rspace).rspace.get_data(channel).await };
+
+        let datums_protos: Vec<DatumProto> = datums
+            .into_iter()
+            .map(|datum| DatumProto {
+                a: Some(datum.a),
+                persist: datum.persist,
+                source: Some(ProduceProto {
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
+                    persistent: datum.source.persistent,
+                }),
+            })
+            .collect();
+
+        let datums_proto = Datums {
+            datums: datums_protos,
+        };
+
+        let mut bytes = datums_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
 pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
@@ -282,25 +350,6 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
         let to_map_result = ToMapResult { map_entries };
 
         let mut bytes = to_map_result.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let checkpoint = unsafe { (*rspace).rspace.create_checkpoint().await };
-
-        let checkpoint_proto = CheckpointProto {
-            root: checkpoint.root.bytes(),
-        };
-
-        let mut bytes = checkpoint_proto.encode_to_vec();
         let len = bytes.len() as u32;
         let len_bytes = len.to_le_bytes().to_vec();
         let mut result = len_bytes;

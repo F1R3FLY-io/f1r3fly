@@ -242,6 +242,21 @@ where
 
     /* RSpaceOps */
 
+    pub async fn get_data(&self, channel: C) -> Vec<Datum<A>> {
+        self.store.get_data(&channel).await
+    }
+
+    pub async fn get_waiting_continuations(
+        &self,
+        channels: Vec<C>,
+    ) -> Vec<WaitingContinuation<P, K>> {
+        self.store.get_continuations(channels).await
+    }
+
+    pub async fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+        self.store.get_joins(channel).await
+    }
+
     async fn store_waiting_continuation(
         &self,
         channels: Vec<C>,
@@ -445,7 +460,7 @@ where
         self.store.to_map().await
     }
 
-    fn reset(&mut self, root: Blake3Hash) -> () {
+    pub fn reset(&mut self, root: Blake3Hash) -> () {
         let next_history = self.history_repository.reset(&root);
         self.history_repository = next_history;
 

@@ -37,9 +37,21 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Pointer
 
-  def to_map(rspace: Pointer): Pointer
-
   def create_checkpoint(rspace: Pointer): Pointer
+
+  def reset(
+      rspace: Pointer,
+      root_pointer: Pointer,
+      root_bytes_len: Int
+  ): Unit
+
+  def get_data(
+      rspace: Pointer,
+      channel_pointer: Pointer,
+      channel_bytes_len: Int
+  ): Pointer
+
+  def to_map(rspace: Pointer): Pointer
 
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }

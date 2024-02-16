@@ -1,6 +1,6 @@
 mod concurrent;
 mod event;
-mod hashing;
+pub mod hashing;
 pub mod history;
 pub mod hot_store;
 pub mod internal;

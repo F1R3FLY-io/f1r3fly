@@ -6,6 +6,7 @@ import com.sun.jna.{Memory, Native, Pointer}
 import coop.rchain.models.rspace_plus_plus_types.{
   ActionResult,
   ConsumeParams,
+  Datums,
   FreeMapProto,
   InstallParams,
   SortedSetElement,
@@ -64,7 +65,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
   def clear(): F[Unit] =
     Applicative[F].pure { INSTANCE.space_clear(rspacePointer) }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def spatialMatchResult(target: C, pattern: C): F[Option[(Map[Int, Par], Unit)]] =
     for {
       result <- Sync[F].delay {
@@ -108,7 +108,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
 
   // TuplespacePlusPlus trait functions
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def produce(channel: C, data: A, persist: Boolean): F[MaybeActionResult] =
     for {
       result <- Sync[F].delay {
@@ -188,7 +187,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                }
     } yield result
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def consume(
       channels: Seq[C],
       patterns: Seq[P],
@@ -273,7 +271,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                }
     } yield result
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def install(channels: Seq[C], patterns: Seq[P], continuation: K): F[Option[(K, Seq[A])]] =
     for {
       result <- Sync[F].delay {
@@ -336,15 +333,85 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                }
     } yield result
 
-  def reset(root: Blake2b256Hash): F[Unit] = {
-    println("reset")
-    ???
-  }
+  def reset(root: Blake2b256Hash): F[Unit] =
+    for {
+      _ <- Sync[F].delay {
+            val rootBytes = root.bytes.toArray
 
-  def getData(channel: C): F[Seq[Datum[A]]] = {
-    println("getData")
-    ???
-  }
+            val rootMemory = new Memory(rootBytes.length.toLong)
+            rootMemory.write(0, rootBytes, 0, rootBytes.length)
+
+            val _ = INSTANCE.reset(
+              rspacePointer,
+              rootMemory,
+              rootBytes.length
+            )
+
+            // Not sure if these lines are needed
+            // Need to figure out how to deallocate each memory instance
+            rootMemory.clear()
+          }
+    } yield ()
+
+  def getData(channel: C): F[Seq[Datum[A]]] =
+    for {
+      result <- Sync[F].delay {
+                 val channelBytes = channel.toByteArray
+
+                 val payloadMemory = new Memory(channelBytes.length.toLong)
+                 payloadMemory.write(0, channelBytes, 0, channelBytes.length)
+
+                 val getDataResultPtr = INSTANCE.get_data(
+                   rspacePointer,
+                   payloadMemory,
+                   channelBytes.length
+                 )
+
+                 // Not sure if these lines are needed
+                 // Need to figure out how to deallocate each memory instance
+                 payloadMemory.clear()
+
+                 if (getDataResultPtr != null) {
+                   val resultByteslength = getDataResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes   = getDataResultPtr.getByteArray(4, resultByteslength)
+                     val datumsProto   = Datums.parseFrom(resultBytes)
+                     val datums_protos = datumsProto.datums
+
+                     val datums: Seq[Datum[A]] =
+                       datums_protos.map(
+                         datum =>
+                           Datum(
+                             datum.a.get,
+                             datum.persist,
+                             source = datum.source match {
+                               case Some(produceEvent) =>
+                                 Produce(
+                                   channelsHash = Blake2b256Hash.fromByteArray(
+                                     produceEvent.channelHash.toByteArray
+                                   ),
+                                   hash =
+                                     Blake2b256Hash.fromByteArray(produceEvent.hash.toByteArray),
+                                   persistent = produceEvent.persistent
+                                 )
+                               case None => {
+                                 Log[F].debug("ProduceEvent is None");
+                                 throw new RuntimeException("ProduceEvent is None")
+                               }
+                             }
+                           )
+                       )
+
+                     datums
+                   } finally {
+                     INSTANCE.deallocate_memory(getDataResultPtr, resultByteslength)
+                   }
+                 } else {
+                   throw new RuntimeException("getDataResultPtr is null")
+                 }
+               }
+    } yield result
 
   def getWaitingContinuations(channels: Seq[C]): F[Seq[WaitingContinuation[P, K]]] = {
     println("getWaitingContinuations")
@@ -434,8 +501,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
     ???
   }
 
-  def spawn: F[ISpacePlusPlus[F, C, P, A, K]] =
-    Sync[F].delay(new RSpacePlusPlus_RhoTypes[F]())
+  def spawn: F[ISpacePlusPlus[F, C, P, A, K]] = {
+    println("spawn")
+    ???
+  }
 }
 
 object RSpacePlusPlus_RhoTypes {

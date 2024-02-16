@@ -143,3 +143,19 @@ message FreeMapProto {
 message CheckpointProto {
   bytes root = 1;
 }
+
+message Datums {
+  repeated DatumProto datums = 1;
+}
+
+message WaitingContinuations {
+  repeated WaitingContinuationProto wks = 1;
+}
+
+message Join {
+  repeated rhoapi.Par join = 1;
+}
+
+message Joins {
+  repeated Join joins = 1;
+}
