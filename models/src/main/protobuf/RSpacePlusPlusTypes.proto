@@ -2,7 +2,15 @@ syntax = "proto3";
 
 package rspace_plus_plus_types;
 
-import "protobuf/RhoTypes.proto";
+import "RhoTypes.proto";
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  package_name: "coop.rchain.models.rspace_plus_plus_types"
+  flat_package: true
+  single_file: true
+  preserve_unknown_fields: false
+};
 
 /**
  * This is the first value of the tuple for the return type of the
@@ -11,10 +19,10 @@ import "protobuf/RhoTypes.proto";
  * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
  */
 message ContResultProto {
-  rhotypes.TaggedContinuation continuation = 1;
+  rhoapi.TaggedContinuation continuation = 1;
   bool persistent = 2;
-  repeated rhotypes.Par channels = 3;
-  repeated rhotypes.BindPattern patterns = 4;
+  repeated rhoapi.Par channels = 3;
+  repeated rhoapi.BindPattern patterns = 4;
   bool peek = 5;
 }
 
@@ -27,9 +35,9 @@ message ContResultProto {
  * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
  */
 message RSpaceResultProto {
-  rhotypes.Par channel = 1;
-  rhotypes.ListParWithRandom matchedDatum = 2;
-  rhotypes.ListParWithRandom removedDatum = 3;
+  rhoapi.Par channel = 1;
+  rhoapi.ListParWithRandom matchedDatum = 2;
+  rhoapi.ListParWithRandom removedDatum = 3;
   bool persistent = 4;
 }
 
@@ -48,7 +56,7 @@ message ActionResult {
  * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
  */
 message DatumProto {
-  rhotypes.ListParWithRandom a = 1;
+  rhoapi.ListParWithRandom a = 1;
   bool persist = 2;
   ProduceProto source = 3;
 }
@@ -60,8 +68,8 @@ message DatumProto {
  * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
  */
 message WaitingContinuationProto {
-  repeated rhotypes.BindPattern patterns = 1;
-  rhotypes.TaggedContinuation continuation = 2;
+  repeated rhoapi.BindPattern patterns = 1;
+  rhoapi.TaggedContinuation continuation = 2;
   bool persist = 3;
   repeated SortedSetElement peeks = 4;
   ConsumeProto source = 5;
@@ -103,7 +111,7 @@ message ProtobufRow {
 }
 
 message MapEntry {
-  repeated rhotypes.Par key = 1;
+  repeated rhoapi.Par key = 1;
   ProtobufRow value = 2;
 }
 
@@ -115,21 +123,21 @@ message ToMapResult {
 }
 
 message ConsumeParams {
-  repeated rhotypes.Par channels = 1;
-  repeated rhotypes.BindPattern patterns = 2;
-  rhotypes.TaggedContinuation continuation = 3;
+  repeated rhoapi.Par channels = 1;
+  repeated rhoapi.BindPattern patterns = 2;
+  rhoapi.TaggedContinuation continuation = 3;
   bool persist = 4;
   repeated SortedSetElement peeks = 5;
 }
 
 message InstallParams {
-  repeated rhotypes.Par channels = 1;
-  repeated rhotypes.BindPattern patterns = 2;
-  rhotypes.TaggedContinuation continuation = 3;
+  repeated rhoapi.Par channels = 1;
+  repeated rhoapi.BindPattern patterns = 2;
+  rhoapi.TaggedContinuation continuation = 3;
 }
 
 message FreeMapProto {
-  map<int32, rhotypes.Par> entries = 4;
+  map<int32, rhoapi.Par> entries = 4;
 }
 
 message CheckpointProto {

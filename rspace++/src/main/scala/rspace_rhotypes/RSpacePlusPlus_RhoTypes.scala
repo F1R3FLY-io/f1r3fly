@@ -3,18 +3,15 @@ package rspacePlusPlus
 import cats.Applicative
 import cats.implicits._
 import com.sun.jna.{Memory, Native, Pointer}
-import coop.rchain.models.{
-  BindPattern,
+import coop.rchain.models.rspace_plus_plus_types.{
+  ActionResult,
   ConsumeParams,
   FreeMapProto,
   InstallParams,
-  ListParWithRandom,
-  Par,
-  RhoTypesActionResult,
   SortedSetElement,
-  TaggedContinuation,
   ToMapResult
 }
+import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import scala.collection.SortedSet
 import coop.rchain.rspace.{ContResult, Result}
 import coop.rchain.rspace.trace.{Consume, Produce}
@@ -141,7 +138,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
 
                    try {
                      val resultBytes          = produceResultPtr.getByteArray(4, resultByteslength)
-                     val rhoTypesActionResult = RhoTypesActionResult.parseFrom(resultBytes)
+                     val rhoTypesActionResult = ActionResult.parseFrom(resultBytes)
                      val contResult = rhoTypesActionResult.contResult.getOrElse({
                        Log[F].debug("ContResult is None")
                        throw new RuntimeException("ContResult is None")
@@ -226,7 +223,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
 
                    try {
                      val resultBytes          = consumeResultPtr.getByteArray(4, resultByteslength)
-                     val rhoTypesActionResult = RhoTypesActionResult.parseFrom(resultBytes)
+                     val rhoTypesActionResult = ActionResult.parseFrom(resultBytes)
                      val contResult = rhoTypesActionResult.contResult.getOrElse({
                        Log[F].debug("ContResult is None")
                        throw new RuntimeException("ContResult is None")

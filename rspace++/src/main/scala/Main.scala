@@ -8,7 +8,7 @@ import org.scalacheck.Gen
 import scala.collection.SortedSet
 
 import coop.rchain.crypto.hash.Blake2b512Random
-import coop.rchain.models.{SortedSetElement}
+import coop.rchain.models.rspace_plus_plus_types.{SortedSetElement}
 
 import cats.Id
 

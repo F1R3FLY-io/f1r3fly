@@ -29,9 +29,9 @@ pub use crate::rspace::matcher::utils::{
     vector_par, FreeMap,
 };
 pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
-    ActionResult, ContResult, RSpaceResult,
+    ActionResult, ContResultProto, RSpaceResultProto,
 };
 pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
-    Consume, ConsumeParams, Datum, FreeMapProto, InstallParams, MapEntry, Produce, ProtobufRow,
-    SortedSetElement, ToMapResult, WaitingContinuation,
+    ConsumeProto, ConsumeParams, DatumProto, FreeMapProto, InstallParams, MapEntry, ProduceProto, ProtobufRow,
+    SortedSetElement, ToMapResult, WaitingContinuationProto,
 };
