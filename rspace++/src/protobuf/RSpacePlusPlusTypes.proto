@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package rspace_plus_plus_types;
+
+import "protobuf/RhoTypes.proto";
+
+/**
+ * This is the first value of the tuple for the return type of the
+ * Consume/Produce functions
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
+ */
+message ContResult {
+  rhotypes.TaggedContinuation continuation = 1;
+  bool persistent = 2;
+  repeated rhotypes.Par channels = 3;
+  repeated rhotypes.BindPattern patterns = 4;
+  bool peek = 5;
+}
+
+/**
+ * This is the second value of the tuple for the return type of the
+ * Consume/Produce functions
+ *
+ * 'RSpaceResult' because Rust has a standard name type 'Result'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
+ */
+message RSpaceResult {
+  rhotypes.Par channel = 1;
+  rhotypes.ListParWithRandom matchedDatum = 2;
+  rhotypes.ListParWithRandom removedDatum = 3;
+  bool persistent = 4;
+}
+
+/**
+ * This is the tuple that is returned from the Consume/Produce functions
+ */
+message ActionResult {
+  ContResult contResult = 1;
+  repeated RSpaceResult results = 2;
+}
+
+/**
+ * Protobuf message representation of 'Datum'
+ * One of the data structures returned in 'to_map' / 'toMap'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
+ */
+message Datum {
+  rhotypes.ListParWithRandom a = 1;
+  bool persist = 2;
+  Produce source = 3;
+}
+
+/**
+ * Protobuf message representation of 'WaitingContinuation'
+ * This one of the data structures returned in 'to_map' / 'toMap'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
+ */
+message WaitingContinuation {
+  repeated rhotypes.BindPattern patterns = 1;
+  rhotypes.TaggedContinuation continuation = 2;
+  bool persist = 3;
+  repeated SortedSetElement peeks = 4;
+  Consume source = 5;
+}
+
+/**
+ * This message is needed on the Scala side because the
+ * 'project/StacksafeScalapbGenerator.scala' file prohibits packable fields
+ */
+message SortedSetElement {
+  int32 value = 1;
+}
+
+/**
+ * Protobuf message representation of 'Produce'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
+ */
+message Produce {
+  bytes channelHash = 1;
+  bytes hash = 2;
+  bool persistent = 3;
+}
+
+/**
+ * Protobuf message representation of 'Consume'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
+ */
+message Consume {
+  repeated bytes channelHashes = 1;
+  bytes hash = 2;
+  bool persistent = 3;
+}
+
+message ProtobufRow {
+  repeated Datum data = 1;
+  repeated WaitingContinuation wks = 2;
+}
+
+message MapEntry {
+  repeated rhotypes.Par key = 1;
+  ProtobufRow value = 2;
+}
+
+/**
+ * Return type for 'to_map' / 'toMap'
+ */
+message ToMapResult {
+  repeated MapEntry mapEntries = 1;
+}
+
+message ConsumeParams {
+  repeated rhotypes.Par channels = 1;
+  repeated rhotypes.BindPattern patterns = 2;
+  rhotypes.TaggedContinuation continuation = 3;
+  bool persist = 4;
+  repeated SortedSetElement peeks = 5;
+}
+
+message InstallParams {
+  repeated rhotypes.Par channels = 1;
+  repeated rhotypes.BindPattern patterns = 2;
+  rhotypes.TaggedContinuation continuation = 3;
+}
+
+message FreeMapProto {
+  map<int32, rhotypes.Par> entries = 4;
+}

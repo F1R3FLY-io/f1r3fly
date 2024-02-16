@@ -108,7 +108,7 @@ pub extern "C" fn produce(
                 };
                 let protobuf_results = rspace_results
                     .into_iter()
-                    .map(|result| RSpaceResultProto {
+                    .map(|result| RSpaceResult {
                         channel: Some(result.channel),
                         matched_datum: Some(result.matched_datum),
                         removed_datum: Some(result.removed_datum),
@@ -116,7 +116,7 @@ pub extern "C" fn produce(
                     })
                     .collect();
 
-                let maybe_action_result = RhoTypesActionResult {
+                let maybe_action_result = ActionResult {
                     cont_result: Some(protobuf_cont_result),
                     results: protobuf_results,
                 };
@@ -168,7 +168,7 @@ pub extern "C" fn consume(
                 };
                 let protobuf_results = rspace_results
                     .into_iter()
-                    .map(|result| RSpaceResultProto {
+                    .map(|result| RSpaceResult {
                         channel: Some(result.channel),
                         matched_datum: Some(result.matched_datum),
                         removed_datum: Some(result.removed_datum),
@@ -176,7 +176,7 @@ pub extern "C" fn consume(
                     })
                     .collect();
 
-                let maybe_action_result = RhoTypesActionResult {
+                let maybe_action_result = ActionResult {
                     cont_result: Some(protobuf_cont_result),
                     results: protobuf_results,
                 };
@@ -235,10 +235,10 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
             let datums = value
                 .data
                 .into_iter()
-                .map(|datum| DatumProto {
+                .map(|datum| Datum {
                     a: Some(datum.a),
                     persist: datum.persist,
-                    source: Some(ProduceProto {
+                    source: Some(Produce {
                         channel_hash: datum.source.channel_hash.bytes(),
                         hash: datum.source.hash.bytes(),
                         persistent: datum.source.persistent,
@@ -249,7 +249,7 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
             let wks = value
                 .wks
                 .into_iter()
-                .map(|wk| WaitingContinuationProto {
+                .map(|wk| WaitingContinuation {
                     patterns: wk.patterns,
                     continuation: Some(wk.continuation),
                     persist: wk.persist,
@@ -258,7 +258,7 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                         .into_iter()
                         .map(|peek| SortedSetElement { value: peek as i32 })
                         .collect(),
-                    source: Some(ConsumeProto {
+                    source: Some(Consume {
                         channel_hashes: wk
                             .source
                             .channel_hashes

@@ -2,7 +2,7 @@ use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
 };
-use rspace_plus_plus::rhotypes::rhotypes::SortedSetElement;
+use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::SortedSetElement;
 use std::error::Error;
 
 // Playground

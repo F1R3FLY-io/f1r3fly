@@ -18,11 +18,6 @@ pub use crate::rhotypes::rhotypes::{
     ListParWithRandom, Match, MatchCase, New, Par, Receive, ReceiveBind, Send, TaggedContinuation,
     Var, VarRef,
 };
-pub use crate::rhotypes::rhotypes::{
-    ConsumeParams, ConsumeProto, DatumProto, FreeMapProto, InstallParams, MapEntry, ProduceProto,
-    ProtobufRow, SortedSetElement, ToMapResult, WaitingContinuationProto,
-};
-pub use crate::rhotypes::rhotypes::{ContResult, RSpaceResultProto, RhoTypesActionResult};
 pub use crate::rspace::matcher::maximum_bipartite_match::MaximumBipartiteMatch;
 pub use crate::rspace::matcher::utils::{
     attempt_opt, guard, new_boundvar_expr, new_boundvar_par, new_conn_and_body_par,
@@ -32,4 +27,11 @@ pub use crate::rspace::matcher::utils::{
     new_match_par, new_new_par, new_receive_par, new_send, new_send_par, new_wildcard_expr,
     new_wildcard_par, new_wildcard_var, no_frees, no_frees_exprs, run_first, single_expr, to_vec,
     vector_par, FreeMap,
+};
+pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
+    ActionResult, ContResult, RSpaceResult,
+};
+pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
+    Consume, ConsumeParams, Datum, FreeMapProto, InstallParams, MapEntry, Produce, ProtobufRow,
+    SortedSetElement, ToMapResult, WaitingContinuation,
 };
