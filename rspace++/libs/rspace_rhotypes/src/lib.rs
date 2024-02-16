@@ -33,7 +33,8 @@ pub extern "C" fn space_new() -> *mut Space {
 
 #[no_mangle]
 pub extern "C" fn space_print(rspace: *mut Space) -> () {
-    unsafe { (*rspace).rspace.store.print() }
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async { unsafe { (*rspace).rspace.store.print().await } })
 }
 
 #[no_mangle]
@@ -92,41 +93,44 @@ pub extern "C" fn produce(
     let channel = Par::decode(channel_slice).unwrap();
     let data = ListParWithRandom::decode(data_slice).unwrap();
 
-    let result_option = unsafe { (*rspace).rspace.produce(channel, data, persist) };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let result_option = unsafe { (*rspace).rspace.produce(channel, data, persist).await };
 
-    match result_option {
-        Some((cont_result, rspace_results)) => {
-            let protobuf_cont_result = ContResult {
-                continuation: Some(cont_result.continuation),
-                persistent: cont_result.persistent,
-                channels: cont_result.channels,
-                patterns: cont_result.patterns,
-                peek: cont_result.peek,
-            };
-            let protobuf_results = rspace_results
-                .into_iter()
-                .map(|result| RSpaceResultProto {
-                    channel: Some(result.channel),
-                    matched_datum: Some(result.matched_datum),
-                    removed_datum: Some(result.removed_datum),
-                    persistent: result.persistent,
-                })
-                .collect();
+        match result_option {
+            Some((cont_result, rspace_results)) => {
+                let protobuf_cont_result = ContResult {
+                    continuation: Some(cont_result.continuation),
+                    persistent: cont_result.persistent,
+                    channels: cont_result.channels,
+                    patterns: cont_result.patterns,
+                    peek: cont_result.peek,
+                };
+                let protobuf_results = rspace_results
+                    .into_iter()
+                    .map(|result| RSpaceResultProto {
+                        channel: Some(result.channel),
+                        matched_datum: Some(result.matched_datum),
+                        removed_datum: Some(result.removed_datum),
+                        persistent: result.persistent,
+                    })
+                    .collect();
 
-            let maybe_action_result = RhoTypesActionResult {
-                cont_result: Some(protobuf_cont_result),
-                results: protobuf_results,
-            };
+                let maybe_action_result = RhoTypesActionResult {
+                    cont_result: Some(protobuf_cont_result),
+                    results: protobuf_results,
+                };
 
-            let mut bytes = maybe_action_result.encode_to_vec();
-            let len = bytes.len() as u32;
-            let len_bytes = len.to_le_bytes().to_vec();
-            let mut result = len_bytes;
-            result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+                let mut bytes = maybe_action_result.encode_to_vec();
+                let len = bytes.len() as u32;
+                let len_bytes = len.to_le_bytes().to_vec();
+                let mut result = len_bytes;
+                result.append(&mut bytes);
+                Box::leak(result.into_boxed_slice()).as_ptr()
+            }
+            None => std::ptr::null(),
         }
-        None => std::ptr::null(),
-    }
+    })
 }
 
 #[no_mangle]
@@ -144,45 +148,49 @@ pub extern "C" fn consume(
     let persist = consume_params.persist;
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
-    let result_option = unsafe {
-        (*rspace)
-            .rspace
-            .consume(channels, patterns, continuation, persist, peeks)
-    };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let result_option = unsafe {
+            (*rspace)
+                .rspace
+                .consume(channels, patterns, continuation, persist, peeks)
+                .await
+        };
 
-    match result_option {
-        Some((cont_result, rspace_results)) => {
-            let protobuf_cont_result = ContResult {
-                continuation: Some(cont_result.continuation),
-                persistent: cont_result.persistent,
-                channels: cont_result.channels,
-                patterns: cont_result.patterns,
-                peek: cont_result.peek,
-            };
-            let protobuf_results = rspace_results
-                .into_iter()
-                .map(|result| RSpaceResultProto {
-                    channel: Some(result.channel),
-                    matched_datum: Some(result.matched_datum),
-                    removed_datum: Some(result.removed_datum),
-                    persistent: result.persistent,
-                })
-                .collect();
+        match result_option {
+            Some((cont_result, rspace_results)) => {
+                let protobuf_cont_result = ContResult {
+                    continuation: Some(cont_result.continuation),
+                    persistent: cont_result.persistent,
+                    channels: cont_result.channels,
+                    patterns: cont_result.patterns,
+                    peek: cont_result.peek,
+                };
+                let protobuf_results = rspace_results
+                    .into_iter()
+                    .map(|result| RSpaceResultProto {
+                        channel: Some(result.channel),
+                        matched_datum: Some(result.matched_datum),
+                        removed_datum: Some(result.removed_datum),
+                        persistent: result.persistent,
+                    })
+                    .collect();
 
-            let maybe_action_result = RhoTypesActionResult {
-                cont_result: Some(protobuf_cont_result),
-                results: protobuf_results,
-            };
+                let maybe_action_result = RhoTypesActionResult {
+                    cont_result: Some(protobuf_cont_result),
+                    results: protobuf_results,
+                };
 
-            let mut bytes = maybe_action_result.encode_to_vec();
-            let len = bytes.len() as u32;
-            let len_bytes = len.to_le_bytes().to_vec();
-            let mut result = len_bytes;
-            result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+                let mut bytes = maybe_action_result.encode_to_vec();
+                let len = bytes.len() as u32;
+                let len_bytes = len.to_le_bytes().to_vec();
+                let mut result = len_bytes;
+                result.append(&mut bytes);
+                Box::leak(result.into_boxed_slice()).as_ptr()
+            }
+            None => std::ptr::null(),
         }
-        None => std::ptr::null(),
-    }
+    })
 }
 
 #[no_mangle]
@@ -198,76 +206,87 @@ pub extern "C" fn install(
     let patterns = consume_params.patterns;
     let continuation = consume_params.continuation.unwrap();
 
-    let result_option = unsafe { (*rspace).rspace.install(channels, patterns, continuation) };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let result_option = unsafe {
+            (*rspace)
+                .rspace
+                .install(channels, patterns, continuation)
+                .await
+        };
 
-    match result_option {
-        None => std::ptr::null(),
-        Some(_) => {
-            panic!("RUST ERROR: Installing can be done only on startup")
+        match result_option {
+            None => std::ptr::null(),
+            Some(_) => {
+                panic!("RUST ERROR: Installing can be done only on startup")
+            }
         }
-    }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
-    let hot_store_mapped = unsafe { (*rspace).rspace.store.to_map() };
-    let mut map_entries: Vec<MapEntry> = Vec::new();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let hot_store_mapped = unsafe { (*rspace).rspace.store.to_map().await };
+        let mut map_entries: Vec<MapEntry> = Vec::new();
 
-    for (key, value) in hot_store_mapped {
-        let datums = value
-            .data
-            .into_iter()
-            .map(|datum| DatumProto {
-                a: Some(datum.a),
-                persist: datum.persist,
-                source: Some(ProduceProto {
-                    channel_hash: datum.source.channel_hash.bytes(),
-                    hash: datum.source.hash.bytes(),
-                    persistent: datum.source.persistent,
-                }),
-            })
-            .collect();
+        for (key, value) in hot_store_mapped {
+            let datums = value
+                .data
+                .into_iter()
+                .map(|datum| DatumProto {
+                    a: Some(datum.a),
+                    persist: datum.persist,
+                    source: Some(ProduceProto {
+                        channel_hash: datum.source.channel_hash.bytes(),
+                        hash: datum.source.hash.bytes(),
+                        persistent: datum.source.persistent,
+                    }),
+                })
+                .collect();
 
-        let wks = value
-            .wks
-            .into_iter()
-            .map(|wk| WaitingContinuationProto {
-                patterns: wk.patterns,
-                continuation: Some(wk.continuation),
-                persist: wk.persist,
-                peeks: wk
-                    .peeks
-                    .into_iter()
-                    .map(|peek| SortedSetElement { value: peek as i32 })
-                    .collect(),
-                source: Some(ConsumeProto {
-                    channel_hashes: wk
-                        .source
-                        .channel_hashes
-                        .iter()
-                        .map(|hash| hash.bytes())
+            let wks = value
+                .wks
+                .into_iter()
+                .map(|wk| WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(wk.continuation),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
                         .collect(),
-                    hash: wk.source.hash.bytes(),
-                    persistent: wk.source.persistent,
-                }),
-            })
-            .collect();
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                })
+                .collect();
 
-        let row = ProtobufRow { data: datums, wks };
-        map_entries.push(MapEntry {
-            key,
-            value: Some(row),
-        });
-    }
+            let row = ProtobufRow { data: datums, wks };
+            map_entries.push(MapEntry {
+                key,
+                value: Some(row),
+            });
+        }
 
-    let to_map_result = ToMapResult { map_entries };
+        let to_map_result = ToMapResult { map_entries };
 
-    let mut bytes = to_map_result.encode_to_vec();
-    let len = bytes.len() as u32;
-    let len_bytes = len.to_le_bytes().to_vec();
-    let mut result = len_bytes;
-    result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+        let mut bytes = to_map_result.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
 }
 
 #[no_mangle]

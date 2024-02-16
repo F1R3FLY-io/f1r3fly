@@ -45,7 +45,7 @@ pub trait HistoryReader<Key, C: Clone, P: Clone, A: Clone, K: Clone> {
 /**
  * History reader base, version of a reader which accepts non-serialized and hashed keys
  */
-pub trait HistoryReaderBase<C: Clone, P: Clone, A: Clone, K: Clone> {
+pub trait HistoryReaderBase<C: Clone, P: Clone, A: Clone, K: Clone>: Sync {
     fn get_data_proj(&self, key: &C) -> Vec<Datum<A>>;
 
     fn get_continuations_proj(&self, key: &Vec<C>) -> Vec<WaitingContinuation<P, K>>;

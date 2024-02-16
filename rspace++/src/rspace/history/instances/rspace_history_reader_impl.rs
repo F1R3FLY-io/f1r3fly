@@ -58,10 +58,10 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
 
 impl<C, P, A, K> HistoryReader<Blake3Hash, C, P, A, K> for RSpaceHistoryReaderImpl<C, P, A, K>
 where
-    C: Clone + for<'a> Deserialize<'a> + Serialize + 'static,
-    P: Clone + for<'a> Deserialize<'a> + 'static,
-    A: Clone + for<'a> Deserialize<'a> + 'static,
-    K: Clone + for<'a> Deserialize<'a> + 'static,
+    C: Clone + for<'a> Deserialize<'a> + Serialize + 'static + Sync + Send,
+    P: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
+    A: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
+    K: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
 {
     fn root(&self) -> Blake3Hash {
         self.target_history.root()
@@ -115,10 +115,10 @@ where
 
         impl<C, P, A, K> HistoryReaderBase<C, P, A, K> for HistoryReaderBaseImpl<C, P, A, K>
         where
-            C: Clone + for<'de> Deserialize<'de> + Serialize + 'static,
-            P: Clone + for<'de> Deserialize<'de> + 'static,
-            A: Clone + for<'de> Deserialize<'de> + 'static,
-            K: Clone + for<'de> Deserialize<'de> + 'static,
+            C: Clone + for<'de> Deserialize<'de> + Serialize + 'static + Sync + Send,
+            P: Clone + for<'de> Deserialize<'de> + 'static + Sync + Send,
+            A: Clone + for<'de> Deserialize<'de> + 'static + Sync + Send,
+            K: Clone + for<'de> Deserialize<'de> + 'static + Sync + Send,
         {
             fn get_data_proj(&self, key: &C) -> Vec<Datum<A>> {
                 self.outer.get_data_proj(&hash(key))
