@@ -151,3 +151,7 @@ message Join {
 message Joins {
   repeated Join joins = 1;
 }
+
+message Channels {
+  repeated rhotypes.Par channels = 1;
+}

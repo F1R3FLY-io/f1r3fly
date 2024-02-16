@@ -5,12 +5,15 @@ import cats.implicits._
 import com.sun.jna.{Memory, Native, Pointer}
 import coop.rchain.models.rspace_plus_plus_types.{
   ActionResult,
+  Channels,
   ConsumeParams,
   Datums,
   FreeMapProto,
   InstallParams,
+  Joins,
   SortedSetElement,
-  ToMapResult
+  ToMapResult,
+  WaitingContinuations
 }
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import scala.collection.SortedSet
@@ -375,12 +378,12 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                    val resultByteslength = getDataResultPtr.getInt(0)
 
                    try {
-                     val resultBytes   = getDataResultPtr.getByteArray(4, resultByteslength)
-                     val datumsProto   = Datums.parseFrom(resultBytes)
-                     val datums_protos = datumsProto.datums
+                     val resultBytes  = getDataResultPtr.getByteArray(4, resultByteslength)
+                     val datumsProto  = Datums.parseFrom(resultBytes)
+                     val datumsProtos = datumsProto.datums
 
                      val datums: Seq[Datum[A]] =
-                       datums_protos.map(
+                       datumsProtos.map(
                          datum =>
                            Datum(
                              datum.a.get,
@@ -413,15 +416,111 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                }
     } yield result
 
-  def getWaitingContinuations(channels: Seq[C]): F[Seq[WaitingContinuation[P, K]]] = {
-    println("getWaitingContinuations")
-    ???
-  }
+  def getWaitingContinuations(channels: Seq[C]): F[Seq[WaitingContinuation[P, K]]] =
+    for {
+      result <- Sync[F].delay {
+                 val channelsProto = Channels(channels)
+                 val channelsBytes = channelsProto.toByteArray
 
-  def getJoins(channel: C): F[Seq[Seq[C]]] = {
-    println("getJoins")
-    ???
-  }
+                 val payloadMemory = new Memory(channelsBytes.length.toLong)
+                 payloadMemory.write(0, channelsBytes, 0, channelsBytes.length)
+
+                 val getWaitingContinuationResultPtr = INSTANCE.get_waiting_continuations(
+                   rspacePointer,
+                   payloadMemory,
+                   channelsBytes.length
+                 )
+
+                 // Not sure if these lines are needed
+                 // Need to figure out how to deallocate each memory instance
+                 payloadMemory.clear()
+
+                 if (getWaitingContinuationResultPtr != null) {
+                   val resultByteslength = getWaitingContinuationResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes =
+                       getWaitingContinuationResultPtr.getByteArray(4, resultByteslength)
+                     val wksProto  = WaitingContinuations.parseFrom(resultBytes)
+                     val wksProtos = wksProto.wks
+
+                     val wks: Seq[WaitingContinuation[P, K]] =
+                       wksProtos.map(
+                         wk =>
+                           WaitingContinuation(
+                             patterns = wk.patterns,
+                             continuation = wk.continuation.get,
+                             persist = wk.persist,
+                             peeks = wk.peeks.map(_.value).to[SortedSet],
+                             source = wk.source match {
+                               case Some(consumeEvent) =>
+                                 Consume(
+                                   channelsHashes = consumeEvent.channelHashes.map(
+                                     bs => Blake2b256Hash.fromByteArray(bs.toByteArray)
+                                   ),
+                                   hash =
+                                     Blake2b256Hash.fromByteArray(consumeEvent.hash.toByteArray),
+                                   persistent = consumeEvent.persistent
+                                 )
+                               case None => {
+                                 Log[F].debug("ConsumeEvent is None");
+                                 throw new RuntimeException("ConsumeEvent is None")
+                               }
+                             }
+                           )
+                       )
+
+                     wks
+                   } finally {
+                     INSTANCE.deallocate_memory(getWaitingContinuationResultPtr, resultByteslength)
+                   }
+                 } else {
+                   throw new RuntimeException("getWaitingContinuationResultPtr is null")
+                 }
+               }
+    } yield result
+
+  def getJoins(channel: C): F[Seq[Seq[C]]] =
+    for {
+      result <- Sync[F].delay {
+                 val channelBytes = channel.toByteArray
+
+                 val payloadMemory = new Memory(channelBytes.length.toLong)
+                 payloadMemory.write(0, channelBytes, 0, channelBytes.length)
+
+                 val getJoinsResultPtr = INSTANCE.get_joins(
+                   rspacePointer,
+                   payloadMemory,
+                   channelBytes.length
+                 )
+
+                 // Not sure if these lines are needed
+                 // Need to figure out how to deallocate each memory instance
+                 payloadMemory.clear()
+
+                 if (getJoinsResultPtr != null) {
+                   val resultByteslength = getJoinsResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes = getJoinsResultPtr.getByteArray(4, resultByteslength)
+                     val joinsProto  = Joins.parseFrom(resultBytes)
+                     val joinsProtos = joinsProto.joins
+
+                     val joins: Seq[Seq[C]] =
+                       joinsProtos.map(
+                         join => join.join
+                       )
+
+                     joins
+
+                   } finally {
+                     INSTANCE.deallocate_memory(getJoinsResultPtr, resultByteslength)
+                   }
+                 } else {
+                   throw new RuntimeException("getJoinsResultPtr is null")
+                 }
+               }
+    } yield result
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def toMap: F[Map[Seq[C], Row[P, A, K]]] = {

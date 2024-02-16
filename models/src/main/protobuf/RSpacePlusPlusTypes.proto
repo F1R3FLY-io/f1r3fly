@@ -159,3 +159,7 @@ message Join {
 message Joins {
   repeated Join joins = 1;
 }
+
+message Channels {
+  repeated rhoapi.Par channels = 1;
+}

@@ -51,6 +51,18 @@ trait JNAInterface extends Library {
       channel_bytes_len: Int
   ): Pointer
 
+  def get_waiting_continuations(
+      rspace: Pointer,
+      channels_pointer: Pointer,
+      channels_bytes_len: Int
+  ): Pointer
+
+  def get_joins(
+      rspace: Pointer,
+      channel_pointer: Pointer,
+      channel_bytes_len: Int
+  ): Pointer
+
   def to_map(rspace: Pointer): Pointer
 
   def deallocate_memory(ptr: Pointer, len: Int): Unit

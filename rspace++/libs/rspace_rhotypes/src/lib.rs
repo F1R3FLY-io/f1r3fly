@@ -7,8 +7,9 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::CheckpointProto;
-use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::Datums;
+use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
+    Channels, CheckpointProto, Datums, Join, Joins, WaitingContinuations,
+};
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -285,6 +286,84 @@ pub extern "C" fn get_data(
         };
 
         let mut bytes = datums_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn get_waiting_continuations(
+    rspace: *mut Space,
+    channels_pointer: *const u8,
+    channels_bytes_len: usize,
+) -> *const u8 {
+    let channels_slice =
+        unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
+    let channels_proto = Channels::decode(channels_slice).unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let wks = unsafe {
+            (*rspace)
+                .rspace
+                .get_waiting_continuations(channels_proto.channels)
+                .await
+        };
+
+        let wks_protos: Vec<WaitingContinuationProto> = wks
+            .into_iter()
+            .map(|wk| WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(wk.continuation),
+                persist: wk.persist,
+                peeks: wk
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
+                    .collect(),
+                source: Some(ConsumeProto {
+                    channel_hashes: wk
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
+                }),
+            })
+            .collect();
+
+        let wks_proto = WaitingContinuations { wks: wks_protos };
+
+        let mut bytes = wks_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn get_joins(
+    rspace: *mut Space,
+    channel_pointer: *const u8,
+    channel_bytes_len: usize,
+) -> *const u8 {
+    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
+    let channel = Par::decode(channel_slice).unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let joins = unsafe { (*rspace).rspace.get_joins(channel).await };
+        let vec_join: Vec<Join> = joins.into_iter().map(|join| Join { join }).collect();
+        let joins_proto = Joins { joins: vec_join };
+
+        let mut bytes = joins_proto.encode_to_vec();
         let len = bytes.len() as u32;
         let len_bytes = len.to_le_bytes().to_vec();
         let mut result = len_bytes;
