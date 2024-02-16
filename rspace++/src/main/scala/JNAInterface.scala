@@ -39,5 +39,7 @@ trait JNAInterface extends Library {
 
   def to_map(rspace: Pointer): Pointer
 
+  def create_checkpoint(rspace: Pointer): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }

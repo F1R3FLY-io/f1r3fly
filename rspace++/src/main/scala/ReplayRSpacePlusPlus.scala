@@ -1,13 +1,8 @@
 package rspacePlusPlus
 
 import cats.Applicative
-import coop.rchain.models.{
-  BindPattern,
-  ListParWithRandom,
-  Par,
-  RhoTypesActionResult,
-  TaggedContinuation
-}
+import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+import coop.rchain.models.rspace_plus_plus_types.{ActionResult}
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
 

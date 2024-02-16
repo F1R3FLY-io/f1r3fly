@@ -6,6 +6,7 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::CheckpointProto;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -281,6 +282,25 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
         let to_map_result = ToMapResult { map_entries };
 
         let mut bytes = to_map_result.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let checkpoint = unsafe { (*rspace).rspace.create_checkpoint().await };
+
+        let checkpoint_proto = CheckpointProto {
+            root: checkpoint.root.bytes(),
+        };
+
+        let mut bytes = checkpoint_proto.encode_to_vec();
         let len = bytes.len() as u32;
         let len_bytes = len.to_le_bytes().to_vec();
         let mut result = len_bytes;

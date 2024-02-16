@@ -212,7 +212,7 @@ where
         self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
     }
 
-    async fn create_checkpoint(&mut self) -> Checkpoint {
+    pub async fn create_checkpoint(&mut self) -> Checkpoint {
         let changes = self.store.changes().await;
         let next_history = self.history_repository.checkpoint(&changes).await;
         self.history_repository = next_history;

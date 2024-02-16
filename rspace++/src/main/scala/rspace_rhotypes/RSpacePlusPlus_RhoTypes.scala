@@ -20,6 +20,8 @@ import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
+import coop.rchain.models.rspace_plus_plus_types.CheckpointProto
+import coop.rchain.rspace.trace.Event
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -137,13 +139,13 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                    val resultByteslength = produceResultPtr.getInt(0)
 
                    try {
-                     val resultBytes          = produceResultPtr.getByteArray(4, resultByteslength)
-                     val rhoTypesActionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult = rhoTypesActionResult.contResult.getOrElse({
+                     val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
+                     val actionResult = ActionResult.parseFrom(resultBytes)
+                     val contResult = actionResult.contResult.getOrElse({
                        Log[F].debug("ContResult is None")
                        throw new RuntimeException("ContResult is None")
                      })
-                     val results = rhoTypesActionResult.results
+                     val results = actionResult.results
 
                      Some(
                        (
@@ -222,13 +224,13 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
                    val resultByteslength = consumeResultPtr.getInt(0)
 
                    try {
-                     val resultBytes          = consumeResultPtr.getByteArray(4, resultByteslength)
-                     val rhoTypesActionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult = rhoTypesActionResult.contResult.getOrElse({
+                     val resultBytes  = consumeResultPtr.getByteArray(4, resultByteslength)
+                     val actionResult = ActionResult.parseFrom(resultBytes)
+                     val contResult = actionResult.contResult.getOrElse({
                        Log[F].debug("ContResult is None")
                        throw new RuntimeException("ContResult is None")
                      })
-                     val results = rhoTypesActionResult.results
+                     val results = actionResult.results
 
                      Some(
                        (
@@ -305,10 +307,34 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
 
   // ISpacePlusPlus trait functions
 
-  def createCheckpoint(): F[Checkpoint] = {
-    println("createCheckpoint")
-    ???
-  }
+  def createCheckpoint(): F[Checkpoint] =
+    for {
+      result <- Sync[F].delay {
+                 val checkpointResultPtr = INSTANCE.create_checkpoint(
+                   rspacePointer
+                 )
+
+                 if (checkpointResultPtr != null) {
+                   val resultByteslength = checkpointResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes    = checkpointResultPtr.getByteArray(4, resultByteslength)
+                     val checkpoint     = CheckpointProto.parseFrom(resultBytes)
+                     val checkpointRoot = checkpoint.root
+
+                     Checkpoint(
+                       root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                       log = Seq.empty[Event]
+                     )
+
+                   } finally {
+                     INSTANCE.deallocate_memory(checkpointResultPtr, resultByteslength)
+                   }
+                 } else {
+                   throw new RuntimeException("Checkpoint pointer from rust was null")
+                 }
+               }
+    } yield result
 
   def reset(root: Blake2b256Hash): F[Unit] = {
     println("reset")
