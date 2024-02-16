@@ -28,7 +28,6 @@
                 "https://github.com/lihaoyi/Ammonite/releases/download/${version}/2.12-${version}";
               sha256 = "0ycwdcpprfd195i5f2ds03z2vpifv8fky6i9wh9v328z0glnjwrg";
             };
-          
           };
         };
         overlays = [ typelevel-nix.overlay (import rust-overlay) graalOverlay ammOverlay ];
