@@ -157,7 +157,7 @@ where
 
         match extracted {
             Some(produce_candidate) => self.process_match_found(produce_candidate).await,
-            None => self.store_data(channel, data, persist, produce_ref),
+            None => self.store_data(channel, data, persist, produce_ref).await,
         }
     }
 
@@ -273,7 +273,7 @@ where
         None
     }
 
-    fn store_data(
+    async fn store_data(
         &self,
         channel: C,
         data: A,
@@ -281,14 +281,16 @@ where
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_data");
-        let _ = self.store.put_datum(
-            channel,
-            Datum {
-                a: data,
-                persist,
-                source: produce_ref,
-            },
-        );
+        self.store
+            .put_datum(
+                channel,
+                Datum {
+                    a: data,
+                    persist,
+                    source: produce_ref,
+                },
+            )
+            .await;
         // println!(
         //     "produce: persisted <data: {:?}> at <channel: {:?}>",
         //     data, channel
@@ -376,7 +378,7 @@ where
         let result = self
             .locked_produce(channel, data, persist, produce_ref)
             .await;
-        println!("\nlocked_produce result: {:?}", result);
+        // println!("\nlocked_produce result: {:?}", result);
         result
     }
 
