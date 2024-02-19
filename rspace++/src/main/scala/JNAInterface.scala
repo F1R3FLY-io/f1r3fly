@@ -65,5 +65,7 @@ trait JNAInterface extends Library {
 
   def to_map(rspace: Pointer): Pointer
 
+  def spawn(rspace: Pointer): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }

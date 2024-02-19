@@ -438,6 +438,23 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
 }
 
 #[no_mangle]
+pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rspace = rt.block_on(async { unsafe { (*rspace).rspace.spawn().await } });
+
+    Box::into_raw(Box::new(Space { rspace }))
+}
+
+// #[no_mangle]
+// pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
+//     let rt = tokio::runtime::Runtime::new().unwrap();
+//     let soft_checkpoint =
+//         rt.block_on(async { unsafe { (*rspace).rspace.create_soft_checkpoint().await } });
+
+//     Box::into_raw(Box::new(Space { rspace }))
+// }
+
+#[no_mangle]
 pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
     // SAFETY: The caller must guarantee that `ptr` is a valid pointer to a memory block
     // allocated by Rust, and that `len` is the correct size of the block.

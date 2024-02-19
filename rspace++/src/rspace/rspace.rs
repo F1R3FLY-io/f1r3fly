@@ -1,3 +1,4 @@
+use super::checkpoint::SoftCheckpoint;
 use super::hashing::blake3_hash::Blake3Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
@@ -33,6 +34,7 @@ where
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     installs: HashMap<Vec<C>, Install<P, K>>,
+    produce_counter: HashMap<Produce, i32>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
@@ -229,7 +231,7 @@ where
         }
     }
 
-    async fn spawn(&self) -> Self {
+    pub async fn spawn(&self) -> Self {
         let history_repo = &self.history_repository;
         let next_history = history_repo.reset(&history_repo.root());
         let history_reader = next_history.get_history_reader(next_history.root());
@@ -480,6 +482,29 @@ where
         self.store = next_hot_store;
     }
 
+    pub async fn create_soft_checkpoint(&self) -> SoftCheckpoint<C, P, A, K> {
+        let cache_mutex = self.store.snapshot();
+        SoftCheckpoint {
+            cache_snapshot: cache_mutex.clone(),
+            produce_counter: HashMap::new(),
+        }
+    }
+
+    pub async fn revert_to_soft_checkpoint(
+        &mut self,
+        checkpoint: SoftCheckpoint<C, P, A, K>,
+    ) -> () {
+        let history = &self.history_repository;
+        let history_reader = history.get_history_reader(history.root());
+        let hot_store = HotStoreInstances::create_from_mhs_and_hr(
+            checkpoint.cache_snapshot,
+            history_reader.base(),
+        );
+
+        self.store = Box::new(hot_store);
+        self.produce_counter = checkpoint.produce_counter;
+    }
+
     fn wrap_result(
         &self,
         channels: Vec<C>,
@@ -676,6 +701,7 @@ impl RSpaceInstances {
             store,
             space_matcher: SpaceMatcher::create(matcher),
             installs: HashMap::new(),
+            produce_counter: HashMap::new(),
         }
     }
 

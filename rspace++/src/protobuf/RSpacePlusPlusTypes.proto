@@ -114,6 +114,9 @@ message ToMapResult {
   repeated MapEntry mapEntries = 1;
 }
 
+/**
+ * Data structure for 'consume' function parameters
+ */
 message ConsumeParams {
   repeated rhotypes.Par channels = 1;
   repeated rhotypes.BindPattern patterns = 2;
@@ -122,16 +125,27 @@ message ConsumeParams {
   repeated SortedSetElement peeks = 5;
 }
 
+/**
+ * Data structure for 'install' function parameters
+ */
 message InstallParams {
   repeated rhotypes.Par channels = 1;
   repeated rhotypes.BindPattern patterns = 2;
   rhotypes.TaggedContinuation continuation = 3;
 }
 
+/**
+ * Data structure for 'spatial_match_result' function return type
+ */
 message FreeMapProto {
-  map<int32, rhotypes.Par> entries = 4;
+  map<int32, rhotypes.Par> entries = 1;
 }
 
+/**
+ * Protobuf message representation of 'Checkpoint'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
+ */
 message CheckpointProto {
   bytes root = 1;
 }
@@ -155,3 +169,28 @@ message Joins {
 message Channels {
   repeated rhotypes.Par channels = 1;
 }
+
+message RepeatedChannels {
+  repeated Channels channels = 1;
+}
+
+/**
+ * Protobuf message representation of 'HotStoreState'
+ */
+// message HotStoreState {
+//   map<Channels, rhotypes.Par> continuations = 1;
+//   map<Channels, WaitingContinuationProto> installed_continuations = 2;
+//   map<rhotypes.Par, Datums> data = 3;
+//   map<rhotypes.Par, RepeatedChannels> joins = 4;
+//   map<rhotypes.Par, RepeatedChannels> installed_joins = 5;
+// }
+
+/**
+ * Protobuf message representation of 'SoftCheckpoint'
+ *
+ * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
+ */
+// message SoftCheckpoint {
+//   HotStoreState cache_snapshot = 1;
+//   map<ProduceProto, int32> produce_counter = 2;
+// }

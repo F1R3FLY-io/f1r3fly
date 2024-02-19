@@ -651,7 +651,7 @@ where
 pub struct HotStoreInstances;
 
 impl HotStoreInstances {
-    fn create_from_mhs_and_hr<C, P, A, K>(
+    pub fn create_from_mhs_and_hr<C, P, A, K>(
         hot_store_state_ref: Arc<Mutex<HotStoreState<C, P, A, K>>>,
         history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
     ) -> impl HotStore<C, P, A, K>
@@ -668,7 +668,7 @@ impl HotStoreInstances {
         }
     }
 
-    fn create_from_hs_and_hr<C, P, A, K>(
+    pub fn create_from_hs_and_hr<C, P, A, K>(
         cache: HotStoreState<C, P, A, K>,
         history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
     ) -> impl HotStore<C, P, A, K>

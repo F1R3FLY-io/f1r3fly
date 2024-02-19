@@ -31,7 +31,7 @@ import coop.rchain.rspace.trace.Event
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
   * These types (C, P, A, K) MUST MATCH the corresponding types on the Rust side in 'rspace_rhotypes/lib.rs'
   */
-class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
+class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
     extends RSpaceOpsPlusPlus[F]
     with ISpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation] {
 
@@ -55,11 +55,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
     Native
       .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
       .asInstanceOf[JNAInterface]
-
-  val rspacePointer: Pointer = space_new()
-
-  private def space_new(): Pointer =
-    INSTANCE.space_new()
 
   def print(): Unit =
     INSTANCE.space_print(rspacePointer)
@@ -600,18 +595,43 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log]
     ???
   }
 
-  def spawn: F[ISpacePlusPlus[F, C, P, A, K]] = {
-    println("spawn")
-    ???
-  }
+  def spawn: F[ISpacePlusPlus[F, C, P, A, K]] =
+    for {
+      result <- Sync[F].delay {
+                 val rspace = INSTANCE.spawn(
+                   rspacePointer
+                 )
+
+                 new RSpacePlusPlus_RhoTypes[F](rspace)
+               }
+    } yield result
 }
 
 object RSpacePlusPlus_RhoTypes {
   def create[F[_]: Concurrent: Log](
       ): F[RSpacePlusPlus_RhoTypes[F]] =
-    Sync[F].delay(new RSpacePlusPlus_RhoTypes[F]())
+    Sync[F].delay {
+      val INSTANCE: JNAInterface =
+        Native
+          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+          .asInstanceOf[JNAInterface]
+
+      val rspacePointer = INSTANCE.space_new();
+      new RSpacePlusPlus_RhoTypes[F](rspacePointer)
+    }
 
   def createWithReplay[F[_]: Concurrent: Log, C, P, A, K](
       ): F[(RSpacePlusPlus_RhoTypes[F], ReplayRSpacePlusPlus[F, C, P, A, K])] =
-    Sync[F].delay((new RSpacePlusPlus_RhoTypes[F](), new ReplayRSpacePlusPlus[F, C, P, A, K]()))
+    Sync[F].delay {
+      val INSTANCE: JNAInterface =
+        Native
+          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+          .asInstanceOf[JNAInterface]
+
+      val rspacePointer = INSTANCE.space_new();
+      (
+        new RSpacePlusPlus_RhoTypes[F](rspacePointer),
+        new ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer)
+      )
+    }
 }
