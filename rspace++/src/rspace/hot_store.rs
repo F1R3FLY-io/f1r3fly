@@ -5,6 +5,7 @@ use crate::rspace::hot_store_action::{
 };
 use crate::rspace::internal::{Datum, Row, WaitingContinuation};
 use async_trait::async_trait;
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -65,9 +66,9 @@ where
     P: Clone,
     K: Clone,
 {
-    continuations: DashMap<Vec<C>, oneshot::Receiver<Vec<WaitingContinuation<P, K>>>>,
-    datums: DashMap<C, oneshot::Receiver<Vec<Datum<A>>>>,
-    joins: DashMap<C, oneshot::Receiver<Vec<Vec<C>>>>,
+    continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
+    datums: DashMap<C, Vec<Datum<A>>>,
+    joins: DashMap<C, Vec<Vec<C>>>,
 }
 
 struct InMemHotStore<C, P, A, K>
@@ -574,6 +575,7 @@ where
     }
 }
 
+// TODO: 'history_reader_base' calls should be async called in these three get methods
 impl<C, P, A, K> InMemHotStore<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq,
@@ -586,41 +588,25 @@ where
         channels: &Vec<C>,
     ) -> Vec<WaitingContinuation<P, K>> {
         let cache = self.history_store_cache.lock().await;
-        let entry = cache.continuations.get_mut(channels);
-
+        let entry = cache.continuations.entry(channels.clone());
         match entry {
-            Some(mut entry_ref) => {
-                let receiver = entry_ref.value_mut();
-                receiver.await.expect("Hot Store: Failed to await receiver")
-            }
-            None => {
-                let (tx, rx) = oneshot::channel::<Vec<WaitingContinuation<P, K>>>();
-                cache.continuations.insert(channels.clone(), rx);
-
-                let continuations = self.history_reader_base.get_continuations(&channels);
-                tx.send(continuations.clone()).unwrap();
-
-                continuations
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let ks = self.history_reader_base.get_continuations(channels);
+                v.insert(ks.clone());
+                ks
             }
         }
     }
 
     async fn get_data_from_history_store(&self, channel: &C) -> Vec<Datum<A>> {
         let cache = self.history_store_cache.lock().await;
-        let entry = cache.datums.get_mut(channel);
-
+        let entry = cache.datums.entry(channel.clone());
         match entry {
-            Some(mut entry_ref) => {
-                let receiver = entry_ref.value_mut();
-                receiver.await.expect("Hot Store: Failed to await receiver")
-            }
-            None => {
-                let (tx, rx) = oneshot::channel::<Vec<Datum<A>>>();
-                cache.datums.insert(channel.clone(), rx);
-
-                let datums = self.history_reader_base.get_data(&channel);
-                tx.send(datums.clone()).unwrap();
-
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let datums = self.history_reader_base.get_data(channel);
+                v.insert(datums.clone());
                 datums
             }
         }
@@ -628,20 +614,12 @@ where
 
     async fn get_joins_from_history_store(&self, channel: &C) -> Vec<Vec<C>> {
         let cache = self.history_store_cache.lock().await;
-        let entry = cache.joins.get_mut(channel);
-
+        let entry = cache.joins.entry(channel.clone());
         match entry {
-            Some(mut entry_ref) => {
-                let receiver = entry_ref.value_mut();
-                receiver.await.expect("Hot Store: Failed to await receiver")
-            }
-            None => {
-                let (tx, rx) = oneshot::channel::<Vec<Vec<C>>>();
-                cache.joins.insert(channel.clone(), rx);
-
-                let joins = self.history_reader_base.get_joins(&channel);
-                tx.send(joins.clone()).unwrap();
-
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let joins = self.history_reader_base.get_joins(channel);
+                v.insert(joins.clone());
                 joins
             }
         }

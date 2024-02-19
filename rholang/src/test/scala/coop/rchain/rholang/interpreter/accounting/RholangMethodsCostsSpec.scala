@@ -838,7 +838,7 @@ class RholangMethodsCostsSpec
     // space = RSpace
     //   .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](rSpaceStore)
     //   .unsafeRunSync
-    space = new RSpacePlusPlus_RhoTypes[Task]()
+    space = RSpacePlusPlus_RhoTypes.create[Task].unsafeRunSync
   }
 
   protected override def afterAll(): Unit = {

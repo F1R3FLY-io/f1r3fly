@@ -37,7 +37,7 @@ trait PersistentStoreTester {
     // val space = RSpace
     //   .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
     //   .unsafeRunSync
-    val space   = new RSpacePlusPlus_RhoTypes[Task]()
+    val space   = RSpacePlusPlus_RhoTypes.create[Task].unsafeRunSync
     val reducer = RholangOnlyDispatcher(space)._2
     cost.set(Cost.UNSAFE_MAX).runSyncUnsafe(1.second)
 

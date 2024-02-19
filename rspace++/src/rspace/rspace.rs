@@ -361,7 +361,7 @@ where
             let result = self
                 .locked_consume(channels, patterns, continuation, persist, peeks, consume_ref)
                 .await;
-            println!("\nlocked_consume result: {:?}", result);
+            // println!("\nlocked_consume result: {:?}", result);
             result
         }
     }
