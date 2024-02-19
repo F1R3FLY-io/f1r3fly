@@ -46,13 +46,18 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
             .read(prepend_bytes(prefix, &key.bytes()))
             .expect("RSpace History Reader Impl: Failed to call read");
 
-        let read_hash = Blake3Hash::new(&read_bytes.unwrap());
-        let leaf_store_lock = self
-            .leaf_store
-            .lock()
-            .expect("RSpace History Reader Impl: Unable to acquire leaf store lock");
-        let get_opt = leaf_store_lock.get_one(&read_hash).unwrap();
-        get_opt
+        match read_bytes {
+            Some(bytes) => {
+                let read_hash = Blake3Hash::new(&bytes);
+                let leaf_store_lock = self
+                    .leaf_store
+                    .lock()
+                    .expect("RSpace History Reader Impl: Unable to acquire leaf store lock");
+                let get_opt = leaf_store_lock.get_one(&read_hash).unwrap();
+                get_opt
+            }
+            None => None,
+        }
     }
 }
 
