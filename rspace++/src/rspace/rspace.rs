@@ -1,8 +1,8 @@
 use super::checkpoint::SoftCheckpoint;
 use super::hashing::blake3_hash::Blake3Hash;
 use super::history::history_reader::HistoryReader;
+use super::history::history_repository::HistoryRepositoryError;
 use super::history::instances::radix_history::RadixHistory;
-use super::shared::key_value_store::KvStoreError;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
@@ -710,7 +710,7 @@ impl RSpaceInstances {
     pub async fn create<C, P, A, K, M>(
         store: RSpaceStore,
         matcher: M,
-    ) -> Result<RSpace<C, P, A, K, M>, KvStoreError>
+    ) -> Result<RSpace<C, P, A, K, M>, HistoryRepositoryError>
     where
         C: Clone
             + Debug
@@ -738,7 +738,10 @@ impl RSpaceInstances {
      */
     pub async fn create_history_repo<C, P, A, K>(
         store: RSpaceStore,
-    ) -> Result<(Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>), KvStoreError>
+    ) -> Result<
+        (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>),
+        HistoryRepositoryError,
+    >
     where
         C: Clone
             + Debug

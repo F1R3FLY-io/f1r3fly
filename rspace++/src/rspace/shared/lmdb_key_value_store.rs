@@ -1,15 +1,16 @@
-use super::key_value_store::KeyValueStore;
+use super::key_value_store::{KeyValueStore, KvStoreError};
+use crate::rspace::ByteBuffer;
 use heed::types::SerdeBincode;
 use heed::{Database, Env};
 use std::sync::{Arc, Mutex};
 
 pub struct LmdbKeyValueStore {
     env: Arc<Env>,
-    db: Arc<Mutex<Database<SerdeBincode<Vec<u8>>, SerdeBincode<Vec<u8>>>>>,
+    db: Arc<Mutex<Database<SerdeBincode<ByteBuffer>, SerdeBincode<ByteBuffer>>>>,
 }
 
 impl KeyValueStore for LmdbKeyValueStore {
-    fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error> {
+    fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
         let db = self
             .db
             .lock()
@@ -23,7 +24,7 @@ impl KeyValueStore for LmdbKeyValueStore {
         results
     }
 
-    fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error> {
+    fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
         let db = self
             .db
             .lock()
@@ -36,7 +37,7 @@ impl KeyValueStore for LmdbKeyValueStore {
         Ok(())
     }
 
-    fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error> {
+    fn delete(&self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError> {
         let db = self
             .db
             .lock()
@@ -52,7 +53,7 @@ impl KeyValueStore for LmdbKeyValueStore {
         Ok(delete_count)
     }
 
-    fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error> {
+    fn iterate(&self, f: fn(ByteBuffer, ByteBuffer)) -> Result<(), KvStoreError> {
         let db = self
             .db
             .lock()
@@ -73,7 +74,7 @@ impl KeyValueStore for LmdbKeyValueStore {
 }
 
 impl LmdbKeyValueStore {
-    pub fn new(env: Env, db: Database<SerdeBincode<Vec<u8>>, SerdeBincode<Vec<u8>>>) -> Self {
+    pub fn new(env: Env, db: Database<SerdeBincode<ByteBuffer>, SerdeBincode<ByteBuffer>>) -> Self {
         let env_arc = Arc::new(env);
         let db_arc = Arc::new(Mutex::new(db));
 

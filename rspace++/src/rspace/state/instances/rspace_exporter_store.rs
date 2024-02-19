@@ -1,6 +1,6 @@
 use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::instances::radix_history::RadixHistory;
-use crate::rspace::history::roots_store::{RootsStore, RootsStoreInstances};
+use crate::rspace::history::roots_store::{RootError, RootsStore, RootsStoreInstances};
 use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::trie_exporter::{TrieExporter, TrieNode};
 use crate::rspace::state::rspace_exporter::RSpaceExporterInstance;
@@ -52,11 +52,11 @@ impl RSpaceExporterImpl {
 }
 
 impl RSpaceExporter for RSpaceExporterImpl {
-    fn get_root(&self) -> Blake3Hash {
+    fn get_root(&self) -> Result<Blake3Hash, RootError> {
         let roots_store = RootsStoreInstances::roots_store(self.source_roots_store.clone());
-        let maybe_root = roots_store.current_root();
+        let maybe_root = roots_store.current_root()?;
         match maybe_root {
-            Some(root) => root,
+            Some(root) => Ok(root),
             None => panic!("RSpace Exporter Store: No root found"),
         }
     }

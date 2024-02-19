@@ -1,16 +1,15 @@
+use super::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{collections::BTreeMap, marker::PhantomData};
 
-use super::key_value_store::KvStoreError;
-
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStore.scala
 #[async_trait]
 pub trait KeyValueTypedStore<K, V>: Send + Sync
 where
-    K: Debug + Clone + Send + Sync,
+    K: Debug + Send + Sync + Clone,
     V: Debug + Send + Sync,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
@@ -61,8 +60,8 @@ pub struct KeyValueTypedStoreInstance<K, V> {
 
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
-    K: Debug + Clone + Send + Sync + Serialize + 'static,
-    V: Debug + Send + Sync + for<'a> Deserialize<'a> + 'static + Serialize,
+    K: Debug + Send + Sync + Serialize + 'static + Clone,
+    V: Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
         let keys_bytes = keys

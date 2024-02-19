@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::Mutex;
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
 #[async_trait]

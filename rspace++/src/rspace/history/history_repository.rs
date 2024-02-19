@@ -7,7 +7,7 @@ use crate::rspace::history::root_repository::RootRepository;
 use crate::rspace::history::roots_store::RootsStoreInstances;
 use crate::rspace::hot_store_action::HotStoreAction;
 use crate::rspace::hot_store_trie_action::HotStoreTrieAction;
-use crate::rspace::shared::key_value_store::{KeyValueStore, KvStoreError};
+use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
@@ -17,6 +17,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
+
+use super::roots_store::RootError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 #[async_trait]
@@ -80,7 +82,7 @@ where
         history_key_value_store: Box<dyn KeyValueStore>,
         roots_key_value_store: Box<dyn KeyValueStore>,
         cold_key_value_store: Box<dyn KeyValueStore>,
-    ) -> Result<impl HistoryRepository<C, P, A, K>, KvStoreError> {
+    ) -> Result<impl HistoryRepository<C, P, A, K>, HistoryRepositoryError> {
         // Roots store
         let roots_repository = RootRepository {
             roots_store: Box::new(RootsStoreInstances::roots_store(roots_key_value_store.clone())),
@@ -114,5 +116,24 @@ where
             rspace_importer: Arc::new(Mutex::new(Box::new(importer))),
             _marker: PhantomData,
         })
+    }
+}
+
+#[derive(Debug)]
+pub enum HistoryRepositoryError {
+    RootError(RootError),
+}
+
+impl std::fmt::Display for HistoryRepositoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HistoryRepositoryError::RootError(err) => write!(f, "Root Error: {}", err),
+        }
+    }
+}
+
+impl From<RootError> for HistoryRepositoryError {
+    fn from(error: RootError) -> Self {
+        HistoryRepositoryError::RootError(error)
     }
 }

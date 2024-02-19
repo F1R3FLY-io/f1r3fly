@@ -135,7 +135,7 @@ object BasicBench {
     //     ](rSpaceStore)
     //     .unsafeRunSync
 
-    val testSpace = new RSpacePlusPlus_RhoTypes[Task]()
+    val testSpace = RSpacePlusPlus_RhoTypes.create[Task].unsafeRunSync
 
     implicit val cost = CostAccounting.initialCost[Task](Cost.UNSAFE_MAX).unsafeRunSync
 

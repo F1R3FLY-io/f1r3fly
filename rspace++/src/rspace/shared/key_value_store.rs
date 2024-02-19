@@ -1,41 +1,35 @@
 use crate::rspace::shared::key_value_typed_store::{
     KeyValueTypedStore, KeyValueTypedStoreInstance,
 };
+use crate::rspace::ByteBuffer;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
 pub trait KeyValueStore: Send + Sync {
-    fn get(&self, keys: Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, heed::Error>;
+    fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError>;
 
-    fn put(&self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), heed::Error>;
+    fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError>;
 
-    fn delete(&self, keys: Vec<Vec<u8>>) -> Result<usize, heed::Error>;
+    fn delete(&self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError>;
 
-    fn iterate(&self, f: fn(Vec<u8>, Vec<u8>)) -> Result<(), heed::Error>;
+    fn iterate(&self, f: fn(ByteBuffer, ByteBuffer)) -> Result<(), KvStoreError>;
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
-    fn get_one(&self, key: Vec<u8>) -> Option<Vec<u8>> {
-        let values = self.get(vec![key]);
-        let first_value = values.map(|mut v| v.remove(0));
+    fn get_one(&self, key: ByteBuffer) -> Result<Option<ByteBuffer>, KvStoreError> {
+        let values = self.get(vec![key])?;
 
-        match first_value {
-            Ok(value) => value,
-            Err(err) => {
-                println!("Key_Value_Store: {}", err);
-                None
-            }
+        match values.split_first() {
+            Some((first_value, _)) => Ok(first_value.clone()),
+            None => Ok(None),
         }
     }
 
-    fn put_one(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), KvStoreError> {
-        self.put(vec![(key, value)])?;
-        Ok(())
+    fn put_one(&self, key: ByteBuffer, value: ByteBuffer) -> Result<(), KvStoreError> {
+        self.put(vec![(key, value)])
     }
 }
 
@@ -48,46 +42,29 @@ impl Clone for Box<dyn KeyValueStore> {
 #[derive(Debug)]
 pub enum KvStoreError {
     KeyNotFound(String),
-    IoError(std::io::Error),
-    SerializationError(serde_json::Error),
-    DeserializationError(serde_json::Error),
-    HeedError(heed::Error),
-    BoxBincodeError(Box<bincode::ErrorKind>),
+    IoError(heed::Error),
+    SerializationError(Box<bincode::ErrorKind>),
 }
 
-impl fmt::Display for KvStoreError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for KvStoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             KvStoreError::KeyNotFound(key) => write!(f, "Key not found: {}", key),
-            KvStoreError::SerializationError(e) => write!(f, "Serialization error: {}", e),
-            KvStoreError::DeserializationError(e) => write!(f, "Deserialization error: {}", e),
             KvStoreError::IoError(e) => write!(f, "I/O error: {}", e),
-            KvStoreError::HeedError(e) => write!(f, "Heed error: {}", e),
-            KvStoreError::BoxBincodeError(e) => write!(f, "Bincode error: {}", e),
-        }
-    }
-}
-
-impl Error for KvStoreError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            KvStoreError::SerializationError(e) => Some(e),
-            KvStoreError::DeserializationError(e) => Some(e),
-            KvStoreError::IoError(e) => Some(e),
-            _ => None,
+            KvStoreError::SerializationError(e) => write!(f, "SerializationError error: {}", e),
         }
     }
 }
 
 impl From<heed::Error> for KvStoreError {
     fn from(error: heed::Error) -> Self {
-        KvStoreError::HeedError(error)
+        KvStoreError::IoError(error)
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for KvStoreError {
     fn from(error: Box<bincode::ErrorKind>) -> Self {
-        KvStoreError::BoxBincodeError(error)
+        KvStoreError::SerializationError(error)
     }
 }
 
@@ -98,7 +75,7 @@ impl KeyValueStoreOps {
     pub fn to_typed_store<K, V>(store: Box<dyn KeyValueStore>) -> impl KeyValueTypedStore<K, V>
     where
         K: Clone + Debug + Send + Sync + Serialize + 'static,
-        V: Clone + Debug + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        V: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
     {
         KeyValueTypedStoreInstance {
             store,
