@@ -23,11 +23,15 @@ Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
 
-inThisBuild(List(
-  publish / skip := true,
-  publishMavenStyle := true,
-  publishTo := Option("GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly")
-))
+inThisBuild(
+  List(
+    publish / skip := true,
+    publishMavenStyle := true,
+    publishTo := Option(
+      "GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly"
+    )
+  )
+)
 
 val javaOpens = List(
   "--add-opens",
@@ -196,7 +200,7 @@ release := {
     throw new IllegalStateException("Benchmark tests failed")
   }
 }
-*/
+ */
 
 lazy val benchmark = taskKey[Unit]("Run benchmark, and update changelog")
 
@@ -441,17 +445,23 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("RUN", """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
+        Cmd(
+          "RUN",
+          """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
                       microdnf update && \
                       microdnf install jq gzip && \
                       curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       chmod a+x grpcurl && \
-                      mv grpcurl /usr/local/bin"""),
-        Cmd("USER", (Docker/daemonUser).value),
-        Cmd("HEALTHCHECK CMD", """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
-                                  curl -s 127.0.0.1:40403/status | jq -e"""),
+                      mv grpcurl /usr/local/bin"""
+        ),
+        Cmd("USER", (Docker / daemonUser).value),
+        Cmd(
+          "HEALTHCHECK CMD",
+          """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
+                                  curl -s 127.0.0.1:40403/status | jq -e"""
+        ),
         ExecCmd("CMD", "run")
       )
     },
@@ -527,7 +537,15 @@ lazy val rholang = (project in file("rholang"))
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
       "-Djna.library.path=../rspace++/target/release/"
-    )
+    ),
+    runCargoBuild := {
+      import scala.sys.process._
+      val exitCode = Seq("./scripts/build_rspace++.sh").!
+      if (exitCode != 0) {
+        throw new Exception("Rust build script failed with exit code " + exitCode)
+      }
+    },
+    (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(
     models % "compile->compile;test->test",
@@ -556,7 +574,7 @@ lazy val rholangServer = (project in file("rholang-server"))
     nativeImageVersion := "22.3.3",
     libraryDependencies ++= List(
       fs2Io,
-      "org.jline"          % "jline"         % "3.21.0",
+      "org.jline"         % "jline"          % "3.21.0",
       "org.scodec"        %% "scodec-stream" % "2.0.3",
       "io.chrisdavenport" %% "fuuid"         % "0.7.0",
       "com.comcast"       %% "ip4s-core"     % "2.0.4",

@@ -95,8 +95,7 @@ where
                 //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
                 //     patterns, channels
                 // );
-                self.store_persistent_data(data_candidates.clone(), peeks)
-                    .await;
+                self.store_persistent_data(data_candidates.clone()).await;
                 self.wrap_result(channels, wk, consume_ref, data_candidates)
             }
             None => {
@@ -302,7 +301,6 @@ where
     async fn store_persistent_data(
         &self,
         data_candidates: Vec<ConsumeCandidate<C, A>>,
-        _peeks: BTreeSet<i32>,
     ) -> Option<Vec<()>> {
         let futures: Vec<_> = data_candidates
             .into_iter()
@@ -317,8 +315,7 @@ where
 
                 async move {
                     if !persist {
-                        self.store.remove_datum(channel, datum_index).await;
-                        None
+                        self.store.remove_datum(channel, datum_index).await
                     } else {
                         Some(())
                     }
