@@ -385,7 +385,8 @@ where
 
     async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
-        let continuations_in_history_store: Vec<WaitingContinuation<P, K>> = Vec::new();
+        let continuations_in_history_store: Vec<WaitingContinuation<P, K>> =
+            self.get_cont_from_history_store(&join).await;
 
         let state = self.hot_store_state.lock().await;
         let current_joins = state

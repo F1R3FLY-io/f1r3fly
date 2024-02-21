@@ -146,7 +146,7 @@ message InstallParams {
  * Data structure for 'spatial_match_result' function return type
  */
 message FreeMapProto {
-  map<int32, rhoapi.Par> entries = 4;
+  map<int32, rhoapi.Par> entries = 1;
 }
 
 /**
