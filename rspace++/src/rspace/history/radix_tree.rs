@@ -287,7 +287,7 @@ pub fn sequential_export(
     take_size: usize,
     get_node_data_from_store: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     settings: ExportDataSettings,
-) -> Result<(ExportData, Option<ByteVector>), KvStoreError> {
+) -> Result<(ExportData, Option<ByteVector>), RadixTreeError> {
     #[derive(Clone)]
     struct NodeData {
         prefix: ByteVector,
@@ -318,7 +318,7 @@ pub fn sequential_export(
      * Create path from root to lastPrefix node
      */
     let init_node_path: Box<
-        dyn Fn(NodePathData) -> Result<Either<NodePathData, Path>, KvStoreError>,
+        dyn Fn(NodePathData) -> Result<Either<NodePathData, Path>, RadixTreeError>,
     > = Box::new(|p: NodePathData| {
         let process_child_item = |node: Node| {
             let item_idx = byte_to_int(*p.rest_prefix.first().unwrap());
@@ -382,7 +382,7 @@ pub fn sequential_export(
 
         let node_opt = get_node_data_from_store(&p.hash);
         if node_opt.is_none() {
-            Err(KvStoreError::KeyNotFound(format!(
+            Err(RadixTreeError::KeyNotFound(format!(
                 "Radix Tree - Export error: node with key {} not found.",
                 { hex::encode(p.hash) }
             )))
@@ -509,7 +509,7 @@ pub fn sequential_export(
             Byte,
             ByteVector,
             Vec<NodeData>,
-        ) -> Result<StepData, KvStoreError>,
+        ) -> Result<StepData, RadixTreeError>,
     > = Box::new(
         |p: StepData,
          ptr_prefix: ByteVector,
@@ -556,7 +556,7 @@ pub fn sequential_export(
 
             let child_node_opt = get_node_data_from_store(&ptr);
             if child_node_opt.is_none() {
-                Err(KvStoreError::KeyNotFound(format!(
+                Err(RadixTreeError::KeyNotFound(format!(
                     "Radix Tree - Export error: node with key {} not found.",
                     { hex::encode(ptr) }
                 )))
@@ -581,7 +581,7 @@ pub fn sequential_export(
     );
 
     let add_element: Box<
-        dyn Fn(StepData, u8, Item, Vec<Item>, Vec<u8>) -> Result<StepData, KvStoreError>,
+        dyn Fn(StepData, u8, Item, Vec<Item>, Vec<u8>) -> Result<StepData, RadixTreeError>,
     > = Box::new(
         |p: StepData,
          item_index: Byte,
@@ -612,7 +612,8 @@ pub fn sequential_export(
     let export_step: Box<
         dyn Fn(
             StepData,
-        ) -> Result<Either<StepData, (ExportData, Option<ByteVector>)>, KvStoreError>,
+        )
+            -> Result<Either<StepData, (ExportData, Option<ByteVector>)>, RadixTreeError>,
     > = Box::new(|p: StepData| {
         if p.path.is_empty() {
             // End of Tree
@@ -660,7 +661,7 @@ pub fn sequential_export(
     }
 
     let do_export: Box<
-        dyn Fn(ByteVector) -> Result<(ExportData, Option<ByteVector>), KvStoreError>,
+        dyn Fn(ByteVector) -> Result<(ExportData, Option<ByteVector>), RadixTreeError>,
     > = Box::new(|root_node_ser: ByteVector| {
         let root_params = NodePathData {
             hash: root_hash.clone(),
@@ -809,7 +810,7 @@ impl RadixTreeImpl {
         &self,
         node_ptr: ByteVector,
         no_assert: Option<bool>,
-    ) -> Result<Node, KvStoreError> {
+    ) -> Result<Node, RadixTreeError> {
         let no_assert = no_assert.unwrap_or(false);
 
         let error_msg = |node_ptr: &[u8]| {
@@ -885,7 +886,7 @@ impl RadixTreeImpl {
      *
      * If detected collision with older KVDB data - execute Exception
      */
-    pub fn commit(&self) -> Result<(), KvStoreError> {
+    pub fn commit(&self) -> Result<(), RadixTreeError> {
         fn collision_panic(collisions: Vec<(ByteVector, ByteVector)>) -> () {
             panic!(
                 "Radix Tree - ${} collisions in KVDB (first collision with key = ${}.",
@@ -944,7 +945,8 @@ impl RadixTreeImpl {
             .map(|(kv, _)| kv)
             .collect();
 
-        store_lock.put(kv_absent)
+        store_lock.put(kv_absent)?;
+        Ok(())
     }
 
     /**
@@ -961,45 +963,46 @@ impl RadixTreeImpl {
         &self,
         start_node: Node,
         start_prefix: ByteVector,
-    ) -> Result<Option<ByteVector>, KvStoreError> {
+    ) -> Result<Option<ByteVector>, RadixTreeError> {
         type Params = (Node, ByteVector);
 
-        let loops: Box<dyn Fn(Params) -> Result<Either<Params, Option<ByteVector>>, KvStoreError>> =
-            Box::new(|params: Params| {
-                match params {
-                    (_, ref prefix) if prefix.is_empty() => Ok(Either::Right(None)), // Not found
-                    (cur_node, prefix) => match &cur_node[byte_to_int(*prefix.first().unwrap())] {
-                        Item::EmptyItem => Ok(Either::Right(None)), // Not found,
-                        Item::Leaf {
-                            prefix: leaf_prefix,
-                            value,
-                        } => {
-                            let (_, prefix_tail) = prefix.split_first().unwrap();
-                            if leaf_prefix == prefix_tail {
-                                Ok(Either::Right(Some(value.clone()))) // Happy end
-                            } else {
-                                Ok(Either::Right(None)) // Not found
-                            }
+        let loops: Box<
+            dyn Fn(Params) -> Result<Either<Params, Option<ByteVector>>, RadixTreeError>,
+        > = Box::new(|params: Params| {
+            match params {
+                (_, ref prefix) if prefix.is_empty() => Ok(Either::Right(None)), // Not found
+                (cur_node, prefix) => match &cur_node[byte_to_int(*prefix.first().unwrap())] {
+                    Item::EmptyItem => Ok(Either::Right(None)), // Not found,
+                    Item::Leaf {
+                        prefix: leaf_prefix,
+                        value,
+                    } => {
+                        let (_, prefix_tail) = prefix.split_first().unwrap();
+                        if leaf_prefix == prefix_tail {
+                            Ok(Either::Right(Some(value.clone()))) // Happy end
+                        } else {
+                            Ok(Either::Right(None)) // Not found
                         }
-                        Item::NodePtr {
-                            prefix: ptr_prefix,
-                            ptr,
-                        } => {
-                            let (_, prefix_tail) = prefix.split_first().unwrap();
-                            let (_, prefix_rest, ptr_prefix_rest) =
-                                common_prefix(prefix_tail.to_vec(), ptr_prefix.to_vec());
+                    }
+                    Item::NodePtr {
+                        prefix: ptr_prefix,
+                        ptr,
+                    } => {
+                        let (_, prefix_tail) = prefix.split_first().unwrap();
+                        let (_, prefix_rest, ptr_prefix_rest) =
+                            common_prefix(prefix_tail.to_vec(), ptr_prefix.to_vec());
 
-                            if ptr_prefix_rest.is_empty() {
-                                // Deeper
-                                self.load_node(ptr.to_vec(), None)
-                                    .map(|n| Ok(Either::Left((n, prefix_rest))))?
-                            } else {
-                                Ok(Either::Right(None)) // Not found
-                            }
+                        if ptr_prefix_rest.is_empty() {
+                            // Deeper
+                            self.load_node(ptr.to_vec(), None)
+                                .map(|n| Ok(Either::Left((n, prefix_rest))))?
+                        } else {
+                            Ok(Either::Right(None)) // Not found
                         }
-                    },
-                }
-            });
+                    }
+                },
+            }
+        });
 
         tail_rec_m((start_node, start_prefix), loops)
     }
@@ -1053,7 +1056,7 @@ impl RadixTreeImpl {
      *
      * If item is NodePtr and prefix is empty - load child node
      */
-    fn construct_node_from_item(&self, item: Item) -> Result<Node, KvStoreError> {
+    fn construct_node_from_item(&self, item: Item) -> Result<Node, RadixTreeError> {
         match item {
             Item::NodePtr { prefix, ptr } if prefix.is_empty() => self.load_node(ptr, None),
             _ => Ok(self.create_node_from_item(item)),
@@ -1137,9 +1140,9 @@ impl RadixTreeImpl {
         curr_item: Item,
         ins_prefix: ByteVector,
         ins_value: ByteVector,
-    ) -> Result<Option<Item>, KvStoreError> {
+    ) -> Result<Option<Item>, RadixTreeError> {
         let insert_new_node_to_child: Box<
-            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, KvStoreError>,
+            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, RadixTreeError>,
         > = Box::new(|child_ptr: ByteVector, child_prefix: ByteVector, ins_prefix: ByteVector| {
             let child_node = self.load_node(child_ptr, None)?;
             let (ins_prefix_head, ins_prefix_tail) = ins_prefix.split_first().unwrap();
@@ -1277,9 +1280,9 @@ impl RadixTreeImpl {
         &self,
         curr_item: Item,
         del_prefix: ByteVector,
-    ) -> Result<Option<Item>, KvStoreError> {
+    ) -> Result<Option<Item>, RadixTreeError> {
         let delete_from_child_node: Box<
-            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, KvStoreError>,
+            dyn Fn(ByteVector, ByteVector, ByteVector) -> Result<Option<Item>, RadixTreeError>,
         > = Box::new(|child_ptr: ByteVector, child_prefix: ByteVector, del_prefix: ByteVector| {
             let child_node = self.load_node(child_ptr, None)?;
             let (del_prefix_head, del_prefix_tail) = del_prefix.split_first().unwrap();
@@ -1335,11 +1338,11 @@ impl RadixTreeImpl {
         &self,
         curr_node: Node,
         actions: Vec<HistoryAction>,
-    ) -> Result<Option<Node>, KvStoreError> {
+    ) -> Result<Option<Node>, RadixTreeError> {
         // If we have 1 action in group.
         // We can't parallel next and we should use sequential traversing with help update() or delete().
         let process_one_action: Box<
-            dyn Fn(HistoryAction, Item, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+            dyn Fn(HistoryAction, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
         > = Box::new(|action: HistoryAction, item: Item, item_idx: i32| {
             let new_item = match action {
                 HistoryAction::Insert(InsertAction { key, hash }) => {
@@ -1396,7 +1399,7 @@ impl RadixTreeImpl {
         }
 
         let process_non_empty_actions: Box<
-            dyn Fn(Vec<HistoryAction>, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+            dyn Fn(Vec<HistoryAction>, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
         > = Box::new(|actions: Vec<HistoryAction>, item_idx: i32| {
             let create_node =
                 self.construct_node_from_item(curr_node.get(item_idx as usize).unwrap().clone())?;
@@ -1412,7 +1415,7 @@ impl RadixTreeImpl {
 
         // If we have more than 1 action. We can create more parallel processes.
         let process_several_actions: Box<
-            dyn Fn(Vec<HistoryAction>, Item, i32) -> Result<(i32, Option<Item>), KvStoreError>,
+            dyn Fn(Vec<HistoryAction>, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
         > = Box::new(|actions: Vec<HistoryAction>, item: Item, item_idx: i32| {
             let cleared_actions = clearing_delete_actions(actions, item);
             if cleared_actions.is_empty() {
@@ -1427,7 +1430,7 @@ impl RadixTreeImpl {
             dyn Fn(
                 Vec<(Byte, Vec<HistoryAction>)>,
                 Node,
-            ) -> Vec<Result<(i32, Option<Item>), KvStoreError>>,
+            ) -> Vec<Result<(i32, Option<Item>), RadixTreeError>>,
         > = Box::new(|grouped_actions: Vec<(Byte, Vec<HistoryAction>)>, curr_node: Node| {
             grouped_actions
                 .iter()
@@ -1501,9 +1504,9 @@ impl RadixTreeImpl {
     }
 }
 
-fn tail_rec_m<A, B, F>(initial_state: A, mut func: F) -> Result<B, KvStoreError>
+fn tail_rec_m<A, B, F>(initial_state: A, mut func: F) -> Result<B, RadixTreeError>
 where
-    F: FnMut(A) -> Result<Either<A, B>, KvStoreError>,
+    F: FnMut(A) -> Result<Either<A, B>, RadixTreeError>,
 {
     let mut state = initial_state;
     loop {
@@ -1511,5 +1514,26 @@ where
             Either::Left(new_state) => state = new_state,
             Either::Right(final_state) => return Ok(final_state),
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum RadixTreeError {
+    KeyNotFound(String),
+    KvStoreError(KvStoreError),
+}
+
+impl std::fmt::Display for RadixTreeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RadixTreeError::KeyNotFound(err) => write!(f, "Key Not Found Error: {}", err),
+            RadixTreeError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
+        }
+    }
+}
+
+impl From<KvStoreError> for RadixTreeError {
+    fn from(error: KvStoreError) -> Self {
+        RadixTreeError::KvStoreError(error)
     }
 }

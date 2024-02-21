@@ -349,7 +349,8 @@ where
                     .expect("History Repository Impl: Unable to acquire history lock");
 
                 history_lock.process(history_actions)
-            };
+            }
+            .unwrap();
             result_history
         };
         let new_root = store_history.root();

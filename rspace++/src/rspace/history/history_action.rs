@@ -10,7 +10,7 @@ pub enum HistoryAction {
 }
 
 pub trait HistoryActionTrait {
-    fn key(&self) -> &KeyPath;
+    fn key(&self) -> KeyPath;
 }
 
 #[derive(Clone)]
@@ -20,8 +20,8 @@ pub struct InsertAction {
 }
 
 impl HistoryActionTrait for InsertAction {
-    fn key(&self) -> &KeyPath {
-        &self.key
+    fn key(&self) -> KeyPath {
+        self.key.clone()
     }
 }
 
@@ -31,13 +31,13 @@ pub struct DeleteAction {
 }
 
 impl HistoryActionTrait for DeleteAction {
-    fn key(&self) -> &KeyPath {
-        &self.key
+    fn key(&self) -> KeyPath {
+        self.key.clone()
     }
 }
 
 impl HistoryActionTrait for HistoryAction {
-    fn key(&self) -> &KeyPath {
+    fn key(&self) -> KeyPath {
         match self {
             HistoryAction::Insert(insert_action) => insert_action.key(),
             HistoryAction::Delete(delete_action) => delete_action.key(),
