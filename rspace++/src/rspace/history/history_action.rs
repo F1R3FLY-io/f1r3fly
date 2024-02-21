@@ -1,7 +1,7 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::{hashing::blake3_hash::Blake3Hash, Byte};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryAction.scala
-type KeyPath = Vec<u8>;
+pub type KeyPath = Vec<Byte>;
 
 #[derive(Clone)]
 pub enum HistoryAction {
