@@ -2,10 +2,11 @@
 #[cfg(test)]
 mod tests {
     use rand::distributions::{Alphanumeric, DistString};
+    use rspace_plus_plus::rspace::history::radix_tree::RadixTreeError;
     use rspace_plus_plus::rspace::{
         hashing::blake3_hash::Blake3Hash,
         history::{
-            history::{History, HistoryInstances},
+            history::{History, HistoryError, HistoryInstances},
             history_action::{
                 DeleteAction, HistoryAction, HistoryActionTrait, InsertAction, KeyPath,
             },
@@ -45,7 +46,6 @@ mod tests {
     #[test]
     fn creating_ten_records_should_work() {
         let data: Vec<HistoryAction> = (0..10).map(zeros_and).map(|k| history_insert(k)).collect();
-
         let empty_history = create_empty_history();
         let new_history = empty_history.process(data.clone()).unwrap();
 
@@ -103,14 +103,60 @@ mod tests {
     // TODO: Don't works for MergingHistory
     #[test]
     fn deletion_of_a_non_existing_records_should_not_throw_error() {
-        let changes_1 = vec![history_insert(hex_key("0011"))];
-        let changes_2 = vec![history_delete(hex_key("0012")), history_delete(hex_key("0011"))];
+        let changes1 = vec![history_insert(hex_key("0011"))];
+        let changes2 = vec![history_delete(hex_key("0012")), history_delete(hex_key("0011"))];
 
         let empty_history = create_empty_history();
-        let history_one = empty_history.process(changes_1).unwrap();
-        let err = history_one.process(changes_2);
+        let history_one = empty_history.process(changes1).unwrap();
+        let err = history_one.process(changes2);
 
         assert!(err.is_ok());
+    }
+
+    #[test]
+    fn history_should_not_allow_to_store_different_length_key_records_in_same_branch() {
+        let data = vec![history_insert(hex_key("01")), history_insert(hex_key("0100"))];
+        let empty_history = create_empty_history();
+        let err = empty_history.process(data);
+
+        assert!(err.is_err());
+        match err {
+            Err(HistoryError::RadixTreeError(RadixTreeError::PrefixError(message))) => {
+                assert_eq!(message, "The length of all prefixes in the subtree must be the same.");
+            }
+            _ => panic!("Expected PrefixError variant"),
+        }
+
+        // TODO: For MergingHistory
+        // ex shouldBe a[RuntimeException]
+        // ex.getMessage shouldBe s"malformed trie"
+    }
+
+    #[test]
+    fn history_should_not_allow_to_process_history_actions_with_same_keys() {
+        let data1 = vec![history_insert(zeros()), history_insert(zeros())];
+        let empty_history = create_empty_history();
+        let err = empty_history.process(data1);
+
+        assert!(err.is_err());
+        match err {
+            Err(HistoryError::ActionError(message)) => {
+                assert_eq!(message, "Cannot process duplicate actions on one key.");
+            }
+            _ => panic!("Expected ActionError variant"),
+        }
+
+        let data2 = vec![history_insert(zeros()), history_delete(zeros())];
+        let empty_history = create_empty_history();
+        let err = empty_history.process(data2);
+
+        assert!(err.is_err());
+        match err {
+            Err(HistoryError::ActionError(message)) => {
+                assert_eq!(message, "Cannot process duplicate actions on one key.");
+            }
+            _ => panic!("Expected ActionError variant"),
+        }
     }
 
     fn create_empty_history() -> impl History {

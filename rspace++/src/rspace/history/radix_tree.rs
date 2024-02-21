@@ -1457,23 +1457,30 @@ impl RadixTreeImpl {
         });
 
         // Group the actions by the first byte of the prefix.
-        fn grouping(actions: Vec<HistoryAction>) -> Vec<(Byte, Vec<HistoryAction>)> {
+        fn grouping(
+            actions: Vec<HistoryAction>,
+        ) -> Result<Vec<(Byte, Vec<HistoryAction>)>, RadixTreeError> {
             let mut groups: HashMap<Byte, Vec<HistoryAction>> = HashMap::new();
             for action in actions {
-                let first_byte = *action
-                    .key()
-                    .first()
-                    .expect("The length of all prefixes in the subtree must be the same.");
+                let first_byte = match action.key().first() {
+                    Some(b) => *b,
+                    None => {
+                        return Err(RadixTreeError::PrefixError(
+                            "The length of all prefixes in the subtree must be the same."
+                                .to_string(),
+                        ))
+                    }
+                };
                 groups
                     .entry(first_byte)
                     .or_insert_with(Vec::new)
                     .push(action);
             }
-            groups.into_iter().collect()
+            Ok(groups.into_iter().collect())
         }
 
         // Group the actions by the first byte of the prefix.
-        let grouped_actions = grouping(actions);
+        let grouped_actions = grouping(actions)?;
         // Process actions within each group.
         // TODO: Update to handle parallel execution. See Scala side
         let new_group_items_results = process_grouped_actions(grouped_actions, curr_node.clone());
@@ -1521,6 +1528,7 @@ where
 pub enum RadixTreeError {
     KeyNotFound(String),
     KvStoreError(KvStoreError),
+    PrefixError(String),
 }
 
 impl std::fmt::Display for RadixTreeError {
@@ -1528,6 +1536,7 @@ impl std::fmt::Display for RadixTreeError {
         match self {
             RadixTreeError::KeyNotFound(err) => write!(f, "Key Not Found Error: {}", err),
             RadixTreeError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
+            RadixTreeError::PrefixError(err) => write!(f, "Prefix Error: {}", err),
         }
     }
 }

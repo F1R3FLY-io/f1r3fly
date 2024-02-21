@@ -69,7 +69,9 @@ impl History for RadixHistory {
 
     fn process(&self, actions: Vec<HistoryAction>) -> Result<Box<dyn History>, HistoryError> {
         if self.has_no_duplicates(&actions) {
-            panic!("Radix History: Cannot process duplicate actions on one key.")
+            return Err(HistoryError::ActionError(
+                "Cannot process duplicate actions on one key.".to_string(),
+            ));
         }
 
         let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions)?;
