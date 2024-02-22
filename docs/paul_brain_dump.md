@@ -40,6 +40,24 @@
   * The reproducible development environment provides [grpcurl](https://github.com/fullstorydev/grpcurl). It's important that you know and understand this.
   * All clients must have an implementation of `signDeploy`, which takes a Protobuf `DeployDataProto`. serializes several of its fields, hashes those bytes with Blake2b256, signs the hash with a private secp256k1 key, DER encodes the signature, and returns a new `DeployDataProto` with the `sig` field containing the encoded signature, the `deployer` field containing the compressed public key inferred from the private key, and the `sigAlgorithm` field containing "secp256k1".
   * See `scripts/playground.sc` for the most perspicuous (if I do say so myself) implementation of `signDeploy`.
+* Deployment
+  * The reality is you'll deploy on Kubernetes indefinitely—at the barest minimum, two years. It's important that you know and understand this.
+  * Public cloud infrastructure, customer infrastructure, it doesn't matter, except insofar as, if you want these networks to talk to each other, you'll need to master [Kubernetes multi-clustering](https://www.tigera.io/learn/guides/kubernetes-networking/kubernetes-multi-cluster/).
+  * [Rancher](https://www.rancher.com/) is extremely good for provisioning Kubernetes clusters, and in particular supports your first target, OKE.
+  * Eventually, to deal with exotic hardware F1r3fly can take the best advantage of, you'll need to master [bare-metal Kubernetes](https://deploy.equinix.com/blog/guide-to-running-kubernetes-on-bare-metal/).
+  * The reproducible development environment provides [Minikube](https://minikube.sigs.k8s.io/docs/), a _very_ good local single-node Kubernetes "cluster."
+  * The reproducible development environment provides [Dhall](ihttps://dhall-lang.org/) and its YAML-generating CLI.
+  * The project repository includes [dhall-kubernetes](https://github.com/dhall-lang/dhall-kubernetes) as a Git submodule. This may be useful for developing rich deployments.
+  * Study other stateful services that can be deployed to Kubernetes, including other blockchains.
+    * Strongly consider developing a F1r3fly [Operator](https://operatorframework.io/)
+      * Using the [kubernetes-client](https://github.com/joan38/kubernetes-client)
+    * Strongly consider using the [Operator Lifecycle Manager](https://olm.operatorframework.io/)
+    * Ideally, the F1r3fly Operator should be listed in the [Operator Hub](https://operatorhub.io/)
+    * Study the [Crunchy Data PostgreSQL Operator](https://access.crunchydata.com/documentation/postgres-operator/latest/architecture)
+    * Study the [Hyperledger Besu Operator](https://github.com/hyperledger-labs/besu-operator)
+    * Study the [Hyperledger Fabric Operator](https://hyperledger.github.io/bevel-operator-fabric/docs/)
+    * Study the [Cosmos Operator](https://github.com/strangelove-ventures/cosmos-operator)
+    * Consider integrating into [Kotal](https://github.com/kotalco/kotal)
 * The Code
   * A time capsule of multiple teams with no engineering management and varying backgrounds and skills banging away.
   * Using a badly outdated version of Scala, at least one major unsupported library, and libraries that have been dramatically improved upon since.
