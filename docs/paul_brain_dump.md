@@ -63,9 +63,12 @@
   * Using a badly outdated version of Scala, at least one major unsupported library, and libraries that have been dramatically improved upon since.
   * Priorities (it's important that you know and understand this):
     * Upgrade ScalaTest to a version supported by [cats-effect-testing](https://github.com/typelevel/cats-effect-testing) and [testcontainers-scala](https://github.com/testcontainers/testcontainers-scala).
+      * _Very_ strongly consider migrating from ScalaTest to [Weaver](https://disneystreaming.github.io/weaver-test/)
     * Upgrade to Scala 2.13.x.
     * Upgrade dependencies to those based on [cats-effect 3.x](https://typelevel.org/cats-effect/docs/getting-started), whose scheduler is [50-60x faster](https://gist.github.com/djspiewak/f4cfc08e0827088f17032e0e9099d292) than cats-effect 2.x's.
     * Remove the unmaintained [Monix](https://monix.io/) dependency and replace all the Monix-gRPC machinery with [fs2-grpc](https://github.com/typelevel/fs2-grpc).
+    * For the love of all that is holy, remove Scapegoat, add [sbt-tpolecat](https://github.com/typelevel/sbt-tpolecat), and strictly use the [unsafe Wart list](https://www.wartremover.org/doc/install-setup.html) from WartRemover.
+    * Generally, refactor over time to reflect style from [Scala With Cats](https://underscore.io/books/scala-with-cats/) and [Practical FP in Scala](https://leanpub.com/pfp-scala)
 * The Programming Model
   * Re-architect the API to be almost, if not entirely, streaming. Be sure to eradicate polling.
   * It must not be necessary to "deploy Rholang" just to invoke a smart contract and get results. See [web3.eth.Contract](https://web3js.readthedocs.io/en/v1.2.11/web3-eth-contract.html) for the right way to approach this.
@@ -103,7 +106,7 @@ res4: String = "f004ccc5955cef0b7ae52953d861f749bbc8e18b1484217209777af1b4fced4c
 
 For convenience, copy the public key hex value above, and create a file in `~/.rnode/genesis` with that as its name, with `.sk` appended:
 
-`$ hx 04458c90e163dcb143b7e358b160a794a6eb85301518a7f46aa5c6f9514188f876809fbd5607d1d338f9056da9e07026c6b5e9ff56d057797fc4c8b3f2f8be76b3.sk`
+`$ hx ~/.rnode/genesis/04458c90e163dcb143b7e358b160a794a6eb85301518a7f46aa5c6f9514188f876809fbd5607d1d338f9056da9e07026c6b5e9ff56d057797fc4c8b3f2f8be76b3.sk`
 
 In the file you're now editing, copy and paste the private key hex value above. Save the file.
 
@@ -161,6 +164,8 @@ Copy the contents of `rholang/examples/tut-registry.rho` to your clipboard. Then
 ...
 @ signDeployJSON(vpk, ddp)
 ```
+
+The value of `vpk` can be any valid secp256k1 private key. It has no meaning other than to let F1r3fly validate the signature against the `deployer` field, which is just the public key inferred from this private key.
 
 Copy the resulting JSON object to your clipboard. Then:
 
