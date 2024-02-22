@@ -197,6 +197,7 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
         _                = historyOneSize shouldBe historyTwoSize
       } yield ()
   }
+
 // TODO: Don't works for MergingHistory
   "collision detecting in KVDB" should "works" in withEmptyHistoryAndStore {
     (emptyHistoryF, inMemoStore) =>

@@ -887,12 +887,12 @@ impl RadixTreeImpl {
      * If detected collision with older KVDB data - execute Exception
      */
     pub fn commit(&self) -> Result<(), RadixTreeError> {
-        fn collision_panic(collisions: Vec<(ByteVector, ByteVector)>) -> () {
-            panic!(
-                "Radix Tree - ${} collisions in KVDB (first collision with key = ${}.",
+        fn collision_panic(collisions: Vec<(ByteVector, ByteVector)>) -> RadixTreeError {
+            RadixTreeError::CollisionError(format!(
+                "${} collisions in KVDB (first collision with key = ${}.",
                 collisions.len(),
-                hex::encode(collisions.first().unwrap().0.clone())
-            )
+                hex::encode(collisions.first().unwrap().0.clone()),
+            ))
         }
 
         let kv_pairs: Vec<(ByteVector, ByteVector)> = self
@@ -936,7 +936,7 @@ impl RadixTreeImpl {
             .collect();
 
         if !kv_collision.is_empty() {
-            collision_panic(kv_collision);
+            return Err(collision_panic(kv_collision));
         }
 
         let kv_absent: Vec<(ByteVector, ByteVector)> = kv_if_absent
@@ -1529,6 +1529,7 @@ pub enum RadixTreeError {
     KeyNotFound(String),
     KvStoreError(KvStoreError),
     PrefixError(String),
+    CollisionError(String),
 }
 
 impl std::fmt::Display for RadixTreeError {
@@ -1537,6 +1538,7 @@ impl std::fmt::Display for RadixTreeError {
             RadixTreeError::KeyNotFound(err) => write!(f, "Key Not Found Error: {}", err),
             RadixTreeError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
             RadixTreeError::PrefixError(err) => write!(f, "Prefix Error: {}", err),
+            RadixTreeError::CollisionError(err) => write!(f, "Collision Error: {}", err),
         }
     }
 }
