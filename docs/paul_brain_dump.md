@@ -68,9 +68,16 @@
     * Upgrade dependencies to those based on [cats-effect 3.x](https://typelevel.org/cats-effect/docs/getting-started), whose scheduler is [50-60x faster](https://gist.github.com/djspiewak/f4cfc08e0827088f17032e0e9099d292) than cats-effect 2.x's.
     * Remove the unmaintained [Monix](https://monix.io/) dependency and replace all the Monix-gRPC machinery with [fs2-grpc](https://github.com/typelevel/fs2-grpc).
     * For the love of all that is holy, remove Scapegoat, add [sbt-tpolecat](https://github.com/typelevel/sbt-tpolecat), and strictly use the [unsafe Wart list](https://www.wartremover.org/doc/install-setup.html) from WartRemover.
-    * Generally, refactor over time to reflect style from [Scala With Cats](https://underscore.io/books/scala-with-cats/) and [Practical FP in Scala](https://leanpub.com/pfp-scala)
+    * Generally, refactor over time to reflect style from [Scala With Cats](https://underscore.io/books/scala-with-cats/) and [Practical FP in Scala](https://leanpub.com/pfp-scala).
 * The Programming Model
   * Re-architect the API to be almost, if not entirely, streaming. Be sure to eradicate polling.
+    * See [this fs2-grpc example](https://github.com/fiadliel/fs2-grpc-example/tree/master) of both an RPC and a streaming API.
+    * See [this TypeScript example](https://floydfajones.medium.com/creating-your-grpc-service-in-nodejs-typescript-part-2-19464c73320b) of gRPC with streaming.
+    * See e.g. [web3j's managed filter approach for Ethereum](https://docs.web3j.io/4.11.0/advanced/filters_and_events/), but don't actually do a client-side polling implementation.
+    * See [Functional Event-Driven Architecture](https://leanpub.com/feda) for a great book on modern distributed systems architecture.
+    * See [RxDB](https://rxdb.info/) for an example of a database system designed along async/streaming principles.
+    * See [React-RxJS](https://react-rxjs.org/) for an example of building React UIs with an async/streaming architecture.
+    * [RethinkDB](https://rethinkdb.com/) is another example of an async/streaming database system.
   * It must not be necessary to "deploy Rholang" just to invoke a smart contract and get results. See [web3.eth.Contract](https://web3js.readthedocs.io/en/v1.2.11/web3-eth-contract.html) for the right way to approach this.
 
 ## An example tying the above together, hopefully
