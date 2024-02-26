@@ -59,9 +59,6 @@ final class SynchronyConstraintChecker[F[_]: Sync: BlockStore: Log] {
 
             // Get bonds map from PoS
             // NOTE: It would be useful to have active validators cached in the block in the same way as bonds.
-            _ <- Log[F].info(
-                  s"""*** ABOUT TO GET ACTIVE VALIDATORS FOR mainParentStateHash ${mainParentStateHash.toString} ***"""
-                )
             activeValidators <- runtimeManager.getActiveValidators(mainParentStateHash)
 
             // Validators weight map filtered by active validators only.

@@ -199,9 +199,6 @@ class MultiParentCasperImpl[F[_]
 
     def getOnChainState(b: BlockMessage): F[OnChainCasperState] =
       for {
-        _ <- Log[F].info(
-              s"""*** ABOUT TO GET ACTIVE VALIDATORS FOR b.body.state.postStateHash ${b.body.state.postStateHash.show} ***"""
-            )
         av <- RuntimeManager[F].getActiveValidators(b.body.state.postStateHash)
         // bonds are available in block message, but please remember this is just a cache, source of truth is RSpace.
         bm          = b.body.state.bonds

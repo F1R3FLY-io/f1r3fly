@@ -576,7 +576,14 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
               .buildString(startHash)}: ${validatorsPar.size}"
           )
       )(validatorsPar => validatorsPar.size == 1)
-      .map(validatorsPar => toValidatorSeq(validatorsPar.head))
+      .map { validatorsPar =>
+        toValidatorSeq(validatorsPar.head)
+      }
+      .flatTap { validators =>
+        val vlds = validators.map(_.toHexString)
+        Log[F].info(s"""*** ACTIVE VALIDATORS FOR StateHash ${startHash.toHexString}:\n${vlds
+          .mkString("\n")} ***""")
+      }
 
   def computeBonds(hash: StateHash): F[Seq[Bond]] =
     // Create a deploy with newly created private key
