@@ -68,7 +68,7 @@ impl History for RadixHistory {
     }
 
     fn process(&self, actions: Vec<HistoryAction>) -> Result<Box<dyn History>, HistoryError> {
-        if self.has_no_duplicates(&actions) {
+        if !self.has_no_duplicates(&actions) {
             return Err(HistoryError::ActionError(
                 "Cannot process duplicate actions on one key.".to_string(),
             ));

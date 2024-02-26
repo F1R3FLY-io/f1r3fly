@@ -73,8 +73,11 @@ where
         let values: Vec<Option<V>> = values_bytes
             .into_iter()
             .map(|value_bytes_opt| match value_bytes_opt {
-                Some(bytes) => bincode::deserialize(&bytes)
-                    .expect("Key Value Typed Store: Failed to deserialize value bytes"),
+                Some(bytes) => {
+                    let decoded: V = bincode::deserialize(&bytes)
+                        .expect("Key Value Typed Store: Failed to deserialize value bytes");
+                    Some(decoded)
+                }
                 None => None,
             })
             .collect();
