@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::{ByteBuffer, ByteVector};
 use bincode;
@@ -45,6 +47,18 @@ impl KeyValueStore for InMemoryKeyValueStore {
 
     fn clone_box(&self) -> Box<dyn KeyValueStore> {
         Box::new(self.clone())
+    }
+
+    fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError> {
+        let mut map = HashMap::new();
+        for entry in self.state.iter() {
+            let (key, value) = entry.pair();
+            map.insert(
+                key.clone(),
+                bincode::deserialize(value).expect("Mem Key Value Store: Unable to deserialize"),
+            );
+        }
+        Ok(map)
     }
 }
 

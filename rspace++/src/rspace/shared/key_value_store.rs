@@ -3,6 +3,7 @@ use crate::rspace::shared::key_value_typed_store::{
 };
 use crate::rspace::ByteBuffer;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -17,6 +18,8 @@ pub trait KeyValueStore: Send + Sync {
     fn iterate(&self, f: fn(ByteBuffer, ByteBuffer)) -> Result<(), KvStoreError>;
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
+
+    fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
     fn get_one(&self, key: ByteBuffer) -> Result<Option<ByteBuffer>, KvStoreError> {

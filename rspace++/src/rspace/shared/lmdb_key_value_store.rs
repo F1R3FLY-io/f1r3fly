@@ -2,6 +2,7 @@ use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::ByteBuffer;
 use heed::types::SerdeBincode;
 use heed::{Database, Env};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub struct LmdbKeyValueStore {
@@ -70,6 +71,22 @@ impl KeyValueStore for LmdbKeyValueStore {
 
     fn clone_box(&self) -> Box<dyn KeyValueStore> {
         Box::new(self.clone())
+    }
+
+    fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError> {
+        let db = self
+            .db
+            .lock()
+            .expect("LMDB Key Value Store: Failed to acquire lock on db");
+        let reader = self.env.read_txn()?;
+        let iter = db.iter(&reader)?;
+        let mut map = HashMap::new();
+        for result in iter {
+            let (key, value) = result?;
+            map.insert(key.to_vec(), value);
+        }
+        reader.commit()?;
+        Ok(map)
     }
 }
 
