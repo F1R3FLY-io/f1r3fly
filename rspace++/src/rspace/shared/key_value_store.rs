@@ -77,7 +77,7 @@ pub struct KeyValueStoreOps;
 impl KeyValueStoreOps {
     pub fn to_typed_store<K, V>(store: Box<dyn KeyValueStore>) -> impl KeyValueTypedStore<K, V>
     where
-        K: Clone + Debug + Send + Sync + Serialize + 'static,
+        K: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a> + Ord,
         V: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
     {
         KeyValueTypedStoreInstance {

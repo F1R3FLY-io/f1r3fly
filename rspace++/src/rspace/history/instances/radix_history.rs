@@ -86,11 +86,15 @@ impl History for RadixHistory {
                     imple: self.imple.clone(),
                     store: self.store.clone(),
                 };
+                println!("\ncache_w before clear: {:?}", self.imple.cache_w);
                 self.imple
                     .commit()
                     .expect("Radix History: Failed to commit");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
+
+                println!("\ncache_w after clear: {:?}", self.imple.cache_w);
+
                 Ok(Box::new(new_history))
             }
             None => {

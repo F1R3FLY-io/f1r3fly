@@ -895,11 +895,15 @@ impl RadixTreeImpl {
             ))
         }
 
+        println!("\ncache_w: {:?}", self.cache_w);
+
         let kv_pairs: Vec<(ByteVector, ByteVector)> = self
             .cache_w
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
+
+        println!("\nkv_pairs length: {}", kv_pairs.len());
 
         let store_lock = self
             .store

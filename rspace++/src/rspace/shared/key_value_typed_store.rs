@@ -20,11 +20,7 @@ where
 
     fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError>;
 
-    // def collect[T](pf: PartialFunction[(K, () => V), T]): F[Seq[T]]
-    // TODO: Update this to match scala
-    fn collect(&self) -> ();
-
-    fn to_map(&self) -> BTreeMap<K, V>;
+    fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError>;
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
     fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
@@ -60,7 +56,7 @@ pub struct KeyValueTypedStoreInstance<K, V> {
 
 impl<K, V> KeyValueTypedStore<K, V> for KeyValueTypedStoreInstance<K, V>
 where
-    K: Debug + Send + Sync + Serialize + 'static + Clone,
+    K: Debug + Send + Sync + Serialize + 'static + Clone + for<'a> Deserialize<'a> + Ord,
     V: Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
@@ -131,13 +127,16 @@ where
             .collect())
     }
 
-    // Not implemented because unsure if used in 'rspace' code
-    fn collect(&self) -> () {
-        todo!()
-    }
-
-    // Not implemented because unsure if used in 'rspace' code
-    fn to_map(&self) -> BTreeMap<K, V> {
-        todo!()
+    fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError> {
+        let map_bytes = self.store.to_map()?;
+        let mut map = BTreeMap::new();
+        for (k_bytes, v_bytes) in map_bytes {
+            let k: K = bincode::deserialize(&k_bytes)
+                .expect("Key Value Typed Store: Failed to deserialize key bytes");
+            let v: V = bincode::deserialize(&v_bytes)
+                .expect("Key Value Typed Store: Failed to value key bytes");
+            map.insert(k, v);
+        }
+        Ok(map)
     }
 }

@@ -622,6 +622,8 @@ object RadixTree {
         ).raiseError
       for {
         kvPairs           <- Sync[F].delay(cacheW.toList)
+        _                 = println("\ncacheW: " + cacheW)
+        _                 = println("\nkvPairs length: " + kvPairs.length)
         ifAbsent          <- store.contains(kvPairs.map(_._1))
         kvIfAbsent        = kvPairs zip ifAbsent
         kvExist           = kvIfAbsent.filter(_._2).map(_._1)
