@@ -260,19 +260,30 @@ mod tests {
         let inserts = vec![history_insert(zeros())];
 
         let (empty_history, in_mem_store) = create_empty_history_and_store();
+
         let in_mem_store_lock = in_mem_store
             .lock()
             .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-
         let empty_history_size = in_mem_store_lock.size_bytes();
+        drop(in_mem_store_lock);
 
         let history_one = empty_history.process(inserts.clone());
         assert!(history_one.is_ok());
+
+        let in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
         let history_one_size = in_mem_store_lock.size_bytes();
+        drop(in_mem_store_lock);
 
         let history_two = history_one.as_ref().unwrap().process(inserts);
         assert!(history_two.is_ok());
+
+        let in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
         let history_two_size = in_mem_store_lock.size_bytes();
+        drop(in_mem_store_lock);
 
         assert_eq!(history_one.unwrap().root(), history_two.unwrap().root());
         assert_eq!(empty_history_size, 0_usize);
@@ -285,18 +296,33 @@ mod tests {
         let delete_record = vec![history_delete(zeros())];
         let collision_kv_pair = (RadixHistory::empty_root_hash().bytes(), random_blake().bytes());
 
-        let (empty_history, in_mem_store) = create_empty_history_and_store();
-        let new_history = empty_history.process(insert_record);
-        assert!(new_history.is_ok());
+        // println!("\ninsert record {:?}", insert_record);
 
-        println!("\ncalling put directly in test");
+        let (empty_history, in_mem_store) = create_empty_history_and_store();
+
         let in_mem_store_lock = in_mem_store
             .lock()
             .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+        println!("\nin_mem_store fresh: {:?}", in_mem_store_lock.to_map());
+        drop(in_mem_store_lock);
+
+        let new_history = empty_history.process(insert_record);
+        assert!(new_history.is_ok());
+
+        let mut in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+        // println!("\nin_mem_store after insert process: {:?}", in_mem_store_lock.to_map());
+
         assert!(in_mem_store_lock.put(vec![collision_kv_pair]).is_ok());
         drop(in_mem_store_lock);
 
         let err = new_history.unwrap().process(delete_record);
+        let in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+        println!("\nin_mem_store after delete process, 2nd: {:?}", in_mem_store_lock.to_map());
+        drop(in_mem_store_lock);
         assert!(err.is_err());
         match err {
             Err(HistoryError::RadixTreeError(RadixTreeError::CollisionError(message))) => {

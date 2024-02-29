@@ -25,7 +25,7 @@ impl KeyValueStore for LmdbKeyValueStore {
         results
     }
 
-    fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
+    fn put(&mut self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
         let db = self
             .db
             .lock()
@@ -38,7 +38,7 @@ impl KeyValueStore for LmdbKeyValueStore {
         Ok(())
     }
 
-    fn delete(&self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError> {
+    fn delete(&mut self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError> {
         let db = self
             .db
             .lock()

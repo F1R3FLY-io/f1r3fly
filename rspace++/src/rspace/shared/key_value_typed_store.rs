@@ -1,5 +1,6 @@
 use super::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_store::KeyValueStore;
+use crate::rspace::ByteVector;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -88,7 +89,7 @@ where
     }
 
     fn put(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError> {
-        let store_lock = self
+        let mut store_lock = self
             .store
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
@@ -108,7 +109,7 @@ where
     }
 
     fn delete(&self, keys: Vec<K>) -> Result<usize, KvStoreError> {
-        let store_lock = self
+        let mut store_lock = self
             .store
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
@@ -127,7 +128,8 @@ where
     }
 
     fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError> {
-        let keys_bytes: Vec<Vec<u8>> = keys
+        // println!("\nkeys in contains: {:?}", keys);
+        let keys_bytes: Vec<ByteVector> = keys
             .iter()
             .map(|k| {
                 let serialized_key =
@@ -136,13 +138,15 @@ where
             })
             .collect();
 
+        // println!("\nkeys_bytes in contains: {:?}", keys_bytes);
+
         let store_lock = self
             .store
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
 
         let results = store_lock.get(keys_bytes)?;
-        println!("\nresults: {:?}", results);
+        // println!("\nresults in contains: {:?}", results);
         Ok(results
             .into_iter()
             .map(|result| !result.is_none())

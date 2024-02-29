@@ -13,7 +13,14 @@ final case class InMemoryKeyValueStore[F[_]: Sync]() extends KeyValueStore[F] {
   override def get[T](keys: Seq[ByteBuffer], fromBuffer: ByteBuffer => T): F[Seq[Option[T]]] =
     Sync[F].delay {
       println("\ninMemState get: " + state);
-      keys.map(state.get).map(_.map(_.toByteBuffer).map(fromBuffer))
+      println("\ninMemState get keys: " + keys);
+      val res = keys.map { key =>
+        val value = state.get(key)
+        println(s"\nRetrieved value for key $key: $value")
+        value.map(_.toByteBuffer).map(fromBuffer)
+      }
+      println("\nresults in get: " + res)
+      res
     }
 
   override def put[T](kvPairs: Seq[(ByteBuffer, T)], toBuffer: T => ByteBuffer): F[Unit] =

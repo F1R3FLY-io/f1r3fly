@@ -53,7 +53,7 @@ impl TrieImporter for RSpaceImporterImpl {
     type Value = ByteVector;
 
     fn set_history_items(&self, data: Vec<(Self::KeyHash, Self::Value)>) -> () {
-        let history_store_lock = self
+        let mut history_store_lock = self
             .history_store
             .lock()
             .expect("RSpace Importer Store: Failed to acquire lock on history_store");
@@ -68,7 +68,7 @@ impl TrieImporter for RSpaceImporterImpl {
     }
 
     fn set_data_items(&self, data: Vec<(Self::KeyHash, Self::Value)>) -> () {
-        let value_store_lock = self
+        let mut value_store_lock = self
             .value_store
             .lock()
             .expect("RSpace Importer Store: Failed to acquire lock on value_store");

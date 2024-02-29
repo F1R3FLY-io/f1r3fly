@@ -83,99 +83,101 @@ const HEAD_SIZE: usize = 2;
 /** Serialization [[Node]] to [[ByteVector]]
  */
 pub fn encode(node: &Node) -> ByteVector {
-    // Calculate the size of the serialized data
-    let calc_size = node.iter().fold(0, |acc, item| match item {
-        Item::EmptyItem => acc,
-        Item::Leaf { prefix, value } => {
-            assert!(
-                prefix.len() <= 127,
-                "Error during serialization: size of prefix more than 127."
-            );
-            assert!(
-                value.len() == DEF_SIZE,
-                "Error during serialization: size of leafValue not equal 32."
-            );
-            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
-        }
-        Item::NodePtr { prefix, ptr } => {
-            assert!(
-                prefix.len() <= 127,
-                "Error during serialization: size of prefix more than 127."
-            );
-            assert!(
-                ptr.len() == DEF_SIZE,
-                "Error during serialization: size of ptrPrefix not equal 32."
-            );
-            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
-        }
-    });
+    // // Calculate the size of the serialized data
+    // let calc_size = node.iter().fold(0, |acc, item| match item {
+    //     Item::EmptyItem => acc,
+    //     Item::Leaf { prefix, value } => {
+    //         assert!(
+    //             prefix.len() <= 127,
+    //             "Error during serialization: size of prefix more than 127."
+    //         );
+    //         assert!(
+    //             value.len() == DEF_SIZE,
+    //             "Error during serialization: size of leafValue not equal 32."
+    //         );
+    //         acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+    //     }
+    //     Item::NodePtr { prefix, ptr } => {
+    //         assert!(
+    //             prefix.len() <= 127,
+    //             "Error during serialization: size of prefix more than 127."
+    //         );
+    //         assert!(
+    //             ptr.len() == DEF_SIZE,
+    //             "Error during serialization: size of ptrPrefix not equal 32."
+    //         );
+    //         acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+    //     }
+    // });
 
-    let mut buf = Vec::with_capacity(calc_size);
+    // let mut buf = Vec::with_capacity(calc_size);
 
-    for (idx, item) in node.iter().enumerate() {
-        match item {
-            Item::EmptyItem => {
-                // EmptyItem - not encoded
-            }
-            Item::Leaf { prefix, value } => {
-                buf.push(idx as u8); // item index
-                buf.push(prefix.len() as u8); // second byte with Leaf identifier
-                buf.extend_from_slice(prefix);
-                buf.extend_from_slice(value);
-            }
-            Item::NodePtr { prefix, ptr } => {
-                buf.push(idx as u8); // item index
-                buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
-                buf.extend_from_slice(prefix);
-                buf.extend_from_slice(ptr);
-            }
-        }
-    }
+    // for (idx, item) in node.iter().enumerate() {
+    //     match item {
+    //         Item::EmptyItem => {
+    //             // EmptyItem - not encoded
+    //         }
+    //         Item::Leaf { prefix, value } => {
+    //             buf.push(idx as u8); // item index
+    //             buf.push(prefix.len() as u8); // second byte with Leaf identifier
+    //             buf.extend_from_slice(prefix);
+    //             buf.extend_from_slice(value);
+    //         }
+    //         Item::NodePtr { prefix, ptr } => {
+    //             buf.push(idx as u8); // item index
+    //             buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
+    //             buf.extend_from_slice(prefix);
+    //             buf.extend_from_slice(ptr);
+    //         }
+    //     }
+    // }
 
-    assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
-    buf
+    // assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
+    // buf
+    bincode::serialize(&node).unwrap()
 }
 
 /** Deserialization [[ByteVector]] to [[Node]]
  */
 pub fn decode(encoded: ByteVector) -> Node {
-    let mut node = EmptyNode::new().node;
-    let mut pos = 0;
-    let max_size = encoded.len();
+    // let mut node = EmptyNode::new().node;
+    // let mut pos = 0;
+    // let max_size = encoded.len();
 
-    while pos < max_size {
-        let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
-        assert_eq!(
-            node[idx_item],
-            Item::EmptyItem,
-            "Error during deserialization: wrong index of item."
-        );
+    // while pos < max_size {
+    //     let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
+    //     assert_eq!(
+    //         node[idx_item],
+    //         Item::EmptyItem,
+    //         "Error during deserialization: wrong index of item."
+    //     );
 
-        let second_byte = encoded[pos + 1]; // Take second byte
-        let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
-        let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
+    //     let second_byte = encoded[pos + 1]; // Take second byte
+    //     let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
+    //     let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
 
-        let val_or_ptr =
-            &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
+    //     let val_or_ptr =
+    //         &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
 
-        pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
+    //     pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
 
-        let item = if (second_byte & 0x80) == 0 {
-            Item::Leaf {
-                prefix: prefix.to_vec(),
-                value: val_or_ptr.to_vec(),
-            }
-        } else {
-            Item::NodePtr {
-                prefix: prefix.to_vec(),
-                ptr: val_or_ptr.to_vec(),
-            }
-        };
+    //     let item = if (second_byte & 0x80) == 0 {
+    //         Item::Leaf {
+    //             prefix: prefix.to_vec(),
+    //             value: val_or_ptr.to_vec(),
+    //         }
+    //     } else {
+    //         Item::NodePtr {
+    //             prefix: prefix.to_vec(),
+    //             ptr: val_or_ptr.to_vec(),
+    //         }
+    //     };
 
-        node[idx_item] = item;
-    }
+    //     node[idx_item] = item;
+    // }
 
-    node
+    // node
+    bincode::deserialize(&encoded).unwrap()
 }
 
 fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, ByteVector) {
@@ -751,7 +753,7 @@ pub struct RadixTreeImpl {
      * Cache for storing read and decoded nodes.
      *
      * Cache stores kv-pairs (hash, node).
-     * Where hash - Blake2b256Hash of serializing nodes data,
+     * Where hash - Blake3Hash of serializing nodes data,
      *       node - deserialized data of this node.
      */
     pub cache_r: DashMap<ByteVector, Node>,
@@ -759,7 +761,7 @@ pub struct RadixTreeImpl {
      * Cache for storing serializing nodes. For subsequent unloading in KVDB
      *
      * Cache stores kv-pairs (hash, bytes).
-     * Where hash -  Blake2b256Hash of bytes,
+     * Where hash -  Blake3Hash of bytes,
      *       bytes - serializing data of nodes.
      */
     pub cache_w: DashMap<ByteVector, ByteVector>,
@@ -861,24 +863,26 @@ impl RadixTreeImpl {
      * If detected collision with older cache data - executing assert
      */
     pub fn save_node(&self, node: Node) -> ByteVector {
-        let (hash, bytes) = hash_node(&node);
+        println!("\nhit save_node");
+        let (hash_bytes, node_bytes) = hash_node(&node);
         let check_collision = |v: Node| {
             assert!(
                 v == node,
                 "Radix Tree - Collision in cache: record with key = ${} has already existed.",
-                hex::encode(hash.clone())
+                hex::encode(hash_bytes.clone())
             )
         };
 
-        match self.cache_r.get(&hash) {
+        match self.cache_r.get(&hash_bytes) {
             Some(node) => check_collision(node.value().to_vec()),
             None => {
-                let _ = self.cache_r.insert(hash.clone(), node);
+                let _ = self.cache_r.insert(hash_bytes.clone(), node);
             }
         };
 
-        let _ = self.cache_w.insert(hash.clone(), bytes);
-        hash
+        // println("\nsave node: key {} value {}", hash_bytes.clone(), node_bytes);
+        let _ = self.cache_w.insert(hash_bytes.clone(), node_bytes);
+        hash_bytes
     }
 
     /**
@@ -895,9 +899,10 @@ impl RadixTreeImpl {
             ))
         }
 
-        println!("\nnew callll");
+        // println!("\nnew commit callll");
 
-        println!("\ncache_w: {:?}", self.cache_w);
+        println!("\ncache_w in commit: {:?}", self.cache_w);
+        println!("\ncache_r in commit: {:?}", self.cache_r);
 
         let kv_pairs: Vec<(ByteVector, ByteVector)> = self
             .cache_w
@@ -905,7 +910,7 @@ impl RadixTreeImpl {
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
 
-        println!("\nkv_pairs length: {}", kv_pairs.len());
+        println!("\nkv_pairs in commit: {:?}", kv_pairs);
 
         let store_lock = self
             .store
@@ -914,7 +919,7 @@ impl RadixTreeImpl {
 
         let if_absent: Vec<bool> =
             store_lock.contains(&kv_pairs.clone().into_iter().map(|(k, _)| k).collect_vec())?;
-        println!("\nif_absent: {:?}", if_absent);
+        // println!("\nif_absent: {:?}", if_absent);
         let kv_if_absent: Vec<((ByteVector, ByteVector), bool)> =
             kv_pairs.into_iter().zip(if_absent.into_iter()).collect();
 
@@ -938,7 +943,7 @@ impl RadixTreeImpl {
 
         let kv_collision: Vec<(ByteVector, ByteVector)> = kvv_exist
             .into_iter()
-            .filter(|((_, v1), v2)| v1 != v2)
+            .filter(|kvv| !(kvv.0 .1 == kvv.1))
             .map(|(kv, _)| kv)
             .collect();
 

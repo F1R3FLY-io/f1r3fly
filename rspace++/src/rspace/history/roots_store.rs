@@ -58,7 +58,7 @@ impl RootsStoreInstances {
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
                 let bytes = key.bytes();
 
-                let store_lock = self
+                let mut store_lock = self
                     .store
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
@@ -76,7 +76,7 @@ impl RootsStoreInstances {
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
                 let bytes = key.bytes();
 
-                let store_lock = self
+                let mut store_lock = self
                     .store
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");

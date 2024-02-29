@@ -58,6 +58,7 @@ final case class RadixHistory[F[_]: Sync: Parallel](
             .unlessA(hasNoDuplicates(actions))
 
       newRootNodeOpt <- impl.makeActions(rootNode, actions)
+      _              = println("\nnewRootNodeOpt: " + newRootNodeOpt)
       newHistoryOpt <- newRootNodeOpt.traverse { newRootNode =>
                         val hash       = impl.saveNode(newRootNode)
                         val blakeHash  = Blake2b256Hash.fromByteVector(hash)

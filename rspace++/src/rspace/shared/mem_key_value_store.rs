@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::{ByteBuffer, ByteVector};
@@ -8,30 +8,39 @@ use dashmap::DashMap;
 // See shared/src/main/scala/coop/rchain/store/InMemoryKeyValueStore.scala
 #[derive(Clone)]
 pub struct InMemoryKeyValueStore {
-    state: DashMap<ByteBuffer, ByteVector>,
+    state: BTreeMap<ByteBuffer, ByteVector>,
 }
 
 impl KeyValueStore for InMemoryKeyValueStore {
     fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
-        println!("\nin_mem_state get: {:?}", self.state);
+        // println!("\nin_mem_state get: {:?}", self.state);
+        // println!("\nin_mem_state get keys: {:?}", keys);
         let result = keys
             .into_iter()
             .map(|key| {
-                self.state
-                    .get(&key)
-                    .map(|value| bincode::deserialize(&value).ok())
-                    .flatten()
+                self.state.get(&key).map(|value| {
+                    // println!(
+                    //     "\nRetrieved value for key {:?}: {:?}",
+                    //     key_value.key(),
+                    //     key_value.value()
+                    // );
+                    bincode::deserialize(&value)
+                        .expect("Mem Key Value Store: Failed to deserialize")
+                })
             })
-            .collect();
+            .collect::<Vec<Option<_>>>();
+
+        // println!("\nresults in get: {:?}", result);
+
         Ok(result)
     }
 
-    fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
+    fn put(&mut self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
         println!("\nhit put in mem_kv");
-        println!("\nin_mem_state before put: {:?}", self.state);
+        // println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
-            let encoded = bincode::serialize(&value).unwrap();
-            self.state.insert(key, encoded);
+            let encoded_value = bincode::serialize(&value).unwrap();
+            self.state.insert(key, encoded_value);
         }
 
         println!("\nin_mem_state after put: {:?}", self.state);
@@ -39,7 +48,7 @@ impl KeyValueStore for InMemoryKeyValueStore {
         Ok(())
     }
 
-    fn delete(&self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError> {
+    fn delete(&mut self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError> {
         Ok(keys
             .into_iter()
             .filter_map(|key| self.state.remove(&key))
@@ -57,7 +66,7 @@ impl KeyValueStore for InMemoryKeyValueStore {
     fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError> {
         let mut map = HashMap::new();
         for entry in self.state.iter() {
-            let (key, value) = entry.pair();
+            let (key, value) = entry;
             map.insert(
                 key.clone(),
                 bincode::deserialize(value).expect("Mem Key Value Store: Unable to deserialize"),
@@ -70,7 +79,7 @@ impl KeyValueStore for InMemoryKeyValueStore {
         self.state
             .iter()
             .map(|ref_entry| {
-                let (key, value) = ref_entry.pair();
+                let (key, value) = ref_entry;
                 key.len() + value.len()
             })
             .sum()
@@ -80,11 +89,11 @@ impl KeyValueStore for InMemoryKeyValueStore {
 impl InMemoryKeyValueStore {
     pub fn new() -> Self {
         InMemoryKeyValueStore {
-            state: DashMap::new(),
+            state: BTreeMap::new(),
         }
     }
 
-    pub fn clear(&self) {
+    pub fn clear(&mut self) {
         self.state.clear();
     }
 

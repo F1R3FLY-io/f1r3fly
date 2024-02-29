@@ -47,11 +47,11 @@ impl RadixHistory {
 
     pub fn empty_root_hash() -> Blake3Hash {
         let hash_bytes = hash_node(&EmptyNode::new().node).0;
-        let hash_array: [u8; 32] = match hash_bytes.try_into() {
-            Ok(array) => array,
-            Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
-        };
-        let hash = Blake3Hash::new(&hash_array);
+        // let hash_array: [u8; 32] = match hash_bytes.try_into() {
+        //     Ok(array) => array,
+        //     Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
+        // };
+        let hash = Blake3Hash::new(&hash_bytes);
         hash
     }
 
@@ -76,10 +76,12 @@ impl History for RadixHistory {
 
         let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions)?;
 
+        println!("\nnew_root_node_opt: {:?}", new_root_node_opt);
+
         match new_root_node_opt {
             Some(new_root_node) => {
-                let hash = self.imple.save_node(new_root_node.clone());
-                let blake_hash = Blake3Hash::new(&hash);
+                let hash_bytes = self.imple.save_node(new_root_node.clone());
+                let blake_hash = Blake3Hash::new(&hash_bytes);
                 let new_history = RadixHistory {
                     root_hash: blake_hash,
                     root_node: new_root_node,
@@ -98,6 +100,7 @@ impl History for RadixHistory {
                 Ok(Box::new(new_history))
             }
             None => {
+              println!("\nNone in process");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
                 Ok(Box::new(RadixHistory {

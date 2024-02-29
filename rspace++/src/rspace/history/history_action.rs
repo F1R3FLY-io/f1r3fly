@@ -3,7 +3,7 @@ use crate::rspace::{hashing::blake3_hash::Blake3Hash, Byte};
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryAction.scala
 pub type KeyPath = Vec<Byte>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HistoryAction {
     Insert(InsertAction),
     Delete(DeleteAction),
@@ -13,7 +13,7 @@ pub trait HistoryActionTrait {
     fn key(&self) -> KeyPath;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InsertAction {
     pub key: KeyPath,
     pub hash: Blake3Hash,
@@ -25,7 +25,7 @@ impl HistoryActionTrait for InsertAction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DeleteAction {
     pub key: KeyPath,
 }

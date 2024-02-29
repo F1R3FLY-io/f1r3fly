@@ -12,9 +12,9 @@ use std::sync::{Arc, Mutex};
 pub trait KeyValueStore: Send + Sync {
     fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError>;
 
-    fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError>;
+    fn put(&mut self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError>;
 
-    fn delete(&self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError>;
+    fn delete(&mut self, keys: Vec<ByteBuffer>) -> Result<usize, KvStoreError>;
 
     fn iterate(&self, f: fn(ByteBuffer, ByteBuffer)) -> Result<(), KvStoreError>;
 
@@ -32,7 +32,7 @@ pub trait KeyValueStore: Send + Sync {
         }
     }
 
-    fn put_one(&self, key: ByteBuffer, value: ByteBuffer) -> Result<(), KvStoreError> {
+    fn put_one(&mut self, key: ByteBuffer, value: ByteBuffer) -> Result<(), KvStoreError> {
         self.put(vec![(key, value)])
     }
 
