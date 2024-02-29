@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
 pub trait KeyValueStore: Send + Sync {
@@ -34,6 +35,8 @@ pub trait KeyValueStore: Send + Sync {
     fn put_one(&self, key: ByteBuffer, value: ByteBuffer) -> Result<(), KvStoreError> {
         self.put(vec![(key, value)])
     }
+
+    fn size_bytes(&self) -> usize;
 }
 
 impl Clone for Box<dyn KeyValueStore> {
@@ -75,7 +78,9 @@ impl From<Box<bincode::ErrorKind>> for KvStoreError {
 pub struct KeyValueStoreOps;
 
 impl KeyValueStoreOps {
-    pub fn to_typed_store<K, V>(store: Box<dyn KeyValueStore>) -> impl KeyValueTypedStore<K, V>
+    pub fn to_typed_store<K, V>(
+        store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    ) -> impl KeyValueTypedStore<K, V>
     where
         K: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a> + Ord,
         V: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,

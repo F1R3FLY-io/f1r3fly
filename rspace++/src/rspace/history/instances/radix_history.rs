@@ -38,7 +38,7 @@ impl RadixHistory {
     }
 
     pub fn create_store(
-        store: Box<dyn KeyValueStore>,
+        store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Arc<Mutex<Box<dyn KeyValueTypedStore<ByteVector, ByteVector>>>> {
         Arc::new(Mutex::new(Box::new(KeyValueStoreOps::to_typed_store::<ByteVector, ByteVector>(
             store,
@@ -83,17 +83,17 @@ impl History for RadixHistory {
                 let new_history = RadixHistory {
                     root_hash: blake_hash,
                     root_node: new_root_node,
-                    imple: self.imple.clone(),
+                    imple: RadixTreeImpl::new(self.store.clone()),
                     store: self.store.clone(),
                 };
-                println!("\ncache_w before clear: {:?}", self.imple.cache_w);
+                // println!("\ncache_w before clear: {:?}", self.imple.cache_w);
                 self.imple
                     .commit()
                     .expect("Radix History: Failed to commit");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
 
-                println!("\ncache_w after clear: {:?}", self.imple.cache_w);
+                // println!("\ncache_w after clear: {:?}", self.imple.cache_w);
 
                 Ok(Box::new(new_history))
             }

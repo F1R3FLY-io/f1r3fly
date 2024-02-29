@@ -7,16 +7,16 @@ use crate::rspace::state::rspace_exporter::RSpaceExporterInstance;
 use crate::rspace::{
     shared::key_value_store::KeyValueStore, state::rspace_exporter::RSpaceExporter,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/instances/RSpaceExporterStore.scala
 pub struct RSpaceExporterStore;
 
 impl RSpaceExporterStore {
     pub fn create(
-        history_store: Box<dyn KeyValueStore>,
-        value_store: Box<dyn KeyValueStore>,
-        roots_store: Box<dyn KeyValueStore>,
+        history_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+        value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+        roots_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> impl RSpaceExporter<
         KeyHash = Blake3Hash,
         NodePath = Vec<(Blake3Hash, Option<u8>)>,
@@ -31,18 +31,22 @@ impl RSpaceExporterStore {
 }
 
 struct RSpaceExporterImpl {
-    source_history_store: Box<dyn KeyValueStore>,
-    source_value_store: Box<dyn KeyValueStore>,
-    source_roots_store: Box<dyn KeyValueStore>,
+    source_history_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    source_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    source_roots_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
 }
 
 impl RSpaceExporterImpl {
     fn get_items(
         &self,
-        store: Box<dyn KeyValueStore>,
+        store: Arc<Mutex<Box<dyn KeyValueStore>>>,
         keys: Vec<Blake3Hash>,
     ) -> Result<Vec<(Blake3Hash, <RSpaceExporterImpl as TrieExporter>::Value)>, KvStoreError> {
-        let loaded = store.get(keys.iter().map(|key| key.bytes()).collect())?;
+        let store_lock = store
+            .lock()
+            .expect("RSpace Exporter Store: Failed to acquire lock on store");
+
+        let loaded = store_lock.get(keys.iter().map(|key| key.bytes()).collect())?;
         Ok(keys
             .into_iter()
             .zip(loaded.into_iter())

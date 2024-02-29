@@ -2,6 +2,7 @@ use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::shared::key_value_store::KeyValueStore;
+use std::sync::{Arc, Mutex};
 
 use super::radix_tree::RadixTreeError;
 
@@ -19,7 +20,7 @@ pub trait History: Send + Sync {
 pub struct HistoryInstances;
 
 impl HistoryInstances {
-    pub fn create(root: Blake3Hash, store: Box<dyn KeyValueStore>) -> RadixHistory {
+    pub fn create(root: Blake3Hash, store: Arc<Mutex<Box<dyn KeyValueStore>>>) -> RadixHistory {
         let typed_store = RadixHistory::create_store(store.to_owned());
         RadixHistory::create(root, typed_store)
     }

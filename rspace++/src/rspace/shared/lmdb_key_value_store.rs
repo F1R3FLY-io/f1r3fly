@@ -88,6 +88,11 @@ impl KeyValueStore for LmdbKeyValueStore {
         reader.commit()?;
         Ok(map)
     }
+
+    // This is only needed for testing purposes
+    fn size_bytes(&self) -> usize {
+        todo!()
+    }
 }
 
 impl LmdbKeyValueStore {

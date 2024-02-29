@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/RSpace.scala
 // NOTE: 'space_matcher' field is added on Rust side to behave like Scala's 'extend'
@@ -674,9 +675,9 @@ where
 pub struct RSpaceInstances;
 
 pub struct RSpaceStore {
-    pub history: Box<dyn KeyValueStore>,
-    pub roots: Box<dyn KeyValueStore>,
-    pub cold: Box<dyn KeyValueStore>,
+    pub history: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    pub roots: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    pub cold: Arc<Mutex<Box<dyn KeyValueStore>>>,
 }
 
 impl RSpaceInstances {

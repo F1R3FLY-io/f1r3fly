@@ -3,6 +3,7 @@ use crate::rspace::shared::key_value_store::KeyValueStore;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
 use std::{collections::BTreeMap, marker::PhantomData};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStore.scala
@@ -50,7 +51,7 @@ where
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreCodec.scala
 #[derive(Clone)]
 pub struct KeyValueTypedStoreInstance<K, V> {
-    pub store: Box<dyn KeyValueStore>,
+    pub store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     pub _marker: PhantomData<(K, V)>,
 }
 
@@ -65,7 +66,12 @@ where
             .map(|key| bincode::serialize(&key))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let values_bytes = self.store.get(keys_bytes)?;
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
+        let values_bytes = store_lock.get(keys_bytes)?;
         let values: Vec<Option<V>> = values_bytes
             .into_iter()
             .map(|value_bytes_opt| match value_bytes_opt {
@@ -82,6 +88,11 @@ where
     }
 
     fn put(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError> {
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
         let pairs_bytes: Vec<(Vec<u8>, Vec<u8>)> = kv_pairs
             .iter()
             .map(|(k, v)| {
@@ -93,10 +104,15 @@ where
             })
             .collect();
 
-        Ok(self.store.put(pairs_bytes)?)
+        Ok(store_lock.put(pairs_bytes)?)
     }
 
     fn delete(&self, keys: Vec<K>) -> Result<usize, KvStoreError> {
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
         let keys_bytes: Vec<Vec<u8>> = keys
             .iter()
             .map(|k| {
@@ -106,7 +122,7 @@ where
             })
             .collect();
 
-        let deleted_count = self.store.delete(keys_bytes);
+        let deleted_count = store_lock.delete(keys_bytes);
         Ok(deleted_count?)
     }
 
@@ -120,7 +136,13 @@ where
             })
             .collect();
 
-        let results = self.store.get(keys_bytes)?;
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
+        let results = store_lock.get(keys_bytes)?;
+        println!("\nresults: {:?}", results);
         Ok(results
             .into_iter()
             .map(|result| !result.is_none())
@@ -128,7 +150,12 @@ where
     }
 
     fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError> {
-        let map_bytes = self.store.to_map()?;
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
+        let map_bytes = store_lock.to_map()?;
         let mut map = BTreeMap::new();
         for (k_bytes, v_bytes) in map_bytes {
             let k: K = bincode::deserialize(&k_bytes)

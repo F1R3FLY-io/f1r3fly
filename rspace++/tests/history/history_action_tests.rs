@@ -3,6 +3,7 @@
 mod tests {
     use std::collections::{BTreeMap, HashSet};
     use std::error::Error;
+    use std::sync::{Arc, Mutex};
 
     use rand::distributions::{Alphanumeric, DistString};
     use rand::seq::SliceRandom;
@@ -259,15 +260,19 @@ mod tests {
         let inserts = vec![history_insert(zeros())];
 
         let (empty_history, in_mem_store) = create_empty_history_and_store();
-        let empty_history_size = in_mem_store.size_bytes();
+        let in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+
+        let empty_history_size = in_mem_store_lock.size_bytes();
 
         let history_one = empty_history.process(inserts.clone());
         assert!(history_one.is_ok());
-        let history_one_size = in_mem_store.size_bytes();
+        let history_one_size = in_mem_store_lock.size_bytes();
 
         let history_two = history_one.as_ref().unwrap().process(inserts);
         assert!(history_two.is_ok());
-        let history_two_size = in_mem_store.size_bytes();
+        let history_two_size = in_mem_store_lock.size_bytes();
 
         assert_eq!(history_one.unwrap().root(), history_two.unwrap().root());
         assert_eq!(empty_history_size, 0_usize);
@@ -283,7 +288,13 @@ mod tests {
         let (empty_history, in_mem_store) = create_empty_history_and_store();
         let new_history = empty_history.process(insert_record);
         assert!(new_history.is_ok());
-        assert!(in_mem_store.put(vec![collision_kv_pair]).is_ok());
+
+        println!("\ncalling put directly in test");
+        let in_mem_store_lock = in_mem_store
+            .lock()
+            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+        assert!(in_mem_store_lock.put(vec![collision_kv_pair]).is_ok());
+        drop(in_mem_store_lock);
 
         let err = new_history.unwrap().process(delete_record);
         assert!(err.is_err());
@@ -368,14 +379,14 @@ mod tests {
     fn create_empty_history() -> Box<dyn History> {
         Box::new(HistoryInstances::create(
             RadixHistory::empty_root_hash(),
-            Box::new(InMemoryKeyValueStore::new()),
+            Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new()))),
         ))
     }
 
-    fn create_empty_history_and_store() -> (impl History, InMemoryKeyValueStore) {
-        let store = InMemoryKeyValueStore::new();
-
-        (HistoryInstances::create(RadixHistory::empty_root_hash(), Box::new(store.clone())), store)
+    fn create_empty_history_and_store() -> (impl History, Arc<Mutex<Box<dyn KeyValueStore>>>) {
+        let store: Arc<Mutex<Box<dyn KeyValueStore>>> =
+            Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new())));
+        (HistoryInstances::create(RadixHistory::empty_root_hash(), store.clone()), store)
     }
 
     fn random_key(size: usize) -> Vec<u8> {

@@ -13,6 +13,7 @@ pub struct InMemoryKeyValueStore {
 
 impl KeyValueStore for InMemoryKeyValueStore {
     fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
+        println!("\nin_mem_state get: {:?}", self.state);
         let result = keys
             .into_iter()
             .map(|key| {
@@ -26,10 +27,14 @@ impl KeyValueStore for InMemoryKeyValueStore {
     }
 
     fn put(&self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
+        println!("\nhit put in mem_kv");
+        println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
             let encoded = bincode::serialize(&value).unwrap();
             self.state.insert(key, encoded);
         }
+
+        println!("\nin_mem_state after put: {:?}", self.state);
 
         Ok(())
     }
@@ -60,6 +65,16 @@ impl KeyValueStore for InMemoryKeyValueStore {
         }
         Ok(map)
     }
+
+    fn size_bytes(&self) -> usize {
+        self.state
+            .iter()
+            .map(|ref_entry| {
+                let (key, value) = ref_entry.pair();
+                key.len() + value.len()
+            })
+            .sum()
+    }
 }
 
 impl InMemoryKeyValueStore {
@@ -75,15 +90,5 @@ impl InMemoryKeyValueStore {
 
     pub fn num_records(&self) -> usize {
         self.state.len()
-    }
-
-    pub fn size_bytes(&self) -> usize {
-        self.state
-            .iter()
-            .map(|ref_entry| {
-                let (key, value) = ref_entry.pair();
-                key.len() + value.len()
-            })
-            .sum()
     }
 }

@@ -895,6 +895,8 @@ impl RadixTreeImpl {
             ))
         }
 
+        println!("\nnew callll");
+
         println!("\ncache_w: {:?}", self.cache_w);
 
         let kv_pairs: Vec<(ByteVector, ByteVector)> = self
@@ -912,6 +914,7 @@ impl RadixTreeImpl {
 
         let if_absent: Vec<bool> =
             store_lock.contains(&kv_pairs.clone().into_iter().map(|(k, _)| k).collect_vec())?;
+        println!("\nif_absent: {:?}", if_absent);
         let kv_if_absent: Vec<((ByteVector, ByteVector), bool)> =
             kv_pairs.into_iter().zip(if_absent.into_iter()).collect();
 

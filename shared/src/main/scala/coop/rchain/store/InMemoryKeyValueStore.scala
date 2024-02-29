@@ -11,18 +11,22 @@ final case class InMemoryKeyValueStore[F[_]: Sync]() extends KeyValueStore[F] {
   val state = TrieMap[ByteBuffer, ByteVector]()
 
   override def get[T](keys: Seq[ByteBuffer], fromBuffer: ByteBuffer => T): F[Seq[Option[T]]] =
-    Sync[F].delay(
+    Sync[F].delay {
+      println("\ninMemState get: " + state);
       keys.map(state.get).map(_.map(_.toByteBuffer).map(fromBuffer))
-    )
+    }
 
   override def put[T](kvPairs: Seq[(ByteBuffer, T)], toBuffer: T => ByteBuffer): F[Unit] =
-    Sync[F].delay(
+    Sync[F].delay {
+      println("\nhit put in memKV");
+      println("\ninMemState before put: " + state);
       kvPairs
         .foreach {
           case (k, v) =>
             state.put(k, ByteVector(toBuffer(v)))
         }
-    )
+      println("\ninMemState after put: " + state)
+    }
 
   override def delete(keys: Seq[ByteBuffer]): F[Int] =
     Sync[F].delay(keys.map(state.remove).count(_.nonEmpty))

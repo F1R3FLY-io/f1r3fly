@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use super::key_value_store::KeyValueStore;
 use crate::rspace::rspace::RSpaceStore;
 use async_trait::async_trait;
@@ -24,9 +26,9 @@ pub trait KeyValueStoreManager: Send + Sync {
         let cold = self.store(format!("{}-cold", db_prefix)).await?;
 
         Ok(RSpaceStore {
-            history,
-            roots,
-            cold,
+            history: Arc::new(Mutex::new(history)),
+            roots: Arc::new(Mutex::new(roots)),
+            cold: Arc::new(Mutex::new(cold)),
         })
     }
 }

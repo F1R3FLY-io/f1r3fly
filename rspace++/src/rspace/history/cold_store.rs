@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::rspace::{
     hashing::blake3_hash::Blake3Hash,
     shared::{
@@ -12,7 +14,7 @@ pub struct ColdStoreInstances;
 
 impl ColdStoreInstances {
     pub fn cold_store(
-        store: Box<dyn KeyValueStore>,
+        store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>> {
         Box::new(KeyValueStoreOps::to_typed_store::<Blake3Hash, PersistedData>(store))
     }
