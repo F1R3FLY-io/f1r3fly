@@ -471,7 +471,7 @@ where
     }
 
     pub fn clear(&mut self) -> () {
-        self.reset(RadixHistory::empty_root_hash())
+        self.reset(RadixHistory::empty_root_node_hash())
     }
 
     fn create_new_hot_store(

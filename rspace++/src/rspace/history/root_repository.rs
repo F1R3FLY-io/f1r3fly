@@ -14,7 +14,7 @@ impl RootRepository {
     pub fn current_root(&self) -> Result<Blake3Hash, RootError> {
         match self.roots_store.current_root()? {
             None => {
-                let empty_root_hash = RadixHistory::empty_root_hash();
+                let empty_root_hash = RadixHistory::empty_root_node_hash();
                 self.roots_store.record_root(&empty_root_hash)?;
                 Ok(empty_root_hash)
             }

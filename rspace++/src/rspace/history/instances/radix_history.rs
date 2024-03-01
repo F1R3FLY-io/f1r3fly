@@ -3,7 +3,8 @@ use crate::rspace::history::history::History;
 use crate::rspace::history::history::HistoryError;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::history_action::HistoryActionTrait;
-use crate::rspace::history::radix_tree::{hash_node, EmptyNode, Node, RadixTreeImpl};
+use crate::rspace::history::radix_tree::empty_node;
+use crate::rspace::history::radix_tree::{hash_node, Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::{KeyValueStore, KeyValueStoreOps};
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
 use crate::rspace::ByteVector;
@@ -43,8 +44,8 @@ impl RadixHistory {
         ))))
     }
 
-    pub fn empty_root_hash() -> Blake3Hash {
-        let hash_bytes = hash_node(&EmptyNode::new().node).0;
+    pub fn empty_root_node_hash() -> Blake3Hash {
+        let hash_bytes = hash_node(&empty_node()).0;
         // let hash_array: [u8; 32] = match hash_bytes.try_into() {
         //     Ok(array) => array,
         //     Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),

@@ -294,7 +294,7 @@ mod tests {
     fn collision_detecting_in_kvdb_should_work() {
         let insert_record = vec![history_insert(zeros())];
         let delete_record = vec![history_delete(zeros())];
-        let collision_kv_pair = (RadixHistory::empty_root_hash().bytes(), random_blake().bytes());
+        let collision_kv_pair = (RadixHistory::empty_root_node_hash().bytes(), random_blake().bytes());
 
         // println!("\ninsert record {:?}", insert_record);
 
@@ -330,7 +330,7 @@ mod tests {
                     message,
                     format!(
                         "1 collisions in KVDB (first collision with key = {}.",
-                        hex::encode(RadixHistory::empty_root_hash().bytes())
+                        hex::encode(RadixHistory::empty_root_node_hash().bytes())
                     )
                 );
             }
@@ -404,7 +404,7 @@ mod tests {
 
     fn create_empty_history() -> Box<dyn History> {
         let empty_history = HistoryInstances::create(
-            RadixHistory::empty_root_hash(),
+            RadixHistory::empty_root_node_hash(),
             Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new()))),
         )
         .expect("History Actions Tests: Failed to create empty history");
@@ -417,7 +417,7 @@ mod tests {
             Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new())));
 
         let empty_history: Box<dyn History> = Box::new(
-            HistoryInstances::create(RadixHistory::empty_root_hash(), store.clone())
+            HistoryInstances::create(RadixHistory::empty_root_node_hash(), store.clone())
                 .expect("History Actions Tests: Failed to create empty history and store"),
         );
 

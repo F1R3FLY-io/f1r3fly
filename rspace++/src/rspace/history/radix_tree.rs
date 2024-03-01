@@ -34,16 +34,8 @@ pub type Node = Vec<Item>;
 
 const NUM_ITEMS: usize = 256;
 
-pub struct EmptyNode {
-    pub node: Node,
-}
-
-impl EmptyNode {
-    pub fn new() -> EmptyNode {
-        EmptyNode {
-            node: vec![Item::EmptyItem; NUM_ITEMS],
-        }
-    }
+pub fn empty_node() -> Node {
+    vec![Item::EmptyItem; NUM_ITEMS]
 }
 
 enum Either<L, R> {
@@ -838,7 +830,7 @@ impl RadixTreeImpl {
 
             match node_opt {
                 Some(node) => node,
-                None => EmptyNode::new().node,
+                None => empty_node(),
             }
         };
 
@@ -1021,7 +1013,7 @@ impl RadixTreeImpl {
 
     fn create_node_from_item(&self, item: Item) -> Node {
         match item {
-            Item::EmptyItem => EmptyNode::new().node,
+            Item::EmptyItem => empty_node(),
             Item::Leaf {
                 prefix: leaf_prefix,
                 value: leaf_value,
@@ -1033,7 +1025,7 @@ impl RadixTreeImpl {
 
                 let index = byte_to_int(*leaf_prefix.first().unwrap());
                 let (_, leaf_prefix_tail) = leaf_prefix.split_first().unwrap();
-                let mut empty_node = EmptyNode::new().node;
+                let mut empty_node = empty_node();
                 empty_node[index] = Item::Leaf {
                     prefix: leaf_prefix_tail.to_vec(),
                     value: leaf_value,
@@ -1052,7 +1044,7 @@ impl RadixTreeImpl {
 
                 let index = byte_to_int(*node_ptr_prefix.first().unwrap());
                 let (_, node_ptr_prefix_tail) = node_ptr_prefix.split_first().unwrap();
-                let mut empty_node = EmptyNode::new().node;
+                let mut empty_node = empty_node();
                 empty_node[index] = Item::Leaf {
                     prefix: node_ptr_prefix_tail.to_vec(),
                     value: ptr,
@@ -1210,7 +1202,7 @@ impl RadixTreeImpl {
                     let (comm_prefix, ins_prefix_rest, leaf_prefix_rest) =
                         common_prefix(ins_prefix, leaf_prefix);
 
-                    let mut new_node = EmptyNode::new().node;
+                    let mut new_node = empty_node();
                     let (leaf_prefix_rest_head, leaf_prefix_rest_tail) =
                         leaf_prefix_rest.split_first().unwrap();
 
@@ -1252,7 +1244,7 @@ impl RadixTreeImpl {
                     insert_new_node_to_child(ptr, comm_prefix, ins_prefix_rest) // Add new node to existing child node.
                 } else {
                     // Create child node, insert existing Ptr and new leaf in this node.
-                    let mut new_node = EmptyNode::new().node;
+                    let mut new_node = empty_node();
                     let (ptr_prefix_rest_head, ptr_prefix_rest_tail) =
                         ptr_prefix_rest.split_first().unwrap();
 
