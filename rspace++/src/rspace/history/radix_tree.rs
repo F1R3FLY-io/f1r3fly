@@ -830,7 +830,10 @@ impl RadixTreeImpl {
 
             match node_opt {
                 Some(node) => node,
-                None => empty_node(),
+                None => {
+                    // println!("\nreturning empty node in load_node");
+                    empty_node()
+                }
             }
         };
 
@@ -893,8 +896,8 @@ impl RadixTreeImpl {
 
         // println!("\nnew commit callll");
 
-        println!("\ncache_w in commit: {:?}", self.cache_w);
-        println!("\ncache_r in commit: {:?}", self.cache_r);
+        // println!("\ncache_w in commit: {:?}", self.cache_w);
+        // println!("\ncache_r in commit: {:?}", self.cache_r);
 
         let kv_pairs: Vec<(ByteVector, ByteVector)> = self
             .cache_w
@@ -902,7 +905,7 @@ impl RadixTreeImpl {
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
 
-        println!("\nkv_pairs in commit: {:?}", kv_pairs);
+        // println!("\nkv_pairs in commit: {:?}", kv_pairs);
 
         let store_lock = self
             .store
@@ -1512,6 +1515,51 @@ impl RadixTreeImpl {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn print_tree(&self, node: &Node, prefix: Vec<u8>) -> Result<String, RadixTreeError> {
+        let mut output = String::new();
+        for (_, item) in node.iter().enumerate() {
+            match item {
+                Item::EmptyItem => {
+                    // Skip empty items
+                }
+                Item::Leaf {
+                    prefix: leaf_prefix,
+                    value,
+                } => {
+                    let full_prefix = [prefix.clone(), leaf_prefix.clone()].concat();
+                    let prefix_str = format!("{:02X?}", full_prefix);
+                    let value_str = format!("{:02X?}", value);
+                    output.push_str(&format!("Leaf at prefix:{}: data: {}", prefix_str, value_str));
+                }
+                Item::NodePtr {
+                    prefix: node_prefix,
+                    ptr,
+                } => {
+                    let full_prefix = [prefix.clone(), node_prefix.clone()].concat();
+                    let prefix_str = format!("{:02X?}", full_prefix);
+                    output.push_str(&format!("NodePtr at {}: ", prefix_str));
+
+                    let store_lock = self
+                        .store
+                        .lock()
+                        .expect("Radix Tree: Failed to acquire store lock");
+
+                    // Retrieve the serialized child node using the store's get method
+                    let serialized_child_nodes = store_lock.get(vec![ptr.clone()])?;
+                    if let Some(serialized_child_node) = serialized_child_nodes.get(0) {
+                        if let Some(child_node_bytes) = serialized_child_node {
+                            let child_node =
+                                bincode::deserialize::<Node>(child_node_bytes.as_ref())
+                                    .expect("Radix Tree: Failed to deserialize");
+                            output.push_str(&self.print_tree(&child_node, full_prefix)?);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(output)
     }
 }
 

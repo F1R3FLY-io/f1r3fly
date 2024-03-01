@@ -300,11 +300,13 @@ mod tests {
 
         let (empty_history, in_mem_store) = create_empty_history_and_store();
 
-        let in_mem_store_lock = in_mem_store
-            .lock()
-            .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-        println!("\nin_mem_store fresh: {:?}", in_mem_store_lock.to_map());
-        drop(in_mem_store_lock);
+        // println(empty_history)
+
+        // let in_mem_store_lock = in_mem_store
+        //     .lock()
+        //     .expect("History Action Tests: Failed to aquire lock on in_mem_store");
+        // println!("\nin_mem_store fresh: {:?}", in_mem_store_lock.to_map());
+        // drop(in_mem_store_lock);
 
         let new_history = empty_history.process(insert_record);
         assert!(new_history.is_ok());
@@ -321,7 +323,7 @@ mod tests {
         let in_mem_store_lock = in_mem_store
             .lock()
             .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-        println!("\nin_mem_store after delete process, 2nd: {:?}", in_mem_store_lock.to_map());
+        // println!("\nin_mem_store after delete process, 2nd: {:?}", in_mem_store_lock.to_map());
         drop(in_mem_store_lock);
         assert!(err.is_err());
         match err {

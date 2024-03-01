@@ -28,6 +28,8 @@ impl RadixHistory {
         let imple = RadixTreeImpl::new(store.clone());
         let node = imple.load_node(root.bytes(), Some(true))?;
 
+        println!("Radix Tree in Radix History create: {:?}", imple.print_tree(&node, vec![]));
+
         Ok(RadixHistory {
             root_hash: root,
             root_node: node,
@@ -75,15 +77,19 @@ impl History for RadixHistory {
 
         let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions)?;
 
-        println!("\nnew_root_node_opt: {:?}", new_root_node_opt);
+        // println!("\nnew_root_node_opt: {:?}", new_root_node_opt);
 
         match new_root_node_opt {
             Some(new_root_node) => {
                 let hash_bytes = self.imple.save_node(new_root_node.clone());
+                println!(
+                    "\nRadix Tree after Radix History save_node: {:?}",
+                    self.imple.print_tree(&new_root_node, vec![])
+                );
                 let blake_hash = Blake3Hash::new(&hash_bytes);
                 let new_history = RadixHistory {
                     root_hash: blake_hash,
-                    root_node: new_root_node,
+                    root_node: new_root_node.clone(),
                     imple: RadixTreeImpl::new(self.store.clone()),
                     store: self.store.clone(),
                 };
@@ -93,6 +99,11 @@ impl History for RadixHistory {
                     .expect("Radix History: Failed to commit");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
+
+                println!(
+                    "\nRadix Tree after Radix History commit: {:?}",
+                    self.imple.print_tree(&new_root_node, vec![])
+                );
 
                 // println!("\ncache_w after clear: {:?}", self.imple.cache_w);
 

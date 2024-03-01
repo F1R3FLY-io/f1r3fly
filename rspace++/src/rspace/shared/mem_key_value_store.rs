@@ -36,14 +36,14 @@ impl KeyValueStore for InMemoryKeyValueStore {
     }
 
     fn put(&mut self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
-        println!("\nhit put in mem_kv");
+        // println!("\nhit put in mem_kv");
         // println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
             let encoded_value = bincode::serialize(&value).unwrap();
             self.state.insert(key, encoded_value);
         }
 
-        println!("\nin_mem_state after put: {:?}", self.state);
+        // println!("\nin_mem_state after put: {:?}", self.state);
 
         Ok(())
     }

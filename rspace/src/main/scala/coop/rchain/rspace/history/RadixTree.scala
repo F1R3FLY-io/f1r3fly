@@ -621,12 +621,12 @@ object RadixTree {
           s"${collisions.length} collisions in KVDB (first collision with key = ${collisions.head._1.toHex})."
         ).raiseError
       for {
-        kvPairs           <- Sync[F].delay(cacheW.toList)
-        _                 = println("\nnew commit calll")
-        _                 = println("\ncacheW: " + cacheW)
-        _                 = println("\nkvPairs: " + kvPairs)
-        ifAbsent          <- store.contains(kvPairs.map(_._1))
-        _                 = println("\nifAbsent: " + ifAbsent)
+        kvPairs <- Sync[F].delay(cacheW.toList)
+        // _                 = println("\nnew commit calll")
+        // _                 = println("\ncacheW: " + cacheW)
+        // _                 = println("\nkvPairs: " + kvPairs)
+        ifAbsent <- store.contains(kvPairs.map(_._1))
+        // _                 = println("\nifAbsent: " + ifAbsent)
         kvIfAbsent        = kvPairs zip ifAbsent
         kvExist           = kvIfAbsent.filter(_._2).map(_._1)
         valueExistInStore <- store.get(kvExist.map(_._1))
