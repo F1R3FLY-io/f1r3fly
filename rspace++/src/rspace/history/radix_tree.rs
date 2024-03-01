@@ -864,25 +864,25 @@ impl RadixTreeImpl {
      */
     pub fn save_node(&self, node: Node) -> ByteVector {
         println!("\nhit save_node");
-        let (hash_bytes, node_bytes) = hash_node(&node);
+        let (hash_node_bytes, node_bytes) = hash_node(&node);
         let check_collision = |v: Node| {
             assert!(
                 v == node,
                 "Radix Tree - Collision in cache: record with key = ${} has already existed.",
-                hex::encode(hash_bytes.clone())
+                hex::encode(hash_node_bytes.clone())
             )
         };
 
-        match self.cache_r.get(&hash_bytes) {
+        match self.cache_r.get(&hash_node_bytes) {
             Some(node) => check_collision(node.value().to_vec()),
             None => {
-                let _ = self.cache_r.insert(hash_bytes.clone(), node);
+                let _ = self.cache_r.insert(hash_node_bytes.clone(), node);
             }
         };
 
         // println("\nsave node: key {} value {}", hash_bytes.clone(), node_bytes);
-        let _ = self.cache_w.insert(hash_bytes.clone(), node_bytes);
-        hash_bytes
+        let _ = self.cache_w.insert(hash_node_bytes.clone(), node_bytes);
+        hash_node_bytes
     }
 
     /**

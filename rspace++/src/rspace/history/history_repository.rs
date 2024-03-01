@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
+use super::history::HistoryError;
 use super::roots_store::RootError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
@@ -91,7 +92,7 @@ where
         let current_root = roots_repository.current_root()?;
 
         // History store
-        let history = HistoryInstances::create(current_root, history_key_value_store.clone());
+        let history = HistoryInstances::create(current_root, history_key_value_store.clone())?;
 
         // Cold store
         let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());
@@ -122,12 +123,14 @@ where
 #[derive(Debug)]
 pub enum HistoryRepositoryError {
     RootError(RootError),
+    HistoryError(HistoryError),
 }
 
 impl std::fmt::Display for HistoryRepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             HistoryRepositoryError::RootError(err) => write!(f, "Root Error: {}", err),
+            HistoryRepositoryError::HistoryError(err) => write!(f, "History Error: {}", err),
         }
     }
 }
@@ -135,5 +138,11 @@ impl std::fmt::Display for HistoryRepositoryError {
 impl From<RootError> for HistoryRepositoryError {
     fn from(error: RootError) -> Self {
         HistoryRepositoryError::RootError(error)
+    }
+}
+
+impl From<HistoryError> for HistoryRepositoryError {
+    fn from(error: HistoryError) -> Self {
+        HistoryRepositoryError::HistoryError(error)
     }
 }

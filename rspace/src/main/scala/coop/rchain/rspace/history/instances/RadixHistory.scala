@@ -67,6 +67,7 @@ final case class RadixHistory[F[_]: Sync: Parallel](
                       }
       _ = impl.clearWriteCache()
       _ = impl.clearReadCache()
+      // _ = println("\nPrinting Radix Tree after process: " + impl.printTree())
     } yield newHistoryOpt.getOrElse(this)
 
   private def hasNoDuplicates(actions: List[HistoryAction]) =

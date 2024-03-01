@@ -23,18 +23,16 @@ impl RadixHistory {
     pub fn create(
         root: Blake3Hash,
         store: Arc<Mutex<Box<dyn KeyValueTypedStore<ByteVector, ByteVector>>>>,
-    ) -> RadixHistory {
+    ) -> Result<RadixHistory, HistoryError> {
         let imple = RadixTreeImpl::new(store.clone());
-        let node = imple
-            .load_node(root.bytes(), Some(true))
-            .expect("Radix History: Unable to call load_node");
+        let node = imple.load_node(root.bytes(), Some(true))?;
 
-        RadixHistory {
+        Ok(RadixHistory {
             root_hash: root,
             root_node: node,
             imple,
             store,
-        }
+        })
     }
 
     pub fn create_store(
@@ -100,7 +98,7 @@ impl History for RadixHistory {
                 Ok(Box::new(new_history))
             }
             None => {
-              println!("\nNone in process");
+                println!("\nNone in process");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
                 Ok(Box::new(RadixHistory {

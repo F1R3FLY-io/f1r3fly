@@ -403,16 +403,25 @@ mod tests {
     }
 
     fn create_empty_history() -> Box<dyn History> {
-        Box::new(HistoryInstances::create(
+        let empty_history = HistoryInstances::create(
             RadixHistory::empty_root_hash(),
             Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new()))),
-        ))
+        )
+        .expect("History Actions Tests: Failed to create empty history");
+
+        Box::new(empty_history)
     }
 
-    fn create_empty_history_and_store() -> (impl History, Arc<Mutex<Box<dyn KeyValueStore>>>) {
+    fn create_empty_history_and_store() -> (Box<dyn History>, Arc<Mutex<Box<dyn KeyValueStore>>>) {
         let store: Arc<Mutex<Box<dyn KeyValueStore>>> =
             Arc::new(Mutex::new(Box::new(InMemoryKeyValueStore::new())));
-        (HistoryInstances::create(RadixHistory::empty_root_hash(), store.clone()), store)
+
+        let empty_history: Box<dyn History> = Box::new(
+            HistoryInstances::create(RadixHistory::empty_root_hash(), store.clone())
+                .expect("History Actions Tests: Failed to create empty history and store"),
+        );
+
+        (empty_history, store)
     }
 
     fn random_key(size: usize) -> Vec<u8> {

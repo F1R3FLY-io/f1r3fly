@@ -20,7 +20,10 @@ pub trait History: Send + Sync {
 pub struct HistoryInstances;
 
 impl HistoryInstances {
-    pub fn create(root: Blake3Hash, store: Arc<Mutex<Box<dyn KeyValueStore>>>) -> RadixHistory {
+    pub fn create(
+        root: Blake3Hash,
+        store: Arc<Mutex<Box<dyn KeyValueStore>>>,
+    ) -> Result<RadixHistory, HistoryError> {
         let typed_store = RadixHistory::create_store(store.to_owned());
         RadixHistory::create(root, typed_store)
     }
