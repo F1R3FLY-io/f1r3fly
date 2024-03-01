@@ -23,11 +23,11 @@ object RadixHistory {
     for {
       impl <- Sync[F].delay(new RadixTreeImpl[F](store))
       node <- impl.loadNode(root.bytes, noAssert = true)
-      _ = println(
-        "\nRadix Tree after Radix History save_node: "
-      )
-      _ <- impl
-            .printTree(node, "", false)
+      // _ = println(
+      //   "\nRadix Tree after Radix History save_node: "
+      // )
+      // _ <- impl
+      //       .printTree(node, "", false)
     } yield RadixHistory(root, node, impl, store)
 
   def createStore[F[_]: Sync](
@@ -65,14 +65,22 @@ final case class RadixHistory[F[_]: Sync: Parallel](
       newRootNodeOpt <- impl.makeActions(rootNode, actions)
       // _              = println("\nnewRootNodeOpt: " + newRootNodeOpt)
       newHistoryOpt <- newRootNodeOpt.traverse { newRootNode =>
-                        val hash = impl.saveNode(newRootNode)
-                        println("\nRadix Tree after Radix History save_node: ")
-                        for {
-                          _                <- impl.printTree(newRootNode, "", false)
-                          blakeHash        = Blake2b256Hash.fromByteVector(hash)
-                          newHistory       = this.copy(blakeHash, newRootNode, impl, store)
-                          committedHistory <- impl.commit.as(newHistory)
-                        } yield committedHistory
+                        println("\nnewRootNode: " + newRootNode)
+                        // val hash = impl.saveNode(newRootNode)
+                        // // println("\nRadix Tree after Radix History save_node: ")
+                        // for {
+                        //   // _                <- impl.printTree(newRootNode, "", false)
+                        //   blakeHash        = Blake2b256Hash.fromByteVector(hash)
+                        //   newHistory       = this.copy(blakeHash, newRootNode, impl, store)
+                        //   committedHistory <- impl.commit.as(newHistory)
+                        //   // store_map        <- store.toMap
+                        //   // _                = println("\nstore after commit: " + store_map)
+                        // } yield committedHistory
+
+                        val hash       = impl.saveNode(newRootNode)
+                        val blakeHash  = Blake2b256Hash.fromByteVector(hash)
+                        val newHistory = this.copy(blakeHash, newRootNode, impl, store)
+                        impl.commit.as(newHistory)
                       }
       _ = impl.clearWriteCache()
       _ = impl.clearReadCache()

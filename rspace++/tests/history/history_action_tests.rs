@@ -8,7 +8,7 @@ mod tests {
     use rand::distributions::{Alphanumeric, DistString};
     use rand::seq::SliceRandom;
     use rand::Rng;
-    use rspace_plus_plus::rspace::history::radix_tree::RadixTreeError;
+    use rspace_plus_plus::rspace::history::radix_tree::{empty_node, hash_node, RadixTreeError};
     use rspace_plus_plus::rspace::shared::key_value_store::KeyValueStore;
     use rspace_plus_plus::rspace::{
         hashing::blake3_hash::Blake3Hash,
@@ -294,7 +294,8 @@ mod tests {
     fn collision_detecting_in_kvdb_should_work() {
         let insert_record = vec![history_insert(zeros())];
         let delete_record = vec![history_delete(zeros())];
-        let collision_kv_pair = (RadixHistory::empty_root_node_hash().bytes(), random_blake().bytes());
+        let collision_kv_pair =
+            (RadixHistory::empty_root_node_hash().bytes(), random_blake().bytes());
 
         // println!("\ninsert record {:?}", insert_record);
 
@@ -310,6 +311,9 @@ mod tests {
 
         let new_history = empty_history.process(insert_record);
         assert!(new_history.is_ok());
+
+        // println!("\nnew_history root_hash: {:?}", new_history.as_ref().unwrap().root());
+        // println!("\nempty_root_node_hash: {:?}", hash_node(&empty_node()).0);
 
         let mut in_mem_store_lock = in_mem_store
             .lock()

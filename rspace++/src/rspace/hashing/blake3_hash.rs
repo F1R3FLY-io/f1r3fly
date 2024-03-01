@@ -12,6 +12,10 @@ impl Blake3Hash {
         Blake3Hash(hash.as_bytes().to_vec())
     }
 
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Blake3Hash(bytes)
+    }
+
     pub fn bytes(&self) -> Vec<u8> {
         self.0.clone()
     }

@@ -212,9 +212,11 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       for {
         emptyHistory <- emptyHistoryF
         newHistory   <- emptyHistory.process(insertRecord)
-        _            = println("\ncalling put directly in test")
-        _            <- inMemoStore.put[ByteVector](Seq(collisionKVPair), copyBVToBuf)
-        err          <- newHistory.process(deleteRecord).attempt
+        _            = println("\nnewHistory root bytes: " + copyBVToBuf(newHistory.root.bytes))
+        _            = println("\nemptyRootHash bytes: " + copyBVToBuf(History.emptyRootHash.bytes))
+        // _            = println("\ncalling put directly in test")
+        _   <- inMemoStore.put[ByteVector](Seq(collisionKVPair), copyBVToBuf)
+        err <- newHistory.process(deleteRecord).attempt
       } yield {
         err.isLeft shouldBe true
         val ex = err.left.get

@@ -1,3 +1,4 @@
+use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::shared::key_value_store::KvStoreError;
 use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
@@ -197,8 +198,9 @@ fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, Byt
 
 pub fn hash_node(node: &Node) -> (ByteVector, ByteVector) {
     let bytes = encode(node);
-    let hash = blake3::hash(&bytes);
-    (hash.as_bytes().to_vec(), bytes)
+    let hash = Blake3Hash::new(&bytes);
+    // println!("\nHash in hash node: {:?}", hash);
+    (hash.bytes(), bytes)
 }
 
 fn byte_to_int(b: u8) -> usize {
@@ -858,7 +860,7 @@ impl RadixTreeImpl {
      * If detected collision with older cache data - executing assert
      */
     pub fn save_node(&self, node: Node) -> ByteVector {
-        println!("\nhit save_node");
+        // println!("\nhit save_node");
         let (hash_node_bytes, node_bytes) = hash_node(&node);
         let check_collision = |v: Node| {
             assert!(

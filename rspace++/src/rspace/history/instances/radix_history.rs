@@ -28,7 +28,7 @@ impl RadixHistory {
         let imple = RadixTreeImpl::new(store.clone());
         let node = imple.load_node(root.bytes(), Some(true))?;
 
-        println!("Radix Tree in Radix History create: {:?}", imple.print_tree(&node, vec![]));
+        // println!("Radix Tree in Radix History create: {:?}", imple.print_tree(&node, vec![]));
 
         Ok(RadixHistory {
             root_hash: root,
@@ -81,14 +81,17 @@ impl History for RadixHistory {
 
         match new_root_node_opt {
             Some(new_root_node) => {
-                let hash_bytes = self.imple.save_node(new_root_node.clone());
-                println!(
-                    "\nRadix Tree after Radix History save_node: {:?}",
-                    self.imple.print_tree(&new_root_node, vec![])
-                );
-                let blake_hash = Blake3Hash::new(&hash_bytes);
+                println!("\nnew_root_node: {:?}", new_root_node);
+                let hash_node_bytes = self.imple.save_node(new_root_node.clone());
+                // println!("\nhash_node_bytes: {:?}", hash_node_bytes);
+                // println!(
+                //     "\nRadix Tree after Radix History save_node: {:?}",
+                //     self.imple.print_tree(&new_root_node, vec![])
+                // );
+                let root_hash = Blake3Hash::from_bytes(hash_node_bytes);
+                // println!("\nHash in process: {:?}", root_hash);
                 let new_history = RadixHistory {
-                    root_hash: blake_hash,
+                    root_hash,
                     root_node: new_root_node.clone(),
                     imple: RadixTreeImpl::new(self.store.clone()),
                     store: self.store.clone(),
@@ -97,13 +100,21 @@ impl History for RadixHistory {
                 self.imple
                     .commit()
                     .expect("Radix History: Failed to commit");
+
+                let store_lock = self
+                    .store
+                    .lock()
+                    .expect("Radix History: Failed to acquire store lock");
+                // println!("\nstore after commit: {:?}", store_lock.to_map());
+                drop(store_lock);
+
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
 
-                println!(
-                    "\nRadix Tree after Radix History commit: {:?}",
-                    self.imple.print_tree(&new_root_node, vec![])
-                );
+                // println!(
+                //     "\nRadix Tree after Radix History commit: {:?}",
+                //     self.imple.print_tree(&new_root_node, vec![])
+                // );
 
                 // println!("\ncache_w after clear: {:?}", self.imple.cache_w);
 

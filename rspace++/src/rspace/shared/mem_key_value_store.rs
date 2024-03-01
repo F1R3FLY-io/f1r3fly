@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, HashMap};
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::{ByteBuffer, ByteVector};
 use bincode;
-use dashmap::DashMap;
 
 // See shared/src/main/scala/coop/rchain/store/InMemoryKeyValueStore.scala
 #[derive(Clone)]
