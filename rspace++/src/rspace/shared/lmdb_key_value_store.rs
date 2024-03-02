@@ -93,6 +93,11 @@ impl KeyValueStore for LmdbKeyValueStore {
     fn size_bytes(&self) -> usize {
         todo!()
     }
+
+    // This is only needed for testing purposes
+    fn print_store(&self) -> () {
+        todo!()
+    }
 }
 
 impl LmdbKeyValueStore {

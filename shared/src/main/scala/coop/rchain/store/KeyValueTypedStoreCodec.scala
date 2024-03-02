@@ -78,7 +78,7 @@ class KeyValueTypedStoreCodec[F[_]: Sync, K, V](
       keysBuf = keysBitVector.map(_.toByteVector.toDirectByteBuffer)
       // _             = println("\nkeysBuf in contains: " + keysBuf)
       results <- store.get(keysBuf, _ => ())
-      // _             = println("\nresults in contains: " + results)
+      // _       = println("\nresults in contains: " + results)
     } yield results.map(_.nonEmpty)
 
   override def collect[T](pf: PartialFunction[(K, () => V), T]): F[Seq[T]] =

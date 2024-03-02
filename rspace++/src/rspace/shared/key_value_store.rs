@@ -21,6 +21,8 @@ pub trait KeyValueStore: Send + Sync {
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
 
     fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError>;
+    
+    fn print_store(&self) -> ();
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
     fn get_one(&self, key: ByteBuffer) -> Result<Option<ByteBuffer>, KvStoreError> {

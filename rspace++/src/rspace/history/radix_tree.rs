@@ -861,25 +861,25 @@ impl RadixTreeImpl {
      */
     pub fn save_node(&self, node: Node) -> ByteVector {
         // println!("\nhit save_node");
-        let (hash_node_bytes, node_bytes) = hash_node(&node);
+        let (node_hash_bytes, node_bytes) = hash_node(&node);
         let check_collision = |v: Node| {
             assert!(
                 v == node,
                 "Radix Tree - Collision in cache: record with key = ${} has already existed.",
-                hex::encode(hash_node_bytes.clone())
+                hex::encode(node_hash_bytes.clone())
             )
         };
 
-        match self.cache_r.get(&hash_node_bytes) {
+        match self.cache_r.get(&node_hash_bytes) {
             Some(node) => check_collision(node.value().to_vec()),
             None => {
-                let _ = self.cache_r.insert(hash_node_bytes.clone(), node);
+                let _ = self.cache_r.insert(node_hash_bytes.clone(), node);
             }
         };
 
         // println("\nsave node: key {} value {}", hash_bytes.clone(), node_bytes);
-        let _ = self.cache_w.insert(hash_node_bytes.clone(), node_bytes);
-        hash_node_bytes
+        let _ = self.cache_w.insert(node_hash_bytes.clone(), node_bytes);
+        node_hash_bytes
     }
 
     /**
@@ -890,7 +890,7 @@ impl RadixTreeImpl {
     pub fn commit(&self) -> Result<(), RadixTreeError> {
         fn collision_panic(collisions: Vec<(ByteVector, ByteVector)>) -> RadixTreeError {
             RadixTreeError::CollisionError(format!(
-                "${} collisions in KVDB (first collision with key = ${}.",
+                "{} collisions in KVDB (first collision with key = {}.",
                 collisions.len(),
                 hex::encode(collisions.first().unwrap().0.clone()),
             ))
@@ -907,18 +907,22 @@ impl RadixTreeImpl {
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
 
-        // println!("\nkv_pairs in commit: {:?}", kv_pairs);
+        // println!("\nkv_pairs: {:?}", kv_pairs);
 
         let store_lock = self
             .store
             .lock()
             .expect("Radix Tree: Unable to acquire store lock");
 
+        // store_lock.print_store();
+
         let if_absent: Vec<bool> =
             store_lock.contains(&kv_pairs.clone().into_iter().map(|(k, _)| k).collect_vec())?;
-        // println!("\nif_absent: {:?}", if_absent);
+        println!("\nif_absent: {:?}", if_absent);
         let kv_if_absent: Vec<((ByteVector, ByteVector), bool)> =
             kv_pairs.into_iter().zip(if_absent.into_iter()).collect();
+
+        // println!("\nkv_if_absent: {:?}", kv_if_absent);
 
         let kv_exist: Vec<(ByteVector, ByteVector)> = kv_if_absent
             .iter()
@@ -926,8 +930,12 @@ impl RadixTreeImpl {
             .map(|(kv, _)| kv.clone())
             .collect();
 
+        // println!("\nkv_exist: {:?}", kv_exist);
+
         let value_exist_in_store: Vec<Option<ByteVector>> =
             store_lock.get(kv_exist.clone().into_iter().map(|(k, _)| k).collect_vec())?;
+
+        // println!("\nvalue_exist_in_store: {:?}", value_exist_in_store);
 
         let kvv_exist: Vec<((ByteVector, ByteVector), ByteVector)> = kv_exist
             .into_iter()

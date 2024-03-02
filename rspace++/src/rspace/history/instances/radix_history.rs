@@ -47,13 +47,13 @@ impl RadixHistory {
     }
 
     pub fn empty_root_node_hash() -> Blake3Hash {
-        let hash_bytes = hash_node(&empty_node()).0;
+        let node_hash_bytes = hash_node(&empty_node()).0;
         // let hash_array: [u8; 32] = match hash_bytes.try_into() {
         //     Ok(array) => array,
         //     Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
         // };
-        let hash = Blake3Hash::new(&hash_bytes);
-        hash
+        let node_hash = Blake3Hash::from_bytes(node_hash_bytes);
+        node_hash
     }
 
     fn has_no_duplicates(&self, actions: &Vec<HistoryAction>) -> bool {
@@ -75,20 +75,22 @@ impl History for RadixHistory {
             ));
         }
 
+        // println!("\nhit process");
+
         let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions)?;
 
         // println!("\nnew_root_node_opt: {:?}", new_root_node_opt);
 
         match new_root_node_opt {
             Some(new_root_node) => {
-                println!("\nnew_root_node: {:?}", new_root_node);
-                let hash_node_bytes = self.imple.save_node(new_root_node.clone());
+                // println!("\nnew_root_node: {:?}", new_root_node);
+                let node_hash_bytes = self.imple.save_node(new_root_node.clone());
                 // println!("\nhash_node_bytes: {:?}", hash_node_bytes);
                 // println!(
                 //     "\nRadix Tree after Radix History save_node: {:?}",
                 //     self.imple.print_tree(&new_root_node, vec![])
                 // );
-                let root_hash = Blake3Hash::from_bytes(hash_node_bytes);
+                let root_hash = Blake3Hash::from_bytes(node_hash_bytes);
                 // println!("\nHash in process: {:?}", root_hash);
                 let new_history = RadixHistory {
                     root_hash,
@@ -97,9 +99,7 @@ impl History for RadixHistory {
                     store: self.store.clone(),
                 };
                 // println!("\ncache_w before clear: {:?}", self.imple.cache_w);
-                self.imple
-                    .commit()
-                    .expect("Radix History: Failed to commit");
+                self.imple.commit()?;
 
                 let store_lock = self
                     .store

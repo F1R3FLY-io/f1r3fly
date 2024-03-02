@@ -62,10 +62,12 @@ final case class RadixHistory[F[_]: Sync: Parallel](
       _ <- new RuntimeException("Cannot process duplicate actions on one key.").raiseError
             .unlessA(hasNoDuplicates(actions))
 
+      // _ = println("\nhit process")
+
       newRootNodeOpt <- impl.makeActions(rootNode, actions)
       // _              = println("\nnewRootNodeOpt: " + newRootNodeOpt)
       newHistoryOpt <- newRootNodeOpt.traverse { newRootNode =>
-                        println("\nnewRootNode: " + newRootNode)
+                        // println("\nnewRootNode: " + newRootNode)
                         // val hash = impl.saveNode(newRootNode)
                         // // println("\nRadix Tree after Radix History save_node: ")
                         // for {
@@ -77,14 +79,16 @@ final case class RadixHistory[F[_]: Sync: Parallel](
                         //   // _                = println("\nstore after commit: " + store_map)
                         // } yield committedHistory
 
-                        val hash       = impl.saveNode(newRootNode)
-                        val blakeHash  = Blake2b256Hash.fromByteVector(hash)
+                        val hash      = impl.saveNode(newRootNode)
+                        val blakeHash = Blake2b256Hash.fromByteVector(hash)
+                        // println("\nnewRootNode hash: " + blakeHash.bytes)
                         val newHistory = this.copy(blakeHash, newRootNode, impl, store)
                         impl.commit.as(newHistory)
                       }
       _ = impl.clearWriteCache()
       _ = impl.clearReadCache()
-      // _ = println("\nPrinting Radix Tree after process: " + impl.printTree())
+      // _ = println("\nPrinting Radix Tree after process: ")
+      // _ <- impl.printTree(this.rootNode, "", false)
     } yield newHistoryOpt.getOrElse(this)
 
   private def hasNoDuplicates(actions: List[HistoryAction]) =

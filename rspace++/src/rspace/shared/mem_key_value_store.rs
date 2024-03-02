@@ -23,11 +23,12 @@ impl KeyValueStore for InMemoryKeyValueStore {
                     //     key_value.key(),
                     //     key_value.value()
                     // );
-                    bincode::deserialize(&value)
-                        .expect("Mem Key Value Store: Failed to deserialize")
+                    // bincode::deserialize(&value)
+                    //     .expect("Mem Key Value Store: Failed to deserialize")
+                    value.clone()
                 })
             })
-            .collect::<Vec<Option<_>>>();
+            .collect::<Vec<Option<ByteBuffer>>>();
 
         // println!("\nresults in get: {:?}", result);
 
@@ -38,8 +39,9 @@ impl KeyValueStore for InMemoryKeyValueStore {
         // println!("\nhit put in mem_kv");
         // println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
+            let encoded_key = bincode::serialize(&key).unwrap();
             let encoded_value = bincode::serialize(&value).unwrap();
-            self.state.insert(key, encoded_value);
+            self.state.insert(encoded_key, encoded_value);
         }
 
         // println!("\nin_mem_state after put: {:?}", self.state);
@@ -67,7 +69,7 @@ impl KeyValueStore for InMemoryKeyValueStore {
         for entry in self.state.iter() {
             let (key, value) = entry;
             map.insert(
-                key.clone(),
+                bincode::deserialize(key).expect("Mem Key Value Store: Unable to deserialize"),
                 bincode::deserialize(value).expect("Mem Key Value Store: Unable to deserialize"),
             );
         }
@@ -82,6 +84,10 @@ impl KeyValueStore for InMemoryKeyValueStore {
                 key.len() + value.len()
             })
             .sum()
+    }
+
+    fn print_store(&self) -> () {
+        println!("\nIn Mem Key Value Store: {:?}", self.to_map().unwrap())
     }
 }
 

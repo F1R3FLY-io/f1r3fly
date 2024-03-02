@@ -8,7 +8,7 @@ mod tests {
     use rand::distributions::{Alphanumeric, DistString};
     use rand::seq::SliceRandom;
     use rand::Rng;
-    use rspace_plus_plus::rspace::history::radix_tree::{empty_node, hash_node, RadixTreeError};
+    use rspace_plus_plus::rspace::history::radix_tree::RadixTreeError;
     use rspace_plus_plus::rspace::shared::key_value_store::KeyValueStore;
     use rspace_plus_plus::rspace::{
         hashing::blake3_hash::Blake3Hash,
@@ -297,29 +297,13 @@ mod tests {
         let collision_kv_pair =
             (RadixHistory::empty_root_node_hash().bytes(), random_blake().bytes());
 
-        // println!("\ninsert record {:?}", insert_record);
-
         let (empty_history, in_mem_store) = create_empty_history_and_store();
-
-        // println(empty_history)
-
-        // let in_mem_store_lock = in_mem_store
-        //     .lock()
-        //     .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-        // println!("\nin_mem_store fresh: {:?}", in_mem_store_lock.to_map());
-        // drop(in_mem_store_lock);
-
         let new_history = empty_history.process(insert_record);
         assert!(new_history.is_ok());
-
-        // println!("\nnew_history root_hash: {:?}", new_history.as_ref().unwrap().root());
-        // println!("\nempty_root_node_hash: {:?}", hash_node(&empty_node()).0);
 
         let mut in_mem_store_lock = in_mem_store
             .lock()
             .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-        // println!("\nin_mem_store after insert process: {:?}", in_mem_store_lock.to_map());
-
         assert!(in_mem_store_lock.put(vec![collision_kv_pair]).is_ok());
         drop(in_mem_store_lock);
 
@@ -327,9 +311,9 @@ mod tests {
         let in_mem_store_lock = in_mem_store
             .lock()
             .expect("History Action Tests: Failed to aquire lock on in_mem_store");
-        // println!("\nin_mem_store after delete process, 2nd: {:?}", in_mem_store_lock.to_map());
         drop(in_mem_store_lock);
         assert!(err.is_err());
+
         match err {
             Err(HistoryError::RadixTreeError(RadixTreeError::CollisionError(message))) => {
                 assert_eq!(

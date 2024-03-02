@@ -4,8 +4,8 @@ use crate::rspace::ByteVector;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use std::{collections::BTreeMap, marker::PhantomData};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStore.scala
 #[async_trait]
@@ -22,7 +22,8 @@ where
 
     fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError>;
 
-    fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError>;
+    // fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError>;
+    fn print_store(&self) -> ();
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
     fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
@@ -153,21 +154,30 @@ where
             .collect())
     }
 
-    fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError> {
+    // fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError> {
+    //     let store_lock = self
+    //         .store
+    //         .lock()
+    //         .expect("Key Value Typed Store: Failed to acquire lock on store");
+
+    //     let map_bytes = store_lock.to_map()?;
+    //     let mut map = BTreeMap::new();
+    //     for (k_bytes, v_bytes) in map_bytes {
+    //         let k: K = bincode::deserialize(&k_bytes)
+    //             .expect("Key Value Typed Store: Failed to deserialize key bytes");
+    //         let v: V = bincode::deserialize(&v_bytes)
+    //             .expect("Key Value Typed Store: Failed to value key bytes");
+    //         map.insert(k, v);
+    //     }
+    //     Ok(map)
+    // }
+
+    fn print_store(&self) -> () {
         let store_lock = self
             .store
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
 
-        let map_bytes = store_lock.to_map()?;
-        let mut map = BTreeMap::new();
-        for (k_bytes, v_bytes) in map_bytes {
-            let k: K = bincode::deserialize(&k_bytes)
-                .expect("Key Value Typed Store: Failed to deserialize key bytes");
-            let v: V = bincode::deserialize(&v_bytes)
-                .expect("Key Value Typed Store: Failed to value key bytes");
-            map.insert(k, v);
-        }
-        Ok(map)
+        store_lock.print_store()
     }
 }

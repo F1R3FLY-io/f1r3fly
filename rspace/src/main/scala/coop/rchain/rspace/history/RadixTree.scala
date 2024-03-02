@@ -624,17 +624,22 @@ object RadixTree {
         kvPairs <- Sync[F].delay(cacheW.toList)
         // _                 = println("\nnew commit calll")
         // _                 = println("\ncacheW: " + cacheW)
-        // _                 = println("\nkvPairs: " + kvPairs)
+        // _          = println("\nkvPairs: " + kvPairs)
+        storeMap <- store.toMap
+        // _          = println("\nstore: " + storeMap)
         ifAbsent <- store.contains(kvPairs.map(_._1))
-        // _                 = println("\nifAbsent: " + ifAbsent)
-        kvIfAbsent        = kvPairs zip ifAbsent
-        kvExist           = kvIfAbsent.filter(_._2).map(_._1)
+        // _          = println("\nifAbsent: " + ifAbsent)
+        kvIfAbsent = kvPairs zip ifAbsent
+        // _          = println("\nkvIfAbsent: " + kvIfAbsent)
+        kvExist = kvIfAbsent.filter(_._2).map(_._1)
+        // _                 = println("\nkvExist: " + kvExist)
         valueExistInStore <- store.get(kvExist.map(_._1))
-        kvvExist          = kvExist zip valueExistInStore.map(_.getOrElse(ByteVector.empty))
-        kvCollision       = kvvExist.filter(kvv => !(kvv._1._2 == kvv._2)).map(_._1)
-        _                 <- if (kvCollision.nonEmpty) collisionException(kvCollision) else ().pure
-        kvAbsent          = kvIfAbsent.filterNot(_._2).map(_._1)
-        _                 <- store.put(kvAbsent)
+        // _                 = println("\nvalueExistInStore: " + valueExistInStore)
+        kvvExist    = kvExist zip valueExistInStore.map(_.getOrElse(ByteVector.empty))
+        kvCollision = kvvExist.filter(kvv => !(kvv._1._2 == kvv._2)).map(_._1)
+        _           <- if (kvCollision.nonEmpty) collisionException(kvCollision) else ().pure
+        kvAbsent    = kvIfAbsent.filterNot(_._2).map(_._1)
+        _           <- store.put(kvAbsent)
       } yield ()
     }
 
