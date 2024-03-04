@@ -42,6 +42,7 @@ impl KeyValueStore for InMemoryKeyValueStore {
             let encoded_key = bincode::serialize(&key).unwrap();
             let encoded_value = bincode::serialize(&value).unwrap();
             self.state.insert(encoded_key, encoded_value);
+            // self.state.insert(key, value);
         }
 
         // println!("\nin_mem_state after put: {:?}", self.state);

@@ -571,6 +571,7 @@ object RadixTree {
       def cacheMiss =
         for {
           storeNodeOpt <- loadNodeFromStore(nodePtr)
+          _            = println("\nstoreNode in loadNode: " + storeNodeOpt)
           _            = storeNodeOpt.map(cacheR.update(nodePtr, _)).getOrElse(errorMsg())
         } yield storeNodeOpt.getOrElse(emptyNode)
       for {
@@ -670,6 +671,10 @@ object RadixTree {
                 else Option.empty[ByteVector].asRight[Params].pure                        // Not found
             }
         }
+
+      println("\nstartNode: " + startNode)
+      println("\nstartPrefix: " + startPrefix)
+
       (startNode, startPrefix).tailRecM(loop)
     }
 

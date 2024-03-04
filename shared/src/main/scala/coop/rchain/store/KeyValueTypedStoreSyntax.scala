@@ -17,7 +17,19 @@ final class KeyValueTypedStoreOps[F[_], K, V](
   def errKVStoreExpectValue(hash: String) =
     s"Error when unsafe reading from KeyValueStore: value for key ${hash} not found."
 
-  def get1(key: K)(implicit f: Functor[F]): F[Option[V]] = store.get(Seq(key)).map(_.head)
+  def get1(key: K)(implicit f: Functor[F]): F[Option[V]] = {
+    val result = store.get(Seq(key))
+    println("\ngetValues in getOne: " + result)
+    result.map(_.head)
+    // store
+    //   .get(Seq(key))
+    //   .map { values =>
+    //     val headOption = values.headOption
+    //     println(s"Value for key $key: $headOption")
+    //     headOption
+  }
+
+  // store.get(Seq(key)).map(_.head)
 
   def getUnsafeBatch(keys: Seq[K])(implicit f: Sync[F], show: Show[K]): F[List[V]] =
     store

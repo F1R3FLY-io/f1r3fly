@@ -26,15 +26,7 @@ where
     fn print_store(&self) -> ();
 
     // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
-    fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
-        let mut values = self.get(vec![key.clone()])?;
-        let first_value = values.remove(0);
-
-        match first_value {
-            Some(value) => Ok(Some(value)),
-            None => Ok(None),
-        }
-    }
+    fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError>;
 
     fn put_if_absent(&self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError> {
         let keys: Vec<K> = kv_pairs.iter().map(|(k, _)| k.clone()).collect();
@@ -63,7 +55,7 @@ where
     V: Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
 {
     fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError> {
-        let keys_bytes = keys
+        let serialized_keys = keys
             .into_iter()
             .map(|key| bincode::serialize(&key))
             .collect::<Result<Vec<_>, _>>()?;
@@ -73,7 +65,7 @@ where
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
 
-        let values_bytes = store_lock.get(keys_bytes)?;
+        let values_bytes = store_lock.get(serialized_keys)?;
         let values: Vec<Option<V>> = values_bytes
             .into_iter()
             .map(|value_bytes_opt| match value_bytes_opt {
@@ -130,7 +122,7 @@ where
 
     fn contains(&self, keys: &Vec<K>) -> Result<Vec<bool>, KvStoreError> {
         // println!("\nkeys in contains: {:?}", keys);
-        let keys_bytes: Vec<ByteVector> = keys
+        let serialized_keys: Vec<ByteVector> = keys
             .iter()
             .map(|k| {
                 let serialized_key =
@@ -146,12 +138,44 @@ where
             .lock()
             .expect("Key Value Typed Store: Failed to acquire lock on store");
 
-        let results = store_lock.get(keys_bytes)?;
+        let results = store_lock.get(serialized_keys)?;
         // println!("\nresults in contains: {:?}", results);
         Ok(results
             .into_iter()
             .map(|result| !result.is_none())
             .collect())
+    }
+
+    // See shared/src/main/scala/coop/rchain/store/KeyValueTypedStoreSyntax.scala
+    fn get_one(&self, key: &K) -> Result<Option<V>, KvStoreError> {
+        let serialized_key =
+            bincode::serialize(key).expect("Key Value Typed Store: Failed to serialize key");
+
+        let double_serialized_key =
+            bincode::serialize(&serialized_key).expect("Key Value Typed Store: Failed to serialize key");
+
+        let store_lock = self
+            .store
+            .lock()
+            .expect("Key Value Typed Store: Failed to acquire lock on store");
+
+        println!("\nserialized key: {:?}", double_serialized_key);
+        store_lock.print_store();
+
+        let mut values = store_lock.get(vec![double_serialized_key])?;
+
+        println!("\nget_values in get_one: {:?}", values);
+
+        let first_value = values.remove(0);
+
+        match first_value {
+            Some(value) => {
+                let decoded_value: V = bincode::deserialize(&value)
+                    .expect("Key Value Typed Store: Failed to deserialize value bytes");
+                Ok(Some(decoded_value))
+            }
+            None => Ok(None),
+        }
     }
 
     // fn to_map(&self) -> Result<BTreeMap<K, V>, KvStoreError> {

@@ -823,6 +823,8 @@ impl RadixTreeImpl {
         let cache_miss = |node_ptr: ByteVector| {
             let store_node_opt = self.load_node_from_store(&node_ptr);
 
+            println!("\nstore_node in load_node: {:?}", store_node_opt);
+
             let node_opt = store_node_opt
                 .map(|node| self.cache_r.insert(node_ptr.clone(), node))
                 .unwrap_or_else(|| {
@@ -918,7 +920,7 @@ impl RadixTreeImpl {
 
         let if_absent: Vec<bool> =
             store_lock.contains(&kv_pairs.clone().into_iter().map(|(k, _)| k).collect_vec())?;
-        println!("\nif_absent: {:?}", if_absent);
+        // println!("\nif_absent: {:?}", if_absent);
         let kv_if_absent: Vec<((ByteVector, ByteVector), bool)> =
             kv_pairs.into_iter().zip(if_absent.into_iter()).collect();
 
@@ -1020,6 +1022,9 @@ impl RadixTreeImpl {
                 },
             }
         });
+
+        println!("\nstart_node: {:?}", start_node);
+        println!("\nstart_prefix: {:?}", start_prefix);
 
         tail_rec_m((start_node, start_prefix), loops)
     }

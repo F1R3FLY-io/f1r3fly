@@ -65,6 +65,7 @@ impl RadixHistory {
 impl History for RadixHistory {
     fn read(&self, key: ByteVector) -> Result<Option<ByteVector>, HistoryError> {
         let read_result = self.imple.read(self.root_node.clone(), key)?;
+        println!("read_result: {:?}", read_result);
         Ok(read_result)
     }
 
@@ -83,7 +84,7 @@ impl History for RadixHistory {
 
         match new_root_node_opt {
             Some(new_root_node) => {
-                // println!("\nnew_root_node: {:?}", new_root_node);
+                println!("\nnew_root_node in process: {:?}", new_root_node);
                 let node_hash_bytes = self.imple.save_node(new_root_node.clone());
                 // println!("\nhash_node_bytes: {:?}", hash_node_bytes);
                 // println!(
@@ -101,12 +102,12 @@ impl History for RadixHistory {
                 // println!("\ncache_w before clear: {:?}", self.imple.cache_w);
                 self.imple.commit()?;
 
-                let store_lock = self
-                    .store
-                    .lock()
-                    .expect("Radix History: Failed to acquire store lock");
+                // let store_lock = self
+                //     .store
+                //     .lock()
+                //     .expect("Radix History: Failed to acquire store lock");
                 // println!("\nstore after commit: {:?}", store_lock.to_map());
-                drop(store_lock);
+                // drop(store_lock);
 
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
@@ -121,7 +122,7 @@ impl History for RadixHistory {
                 Ok(Box::new(new_history))
             }
             None => {
-                println!("\nNone in process");
+                // println!("\nNone in process");
                 self.imple.clear_write_cache();
                 self.imple.clear_read_cache();
                 Ok(Box::new(RadixHistory {
@@ -140,10 +141,21 @@ impl History for RadixHistory {
 
     fn reset(&self, root: &Blake3Hash) -> Box<dyn History> {
         let imple = RadixTreeImpl::new(self.store.clone());
+
+      // println!("")
+
         let node = imple
             .load_node(root.bytes(), Some(true))
             .expect("Radix History: Unable to call load_node");
 
+        println!("\nroot_node in reset: {:?}", node);
+
+        // Box::new(RadixHistory {
+        //     root_hash: root.clone(),
+        //     root_node: node,
+        //     imple: RadixTreeImpl::new(self.store.clone()),
+        //     store: self.store.clone(),
+        // })
         Box::new(RadixHistory {
             root_hash: root.clone(),
             root_node: node,
