@@ -1,9 +1,6 @@
-use crate::rspace::{ByteBuffer, ByteVector};
-use serde::{Deserialize, Serialize};
+use crate::rspace::ByteBuffer;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
 pub trait KeyValueStore: Send + Sync {
@@ -23,14 +20,6 @@ pub trait KeyValueStore: Send + Sync {
 
     fn contains(&self, keys: &Vec<ByteBuffer>) -> Result<Vec<bool>, KvStoreError> {
         // println!("\nkeys in contains: {:?}", keys);
-        // let serialized_keys: Vec<ByteVector> = keys
-        //     .iter()
-        //     .map(|k| {
-        //         let serialized_key =
-        //             bincode::serialize(k).expect("Key Value Typed Store: Failed to serialize key");
-        //         serialized_key
-        //     })
-        //     .collect();
 
         // println!("\nkeys_bytes in contains: {:?}", keys_bytes);
 
@@ -111,21 +100,3 @@ impl From<Box<bincode::ErrorKind>> for KvStoreError {
         KvStoreError::SerializationError(error)
     }
 }
-
-// See shared/src/main/scala/coop/rchain/store/KeyValueStoreSyntax.scala
-// pub struct KeyValueStoreOps;
-
-// impl KeyValueStoreOps {
-//     pub fn to_typed_store<K, V>(
-//         store: Arc<Mutex<Box<dyn KeyValueStore>>>,
-//     ) -> impl KeyValueTypedStore<K, V>
-//     where
-//         K: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a> + Ord,
-//         V: Clone + Debug + Send + Sync + Serialize + 'static + for<'a> Deserialize<'a>,
-//     {
-//         KeyValueTypedStoreInstance {
-//             store,
-//             _marker: PhantomData,
-//         }
-//     }
-// }

@@ -23,8 +23,6 @@ impl KeyValueStore for InMemoryKeyValueStore {
                     //     key_value.key(),
                     //     key_value.value()
                     // );
-                    // bincode::deserialize(&value)
-                    //     .expect("Mem Key Value Store: Failed to deserialize")
                     value.clone()
                 })
             })
@@ -39,9 +37,6 @@ impl KeyValueStore for InMemoryKeyValueStore {
         // println!("\nhit put in mem_kv");
         // println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
-            // let encoded_key = bincode::serialize(&key).unwrap();
-            // let encoded_value = bincode::serialize(&value).unwrap();
-            // self.state.insert(encoded_key, encoded_value);
             self.state.insert(key, value);
         }
 
