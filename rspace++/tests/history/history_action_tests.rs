@@ -32,7 +32,7 @@ mod tests {
         let read_value = new_history.read(zeros());
         assert!(read_value.is_ok());
 
-        let expected_data = vec![insert(zeros())].first().unwrap().hash.bytes();
+        let expected_data = insert(zeros()).hash.bytes();
         assert_eq!(read_value.unwrap(), Some(expected_data));
     }
 
@@ -42,11 +42,11 @@ mod tests {
 
         let empty_history = create_empty_history();
         let new_history = empty_history.process(data).unwrap();
-        let history_one_reset = empty_history.reset(&new_history.root());
+        let history_one_reset = empty_history.reset(&new_history.root()).unwrap();
         let read_value = history_one_reset.read(zeros());
         assert!(read_value.is_ok());
 
-        let expected_data = vec![insert(zeros())].first().unwrap().hash.bytes();
+        let expected_data = insert(zeros()).hash.bytes();
         assert_eq!(read_value.unwrap(), Some(expected_data));
     }
 

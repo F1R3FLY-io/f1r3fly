@@ -11,7 +11,7 @@ pub struct LmdbKeyValueStore {
 }
 
 impl KeyValueStore for LmdbKeyValueStore {
-    fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
+    fn get(&self, keys: &Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
         let db = self
             .db
             .lock()
@@ -96,7 +96,7 @@ impl KeyValueStore for LmdbKeyValueStore {
 
     // This is only needed for testing purposes
     fn print_store(&self) -> () {
-        todo!()
+        println!("\nthis is only needed for testing purposes")
     }
 }
 

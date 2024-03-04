@@ -46,7 +46,7 @@ impl RSpaceExporterImpl {
             .lock()
             .expect("RSpace Exporter Store: Failed to acquire lock on store");
 
-        let loaded = store_lock.get(keys.iter().map(|key| key.bytes()).collect())?;
+        let loaded = store_lock.get(&keys.iter().map(|key| key.bytes()).collect())?;
         Ok(keys
             .into_iter()
             .zip(loaded.into_iter())

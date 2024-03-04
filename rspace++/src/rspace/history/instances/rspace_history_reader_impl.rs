@@ -5,14 +5,14 @@ use crate::rspace::{
     },
     history::{
         cold_store::PersistedData,
-        history::History,
+        history::{History, HistoryError},
         history_reader::{HistoryReader, HistoryReaderBase},
         history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT},
         history_repository_impl::prepend_bytes,
     },
     internal::{Datum, WaitingContinuation},
     serializers::serializers::{decode_continuations, decode_datums, decode_joins},
-    shared::key_value_typed_store::KeyValueTypedStore,
+    shared::key_value_store::KeyValueStore,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,14 +23,16 @@ use std::{
 #[derive(Clone)]
 pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
     target_history: Arc<Box<dyn History>>,
-    leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     _marker: PhantomData<(C, P, A, K)>,
 }
 
 impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     pub fn new(
         target_history: Box<dyn History>,
-        leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+        // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+        leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Self {
         RSpaceHistoryReaderImpl {
             target_history: Arc::new(target_history),
@@ -40,23 +42,34 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     }
 
     /** Fetch data on a hash pointer */
-    fn fetch_data(&self, prefix: u8, key: &Blake3Hash) -> Option<PersistedData> {
+    fn fetch_data(
+        &self,
+        prefix: u8,
+        key: &Blake3Hash,
+    ) -> Result<Option<PersistedData>, HistoryError> {
         let read_bytes = self
             .target_history
-            .read(prepend_bytes(prefix, &key.bytes()))
-            .expect("RSpace History Reader Impl: Failed to call read");
+            .read(prepend_bytes(prefix, &key.bytes()))?;
 
         match read_bytes {
             Some(bytes) => {
-                let read_hash = Blake3Hash::new(&bytes);
+                let read_hash = Blake3Hash::from_bytes(bytes);
                 let leaf_store_lock = self
                     .leaf_store
                     .lock()
                     .expect("RSpace History Reader Impl: Unable to acquire leaf store lock");
-                let get_opt = leaf_store_lock.get_one(&read_hash).unwrap();
-                get_opt
+
+                let serialized_read_hash = bincode::serialize(&read_hash.bytes())
+                    .expect("RSpace History Reade rImpl: Unable to serialize");
+
+                let get_opt = leaf_store_lock.get_one(&serialized_read_hash)?;
+
+                Ok(get_opt.map(|store_value_bytes| {
+                    bincode::deserialize(&store_value_bytes)
+                        .expect("RSpace History Reader Impl: Failed to deserialize")
+                }))
             }
-            None => None,
+            None => Ok(None),
         }
     }
 }
@@ -72,23 +85,26 @@ where
         self.target_history.root()
     }
 
-    fn get_data_proj(&self, key: &Blake3Hash) -> Vec<Datum<A>> {
-        match self.fetch_data(PREFIX_DATUM, key) {
-            Some(PersistedData::Data(data_leaf)) => decode_datums(&data_leaf.bytes),
+    fn get_data_proj(&self, key: &Blake3Hash) -> Result<Vec<Datum<A>>, HistoryError> {
+        match self.fetch_data(PREFIX_DATUM, key)? {
+            Some(PersistedData::Data(data_leaf)) => Ok(decode_datums(&data_leaf.bytes)),
             Some(p) => {
                 panic!(
                     "Found unexpected leaf while looking for data at key {:?}, data: {:?}",
                     key, p
                 );
             }
-            None => Vec::new(),
+            None => Ok(Vec::new()),
         }
     }
 
-    fn get_continuations_proj(&self, key: &Blake3Hash) -> Vec<WaitingContinuation<P, K>> {
-        match self.fetch_data(PREFIX_KONT, key) {
+    fn get_continuations_proj(
+        &self,
+        key: &Blake3Hash,
+    ) -> Result<Vec<WaitingContinuation<P, K>>, HistoryError> {
+        match self.fetch_data(PREFIX_KONT, key)? {
             Some(PersistedData::Continuations(continuation_leaf)) => {
-                decode_continuations(&continuation_leaf.bytes)
+                Ok(decode_continuations(&continuation_leaf.bytes))
             }
             Some(p) => {
                 panic!(
@@ -96,20 +112,20 @@ where
                     key, p
                 );
             }
-            None => Vec::new(),
+            None => Ok(Vec::new()),
         }
     }
 
-    fn get_joins_proj(&self, key: &Blake3Hash) -> Vec<Vec<C>> {
-        match self.fetch_data(PREFIX_JOINS, key) {
-            Some(PersistedData::Joins(joins_leaf)) => decode_joins(&joins_leaf.bytes),
+    fn get_joins_proj(&self, key: &Blake3Hash) -> Result<Vec<Vec<C>>, HistoryError> {
+        match self.fetch_data(PREFIX_JOINS, key)? {
+            Some(PersistedData::Joins(joins_leaf)) => Ok(decode_joins(&joins_leaf.bytes)),
             Some(p) => {
                 panic!(
                     "Found unexpected leaf while looking for joins at key {:?}, data: {:?}",
                     key, p
                 );
             }
-            None => Vec::new(),
+            None => Ok(Vec::new()),
         }
     }
 
@@ -126,15 +142,17 @@ where
             K: Clone + for<'de> Deserialize<'de> + 'static + Sync + Send,
         {
             fn get_data_proj(&self, key: &C) -> Vec<Datum<A>> {
-                self.outer.get_data_proj(&hash(key))
+                self.outer.get_data_proj(&hash(key)).expect("Error here")
             }
 
             fn get_continuations_proj(&self, key: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
-                self.outer.get_continuations_proj(&hash_from_vec(key))
+                self.outer
+                    .get_continuations_proj(&hash_from_vec(key))
+                    .expect("Error here")
             }
 
             fn get_joins_proj(&self, key: &C) -> Vec<Vec<C>> {
-                self.outer.get_joins_proj(&hash(key))
+                self.outer.get_joins_proj(&hash(key)).expect("Error here")
             }
         }
 

@@ -34,7 +34,10 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
         actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
-    fn reset(&self, root: &Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>>;
+    fn reset(
+        &self,
+        root: &Blake3Hash,
+    ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError>;
 
     fn history(&self) -> Arc<Mutex<Box<dyn History>>>;
 
@@ -59,7 +62,7 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
     fn get_history_reader(
         &self,
         state_hash: Blake3Hash,
-    ) -> Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>;
+    ) -> Result<Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>, HistoryError>;
 
     fn root(&self) -> Blake3Hash;
 }

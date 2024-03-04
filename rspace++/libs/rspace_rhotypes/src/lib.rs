@@ -232,7 +232,13 @@ pub extern "C" fn install(
 pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let checkpoint = unsafe { (*rspace).rspace.create_checkpoint().await };
+        let checkpoint = unsafe {
+            (*rspace)
+                .rspace
+                .create_checkpoint()
+                .await
+                .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
+        };
 
         let checkpoint_proto = CheckpointProto {
             root: checkpoint.root.bytes(),
@@ -440,7 +446,15 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
 #[no_mangle]
 pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let rspace = rt.block_on(async { unsafe { (*rspace).rspace.spawn().await } });
+    let rspace = rt.block_on(async {
+        unsafe {
+            (*rspace)
+                .rspace
+                .spawn()
+                .await
+                .expect("Rust RSpacePlusPlus Library: Failed to spawn")
+        }
+    });
 
     Box::into_raw(Box::new(Space { rspace }))
 }

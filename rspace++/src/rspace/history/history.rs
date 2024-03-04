@@ -1,7 +1,7 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::shared::key_value_store::KeyValueStore;
+use crate::rspace::{hashing::blake3_hash::Blake3Hash, shared::key_value_store::KvStoreError};
 use std::sync::{Arc, Mutex};
 
 use super::radix_tree::RadixTreeError;
@@ -14,7 +14,7 @@ pub trait History: Send + Sync {
 
     fn root(&self) -> Blake3Hash;
 
-    fn reset(&self, root: &Blake3Hash) -> Box<dyn History>;
+    fn reset(&self, root: &Blake3Hash) -> Result<Box<dyn History>, HistoryError>;
 }
 
 pub struct HistoryInstances;
@@ -33,6 +33,7 @@ impl HistoryInstances {
 pub enum HistoryError {
     ActionError(String),
     RadixTreeError(RadixTreeError),
+    KvStoreError(KvStoreError),
 }
 
 impl std::fmt::Display for HistoryError {
@@ -40,6 +41,7 @@ impl std::fmt::Display for HistoryError {
         match self {
             HistoryError::ActionError(err) => write!(f, "Actions Error: {}", err),
             HistoryError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
+            HistoryError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
         }
     }
 }
@@ -47,5 +49,11 @@ impl std::fmt::Display for HistoryError {
 impl From<RadixTreeError> for HistoryError {
     fn from(error: RadixTreeError) -> Self {
         HistoryError::RadixTreeError(error)
+    }
+}
+
+impl From<KvStoreError> for HistoryError {
+    fn from(error: KvStoreError) -> Self {
+        HistoryError::KvStoreError(error)
     }
 }

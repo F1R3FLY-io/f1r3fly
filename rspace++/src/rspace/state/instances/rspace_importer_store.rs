@@ -39,7 +39,7 @@ impl RSpaceImporter for RSpaceImporterImpl {
             .expect("RSpace Importer Store: Failed to acquire lock on history_store");
 
         history_store_lock
-            .get(vec![hash.bytes()])
+            .get(&vec![hash.bytes()])
             .expect("RSpace Importer: history store get failed")
             .into_iter()
             .next()

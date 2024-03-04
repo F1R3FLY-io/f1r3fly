@@ -35,15 +35,15 @@ impl RootsStoreInstances {
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                let bytes = store_lock.get_one(current_root_name)?;
+                let bytes = store_lock.get_one(&current_root_name)?;
 
                 let maybe_decoded = match bytes {
                     Some(b) => {
-                        let hash_array: [u8; 32] = match b.try_into() {
-                            Ok(array) => array,
-                            Err(_) => panic!("Roots Store: Expected a Blake3 hash of length 32"),
-                        };
-                        Some(Blake3Hash::new(&hash_array))
+                        // let hash_array: [u8; 32] = match b.try_into() {
+                        //     Ok(array) => array,
+                        //     Err(_) => panic!("Roots Store: Expected a Blake3 hash of length 32"),
+                        // };
+                        Some(Blake3Hash::from_bytes(b))
                     }
                     None => None,
                 };
@@ -63,7 +63,7 @@ impl RootsStoreInstances {
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                if let Some(_) = store_lock.get_one(bytes.clone())? {
+                if let Some(_) = store_lock.get_one(&bytes)? {
                     store_lock.put_one(current_root_name, bytes)?;
                     Ok(Some(key))
                 } else {

@@ -1,5 +1,7 @@
 use crate::rspace::internal::{Datum, WaitingContinuation};
 
+use super::history::HistoryError;
+
 /**
 * Reader for particular history (state verified on blockchain)
 *
@@ -15,24 +17,27 @@ pub trait HistoryReader<Key, C: Clone, P: Clone, A: Clone, K: Clone> {
     // Get current root which reader reads from
     fn root(&self) -> Key;
 
-    fn get_data_proj(&self, key: &Key) -> Vec<Datum<A>>;
+    fn get_data_proj(&self, key: &Key) -> Result<Vec<Datum<A>>, HistoryError>;
 
-    fn get_continuations_proj(&self, key: &Key) -> Vec<WaitingContinuation<P, K>>;
+    fn get_continuations_proj(
+        &self,
+        key: &Key,
+    ) -> Result<Vec<WaitingContinuation<P, K>>, HistoryError>;
 
-    fn get_joins_proj(&self, key: &Key) -> Vec<Vec<C>>;
+    fn get_joins_proj(&self, key: &Key) -> Result<Vec<Vec<C>>, HistoryError>;
 
     /**                                                                                                                                                                                                              
      * Defaults                                                                                                                                                                                                       
      */
-    fn get_data(&self, key: &Key) -> Vec<Datum<A>> {
+    fn get_data(&self, key: &Key) -> Result<Vec<Datum<A>>, HistoryError> {
         self.get_data_proj(key)
     }
 
-    fn get_continuations(&self, key: &Key) -> Vec<WaitingContinuation<P, K>> {
+    fn get_continuations(&self, key: &Key) -> Result<Vec<WaitingContinuation<P, K>>, HistoryError> {
         self.get_continuations_proj(key)
     }
 
-    fn get_joins(&self, key: &Key) -> Vec<Vec<C>> {
+    fn get_joins(&self, key: &Key) -> Result<Vec<Vec<C>>, HistoryError> {
         self.get_joins_proj(key)
     }
 

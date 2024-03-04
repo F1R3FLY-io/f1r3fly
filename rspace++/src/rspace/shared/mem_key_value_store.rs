@@ -11,13 +11,13 @@ pub struct InMemoryKeyValueStore {
 }
 
 impl KeyValueStore for InMemoryKeyValueStore {
-    fn get(&self, keys: Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
+    fn get(&self, keys: &Vec<ByteBuffer>) -> Result<Vec<Option<ByteBuffer>>, KvStoreError> {
         // println!("\nin_mem_state get: {:?}", self.state);
         // println!("\nin_mem_state get keys: {:?}", keys);
         let result = keys
             .into_iter()
             .map(|key| {
-                self.state.get(&key).map(|value| {
+                self.state.get(key).map(|value| {
                     // println!(
                     //     "\nRetrieved value for key {:?}: {:?}",
                     //     key_value.key(),
@@ -39,10 +39,10 @@ impl KeyValueStore for InMemoryKeyValueStore {
         // println!("\nhit put in mem_kv");
         // println!("\nin_mem_state before put: {:?}", self.state);
         for (key, value) in kv_pairs {
-            let encoded_key = bincode::serialize(&key).unwrap();
-            let encoded_value = bincode::serialize(&value).unwrap();
-            self.state.insert(encoded_key, encoded_value);
-            // self.state.insert(key, value);
+            // let encoded_key = bincode::serialize(&key).unwrap();
+            // let encoded_value = bincode::serialize(&value).unwrap();
+            // self.state.insert(encoded_key, encoded_value);
+            self.state.insert(key, value);
         }
 
         // println!("\nin_mem_state after put: {:?}", self.state);

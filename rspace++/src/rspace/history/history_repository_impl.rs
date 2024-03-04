@@ -1,4 +1,5 @@
 use super::cold_store::{ContinuationsLeaf, DataLeaf, JoinsLeaf};
+use super::history::HistoryError;
 use super::history_action::{DeleteAction, HistoryAction, InsertAction};
 use super::history_reader::HistoryReader;
 use super::history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT};
@@ -19,7 +20,7 @@ use crate::rspace::hot_store_trie_action::{
 use crate::rspace::serializers::serializers::{
     encode_binary, encode_continuations, encode_datums, encode_joins,
 };
-use crate::rspace::shared::key_value_typed_store::KeyValueTypedStore;
+use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use crate::rspace::ByteVector;
@@ -34,7 +35,8 @@ use std::sync::{Arc, Mutex};
 pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub current_history: Arc<Mutex<Box<dyn History>>>,
     pub roots_repository: Arc<Mutex<RootRepository>>,
-    pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    // pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    pub leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     pub rspace_exporter: Arc<
         Mutex<
             Box<
@@ -331,12 +333,24 @@ where
 
         // store cold data
         let store_leaves = async move {
-            let leaf_store_lock = self
+            let mut leaf_store_lock = self
                 .leaf_store
                 .lock()
                 .expect("History Repository Impl: Unable to acquire leaf store lock");
+
+            let serialized_cold_actions = cold_actions
+                .into_iter()
+                .map(|(key, value)| {
+                    let serialized_key = bincode::serialize(&key)
+                        .expect("History Respository Impl: Failed to serialize");
+                    let serialized_value = bincode::serialize(&value)
+                        .expect("History Respository Impl: Failed to serialize");
+                    (serialized_key, serialized_value)
+                })
+                .collect();
+
             leaf_store_lock
-                .put_if_absent(cold_actions)
+                .put_if_absent(serialized_cold_actions)
                 .expect("History Repository Impl: Failed to put if absent");
         };
 
@@ -375,7 +389,10 @@ where
         })
     }
 
-    fn reset(&self, root: &Blake3Hash) -> Box<dyn HistoryRepository<C, P, A, K>> {
+    fn reset(
+        &self,
+        root: &Blake3Hash,
+    ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError> {
         let roots_lock = self
             .roots_repository
             .lock()
@@ -386,16 +403,16 @@ where
             .current_history
             .lock()
             .expect("History Repository Impl: Unable to acquire history lock");
-        let next = history_lock.reset(root);
+        let next = history_lock.reset(root)?;
 
-        Box::new(HistoryRepositoryImpl {
+        Ok(Box::new(HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(next)),
             roots_repository: self.roots_repository.clone(),
             leaf_store: self.leaf_store.clone(),
             rspace_exporter: self.rspace_exporter.clone(),
             rspace_importer: self.rspace_importer.clone(),
             _marker: PhantomData,
-        })
+        }))
     }
 
     fn history(&self) -> Arc<Mutex<Box<dyn History>>> {
@@ -427,13 +444,13 @@ where
     fn get_history_reader(
         &self,
         state_hash: Blake3Hash,
-    ) -> Box<dyn HistoryReader<Blake3Hash, C, P, A, K>> {
+    ) -> Result<Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>, HistoryError> {
         let history_lock = self
             .current_history
             .lock()
             .expect("History Repository Impl: Unable to acquire history lock");
-        let history_repo = history_lock.reset(&state_hash);
-        Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone()))
+        let history_repo = history_lock.reset(&state_hash)?;
+        Ok(Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone())))
     }
 
     fn root(&self) -> Blake3Hash {

@@ -35,6 +35,7 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       newHistory      <- emptyHistory.process(data)
       historyOneReset <- emptyHistory.reset(newHistory.root)
       readValue       <- historyOneReset.read(_zeros)
+      _               = println("\ninsert bytes: " + data.head.hash.bytes.some)
       _               = readValue shouldBe data.head.hash.bytes.some
     } yield ()
   }

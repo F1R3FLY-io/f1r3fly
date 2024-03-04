@@ -1,8 +1,11 @@
 use super::checkpoint::SoftCheckpoint;
 use super::hashing::blake3_hash::Blake3Hash;
+use super::history::history::HistoryError;
 use super::history::history_reader::HistoryReader;
 use super::history::history_repository::HistoryRepositoryError;
 use super::history::instances::radix_history::RadixHistory;
+use super::history::radix_tree::RadixTreeError;
+use super::shared::key_value_store::KvStoreError;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
@@ -214,32 +217,32 @@ where
         self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
     }
 
-    pub async fn create_checkpoint(&mut self) -> Checkpoint {
+    pub async fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
         let changes = self.store.changes().await;
         let next_history = self.history_repository.checkpoint(&changes).await;
         self.history_repository = next_history;
 
         let history_reader = self
             .history_repository
-            .get_history_reader(self.history_repository.root());
+            .get_history_reader(self.history_repository.root())?;
 
         self.create_new_hot_store(history_reader);
         self.restore_installs().await;
 
-        Checkpoint {
+        Ok(Checkpoint {
             root: self.history_repository.root(),
-        }
+        })
     }
 
-    pub async fn spawn(&self) -> Self {
+    pub async fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.history_repository;
-        let next_history = history_repo.reset(&history_repo.root());
-        let history_reader = next_history.get_history_reader(next_history.root());
+        let next_history = history_repo.reset(&history_repo.root())?;
+        let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let rspace =
             RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
         rspace.restore_installs().await;
-        rspace
+        Ok(rspace)
     }
 
     /* RSpaceOps */
@@ -462,15 +465,17 @@ where
         self.store.to_map().await
     }
 
-    pub fn reset(&mut self, root: Blake3Hash) -> () {
-        let next_history = self.history_repository.reset(&root);
+    pub fn reset(&mut self, root: Blake3Hash) -> Result<(), RSpaceError> {
+        let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
-        let history_reader = self.history_repository.get_history_reader(root);
+        let history_reader = self.history_repository.get_history_reader(root)?;
         self.create_new_hot_store(history_reader);
+
+        Ok(())
     }
 
-    pub fn clear(&mut self) -> () {
+    pub fn clear(&mut self) -> Result<(), RSpaceError> {
         self.reset(RadixHistory::empty_root_node_hash())
     }
 
@@ -493,9 +498,9 @@ where
     pub async fn revert_to_soft_checkpoint(
         &mut self,
         checkpoint: SoftCheckpoint<C, P, A, K>,
-    ) -> () {
+    ) -> Result<(), RSpaceError> {
         let history = &self.history_repository;
-        let history_reader = history.get_history_reader(history.root());
+        let history_reader = history.get_history_reader(history.root())?;
         let hot_store = HotStoreInstances::create_from_mhs_and_hr(
             checkpoint.cache_snapshot,
             history_reader.base(),
@@ -503,6 +508,8 @@ where
 
         self.store = Box::new(hot_store);
         self.produce_counter = checkpoint.produce_counter;
+
+        Ok(())
     }
 
     fn wrap_result(
@@ -759,10 +766,45 @@ impl RSpaceInstances {
             HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)
                 .await?;
 
-        let history_reader = history_repo.get_history_reader(history_repo.root());
+        let history_reader = history_repo.get_history_reader(history_repo.root())?;
 
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
         Ok((Box::new(history_repo), hot_store))
+    }
+}
+
+#[derive(Debug)]
+pub enum RSpaceError {
+    HistoryError(HistoryError),
+    RadixTreeError(RadixTreeError),
+    KvStoreError(KvStoreError),
+}
+
+impl std::fmt::Display for RSpaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RSpaceError::HistoryError(err) => write!(f, "History Error: {}", err),
+            RSpaceError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
+            RSpaceError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
+        }
+    }
+}
+
+impl From<RadixTreeError> for RSpaceError {
+    fn from(error: RadixTreeError) -> Self {
+        RSpaceError::RadixTreeError(error)
+    }
+}
+
+impl From<KvStoreError> for RSpaceError {
+    fn from(error: KvStoreError) -> Self {
+        RSpaceError::KvStoreError(error)
+    }
+}
+
+impl From<HistoryError> for RSpaceError {
+    fn from(error: HistoryError) -> Self {
+        RSpaceError::HistoryError(error)
     }
 }

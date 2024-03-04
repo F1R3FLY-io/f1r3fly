@@ -50,7 +50,7 @@ final case class RadixHistory[F[_]: Sync: Parallel](
     for {
       impl <- Sync[F].delay(new RadixTreeImpl[F](store))
       node <- impl.loadNode(root.bytes, noAssert = true)
-      _    = println("\nrootNode in reset: " + node)
+      // _    = println("\nrootNode in reset: " + node)
     } yield this.copy(root, node, impl, store)
 
   override def read(key: ByteVector): F[Option[ByteVector]] =
