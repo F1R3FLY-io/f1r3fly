@@ -25,38 +25,38 @@ mod tests {
 
     #[test]
     fn creating_and_read_one_record_should_work() {
-        let data = vec![history_insert(zeros())];
+        let (history_action, insert_action) = history_insert(zeros());
 
         let empty_history = create_empty_history();
-        let new_history = empty_history.process(data).unwrap();
+        let new_history = empty_history.process(vec![history_action]).unwrap();
         let read_value = new_history.read(zeros());
-        assert!(read_value.is_ok());
 
-        let expected_data = insert(zeros()).hash.bytes();
-        assert_eq!(read_value.unwrap(), Some(expected_data));
+        assert!(read_value.is_ok());
+        assert_eq!(read_value.unwrap(), Some(insert_action.hash.bytes()));
     }
 
     #[test]
     fn reset_method_of_history_should_work() {
-        let data = vec![history_insert(zeros())];
+        let (history_action, insert_action) = history_insert(zeros());
 
         let empty_history = create_empty_history();
-        let new_history = empty_history.process(data).unwrap();
+        let new_history = empty_history.process(vec![history_action]).unwrap();
         let history_one_reset = empty_history.reset(&new_history.root()).unwrap();
         let read_value = history_one_reset.read(zeros());
-        assert!(read_value.is_ok());
 
-        let expected_data = insert(zeros()).hash.bytes();
-        assert_eq!(read_value.unwrap(), Some(expected_data));
+        assert!(read_value.is_ok());
+        assert_eq!(read_value.unwrap(), Some(insert_action.hash.bytes()));
     }
 
     #[test]
     fn creating_ten_records_should_work() {
-        let data: Vec<HistoryAction> = (0..10).map(zeros_and).map(|k| history_insert(k)).collect();
-        let empty_history = create_empty_history();
-        let new_history = empty_history.process(data.clone()).unwrap();
+        let (history_actions, insert_actions): (Vec<HistoryAction>, Vec<InsertAction>) =
+            (0..10).map(zeros_and).map(history_insert).unzip();
 
-        let read_values: Vec<Option<ByteVector>> = data
+        let empty_history = create_empty_history();
+        let new_history = empty_history.process(history_actions.clone()).unwrap();
+
+        let read_values: Vec<Option<ByteVector>> = history_actions
             .iter()
             .map(|action| new_history.read(action.key()))
             .map(|read_result| {
@@ -65,7 +65,6 @@ mod tests {
             })
             .collect();
 
-        let insert_actions: Vec<InsertAction> = (0..10).map(zeros_and).map(|k| insert(k)).collect();
         let expected_data: Vec<Option<ByteVector>> = insert_actions
             .iter()
             .map(|action| Some(action.hash.bytes()))
@@ -75,17 +74,19 @@ mod tests {
 
     #[test]
     fn history_should_allow_to_store_different_length_key_records_in_different_branches() {
-        let data = vec![
+        let (history_actions, insert_actions): (Vec<HistoryAction>, Vec<InsertAction>) = vec![
             history_insert(hex_key("01")),
             history_insert(hex_key("02")),
             history_insert(hex_key("0001")),
             history_insert(hex_key("0002")),
-        ];
+        ]
+        .into_iter()
+        .unzip();
 
         let empty_history = create_empty_history();
-        let new_history = empty_history.process(data.clone()).unwrap();
+        let new_history = empty_history.process(history_actions.clone()).unwrap();
 
-        let read_values: Vec<Option<ByteVector>> = data
+        let read_values: Vec<Option<ByteVector>> = history_actions
             .iter()
             .map(|action| new_history.read(action.key()))
             .map(|read_result| {
@@ -94,12 +95,6 @@ mod tests {
             })
             .collect();
 
-        let insert_actions = vec![
-            insert(hex_key("01")),
-            insert(hex_key("02")),
-            insert(hex_key("0001")),
-            insert(hex_key("0002")),
-        ];
         let expected_data: Vec<Option<ByteVector>> = insert_actions
             .iter()
             .map(|action| Some(action.hash.bytes()))
@@ -107,24 +102,30 @@ mod tests {
         assert_eq!(read_values, expected_data);
     }
 
-    // TODO: Don't works for MergingHistory
+    // // TODO: Don't works for MergingHistory
     #[test]
     fn deletion_of_a_non_existing_records_should_not_throw_error() {
-        let changes1 = vec![history_insert(hex_key("0011"))];
-        let changes2 = vec![history_delete(hex_key("0012")), history_delete(hex_key("0011"))];
+        let (history_action1, insert_action1) = history_insert(hex_key("0011"));
+        let (history_action2, insert_action2): (Vec<HistoryAction>, Vec<DeleteAction>) =
+            vec![history_delete(hex_key("0012")), history_delete(hex_key("0011"))]
+                .into_iter()
+                .unzip();
 
         let empty_history = create_empty_history();
-        let history_one = empty_history.process(changes1).unwrap();
-        let err = history_one.process(changes2);
+        let history_one = empty_history.process(vec![history_action1]).unwrap();
+        let err = history_one.process(history_action2);
 
         assert!(err.is_ok());
     }
 
     #[test]
     fn history_should_not_allow_to_store_different_length_key_records_in_same_branch() {
-        let data = vec![history_insert(hex_key("01")), history_insert(hex_key("0100"))];
+        let (history_actions, insert_actions): (Vec<HistoryAction>, Vec<InsertAction>) =
+            vec![history_insert(hex_key("01")), history_insert(hex_key("0100"))]
+                .into_iter()
+                .unzip();
         let empty_history = create_empty_history();
-        let err = empty_history.process(data);
+        let err = empty_history.process(history_actions);
 
         assert!(err.is_err());
         match err {
@@ -141,9 +142,13 @@ mod tests {
 
     #[test]
     fn history_should_not_allow_to_process_history_actions_with_same_keys() {
-        let data1 = vec![history_insert(zeros()), history_insert(zeros())];
+        let (history_actions1, insert_actions1): (Vec<HistoryAction>, Vec<InsertAction>) =
+            vec![history_insert(zeros()), history_insert(zeros())]
+                .into_iter()
+                .unzip();
+
         let empty_history = create_empty_history();
-        let err1 = empty_history.process(data1);
+        let err1 = empty_history.process(history_actions1);
 
         assert!(err1.is_err());
         match err1 {
@@ -153,7 +158,7 @@ mod tests {
             _ => panic!("Expected ActionError variant"),
         }
 
-        let data2 = vec![history_insert(zeros()), history_delete(zeros())];
+        let data2 = vec![history_insert(zeros()).0, history_delete(zeros()).0];
         let empty_history = create_empty_history();
         let err2 = empty_history.process(data2);
 
@@ -168,8 +173,8 @@ mod tests {
 
     #[test]
     fn history_after_deleting_all_records_should_be_empty() {
-        let insertions = vec![history_insert(zeros())];
-        let deletions = vec![history_delete(zeros())];
+        let insertions = vec![history_insert(zeros()).0];
+        let deletions = vec![history_delete(zeros()).0];
 
         let empty_history = create_empty_history();
         let history_one = empty_history.process(insertions);
@@ -191,8 +196,8 @@ mod tests {
 
     #[test]
     fn update_of_a_record_should_not_change_past_history() {
-        let insert_one = vec![history_insert(zeros())];
-        let insert_two = vec![history_insert(zeros())];
+        let insert_one = vec![history_insert(zeros()).0];
+        let insert_two = vec![history_insert(zeros()).0];
 
         let empty_history = create_empty_history();
         let history_one = empty_history.process(insert_one);
@@ -212,18 +217,20 @@ mod tests {
 
     #[test]
     fn history_should_correctly_build_the_same_trees_in_different_ways() {
-        let insert_one = vec![history_insert(hex_key("010000")), history_insert(hex_key("0200"))];
-        let insert_two = vec![history_insert(hex_key("010001")), history_insert(hex_key("0300"))];
+        let insert_one =
+            vec![history_insert(hex_key("010000")).0, history_insert(hex_key("0200")).0];
+        let insert_two =
+            vec![history_insert(hex_key("010001")).0, history_insert(hex_key("0300")).0];
         let mut insert_one_two = insert_one.clone();
         insert_one_two.extend(insert_two.clone());
 
         let delete_one = vec![
-            history_delete(insert_one.first().unwrap().key()),
-            history_delete(insert_one.get(1).unwrap().key()),
+            history_delete(insert_one.first().unwrap().key()).0,
+            history_delete(insert_one.get(1).unwrap().key()).0,
         ];
         let delete_two = vec![
-            history_delete(insert_two.first().unwrap().key()),
-            history_delete(insert_two.get(1).unwrap().key()),
+            history_delete(insert_two.first().unwrap().key()).0,
+            history_delete(insert_two.get(1).unwrap().key()).0,
         ];
         let mut delete_one_two = delete_one.clone();
         delete_one_two.extend(delete_two.clone());
@@ -257,7 +264,7 @@ mod tests {
 
     #[test]
     fn adding_already_existing_records_should_not_change_history() {
-        let inserts = vec![history_insert(zeros())];
+        let inserts = vec![history_insert(zeros()).0];
 
         let (empty_history, in_mem_store) = create_empty_history_and_store();
 
@@ -292,8 +299,8 @@ mod tests {
 
     #[test]
     fn collision_detecting_in_kvdb_should_work() {
-        let insert_record = vec![history_insert(zeros())];
-        let delete_record = vec![history_delete(zeros())];
+        let insert_record = vec![history_insert(zeros()).0];
+        let delete_record = vec![history_delete(zeros()).0];
         let collision_kv_pair =
             (RadixHistory::empty_root_node_hash().bytes(), random_blake().bytes());
 
@@ -425,11 +432,15 @@ mod tests {
     }
 
     fn generate_random_insert(size: usize) -> Vec<HistoryAction> {
-        (0..size).map(|_| history_insert(random_key(32))).collect()
+        (0..size)
+            .map(|_| history_insert(random_key(32)).0)
+            .collect()
     }
 
     fn generate_random_delete(size: usize) -> Vec<HistoryAction> {
-        (0..size).map(|_| history_delete(random_key(32))).collect()
+        (0..size)
+            .map(|_| history_delete(random_key(32)).0)
+            .collect()
     }
 
     fn generate_random_delete_from_insert(
@@ -442,7 +453,7 @@ mod tests {
         shuffled_inserts
             .into_iter()
             .take(size)
-            .map(|i| history_delete(i.key()))
+            .map(|i| history_delete(i.key()).0)
             .collect()
     }
 
@@ -456,7 +467,7 @@ mod tests {
         shuffled_inserts
             .into_iter()
             .take(size)
-            .map(|i| history_insert(i.key()))
+            .map(|i| history_insert(i.key()).0)
             .collect()
     }
 
@@ -503,21 +514,17 @@ mod tests {
         )
     }
 
-    fn insert(k: KeyPath) -> InsertAction {
-        InsertAction {
+    fn history_insert(k: KeyPath) -> (HistoryAction, InsertAction) {
+        let insert_action = InsertAction {
             key: k,
             hash: random_blake(),
-        }
+        };
+
+        (HistoryAction::Insert(insert_action.clone()), insert_action)
     }
 
-    fn history_insert(k: KeyPath) -> HistoryAction {
-        HistoryAction::Insert(InsertAction {
-            key: k,
-            hash: random_blake(),
-        })
-    }
-
-    fn history_delete(k: KeyPath) -> HistoryAction {
-        HistoryAction::Delete(DeleteAction { key: k })
+    fn history_delete(k: KeyPath) -> (HistoryAction, DeleteAction) {
+        let delete_action = DeleteAction { key: k };
+        (HistoryAction::Delete(delete_action.clone()), delete_action)
     }
 }

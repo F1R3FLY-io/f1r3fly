@@ -40,19 +40,11 @@ impl RadixHistory {
     pub fn create_store(
         store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Arc<Mutex<Box<dyn KeyValueStore>>> {
-        // let store_lock = store
-        //     .lock()
-        //     .expect("Radix History: Failed to acquire lock on store");
-        // Arc::new(Mutex::new(Box::new(store_lock.clone())))
         store
     }
 
     pub fn empty_root_node_hash() -> Blake3Hash {
         let node_hash_bytes = hash_node(&empty_node()).0;
-        // let hash_array: [u8; 32] = match hash_bytes.try_into() {
-        //     Ok(array) => array,
-        //     Err(_) => panic!("Radix_History: Expected a Blake3 hash of length 32"),
-        // };
         let node_hash = Blake3Hash::from_bytes(node_hash_bytes);
         node_hash
     }
@@ -149,12 +141,6 @@ impl History for RadixHistory {
 
         // println!("\nroot_node in reset: {:?}", node);
 
-        // Box::new(RadixHistory {
-        //     root_hash: root.clone(),
-        //     root_node: node,
-        //     imple: RadixTreeImpl::new(self.store.clone()),
-        //     store: self.store.clone(),
-        // })
         Ok(Box::new(RadixHistory {
             root_hash: root.clone(),
             root_node: node,
