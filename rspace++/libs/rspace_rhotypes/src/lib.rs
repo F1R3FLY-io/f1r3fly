@@ -44,7 +44,10 @@ pub extern "C" fn space_print(rspace: *mut Space) -> () {
 #[no_mangle]
 pub extern "C" fn space_clear(rspace: *mut Space) -> () {
     unsafe {
-        (*rspace).rspace.clear();
+        (*rspace)
+            .rspace
+            .clear()
+            .expect("Rust RSpacePlusPlus Library: Failed to clear");
     }
 }
 

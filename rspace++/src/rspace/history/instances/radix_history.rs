@@ -85,11 +85,11 @@ impl History for RadixHistory {
                 //     self.imple.print_tree(&new_root_node, vec![])
                 // );
                 let root_hash = Blake3Hash::from_bytes(node_hash_bytes);
-                // println!("\nHash in process: {:?}", root_hash);
+                // println!("\nnew_root_node hash: {:?}", root_hash);
                 let new_history = RadixHistory {
                     root_hash,
                     root_node: new_root_node.clone(),
-                    imple: RadixTreeImpl::new(self.store.clone()),
+                    imple: self.imple.clone(),
                     store: self.store.clone(),
                 };
                 // println!("\ncache_w before clear: {:?}", self.imple.cache_w);
@@ -134,9 +134,6 @@ impl History for RadixHistory {
 
     fn reset(&self, root: &Blake3Hash) -> Result<Box<dyn History>, HistoryError> {
         let imple = RadixTreeImpl::new(self.store.clone());
-
-        // println!("")
-
         let node = imple.load_node(root.bytes(), Some(true))?;
 
         // println!("\nroot_node in reset: {:?}", node);

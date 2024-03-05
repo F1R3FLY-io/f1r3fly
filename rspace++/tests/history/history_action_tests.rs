@@ -105,8 +105,8 @@ mod tests {
     // // TODO: Don't works for MergingHistory
     #[test]
     fn deletion_of_a_non_existing_records_should_not_throw_error() {
-        let (history_action1, insert_action1) = history_insert(hex_key("0011"));
-        let (history_action2, insert_action2): (Vec<HistoryAction>, Vec<DeleteAction>) =
+        let (history_action1, _) = history_insert(hex_key("0011"));
+        let (history_action2, _): (Vec<HistoryAction>, Vec<DeleteAction>) =
             vec![history_delete(hex_key("0012")), history_delete(hex_key("0011"))]
                 .into_iter()
                 .unzip();
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn history_should_not_allow_to_store_different_length_key_records_in_same_branch() {
-        let (history_actions, insert_actions): (Vec<HistoryAction>, Vec<InsertAction>) =
+        let (history_actions, _): (Vec<HistoryAction>, Vec<InsertAction>) =
             vec![history_insert(hex_key("01")), history_insert(hex_key("0100"))]
                 .into_iter()
                 .unzip();
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn history_should_not_allow_to_process_history_actions_with_same_keys() {
-        let (history_actions1, insert_actions1): (Vec<HistoryAction>, Vec<InsertAction>) =
+        let (history_actions1, _): (Vec<HistoryAction>, Vec<InsertAction>) =
             vec![history_insert(zeros()), history_insert(zeros())]
                 .into_iter()
                 .unzip();
@@ -240,9 +240,19 @@ mod tests {
         assert!(history_one.is_ok());
         let history_two = empty_history.process(insert_two.clone());
         assert!(history_two.is_ok());
-        let history_one_two = empty_history.process(insert_one_two);
 
+        println!("\nhistoryOneAndTwo process");
+        let history_one_two = empty_history.process(insert_one_two);
+        assert!(history_one_two.is_ok());
+        // println!("\nhistoryOneAndTwo hash: {:?}", history_one_two.as_ref().unwrap().root());
+
+        println!("\nhistory_one_two_another_way process");
         let history_one_two_another_way = history_one.as_ref().unwrap().process(insert_two);
+        // println!(
+        //     "\nhistory_one_two_another_way hash: {:?}",
+        //     history_one_two_another_way.as_ref().unwrap().root()
+        // );
+
         assert!(history_one_two_another_way.is_ok());
         assert_eq!(
             history_one_two.as_ref().unwrap().root(),
