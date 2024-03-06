@@ -164,17 +164,28 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       for {
         emptyHistory <- emptyHistoryF
 
-        historyOne       <- emptyHistory.process(insertOne)
-        historyTwo       <- emptyHistory.process(insertTwo)
-        _                = println("\nhistoryOneAndTwo process")
-        historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
+        _          = println("\n" + hexKey("010000"))
+        _          = println(hexKey("0200"))
+        historyOne <- emptyHistory.process(insertOne)
+        // historyTwo       <- emptyHistory.process(insertTwo)
+        // _                = println("\nhistoryOneAndTwo process")
+        // historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
 
         // _ = println("\nhistoryOneAndTwo hash: " + historyOneAndTwo.root)
 
-        _                          = println("\nhistoryOneAndTwoAnotherWay process")
+        // _                          = println("\nhistoryOneAndTwoAnotherWay process")
+        _                          = println("\n" + hexKey("010001"))
+        _                          = println(hexKey("0300"))
         historyOneAndTwoAnotherWay <- historyOne.process(insertTwo)
         // _                          = println("\nhistoryOneAndTwoAnotherWay hash: " + historyOneAndTwoAnotherWay.root)
-        _                          = historyOneAndTwo.root shouldBe historyOneAndTwoAnotherWay.root
+
+        _                = println("\n" + hexKey("010000"))
+        _                = println(hexKey("0200"))
+        _                = println(hexKey("010001"))
+        _                = println(hexKey("0300"))
+        historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
+
+        _ = historyOneAndTwo.root shouldBe historyOneAndTwoAnotherWay.root
 
         // historyOneAnotherWay <- historyOneAndTwo.process(deleteTwo)
         // _                    = historyOne.root shouldBe historyOneAnotherWay.root

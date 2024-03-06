@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::{ByteBuffer, ByteVector};
@@ -60,8 +60,8 @@ impl KeyValueStore for InMemoryKeyValueStore {
         Box::new(self.clone())
     }
 
-    fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError> {
-        let mut map = HashMap::new();
+    fn to_map(&self) -> Result<BTreeMap<ByteBuffer, ByteBuffer>, KvStoreError> {
+        let mut map = BTreeMap::new();
         for entry in self.state.iter() {
             let (key, value) = entry;
             map.insert(

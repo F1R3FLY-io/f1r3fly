@@ -70,6 +70,7 @@ impl History for RadixHistory {
         }
 
         // println!("\nhit process");
+        // println!("\nprocess root_node: {:?}", self.root_node.clone());
 
         let new_root_node_opt = self.imple.make_actions(self.root_node.clone(), actions)?;
 
@@ -77,7 +78,7 @@ impl History for RadixHistory {
 
         match new_root_node_opt {
             Some(new_root_node) => {
-                println!("\nnew_root_node in process: {:?}", new_root_node);
+                // println!("\nnew_root_node in process: {:?}", new_root_node);
                 let node_hash_bytes = self.imple.save_node(new_root_node.clone());
                 // println!("\nhash_node_bytes: {:?}", hash_node_bytes);
                 // println!(

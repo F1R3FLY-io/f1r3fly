@@ -780,6 +780,7 @@ object RadixTree {
               val newNode = emptyNode
                 .updated(byteToInt(leafPrefixRest.head), Leaf(leafPrefixRest.tail, leafValue))
                 .updated(byteToInt(insPrefixRest.head), Leaf(insPrefixRest.tail, insValue))
+              println("\nnewNode in update: " + newNode.length)
               saveNodeAndCreateItem(newNode, commPrefix, compaction = false).some.pure
             }
 
@@ -853,6 +854,7 @@ object RadixTree {
                       case InsertAction(key, hash) => update(item, ByteVector(key).tail, hash.bytes)
                       case DeleteAction(key)       => delete(item, ByteVector(key).tail)
                     }
+          // _ = println("\nhit processOneAction")
         } yield (itemIdx, newItem)
 
       def clearingDeleteActions(actions: List[HistoryAction], item: Item) = {
@@ -869,9 +871,13 @@ object RadixTree {
       def processNonEmptyActions(actions: List[HistoryAction], itemIdx: Int) =
         for {
           createdNode <- constructNodeFromItem(curNode(itemIdx))
-          newActions  = trimKeys(actions)
-          newNodeOpt  <- makeActions(createdNode, newActions)
-          newItem     = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
+          _           = println("\nactions in processNonEmptyActions: " + actions)
+          // _           = println("currNode: " + curNode)
+          newActions = trimKeys(actions)
+          newNodeOpt <- makeActions(createdNode, newActions)
+          _          = println("\nnewNodeOpt in processNonEmptyActions: " + newNodeOpt.get.length)
+          newItem    = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
+          _          = println("\nnewItem: " + newItem)
         } yield (itemIdx, newItem)
 
       // If we have more than 1 action. We can create more parallel processes.
@@ -909,8 +915,12 @@ object RadixTree {
       for {
         // Group the actions by the first byte of the prefix.
         groupedActions <- Sync[F].delay(grouping(actions))
+        // _              = println("\ngroupedActions: " + groupedActions)
         // Process actions within each group.
         newGroupItems <- processGroupedActions(groupedActions, curNode).parSequence
+        // newGroupItems <- Sync[F].delay(processGroupedActions(groupedActions, curNode))
+
+        // _ = println("\nnewGroupItems: " + newGroupItems)
         // Update all changed items in current node.
         newCurNode = newGroupItems.foldLeft(curNode) {
           case (tempNode, (index, newItemOpt)) =>

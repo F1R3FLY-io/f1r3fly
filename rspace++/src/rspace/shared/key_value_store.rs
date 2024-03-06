@@ -1,5 +1,5 @@
 use crate::rspace::ByteBuffer;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
@@ -14,7 +14,7 @@ pub trait KeyValueStore: Send + Sync {
 
     fn clone_box(&self) -> Box<dyn KeyValueStore>;
 
-    fn to_map(&self) -> Result<HashMap<ByteBuffer, ByteBuffer>, KvStoreError>;
+    fn to_map(&self) -> Result<BTreeMap<ByteBuffer, ByteBuffer>, KvStoreError>;
 
     fn print_store(&self) -> ();
 
