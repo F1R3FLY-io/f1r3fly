@@ -780,7 +780,7 @@ object RadixTree {
               val newNode = emptyNode
                 .updated(byteToInt(leafPrefixRest.head), Leaf(leafPrefixRest.tail, leafValue))
                 .updated(byteToInt(insPrefixRest.head), Leaf(insPrefixRest.tail, insValue))
-              println("\nnewNode in update: " + newNode.length)
+              // println("\nnewNode in update: " + newNode.length)
               saveNodeAndCreateItem(newNode, commPrefix, compaction = false).some.pure
             }
 
@@ -871,13 +871,14 @@ object RadixTree {
       def processNonEmptyActions(actions: List[HistoryAction], itemIdx: Int) =
         for {
           createdNode <- constructNodeFromItem(curNode(itemIdx))
-          _           = println("\nactions in processNonEmptyActions: " + actions)
-          // _           = println("currNode: " + curNode)
+          // _           = println("\ncreatedNode in processNonEmptyActions: " + createdNode)
+          // _ = println("\ncurrNode: " + curNode)
+          // _          = println("\nitemIdx: " + itemIdx)
           newActions = trimKeys(actions)
           newNodeOpt <- makeActions(createdNode, newActions)
-          _          = println("\nnewNodeOpt in processNonEmptyActions: " + newNodeOpt.get.length)
-          newItem    = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
-          _          = println("\nnewItem: " + newItem)
+          // _          = println("\nnewNodeOpt in processNonEmptyActions: " + newNodeOpt.get.length)
+          newItem = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
+          // _          = println("\nnewItem: " + newItem)
         } yield (itemIdx, newItem)
 
       // If we have more than 1 action. We can create more parallel processes.

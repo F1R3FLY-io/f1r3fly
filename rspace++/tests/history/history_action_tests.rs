@@ -236,32 +236,13 @@ mod tests {
         delete_one_two.extend(delete_two.clone());
 
         let empty_history = create_empty_history();
-        // println!("{:?}", hex_key("010000"));
-        // println!("{:?}", hex_key("0200"));
+
         let history_one = empty_history.process(insert_one);
-        assert!(history_one.is_ok());
         let history_two = empty_history.process(insert_two.clone());
-        // assert!(history_two.is_ok());
 
-        // println!("\nhistory_one_two_another_way process");
-        // println!("\n{:?}", hex_key("010001"));
-        // println!("{:?}", hex_key("0300"));
-        let history_one_two_another_way = history_one.as_ref().unwrap().process(insert_two);
-        // println!(
-        //     "\nhistory_one_two_another_way hash: {:?}",
-        //     history_one_two_another_way.as_ref().unwrap().root()
-        // );
-
-        // println!("\nhistoryOneAndTwo process");
-        // println!("\n{:?}", hex_key("010000"));
-        // println!("{:?}", hex_key("0200"));
-        // println!("{:?}", hex_key("010001"));
-        // println!("{:?}", hex_key("0300"));
         let history_one_two = empty_history.process(insert_one_two);
-        assert!(history_one_two.is_ok());
-        // println!("\nhistoryOneAndTwo hash: {:?}", history_one_two.as_ref().unwrap().root());
+        let history_one_two_another_way = history_one.as_ref().unwrap().process(insert_two);
 
-        assert!(history_one_two_another_way.is_ok());
         assert_eq!(
             history_one_two.as_ref().unwrap().root(),
             history_one_two_another_way.unwrap().root()

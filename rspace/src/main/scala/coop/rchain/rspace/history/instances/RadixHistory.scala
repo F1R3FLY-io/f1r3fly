@@ -65,6 +65,7 @@ final case class RadixHistory[F[_]: Sync: Parallel](
 
       // _ = println("\nhit process")
 
+      // _              = println("\nroot_node (curr_node) in process method: " + rootNode)
       newRootNodeOpt <- impl.makeActions(rootNode, actions)
       // _              = println("\nnewRootNodeOpt: " + newRootNodeOpt)
       newHistoryOpt <- newRootNodeOpt.traverse { newRootNode =>

@@ -162,39 +162,24 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       val deleteOneAndTwo = deleteOne ::: deleteTwo
 
       for {
-        emptyHistory <- emptyHistoryF
-
-        _          = println("\n" + hexKey("010000"))
-        _          = println(hexKey("0200"))
-        historyOne <- emptyHistory.process(insertOne)
-        // historyTwo       <- emptyHistory.process(insertTwo)
-        // _                = println("\nhistoryOneAndTwo process")
-        // historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
-
-        // _ = println("\nhistoryOneAndTwo hash: " + historyOneAndTwo.root)
-
-        // _                          = println("\nhistoryOneAndTwoAnotherWay process")
-        _                          = println("\n" + hexKey("010001"))
-        _                          = println(hexKey("0300"))
-        historyOneAndTwoAnotherWay <- historyOne.process(insertTwo)
-        // _                          = println("\nhistoryOneAndTwoAnotherWay hash: " + historyOneAndTwoAnotherWay.root)
-
-        _                = println("\n" + hexKey("010000"))
-        _                = println(hexKey("0200"))
-        _                = println(hexKey("010001"))
-        _                = println(hexKey("0300"))
+        emptyHistory     <- emptyHistoryF
+        historyOne       <- emptyHistory.process(insertOne)
+        historyTwo       <- emptyHistory.process(insertTwo)
         historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
+
+        historyOneAndTwoAnotherWay <- historyOne.process(insertTwo)
+        historyOneAndTwo           <- emptyHistory.process(insertOneAndTwo)
 
         _ = historyOneAndTwo.root shouldBe historyOneAndTwoAnotherWay.root
 
-        // historyOneAnotherWay <- historyOneAndTwo.process(deleteTwo)
-        // _                    = historyOne.root shouldBe historyOneAnotherWay.root
+        historyOneAnotherWay <- historyOneAndTwo.process(deleteTwo)
+        _                    = historyOne.root shouldBe historyOneAnotherWay.root
 
-        // historyTwoAnotherWay <- historyOneAndTwo.process(deleteOne)
-        // _                    = historyTwo.root shouldBe historyTwoAnotherWay.root
+        historyTwoAnotherWay <- historyOneAndTwo.process(deleteOne)
+        _                    = historyTwo.root shouldBe historyTwoAnotherWay.root
 
-        // emptyHistoryAnotherWay <- historyOneAndTwo.process(deleteOneAndTwo)
-        // _                      = emptyHistory.root shouldBe emptyHistoryAnotherWay.root
+        emptyHistoryAnotherWay <- historyOneAndTwo.process(deleteOneAndTwo)
+        _                      = emptyHistory.root shouldBe emptyHistoryAnotherWay.root
 
       } yield ()
   }

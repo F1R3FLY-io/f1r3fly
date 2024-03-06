@@ -1071,7 +1071,7 @@ impl RadixTreeImpl {
             } => {
                 assert!(
                     !leaf_prefix.is_empty(),
-                    "Radix Tree: Impossible to create a node. LeafPrefix should be non empty."
+                    "Impossible to create a node. LeafPrefix should be non empty."
                 );
 
                 let index = byte_to_int(*leaf_prefix.first().unwrap());
@@ -1090,15 +1090,15 @@ impl RadixTreeImpl {
             } => {
                 assert!(
                     !node_ptr_prefix.is_empty(),
-                    "Radix Tree: Impossible to create a node. NodePtrPrefix should be non empty."
+                    "Impossible to create a node. NodePtrPrefix should be non empty."
                 );
 
                 let index = byte_to_int(*node_ptr_prefix.first().unwrap());
                 let (_, node_ptr_prefix_tail) = node_ptr_prefix.split_first().unwrap();
                 let mut empty_node = empty_node();
-                empty_node[index] = Item::Leaf {
+                empty_node[index] = Item::NodePtr {
                     prefix: node_ptr_prefix_tail.to_vec(),
-                    value: ptr,
+                    ptr,
                 };
 
                 empty_node
@@ -1112,6 +1112,7 @@ impl RadixTreeImpl {
      * If item is NodePtr and prefix is empty - load child node
      */
     fn construct_node_from_item(&self, item: Item) -> Result<Node, RadixTreeError> {
+        // println!("\nitem: {:?}", item);
         match item {
             Item::NodePtr { prefix, ptr } if prefix.is_empty() => self.load_node(ptr, None),
             _ => Ok(self.create_node_from_item(item)),
@@ -1502,12 +1503,12 @@ impl RadixTreeImpl {
         > = Box::new(|actions: Vec<HistoryAction>, item_idx: i32| {
             // println!("\nactions in process_non_empty_actions: {:?}", actions);
             // println!("item_idx in process_non_empty_actions: {:?}", item_idx);
-            // println!("curr_node: {:?}", curr_node);
+            // println!("\ncurr_node: {:?}", curr_node);
 
             let created_node =
                 self.construct_node_from_item(curr_node.get(item_idx as usize).unwrap().clone())?;
 
-            // println!("\ncreate_node in process_non_empty_actions: {:?}", create_node);
+            // println!("\ncreated_node in process_non_empty_actions: {:?}", created_node);
 
             let new_actions = trim_keys(actions);
             let new_node_opt = self.make_actions(created_node, new_actions)?;
