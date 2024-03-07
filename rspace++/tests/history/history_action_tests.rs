@@ -349,12 +349,12 @@ mod tests {
                 let new_inserts = generate_random_insert(size_inserts);
                 let new_updates = generate_random_insert_from_insert(size_updates, &inserts);
 
-                let update_key: HashSet<_> =
+                let update_keys: HashSet<KeyPath> =
                     new_updates.iter().map(|action| action.key()).collect();
 
-                let last_inserts: Vec<_> = inserts
+                let last_inserts: Vec<HistoryAction> = inserts
                     .into_iter()
-                    .filter(|i| !update_key.contains(&i.key()))
+                    .filter(|i| !update_keys.contains(&i.key()))
                     .collect();
 
                 let new_deletes = generate_random_delete_from_insert(size_deletes, last_inserts)
@@ -378,7 +378,13 @@ mod tests {
                 for (k, value) in new_state.iter() {
                     match new_history.as_ref().unwrap().read(k.to_vec()) {
                         Ok(Some(v)) => assert!(v == value.bytes()),
-                        _ => assert!(false, "Can not get value"),
+                        Err(e) => {
+                            println!("{:?}", e);
+                            assert!(false, "Can not get value")
+                        }
+                        Ok(None) => {
+                            assert!(false, "Can not get value")
+                        }
                     }
                 }
 
@@ -424,8 +430,8 @@ mod tests {
         let mut rng = rand::thread_rng();
         (0..size)
             .map(|_| {
-                let num = rng.gen_range(0..256) as i16;
-                (num - 128) as u8
+                let num = rng.gen_range(-128..=127) as i8;
+                num as u8
             })
             .collect()
     }

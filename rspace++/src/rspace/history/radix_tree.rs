@@ -775,7 +775,7 @@ impl RadixTreeImpl {
     /**
      * Load and decode serializing data from KVDB.
      */
-    fn load_node_from_store(&self, node_ptr: &ByteVector) -> Option<Node> {
+    fn load_node_from_store(&self, node_ptr: &ByteVector) -> Result<Option<Node>, RadixTreeError> {
         let store_lock = self
             .store
             .lock()
@@ -784,30 +784,24 @@ impl RadixTreeImpl {
         let serialized_node_ptr =
             bincode::serialize(node_ptr).expect("Radix Tree: Failed to serialize");
 
-        let get_result = store_lock.get_one(&serialized_node_ptr);
+        let get_result = store_lock.get_one(&serialized_node_ptr)?;
 
         // println!("\nget_result in load_node_from_store: {:?}", get_result);
 
         // store_lock.print_store();
 
         match get_result {
-            Ok(bytes_opt) => match bytes_opt {
-                Some(bytes) => {
-                    let deserialized_node_bytes: ByteVector = bincode::deserialize(&bytes)
-                        .expect("Radix Tree: Failed to deserialize node bytes");
+            Some(bytes) => {
+                let deserialized_node_bytes: ByteVector = bincode::deserialize(&bytes)
+                    .expect("Radix Tree: Failed to deserialize node bytes");
 
-                    let deserialized_node: Node = bincode::deserialize(&deserialized_node_bytes)
-                        .expect("Radix Tree: Failed to deserialize node bytes");
+                let deserialized_node: Node = bincode::deserialize(&deserialized_node_bytes)
+                    .expect("Radix Tree: Failed to deserialize node bytes");
 
-                    // println!("\ndeserialized: {:?}", deserialized);
-                    Some(deserialized_node)
-                }
-                None => None,
-            },
-            Err(err) => {
-                println!("Radix Tree: {}", err);
-                None
+                // println!("\ndeserialized: {:?}", deserialized);
+                Ok(Some(deserialized_node))
             }
+            None => Ok(None),
         }
     }
 
@@ -835,38 +829,32 @@ impl RadixTreeImpl {
             );
         };
 
-        let cache_miss = |node_ptr: ByteVector| {
-            let store_node_opt = self.load_node_from_store(&node_ptr);
+        let cache_miss: Box<dyn Fn(ByteVector) -> Result<Node, RadixTreeError>> =
+            Box::new(|node_ptr: ByteVector| {
+                let store_node_opt = self.load_node_from_store(&node_ptr)?;
 
-            // println!("\nstore_node in load_node: {:?}", store_node_opt);
+                // println!("\nstore_node in load_node: {:?}", store_node_opt);
 
-            // let node_opt = store_node_opt
-            //     .map(|node| self.cache_r.insert(node_ptr.clone(), node))
-            //     .unwrap_or_else(|| {
-            //         error_msg(&node_ptr);
-            //         None
-            //     });
+                match store_node_opt {
+                    Some(ref node) => {
+                        self.cache_r.insert(node_ptr.clone(), node.to_vec());
+                    }
+                    None => error_msg(&node_ptr),
+                };
 
-            match store_node_opt {
-                Some(ref node) => {
-                    let _ = self.cache_r.insert(node_ptr.clone(), node.to_vec());
+                match store_node_opt {
+                    Some(node) => Ok(node),
+                    None => {
+                        // println!("\nreturning empty node in load_node");
+                        Ok(empty_node())
+                    }
                 }
-                None => error_msg(&node_ptr),
-            };
-
-            match store_node_opt {
-                Some(node) => node,
-                None => {
-                    // println!("\nreturning empty node in load_node");
-                    empty_node()
-                }
-            }
-        };
+            });
 
         let cache_node_opt = self.cache_r.get(&node_ptr);
         match cache_node_opt {
             Some(node) => Ok(node.to_vec()),
-            None => Ok(cache_miss(node_ptr)),
+            None => cache_miss(node_ptr),
         }
     }
 
@@ -897,12 +885,12 @@ impl RadixTreeImpl {
         match self.cache_r.get(&node_bytes_hash) {
             Some(node) => check_collision(node.value().to_vec()),
             None => {
-                let _ = self.cache_r.insert(node_bytes_hash.clone(), node);
+                self.cache_r.insert(node_bytes_hash.clone(), node);
             }
         };
 
         // println("\nsave node: key {} value {}", hash_bytes.clone(), node_bytes);
-        let _ = self.cache_w.insert(node_bytes_hash.clone(), node_bytes);
+        self.cache_w.insert(node_bytes_hash.clone(), node_bytes);
         node_bytes_hash
     }
 
@@ -930,6 +918,17 @@ impl RadixTreeImpl {
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
+
+        // let serialized_kv_pairs: Vec<_> = kv_pairs
+        // .iter()
+        // .map(|(key, value)| {
+        //     let serialized_key =
+        //         bincode::serialize(key).expect("Radix Tree: Failed to serialize");
+        //     let serialized_value =
+        //         bincode::serialize(value).expect("Radix Tree: Failed to serialize");
+        //     (serialized_key, serialized_value)
+        // })
+        // .collect();
 
         // println!("\nkv_pairs: {:?}", kv_pairs);
 
@@ -1224,7 +1223,6 @@ impl RadixTreeImpl {
             match child_item_opt {
                 Some(child_item) => {
                     let mut updated_child_node = child_node.clone();
-                    // updated_child_node.insert(child_item_idx, child_item);
                     updated_child_node[child_item_idx] = child_item;
                     let returned_item =
                         self.save_node_and_create_item(updated_child_node, child_prefix, false);
@@ -1260,11 +1258,9 @@ impl RadixTreeImpl {
                         Ok(Some(Item::Leaf {
                             prefix: ins_prefix,
                             value: ins_value.clone(),
-                        }))
+                        })) // Update Leaf.
                     }
                 } else {
-                    // Update Leaf.
-
                     // Create child node, insert existing and new leaf in this node.
                     // Intentionally not recursive for speed up.
                     let (comm_prefix, ins_prefix_rest, leaf_prefix_rest) =
@@ -1278,14 +1274,6 @@ impl RadixTreeImpl {
                     let (leaf_prefix_rest_head, leaf_prefix_rest_tail) =
                         leaf_prefix_rest.split_first().unwrap();
 
-                    // new_node.insert(
-                    //     byte_to_int(*leaf_prefix_rest_head),
-                    //     Item::Leaf {
-                    //         prefix: leaf_prefix_rest_tail.to_vec(),
-                    //         value: leaf_value,
-                    //     },
-                    // );
-
                     new_node[byte_to_int(*leaf_prefix_rest_head)] = Item::Leaf {
                         prefix: leaf_prefix_rest_tail.to_vec(),
                         value: leaf_value,
@@ -1293,14 +1281,6 @@ impl RadixTreeImpl {
 
                     let (ins_prefix_rest_head, ins_prefix_rest_tail) =
                         ins_prefix_rest.split_first().unwrap();
-
-                    // new_node.insert(
-                    //   byte_to_int(*ins_prefix_rest_head),
-                    //   Item::Leaf {
-                    //       prefix: ins_prefix_rest_tail.to_vec(),
-                    //       value: ins_value.clone(),
-                    //   },
-                    // );
 
                     new_node[byte_to_int(*ins_prefix_rest_head)] = Item::Leaf {
                         prefix: ins_prefix_rest_tail.to_vec(),
@@ -1332,14 +1312,6 @@ impl RadixTreeImpl {
                     let (ptr_prefix_rest_head, ptr_prefix_rest_tail) =
                         ptr_prefix_rest.split_first().unwrap();
 
-                    // new_node.insert(
-                    //     byte_to_int(*ptr_prefix_rest_head),
-                    //     Item::NodePtr {
-                    //         prefix: ptr_prefix_rest_tail.to_vec(),
-                    //         ptr: ptr.clone(),
-                    //     },
-                    // );
-
                     new_node[byte_to_int(*ptr_prefix_rest_head)] = Item::NodePtr {
                         prefix: ptr_prefix_rest_tail.to_vec(),
                         ptr: ptr.clone(),
@@ -1348,17 +1320,9 @@ impl RadixTreeImpl {
                     let (ins_prefix_rest_head, ins_prefix_rest_tail) =
                         ins_prefix_rest.split_first().unwrap();
 
-                    // new_node.insert(
-                    //     byte_to_int(*ins_prefix_rest_head),
-                    //     Item::NodePtr {
-                    //         prefix: ins_prefix_rest_tail.to_vec(),
-                    //         ptr,
-                    //     },
-                    // );
-
-                    new_node[byte_to_int(*ins_prefix_rest_head)] = Item::NodePtr {
+                    new_node[byte_to_int(*ins_prefix_rest_head)] = Item::Leaf {
                         prefix: ins_prefix_rest_tail.to_vec(),
-                        ptr,
+                        value: ins_value.clone(),
                     };
 
                     Ok(Some(self.save_node_and_create_item(new_node, comm_prefix, false)))

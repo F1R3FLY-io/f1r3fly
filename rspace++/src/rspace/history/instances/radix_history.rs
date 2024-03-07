@@ -117,8 +117,8 @@ impl History for RadixHistory {
             }
             None => {
                 // println!("\nNone in process");
-                self.imple.clear_write_cache();
-                self.imple.clear_read_cache();
+                // self.imple.clear_write_cache();
+                // self.imple.clear_read_cache();
                 Ok(Box::new(RadixHistory {
                     root_hash: self.root_hash.clone(),
                     root_node: self.root_node.clone(),
