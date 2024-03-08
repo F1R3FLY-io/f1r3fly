@@ -1359,45 +1359,45 @@ mod tests {
         let target: Par =
             new_emap_par(target_elements.clone(), Vec::new(), false, None, Vec::new(), false);
 
-        // let pattern: Par = new_emap_par(
-        //     vec![new_key_value_pair(
-        //         new_freevar_par(0, Vec::new()),
-        //         new_gint_par(4, Vec::new(), false),
-        //     )],
-        //     vec![],
-        //     true,
-        //     Some(new_freevar_var(1)),
-        //     vec![],
-        //     true,
-        // );
+        let pattern: Par = new_emap_par(
+            vec![new_key_value_pair(
+                new_freevar_par(0, Vec::new()),
+                new_gint_par(4, Vec::new(), false),
+            )],
+            vec![],
+            true,
+            Some(new_freevar_var(1)),
+            vec![],
+            true,
+        );
 
-        // let expected_captures = BTreeMap::from([
-        //     (0, new_gint_par(3, Vec::new(), false)),
-        //     (
-        //         1,
-        //         new_emap_par(
-        //             vec![
-        //                 new_key_value_pair(
-        //                     new_gint_par(1, Vec::new(), false),
-        //                     new_gint_par(2, Vec::new(), false),
-        //                 ),
-        //                 new_key_value_pair(
-        //                     new_gint_par(5, Vec::new(), false),
-        //                     new_gint_par(6, Vec::new(), false),
-        //                 ),
-        //             ],
-        //             Vec::new(),
-        //             false,
-        //             None,
-        //             Vec::new(),
-        //             false,
-        //         ),
-        //     ),
-        // ]);
+        let expected_captures = BTreeMap::from([
+            (0, new_gint_par(3, Vec::new(), false)),
+            (
+                1,
+                new_emap_par(
+                    vec![
+                        new_key_value_pair(
+                            new_gint_par(1, Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                        ),
+                        new_key_value_pair(
+                            new_gint_par(5, Vec::new(), false),
+                            new_gint_par(6, Vec::new(), false),
+                        ),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ),
+        ]);
 
-        // assert!(
-        //     assert_spatial_match(target.clone(), pattern.clone(), Some(expected_captures)).is_ok()
-        // );
+        assert!(
+            assert_spatial_match(target.clone(), pattern.clone(), Some(expected_captures)).is_ok()
+        );
 
         let all_elements_and_remainder = new_emap_par(
             target_elements.clone(),

@@ -1110,11 +1110,11 @@ mod tests {
             .await;
         assert!(!c3.is_empty());
         assert!(r3.is_some());
-        // assert!(check_same_elements(
-        //     run_k(r3),
-        //     vec![vec!["datum1".to_string()], vec!["datum2".to_string()]]
-        // ));
-        // NOTE: The above should pass
+        assert!(check_same_elements(
+            run_k(r3.clone()),
+            vec![vec!["datum1".to_string()], vec!["datum2".to_string()]]
+        ));
+
         assert!(check_same_elements(run_k(r3), vec![vec!["datum2".to_string()]]));
     }
 
