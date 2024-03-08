@@ -12,7 +12,6 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use crate::rspace::ByteVector;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -41,23 +40,9 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
 
     fn history(&self) -> Arc<Mutex<Box<dyn History>>>;
 
-    fn exporter(
-        &self,
-    ) -> Arc<
-        Mutex<
-            Box<
-                dyn RSpaceExporter<
-                    KeyHash = Blake3Hash,
-                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = ByteVector,
-                >,
-            >,
-        >,
-    >;
+    fn exporter(&self) -> Arc<Mutex<Box<dyn RSpaceExporter>>>;
 
-    fn importer(
-        &self,
-    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = ByteVector>>>>;
+    fn importer(&self) -> Arc<Mutex<Box<dyn RSpaceImporter>>>;
 
     fn get_history_reader(
         &self,

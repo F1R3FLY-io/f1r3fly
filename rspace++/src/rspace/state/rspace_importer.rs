@@ -5,13 +5,15 @@ use rayon::{
 use std::{collections::HashMap, sync::Arc};
 
 use crate::rspace::{
-    hashing::blake3_hash::Blake3Hash, shared::trie_importer::TrieImporter,
-    state::rspace_exporter::RSpaceExporterInstance, ByteVector,
+    hashing::blake3_hash::Blake3Hash,
+    shared::{trie_exporter::KeyHash, trie_importer::TrieImporter},
+    state::rspace_exporter::RSpaceExporterInstance,
+    ByteVector,
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/RSpaceImporter.scala
 pub trait RSpaceImporter: TrieImporter + Send + Sync {
-    fn get_history_item(&self, hash: Self::KeyHash) -> Option<ByteVector>;
+    fn get_history_item(&self, hash: KeyHash) -> Option<ByteVector>;
 }
 
 struct RSpaceImporterInstance;

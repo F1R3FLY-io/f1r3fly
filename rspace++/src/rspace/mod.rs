@@ -11,7 +11,7 @@ mod checkpoint;
 mod hot_store_action;
 pub mod shared;
 mod hot_store_trie_action;
-mod state;
+pub mod state;
 mod serializers;
 
 pub type ByteVector = Vec<u8>;

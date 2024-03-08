@@ -15,7 +15,14 @@ mod tests {
             root_repository::RootRepository,
             roots_store::{RootError, RootsStore},
         },
-        shared::mem_key_value_store::InMemoryKeyValueStore,
+        shared::{
+            key_value_store::{KeyValueStore, KvStoreError},
+            mem_key_value_store::InMemoryKeyValueStore,
+            trie_exporter::{KeyHash, NodePath, TrieExporter, TrieNode, Value},
+            trie_importer::TrieImporter,
+        },
+        state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
+        ByteVector,
     };
 
     #[test]
@@ -34,9 +41,9 @@ mod tests {
         HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(Box::new(empty_history))),
             roots_repository: Arc::new(Mutex::new(past_roots)),
-            leaf_store: todo!(),
-            rspace_exporter: todo!(),
-            rspace_importer: todo!(),
+            leaf_store: Arc::new(Mutex::new(create_inmem_cold_store())),
+            rspace_exporter: Arc::new(Mutex::new(Box::new(EmptyExporter))),
+            rspace_importer: Arc::new(Mutex::new(Box::new(EmptyImporter))),
             _marker: std::marker::PhantomData,
         }
     }
@@ -91,5 +98,62 @@ mod tests {
         }
     }
 
-    // fn create_inmem_cold_store() -> ColdK
+    fn create_inmem_cold_store() -> Box<dyn KeyValueStore> {
+        Box::new(InMemoryKeyValueStore::new())
+    }
+
+    struct EmptyExporter;
+
+    impl RSpaceExporter for EmptyExporter {
+        fn get_root(&self) -> Result<KeyHash, RootError> {
+            todo!()
+        }
+    }
+
+    impl TrieExporter for EmptyExporter {
+        fn get_nodes(
+            &self,
+            start_path: NodePath,
+            skip: usize,
+            take: usize,
+        ) -> Vec<TrieNode<KeyHash>> {
+            todo!()
+        }
+
+        fn get_history_items(
+            &self,
+            keys: Vec<KeyHash>,
+        ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
+            todo!()
+        }
+
+        fn get_data_items(
+            &self,
+            keys: Vec<KeyHash>,
+        ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
+            todo!()
+        }
+    }
+
+    struct EmptyImporter;
+
+    impl RSpaceImporter for EmptyImporter {
+        fn get_history_item(&self, hash: KeyHash) -> Option<ByteVector> {
+            todo!()
+        }
+    }
+
+    impl TrieImporter for EmptyImporter {
+        fn set_history_items(&self, data: Vec<(KeyHash, Value)>) -> () {
+            todo!()
+        }
+
+        fn set_data_items(&self, data: Vec<(KeyHash, Value)>) -> () {
+            todo!()
+        }
+
+        fn set_root(&self, key: &KeyHash) -> () {
+            todo!()
+        }
+    }
 }

@@ -23,7 +23,6 @@ use crate::rspace::serializers::serializers::{
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use crate::rspace::ByteVector;
 use async_trait::async_trait;
 use log::debug;
 use rayon::prelude::*;
@@ -37,19 +36,8 @@ pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub roots_repository: Arc<Mutex<RootRepository>>,
     // pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
     pub leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
-    pub rspace_exporter: Arc<
-        Mutex<
-            Box<
-                dyn RSpaceExporter<
-                    KeyHash = Blake3Hash,
-                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = Vec<u8>,
-                >,
-            >,
-        >,
-    >,
-    pub rspace_importer:
-        Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = ByteVector>>>>,
+    pub rspace_exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
+    pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter>>>,
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
@@ -419,25 +407,11 @@ where
         self.current_history.clone()
     }
 
-    fn exporter(
-        &self,
-    ) -> Arc<
-        Mutex<
-            Box<
-                dyn RSpaceExporter<
-                    KeyHash = Blake3Hash,
-                    NodePath = Vec<(Blake3Hash, Option<u8>)>,
-                    Value = Vec<u8>,
-                >,
-            >,
-        >,
-    > {
+    fn exporter(&self) -> Arc<Mutex<Box<dyn RSpaceExporter>>> {
         self.rspace_exporter.clone()
     }
 
-    fn importer(
-        &self,
-    ) -> Arc<Mutex<Box<dyn RSpaceImporter<KeyHash = Blake3Hash, Value = ByteVector>>>> {
+    fn importer(&self) -> Arc<Mutex<Box<dyn RSpaceImporter>>> {
         self.rspace_importer.clone()
     }
 

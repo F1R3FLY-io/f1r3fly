@@ -4,7 +4,7 @@ use crate::rspace::{
         radix_tree::{sequential_export, ExportData, ExportDataSettings},
         roots_store::RootError,
     },
-    shared::trie_exporter::{TrieExporter, TrieNode},
+    shared::trie_exporter::{KeyHash, TrieExporter, TrieNode},
     ByteVector,
 };
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 // See rspace/src/main/scala/coop/rchain/rspace/state/RSpaceExporter.scala
 pub trait RSpaceExporter: TrieExporter + Send + Sync {
     // Get current root
-    fn get_root(&self) -> Result<Self::KeyHash, RootError>;
+    fn get_root(&self) -> Result<KeyHash, RootError>;
 }
 
 pub struct RSpaceExporterInstance;
