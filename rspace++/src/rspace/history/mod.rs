@@ -5,6 +5,6 @@ pub mod history_action;
 pub mod instances;
 pub mod radix_tree;
 pub mod roots_store;
-mod root_repository;
+pub mod root_repository;
 mod cold_store;
-mod history_repository_impl;
+pub mod history_repository_impl;
