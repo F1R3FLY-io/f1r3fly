@@ -1,5 +1,5 @@
 mod concurrent;
-mod event;
+pub mod event;
 pub mod hashing;
 pub mod history;
 pub mod hot_store;
@@ -8,7 +8,7 @@ pub mod matcher;
 pub mod rspace;
 mod space_matcher;
 mod checkpoint;
-mod hot_store_action;
+pub mod hot_store_action;
 pub mod shared;
 mod hot_store_trie_action;
 pub mod state;

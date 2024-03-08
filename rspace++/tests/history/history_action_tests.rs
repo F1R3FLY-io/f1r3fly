@@ -1,3 +1,6 @@
+use rand::distributions::{Alphanumeric, DistString};
+use rspace_plus_plus::rspace::hashing::blake3_hash::Blake3Hash;
+
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryActionTests.scala
 #[cfg(test)]
 mod tests {
@@ -5,7 +8,6 @@ mod tests {
     use std::error::Error;
     use std::sync::{Arc, Mutex};
 
-    use rand::distributions::{Alphanumeric, DistString};
     use rand::seq::SliceRandom;
     use rand::Rng;
     use rspace_plus_plus::rspace::history::radix_tree::RadixTreeError;
@@ -22,6 +24,8 @@ mod tests {
         shared::mem_key_value_store::InMemoryKeyValueStore,
         Byte, ByteVector,
     };
+
+    use crate::history::history_action_tests::random_blake;
 
     #[test]
     fn creating_and_read_one_record_should_work() {
@@ -511,14 +515,6 @@ mod tests {
         hex::decode(s).unwrap()
     }
 
-    fn random_blake() -> Blake3Hash {
-        Blake3Hash::new(
-            &Alphanumeric
-                .sample_string(&mut rand::thread_rng(), 32)
-                .into_bytes(),
-        )
-    }
-
     fn history_insert(k: KeyPath) -> (HistoryAction, InsertAction) {
         let insert_action = InsertAction {
             key: k,
@@ -532,4 +528,12 @@ mod tests {
         let delete_action = DeleteAction { key: k };
         (HistoryAction::Delete(delete_action.clone()), delete_action)
     }
+}
+
+pub fn random_blake() -> Blake3Hash {
+    Blake3Hash::new(
+        &Alphanumeric
+            .sample_string(&mut rand::thread_rng(), 32)
+            .into_bytes(),
+    )
 }

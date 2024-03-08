@@ -44,7 +44,7 @@ where
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
     pub continuation: K,

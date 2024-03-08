@@ -1,20 +1,26 @@
-// See src/firefly/f1r3fly/rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
+// See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
+        collections::{BTreeSet, HashSet},
         sync::{Arc, Mutex},
     };
 
     use rspace_plus_plus::rspace::{
+        event::{Consume, Produce},
         hashing::blake3_hash::Blake3Hash,
         history::{
             history::HistoryInstances,
+            history_repository::HistoryRepository,
             history_repository_impl::HistoryRepositoryImpl,
             instances::radix_history::RadixHistory,
             root_repository::RootRepository,
             roots_store::{RootError, RootsStore},
         },
+        hot_store_action::{
+            HotStoreAction, InsertAction, InsertContinuations, InsertData, InsertJoins,
+        },
+        internal::{Datum, WaitingContinuation},
         shared::{
             key_value_store::{KeyValueStore, KvStoreError},
             mem_key_value_store::InMemoryKeyValueStore,
@@ -25,8 +31,149 @@ mod tests {
         ByteVector,
     };
 
-    #[test]
-    fn history_repository_should_process_insert_one_datum() {}
+    use crate::history::history_action_tests::random_blake;
+
+    #[tokio::test]
+    async fn history_repository_should_process_insert_one_datum() {
+        let repo = create_empty_repository();
+        let test_datum = datum(1);
+        let insert_data = InsertData {
+            channel: test_channel_data_prefix(),
+            data: vec![test_datum.clone()],
+        };
+
+        let next_repo = repo
+            .checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))])
+            .await;
+        let history_reader = next_repo.get_history_reader(next_repo.root());
+        let data = history_reader
+            .unwrap()
+            .base()
+            .get_data(&test_channel_data_prefix());
+        let fetched = data.first().unwrap().clone();
+
+        assert_eq!(fetched, test_datum);
+    }
+
+    #[tokio::test]
+    async fn history_repository_should_allow_insert_of_joins_datum_continuation_on_same_channel() {
+        let repo = create_empty_repository();
+        let channel = test_channel_continuations_prefix();
+
+        let test_datum = datum(1);
+        let data = InsertData {
+            channel: channel.clone(),
+            data: vec![test_datum.clone()],
+        };
+
+        let test_joins = join(1);
+        let joins = InsertJoins {
+            channel: channel.clone(),
+            joins: test_joins,
+        };
+
+        let test_continuation = continuation(1);
+        let continuations = InsertContinuations {
+            channels: vec![channel.clone()],
+            continuations: vec![test_continuation.clone()],
+        };
+
+        let next_repo = repo
+            .checkpoint(&vec![
+                HotStoreAction::Insert(InsertAction::InsertData(data)),
+                HotStoreAction::Insert(InsertAction::InsertJoins(joins.clone())),
+                HotStoreAction::Insert(InsertAction::InsertContinuations(continuations)),
+            ])
+            .await;
+        let history_reader = next_repo.get_history_reader(next_repo.root());
+        let reader = history_reader.as_ref().unwrap().base();
+
+        let fetched_data = reader.get_data(&channel);
+        let fetched_continuation = reader.get_continuations(&vec![channel.clone()]);
+        let fetched_joins = reader.get_joins(&channel);
+
+        assert_eq!(fetched_data.len(), 1);
+        assert_eq!(fetched_data.first().unwrap().clone(), test_datum);
+
+        assert_eq!(fetched_continuation.len(), 1);
+        assert_eq!(fetched_continuation.first().unwrap().clone(), test_continuation);
+
+        assert_eq!(fetched_joins.len(), 2);
+        assert_eq!(
+            HashSet::<String>::from_iter(fetched_joins.into_iter().flatten()),
+            HashSet::<String>::from_iter(joins.joins.into_iter().flatten())
+        );
+    }
+
+    fn test_channel_data_prefix() -> String {
+        "channel-data".to_string()
+    }
+
+    fn test_channel_joins_prefix() -> String {
+        "channel-joins".to_string()
+    }
+
+    fn test_channel_continuations_prefix() -> String {
+        "channel-continuations".to_string()
+    }
+
+    fn insert_datum(
+        s: i32,
+    ) -> (HotStoreAction<String, String, String, String>, InsertData<String, String>) {
+        let insert = InsertData {
+            channel: format!("{}{}", test_channel_data_prefix(), s),
+            data: vec![datum(s)],
+        };
+
+        (HotStoreAction::Insert(InsertAction::InsertData(insert.clone())), insert)
+    }
+
+    fn insert_join(s: i32) -> InsertJoins<String> {
+        InsertJoins {
+            channel: format!("{}{}", test_channel_joins_prefix(), s),
+            joins: join(s),
+        }
+    }
+
+    fn insert_continuation(s: i32) -> InsertContinuations<String, String, String> {
+        InsertContinuations {
+            channels: vec![format!("{}{}", test_channel_continuations_prefix(), s)],
+            continuations: vec![continuation(s)],
+        }
+    }
+
+    fn join(s: i32) -> Vec<Vec<String>> {
+        vec![
+            vec![format!("abc{}", s), format!("def{}", s)],
+            vec![format!("wer{}", s), format!("tre{}", s)],
+        ]
+    }
+
+    fn continuation(s: i32) -> WaitingContinuation<String, String> {
+        WaitingContinuation {
+            patterns: vec![format!("pattern-{}", s)],
+            continuation: format!("cont-{}", s),
+            persist: true,
+            peeks: BTreeSet::new(),
+            source: Consume {
+                channel_hashes: vec![random_blake()],
+                hash: random_blake(),
+                persistent: true,
+            },
+        }
+    }
+
+    fn datum(s: i32) -> Datum<String> {
+        Datum {
+            a: format!("data-{}", s),
+            persist: false,
+            source: Produce {
+                channel_hash: random_blake(),
+                hash: random_blake(),
+                persistent: false,
+            },
+        }
+    }
 
     fn create_empty_repository() -> HistoryRepositoryImpl<String, String, String, String> {
         let past_roots = root_repository();
