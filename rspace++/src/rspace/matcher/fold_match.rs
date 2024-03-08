@@ -21,7 +21,7 @@ impl FoldMatch<Par, Par> for SpatialMatcherContext {
         plist: Vec<Par>,
         remainder: Option<Var>,
     ) -> Option<Vec<Par>> {
-        println!("\nHit fold_match");
+        // println!("\nHit fold_match");
         // println!("\ntlist: {:?}", tlist);
         // println!("\nplist: {:?}", plist);
 
@@ -48,11 +48,11 @@ impl FoldMatch<Par, Par> for SpatialMatcherContext {
             },
 
             ([t, trem @ ..], [p, prem @ ..]) => {
-                println!("\ncalling spatial_match in fold_match");
+                // println!("\ncalling spatial_match in fold_match");
                 // println!("trem: {:?}", trem);
-                println!("\nt: {:?}", t);
+                // println!("\nt: {:?}", t);
                 // println!("prem: {:?}", prem);
-                println!("\np: {:?}", p);
+                // println!("\np: {:?}", p);
 
                 self.spatial_match(t.to_owned(), p.to_owned())
                     .and_then(|_| self.fold_match(trem.to_vec(), prem.to_vec(), remainder))

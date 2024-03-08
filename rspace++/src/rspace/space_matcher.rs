@@ -55,10 +55,10 @@ where
                 remaining,
             )) => match self.matcher.get(pattern.clone(), match_candidate.clone()) {
                 Some(mat) => {
-                    println!("\npattern: {:?}", pattern);
-                    println!("\nmatch_candidate: {:?}", match_candidate);
+                    // println!("\npattern: {:?}", pattern);
+                    // println!("\nmatch_candidate: {:?}", match_candidate);
 
-                    println!("\nmatch found! Match: {:?}", mat);
+                    // println!("\nmatch found! Match: {:?}", mat);
 
                     let indexed_datums = if *persist {
                         data.clone()

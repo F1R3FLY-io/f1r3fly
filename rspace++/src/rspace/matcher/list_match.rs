@@ -66,7 +66,7 @@ macro_rules! list_match {
                   wildcard: bool,
               ) -> Option<()> {
 
-                println!("\nHit list_match_single_");
+                // println!("\nHit list_match_single_");
                 // println!("\ntlist: {:#?}", tlist);
                 // println!("\nplist: {:#?}", plist);
                 // let merger_type_name = std::any::type_name::<&dyn Fn(Par, Vec<$type>) -> Par>();
@@ -79,14 +79,14 @@ macro_rules! list_match {
                 let tlen = tlist.len();
 
                 let result: Option<()> = if exact_match && plen != tlen {
-                    println!("\nreturning None in list_match_single_");
+                    // println!("\nreturning None in list_match_single_");
                     None
                 } else if plen > tlen {
-                    println!("\nreturning None in list_match_single_");
+                    // println!("\nreturning None in list_match_single_");
                     None
                 } else if plen == 0 && tlen == 0 && remainder.is_none() {
-                    println!("\ncurrent free_map: {:?}", self.free_map);
-                    println!("\nreturning Some in list_match_single_");
+                    // println!("\ncurrent free_map: {:?}", self.free_map);
+                    // println!("\nreturning Some in list_match_single_");
                     Some(())
                 } else if plen == 0 && remainder.is_some() {
                     if tlist
@@ -95,7 +95,7 @@ macro_rules! list_match {
                     {
                         self.handle_remainder(tlist, remainder.unwrap(), merger)
                     } else {
-                        println!("\nreturning None in list_match_single_");
+                        // println!("\nreturning None in list_match_single_");
                         None
                     }
                 } else {
@@ -115,9 +115,9 @@ macro_rules! list_match {
                   remainder: Option<i32>,
                   wildcard: bool,
               ) -> Option<()> {
-                println!("\nHit list_match");
-                println!("\nlist_match targets: {:?}", targets);
-                println!("\nlist_match patterns: {:?}", patterns);
+                // println!("\nHit list_match");
+                // println!("\nlist_match targets: {:?}", targets);
+                // println!("\nlist_match patterns: {:?}", patterns);
 
                 let remainder_patterns: Vec<Pattern<$type>> = remainder
                     .map(|level| vec![Pattern::Remainder(level); targets.len() - patterns.len()])
@@ -137,7 +137,7 @@ macro_rules! list_match {
                 let matches = maximum_bipartite_match.find_matches(all_patterns, targets.clone())?;
 
                 // println!("\nfree_map after MBM: {:?}", self.free_map);
-                println!("\nmatches: {:?}", matches);
+                // println!("\nmatches: {:?}", matches);
 
                 let free_maps: Vec<FreeMap> = matches
                     .iter()
@@ -145,9 +145,9 @@ macro_rules! list_match {
                     .collect();
 
                 let updated_free_map = aggregate_updates(self.free_map.clone(), free_maps)?;
-                println!("\nsetting free_map in list_match");
+                // println!("\nsetting free_map in list_match");
                 self.free_map = updated_free_map;
-                println!("\nnew free_map: {:?}", self.free_map);
+                // println!("\nnew free_map: {:?}", self.free_map);
 
                 let remainder_targets: Vec<$type> = matches
                     .iter()
@@ -201,7 +201,7 @@ macro_rules! list_match {
 
                 // println!("\nremainder_par_updated: {:#?}", remainder_par_updated);
 
-                println!("\nmodifying free_map in handle_remainder");
+                // println!("\nmodifying free_map in handle_remainder");
                 self.free_map.insert(level, remainder_par_updated);
                 // println!("\ncurrent free_map: {:#?}", self.free_map);
 
@@ -222,7 +222,7 @@ macro_rules! list_match {
                      if !self.connective_used(p.clone()) {
                          guard(t == p)
                       } else {
-                        println!("\ncalling spatial_match in match_function");
+                        // println!("\ncalling spatial_match in match_function");
                         // println!("\nt in match_function: {:#?}", t);
                         // println!("\np in match_function: {:#?}", p);
                          self.spatial_match(t, p)
