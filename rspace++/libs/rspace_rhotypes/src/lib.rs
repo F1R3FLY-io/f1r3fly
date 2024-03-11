@@ -8,7 +8,8 @@ use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreMana
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    Channels, CheckpointProto, Datums, Join, Joins, WaitingContinuations,
+    ChannelProto, CheckpointProto, DatumsProto, JoinProto, JoinsProto, StoreToMapValue,
+    WaitingContinuationsProto,
 };
 
 /*
@@ -290,7 +291,7 @@ pub extern "C" fn get_data(
             })
             .collect();
 
-        let datums_proto = Datums {
+        let datums_proto = DatumsProto {
             datums: datums_protos,
         };
 
@@ -311,14 +312,14 @@ pub extern "C" fn get_waiting_continuations(
 ) -> *const u8 {
     let channels_slice =
         unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
-    let channels_proto = Channels::decode(channels_slice).unwrap();
+    let channels_proto = ChannelProto::decode(channels_slice).unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let wks = unsafe {
             (*rspace)
                 .rspace
-                .get_waiting_continuations(channels_proto.channels)
+                .get_waiting_continuations(channels_proto.channel)
                 .await
         };
 
@@ -346,7 +347,7 @@ pub extern "C" fn get_waiting_continuations(
             })
             .collect();
 
-        let wks_proto = WaitingContinuations { wks: wks_protos };
+        let wks_proto = WaitingContinuationsProto { wks: wks_protos };
 
         let mut bytes = wks_proto.encode_to_vec();
         let len = bytes.len() as u32;
@@ -369,8 +370,8 @@ pub extern "C" fn get_joins(
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let joins = unsafe { (*rspace).rspace.get_joins(channel).await };
-        let vec_join: Vec<Join> = joins.into_iter().map(|join| Join { join }).collect();
-        let joins_proto = Joins { joins: vec_join };
+        let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+        let joins_proto = JoinsProto { joins: vec_join };
 
         let mut bytes = joins_proto.encode_to_vec();
         let len = bytes.len() as u32;
@@ -386,7 +387,7 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let hot_store_mapped = unsafe { (*rspace).rspace.store.to_map().await };
-        let mut map_entries: Vec<MapEntry> = Vec::new();
+        let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
 
         for (key, value) in hot_store_mapped {
             let datums = value
@@ -428,14 +429,14 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                 })
                 .collect();
 
-            let row = ProtobufRow { data: datums, wks };
-            map_entries.push(MapEntry {
+            let value = StoreToMapValue { data: datums, wks };
+            map_entries.push(StoreToMapEntry {
                 key,
-                value: Some(row),
+                value: Some(value),
             });
         }
 
-        let to_map_result = ToMapResult { map_entries };
+        let to_map_result = StoreToMapResult { map_entries };
 
         let mut bytes = to_map_result.encode_to_vec();
         let len = bytes.len() as u32;

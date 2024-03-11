@@ -32,6 +32,6 @@ pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
     ActionResult, ContResultProto, RSpaceResultProto,
 };
 pub use crate::rspace_plus_plus_types::rspace_plus_plus_types::{
-    ConsumeProto, ConsumeParams, DatumProto, FreeMapProto, InstallParams, MapEntry, ProduceProto, ProtobufRow,
-    SortedSetElement, ToMapResult, WaitingContinuationProto,
+    ConsumeParams, ConsumeProto, DatumProto, FreeMapProto, InstallParams, ProduceProto,
+    SortedSetElement, StoreToMapEntry, StoreToMapResult, WaitingContinuationProto,
 };

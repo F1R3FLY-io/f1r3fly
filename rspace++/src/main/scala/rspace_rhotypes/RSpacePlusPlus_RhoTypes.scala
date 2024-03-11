@@ -5,15 +5,15 @@ import cats.implicits._
 import com.sun.jna.{Memory, Native, Pointer}
 import coop.rchain.models.rspace_plus_plus_types.{
   ActionResult,
-  Channels,
   ConsumeParams,
-  Datums,
+  DatumsProto,
   FreeMapProto,
   InstallParams,
-  Joins,
+  JoinsProto,
   SortedSetElement,
-  ToMapResult,
-  WaitingContinuations
+  StoreToMapResult,
+  WaitingContinuationsProto,
+	ChannelProto
 }
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import scala.collection.SortedSet
@@ -374,7 +374,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 
                    try {
                      val resultBytes  = getDataResultPtr.getByteArray(4, resultByteslength)
-                     val datumsProto  = Datums.parseFrom(resultBytes)
+                     val datumsProto  = DatumsProto.parseFrom(resultBytes)
                      val datumsProtos = datumsProto.datums
 
                      val datums: Seq[Datum[A]] =
@@ -414,7 +414,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def getWaitingContinuations(channels: Seq[C]): F[Seq[WaitingContinuation[P, K]]] =
     for {
       result <- Sync[F].delay {
-                 val channelsProto = Channels(channels)
+                 val channelsProto = ChannelProto(channels)
                  val channelsBytes = channelsProto.toByteArray
 
                  val payloadMemory = new Memory(channelsBytes.length.toLong)
@@ -436,7 +436,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                    try {
                      val resultBytes =
                        getWaitingContinuationResultPtr.getByteArray(4, resultByteslength)
-                     val wksProto  = WaitingContinuations.parseFrom(resultBytes)
+                     val wksProto  = WaitingContinuationsProto.parseFrom(resultBytes)
                      val wksProtos = wksProto.wks
 
                      val wks: Seq[WaitingContinuation[P, K]] =
@@ -498,7 +498,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 
                    try {
                      val resultBytes = getJoinsResultPtr.getByteArray(4, resultByteslength)
-                     val joinsProto  = Joins.parseFrom(resultBytes)
+                     val joinsProto  = JoinsProto.parseFrom(resultBytes)
                      val joinsProtos = joinsProto.joins
 
                      val joins: Seq[Seq[C]] =
@@ -522,7 +522,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
     val byteArrayPtr = INSTANCE.to_map(rspacePointer)
     val length       = byteArrayPtr.getInt(0)
     val resultBytes  = byteArrayPtr.getByteArray(4, length)
-    val toMapResult  = ToMapResult.parseFrom(resultBytes)
+    val toMapResult  = StoreToMapResult.parseFrom(resultBytes)
 
     Sync[F].delay {
       val map = toMapResult.mapEntries.map { mapEntry =>

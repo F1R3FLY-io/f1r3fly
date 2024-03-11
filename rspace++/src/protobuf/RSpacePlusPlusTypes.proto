@@ -97,21 +97,21 @@ message ConsumeProto {
   bool persistent = 3;
 }
 
-message ProtobufRow {
+message StoreToMapValue {
   repeated DatumProto data = 1;
   repeated WaitingContinuationProto wks = 2;
 }
 
-message MapEntry {
+message StoreToMapEntry {
   repeated rhotypes.Par key = 1;
-  ProtobufRow value = 2;
+  StoreToMapValue value = 2;
 }
 
 /**
  * Return type for 'to_map' / 'toMap'
  */
-message ToMapResult {
-  repeated MapEntry mapEntries = 1;
+message StoreToMapResult {
+  repeated StoreToMapEntry mapEntries = 1;
 }
 
 /**
@@ -150,47 +150,73 @@ message CheckpointProto {
   bytes root = 1;
 }
 
-message Datums {
+message ChannelProto {
+  repeated rhotypes.Par channel = 1;
+}
+
+message DatumsProto {
   repeated DatumProto datums = 1;
 }
 
-message WaitingContinuations {
+message WaitingContinuationsProto {
   repeated WaitingContinuationProto wks = 1;
 }
 
-message Join {
+message JoinProto {
   repeated rhotypes.Par join = 1;
 }
 
-message Joins {
-  repeated Join joins = 1;
-}
-
-message Channels {
-  repeated rhotypes.Par channels = 1;
-}
-
-message RepeatedChannels {
-  repeated Channels channels = 1;
+message JoinsProto {
+  repeated JoinProto joins = 1;
 }
 
 /**
  * Protobuf message representation of 'HotStoreState'
  */
-// message HotStoreState {
-//   map<Channels, rhotypes.Par> continuations = 1;
-//   map<Channels, WaitingContinuationProto> installed_continuations = 2;
-//   map<rhotypes.Par, Datums> data = 3;
-//   map<rhotypes.Par, RepeatedChannels> joins = 4;
-//   map<rhotypes.Par, RepeatedChannels> installed_joins = 5;
-// }
+message HotStoreStateProto {
+  repeated StoreStateContMapEntry continuations = 1;
+  repeated StoreStateInstalledContMapEntry installed_continuations = 2;
+  repeated StoreStateDataMapEntry data = 3;
+  repeated StoreStateJoinsMapEntry joins = 4;
+  repeated StoreStateInstalledJoinsMapEntry installed_joins = 5;
+}
+
+message StoreStateContMapEntry {
+  repeated rhotypes.Par key = 1;
+  repeated WaitingContinuationProto value = 2;
+}
+
+message StoreStateInstalledContMapEntry {
+  repeated rhotypes.Par key = 1;
+  WaitingContinuationProto value = 2;
+}
+
+message StoreStateDataMapEntry {
+  rhotypes.Par key = 1;
+  repeated DatumProto value = 2;
+}
+
+message StoreStateJoinsMapEntry {
+  rhotypes.Par key = 1;
+  repeated ChannelProto value = 2;
+}
+
+message StoreStateInstalledJoinsMapEntry {
+  rhotypes.Par key = 1;
+  repeated ChannelProto value = 2;
+}
+
+message ProduceCounterMapEntry {
+  ProduceProto key = 1;
+  int32 value = 2;
+}
 
 /**
  * Protobuf message representation of 'SoftCheckpoint'
  *
  * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
  */
-// message SoftCheckpoint {
-//   HotStoreState cache_snapshot = 1;
-//   map<ProduceProto, int32> produce_counter = 2;
-// }
+message SoftCheckpoint {
+  HotStoreStateProto cache_snapshot = 1;
+  repeated ProduceCounterMapEntry produce_counter = 2;
+}
