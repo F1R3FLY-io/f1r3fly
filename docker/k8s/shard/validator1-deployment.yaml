@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose -f docker/shard.yml convert -o ./docker/k8s/shard/
+    kompose.version: 1.32.0 (HEAD)
+  labels:
+    io.kompose.service: validator1
+  name: validator1
+  namespace: f1r3fly
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: validator1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose -f docker/shard.yml convert -o ./docker/k8s/shard/
+        kompose.version: 1.32.0 (HEAD)
+      labels:
+        io.kompose.network/docker-f1r3fly: "true"
+        io.kompose.service: validator1
+    spec:
+      #imagePullSecrets:
+        #- name: ghcr-login-secret
+      containers:
+        - args:
+            - run
+            - --host=
+            - --validator-private-key=2c02138097d019d263c1d5383fcaddb1ba6416a0f4e64e3a617fe3af45b7851d
+            - -Dlogback.configurationFile=/var/lib/rnode/logback.xml
+          image: ghcr.io/f1r3fly-io/rnode:latest
+          #image: rchain/rnode:latest
+          name: validator1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 40400
+              hostPort: 50400
+              protocol: TCP
+            - containerPort: 40401
+              hostPort: 50401
+              protocol: TCP
+            - containerPort: 40402
+              hostPort: 50402
+              protocol: TCP
+            - containerPort: 40403
+              hostPort: 50403
+              protocol: TCP
+            - containerPort: 40404
+              hostPort: 50404
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/rnode
+              name: validator1-claim0
+            - name: validator1-configmap
+              mountPath: /var/lib/rnode/genesis/wallets.txt
+              subPath: wallets.txt
+            - name: validator1-configmap
+              mountPath: /var/lib/rnode/genesis/bonds.txt
+              subPath: bonds.txt
+            - name: validator1-configmap
+              mountPath: /var/lib/rnode/rnode.conf
+              subPath: validator1.conf
+            - name: validator1-configmap
+              mountPath: /var/lib/rnode/logback.xml
+              subPath: logback.xml
+      restartPolicy: Always
+      volumes:
+        - name: validator1-claim0
+          persistentVolumeClaim:
+            claimName: validator1-claim0
+        - name: validator1-configmap
+          configMap:
+            name: validator1-configmap
