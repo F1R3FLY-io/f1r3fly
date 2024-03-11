@@ -53,7 +53,9 @@ I have classified these as "working" if the output and deployment cost matches t
 
 ### Testing Rust (within rspace++ directory)
 
-- Run all Spatial Matcher Tests: `cargo test matcher::match_test -- --test-threads=1`
+Run all tests: `cargo test`
+
+- Run Spatial Matcher Tests: `cargo test matcher::match_test -- --test-threads=1`
 - Run Storage Actions Tests: `cargo test --test storage_actions_test`
 - Run History Action Tests: `cargo test history::history_action_tests`
 - Run History Repository Tests: `cargo test history::history_repository_tests`

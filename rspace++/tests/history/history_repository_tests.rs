@@ -250,21 +250,21 @@ mod tests {
             .iter()
             .map(|d| deleted_reader.get_data(&d.channel))
             .collect();
-        assert!(fetched_data.is_empty());
+        assert!(fetched_data.iter().flatten().collect::<Vec<_>>().is_empty());
 
         let fetched_conts: Vec<Vec<WaitingContinuation<String, String>>> = conts
             .1
             .iter()
             .map(|c| deleted_reader.get_continuations(&c.channels))
             .collect();
-        assert!(fetched_conts.is_empty());
+        assert!(fetched_conts.iter().flatten().collect::<Vec<_>>().is_empty());
 
         let fetched_joins: Vec<Vec<Vec<String>>> = joins
             .1
             .iter()
             .map(|j| deleted_reader.get_joins(&j.channel))
             .collect();
-        assert!(fetched_joins.is_empty());
+        assert!(fetched_joins.iter().flatten().collect::<Vec<_>>().is_empty());
     }
 
     #[tokio::test]
