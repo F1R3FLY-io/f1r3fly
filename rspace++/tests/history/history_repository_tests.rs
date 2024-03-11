@@ -1,11 +1,7 @@
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeSet, HashSet},
-        sync::{Arc, Mutex},
-    };
-
+    use rand::prelude::SliceRandom;
     use rspace_plus_plus::rspace::{
         event::{Consume, Produce},
         hashing::blake3_hash::Blake3Hash,
@@ -18,7 +14,8 @@ mod tests {
             roots_store::{RootError, RootsStore},
         },
         hot_store_action::{
-            HotStoreAction, InsertAction, InsertContinuations, InsertData, InsertJoins,
+            DeleteAction, DeleteContinuations, DeleteData, DeleteJoins, HotStoreAction,
+            InsertAction, InsertContinuations, InsertData, InsertJoins,
         },
         internal::{Datum, WaitingContinuation},
         shared::{
@@ -30,8 +27,12 @@ mod tests {
         state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
         ByteVector,
     };
+    use std::{
+        collections::{BTreeSet, HashSet},
+        sync::{Arc, Mutex},
+    };
 
-    use crate::history::history_action_tests::random_blake;
+    use crate::history::history_action_tests::{random_blake, zeros_blake};
 
     #[tokio::test]
     async fn history_repository_should_process_insert_one_datum() {
@@ -105,6 +106,199 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_elements() {
+        let repo = create_empty_repository();
+
+        let data: (Vec<_>, Vec<_>) = (0..=10).map(insert_datum).unzip();
+        let joins: (Vec<_>, Vec<_>) = (0..=10).map(insert_join).unzip();
+        let conts: (Vec<_>, Vec<_>) = (0..=10).map(insert_continuation).unzip();
+
+        let mut elems: Vec<_> = [&data.0[..], &joins.0[..], &conts.0[..]].concat();
+        let mut rng = rand::thread_rng();
+        elems.shuffle(&mut rng);
+
+        let data_delete: Vec<_> = data
+            .clone()
+            .1
+            .into_iter()
+            .map(|d| {
+                HotStoreAction::<String, String, String, String>::Delete(DeleteAction::DeleteData(
+                    DeleteData { channel: d.channel },
+                ))
+            })
+            .collect();
+
+        let joins_delete: Vec<_> = joins
+            .clone()
+            .1
+            .into_iter()
+            .map(|j| {
+                HotStoreAction::Delete(DeleteAction::DeleteJoins(DeleteJoins {
+                    channel: j.channel,
+                }))
+            })
+            .collect();
+
+        let conts_delete: Vec<_> = conts
+            .clone()
+            .1
+            .into_iter()
+            .map(|c| {
+                HotStoreAction::Delete(DeleteAction::DeleteContinuations(DeleteContinuations {
+                    channels: c.channels,
+                }))
+            })
+            .collect();
+
+        let delete_elems: Vec<_> =
+            [&data_delete[..], &joins_delete[..], &conts_delete[..]].concat();
+
+        let next_repo = repo.checkpoint(&elems).await;
+        let history_reader = next_repo.get_history_reader(next_repo.root()).unwrap();
+        let next_reader = history_reader.base();
+
+        let fetched_data: Vec<Vec<Datum<String>>> = data
+            .1
+            .iter()
+            .map(|d| next_reader.get_data(&d.channel))
+            .collect();
+        assert_eq!(
+            fetched_data,
+            data.1
+                .clone()
+                .into_iter()
+                .map(|d| d.data)
+                .collect::<Vec<_>>()
+        );
+
+        let fetched_conts: Vec<Vec<WaitingContinuation<String, String>>> = conts
+            .1
+            .iter()
+            .map(|c| next_reader.get_continuations(&c.channels))
+            .collect();
+        assert_eq!(
+            fetched_conts,
+            conts
+                .1
+                .clone()
+                .into_iter()
+                .map(|c| c.continuations)
+                .collect::<Vec<_>>()
+        );
+
+        let fetched_joins: Vec<Vec<Vec<String>>> = joins
+            .1
+            .iter()
+            .map(|j| next_reader.get_joins(&j.channel))
+            .collect();
+        let all_joins = HashSet::<String>::from_iter(fetched_joins.into_iter().flatten().flatten());
+        let expected_joins: HashSet<String> = joins
+            .clone()
+            .1
+            .into_iter()
+            .flat_map(|j: InsertJoins<String>| j.joins.into_iter())
+            .flatten()
+            .collect();
+        assert_eq!(all_joins, expected_joins);
+
+        let deleted_repo = next_repo.checkpoint(&delete_elems).await;
+        let history_reader = deleted_repo
+            .get_history_reader(deleted_repo.root())
+            .unwrap();
+        let deleted_reader = history_reader.base();
+
+        let fetched_data: Vec<Vec<Datum<String>>> = data
+            .1
+            .iter()
+            .map(|d| next_reader.get_data(&d.channel))
+            .collect();
+        assert_eq!(
+            fetched_data,
+            data.1
+                .clone()
+                .into_iter()
+                .map(|d| d.data)
+                .collect::<Vec<_>>()
+        );
+
+        let fetched_conts: Vec<Vec<WaitingContinuation<String, String>>> = conts
+            .1
+            .iter()
+            .map(|c| next_reader.get_continuations(&c.channels))
+            .collect();
+        assert_eq!(
+            fetched_conts,
+            conts
+                .1
+                .clone()
+                .into_iter()
+                .map(|c| c.continuations)
+                .collect::<Vec<_>>()
+        );
+
+        let fetched_joins: Vec<Vec<Vec<String>>> = joins
+            .1
+            .iter()
+            .map(|j| next_reader.get_joins(&j.channel))
+            .collect();
+        let all_joins = HashSet::<String>::from_iter(fetched_joins.into_iter().flatten().flatten());
+        assert_eq!(all_joins, expected_joins);
+
+        let fetched_data: Vec<Vec<Datum<String>>> = data
+            .1
+            .iter()
+            .map(|d| deleted_reader.get_data(&d.channel))
+            .collect();
+        assert!(fetched_data.is_empty());
+
+        let fetched_conts: Vec<Vec<WaitingContinuation<String, String>>> = conts
+            .1
+            .iter()
+            .map(|c| deleted_reader.get_continuations(&c.channels))
+            .collect();
+        assert!(fetched_conts.is_empty());
+
+        let fetched_joins: Vec<Vec<Vec<String>>> = joins
+            .1
+            .iter()
+            .map(|j| deleted_reader.get_joins(&j.channel))
+            .collect();
+        assert!(fetched_joins.is_empty());
+    }
+
+    #[tokio::test]
+    async fn history_repository_should_not_allow_switching_to_a_not_existing_root() {
+        let repo = create_empty_repository();
+
+        match repo.reset(&zeros_blake()) {
+            Ok(_) => assert!(false, "Expected a failure"),
+            // Err(RootError::UnknownRootError(err)) => assert_eq!(err, "unknown root"),
+            Err(err) => {
+                println!("{}", err);
+                assert!(false, "wrong error")
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn history_repository_should_record_next_root_as_valid() {
+        let repo = create_empty_repository();
+        let test_datum = datum(1);
+        let insert_data = InsertData {
+            channel: test_channel_data_prefix(),
+            data: vec![test_datum.clone()],
+        };
+
+        let next_repo = repo
+            .checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))])
+            .await;
+        let _ = repo.reset(&RadixHistory::empty_root_node_hash());
+        let binding = next_repo.history();
+        let next_repo_history = binding.lock().expect("Failed to acquire history lock");
+        let _ = repo.reset(&next_repo_history.root());
+    }
+
     fn test_channel_data_prefix() -> String {
         "channel-data".to_string()
     }
@@ -128,18 +322,27 @@ mod tests {
         (HotStoreAction::Insert(InsertAction::InsertData(insert.clone())), insert)
     }
 
-    fn insert_join(s: i32) -> InsertJoins<String> {
-        InsertJoins {
+    fn insert_join(
+        s: i32,
+    ) -> (HotStoreAction<String, String, String, String>, InsertJoins<String>) {
+        let insert = InsertJoins {
             channel: format!("{}{}", test_channel_joins_prefix(), s),
             joins: join(s),
-        }
+        };
+
+        (HotStoreAction::Insert(InsertAction::InsertJoins(insert.clone())), insert)
     }
 
-    fn insert_continuation(s: i32) -> InsertContinuations<String, String, String> {
-        InsertContinuations {
+    fn insert_continuation(
+        s: i32,
+    ) -> (HotStoreAction<String, String, String, String>, InsertContinuations<String, String, String>)
+    {
+        let insert = InsertContinuations {
             channels: vec![format!("{}{}", test_channel_continuations_prefix(), s)],
             continuations: vec![continuation(s)],
-        }
+        };
+
+        (HotStoreAction::Insert(InsertAction::InsertContinuations(insert.clone())), insert)
     }
 
     fn join(s: i32) -> Vec<Vec<String>> {
@@ -260,23 +463,23 @@ mod tests {
     impl TrieExporter for EmptyExporter {
         fn get_nodes(
             &self,
-            start_path: NodePath,
-            skip: usize,
-            take: usize,
+            _start_path: NodePath,
+            _skip: usize,
+            _take: usize,
         ) -> Vec<TrieNode<KeyHash>> {
             todo!()
         }
 
         fn get_history_items(
             &self,
-            keys: Vec<KeyHash>,
+            _keys: Vec<KeyHash>,
         ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
             todo!()
         }
 
         fn get_data_items(
             &self,
-            keys: Vec<KeyHash>,
+            _keys: Vec<KeyHash>,
         ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
             todo!()
         }
@@ -285,21 +488,21 @@ mod tests {
     struct EmptyImporter;
 
     impl RSpaceImporter for EmptyImporter {
-        fn get_history_item(&self, hash: KeyHash) -> Option<ByteVector> {
+        fn get_history_item(&self, _hash: KeyHash) -> Option<ByteVector> {
             todo!()
         }
     }
 
     impl TrieImporter for EmptyImporter {
-        fn set_history_items(&self, data: Vec<(KeyHash, Value)>) -> () {
+        fn set_history_items(&self, _data: Vec<(KeyHash, Value)>) -> () {
             todo!()
         }
 
-        fn set_data_items(&self, data: Vec<(KeyHash, Value)>) -> () {
+        fn set_data_items(&self, _data: Vec<(KeyHash, Value)>) -> () {
             todo!()
         }
 
-        fn set_root(&self, key: &KeyHash) -> () {
+        fn set_root(&self, _key: &KeyHash) -> () {
             todo!()
         }
     }

@@ -537,3 +537,8 @@ pub fn random_blake() -> Blake3Hash {
             .into_bytes(),
     )
 }
+
+pub fn zeros_blake() -> Blake3Hash {
+    let zero_bytes = vec![0u8; 32];
+    Blake3Hash::new(&zero_bytes)
+}
