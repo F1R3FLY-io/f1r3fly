@@ -385,7 +385,7 @@ where
             .roots_repository
             .lock()
             .expect("History Repository Impl: Unable to acquire roots repository lock");
-        let _ = roots_lock.validate_and_set_current_root(root.clone());
+        roots_lock.validate_and_set_current_root(root.clone())?;
 
         let history_lock = self
             .current_history

@@ -6,7 +6,7 @@ mod tests {
         event::{Consume, Produce},
         hashing::blake3_hash::Blake3Hash,
         history::{
-            history::HistoryInstances,
+            history::{HistoryError, HistoryInstances},
             history_repository::HistoryRepository,
             history_repository_impl::HistoryRepositoryImpl,
             instances::radix_history::RadixHistory,
@@ -272,12 +272,11 @@ mod tests {
         let repo = create_empty_repository();
 
         match repo.reset(&zeros_blake()) {
-            Ok(_) => assert!(false, "Expected a failure"),
-            // Err(RootError::UnknownRootError(err)) => assert_eq!(err, "unknown root"),
-            Err(err) => {
-                println!("{}", err);
-                assert!(false, "wrong error")
+            Err(HistoryError::RootError(RootError::UnknownRootError(err))) => {
+                assert_eq!(err, "unknown root")
             }
+            Ok(_) => assert!(false, "Expected a failure"),
+            _ => assert!(false, "Wrong error thrown"),
         }
     }
 

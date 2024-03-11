@@ -5,6 +5,7 @@ use crate::rspace::{hashing::blake3_hash::Blake3Hash, shared::key_value_store::K
 use std::sync::{Arc, Mutex};
 
 use super::radix_tree::RadixTreeError;
+use super::roots_store::RootError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/History.scala
 pub trait History: Send + Sync {
@@ -34,6 +35,7 @@ pub enum HistoryError {
     ActionError(String),
     RadixTreeError(RadixTreeError),
     KvStoreError(KvStoreError),
+    RootError(RootError),
 }
 
 impl std::fmt::Display for HistoryError {
@@ -42,6 +44,7 @@ impl std::fmt::Display for HistoryError {
             HistoryError::ActionError(err) => write!(f, "Actions Error: {}", err),
             HistoryError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
             HistoryError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
+            HistoryError::RootError(err) => write!(f, "Root Error: {}", err),
         }
     }
 }
@@ -55,5 +58,11 @@ impl From<RadixTreeError> for HistoryError {
 impl From<KvStoreError> for HistoryError {
     fn from(error: KvStoreError) -> Self {
         HistoryError::KvStoreError(error)
+    }
+}
+
+impl From<RootError> for HistoryError {
+    fn from(error: RootError) -> Self {
+        HistoryError::RootError(error)
     }
 }
