@@ -142,19 +142,13 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                    try {
                      val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
                      val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult = actionResult.contResult.getOrElse({
-                       Log[F].debug("ContResult is None")
-                       throw new RuntimeException("ContResult is None")
-                     })
-                     val results = actionResult.results
+                     val contResult   = actionResult.contResult.get
+                     val results      = actionResult.results
 
                      Some(
                        (
                          ContResult(
-                           continuation = contResult.continuation.getOrElse({
-                             Log[F].debug("ContResult is None")
-                             throw new RuntimeException("ContResult is None")
-                           }),
+                           continuation = contResult.continuation.get,
                            persistent = contResult.persistent,
                            channels = contResult.channels,
                            patterns = contResult.patterns,
@@ -163,18 +157,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                          results.map(
                            r =>
                              Result(
-                               channel = r.channel.getOrElse({
-                                 Log[F].debug("Channel is None in Seq[Result]")
-                                 throw new RuntimeException("Channel is None in Seq[Result]")
-                               }),
-                               matchedDatum = r.matchedDatum.getOrElse({
-                                 Log[F].debug("MatchedDatum is None in Seq[Result]")
-                                 throw new RuntimeException("MatchedDatum is None in Seq[Result]")
-                               }),
-                               removedDatum = r.removedDatum.getOrElse({
-                                 Log[F].debug("RemovedDatum is None in Seq[Result]")
-                                 throw new RuntimeException("RemovedDatum is None in Seq[Result]")
-                               }),
+                               channel = r.channel.get,
+                               matchedDatum = r.matchedDatum.get,
+                               removedDatum = r.removedDatum.get,
                                persistent = r.persistent
                              )
                          )
@@ -226,19 +211,13 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                    try {
                      val resultBytes  = consumeResultPtr.getByteArray(4, resultByteslength)
                      val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult = actionResult.contResult.getOrElse({
-                       Log[F].debug("ContResult is None")
-                       throw new RuntimeException("ContResult is None")
-                     })
-                     val results = actionResult.results
+                     val contResult   = actionResult.contResult.get
+                     val results      = actionResult.results
 
                      Some(
                        (
                          ContResult(
-                           continuation = contResult.continuation.getOrElse({
-                             Log[F].debug("ContResult is None")
-                             throw new RuntimeException("ContResult is None")
-                           }),
+                           continuation = contResult.continuation.get,
                            persistent = contResult.persistent,
                            channels = contResult.channels,
                            patterns = contResult.patterns,
@@ -247,18 +226,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                          results.map(
                            r =>
                              Result(
-                               channel = r.channel.getOrElse({
-                                 Log[F].debug("Channel is None in Seq[Result]")
-                                 throw new RuntimeException("Channel is None in Seq[Result]")
-                               }),
-                               matchedDatum = r.matchedDatum.getOrElse({
-                                 Log[F].debug("MatchedDatum is None in Seq[Result]")
-                                 throw new RuntimeException("MatchedDatum is None in Seq[Result]")
-                               }),
-                               removedDatum = r.removedDatum.getOrElse({
-                                 Log[F].debug("RemovedDatum is None in Seq[Result]")
-                                 throw new RuntimeException("RemovedDatum is None in Seq[Result]")
-                               }),
+                               channel = r.channel.get,
+                               matchedDatum = r.matchedDatum.get,
+                               removedDatum = r.removedDatum.get,
                                persistent = r.persistent
                              )
                          )
@@ -590,12 +560,11 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   }
 
   def createSoftCheckpoint(): F[SoftCheckpoint[C, P, A, K]] = {
-    val softCheckpointPtr   = INSTANCE.create_soft_checkpoint(rspacePointer)
-    val length              = softCheckpointPtr.getInt(0)
-    val softCheckpointBytes = softCheckpointPtr.getByteArray(4, length)
-    val softCheckpointProto = SoftCheckpointProto.parseFrom(softCheckpointBytes)
-
     Sync[F].delay {
+      val softCheckpointPtr   = INSTANCE.create_soft_checkpoint(rspacePointer)
+      val length              = softCheckpointPtr.getInt(0)
+      val softCheckpointBytes = softCheckpointPtr.getByteArray(4, length)
+      val softCheckpointProto = SoftCheckpointProto.parseFrom(softCheckpointBytes)
       val storeStateProto = softCheckpointProto.cacheSnapshot.get
 
       val continuationsMap = storeStateProto.continuations.map { mapEntry =>
@@ -713,7 +682,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
         (produce, value)
       }.toMap
 
-      val cacheSnapshot: HotStoreState[Par, BindPattern, ListParWithRandom, TaggedContinuation] =
+      val cacheSnapshot: HotStoreState[C, P, A, K] =
         HotStoreState(
           continuationsMap,
           installedContinuationsMap,

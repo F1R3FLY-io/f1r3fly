@@ -265,6 +265,13 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
     let root = Blake3Hash::new(root_slice);
 
     let _ = unsafe { (*rspace).rspace.reset(root) };
+
+    //   unsafe {
+    //     (*rspace)
+    //         .rspace
+    //         .reset(root)
+    //         .expect("Rust RSpacePlusPlus Library: Failed to reset")
+    // }
 }
 
 #[no_mangle]

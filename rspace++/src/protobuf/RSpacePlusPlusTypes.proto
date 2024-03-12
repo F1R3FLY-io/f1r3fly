@@ -175,10 +175,10 @@ message JoinsProto {
  */
 message HotStoreStateProto {
   repeated StoreStateContMapEntry continuations = 1;
-  repeated StoreStateInstalledContMapEntry installed_continuations = 2;
+  repeated StoreStateInstalledContMapEntry installedContinuations = 2;
   repeated StoreStateDataMapEntry data = 3;
   repeated StoreStateJoinsMapEntry joins = 4;
-  repeated StoreStateInstalledJoinsMapEntry installed_joins = 5;
+  repeated StoreStateInstalledJoinsMapEntry installedJoins = 5;
 }
 
 message StoreStateContMapEntry {
@@ -217,6 +217,6 @@ message ProduceCounterMapEntry {
  * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
  */
 message SoftCheckpointProto {
-  HotStoreStateProto cache_snapshot = 1;
-  repeated ProduceCounterMapEntry produce_counter = 2;
+  HotStoreStateProto cacheSnapshot = 1;
+  repeated ProduceCounterMapEntry produceCounter = 2;
 }

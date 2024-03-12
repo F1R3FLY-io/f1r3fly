@@ -7,8 +7,6 @@ import "scalapb/scalapb.proto";
 
 option (scalapb.options) = {
   package_name: "coop.rchain.models.rspace_plus_plus_types"
-  flat_package: true
-  single_file: true
   preserve_unknown_fields: false
 };
 

@@ -82,9 +82,9 @@ where
                     ))
                 }
                 None => {
-                    println!("\npattern: {:?}", pattern);
-                    println!("\nmatch_candidate: {:?}", match_candidate);
-                    println!("\nno match found!");
+                    // println!("\npattern: {:?}", pattern);
+                    // println!("\nmatch_candidate: {:?}", match_candidate);
+                    // println!("\nno match found!");
 
                     let mut new_prefix = prefix;
                     new_prefix.push((datum.clone(), *data_index));
