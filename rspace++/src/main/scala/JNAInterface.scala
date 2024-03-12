@@ -67,5 +67,7 @@ trait JNAInterface extends Library {
 
   def spawn(rspace: Pointer): Pointer
 
+  def create_soft_checkpoint(rspace: Pointer): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }

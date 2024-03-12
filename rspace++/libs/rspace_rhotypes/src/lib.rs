@@ -8,8 +8,10 @@ use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreMana
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    ChannelProto, CheckpointProto, DatumsProto, JoinProto, JoinsProto, StoreToMapValue,
-    WaitingContinuationsProto,
+    ChannelsProto, CheckpointProto, DatumsProto, HotStoreStateProto, JoinProto, JoinsProto,
+    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
+    StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
+    StoreToMapValue, WaitingContinuationsProto,
 };
 
 /*
@@ -312,14 +314,14 @@ pub extern "C" fn get_waiting_continuations(
 ) -> *const u8 {
     let channels_slice =
         unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
-    let channels_proto = ChannelProto::decode(channels_slice).unwrap();
+    let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let wks = unsafe {
             (*rspace)
                 .rspace
-                .get_waiting_continuations(channels_proto.channel)
+                .get_waiting_continuations(channels_proto.channels)
                 .await
         };
 
@@ -463,14 +465,151 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
     Box::into_raw(Box::new(Space { rspace }))
 }
 
-// #[no_mangle]
-// pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
-//     let rt = tokio::runtime::Runtime::new().unwrap();
-//     let soft_checkpoint =
-//         rt.block_on(async { unsafe { (*rspace).rspace.create_soft_checkpoint().await } });
+#[no_mangle]
+pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let soft_checkpoint = unsafe { (*rspace).rspace.create_soft_checkpoint().await };
 
-//     Box::into_raw(Box::new(Space { rspace }))
-// }
+        let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
+        let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
+        let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
+        let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
+        let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
+
+        let hot_store_state = soft_checkpoint.cache_snapshot.lock().await;
+
+        for (key, value) in hot_store_state.continuations.clone().into_iter() {
+            let wks: Vec<WaitingContinuationProto> = value
+                .into_iter()
+                .map(|wk| WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(wk.continuation),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
+                        .collect(),
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                })
+                .collect();
+
+            conts_map_entries.push(StoreStateContMapEntry { key, value: wks });
+        }
+
+        for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
+            let wk = WaitingContinuationProto {
+                patterns: value.patterns,
+                continuation: Some(value.continuation),
+                persist: value.persist,
+                peeks: value
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
+                    .collect(),
+                source: Some(ConsumeProto {
+                    channel_hashes: value
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: value.source.hash.bytes(),
+                    persistent: value.source.persistent,
+                }),
+            };
+
+            installed_conts_map_entries.push(StoreStateInstalledContMapEntry {
+                key,
+                value: Some(wk),
+            });
+        }
+
+        for (key, value) in hot_store_state.data.clone().into_iter() {
+            let datums = value
+                .into_iter()
+                .map(|datum| DatumProto {
+                    a: Some(datum.a),
+                    persist: datum.persist,
+                    source: Some(ProduceProto {
+                        channel_hash: datum.source.channel_hash.bytes(),
+                        hash: datum.source.hash.bytes(),
+                        persistent: datum.source.persistent,
+                    }),
+                })
+                .collect();
+
+            data_map_entries.push(StoreStateDataMapEntry {
+                key: Some(key),
+                value: datums,
+            });
+        }
+
+        for (key, value) in hot_store_state.joins.clone().into_iter() {
+            let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+
+            joins_map_entries.push(StoreStateJoinsMapEntry {
+                key: Some(key),
+                value: joins,
+            });
+        }
+
+        for (key, value) in hot_store_state.installed_joins.clone().into_iter() {
+            let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+
+            installed_joins_map_entries.push(StoreStateInstalledJoinsMapEntry {
+                key: Some(key),
+                value: joins,
+            });
+        }
+
+        let hot_store_state_proto = HotStoreStateProto {
+            continuations: conts_map_entries,
+            installed_continuations: installed_conts_map_entries,
+            data: data_map_entries,
+            joins: joins_map_entries,
+            installed_joins: installed_joins_map_entries,
+        };
+
+        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> = Vec::new();
+        let produce_counter_map = soft_checkpoint.produce_counter;
+
+        for (key, value) in produce_counter_map {
+            let produce = ProduceProto {
+                channel_hash: key.channel_hash.bytes(),
+                hash: key.hash.bytes(),
+                persistent: key.persistent,
+            };
+
+            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                key: Some(produce),
+                value,
+            });
+        }
+
+        let soft_checkpoint_proto = SoftCheckpointProto {
+            cache_snapshot: Some(hot_store_state_proto),
+            produce_counter: produce_counter_map_entries,
+        };
+
+        let mut bytes = soft_checkpoint_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
 
 #[no_mangle]
 pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {

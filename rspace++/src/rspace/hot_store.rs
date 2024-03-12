@@ -51,11 +51,11 @@ where
     P: Clone,
     K: Clone,
 {
-    continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
-    installed_continuations: DashMap<Vec<C>, WaitingContinuation<P, K>>,
-    data: DashMap<C, Vec<Datum<A>>>,
-    joins: DashMap<C, Vec<Vec<C>>>,
-    installed_joins: DashMap<C, Vec<Vec<C>>>,
+    pub continuations: DashMap<Vec<C>, Vec<WaitingContinuation<P, K>>>,
+    pub installed_continuations: DashMap<Vec<C>, WaitingContinuation<P, K>>,
+    pub data: DashMap<C, Vec<Datum<A>>>,
+    pub joins: DashMap<C, Vec<Vec<C>>>,
+    pub installed_joins: DashMap<C, Vec<Vec<C>>>,
 }
 
 #[derive(Default)]

@@ -150,8 +150,8 @@ message CheckpointProto {
   bytes root = 1;
 }
 
-message ChannelProto {
-  repeated rhotypes.Par channel = 1;
+message ChannelsProto {
+  repeated rhotypes.Par channels = 1;
 }
 
 message DatumsProto {
@@ -198,12 +198,12 @@ message StoreStateDataMapEntry {
 
 message StoreStateJoinsMapEntry {
   rhotypes.Par key = 1;
-  repeated ChannelProto value = 2;
+  repeated JoinProto value = 2;
 }
 
 message StoreStateInstalledJoinsMapEntry {
   rhotypes.Par key = 1;
-  repeated ChannelProto value = 2;
+  repeated JoinProto value = 2;
 }
 
 message ProduceCounterMapEntry {
@@ -216,7 +216,7 @@ message ProduceCounterMapEntry {
  *
  * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
  */
-message SoftCheckpoint {
+message SoftCheckpointProto {
   HotStoreStateProto cache_snapshot = 1;
   repeated ProduceCounterMapEntry produce_counter = 2;
 }
