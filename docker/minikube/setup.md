@@ -7,6 +7,7 @@ minikube start \
     --extra-config=apiserver.service-node-port-range=40400-40500 \
     --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434 \
     --driver=docker \
+    --addons='ingress,dashboard,metrics-server' \
     --cpus=8 \
     --memory=6g
 ```
@@ -45,6 +46,11 @@ kube-system   kube-scheduler-minikube            1/1     Running   0            
 kube-system   storage-provisioner                1/1     Running   1 (30m ago)   30m
 ```
 
+## Open Dashboard
+Open a dashboard, then picked f1r3fly namespace and check memory, cpu, and other information.
+```sh
+minikube dashboard
+```
 ## Cleanup
 Delete local Minikube if needed:
 ```sh
