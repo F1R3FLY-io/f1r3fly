@@ -1,14 +1,7 @@
 # Kubernetes deployment
 
-## Tips
-Define aliases for short commands:
-```sh
-# Execute or add to ~/.zshrc or ~/.bashrc
-alias k=kubectl
-```
-
 ## Namespace
-Create a separate deployment
+Create a separate namespace
 ```sh
 kubectl create ns f1r3fly
 
@@ -38,3 +31,7 @@ Delete namespace and k8s will delete all resources
 ```sh
 kubectl delete ns f1r3fly
 ```
+
+## Usefull links/tools
+- [kubectl cheat sheet](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
+- [Autocompletion and shortcuts for ZSH](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/kubectl)

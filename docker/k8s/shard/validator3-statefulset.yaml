@@ -27,6 +27,10 @@ spec:
           #image: rchain/rnode:latest
           name: validator3
           imagePullPolicy: Never
+          resources:
+            limits:
+              cpu: 2
+              memory: 1Gi
           ports:
             - containerPort: 40400
               protocol: TCP
