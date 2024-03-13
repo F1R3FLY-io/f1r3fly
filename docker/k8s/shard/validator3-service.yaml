@@ -1,29 +1,37 @@
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose -f docker/shard.yml convert -o ./docker/k8s/shard/
-    kompose.version: 1.32.0 (HEAD)
   labels:
-    io.kompose.service: validator3
+    app: validator3
   name: validator3
   namespace: f1r3fly
 spec:
+  type: NodePort
   ports:
-    - name: "60500"
-      port: 60500
+    - name: "40400"
+      protocol: TCP
+      port: 40400
       targetPort: 40400
-    - name: "60501"
-      port: 60501
+      nodePort: 40430
+    - name: "40401"
+      protocol: TCP
+      port: 40401
       targetPort: 40401
-    - name: "60502"
-      port: 60502
+      nodePort: 40431
+    - name: "40412"
+      protocol: TCP
+      port: 40402
       targetPort: 40402
-    - name: "60503"
-      port: 60503
+      nodePort: 40432
+    - name: "40403"
+      protocol: TCP
+      port: 40403
       targetPort: 40403
-    - name: "60504"
-      port: 60504
+      nodePort: 40433
+    - name: "40404"
+      protocol: TCP
+      port: 40404
       targetPort: 40404
+      nodePort: 40434
   selector:
-    io.kompose.service: validator3
+    app: validator3

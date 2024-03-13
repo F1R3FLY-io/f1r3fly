@@ -33,7 +33,7 @@ data:
       # address.
       # If this attribute is not set then node will try to guess its public IP address.
       # Note: actual protocol server is binded to "0.0.0.0"
-      #host = validator_2
+      #host = validator2-0.validator2
 
       # Allow `host` to be non publicly accessible address. Required for private networks installations.
       allow-private-addresses = true
@@ -81,7 +81,7 @@ data:
       # To manually generate one the following command can be used
       # ```openssl ec -text -in <path-to-tls-key>/node.key.pem | grep pub -A 5 | tail -n +2 | tr -d '\n[:space:]:' | \
       # sed 's/^04//' | keccak-256sum -x -l | tr -d ' -' | tail -c 41```
-      bootstrap = "rnode://138410b5da898936ec1dc13fafd4893950eb191b@rnode.bootstrap?protocol=40400&discovery=40404"
+      bootstrap = "rnode://138410b5da898936ec1dc13fafd4893950eb191b@bootstrap-0.bootstrap?protocol=40400&discovery=40404"
 
       # Disable the node to start from Last Finalized State, instead it will start from genesis.
       # If this is `true`, when a node without any data connecting to existing network, the node would start from
@@ -105,7 +105,7 @@ data:
     peers-discovery {
       # host name or IP address of this node
       # If this attribute is not set then the node will try to guess its IP address
-      #host = validator_2
+      #host = "validator2-0.validator2"
 
       # Port for Kademlia server
       port = 40404
@@ -128,8 +128,8 @@ data:
 
     api-server {
       # Hostname or IP to bind API servers
-      #host = "0.0.0.0"
-      #host = validator_2
+      #host = "validator2-0.validator2"
+      #host = validator_1
 
       # Port used for external gRPC API, exposes public API endpoints.
       port-grpc-external = 40401
@@ -208,7 +208,7 @@ data:
 
       # Base16 encoding of the private key to use for signing a proposed blocks.
       # It is not recommended to use in production since private key could be revealed through the process table.
-      validator-private-key = 2c02138097d019d263c1d5383fcaddb1ba6416a0f4e64e3a617fe3af45b7851d
+      validator-private-key = ${VALIDATOR2_PRIVATE_KEY}
 
       # Path to the base16 encoded private key to use for signing a proposed blocks.
       # validator-private-key-path =
@@ -372,6 +372,7 @@ data:
       # If set, on each propose node will add dummy deploy signed by this key.
       # deployer-private-key =
     }
+
   logback.xml: |
     <configuration>
 

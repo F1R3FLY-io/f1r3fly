@@ -1,83 +1,69 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  annotations:
-    kompose.cmd: kompose -f docker/shard.yml convert -o ./docker/k8s/shard/
-    kompose.version: 1.32.0 (HEAD)
   labels:
-    io.kompose.service: boot
-  name: boot
+    app: bootstrap
+  name: bootstrap
   namespace: f1r3fly
 spec:
+  serviceName: bootstrap
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: boot
-  strategy:
-    type: Recreate
+      app: bootstrap
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose -f docker/shard.yml convert -o ./docker/k8s/shard/
-        kompose.version: 1.32.0 (HEAD)
       labels:
-        io.kompose.network/docker-f1r3fly: "true"
-        io.kompose.service: boot
+        app: bootstrap
     spec:
       #imagePullSecrets:
         #- name: ghcr-login-secret
       containers:
         - args:
             - run
-#            - --host=$(MY_POD_IP)
-            - --allow-private-addresses
-            - --validator-private-key=5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657
+            - --host=bootstrap-0.bootstrap
             - -Dlogback.configurationFile=/var/lib/rnode/logback.xml
           image: ghcr.io/f1r3fly-io/rnode:latest
           #image: rchain/rnode:latest
-          name: boot
-#          env:
-#            - name: MY_POD_IP
-#              valueFrom:
-#                fieldRef:
-#                  fieldPath: status.podIP
+          name: bootstrap
           imagePullPolicy: Never
           ports:
             - containerPort: 40400
-              hostPort: 40400
               protocol: TCP
             - containerPort: 40401
-              hostPort: 40401
               protocol: TCP
             - containerPort: 40402
-              hostPort: 40402
               protocol: TCP
             - containerPort: 40403
-              hostPort: 40403
               protocol: TCP
             - containerPort: 40404
-              hostPort: 40404
               protocol: TCP
+          env:
+            - name: BOOTSTRAP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: private-keys
+                  key: BOOTSTRAP_PRIVATE_KEY
           volumeMounts:
             - mountPath: /var/lib/rnode
-              name: boot-claim0
-            - name: boot-configmap
+              name: bootstrap-claim0
+            - name: bootstrap-configmap
               mountPath: /var/lib/rnode/rnode.conf
               subPath: bootstrap.conf
-            - name: boot-configmap
+            - name: bootstrap-configmap
               mountPath: /var/lib/rnode/genesis/wallets.txt
               subPath: wallets.txt
-            - name: boot-configmap
+            - name: bootstrap-configmap
               mountPath: /var/lib/rnode/genesis/bonds.txt
               subPath: bonds.txt
-            - name: boot-configmap
+            - name: bootstrap-configmap
               mountPath: /var/lib/rnode/logback.xml
               subPath: logback.xml
       restartPolicy: Always
       volumes:
-        - name: boot-claim0
+        - name: bootstrap-claim0
           persistentVolumeClaim:
-            claimName: boot-claim0
-        - name: boot-configmap
+            claimName: bootstrap-claim0
+        - name: bootstrap-configmap
           configMap:
-            name: boot-configmap
+            name: bootstrap-configmap
