@@ -1,17 +1,17 @@
-pub use crate::rhotypes::rhotypes::connective::ConnectiveInstance::{
+pub use crate::rhoapi::rhoapi::connective::ConnectiveInstance::{
     ConnAndBody, ConnBool, ConnByteArray, ConnInt, ConnNotBody, ConnOrBody, ConnString, ConnUri,
     VarRefBody,
 };
-pub use crate::rhotypes::rhotypes::expr::ExprInstance::{
+pub use crate::rhoapi::rhoapi::expr::ExprInstance::{
     EAndBody, EDivBody, EEqBody, EGtBody, EGteBody, EListBody, ELtBody, ELteBody, EMapBody,
     EMatchesBody, EMethodBody, EMinusBody, EMinusMinusBody, EModBody, EMultBody, ENegBody,
     ENeqBody, ENotBody, EOrBody, EPercentPercentBody, EPlusBody, EPlusPlusBody, ESetBody,
     ETupleBody, EVarBody, GBool, GByteArray, GInt, GString, GUri,
 };
-pub use crate::rhotypes::rhotypes::g_unforgeable::UnfInstance::{GDeployerIdBody, GPrivateBody};
-pub use crate::rhotypes::rhotypes::var::VarInstance::{BoundVar, FreeVar, Wildcard};
-pub use crate::rhotypes::rhotypes::var::{VarInstance, WildcardMsg};
-pub use crate::rhotypes::rhotypes::{
+pub use crate::rhoapi::rhoapi::g_unforgeable::UnfInstance::{GDeployerIdBody, GPrivateBody};
+pub use crate::rhoapi::rhoapi::var::VarInstance::{BoundVar, FreeVar, Wildcard};
+pub use crate::rhoapi::rhoapi::var::{VarInstance, WildcardMsg};
+pub use crate::rhoapi::rhoapi::{
     BindPattern, Bundle, Connective, ConnectiveBody, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte,
     EMap, EMatches, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent,
     EPlus, EPlusPlus, ESet, ETuple, EVar, Expr, GPrivate, GUnforgeable, KeyValuePair,

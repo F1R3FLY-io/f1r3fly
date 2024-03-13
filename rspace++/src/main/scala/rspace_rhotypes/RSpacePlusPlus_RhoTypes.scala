@@ -565,7 +565,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
       val length              = softCheckpointPtr.getInt(0)
       val softCheckpointBytes = softCheckpointPtr.getByteArray(4, length)
       val softCheckpointProto = SoftCheckpointProto.parseFrom(softCheckpointBytes)
-      val storeStateProto = softCheckpointProto.cacheSnapshot.get
+      val storeStateProto     = softCheckpointProto.cacheSnapshot.get
 
       val continuationsMap = storeStateProto.continuations.map { mapEntry =>
         val key = mapEntry.key

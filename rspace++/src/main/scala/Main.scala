@@ -6,6 +6,7 @@ import io.circe.parser._
 import io.circe.generic.auto._
 import org.scalacheck.Gen
 import scala.collection.SortedSet
+import com.sun.jna.{Memory, Native, Pointer}
 
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.models.rspace_plus_plus_types.{SortedSetElement}
@@ -14,35 +15,34 @@ import cats.Id
 
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import scodec.bits.ByteVector
+import coop.rchain.models.rspace_plus_plus_types.StoreStateDataMapEntry
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val protobuf      = SortedSetElement(24)
-    val protobufBytes = protobuf.toByteArray
-    val byteVector    = ByteVector(protobufBytes)
-    val hash          = Blake2b256Hash.create(byteVector)
+    def testFunction(): Unit = {
+      System.setProperty("jna.library.path", "./rspace++/target/release/")
 
-    println("\n" + byteVector)
-    println("\nHash: " + hash)
+      // val currentDir = java.nio.file.Paths.get("").toAbsolutePath.toString
+      // println(s"Current directory: $currentDir")
 
-    // val rspace = new RSpacePlusPlus_16_RhoTypes();
-    // val rspace = new RSpacePlusPlus_RhoTypes[Id]();
+      // val jnaLibraryPath = System.getProperty("jna.library.path")
+      // println(s"Current jna.library.path: $jnaLibraryPath")
 
-    // val cres =
-    //   rspace.put_once_durable_sequential(myPars, Seq(myBindPattern), myTaggedContinuation)
-    // val pres = rspace.get_once_durable_sequential(myPar, myListParWithRandom)
-    // rspace.print()
-    // rspace.clear()
+      val INSTANCE: JNAInterface =
+        Native
+          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+          .asInstanceOf[JNAInterface]
 
-    // val r1 = rspace.produce(myPar, myListParWithRandom, false);
-    // println("r1: " + r1);
-    // rspace.print();
+      // val testFunctionPtr   = INSTANCE.test_function
+      // val length            = testFunctionPtr.getInt(0)
+      // val testFunctionBytes = testFunctionPtr.getByteArray(4, length)
+      // val testFunctionProto = StoreStateDataMapEntry.parseFrom(testFunctionBytes)
 
-    // val r2 =
-    //   rspace.consume(myPars, Seq(myBindPattern), myTaggedContinuation, false, SortedSet.empty[Int]);
-    // println("r2: " + r2);
-    // rspace.print();
+      // println(testFunctionProto)
 
-    // rspace.clear();
+    }
+
+    testFunction
   }
+
 }

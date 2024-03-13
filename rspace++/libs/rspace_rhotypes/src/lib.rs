@@ -547,7 +547,8 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
                 .into_iter()
                 .map(|datum| DatumProto {
                     a: Some(datum.a),
-                    persist: datum.persist,
+                    // TODO: Fix This bug
+                    persist: false,
                     source: Some(ProduceProto {
                         channel_hash: datum.source.channel_hash.bytes(),
                         hash: datum.source.hash.bytes(),

@@ -1,4 +1,4 @@
-use crate::rhotypes::rhotypes::Par;
+use crate::rhoapi::rhoapi::Par;
 use crate::rspace::matcher::par_count::ParCount;
 use itertools::Itertools;
 

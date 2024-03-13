@@ -3,6 +3,12 @@ syntax = "proto3";
 package rspace_plus_plus_types;
 
 import "protobuf/RhoTypes.proto";
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  package_name: "coop.rchain.models.rspace_plus_plus_types"
+  preserve_unknown_fields: false
+};
 
 /**
  * This is the first value of the tuple for the return type of the
@@ -11,10 +17,10 @@ import "protobuf/RhoTypes.proto";
  * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
  */
 message ContResultProto {
-  rhotypes.TaggedContinuation continuation = 1;
+  rhoapi.TaggedContinuation continuation = 1;
   bool persistent = 2;
-  repeated rhotypes.Par channels = 3;
-  repeated rhotypes.BindPattern patterns = 4;
+  repeated rhoapi.Par channels = 3;
+  repeated rhoapi.BindPattern patterns = 4;
   bool peek = 5;
 }
 
@@ -27,9 +33,9 @@ message ContResultProto {
  * See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
  */
 message RSpaceResultProto {
-  rhotypes.Par channel = 1;
-  rhotypes.ListParWithRandom matchedDatum = 2;
-  rhotypes.ListParWithRandom removedDatum = 3;
+  rhoapi.Par channel = 1;
+  rhoapi.ListParWithRandom matchedDatum = 2;
+  rhoapi.ListParWithRandom removedDatum = 3;
   bool persistent = 4;
 }
 
@@ -48,7 +54,7 @@ message ActionResult {
  * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
  */
 message DatumProto {
-  rhotypes.ListParWithRandom a = 1;
+  rhoapi.ListParWithRandom a = 1;
   bool persist = 2;
   ProduceProto source = 3;
 }
@@ -60,8 +66,8 @@ message DatumProto {
  * See rspace/src/main/scala/coop/rchain/rspace/internal.scala
  */
 message WaitingContinuationProto {
-  repeated rhotypes.BindPattern patterns = 1;
-  rhotypes.TaggedContinuation continuation = 2;
+  repeated rhoapi.BindPattern patterns = 1;
+  rhoapi.TaggedContinuation continuation = 2;
   bool persist = 3;
   repeated SortedSetElement peeks = 4;
   ConsumeProto source = 5;
@@ -103,7 +109,7 @@ message StoreToMapValue {
 }
 
 message StoreToMapEntry {
-  repeated rhotypes.Par key = 1;
+  repeated rhoapi.Par key = 1;
   StoreToMapValue value = 2;
 }
 
@@ -118,9 +124,9 @@ message StoreToMapResult {
  * Data structure for 'consume' function parameters
  */
 message ConsumeParams {
-  repeated rhotypes.Par channels = 1;
-  repeated rhotypes.BindPattern patterns = 2;
-  rhotypes.TaggedContinuation continuation = 3;
+  repeated rhoapi.Par channels = 1;
+  repeated rhoapi.BindPattern patterns = 2;
+  rhoapi.TaggedContinuation continuation = 3;
   bool persist = 4;
   repeated SortedSetElement peeks = 5;
 }
@@ -129,16 +135,16 @@ message ConsumeParams {
  * Data structure for 'install' function parameters
  */
 message InstallParams {
-  repeated rhotypes.Par channels = 1;
-  repeated rhotypes.BindPattern patterns = 2;
-  rhotypes.TaggedContinuation continuation = 3;
+  repeated rhoapi.Par channels = 1;
+  repeated rhoapi.BindPattern patterns = 2;
+  rhoapi.TaggedContinuation continuation = 3;
 }
 
 /**
  * Data structure for 'spatial_match_result' function return type
  */
 message FreeMapProto {
-  map<int32, rhotypes.Par> entries = 1;
+  map<int32, rhoapi.Par> entries = 1;
 }
 
 /**
@@ -151,7 +157,7 @@ message CheckpointProto {
 }
 
 message ChannelsProto {
-  repeated rhotypes.Par channels = 1;
+  repeated rhoapi.Par channels = 1;
 }
 
 message DatumsProto {
@@ -163,7 +169,7 @@ message WaitingContinuationsProto {
 }
 
 message JoinProto {
-  repeated rhotypes.Par join = 1;
+  repeated rhoapi.Par join = 1;
 }
 
 message JoinsProto {
@@ -182,27 +188,27 @@ message HotStoreStateProto {
 }
 
 message StoreStateContMapEntry {
-  repeated rhotypes.Par key = 1;
+  repeated rhoapi.Par key = 1;
   repeated WaitingContinuationProto value = 2;
 }
 
 message StoreStateInstalledContMapEntry {
-  repeated rhotypes.Par key = 1;
+  repeated rhoapi.Par key = 1;
   WaitingContinuationProto value = 2;
 }
 
 message StoreStateDataMapEntry {
-  rhotypes.Par key = 1;
+  rhoapi.Par key = 1;
   repeated DatumProto value = 2;
 }
 
 message StoreStateJoinsMapEntry {
-  rhotypes.Par key = 1;
+  rhoapi.Par key = 1;
   repeated JoinProto value = 2;
 }
 
 message StoreStateInstalledJoinsMapEntry {
-  rhotypes.Par key = 1;
+  rhoapi.Par key = 1;
   repeated JoinProto value = 2;
 }
 
