@@ -1,5 +1,13 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use dashmap::DashMap;
 use prost::Message;
+use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
+use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake3_hash::Blake3Hash;
+use rspace_plus_plus::rspace::hot_store::HotStoreState;
+use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
@@ -13,6 +21,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
+use tokio::sync::Mutex;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -264,6 +273,7 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake3Hash::new(root_slice);
 
+    // TODO: The commented below should be implemented
     let _ = unsafe { (*rspace).rspace.reset(root) };
 
     //   unsafe {
@@ -616,6 +626,186 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
         let mut result = len_bytes;
         result.append(&mut bytes);
         Box::leak(result.into_boxed_slice()).as_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn revert_to_soft_checkpoint(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let payload_slice =
+            unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+        let soft_checkpoint_proto = SoftCheckpointProto::decode(payload_slice).unwrap();
+        let cache_snapshot_proto = soft_checkpoint_proto.cache_snapshot.unwrap();
+
+        let conts_map: DashMap<
+            Vec<Par>,
+            Vec<WaitingContinuation<BindPattern, TaggedContinuation>>,
+        > = cache_snapshot_proto
+            .continuations
+            .into_iter()
+            .map(|map_entry| {
+                let key = map_entry.key;
+                let value = map_entry
+                    .value
+                    .into_iter()
+                    .map(|cont_proto| WaitingContinuation {
+                        patterns: cont_proto.patterns,
+                        continuation: cont_proto.continuation.unwrap(),
+                        persist: cont_proto.persist,
+                        peeks: cont_proto
+                            .peeks
+                            .iter()
+                            .map(|element| element.value)
+                            .collect(),
+                        source: {
+                            let consume_proto = cont_proto.source.unwrap();
+                            Consume {
+                                channel_hashes: consume_proto
+                                    .channel_hashes
+                                    .iter()
+                                    .map(|hash_bytes| Blake3Hash::from_bytes(hash_bytes.to_vec()))
+                                    .collect(),
+                                hash: Blake3Hash::from_bytes(consume_proto.hash),
+                                persistent: consume_proto.persistent,
+                            }
+                        },
+                    })
+                    .collect();
+
+                (key, value)
+            })
+            .collect();
+
+        let installed_conts_map: DashMap<
+            Vec<Par>,
+            WaitingContinuation<BindPattern, TaggedContinuation>,
+        > = cache_snapshot_proto
+            .installed_continuations
+            .into_iter()
+            .map(|map_entry| {
+                let key = map_entry.key;
+                let wk_proto = map_entry.value.unwrap();
+                let value = WaitingContinuation {
+                    patterns: wk_proto.patterns,
+                    continuation: wk_proto.continuation.unwrap(),
+                    persist: wk_proto.persist,
+                    peeks: wk_proto.peeks.iter().map(|element| element.value).collect(),
+                    source: {
+                        let consume_proto = wk_proto.source.unwrap();
+                        Consume {
+                            channel_hashes: consume_proto
+                                .channel_hashes
+                                .iter()
+                                .map(|hash_bytes| Blake3Hash::from_bytes(hash_bytes.to_vec()))
+                                .collect(),
+                            hash: Blake3Hash::from_bytes(consume_proto.hash),
+                            persistent: consume_proto.persistent,
+                        }
+                    },
+                };
+
+                (key, value)
+            })
+            .collect();
+
+        let datums_map: DashMap<Par, Vec<Datum<ListParWithRandom>>> = cache_snapshot_proto
+            .data
+            .into_iter()
+            .map(|map_entry| {
+                let key = map_entry.key.unwrap();
+                let value = map_entry
+                    .value
+                    .into_iter()
+                    .map(|datum_proto| Datum {
+                        a: datum_proto.a.unwrap(),
+                        persist: datum_proto.persist,
+                        source: {
+                            let produce_proto = datum_proto.source.unwrap();
+                            Produce {
+                                channel_hash: Blake3Hash::from_bytes(produce_proto.channel_hash),
+                                hash: Blake3Hash::from_bytes(produce_proto.hash),
+                                persistent: produce_proto.persistent,
+                            }
+                        },
+                    })
+                    .collect();
+
+                (key, value)
+            })
+            .collect();
+
+        let joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
+            .joins
+            .into_iter()
+            .map(|map_entry| {
+                let key = map_entry.key.unwrap();
+                let value = map_entry
+                    .value
+                    .into_iter()
+                    .map(|join_proto| join_proto.join)
+                    .collect();
+
+                (key, value)
+            })
+            .collect();
+
+        let installed_joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
+            .installed_joins
+            .into_iter()
+            .map(|map_entry| {
+                let key = map_entry.key.unwrap();
+                let value = map_entry
+                    .value
+                    .into_iter()
+                    .map(|join_proto| join_proto.join)
+                    .collect();
+
+                (key, value)
+            })
+            .collect();
+
+        let produce_counter_map: HashMap<Produce, i32> = soft_checkpoint_proto
+            .produce_counter
+            .into_iter()
+            .map(|map_entry| {
+                let key_proto = map_entry.key.unwrap();
+                let produce = Produce {
+                    channel_hash: Blake3Hash::from_bytes(key_proto.channel_hash),
+                    hash: Blake3Hash::from_bytes(key_proto.hash),
+                    persistent: key_proto.persistent,
+                };
+
+                let value = map_entry.value;
+
+                (produce, value)
+            })
+            .collect();
+
+        let cache_snapshot = HotStoreState {
+            continuations: conts_map,
+            installed_continuations: installed_conts_map,
+            data: datums_map,
+            joins: joins_map,
+            installed_joins: installed_joins_map,
+        };
+
+        let soft_checkpoint = SoftCheckpoint {
+            cache_snapshot: Arc::new(Mutex::new(cache_snapshot)),
+            produce_counter: produce_counter_map,
+        };
+
+        unsafe {
+            (*rspace)
+                .rspace
+                .revert_to_soft_checkpoint(soft_checkpoint)
+                .await
+                .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
+        };
     })
 }
 

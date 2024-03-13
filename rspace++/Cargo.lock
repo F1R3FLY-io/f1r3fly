@@ -965,6 +965,7 @@ dependencies = [
 name = "rspace_plus_plus_rhotypes"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
  "prost",
  "rspace_plus_plus",
  "serde_json",

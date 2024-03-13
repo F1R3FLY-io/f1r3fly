@@ -14,7 +14,18 @@ import coop.rchain.models.rspace_plus_plus_types.{
   SoftCheckpointProto,
   SortedSetElement,
   StoreToMapResult,
-  WaitingContinuationsProto
+  WaitingContinuationsProto,
+	WaitingContinuationProto,
+	ConsumeProto,
+	DatumProto,
+	ProduceProto,
+	JoinProto,
+	HotStoreStateProto,
+	StoreStateContMapEntry,
+	StoreStateInstalledContMapEntry,
+	StoreStateDataMapEntry,
+	StoreStateJoinsMapEntry,StoreStateInstalledJoinsMapEntry,
+	ProduceCounterMapEntry
 }
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import scala.collection.SortedSet
@@ -30,6 +41,7 @@ import coop.rchain.rspace.trace.Event
 import coop.rchain.rspace.HotStoreState
 
 import scala.collection.immutable.Map
+import com.google.protobuf.ByteString
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -695,10 +707,140 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
     }
   }
 
-  def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit] = {
-    println("revertToSoftCheckpoint")
-    ???
-  }
+  def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit] =
+    for {
+      _ <- Sync[F].delay {
+            val cacheSnapshot = checkpoint.cacheSnapshot
+
+            val continuationsMapEntries          = Seq.empty
+            val installedContinuationsMapEntries = Seq.empty
+            val datumsMapEntries                 = Seq.empty
+            val joinsMapEntries                  = Seq.empty
+            val installedJoinsMapEntries         = Seq.empty
+
+            cacheSnapshot.continuations.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map { wk =>
+                WaitingContinuationProto(
+                  patterns = wk.patterns,
+                  continuation = Some(wk.continuation),
+                  persist = wk.persist,
+                  peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
+                  source = Some(
+                    ConsumeProto(
+                      channelHashes = wk.source.channelsHashes.map(
+                        channelHash => channelHash.toByteString
+                      ),
+                      hash = wk.source.hash.toByteString,
+                      persistent = wk.source.persistent
+                    )
+                  )
+                )
+              }
+
+              continuationsMapEntries :+ StoreStateContMapEntry(key, value)
+            }
+
+            cacheSnapshot.installedContinuations.map { mapEntry =>
+              val key = mapEntry._1
+              val wk  = mapEntry._2
+              val value =
+                WaitingContinuationProto(
+                  patterns = wk.patterns,
+                  continuation = Some(wk.continuation),
+                  persist = wk.persist,
+                  peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
+                  source = Some(
+                    ConsumeProto(
+                      channelHashes = wk.source.channelsHashes.map(
+                        channelHash => channelHash.toByteString
+                      ),
+                      hash = wk.source.hash.toByteString,
+                      persistent = wk.source.persistent
+                    )
+                  )
+                )
+
+              installedContinuationsMapEntries :+ StoreStateInstalledContMapEntry(key, Some(value))
+            }
+
+            cacheSnapshot.data.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map { datum =>
+                DatumProto(
+                  a = Some(datum.a),
+                  persist = datum.persist,
+                  source = Some(
+                    ProduceProto(
+                      channelHash = datum.source.channelsHash.toByteString,
+                      hash = datum.source.hash.toByteString,
+                      persistent = datum.source.persistent
+                    )
+                  )
+                )
+              }
+
+              datumsMapEntries :+ StoreStateDataMapEntry(Some(key), value)
+            }
+
+            cacheSnapshot.joins.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map(
+                join => JoinProto(join)
+              )
+
+              joinsMapEntries :+ StoreStateJoinsMapEntry(Some(key), value)
+            }
+
+            cacheSnapshot.installedJoins.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map(
+                join => JoinProto(join)
+              )
+
+              installedJoinsMapEntries :+ StoreStateInstalledJoinsMapEntry(Some(key), value)
+            }
+
+            val hotStoreStateProto = HotStoreStateProto(
+              continuationsMapEntries,
+              installedContinuationsMapEntries,
+              datumsMapEntries,
+              joinsMapEntries,
+              installedJoinsMapEntries
+            )
+
+            val produceCounterMapEntries = Seq.empty
+            val produceCounterMap        = checkpoint.produceCounter
+
+            produceCounterMap.map { mapEntry =>
+              val produce = mapEntry._1
+              val produceProto = ProduceProto(
+                produce.channelsHash.toByteString,
+                produce.hash.toByteString,
+                produce.persistent
+              )
+
+              produceCounterMapEntries :+ ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
+            }
+
+            val softCheckpointProto =
+              SoftCheckpointProto(Some(hotStoreStateProto), produceCounterMapEntries)
+            val softCheckpointProtoBytes = softCheckpointProto.toByteArray
+
+            val payloadMemory = new Memory(softCheckpointProtoBytes.length.toLong)
+            payloadMemory.write(0, softCheckpointProtoBytes, 0, softCheckpointProtoBytes.length)
+
+            val _ = INSTANCE.revert_to_soft_checkpoint(
+              rspacePointer,
+              payloadMemory,
+              softCheckpointProtoBytes.length
+            )
+
+            // Not sure if these lines are needed
+            // Need to figure out how to deallocate each memory instance
+            payloadMemory.clear()
+          }
+    } yield ()
 
   def spawn: F[ISpacePlusPlus[F, C, P, A, K]] =
     for {

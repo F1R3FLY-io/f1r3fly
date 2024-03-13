@@ -7,7 +7,7 @@ pub mod internal;
 pub mod matcher;
 pub mod rspace;
 mod space_matcher;
-mod checkpoint;
+pub mod checkpoint;
 pub mod hot_store_action;
 pub mod shared;
 mod hot_store_trie_action;

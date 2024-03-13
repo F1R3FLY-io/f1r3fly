@@ -69,5 +69,11 @@ trait JNAInterface extends Library {
 
   def create_soft_checkpoint(rspace: Pointer): Pointer
 
+  def revert_to_soft_checkpoint(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }
