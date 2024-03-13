@@ -30,7 +30,7 @@ jarParam="-jar ${rnode}"
 syncrhonyParam="--synchrony-constraint-threshold=0.0"
 # jar file execution configuration:
 Bootstrap="java -Djna.library.path=./rspace++/target/release/ ${baseParams} ${jarParam} run -s --data-dir ${RCHAINXMPL}/node0/rnode"
-printf "Starting: %s" "${Bootstrap}"
+printf "Starting: %s\n" "${Bootstrap}"
 
 # Run the command and pipe its output into a while loop
 (${Bootstrap} &) | while read -r Line; do
@@ -40,13 +40,14 @@ printf "Starting: %s" "${Bootstrap}"
 		Validator1="${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node1/rnode\
           -u -h 8081 -a 8082 -e 40001 -i 40002 --genesis-validator --bootstrap  ${bootstrapIdentity}"
 		IFS=' ' read -ra Val1Params <<<"${Validator1}"
-		printf "> Executing Validator 1 with:\n>> java %s" "${Val1Params[*]}\n"
+		printf "> Executing Validator 1 with:\n>> java %s" "${Val1Params[*]}"
 		# shellcheck disable=2048,2086
 		(java ${Val1Params[*]} &)
 
 		Validator2="${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node2/rnode\
           -u -h 8085 -a 8086 -e 40005 -i 40006 --genesis-validator --bootstrap  ${bootstrapIdentity}"
 		IFS=' ' read -ra Validator2Params <<<"${Validator2}"
+		printf "\n\n> Executing Validator 2 with:\n>> java %s\n" "${Validator2Params[*]}"
 		# shellcheck disable=2048,2086
 		java ${Validator2Params[*]}
 	fi

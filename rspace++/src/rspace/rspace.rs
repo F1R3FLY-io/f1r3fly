@@ -392,7 +392,6 @@ where
         self.locked_install(channels, patterns, continuation).await
     }
 
-    // From the logic in the Scala implementation, I think this either only returns 'None' or an error
     async fn locked_install(
         &self,
         channels: Vec<C>,

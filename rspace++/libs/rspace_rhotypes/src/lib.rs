@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use dashmap::DashMap;
 use prost::Message;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
@@ -21,6 +18,8 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /*
