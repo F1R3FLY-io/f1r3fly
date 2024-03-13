@@ -6,7 +6,7 @@ Create a separate namespace
 kubectl create ns f1r3fly
 
 # and switch kubectl context to the new namespace
-config set-context --namespace f1r3fly --current
+kubectl config set-context --namespace f1r3fly --current
 # now no need to add `-n f1r3fly` to each command
 ```
 

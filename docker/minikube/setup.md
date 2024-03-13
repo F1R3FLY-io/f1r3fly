@@ -5,9 +5,9 @@ Create Minikube (Kubernetes single node) inside Docker container and expose port
 ```sh
 minikube start \
     --extra-config=apiserver.service-node-port-range=40400-40500 \
-    --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434 \
+    --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434,40440,40441,40442,40443,40444 \
     --driver=docker \
-    --addons='ingress,dashboard,metrics-server' \
+    --addons='dashboard,metrics-server' \
     --cpus=8 \
     --memory=6g
 ```
