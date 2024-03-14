@@ -29,7 +29,7 @@ kubectl delete po validator1-0 # k8s will re-create a pod and pod will re-read c
 ## Undeploy
 Delete namespace and k8s will delete all resources
 ```sh
-kubectl delete ns f1r3fly
+kubectl delete ns f1r3fly-8n
 ```
 
 ## Usefull links/tools

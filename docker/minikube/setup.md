@@ -18,8 +18,8 @@ minikube start \
     --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434,40440,40441,40442,40443,40444,40450,40451,40452,40453,40454,40460,40461,40462,40463,40464,40470,40471,40472,40473,40474,40480,40481,40482,40483,40484 \
     --driver=docker \
     --addons='dashboard,metrics-server' \
-    --cpus=8 \
-    --memory=6g
+    --cpus=10 \
+    --memory=10g
 ```
 ## Pull `rnode` into Minikube
 **This step needed if `ghcr.io/f1r3fly-io/rnode:latest` preset as local Docker image only. If the docker image has been published into remote Docker registry, skip this section.**

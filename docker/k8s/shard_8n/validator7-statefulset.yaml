@@ -29,7 +29,7 @@ spec:
           imagePullPolicy: Never
           resources:
             limits:
-              cpu: 2
+              cpu: 1
               memory: 1Gi
           ports:
             - containerPort: 40400
@@ -58,8 +58,8 @@ spec:
               mountPath: /var/lib/rnode/genesis/wallets.txt
               subPath: wallets.txt
             - name: validator7-configmap
-              mountPath: /var/lib/rnode/genesis/bonds_8n.txt
-              subPath: bonds_8n.txt
+              mountPath: /var/lib/rnode/genesis/bonds.txt
+              subPath: bonds.txt
             - name: validator7-configmap
               mountPath: /var/lib/rnode/logback.xml
               subPath: logback.xml
