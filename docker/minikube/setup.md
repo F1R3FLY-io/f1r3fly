@@ -1,11 +1,21 @@
 # Minikube installation
 
 ## Init local minikube
-Create Minikube (Kubernetes single node) inside Docker container and expose ports:
+Create Minikube with 4 validators(Kubernetes single node) inside Docker container and expose ports:
 ```sh
 minikube start \
     --extra-config=apiserver.service-node-port-range=40400-40500 \
     --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434,40440,40441,40442,40443,40444 \
+    --driver=docker \
+    --addons='dashboard,metrics-server' \
+    --cpus=8 \
+    --memory=6g
+```
+Create Minikube with 8 validators(Kubernetes single node) inside Docker container and expose ports:
+```sh
+minikube start \
+    --extra-config=apiserver.service-node-port-range=40400-40500 \
+    --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434,40440,40441,40442,40443,40444,40450,40451,40452,40453,40454,40460,40461,40462,40463,40464,40470,40471,40472,40473,40474,40480,40481,40482,40483,40484 \
     --driver=docker \
     --addons='dashboard,metrics-server' \
     --cpus=8 \
