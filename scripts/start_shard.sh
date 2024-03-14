@@ -37,14 +37,14 @@ printf "Starting: %s\n" "${Bootstrap}"
 	echo "$Line" # Print output to console
 	if [[ "$Line" == *"$rnodePattern"* ]]; then
 		bootstrapIdentity=$(echo "$Line" | awk '{ gsub(/\.$/, "", $13); print $13 }')
-		Validator1="${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node1/rnode\
+		Validator1="-Djna.library.path=./rspace++/target/release/ ${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node1/rnode\
           -u -h 8081 -a 8082 -e 40001 -i 40002 --genesis-validator --bootstrap  ${bootstrapIdentity}"
 		IFS=' ' read -ra Val1Params <<<"${Validator1}"
 		printf "> Executing Validator 1 with:\n>> java %s" "${Val1Params[*]}"
 		# shellcheck disable=2048,2086
 		(java ${Val1Params[*]} &)
 
-		Validator2="${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node2/rnode\
+		Validator2="-Djna.library.path=./rspace++/target/release/ ${baseParams} ${jarParam} run ${syncrhonyParam} --data-dir ${RCHAINXMPL}/node2/rnode\
           -u -h 8085 -a 8086 -e 40005 -i 40006 --genesis-validator --bootstrap  ${bootstrapIdentity}"
 		IFS=' ' read -ra Validator2Params <<<"${Validator2}"
 		printf "\n\n> Executing Validator 2 with:\n>> java %s\n" "${Validator2Params[*]}"
