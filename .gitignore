@@ -110,4 +110,6 @@ rspacePlusPlus/
 docker/data/**/rnode.log
 docker/data/**/*.mdb
 
-rspace++/**/*.mdb
+rspace++/tests/lmdb
+rholang/rspace++_lmdb/
+rspace++_lmdb

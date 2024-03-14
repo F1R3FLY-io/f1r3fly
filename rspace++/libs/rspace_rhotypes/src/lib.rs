@@ -36,7 +36,7 @@ pub extern "C" fn space_new() -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            let mut kvm = mk_rspace_store_manager("../rspace++/lmdb".into(), 1 * GB);
+            let mut kvm = mk_rspace_store_manager("./rspace++_lmdb".into(), 1 * GB);
             let store = kvm.r_space_stores().await.unwrap();
 
             RSpaceInstances::create(store, Matcher).await
@@ -272,15 +272,12 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake3Hash::new(root_slice);
 
-    // TODO: The commented below should be implemented
-    let _ = unsafe { (*rspace).rspace.reset(root) };
-
-    //   unsafe {
-    //     (*rspace)
-    //         .rspace
-    //         .reset(root)
-    //         .expect("Rust RSpacePlusPlus Library: Failed to reset")
-    // }
+    unsafe {
+        (*rspace)
+            .rspace
+            .reset(root)
+            .expect("Rust RSpacePlusPlus Library: Failed to reset")
+    }
 }
 
 #[no_mangle]
@@ -556,8 +553,7 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
                 .into_iter()
                 .map(|datum| DatumProto {
                     a: Some(datum.a),
-                    // TODO: Fix This bug
-                    persist: false,
+                    persist: datum.persist,
                     source: Some(ProduceProto {
                         channel_hash: datum.source.channel_hash.bytes(),
                         hash: datum.source.hash.bytes(),
