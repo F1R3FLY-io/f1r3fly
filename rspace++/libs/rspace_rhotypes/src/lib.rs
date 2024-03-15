@@ -270,7 +270,7 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
 #[no_mangle]
 pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_len: usize) -> () {
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
-    let root = Blake3Hash::new(root_slice);
+    let root = Blake3Hash::from_bytes(root_slice.to_vec());
 
     unsafe {
         (*rspace)

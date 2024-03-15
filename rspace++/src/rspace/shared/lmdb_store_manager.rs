@@ -5,7 +5,6 @@ use super::{
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use heed::{types::SerdeBincode, Database, Env, EnvOpenOptions};
-use log::debug;
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -79,7 +78,7 @@ impl LmdbStoreManager {
     }
 
     async fn create_env(&self) -> Result<Env, heed::Error> {
-        debug!("Creating LMDB environment: {:?}", self.dir_path);
+        println!("Creating LMDB environment: {:?}", self.dir_path);
         fs::create_dir_all(&self.dir_path)?;
 
         let mut env_builder = EnvOpenOptions::new();

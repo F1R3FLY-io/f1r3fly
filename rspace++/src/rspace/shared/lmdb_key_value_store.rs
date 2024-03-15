@@ -96,7 +96,7 @@ impl KeyValueStore for LmdbKeyValueStore {
 
     // This is only needed for testing purposes
     fn print_store(&self) -> () {
-        println!("\nthis is only needed for testing purposes")
+        println!("{:?}", self.to_map().unwrap())
     }
 }
 
