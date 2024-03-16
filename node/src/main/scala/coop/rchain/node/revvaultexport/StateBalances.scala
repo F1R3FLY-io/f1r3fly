@@ -38,8 +38,8 @@ object StateBalances {
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     val legacyRSpaceDirSupport = Files.exists(oldRSpacePath)
     for {
-			// The following below of creating stores is not actually being used.
-			// This is being done on the Rust side.
+      // The following below of creating stores is not actually being used.
+      // This is being done on the Rust side.
       rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir, legacyRSpaceDirSupport)
       blockStore        <- KeyValueBlockStore(rnodeStoreManager)
       blockOpt          <- blockStore.get(blockHash.unsafeHexToByteString)

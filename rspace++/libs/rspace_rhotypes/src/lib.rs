@@ -663,7 +663,9 @@ pub extern "C" fn revert_to_soft_checkpoint(
                                 channel_hashes: consume_proto
                                     .channel_hashes
                                     .iter()
-                                    .map(|hash_bytes| Blake2b256Hash::from_bytes(hash_bytes.to_vec()))
+                                    .map(|hash_bytes| {
+                                        Blake2b256Hash::from_bytes(hash_bytes.to_vec())
+                                    })
                                     .collect(),
                                 hash: Blake2b256Hash::from_bytes(consume_proto.hash),
                                 persistent: consume_proto.persistent,
@@ -722,7 +724,9 @@ pub extern "C" fn revert_to_soft_checkpoint(
                         source: {
                             let produce_proto = datum_proto.source.unwrap();
                             Produce {
-                                channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                                channel_hash: Blake2b256Hash::from_bytes(
+                                    produce_proto.channel_hash,
+                                ),
                                 hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                                 persistent: produce_proto.persistent,
                             }

@@ -94,9 +94,12 @@ impl KeyValueStore for LmdbKeyValueStore {
         todo!()
     }
 
-    // This is only needed for testing purposes
     fn print_store(&self) -> () {
-        println!("{:?}", self.to_map().unwrap())
+        let kv_store_map = self.to_map().unwrap();
+
+        for (key, value) in &kv_store_map {
+            println!("Key: {:?}, Value: {:?}", hex::encode(key), hex::encode(value));
+        }
     }
 }
 

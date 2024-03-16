@@ -16,6 +16,7 @@ import cats.Id
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import scodec.bits.ByteVector
 import coop.rchain.models.rspace_plus_plus_types.StoreStateDataMapEntry
+import coop.rchain.rspace.history.RadixTree
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -40,9 +41,13 @@ object Main {
 
       // println(testFunctionProto)
 
-      val input      = "hello world".getBytes("UTF-8")
-      val blake2Hash = Blake2b256Hash.create(input)
-      println(s"\nHash: ${blake2Hash.bytes.toHex}")
+      // val input      = "hello world".getBytes("UTF-8")
+      // val blake2Hash = Blake2b256Hash.create(input)
+      // println(s"\nHash: ${blake2Hash.bytes.toHex}")
+
+      val (nodeHashBytes, _) = RadixTree.hashNode(RadixTree.emptyNode)
+      println("\nNode Hash: " + Blake2b256Hash.fromByteVector(nodeHashBytes))
+      // println("\n") ByteString.copyFrom(checkpoint.root.bytes.toArray)
     }
 
     testFunction

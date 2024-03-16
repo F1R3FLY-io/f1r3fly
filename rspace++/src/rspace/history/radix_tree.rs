@@ -76,101 +76,99 @@ const HEAD_SIZE: usize = 2;
 /** Serialization [[Node]] to [[ByteVector]]
  */
 pub fn encode(node: &Node) -> ByteVector {
-    // // Calculate the size of the serialized data
-    // let calc_size = node.iter().fold(0, |acc, item| match item {
-    //     Item::EmptyItem => acc,
-    //     Item::Leaf { prefix, value } => {
-    //         assert!(
-    //             prefix.len() <= 127,
-    //             "Error during serialization: size of prefix more than 127."
-    //         );
-    //         assert!(
-    //             value.len() == DEF_SIZE,
-    //             "Error during serialization: size of leafValue not equal 32."
-    //         );
-    //         acc + HEAD_SIZE + prefix.len() + DEF_SIZE
-    //     }
-    //     Item::NodePtr { prefix, ptr } => {
-    //         assert!(
-    //             prefix.len() <= 127,
-    //             "Error during serialization: size of prefix more than 127."
-    //         );
-    //         assert!(
-    //             ptr.len() == DEF_SIZE,
-    //             "Error during serialization: size of ptrPrefix not equal 32."
-    //         );
-    //         acc + HEAD_SIZE + prefix.len() + DEF_SIZE
-    //     }
-    // });
+    // Calculate the size of the serialized data
+    let calc_size = node.iter().fold(0, |acc, item| match item {
+        Item::EmptyItem => acc,
+        Item::Leaf { prefix, value } => {
+            assert!(
+                prefix.len() <= 127,
+                "Error during serialization: size of prefix more than 127."
+            );
+            assert!(
+                value.len() == DEF_SIZE,
+                "Error during serialization: size of leafValue not equal 32."
+            );
+            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+        }
+        Item::NodePtr { prefix, ptr } => {
+            assert!(
+                prefix.len() <= 127,
+                "Error during serialization: size of prefix more than 127."
+            );
+            assert!(
+                ptr.len() == DEF_SIZE,
+                "Error during serialization: size of ptrPrefix not equal 32."
+            );
+            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+        }
+    });
 
-    // let mut buf = Vec::with_capacity(calc_size);
+    let mut buf = Vec::with_capacity(calc_size);
 
-    // for (idx, item) in node.iter().enumerate() {
-    //     match item {
-    //         Item::EmptyItem => {
-    //             // EmptyItem - not encoded
-    //         }
-    //         Item::Leaf { prefix, value } => {
-    //             buf.push(idx as u8); // item index
-    //             buf.push(prefix.len() as u8); // second byte with Leaf identifier
-    //             buf.extend_from_slice(prefix);
-    //             buf.extend_from_slice(value);
-    //         }
-    //         Item::NodePtr { prefix, ptr } => {
-    //             buf.push(idx as u8); // item index
-    //             buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
-    //             buf.extend_from_slice(prefix);
-    //             buf.extend_from_slice(ptr);
-    //         }
-    //     }
-    // }
+    for (idx, item) in node.iter().enumerate() {
+        match item {
+            Item::EmptyItem => {
+                // EmptyItem - not encoded
+            }
+            Item::Leaf { prefix, value } => {
+                buf.push(idx as u8); // item index
+                buf.push(prefix.len() as u8); // second byte with Leaf identifier
+                buf.extend_from_slice(prefix);
+                buf.extend_from_slice(value);
+            }
+            Item::NodePtr { prefix, ptr } => {
+                buf.push(idx as u8); // item index
+                buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
+                buf.extend_from_slice(prefix);
+                buf.extend_from_slice(ptr);
+            }
+        }
+    }
 
-    // assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
-    // buf
-    bincode::serialize(&node).unwrap()
+    assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
+    buf
 }
 
 /** Deserialization [[ByteVector]] to [[Node]]
  */
 pub fn decode(encoded: ByteVector) -> Node {
-    // let mut node = EmptyNode::new().node;
-    // let mut pos = 0;
-    // let max_size = encoded.len();
+    let mut node = empty_node();
+    let mut pos = 0;
+    let max_size = encoded.len();
 
-    // while pos < max_size {
-    //     let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
-    //     assert_eq!(
-    //         node[idx_item],
-    //         Item::EmptyItem,
-    //         "Error during deserialization: wrong index of item."
-    //     );
+    while pos < max_size {
+        let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
+        assert_eq!(
+            node[idx_item],
+            Item::EmptyItem,
+            "Error during deserialization: wrong index of item."
+        );
 
-    //     let second_byte = encoded[pos + 1]; // Take second byte
-    //     let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
-    //     let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
+        let second_byte = encoded[pos + 1]; // Take second byte
+        let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
+        let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
 
-    //     let val_or_ptr =
-    //         &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
+        let val_or_ptr =
+            &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
 
-    //     pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
+        pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
 
-    //     let item = if (second_byte & 0x80) == 0 {
-    //         Item::Leaf {
-    //             prefix: prefix.to_vec(),
-    //             value: val_or_ptr.to_vec(),
-    //         }
-    //     } else {
-    //         Item::NodePtr {
-    //             prefix: prefix.to_vec(),
-    //             ptr: val_or_ptr.to_vec(),
-    //         }
-    //     };
+        let item = if (second_byte & 0x80) == 0 {
+            Item::Leaf {
+                prefix: prefix.to_vec(),
+                value: val_or_ptr.to_vec(),
+            }
+        } else {
+            Item::NodePtr {
+                prefix: prefix.to_vec(),
+                ptr: val_or_ptr.to_vec(),
+            }
+        };
 
-    //     node[idx_item] = item;
-    // }
+        node[idx_item] = item;
+    }
 
-    // node
-    bincode::deserialize(&encoded).unwrap()
+    node
 }
 
 fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, ByteVector) {
@@ -197,12 +195,12 @@ fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, Byt
 }
 
 pub fn hash_node(node: &Node) -> (ByteVector, ByteVector) {
-    let bytes = encode(node);
+    let node_bytes = encode(node);
     // println!("\nnode bytes: {:?}", bytes);
-    let hash = Blake2b256Hash::new(&bytes);
+    let hash = Blake2b256Hash::new(&node_bytes);
     // println!("\nnode bytes hash: {:?}", hash);
     // println!("\nHash in hash node: {:?}", hash);
-    (hash.bytes(), bytes)
+    (hash.bytes(), node_bytes)
 }
 
 fn byte_to_int(b: u8) -> usize {
@@ -795,9 +793,7 @@ impl RadixTreeImpl {
                 let deserialized_node_bytes: ByteVector = bincode::deserialize(&bytes)
                     .expect("Radix Tree: Failed to deserialize node bytes");
 
-                let deserialized_node: Node = bincode::deserialize(&deserialized_node_bytes)
-                    .expect("Radix Tree: Failed to deserialize node bytes");
-
+                let deserialized_node = decode(deserialized_node_bytes);
                 // println!("\ndeserialized: {:?}", deserialized);
                 Ok(Some(deserialized_node))
             }
