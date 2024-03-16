@@ -70,8 +70,8 @@ object RholangCLI {
     val kvm = mkRSpaceStoreManager[Task](conf.dataDir(), conf.mapSize()).runSyncUnsafe()
 
     val runtime = (for {
-      store   <- kvm.rSpaceStores
-      runtime <- RhoRuntime.createRuntime[Task](store, Par())
+      // store   <- kvm.rSpaceStores
+      runtime <- RhoRuntime.createRuntime[Task](Par())
     } yield runtime).unsafeRunSync
 
     val problems = try {
@@ -115,14 +115,14 @@ object RholangCLI {
       mapSize: Long = 100 * mb
   ): F[KeyValueStoreManager[F]] = {
     // Specify database mapping
-    val rspaceHistoryEnvConfig = LmdbEnvConfig(name = "history", mapSize)
-    val rspaceColdEnvConfig    = LmdbEnvConfig(name = "cold", mapSize)
-    val channelEnvConfig       = LmdbEnvConfig(name = "channels", mapSize)
+    // val rspaceHistoryEnvConfig = LmdbEnvConfig(name = "history", mapSize)
+    // val rspaceColdEnvConfig    = LmdbEnvConfig(name = "cold", mapSize)
+    // val channelEnvConfig       = LmdbEnvConfig(name = "channels", mapSize)
     val dbMapping = Map[Db, LmdbEnvConfig](
-      (Db("rspace-history"), rspaceHistoryEnvConfig),
-      (Db("rspace-roots"), rspaceHistoryEnvConfig),
-      (Db("rspace-cold"), rspaceColdEnvConfig),
-      (Db("rspace-channels"), channelEnvConfig)
+      // (Db("rspace-history"), rspaceHistoryEnvConfig),
+      // (Db("rspace-roots"), rspaceHistoryEnvConfig),
+      // (Db("rspace-cold"), rspaceColdEnvConfig),
+      // (Db("rspace-channels"), channelEnvConfig)
     )
     LmdbDirStoreManager[F](dirPath, dbMapping)
   }

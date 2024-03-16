@@ -638,7 +638,7 @@ object RhoRuntime {
    */
 
   def createRuntime[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
-      stores: RSpaceStore[F],
+      // stores: RSpaceStore[F],
       mergeableTagName: Par,
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty

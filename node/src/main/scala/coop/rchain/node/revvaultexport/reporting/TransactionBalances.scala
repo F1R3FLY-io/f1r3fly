@@ -226,7 +226,7 @@ object TransactionBalances {
     for {
       rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir, legacyRSpaceDirSupport)
       blockStore        <- KeyValueBlockStore(rnodeStoreManager)
-      store             <- rnodeStoreManager.rSpaceStores
+      // store             <- rnodeStoreManager.rSpaceStores
       // spaces <- RSpace
       //            .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
       //              store

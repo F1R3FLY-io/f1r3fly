@@ -44,7 +44,7 @@ object StateBalances {
       blockStore        <- KeyValueBlockStore(rnodeStoreManager)
       blockOpt          <- blockStore.get(blockHash.unsafeHexToByteString)
       block             = blockOpt.get
-      store             <- rnodeStoreManager.rSpaceStores
+      // store             <- rnodeStoreManager.rSpaceStores
       // spaces <- RSpace
       //            .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
       //              store

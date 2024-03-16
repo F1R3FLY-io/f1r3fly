@@ -152,7 +152,8 @@ object Setup {
       // Runtime for `rnode eval`
       evalRuntime <- {
         implicit val sp = span
-        rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](_, Par()))
+        // rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](Par()))
+        RhoRuntime.createRuntime[F](Par())
       }
 
       // Runtime manager (play and replay runtimes)

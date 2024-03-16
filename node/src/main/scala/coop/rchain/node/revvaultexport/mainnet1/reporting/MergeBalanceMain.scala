@@ -169,7 +169,7 @@ object MergeBalanceMain {
       accountMap        <- getVaultMap(stateBalanceFile, transactionBalanceFile).pure[Task]
       rnodeStoreManager <- RNodeKeyValueStoreManager[Task](dataDir, legacyRSpaceDirSupport)
       blockStore        <- KeyValueBlockStore[Task](rnodeStoreManager)
-      store             <- rnodeStoreManager.rSpaceStores
+      // store             <- rnodeStoreManager.rSpaceStores
       // spaces <- RSpace
       //            .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](
       //              store
