@@ -382,7 +382,7 @@ where
         &self,
         root: &Blake2b256Hash,
     ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError> {
-        println!("\nhit reset, root: {}", root);
+        // println!("\nhit reset, root: {}", root);
 
         let roots_lock = self
             .roots_repository

@@ -78,7 +78,7 @@ impl LmdbStoreManager {
     }
 
     async fn create_env(&self) -> Result<Env, heed::Error> {
-        println!("Creating LMDB environment: {:?}", self.dir_path);
+        // println!("Creating LMDB environment: {:?}", self.dir_path);
         fs::create_dir_all(&self.dir_path)?;
 
         let mut env_builder = EnvOpenOptions::new();

@@ -49,7 +49,7 @@ impl RootsStoreInstances {
                 &self,
                 key: Blake2b256Hash,
             ) -> Result<Option<Blake2b256Hash>, RootError> {
-                println!("\nhit validate_and_set_current_root, key: {}", key);
+                // println!("\nhit validate_and_set_current_root, key: {}", key);
 
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
                 let key_bytes = key.bytes();
@@ -59,8 +59,8 @@ impl RootsStoreInstances {
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                println!("\nroots_store: ");
-                store_lock.print_store();
+                // println!("\nroots_store: ");
+                // store_lock.print_store();
 
                 if let Some(_) = store_lock.get_one(&key_bytes)? {
                     store_lock.put_one(current_root_name, key_bytes)?;
@@ -71,7 +71,7 @@ impl RootsStoreInstances {
             }
 
             fn record_root(&self, key: &Blake2b256Hash) -> Result<(), RootError> {
-                println!("\nhit record_root, key: {}", key);
+                // println!("\nhit record_root, key: {}", key);
 
                 let tag: ByteBuffer = "tag".as_bytes().to_vec();
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
@@ -85,8 +85,8 @@ impl RootsStoreInstances {
                 store_lock.put_one(key_bytes.to_vec(), tag)?;
                 store_lock.put_one(current_root_name, key_bytes.to_vec())?;
 
-                println!("\nroots_store after record root: ");
-                store_lock.print_store();
+                // println!("\nroots_store after record root: ");
+                // store_lock.print_store();
 
                 Ok(())
             }
