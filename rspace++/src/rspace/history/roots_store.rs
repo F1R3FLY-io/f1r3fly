@@ -38,13 +38,7 @@ impl RootsStoreInstances {
                 let bytes = store_lock.get_one(&current_root_name)?;
 
                 let maybe_decoded = match bytes {
-                    Some(b) => {
-                        // let hash_array: [u8; 32] = match b.try_into() {
-                        //     Ok(array) => array,
-                        //     Err(_) => panic!("Roots Store: Expected a Blake3 hash of length 32"),
-                        // };
-                        Some(Blake3Hash::from_bytes(b))
-                    }
+                    Some(b) => Some(Blake3Hash::from_bytes(b)),
                     None => None,
                 };
 
@@ -55,16 +49,21 @@ impl RootsStoreInstances {
                 &self,
                 key: Blake3Hash,
             ) -> Result<Option<Blake3Hash>, RootError> {
+                println!("\nhit validate_and_set_current_root, key: {}", key);
+
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
-                let bytes = key.bytes();
+                let key_bytes = key.bytes();
 
                 let mut store_lock = self
                     .store
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                if let Some(_) = store_lock.get_one(&bytes)? {
-                    store_lock.put_one(current_root_name, bytes)?;
+                println!("\nroots_store: ");
+                store_lock.print_store();
+
+                if let Some(_) = store_lock.get_one(&key_bytes)? {
+                    store_lock.put_one(current_root_name, key_bytes)?;
                     Ok(Some(key))
                 } else {
                     Ok(None)
@@ -72,17 +71,22 @@ impl RootsStoreInstances {
             }
 
             fn record_root(&self, key: &Blake3Hash) -> Result<(), RootError> {
+                println!("\nhit record_root, key: {}", key);
+
                 let tag: ByteBuffer = "tag".as_bytes().to_vec();
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
-                let bytes = key.bytes();
+                let key_bytes = key.bytes();
 
                 let mut store_lock = self
                     .store
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                store_lock.put_one(bytes.to_vec(), tag)?;
-                store_lock.put_one(current_root_name, bytes.to_vec())?;
+                store_lock.put_one(key_bytes.to_vec(), tag)?;
+                store_lock.put_one(current_root_name, key_bytes.to_vec())?;
+
+                println!("\nroots_store after record root: ");
+                store_lock.print_store();
 
                 Ok(())
             }

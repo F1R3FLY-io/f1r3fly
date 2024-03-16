@@ -355,6 +355,7 @@ where
             .unwrap();
             result_history
         };
+
         let new_root = store_history.root();
         store_root(&new_root)
             .await
@@ -381,6 +382,8 @@ where
         &self,
         root: &Blake3Hash,
     ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError> {
+        println!("\nhit reset, root: {}", root);
+
         let roots_lock = self
             .roots_repository
             .lock()

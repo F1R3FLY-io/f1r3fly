@@ -1,3 +1,5 @@
+use blake2::{digest::consts::U32, Blake2b, Digest};
+use hex::ToHex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -8,8 +10,10 @@ pub struct Blake3Hash(pub Vec<u8>);
 
 impl Blake3Hash {
     pub fn new(data: &[u8]) -> Self {
-        let hash = blake3::hash(data);
-        Blake3Hash(hash.as_bytes().to_vec())
+        let mut hasher = Blake2b::<U32>::new();
+        hasher.update(data);
+        let hash = hasher.finalize();
+        Blake3Hash(hash.to_vec())
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
@@ -36,5 +40,11 @@ impl PartialOrd for Blake3Hash {
 impl PartialEq for Blake3Hash {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
+    }
+}
+
+impl std::fmt::Display for Blake3Hash {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Blake3Hash({})", self.0.encode_hex::<String>())
     }
 }

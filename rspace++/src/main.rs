@@ -1,22 +1,15 @@
-use blake2::{
-    digest::{Update, VariableOutput},
-    Blake2bVar,
-};
-use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::SortedSetElement;
+use blake2::{digest::consts::U32, Blake2b, Digest};
+use hex::ToHex;
 use std::error::Error;
 
-// Playground
 fn main() -> Result<(), Box<dyn Error>> {
-    let protobuf = SortedSetElement { value: 24 };
-    let bytes = bincode::serialize(&protobuf).unwrap();
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(b"hello world");
+    let hash = hasher.finalize();
+    hash.to_vec();
 
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(&bytes);
-    let hash = hasher.finalize_boxed();
-    let hash_hex: String = hash.iter().map(|byte| format!("{:02x}", byte)).collect();
-
-    println!("\nSerialized bytes: {:?}", bytes);
-    println!("\nHash (hex): {}", hash_hex);
+    let hex_hash = hash.encode_hex::<String>();
+    println!("\nHash: {:?}", hex_hash);
 
     Ok(())
 }

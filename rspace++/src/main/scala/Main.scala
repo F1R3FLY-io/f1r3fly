@@ -40,6 +40,9 @@ object Main {
 
       // println(testFunctionProto)
 
+      val input      = "hello world".getBytes("UTF-8")
+      val blake2Hash = Blake2b256Hash.create(input)
+      println(s"\nHash: ${blake2Hash.bytes.toHex}")
     }
 
     testFunction

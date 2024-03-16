@@ -292,6 +292,8 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def createCheckpoint(): F[Checkpoint] =
     for {
       result <- Sync[F].delay {
+                 println("\nhit scala createCheckpoint")
+
                  val checkpointResultPtr = INSTANCE.create_checkpoint(
                    rspacePointer
                  )
@@ -321,6 +323,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def reset(root: Blake2b256Hash): F[Unit] =
     for {
       _ <- Sync[F].delay {
+            println("\nhit scala reset, root: " + root)
             val rootBytes = root.bytes.toArray
 
             val rootMemory = new Memory(rootBytes.length.toLong)
@@ -711,6 +714,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit] =
     for {
       _ <- Sync[F].delay {
+            println("\nhit scala revertToSoftCheckpoint")
             val cacheSnapshot = checkpoint.cacheSnapshot
 
             val continuationsMapEntries          = Seq.empty
@@ -846,6 +850,8 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def spawn: F[ISpacePlusPlus[F, C, P, A, K]] =
     for {
       result <- Sync[F].delay {
+                 println("\nhit scala spawn")
+
                  val rspace = INSTANCE.spawn(
                    rspacePointer
                  )
