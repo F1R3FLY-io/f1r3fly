@@ -1,21 +1,21 @@
 use std::sync::{Arc, Mutex};
 
 use crate::rspace::{
-    hashing::blake3_hash::Blake3Hash,
+    hashing::blake2b256_hash::Blake2b256Hash,
     shared::key_value_store::{KeyValueStore, KvStoreError},
     ByteBuffer,
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootsStore.scala
 pub trait RootsStore: Send + Sync {
-    fn current_root(&self) -> Result<Option<Blake3Hash>, RootError>;
+    fn current_root(&self) -> Result<Option<Blake2b256Hash>, RootError>;
 
     fn validate_and_set_current_root(
         &self,
-        key: Blake3Hash,
-    ) -> Result<Option<Blake3Hash>, RootError>;
+        key: Blake2b256Hash,
+    ) -> Result<Option<Blake2b256Hash>, RootError>;
 
-    fn record_root(&self, key: &Blake3Hash) -> Result<(), RootError>;
+    fn record_root(&self, key: &Blake2b256Hash) -> Result<(), RootError>;
 }
 
 pub struct RootsStoreInstances;
@@ -27,7 +27,7 @@ impl RootsStoreInstances {
         }
 
         impl RootsStore for RootsStoreInstance {
-            fn current_root(&self) -> Result<Option<Blake3Hash>, RootError> {
+            fn current_root(&self) -> Result<Option<Blake2b256Hash>, RootError> {
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
 
                 let store_lock = self
@@ -38,7 +38,7 @@ impl RootsStoreInstances {
                 let bytes = store_lock.get_one(&current_root_name)?;
 
                 let maybe_decoded = match bytes {
-                    Some(b) => Some(Blake3Hash::from_bytes(b)),
+                    Some(b) => Some(Blake2b256Hash::from_bytes(b)),
                     None => None,
                 };
 
@@ -47,8 +47,8 @@ impl RootsStoreInstances {
 
             fn validate_and_set_current_root(
                 &self,
-                key: Blake3Hash,
-            ) -> Result<Option<Blake3Hash>, RootError> {
+                key: Blake2b256Hash,
+            ) -> Result<Option<Blake2b256Hash>, RootError> {
                 println!("\nhit validate_and_set_current_root, key: {}", key);
 
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
@@ -70,7 +70,7 @@ impl RootsStoreInstances {
                 }
             }
 
-            fn record_root(&self, key: &Blake3Hash) -> Result<(), RootError> {
+            fn record_root(&self, key: &Blake2b256Hash) -> Result<(), RootError> {
                 println!("\nhit record_root, key: {}", key);
 
                 let tag: ByteBuffer = "tag".as_bytes().to_vec();

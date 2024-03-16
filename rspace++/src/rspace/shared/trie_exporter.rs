@@ -1,11 +1,11 @@
-use crate::rspace::{hashing::blake3_hash::Blake3Hash, Byte};
+use crate::rspace::{hashing::blake2b256_hash::Blake2b256Hash, Byte};
 
 use super::key_value_store::KvStoreError;
 
 // See shared/src/main/scala/coop/rchain/state/TrieExporter.scala
 
 // Type of the key to uniquely defines the trie / in RSpace this is the hash of the trie
-pub type KeyHash = Blake3Hash;
+pub type KeyHash = Blake2b256Hash;
 
 // Type of the full path to the node
 // - it contains parent nodes with indexes and node itself at the end

@@ -1,4 +1,4 @@
-use super::{event::Produce, hashing::blake3_hash::Blake3Hash, hot_store::HotStoreState};
+use super::{event::Produce, hashing::blake2b256_hash::Blake2b256Hash, hot_store::HotStoreState};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -12,6 +12,6 @@ pub struct SoftCheckpoint<C: Eq + Hash, P: Clone, A: Clone, K: Clone> {
 }
 
 pub struct Checkpoint {
-    pub root: Blake3Hash,
+    pub root: Blake2b256Hash,
     // log: trace.Log
 }

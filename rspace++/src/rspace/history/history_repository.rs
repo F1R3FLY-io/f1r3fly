@@ -1,4 +1,4 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::cold_store::ColdStoreInstances;
 use crate::rspace::history::history::{History, HistoryInstances};
 use crate::rspace::history::history_reader::HistoryReader;
@@ -35,7 +35,7 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
 
     fn reset(
         &self,
-        root: &Blake3Hash,
+        root: &Blake2b256Hash,
     ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError>;
 
     fn history(&self) -> Arc<Mutex<Box<dyn History>>>;
@@ -46,10 +46,10 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
 
     fn get_history_reader(
         &self,
-        state_hash: Blake3Hash,
-    ) -> Result<Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>, HistoryError>;
+        state_hash: Blake2b256Hash,
+    ) -> Result<Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>, HistoryError>;
 
-    fn root(&self) -> Blake3Hash;
+    fn root(&self) -> Blake2b256Hash;
 }
 
 pub struct HistoryRepositoryInstances<C, P, A, K> {

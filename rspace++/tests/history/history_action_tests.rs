@@ -1,5 +1,5 @@
 use rand::distributions::{Alphanumeric, DistString};
-use rspace_plus_plus::rspace::hashing::blake3_hash::Blake3Hash;
+use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryActionTests.scala
 #[cfg(test)]
@@ -13,7 +13,7 @@ mod tests {
     use rspace_plus_plus::rspace::history::radix_tree::RadixTreeError;
     use rspace_plus_plus::rspace::shared::key_value_store::KeyValueStore;
     use rspace_plus_plus::rspace::{
-        hashing::blake3_hash::Blake3Hash,
+        hashing::blake2b256_hash::Blake2b256Hash,
         history::{
             history::{History, HistoryError, HistoryInstances},
             history_action::{
@@ -343,12 +343,12 @@ mod tests {
         let size_inserts = 10000;
         let size_deletes = 3000;
         let size_updates = 1000;
-        let state: BTreeMap<KeyPath, Blake3Hash> = BTreeMap::new();
+        let state: BTreeMap<KeyPath, Blake2b256Hash> = BTreeMap::new();
         let inserts = generate_random_insert(0);
 
         let empty_history = create_empty_history();
 
-        let res: Result<(Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake3Hash>), _> =
+        let res: Result<(Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>), _> =
             (1..=10).try_fold((empty_history, inserts, state), |(history, inserts, state), _| {
                 let new_inserts = generate_random_insert(size_inserts);
                 let new_updates = generate_random_insert_from_insert(size_updates, &inserts);
@@ -400,7 +400,7 @@ mod tests {
                 }
 
                 Ok::<
-                    (Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake3Hash>),
+                    (Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>),
                     Box<dyn Error>,
                 >((new_history.unwrap(), new_inserts, new_state))
             });
@@ -481,9 +481,9 @@ mod tests {
     }
 
     fn update_state(
-        mut state: BTreeMap<KeyPath, Blake3Hash>,
+        mut state: BTreeMap<KeyPath, Blake2b256Hash>,
         actions: &Vec<HistoryAction>,
-    ) -> BTreeMap<KeyPath, Blake3Hash> {
+    ) -> BTreeMap<KeyPath, Blake2b256Hash> {
         for action in actions {
             match action {
                 HistoryAction::Insert(InsertAction { key, hash }) => {
@@ -530,15 +530,15 @@ mod tests {
     }
 }
 
-pub fn random_blake() -> Blake3Hash {
-    Blake3Hash::new(
+pub fn random_blake() -> Blake2b256Hash {
+    Blake2b256Hash::new(
         &Alphanumeric
             .sample_string(&mut rand::thread_rng(), 32)
             .into_bytes(),
     )
 }
 
-pub fn zeros_blake() -> Blake3Hash {
+pub fn zeros_blake() -> Blake2b256Hash {
     let zero_bytes = vec![0u8; 32];
-    Blake3Hash::new(&zero_bytes)
+    Blake2b256Hash::new(&zero_bytes)
 }

@@ -1,4 +1,4 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::shared::key_value_store::KvStoreError;
@@ -199,7 +199,7 @@ fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, Byt
 pub fn hash_node(node: &Node) -> (ByteVector, ByteVector) {
     let bytes = encode(node);
     // println!("\nnode bytes: {:?}", bytes);
-    let hash = Blake3Hash::new(&bytes);
+    let hash = Blake2b256Hash::new(&bytes);
     // println!("\nnode bytes hash: {:?}", hash);
     // println!("\nHash in hash node: {:?}", hash);
     (hash.bytes(), bytes)
@@ -749,7 +749,7 @@ pub struct RadixTreeImpl {
      * Cache for storing read and decoded nodes.
      *
      * Cache stores kv-pairs (hash, node).
-     * Where hash - Blake3Hash of serializing nodes data,
+     * Where hash - Blake2b256Hash of serializing nodes data,
      *       node - deserialized data of this node.
      */
     pub cache_r: DashMap<ByteVector, Node>,
@@ -757,7 +757,7 @@ pub struct RadixTreeImpl {
      * Cache for storing serializing nodes. For subsequent unloading in KVDB
      *
      * Cache stores kv-pairs (hash, bytes).
-     * Where hash -  Blake3Hash of bytes,
+     * Where hash -  Blake2b256Hash of bytes,
      *       bytes - serializing data of nodes.
      */
     pub cache_w: DashMap<ByteVector, ByteVector>,

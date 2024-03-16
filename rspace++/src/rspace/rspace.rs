@@ -1,5 +1,5 @@
 use super::checkpoint::SoftCheckpoint;
-use super::hashing::blake3_hash::Blake3Hash;
+use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history::HistoryError;
 use super::history::history_reader::HistoryReader;
 use super::history::history_repository::HistoryRepositoryError;
@@ -464,7 +464,7 @@ where
         self.store.to_map().await
     }
 
-    pub fn reset(&mut self, root: Blake3Hash) -> Result<(), RSpaceError> {
+    pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
@@ -480,7 +480,7 @@ where
 
     fn create_new_hot_store(
         &mut self,
-        history_reader: Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>,
+        history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
         let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         self.store = next_hot_store;

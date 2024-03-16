@@ -5,7 +5,7 @@ use rayon::{
 use std::{collections::HashMap, sync::Arc};
 
 use crate::rspace::{
-    hashing::blake3_hash::Blake3Hash,
+    hashing::blake2b256_hash::Blake2b256Hash,
     shared::{trie_exporter::KeyHash, trie_importer::TrieImporter},
     state::rspace_exporter::RSpaceExporterInstance,
     ByteVector,
@@ -20,12 +20,12 @@ struct RSpaceImporterInstance;
 
 impl RSpaceImporterInstance {
     async fn validate_state_items(
-        history_items: Vec<(Blake3Hash, ByteVector)>,
-        data_items: Vec<(Blake3Hash, ByteVector)>,
-        start_path: Vec<(Blake3Hash, Option<u8>)>,
+        history_items: Vec<(Blake2b256Hash, ByteVector)>,
+        data_items: Vec<(Blake2b256Hash, ByteVector)>,
+        start_path: Vec<(Blake2b256Hash, Option<u8>)>,
         chunk_size: usize,
         skip: usize,
-        get_from_history: fn(Blake3Hash) -> Option<ByteVector>,
+        get_from_history: fn(Blake2b256Hash) -> Option<ByteVector>,
     ) -> () {
         let received_history_size = history_items.len();
         let is_end = || received_history_size < chunk_size;
@@ -42,7 +42,7 @@ impl RSpaceImporterInstance {
         let get_and_validate_history_items = || {
             let mut validated_items = Vec::new();
             for (hash, trie_bytes) in history_items.clone() {
-                let trie_hash = Blake3Hash::new(&trie_bytes);
+                let trie_hash = Blake2b256Hash::new(&trie_bytes);
                 if hash == trie_hash {
                     validated_items.push((trie_hash.bytes(), trie_bytes));
                 } else {
@@ -57,7 +57,7 @@ impl RSpaceImporterInstance {
             let pool = ThreadPoolBuilder::new().num_threads(64).build().unwrap();
             pool.install(|| {
                 data_items.par_iter().try_for_each(|(hash, value_bytes)| {
-                    let data_hash = Blake3Hash::new(value_bytes);
+                    let data_hash = Blake2b256Hash::new(value_bytes);
                     if *hash != data_hash {
                         Err(format!(
                             "Data hash does not match decoded data, key: {}, decoded: {}.",
@@ -71,7 +71,7 @@ impl RSpaceImporterInstance {
             })
         };
 
-        fn node_hash_not_found_error(h: Blake3Hash) {
+        fn node_hash_not_found_error(h: Blake2b256Hash) {
             panic!("RSpace Importer: Trie hash not found in received items or in history store, hash: {}", hex::encode(h.bytes()))
         }
 
@@ -79,9 +79,9 @@ impl RSpaceImporterInstance {
             Arc::new(move |hash: &ByteVector| {
                 match st.get(hash) {
                 Some(value) => Some(value.clone()),
-                None => match get_from_history(Blake3Hash::new(hash)) {
+                None => match get_from_history(Blake2b256Hash::new(hash)) {
                     Some(bytes) => Some(bytes),
-                    None => panic!("RSpace Importer: Trie hash not found in received items or in history store, hash: {}", hex::encode(Blake3Hash::new(&hash).bytes())),
+                    None => panic!("RSpace Importer: Trie hash not found in received items or in history store, hash: {}", hex::encode(Blake2b256Hash::new(&hash).bytes())),
                 },
             }
             })
@@ -105,20 +105,20 @@ impl RSpaceImporterInstance {
 
         // Extract history and data keys.
         let (leafs, non_leafs): (Vec<_>, Vec<_>) = nodes.into_iter().partition(|node| node.is_leaf);
-        let history_keys: Vec<Blake3Hash> = non_leafs
+        let history_keys: Vec<Blake2b256Hash> = non_leafs
             .into_iter()
             .map(|non_leaf| non_leaf.hash)
             .collect();
-        let data_keys: Vec<Blake3Hash> = leafs.into_iter().map(|leaf| leaf.hash).collect();
+        let data_keys: Vec<Blake2b256Hash> = leafs.into_iter().map(|leaf| leaf.hash).collect();
 
         // Validate keys / cryptographic proof that store chunk is not corrupted or modified.
-        let history_item_keys: Vec<Blake3Hash> =
+        let history_item_keys: Vec<Blake2b256Hash> =
             history_items.into_iter().map(|item| item.0).collect();
         if !(history_item_keys == history_keys) {
             panic!("RSpace Importer: History items are corrupted")
         }
 
-        let data_item_keys: Vec<Blake3Hash> =
+        let data_item_keys: Vec<Blake2b256Hash> =
             data_items.clone().into_iter().map(|item| item.0).collect();
         if !(data_item_keys == data_keys) {
             panic!("RSpace Importer: Data items are corrupted")

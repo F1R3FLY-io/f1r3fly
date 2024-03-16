@@ -2,7 +2,7 @@ use dashmap::DashMap;
 use prost::Message;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::event::{Consume, Produce};
-use rspace_plus_plus::rspace::hashing::blake3_hash::Blake3Hash;
+use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
@@ -270,7 +270,7 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
 #[no_mangle]
 pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_len: usize) -> () {
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
-    let root = Blake3Hash::from_bytes(root_slice.to_vec());
+    let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
     unsafe {
         (*rspace)
@@ -663,9 +663,9 @@ pub extern "C" fn revert_to_soft_checkpoint(
                                 channel_hashes: consume_proto
                                     .channel_hashes
                                     .iter()
-                                    .map(|hash_bytes| Blake3Hash::from_bytes(hash_bytes.to_vec()))
+                                    .map(|hash_bytes| Blake2b256Hash::from_bytes(hash_bytes.to_vec()))
                                     .collect(),
-                                hash: Blake3Hash::from_bytes(consume_proto.hash),
+                                hash: Blake2b256Hash::from_bytes(consume_proto.hash),
                                 persistent: consume_proto.persistent,
                             }
                         },
@@ -696,9 +696,9 @@ pub extern "C" fn revert_to_soft_checkpoint(
                             channel_hashes: consume_proto
                                 .channel_hashes
                                 .iter()
-                                .map(|hash_bytes| Blake3Hash::from_bytes(hash_bytes.to_vec()))
+                                .map(|hash_bytes| Blake2b256Hash::from_bytes(hash_bytes.to_vec()))
                                 .collect(),
-                            hash: Blake3Hash::from_bytes(consume_proto.hash),
+                            hash: Blake2b256Hash::from_bytes(consume_proto.hash),
                             persistent: consume_proto.persistent,
                         }
                     },
@@ -722,8 +722,8 @@ pub extern "C" fn revert_to_soft_checkpoint(
                         source: {
                             let produce_proto = datum_proto.source.unwrap();
                             Produce {
-                                channel_hash: Blake3Hash::from_bytes(produce_proto.channel_hash),
-                                hash: Blake3Hash::from_bytes(produce_proto.hash),
+                                channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                                hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                                 persistent: produce_proto.persistent,
                             }
                         },
@@ -770,8 +770,8 @@ pub extern "C" fn revert_to_soft_checkpoint(
             .map(|map_entry| {
                 let key_proto = map_entry.key.unwrap();
                 let produce = Produce {
-                    channel_hash: Blake3Hash::from_bytes(key_proto.channel_hash),
-                    hash: Blake3Hash::from_bytes(key_proto.hash),
+                    channel_hash: Blake2b256Hash::from_bytes(key_proto.channel_hash),
+                    hash: Blake2b256Hash::from_bytes(key_proto.hash),
                     persistent: key_proto.persistent,
                 };
 

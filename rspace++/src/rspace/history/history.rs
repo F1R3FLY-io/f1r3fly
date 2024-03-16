@@ -1,7 +1,7 @@
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::shared::key_value_store::KeyValueStore;
-use crate::rspace::{hashing::blake3_hash::Blake3Hash, shared::key_value_store::KvStoreError};
+use crate::rspace::{hashing::blake2b256_hash::Blake2b256Hash, shared::key_value_store::KvStoreError};
 use std::sync::{Arc, Mutex};
 
 use super::radix_tree::RadixTreeError;
@@ -13,16 +13,16 @@ pub trait History: Send + Sync {
 
     fn process(&self, actions: Vec<HistoryAction>) -> Result<Box<dyn History>, HistoryError>;
 
-    fn root(&self) -> Blake3Hash;
+    fn root(&self) -> Blake2b256Hash;
 
-    fn reset(&self, root: &Blake3Hash) -> Result<Box<dyn History>, HistoryError>;
+    fn reset(&self, root: &Blake2b256Hash) -> Result<Box<dyn History>, HistoryError>;
 }
 
 pub struct HistoryInstances;
 
 impl HistoryInstances {
     pub fn create(
-        root: Blake3Hash,
+        root: Blake2b256Hash,
         store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Result<RadixHistory, HistoryError> {
         let typed_store = RadixHistory::create_store(store.to_owned());

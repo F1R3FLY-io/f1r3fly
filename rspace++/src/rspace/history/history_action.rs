@@ -1,4 +1,4 @@
-use crate::rspace::{hashing::blake3_hash::Blake3Hash, Byte};
+use crate::rspace::{hashing::blake2b256_hash::Blake2b256Hash, Byte};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryAction.scala
 pub type KeyPath = Vec<Byte>;
@@ -16,7 +16,7 @@ pub trait HistoryActionTrait {
 #[derive(Clone, Debug)]
 pub struct InsertAction {
     pub key: KeyPath,
-    pub hash: Blake3Hash,
+    pub hash: Blake2b256Hash,
 }
 
 impl HistoryActionTrait for InsertAction {

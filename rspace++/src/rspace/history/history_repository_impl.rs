@@ -4,7 +4,7 @@ use super::history_action::{DeleteAction, HistoryAction, InsertAction};
 use super::history_reader::HistoryReader;
 use super::history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT};
 use super::instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl;
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use crate::rspace::history::cold_store::PersistedData;
 use crate::rspace::history::history::History;
@@ -34,14 +34,14 @@ use std::sync::{Arc, Mutex};
 pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub current_history: Arc<Mutex<Box<dyn History>>>,
     pub roots_repository: Arc<Mutex<RootRepository>>,
-    // pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    // pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
     pub leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     pub rspace_exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
     pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter>>>,
     pub _marker: PhantomData<(C, P, A, K)>,
 }
 
-type ColdAction = (Blake3Hash, Option<PersistedData>);
+type ColdAction = (Blake2b256Hash, Option<PersistedData>);
 
 impl<C, P, A, K> HistoryRepositoryImpl<C, P, A, K>
 where
@@ -106,7 +106,7 @@ where
                 let data_leaf = DataLeaf { bytes: data };
                 let data_leaf_encoded = bincode::serialize(&data_leaf)
                     .expect("History Repository Impl: Unable to serialize DataLeaf");
-                let data_hash = Blake3Hash::new(&data_leaf_encoded);
+                let data_hash = Blake2b256Hash::new(&data_leaf_encoded);
 
                 (
                     (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
@@ -121,7 +121,7 @@ where
                 let continuations_leaf = ContinuationsLeaf { bytes: data };
                 let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
                     .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
-                let continuations_hash = Blake3Hash::new(&continuations_leaf_encoded);
+                let continuations_hash = Blake2b256Hash::new(&continuations_leaf_encoded);
 
                 (
                     (
@@ -139,7 +139,7 @@ where
                 let joins_leaf = JoinsLeaf { bytes: data };
                 let joins_leaf_encoded = bincode::serialize(&joins_leaf)
                     .expect("History Repository Impl: Unable to serialize JoinsLeaf");
-                let joins_hash = Blake3Hash::new(&joins_leaf_encoded);
+                let joins_hash = Blake2b256Hash::new(&joins_leaf_encoded);
 
                 (
                     (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
@@ -154,7 +154,7 @@ where
                 let data_leaf = DataLeaf { bytes: data };
                 let data_leaf_encoded = bincode::serialize(&data_leaf)
                     .expect("History Repository Impl: Unable to serialize DataLeaf");
-                let data_hash = Blake3Hash::new(&data_leaf_encoded);
+                let data_hash = Blake2b256Hash::new(&data_leaf_encoded);
 
                 (
                     (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
@@ -169,7 +169,7 @@ where
                 let continuations_leaf = ContinuationsLeaf { bytes: data };
                 let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
                     .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
-                let continuations_hash = Blake3Hash::new(&continuations_leaf_encoded);
+                let continuations_hash = Blake2b256Hash::new(&continuations_leaf_encoded);
 
                 (
                     (
@@ -187,7 +187,7 @@ where
                 let joins_leaf = JoinsLeaf { bytes: data };
                 let joins_leaf_encoded = bincode::serialize(&joins_leaf)
                     .expect("History Repository Impl: Unable to serialize JoinsLeaf");
-                let joins_hash = Blake3Hash::new(&joins_leaf_encoded);
+                let joins_hash = Blake2b256Hash::new(&joins_leaf_encoded);
 
                 (
                     (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
@@ -296,7 +296,7 @@ where
             .map(|a| self.calculate_storage_actions(a))
             .collect();
 
-        let cold_actions: Vec<(Blake3Hash, PersistedData)> = storage_actions
+        let cold_actions: Vec<(Blake2b256Hash, PersistedData)> = storage_actions
             .clone()
             .into_iter()
             .filter_map(|(key_data, _)| match key_data {
@@ -380,7 +380,7 @@ where
 
     fn reset(
         &self,
-        root: &Blake3Hash,
+        root: &Blake2b256Hash,
     ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryError> {
         println!("\nhit reset, root: {}", root);
 
@@ -420,8 +420,8 @@ where
 
     fn get_history_reader(
         &self,
-        state_hash: Blake3Hash,
-    ) -> Result<Box<dyn HistoryReader<Blake3Hash, C, P, A, K>>, HistoryError> {
+        state_hash: Blake2b256Hash,
+    ) -> Result<Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>, HistoryError> {
         let history_lock = self
             .current_history
             .lock()
@@ -430,7 +430,7 @@ where
         Ok(Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone())))
     }
 
-    fn root(&self) -> Blake3Hash {
+    fn root(&self) -> Blake2b256Hash {
         let history_lock = self
             .current_history
             .lock()

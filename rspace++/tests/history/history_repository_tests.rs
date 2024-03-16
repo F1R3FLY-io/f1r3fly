@@ -4,7 +4,7 @@ mod tests {
     use rand::prelude::SliceRandom;
     use rspace_plus_plus::rspace::{
         event::{Consume, Produce},
-        hashing::blake3_hash::Blake3Hash,
+        hashing::blake2b256_hash::Blake2b256Hash,
         history::{
             history::{HistoryError, HistoryInstances},
             history_repository::HistoryRepository,
@@ -398,19 +398,19 @@ mod tests {
     }
 
     struct InmemRootsStore {
-        roots: Arc<Mutex<HashSet<Blake3Hash>>>,
-        maybe_current_root: Arc<Mutex<Option<Blake3Hash>>>,
+        roots: Arc<Mutex<HashSet<Blake2b256Hash>>>,
+        maybe_current_root: Arc<Mutex<Option<Blake2b256Hash>>>,
     }
 
     impl RootsStore for InmemRootsStore {
-        fn current_root(&self) -> Result<Option<Blake3Hash>, RootError> {
+        fn current_root(&self) -> Result<Option<Blake2b256Hash>, RootError> {
             Ok(self.maybe_current_root.lock().unwrap().clone())
         }
 
         fn validate_and_set_current_root(
             &self,
-            key: Blake3Hash,
-        ) -> Result<Option<Blake3Hash>, RootError> {
+            key: Blake2b256Hash,
+        ) -> Result<Option<Blake2b256Hash>, RootError> {
             let roots_lock = self.roots.lock().unwrap();
             let mut maybe_current_root_lock = self.maybe_current_root.lock().unwrap();
 
@@ -422,7 +422,7 @@ mod tests {
             }
         }
 
-        fn record_root(&self, key: &Blake3Hash) -> Result<(), RootError> {
+        fn record_root(&self, key: &Blake2b256Hash) -> Result<(), RootError> {
             let mut roots_lock = self.roots.lock().unwrap();
             let mut maybe_current_root_lock = self.maybe_current_root.lock().unwrap();
 

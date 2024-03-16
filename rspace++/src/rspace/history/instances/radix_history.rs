@@ -1,4 +1,4 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history::HistoryError;
 use crate::rspace::history::history_action::HistoryAction;
@@ -13,7 +13,7 @@ use std::sync::Mutex;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
 pub struct RadixHistory {
-    root_hash: Blake3Hash,
+    root_hash: Blake2b256Hash,
     root_node: Node,
     imple: RadixTreeImpl,
     store: Arc<Mutex<Box<dyn KeyValueStore>>>,
@@ -21,7 +21,7 @@ pub struct RadixHistory {
 
 impl RadixHistory {
     pub fn create(
-        root: Blake3Hash,
+        root: Blake2b256Hash,
         store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Result<RadixHistory, HistoryError> {
         let imple = RadixTreeImpl::new(store.clone());
@@ -43,9 +43,9 @@ impl RadixHistory {
         store
     }
 
-    pub fn empty_root_node_hash() -> Blake3Hash {
+    pub fn empty_root_node_hash() -> Blake2b256Hash {
         let node_hash_bytes = hash_node(&empty_node()).0;
-        let node_hash = Blake3Hash::from_bytes(node_hash_bytes);
+        let node_hash = Blake2b256Hash::from_bytes(node_hash_bytes);
         node_hash
     }
 
@@ -85,7 +85,7 @@ impl History for RadixHistory {
                 //     "\nRadix Tree after Radix History save_node: {:?}",
                 //     self.imple.print_tree(&new_root_node, vec![])
                 // );
-                let root_hash = Blake3Hash::from_bytes(node_hash_bytes);
+                let root_hash = Blake2b256Hash::from_bytes(node_hash_bytes);
                 // println!("\nnew_root_node hash: {:?}", root_hash);
                 let new_history = RadixHistory {
                     root_hash,
@@ -129,11 +129,11 @@ impl History for RadixHistory {
         }
     }
 
-    fn root(&self) -> Blake3Hash {
+    fn root(&self) -> Blake2b256Hash {
         self.root_hash.clone()
     }
 
-    fn reset(&self, root: &Blake3Hash) -> Result<Box<dyn History>, HistoryError> {
+    fn reset(&self, root: &Blake2b256Hash) -> Result<Box<dyn History>, HistoryError> {
         let imple = RadixTreeImpl::new(self.store.clone());
         let node = imple.load_node(root.bytes(), Some(true))?;
 

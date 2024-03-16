@@ -1,6 +1,6 @@
 use crate::rspace::{
     hashing::{
-        blake3_hash::Blake3Hash,
+        blake2b256_hash::Blake2b256Hash,
         stable_hash_provider::{hash, hash_from_vec},
     },
     history::{
@@ -23,7 +23,7 @@ use std::{
 #[derive(Clone)]
 pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
     target_history: Arc<Box<dyn History>>,
-    // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+    // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
     leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     _marker: PhantomData<(C, P, A, K)>,
 }
@@ -31,7 +31,7 @@ pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
 impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     pub fn new(
         target_history: Box<dyn History>,
-        // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake3Hash, PersistedData>>>>,
+        // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
         leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Self {
         RSpaceHistoryReaderImpl {
@@ -45,7 +45,7 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     fn fetch_data(
         &self,
         prefix: u8,
-        key: &Blake3Hash,
+        key: &Blake2b256Hash,
     ) -> Result<Option<PersistedData>, HistoryError> {
         let read_bytes = self
             .target_history
@@ -53,7 +53,7 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
 
         match read_bytes {
             Some(bytes) => {
-                let read_hash = Blake3Hash::from_bytes(bytes);
+                let read_hash = Blake2b256Hash::from_bytes(bytes);
                 let leaf_store_lock = self
                     .leaf_store
                     .lock()
@@ -74,18 +74,18 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     }
 }
 
-impl<C, P, A, K> HistoryReader<Blake3Hash, C, P, A, K> for RSpaceHistoryReaderImpl<C, P, A, K>
+impl<C, P, A, K> HistoryReader<Blake2b256Hash, C, P, A, K> for RSpaceHistoryReaderImpl<C, P, A, K>
 where
     C: Clone + for<'a> Deserialize<'a> + Serialize + 'static + Sync + Send,
     P: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
     A: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
     K: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
 {
-    fn root(&self) -> Blake3Hash {
+    fn root(&self) -> Blake2b256Hash {
         self.target_history.root()
     }
 
-    fn get_data_proj(&self, key: &Blake3Hash) -> Result<Vec<Datum<A>>, HistoryError> {
+    fn get_data_proj(&self, key: &Blake2b256Hash) -> Result<Vec<Datum<A>>, HistoryError> {
         match self.fetch_data(PREFIX_DATUM, key)? {
             Some(PersistedData::Data(data_leaf)) => Ok(decode_datums(&data_leaf.bytes)),
             Some(p) => {
@@ -100,7 +100,7 @@ where
 
     fn get_continuations_proj(
         &self,
-        key: &Blake3Hash,
+        key: &Blake2b256Hash,
     ) -> Result<Vec<WaitingContinuation<P, K>>, HistoryError> {
         match self.fetch_data(PREFIX_KONT, key)? {
             Some(PersistedData::Continuations(continuation_leaf)) => {
@@ -116,7 +116,7 @@ where
         }
     }
 
-    fn get_joins_proj(&self, key: &Blake3Hash) -> Result<Vec<Vec<C>>, HistoryError> {
+    fn get_joins_proj(&self, key: &Blake2b256Hash) -> Result<Vec<Vec<C>>, HistoryError> {
         match self.fetch_data(PREFIX_JOINS, key)? {
             Some(PersistedData::Joins(joins_leaf)) => Ok(decode_joins(&joins_leaf.bytes)),
             Some(p) => {

@@ -1,4 +1,4 @@
-use crate::rspace::hashing::blake3_hash::Blake3Hash;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::instances::radix_history::RadixHistory;
 use crate::rspace::history::roots_store::{RootError, RootsStore, RootsStoreInstances};
 use crate::rspace::shared::key_value_store::KvStoreError;
@@ -36,8 +36,8 @@ impl RSpaceExporterImpl {
     fn get_items(
         &self,
         store: Arc<Mutex<Box<dyn KeyValueStore>>>,
-        keys: Vec<Blake3Hash>,
-    ) -> Result<Vec<(Blake3Hash, Value)>, KvStoreError> {
+        keys: Vec<Blake2b256Hash>,
+    ) -> Result<Vec<(Blake2b256Hash, Value)>, KvStoreError> {
         let store_lock = store
             .lock()
             .expect("RSpace Exporter Store: Failed to acquire lock on store");
@@ -52,7 +52,7 @@ impl RSpaceExporterImpl {
 }
 
 impl RSpaceExporter for RSpaceExporterImpl {
-    fn get_root(&self) -> Result<Blake3Hash, RootError> {
+    fn get_root(&self) -> Result<Blake2b256Hash, RootError> {
         let roots_store = RootsStoreInstances::roots_store(self.source_roots_store.clone());
         let maybe_root = roots_store.current_root()?;
         match maybe_root {
@@ -82,12 +82,12 @@ impl TrieExporter for RSpaceExporterImpl {
 
     fn get_history_items(
         &self,
-        keys: Vec<Blake3Hash>,
+        keys: Vec<Blake2b256Hash>,
     ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
         self.get_items(self.source_history_store.clone(), keys)
     }
 
-    fn get_data_items(&self, keys: Vec<Blake3Hash>) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
+    fn get_data_items(&self, keys: Vec<Blake2b256Hash>) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
         self.get_items(self.source_value_store.clone(), keys)
     }
 }
