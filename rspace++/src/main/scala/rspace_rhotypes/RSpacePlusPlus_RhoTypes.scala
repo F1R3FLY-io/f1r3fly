@@ -43,6 +43,7 @@ import coop.rchain.rspace.HotStoreState
 
 import scala.collection.immutable.Map
 import com.google.protobuf.ByteString
+import coop.rchain.rspace.history.HistoryRepository
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -859,6 +860,12 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                  new RSpacePlusPlus_RhoTypes[F](rspace)
                }
     } yield result
+
+  // RSpaceOps functions
+  def historyRepo: HistoryRepository[F, C, P, A, K] = {
+    println("\nhistoryRepo")
+    ???
+  }
 }
 
 object RSpacePlusPlus_RhoTypes {

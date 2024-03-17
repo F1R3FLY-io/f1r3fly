@@ -293,26 +293,37 @@ object RuntimeManager {
     //       RuntimeManager[F](rSpacePlay, rSpaceReplay, historyRepo, mergeableStore, mergeableTagName)
     //         .map((_, historyRepo))
     //   }
+
     RSpacePlusPlus_RhoTypes
       .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
       .flatMap {
         case (rSpacePlay, rSpaceReplay) =>
-          HistoryRepositoryInstances
-            .lmdbRepository[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-              store.history,
-              store.roots,
-              store.cold
-            )
-            .flatMap { historyRepo =>
-              RuntimeManager[F](
-                rSpacePlay,
-                rSpaceReplay,
-                historyRepo,
-                mergeableStore,
-                mergeableTagName
-              ).map((_, historyRepo))
-            }
+          val historyRepo = rSpacePlay.historyRepo
+          RuntimeManager[F](rSpacePlay, rSpaceReplay, historyRepo, mergeableStore, mergeableTagName)
+            .map((_, historyRepo))
       }
+
+    // RSpacePlusPlus_RhoTypes
+    //   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
+    //   .flatMap {
+    //     case (rSpacePlay, rSpaceReplay) =>
+    //       // HistoryRepositoryInstances
+    //       //   .lmdbRepository[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+    //       //     store.history,
+    //       //     store.roots,
+    //       //     store.cold
+    //       //   )
+    //       rSpacePlay.historyRepo
+    //         .flatMap { historyRepo =>
+    //           RuntimeManager[F](
+    //             rSpacePlay,
+    //             rSpaceReplay,
+    //             historyRepo,
+    //             mergeableStore,
+    //             mergeableTagName
+    //           ).map((_, historyRepo))
+    //         }
+    //   }
   }
 
   /**
