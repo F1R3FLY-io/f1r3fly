@@ -18,8 +18,8 @@ object RNodeKeyValueStoreManager {
   // Config name is used as a sub-folder for LMDB files
 
   // RSpace
-  // private val rspaceHistoryEnvConfig = LmdbEnvConfig(name = "rspace/history", maxEnvSize = 1 * tb)
-  // private val rspaceColdEnvConfig    = LmdbEnvConfig(name = "rspace/cold", maxEnvSize = 1 * tb)
+  private val rspaceHistoryEnvConfig = LmdbEnvConfig(name = "rspace/history", maxEnvSize = 1 * tb)
+  private val rspaceColdEnvConfig    = LmdbEnvConfig(name = "rspace/cold", maxEnvSize = 1 * tb)
   // RSpace evaluator
   private val evalHistoryEnvConfig = LmdbEnvConfig(name = "eval/history", maxEnvSize = 1 * tb)
   private val evalColdEnvConfig    = LmdbEnvConfig(name = "eval/cold", maxEnvSize = 1 * tb)
@@ -34,8 +34,8 @@ object RNodeKeyValueStoreManager {
 
   // Legacy RSpace paths
   val legacyRSpacePathPrefix = "rspace/casper/v2"
-  // private def legacyEnvConfig(dir: String) =
-  //   LmdbEnvConfig(s"$legacyRSpacePathPrefix/$dir", maxEnvSize = 1 * tb)
+  private def legacyEnvConfig(dir: String) =
+    LmdbEnvConfig(s"$legacyRSpacePathPrefix/$dir", maxEnvSize = 1 * tb)
 
   // Database name to store instance name mapping (sub-folder for LMDB store)
   // - keys with the same instance will be in one LMDB file (environment)
@@ -70,17 +70,17 @@ object RNodeKeyValueStoreManager {
       if (!legacyRSpacePaths) {
         // History and roots maps are part of the same LMDB file (environment)
         Seq(
-          // (Db("rspace-history"), rspaceHistoryEnvConfig),
-          // (Db("rspace-roots"), rspaceHistoryEnvConfig),
-          // (Db("rspace-cold"), rspaceColdEnvConfig)
+          (Db("rspace-history"), rspaceHistoryEnvConfig),
+          (Db("rspace-roots"), rspaceHistoryEnvConfig),
+          (Db("rspace-cold"), rspaceColdEnvConfig)
         )
       } else
         // Legacy config has the same database name for all maps
         Seq(
-          // (Db("rspace-history", nameOverride = "db".some), legacyEnvConfig("history")),
-          // (Db("rspace-roots", nameOverride = "db".some), legacyEnvConfig("roots")),
-          // (Db("rspace-cold", nameOverride = "db".some), legacyEnvConfig("cold")),
-          // (Db("rspace-channels", nameOverride = "db".some), legacyEnvConfig("channels"))
+          (Db("rspace-history", nameOverride = "db".some), legacyEnvConfig("history")),
+          (Db("rspace-roots", nameOverride = "db".some), legacyEnvConfig("roots")),
+          (Db("rspace-cold", nameOverride = "db".some), legacyEnvConfig("cold")),
+          (Db("rspace-channels", nameOverride = "db".some), legacyEnvConfig("channels"))
         )
     )
 }

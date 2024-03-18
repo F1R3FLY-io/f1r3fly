@@ -270,15 +270,15 @@ object RuntimeManager {
 
   // NOTE: Removed "implicit ec: ExecutionContext" parameter
   def apply[F[_]: Concurrent: ContextShift: Parallel: Metrics: Span: Log](
-      store: RSpaceStore[F],
+      // store: RSpaceStore[F],
       mergeableStore: MergeableStore[F],
       mergeableTagName: Par
   )(): F[RuntimeManagerImpl[F]] =
-    createWithHistory(store, mergeableStore, mergeableTagName).map(_._1)
+    createWithHistory(mergeableStore, mergeableTagName).map(_._1)
 
   // NOTE: Removed "implicit ec: ExecutionContext" parameter
   def createWithHistory[F[_]: Concurrent: ContextShift: Parallel: Metrics: Span: Log](
-      store: RSpaceStore[F],
+      // store: RSpaceStore[F],
       mergeableStore: MergeableStore[F],
       mergeableTagName: Par
   )(): F[(RuntimeManagerImpl[F], RhoHistoryRepository[F])] = {

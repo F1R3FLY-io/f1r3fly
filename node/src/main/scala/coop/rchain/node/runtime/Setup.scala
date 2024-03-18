@@ -160,10 +160,10 @@ object Setup {
       runtimeManagerWithHistory <- {
         implicit val sp = span
         for {
-          rStores    <- rnodeStoreManager.rSpaceStores
+          // rStores    <- rnodeStoreManager.rSpaceStores
           mergeStore <- RuntimeManager.mergeableStore(rnodeStoreManager)
           rm <- RuntimeManager
-                 .createWithHistory[F](rStores, mergeStore, Genesis.NonNegativeMergeableTagName)
+                 .createWithHistory[F](mergeStore, Genesis.NonNegativeMergeableTagName)
         } yield rm
       }
       (runtimeManager, historyRepo) = runtimeManagerWithHistory
@@ -173,7 +173,8 @@ object Setup {
         implicit val (bs, bd, sp) = (blockStore, blockDagStorage, span)
         if (conf.apiServer.enableReporting) {
           // In reporting replay channels map is not needed
-          rnodeStoreManager.rSpaceStores.map(ReportingCasper.rhoReporter(_))
+          // rnodeStoreManager.rSpaceStores.map(ReportingCasper.rhoReporter(_))
+          ReportingCasper.noop.pure[F]
         } else
           ReportingCasper.noop.pure[F]
       }
