@@ -174,6 +174,7 @@ object Setup {
         if (conf.apiServer.enableReporting) {
           // In reporting replay channels map is not needed
           // rnodeStoreManager.rSpaceStores.map(ReportingCasper.rhoReporter(_))
+          println("\nenableReporting is disabled because of RSpace++")
           ReportingCasper.noop.pure[F]
         } else
           ReportingCasper.noop.pure[F]
