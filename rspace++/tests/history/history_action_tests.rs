@@ -21,7 +21,7 @@ mod tests {
             },
             instances::radix_history::RadixHistory,
         },
-        shared::mem_key_value_store::InMemoryKeyValueStore,
+        shared::in_mem_key_value_store::InMemoryKeyValueStore,
         Byte, ByteVector,
     };
 
@@ -348,62 +348,64 @@ mod tests {
 
         let empty_history = create_empty_history();
 
-        let res: Result<(Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>), _> =
-            (1..=10).try_fold((empty_history, inserts, state), |(history, inserts, state), _| {
-                let new_inserts = generate_random_insert(size_inserts);
-                let new_updates = generate_random_insert_from_insert(size_updates, &inserts);
+        let res: Result<
+            (Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>),
+            _,
+        > = (1..=10).try_fold((empty_history, inserts, state), |(history, inserts, state), _| {
+            let new_inserts = generate_random_insert(size_inserts);
+            let new_updates = generate_random_insert_from_insert(size_updates, &inserts);
 
-                let update_keys: HashSet<KeyPath> =
-                    new_updates.iter().map(|action| action.key()).collect();
+            let update_keys: HashSet<KeyPath> =
+                new_updates.iter().map(|action| action.key()).collect();
 
-                let last_inserts: Vec<HistoryAction> = inserts
-                    .into_iter()
-                    .filter(|i| !update_keys.contains(&i.key()))
-                    .collect();
+            let last_inserts: Vec<HistoryAction> = inserts
+                .into_iter()
+                .filter(|i| !update_keys.contains(&i.key()))
+                .collect();
 
-                let new_deletes = generate_random_delete_from_insert(size_deletes, last_inserts)
-                    .into_iter()
-                    .chain(generate_random_delete(size_deletes).into_iter())
-                    .collect::<Vec<_>>();
+            let new_deletes = generate_random_delete_from_insert(size_deletes, last_inserts)
+                .into_iter()
+                .chain(generate_random_delete(size_deletes).into_iter())
+                .collect::<Vec<_>>();
 
-                let actions = new_inserts
-                    .clone()
-                    .into_iter()
-                    .chain(new_deletes.clone().into_iter())
-                    .chain(new_updates.into_iter())
-                    .collect::<Vec<_>>();
+            let actions = new_inserts
+                .clone()
+                .into_iter()
+                .chain(new_deletes.clone().into_iter())
+                .chain(new_updates.into_iter())
+                .collect::<Vec<_>>();
 
-                println!("\nprocess {}", actions.len());
-                let new_history = history.process(actions.clone());
-                assert!(new_history.is_ok());
-                let new_state = update_state(state, &actions);
-                println!("\nThe new state size is {}", new_state.len());
+            println!("\nprocess {}", actions.len());
+            let new_history = history.process(actions.clone());
+            assert!(new_history.is_ok());
+            let new_state = update_state(state, &actions);
+            println!("\nThe new state size is {}", new_state.len());
 
-                for (k, value) in new_state.iter() {
-                    match new_history.as_ref().unwrap().read(k.to_vec()) {
-                        Ok(Some(v)) => assert!(v == value.bytes()),
-                        Err(e) => {
-                            println!("{:?}", e);
-                            assert!(false, "Can not get value")
-                        }
-                        Ok(None) => {
-                            assert!(false, "Can not get value")
-                        }
+            for (k, value) in new_state.iter() {
+                match new_history.as_ref().unwrap().read(k.to_vec()) {
+                    Ok(Some(v)) => assert!(v == value.bytes()),
+                    Err(e) => {
+                        println!("{:?}", e);
+                        assert!(false, "Can not get value")
+                    }
+                    Ok(None) => {
+                        assert!(false, "Can not get value")
                     }
                 }
+            }
 
-                for d in new_deletes.iter() {
-                    match new_history.as_ref().unwrap().read(d.key()) {
-                        Ok(None) => assert!(true),
-                        _ => assert!(false, "got empty pointer after remove"),
-                    }
+            for d in new_deletes.iter() {
+                match new_history.as_ref().unwrap().read(d.key()) {
+                    Ok(None) => assert!(true),
+                    _ => assert!(false, "got empty pointer after remove"),
                 }
+            }
 
-                Ok::<
-                    (Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>),
-                    Box<dyn Error>,
-                >((new_history.unwrap(), new_inserts, new_state))
-            });
+            Ok::<
+                (Box<dyn History>, Vec<HistoryAction>, BTreeMap<Vec<u8>, Blake2b256Hash>),
+                Box<dyn Error>,
+            >((new_history.unwrap(), new_inserts, new_state))
+        });
 
         assert!(res.is_ok());
     }

@@ -19,8 +19,8 @@ mod tests {
         },
         internal::{Datum, WaitingContinuation},
         shared::{
+            in_mem_key_value_store::InMemoryKeyValueStore,
             key_value_store::{KeyValueStore, KvStoreError},
-            mem_key_value_store::InMemoryKeyValueStore,
             trie_exporter::{KeyHash, NodePath, TrieExporter, TrieNode, Value},
             trie_importer::TrieImporter,
         },
@@ -257,14 +257,22 @@ mod tests {
             .iter()
             .map(|c| deleted_reader.get_continuations(&c.channels))
             .collect();
-        assert!(fetched_conts.iter().flatten().collect::<Vec<_>>().is_empty());
+        assert!(fetched_conts
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .is_empty());
 
         let fetched_joins: Vec<Vec<Vec<String>>> = joins
             .1
             .iter()
             .map(|j| deleted_reader.get_joins(&j.channel))
             .collect();
-        assert!(fetched_joins.iter().flatten().collect::<Vec<_>>().is_empty());
+        assert!(fetched_joins
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .is_empty());
     }
 
     #[tokio::test]
