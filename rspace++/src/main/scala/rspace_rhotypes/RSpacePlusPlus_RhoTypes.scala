@@ -44,6 +44,13 @@ import coop.rchain.rspace.HotStoreState
 import scala.collection.immutable.Map
 import com.google.protobuf.ByteString
 import coop.rchain.rspace.history.HistoryRepository
+import coop.rchain.rspace.state.RSpaceExporter
+import coop.rchain.rspace.state.RSpaceImporter
+import coop.rchain.shared.Serialize
+import coop.rchain.rspace.history.HistoryReader
+import coop.rchain.rspace.HotStoreTrieAction
+import coop.rchain.rspace.HotStoreAction
+import coop.rchain.rspace.history.History
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -862,9 +869,34 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
     } yield result
 
   // RSpaceOps functions
-  def historyRepo: HistoryRepository[F, C, P, A, K] = {
-    println("\nhistoryRepo")
-    ???
+  def historyRepo: HistoryRepository[F, C, P, A, K] = new HistoryRepository[F, C, P, A, K] {
+
+    override def checkpoint(actions: List[HotStoreAction]): F[HistoryRepository[F, C, P, A, K]] = {
+      println("\ncheckpoint"); ???
+    }
+
+    override def doCheckpoint(
+        actions: Seq[HotStoreTrieAction]
+    ): F[HistoryRepository[F, C, P, A, K]] = { println("\ndoCheckpoint"); ??? }
+
+    override def reset(root: Blake2b256Hash): F[HistoryRepository[F, C, P, A, K]] = {
+      println("\nreset"); ???
+    }
+
+    override def history: History[F] = { println("\nhistory"); ??? }
+
+    override def exporter: F[RSpaceExporter[F]] = { println("\nexporter"); ??? }
+
+    override def importer: F[RSpaceImporter[F]] = { println("\nimporter"); ??? }
+
+    override def getHistoryReader(
+        stateHash: Blake2b256Hash
+    ): F[HistoryReader[F, Blake2b256Hash, C, P, A, K]] = { println("\ngetHistoryReader"); ??? }
+
+    override def getSerializeC: Serialize[C] = { println("\ngetSerialize"); ??? }
+
+    override def root: Blake2b256Hash = { println("\nroot"); ??? }
+
   }
 }
 
