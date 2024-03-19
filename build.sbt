@@ -500,6 +500,23 @@ lazy val node = (project in file("node"))
   )
   .dependsOn(casper % "compile->compile;test->test", comm, crypto, rholang)
 
+lazy val nodeCli = (project in file("node-cli"))
+  .settings(commonSettings: _*)
+  .settings(
+    name := "nodeCli",
+    version := "0.1.0-SNAPSHOT",
+    libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
+      // "net.java.dev.jna" % "jna"          % "5.13.0",
+      // "net.java.dev.jna" % "jna-platform" % "5.13.0",
+      circeParser,
+      circeGenericExtras
+    ),
+    PB.targets in Compile := Seq(
+      scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
+    )
+  )
+  .dependsOn(casper)
+
 lazy val regex = (project in file("regex"))
   .settings(commonSettings: _*)
   .settings(libraryDependencies ++= commonDependencies)
