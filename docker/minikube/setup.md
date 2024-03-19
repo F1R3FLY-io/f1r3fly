@@ -8,8 +8,8 @@ minikube start \
     --ports=40400,40401,40402,40403,40404,40410,40411,40412,40413,40414,40420,40421,40422,40423,40424,40430,40431,40432,40433,40434,40440,40441,40442,40443,40444 \
     --driver=docker \
     --addons='dashboard,metrics-server' \
-    --cpus=8 \
-    --memory=6g
+    --cpus=5 \
+    --memory=5g
 ```
 Create Minikube with 8 validators(Kubernetes single node) inside Docker container and expose ports:
 ```sh
