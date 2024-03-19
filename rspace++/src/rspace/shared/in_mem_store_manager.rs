@@ -27,3 +27,11 @@ impl KeyValueStoreManager for InMemoryStoreManager {
         Ok(())
     }
 }
+
+impl InMemoryStoreManager {
+    pub fn new() -> Self {
+        InMemoryStoreManager {
+            state: DashMap::new(),
+        }
+    }
+}
