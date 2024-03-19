@@ -51,6 +51,9 @@ import coop.rchain.rspace.history.HistoryReader
 import coop.rchain.rspace.HotStoreTrieAction
 import coop.rchain.rspace.HotStoreAction
 import coop.rchain.rspace.history.History
+import coop.rchain.state.TrieNode
+import java.nio.ByteBuffer
+import scodec.bits.ByteVector
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -885,9 +888,57 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 
     override def history: History[F] = { println("\nhistory"); ??? }
 
-    override def exporter: F[RSpaceExporter[F]] = { println("\nexporter"); ??? }
+    override def exporter: F[RSpaceExporter[F]] =
+      for {
+        rspaceExporter <- Sync[F].delay {
+                           new RSpaceExporter[F] {
 
-    override def importer: F[RSpaceImporter[F]] = { println("\nimporter"); ??? }
+                             override def getNodes(
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 skip: Int,
+                                 take: Int
+                             ): F[Seq[TrieNode[Blake2b256Hash]]] = ???
+
+                             override def getHistoryItems[Value](
+                                 keys: Seq[Blake2b256Hash],
+                                 fromBuffer: ByteBuffer => Value
+                             ): F[Seq[(Blake2b256Hash, Value)]] = ???
+
+                             override def getDataItems[Value](
+                                 keys: Seq[Blake2b256Hash],
+                                 fromBuffer: ByteBuffer => Value
+                             ): F[Seq[(Blake2b256Hash, Value)]] = ???
+
+                             override def getRoot: F[Blake2b256Hash] = ???
+
+                           }
+                         }
+      } yield rspaceExporter
+
+    override def importer: F[RSpaceImporter[F]] =
+      for {
+        rspaceImporter <- Sync[F].delay {
+                           new RSpaceImporter[F] {
+
+                             override def setHistoryItems[Value](
+                                 data: Seq[(Blake2b256Hash, Value)],
+                                 toBuffer: Value => ByteBuffer
+                             ): F[Unit] = ???
+
+                             override def setDataItems[Value](
+                                 data: Seq[(Blake2b256Hash, Value)],
+                                 toBuffer: Value => ByteBuffer
+                             ): F[Unit] = ???
+
+                             override def setRoot(key: Blake2b256Hash): F[Unit] = ???
+
+                             override def getHistoryItem(
+                                 hash: Blake2b256Hash
+                             ): F[Option[ByteVector]] = ???
+
+                           }
+                         }
+      } yield rspaceImporter
 
     override def getHistoryReader(
         stateHash: Blake2b256Hash
