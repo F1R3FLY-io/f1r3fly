@@ -1,3 +1,4 @@
+use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 // See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
 use rspace_plus_plus::rspace::internal::Datum;
 use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
@@ -101,6 +102,7 @@ async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, Strin
 }
 
 // NOTE: Not implementing test checks for Scala's side 'insertData' and 'insertContinuations'
+//       Also not implementing test checks for Log
 #[tokio::test]
 async fn produce_should_persist_data_in_store() {
     let rspace = create_rspace().await;
@@ -922,6 +924,7 @@ async fn consuming_on_two_channels_then_consuming_on_one_then_producing_on_both_
 }
 
 /* Persist tests */
+
 #[tokio::test]
 async fn producing_then_persistent_consume_on_same_channel_should_return_cont_and_data() {
     let rspace = create_rspace().await;
@@ -1340,6 +1343,53 @@ async fn persistent_produce_should_be_available_for_multiple_matches() {
         .await;
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum".to_string(), "datum".to_string()]]));
+}
+
+#[tokio::test]
+async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
+    let mut rspace = create_rspace().await;
+    let key = vec!["ch1".to_string()];
+    let patterns = vec![Pattern::Wildcard];
+
+    let empty_checkpoint = rspace.create_checkpoint().await.unwrap();
+
+    // put some data so the checkpoint is != empty
+    let _ = rspace
+        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
+        .await;
+
+    let _checkpoint0 = rspace.create_checkpoint().await.unwrap();
+    let _ = rspace.create_checkpoint().await.unwrap();
+
+    // force clearing of trie store state
+    let _ = rspace.clear().unwrap();
+
+    // the checkpointing mechanism should not interfere with the empty root
+    let checkpoint2 = rspace.create_checkpoint().await.unwrap();
+
+    assert_eq!(checkpoint2.root, empty_checkpoint.root);
+}
+
+#[tokio::test]
+async fn create_checkpoint_on_an_empty_store_should_return_the_expected_hash() {
+    let mut rspace = create_rspace().await;
+    let empty_checkpoint = rspace.create_checkpoint().await.unwrap();
+    assert_eq!(empty_checkpoint.root, RadixHistory::empty_root_node_hash());
+}
+
+#[tokio::test]
+async fn create_checkpoint_should_clear_the_store_contents() {
+    let mut rspace = create_rspace().await;
+    let key = vec!["ch1".to_string()];
+    let patterns = vec![Pattern::Wildcard];
+
+    let _ = rspace
+        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
+        .await;
+
+    let _ = rspace.create_checkpoint();
+    let checkpoint0_changes = rspace.store.changes().await;
+    assert_eq!(checkpoint0_changes.len(), 0);
 }
 
 #[tokio::test]

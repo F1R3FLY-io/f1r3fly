@@ -205,6 +205,7 @@ trait StorageActionsTests[F[_]]
       _             = insertActions should have size 0
     } yield ()
   }
+
   "consuming and then producing on the same channel with persistent flag" should
     "return the continuation and data and not insert the persistent data" in fixture {
     (store, _, space) =>

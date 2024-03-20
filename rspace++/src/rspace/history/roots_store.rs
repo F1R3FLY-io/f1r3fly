@@ -59,14 +59,18 @@ impl RootsStoreInstances {
                     .lock()
                     .expect("Roots Store: Failed to acquire lock on store");
 
-                // println!("\nroots_store: ");
-                // store_lock.print_store();
-
-                if let Some(_) = store_lock.get_one(&key_bytes)? {
-                    store_lock.put_one(current_root_name, key_bytes)?;
-                    Ok(Some(key))
-                } else {
-                    Ok(None)
+                match store_lock.get_one(&key_bytes)? {
+                    Some(_) => {
+                        store_lock.put_one(current_root_name, key_bytes)?;
+                        // println!("\nroots_store after validate_and_set_current_root: ");
+                        // store_lock.print_store();
+                        Ok(Some(key))
+                    }
+                    None => {
+                        // println!("\nroots_store after validate_and_set_current_root: ");
+                        // store_lock.print_store();
+                        Ok(None)
+                    }
                 }
             }
 
