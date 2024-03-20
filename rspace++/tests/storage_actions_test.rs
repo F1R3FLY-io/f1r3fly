@@ -1,7 +1,11 @@
+use proptest::prelude::*;
+use rspace_plus_plus::rspace::event::Consume;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
-// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
-use rspace_plus_plus::rspace::internal::Datum;
+use rspace_plus_plus::rspace::hot_store_action::{
+    HotStoreAction, InsertAction, InsertContinuations,
+};
 use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
+use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -10,9 +14,12 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
+use tokio::runtime::Runtime;
+
+// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
 
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 enum Pattern {
     #[default]
     Wildcard,
@@ -37,7 +44,7 @@ impl Match<Pattern, String> for StringMatch {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 struct StringsCaptor {
     res: LinkedList<Vec<String>>,
 }
@@ -1359,6 +1366,7 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
         .await;
 
     let _checkpoint0 = rspace.create_checkpoint().await.unwrap();
+    // _checkpoint0 log should not be empty
     let _ = rspace.create_checkpoint().await.unwrap();
 
     // force clearing of trie store state
@@ -1366,7 +1374,7 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
 
     // the checkpointing mechanism should not interfere with the empty root
     let checkpoint2 = rspace.create_checkpoint().await.unwrap();
-
+    // checkpoint2 log should be empty
     assert_eq!(checkpoint2.root, empty_checkpoint.root);
 }
 
@@ -1393,6 +1401,130 @@ async fn create_checkpoint_should_clear_the_store_contents() {
 }
 
 #[tokio::test]
+async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_log() {
+    let mut rspace = create_rspace().await;
+    let key = vec!["ch1".to_string()];
+    let patterns = vec![Pattern::Wildcard];
+
+    let checkpint0 = rspace.create_checkpoint().await.unwrap();
+    let r = rspace
+        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
+        .await;
+    assert!(r.is_none());
+
+    let checkpoint0_changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
+        .store
+        .changes()
+        .await
+        .into_iter()
+        .filter_map(|action| {
+            if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
+                Some(val)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(!checkpoint0_changes.is_empty());
+    assert_eq!(checkpoint0_changes.len(), 1);
+
+    let _ = rspace.reset(checkpint0.root).unwrap();
+    let reset_changes = rspace.store.changes().await;
+    assert!(reset_changes.is_empty());
+    assert_eq!(reset_changes.len(), 0);
+
+    let _checkpoint1 = rspace.create_checkpoint().await.unwrap();
+    // checkpoint1 log should be empty
+}
+
+#[tokio::test]
+async fn consume_and_produce_a_match_and_then_checkpoint_should_result_in_an_empty_triestore() {
+    let mut rspace = create_rspace().await;
+    let channels = vec!["ch1".to_string()];
+
+    let checkpoint_init = rspace.create_checkpoint().await.unwrap();
+    assert_eq!(checkpoint_init.root, RadixHistory::empty_root_node_hash());
+
+    let r1 = rspace
+        .consume(
+            channels,
+            vec![Pattern::Wildcard],
+            StringsCaptor::new(),
+            false,
+            BTreeSet::default(),
+        )
+        .await;
+    assert!(r1.is_none());
+
+    let r2 = rspace
+        .produce("ch1".to_string(), "datum".to_string(), false)
+        .await;
+    assert!(r2.is_some());
+
+    let checkpoint = rspace.create_checkpoint().await.unwrap();
+    assert_eq!(checkpoint.root, RadixHistory::empty_root_node_hash());
+
+    let _ = rspace.create_checkpoint();
+    let checkpoint0_changes = rspace.store.changes().await;
+    assert_eq!(checkpoint0_changes.len(), 0);
+}
+
+proptest! {
+  #![proptest_config(ProptestConfig {
+    cases: 50,
+    .. ProptestConfig::default()
+})]
+
+  #[test]
+  fn produce_a_bunch_and_then_create_checkpoint_then_consume_on_same_channels_should_result_in_checkpoint_pointing_at_empty_state(data in proptest::collection::vec(".*", 1..100)) {
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async {
+      let mut rspace = create_rspace().await;
+
+      let _ = data.clone().into_iter().map(|channel| rspace.produce(channel, "data".to_string(),false));
+      let checkpoint1 = rspace.create_checkpoint().await.unwrap();
+
+      for channel in data.iter() {
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        assert!(result.is_some());
+      }
+
+      let checkpoint2 = rspace.create_checkpoint().await.unwrap();
+
+      for channel in data.iter() {
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        assert!(result.is_none());
+      }
+
+      assert_eq!(checkpoint2.root, RadixHistory::empty_root_node_hash());
+      let _ = rspace.reset(checkpoint1.root).unwrap();
+
+      for channel in data.iter() {
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        assert!(result.is_some());
+      }
+
+      let checkpoint3 = rspace.create_checkpoint().await.unwrap();
+      assert_eq!(checkpoint3.root, RadixHistory::empty_root_node_hash());
+
+    });
+  }
+}
+
+#[tokio::test]
+#[should_panic(expected = "RUST ERROR: Installing can be done only on startup")]
+async fn an_install_should_not_allow_installing_after_a_produce_operation() {
+    let rspace = create_rspace().await;
+    let channel = "ch1".to_string();
+    let datum = "datum1".to_string();
+    let key = vec![channel.clone()];
+    let patterns = vec![Pattern::Wildcard];
+
+    let _ = rspace.produce(channel, datum, false).await;
+    let _install_attempt = rspace.install(key, patterns, StringsCaptor::new()).await;
+}
+
+#[tokio::test]
 #[should_panic(expected = "RUST ERROR: channels.length must equal patterns.length")]
 async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
     let rspace = create_rspace().await;
@@ -1406,4 +1538,188 @@ async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
         )
         .await;
     assert!(r1.is_none());
+}
+
+#[tokio::test]
+async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() {
+    let rspace = create_rspace().await;
+    let channel = "ch1".to_string();
+    let channels = vec![channel.clone()];
+    let patterns = vec![Pattern::Wildcard];
+    let continuation = StringsCaptor::new();
+
+    let expected_continuation = vec![WaitingContinuation {
+        patterns: patterns.clone(),
+        continuation: continuation.clone(),
+        persist: false,
+        peeks: BTreeSet::default(),
+        source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),
+    }];
+
+    // do an operation
+    let _ = rspace
+        .consume(
+            channels.clone(),
+            patterns.clone(),
+            continuation.clone(),
+            false,
+            BTreeSet::default(),
+        )
+        .await;
+
+    // create a soft checkpoint
+    let s = rspace.create_soft_checkpoint().await;
+
+    // assert that the snapshot contains the continuation
+    let cache_snapshot_lock = s.cache_snapshot.lock().await;
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
+        cache_snapshot_lock
+            .continuations
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+    assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
+    drop(cache_snapshot_lock);
+
+    // consume again
+    let _ = rspace
+        .consume(channels, patterns, continuation, false, BTreeSet::default())
+        .await;
+
+    // assert that the snapshot contains only the first continuation
+    let cache_snapshot_lock = s.cache_snapshot.lock().await;
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
+        cache_snapshot_lock
+            .continuations
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+    assert_eq!(snapshot_continuations_values, vec![expected_continuation]);
+}
+
+#[tokio::test]
+async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_state() {
+    let rspace = create_rspace().await;
+    let channel = "ch1".to_string();
+    let channels = vec![channel.clone()];
+    let datum = "datum1".to_string();
+    let patterns = vec![Pattern::Wildcard];
+    let continuation = StringsCaptor::new();
+
+    let expected_continuation = vec![WaitingContinuation {
+        patterns: patterns.clone(),
+        continuation: continuation.clone(),
+        persist: false,
+        peeks: BTreeSet::default(),
+        source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),
+    }];
+
+    // do an operation
+    let _ = rspace
+        .consume(
+            channels.clone(),
+            patterns.clone(),
+            continuation.clone(),
+            false,
+            BTreeSet::default(),
+        )
+        .await;
+
+    // create a soft checkpoint
+    let s1 = rspace.create_soft_checkpoint().await;
+
+    // assert that the snapshot contains the continuation
+    let cache_snapshot_lock = s1.cache_snapshot.lock().await;
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
+        cache_snapshot_lock
+            .continuations
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+    assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
+    drop(cache_snapshot_lock);
+
+    // produce thus removing the continuation
+    let _ = rspace.produce(channel, datum, false).await;
+    let s2 = rspace.create_soft_checkpoint().await;
+
+    // assert that the first snapshot still contains the first continuation
+    let cache_snapshot_lock = s1.cache_snapshot.lock().await;
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
+        cache_snapshot_lock
+            .continuations
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+    assert_eq!(snapshot_continuations_values, vec![expected_continuation]);
+    drop(cache_snapshot_lock);
+
+    let cache_snapshot_lock = s2.cache_snapshot.lock().await;
+    assert!(cache_snapshot_lock
+        .continuations
+        .get(&channels)
+        .unwrap()
+        .value()
+        .is_empty())
+}
+
+#[tokio::test]
+async fn create_soft_checkpoint_should_clear_the_event_log() {
+    // TODO when log is implemented
+}
+
+#[tokio::test]
+async fn revert_to_soft_checkpoint_should_revert_the_state_of_the_store_to_the_given_checkpoint() {
+    let mut rspace = create_rspace().await;
+    let channel = "ch1".to_string();
+    let channels = vec![channel.clone()];
+    let patterns = vec![Pattern::Wildcard];
+    let continuation = StringsCaptor::new();
+
+    // create an initial soft checkpoint
+    let s1 = rspace.create_soft_checkpoint().await;
+    // do an operation
+    let _ = rspace
+        .consume(channels, patterns, continuation, false, BTreeSet::new())
+        .await;
+
+    let changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
+        .store
+        .changes()
+        .await
+        .into_iter()
+        .filter_map(|action| {
+            if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
+                Some(val)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // the operation should be on the list of changes
+    assert!(!changes.is_empty());
+    let _ = rspace.revert_to_soft_checkpoint(s1).await.unwrap();
+
+    let changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
+        .store
+        .changes()
+        .await
+        .into_iter()
+        .filter_map(|action| {
+            if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
+                Some(val)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // after reverting to the initial soft checkpoint the operation is no longer present in the hot store
+    assert!(changes.is_empty());
+}
+
+#[tokio::test]
+async fn revert_to_soft_checkpoint_should_inject_the_event_log() {
+    // TODO when log is implemented
 }

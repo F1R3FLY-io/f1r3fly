@@ -113,3 +113,4 @@ docker/data/**/*.mdb
 rspace++/tests/lmdb
 rholang/rspace++_lmdb/
 rspace++_lmdb
+rspace++/tests/*.proptest-regressions

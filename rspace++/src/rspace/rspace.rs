@@ -42,7 +42,7 @@ where
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
-type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
+pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
 
 // NOTE: Currently NOT implementing any 'Log' functions
 // NOTE: Currently NOT implementing any 'produceCounter' operations
