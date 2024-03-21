@@ -19,8 +19,6 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreToMapValue, WaitingContinuationsProto,
 };
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -498,7 +496,7 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
         let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
         let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
 
-        let hot_store_state = soft_checkpoint.cache_snapshot.lock().await;
+        let hot_store_state = soft_checkpoint.cache_snapshot;
 
         for (key, value) in hot_store_state.continuations.clone().into_iter() {
             let wks: Vec<WaitingContinuationProto> = value
@@ -802,7 +800,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
         };
 
         let soft_checkpoint = SoftCheckpoint {
-            cache_snapshot: Arc::new(Mutex::new(cache_snapshot)),
+            cache_snapshot,
             produce_counter: produce_counter_map,
         };
 

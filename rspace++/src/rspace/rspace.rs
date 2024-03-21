@@ -492,10 +492,10 @@ where
     }
 
     pub async fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
-        let cache_mutex = self.store.snapshot();
+        let cache_snapshot = self.store.snapshot().await;
         self.produce_counter = HashMap::new();
         SoftCheckpoint {
-            cache_snapshot: cache_mutex.clone(),
+            cache_snapshot,
             produce_counter: HashMap::new(),
         }
     }
@@ -507,7 +507,7 @@ where
         let history = &self.history_repository;
         let history_reader = history.get_history_reader(history.root())?;
         let hot_store = HotStoreInstances::create_from_mhs_and_hr(
-            checkpoint.cache_snapshot,
+            Arc::new(Mutex::new(checkpoint.cache_snapshot)),
             history_reader.base(),
         );
 

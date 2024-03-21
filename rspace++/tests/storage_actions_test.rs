@@ -1570,15 +1570,13 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
     let s = rspace.create_soft_checkpoint().await;
 
     // assert that the snapshot contains the continuation
-    let cache_snapshot_lock = s.cache_snapshot.lock().await;
-    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
-        cache_snapshot_lock
-            .continuations
-            .iter()
-            .map(|entry| entry.value().clone())
-            .collect();
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s
+        .cache_snapshot
+        .continuations
+        .iter()
+        .map(|entry| entry.value().clone())
+        .collect();
     assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
-    drop(cache_snapshot_lock);
 
     // consume again
     let _ = rspace
@@ -1586,13 +1584,12 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
         .await;
 
     // assert that the snapshot contains only the first continuation
-    let cache_snapshot_lock = s.cache_snapshot.lock().await;
-    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
-        cache_snapshot_lock
-            .continuations
-            .iter()
-            .map(|entry| entry.value().clone())
-            .collect();
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s
+        .cache_snapshot
+        .continuations
+        .iter()
+        .map(|entry| entry.value().clone())
+        .collect();
     assert_eq!(snapshot_continuations_values, vec![expected_continuation]);
 }
 
@@ -1628,33 +1625,29 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
     let s1 = rspace.create_soft_checkpoint().await;
 
     // assert that the snapshot contains the continuation
-    let cache_snapshot_lock = s1.cache_snapshot.lock().await;
-    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
-        cache_snapshot_lock
-            .continuations
-            .iter()
-            .map(|entry| entry.value().clone())
-            .collect();
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s1
+        .cache_snapshot
+        .continuations
+        .iter()
+        .map(|entry| entry.value().clone())
+        .collect();
     assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
-    drop(cache_snapshot_lock);
 
     // produce thus removing the continuation
     let _ = rspace.produce(channel, datum, false).await;
     let s2 = rspace.create_soft_checkpoint().await;
 
     // assert that the first snapshot still contains the first continuation
-    let cache_snapshot_lock = s1.cache_snapshot.lock().await;
-    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> =
-        cache_snapshot_lock
-            .continuations
-            .iter()
-            .map(|entry| entry.value().clone())
-            .collect();
+    let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s1
+        .cache_snapshot
+        .continuations
+        .iter()
+        .map(|entry| entry.value().clone())
+        .collect();
     assert_eq!(snapshot_continuations_values, vec![expected_continuation]);
-    drop(cache_snapshot_lock);
 
-    let cache_snapshot_lock = s2.cache_snapshot.lock().await;
-    assert!(cache_snapshot_lock
+    assert!(s2
+        .cache_snapshot
         .continuations
         .get(&channels)
         .unwrap()
