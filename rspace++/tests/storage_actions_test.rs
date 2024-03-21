@@ -1395,7 +1395,7 @@ async fn create_checkpoint_should_clear_the_store_contents() {
         .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
         .await;
 
-    let _ = rspace.create_checkpoint();
+    let _ = rspace.create_checkpoint().await.unwrap();
     let checkpoint0_changes = rspace.store.changes().await;
     assert_eq!(checkpoint0_changes.len(), 0);
 }
