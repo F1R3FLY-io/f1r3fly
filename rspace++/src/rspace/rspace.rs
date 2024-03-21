@@ -222,6 +222,8 @@ where
         let next_history = self.history_repository.checkpoint(&changes).await;
         self.history_repository = next_history;
 
+        self.produce_counter = HashMap::new();
+
         let history_reader = self
             .history_repository
             .get_history_reader(self.history_repository.root())?;
@@ -464,18 +466,21 @@ where
         self.store.to_map().await
     }
 
-    pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+    pub async fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
+        self.produce_counter = HashMap::new();
+
         let history_reader = self.history_repository.get_history_reader(root)?;
         self.create_new_hot_store(history_reader);
+        self.restore_installs().await;
 
         Ok(())
     }
 
-    pub fn clear(&mut self) -> Result<(), RSpaceError> {
-        self.reset(RadixHistory::empty_root_node_hash())
+    pub async fn clear(&mut self) -> Result<(), RSpaceError> {
+        self.reset(RadixHistory::empty_root_node_hash()).await
     }
 
     fn create_new_hot_store(
@@ -486,8 +491,9 @@ where
         self.store = next_hot_store;
     }
 
-    pub async fn create_soft_checkpoint(&self) -> SoftCheckpoint<C, P, A, K> {
+    pub async fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
         let cache_mutex = self.store.snapshot();
+        self.produce_counter = HashMap::new();
         SoftCheckpoint {
             cache_snapshot: cache_mutex.clone(),
             produce_counter: HashMap::new(),

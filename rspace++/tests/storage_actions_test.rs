@@ -1370,7 +1370,7 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
     let _ = rspace.create_checkpoint().await.unwrap();
 
     // force clearing of trie store state
-    let _ = rspace.clear().unwrap();
+    let _ = rspace.clear().await.unwrap();
 
     // the checkpointing mechanism should not interfere with the empty root
     let checkpoint2 = rspace.create_checkpoint().await.unwrap();
@@ -1428,7 +1428,7 @@ async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_l
     assert!(!checkpoint0_changes.is_empty());
     assert_eq!(checkpoint0_changes.len(), 1);
 
-    let _ = rspace.reset(checkpint0.root).unwrap();
+    let _ = rspace.reset(checkpint0.root).await.unwrap();
     let reset_changes = rspace.store.changes().await;
     assert!(reset_changes.is_empty());
     assert_eq!(reset_changes.len(), 0);
@@ -1497,7 +1497,7 @@ proptest! {
       }
 
       assert_eq!(checkpoint2.root, RadixHistory::empty_root_node_hash());
-      let _ = rspace.reset(checkpoint1.root).unwrap();
+      let _ = rspace.reset(checkpoint1.root).await.unwrap();
 
       for channel in data.iter() {
         let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
@@ -1542,7 +1542,7 @@ async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
 
 #[tokio::test]
 async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let channel = "ch1".to_string();
     let channels = vec![channel.clone()];
     let patterns = vec![Pattern::Wildcard];
@@ -1599,7 +1599,7 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
 
 #[tokio::test]
 async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_state() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let channel = "ch1".to_string();
     let channels = vec![channel.clone()];
     let datum = "datum1".to_string();
