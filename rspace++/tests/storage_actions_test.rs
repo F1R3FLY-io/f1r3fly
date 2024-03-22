@@ -1480,7 +1480,10 @@ proptest! {
     rt.block_on(async {
       let mut rspace = create_rspace().await;
 
-      let _ = data.clone().into_iter().map(|channel| rspace.produce(channel, "data".to_string(),false));
+      for channel in data.clone() {
+        let _ = rspace.produce(channel, "data".to_string(),false).await;
+      }
+
       let checkpoint1 = rspace.create_checkpoint().await.unwrap();
 
       for channel in data.iter() {
