@@ -284,6 +284,9 @@ lazy val casper = (project in file("casper"))
       fs2Core,
       fs2Io,
       scalacheck % "slowcooker"
+    ),
+    javaOptions in Test ++= Seq(
+      "-Djna.library.path=../rspace++/target/release/"
     )
   )
   .dependsOn(
@@ -295,7 +298,7 @@ lazy val casper = (project in file("casper"))
     models % "compile->compile;test->test",
     rspace,
     rholang % "compile->compile;test->test",
-		rspacePlusPlus
+    rspacePlusPlus
   )
 
 lazy val comm = (project in file("comm"))
