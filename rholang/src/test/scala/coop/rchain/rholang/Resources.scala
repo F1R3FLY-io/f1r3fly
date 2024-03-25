@@ -60,10 +60,11 @@ object Resources {
   def mkRuntime[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String
   ): Resource[F, RhoRuntime[F]] =
-    mkTempDir(prefix)
-      .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
-      .evalMap(_.rSpaceStores)
-      .evalMap(RhoRuntime.createRuntime(_, Par()))
+    // mkTempDir(prefix)
+    //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
+    //   .evalMap(_.rSpaceStores)
+    //   .evalMap(RhoRuntime.createRuntime(_, Par()))
+		RhoRuntime.createRuntime[F](Par())
 
   def mkRuntimes[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String,

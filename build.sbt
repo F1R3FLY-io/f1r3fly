@@ -294,7 +294,8 @@ lazy val casper = (project in file("casper"))
     crypto,
     models % "compile->compile;test->test",
     rspace,
-    rholang % "compile->compile;test->test"
+    rholang % "compile->compile;test->test",
+		rspacePlusPlus
   )
 
 lazy val comm = (project in file("comm"))
