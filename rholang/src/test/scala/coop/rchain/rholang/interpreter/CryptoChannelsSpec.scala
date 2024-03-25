@@ -220,10 +220,11 @@ class CryptoChannelsSpec
     implicit val kvm                        = InMemoryStoreManager[Task]
 
     val runtime = (for {
-      store                    <- kvm.rSpaceStores
-      spaces                   <- Resources.createRuntimes[Task](store)
-      (runtime, replayRuntime) = spaces
-      _                        <- runtime.cost.set(Cost.UNSAFE_MAX)
+      // store                    <- kvm.rSpaceStores
+      // spaces                   <- Resources.createRuntimes[Task](store)
+      spaces                      <- Resources.createRuntimes[Task]()
+      (runtime, replayRuntime, _) = spaces
+      _                           <- runtime.cost.set(Cost.UNSAFE_MAX)
     } yield runtime).unsafeRunSync
 
     try {

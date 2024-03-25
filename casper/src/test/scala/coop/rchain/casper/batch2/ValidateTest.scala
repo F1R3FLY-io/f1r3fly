@@ -771,11 +771,12 @@ class ValidateTest
       val storageDirectory = Files.createTempDirectory(s"hash-set-casper-test-genesis-")
 
       for {
-        _              <- blockDagStorage.insert(genesis, false, approved = true)
-        kvm            <- mkTestRNodeStoreManager[Task](storageDirectory)
-        rStore         <- kvm.rSpaceStores
-        mStore         <- RuntimeManager.mergeableStore(kvm)
-        runtimeManager <- RuntimeManager[Task](rStore, mStore, Genesis.NonNegativeMergeableTagName)
+        _   <- blockDagStorage.insert(genesis, false, approved = true)
+        kvm <- mkTestRNodeStoreManager[Task](storageDirectory)
+        // rStore         <- kvm.rSpaceStores
+        mStore <- RuntimeManager.mergeableStore(kvm)
+        // runtimeManager <- RuntimeManager[Task](rStore, mStore, Genesis.NonNegativeMergeableTagName)
+        runtimeManager <- RuntimeManager[Task](mStore, Genesis.NonNegativeMergeableTagName)
         dag            <- blockDagStorage.getRepresentation
         _ <- InterpreterUtil
               .validateBlockCheckpoint[Task](genesis, mkCasperSnapshot(dag), runtimeManager)

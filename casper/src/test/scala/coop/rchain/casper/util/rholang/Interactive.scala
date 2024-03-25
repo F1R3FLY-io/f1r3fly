@@ -89,11 +89,13 @@ object Interactive {
     implicit val logger: Log[Task]         = Log.log[Task]
     implicit val metricsEff: Metrics[Task] = new Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
-    val p                                  = Files.createTempDirectory("interactive-")
-    val kvm                                = RNodeKeyValueStoreManager[Task](p).unsafeRunSync
-    val rspaceStore                        = kvm.rSpaceStores.runSyncUnsafe()
+    // val p                                  = Files.createTempDirectory("interactive-")
+    // val kvm                                = RNodeKeyValueStoreManager[Task](p).unsafeRunSync
+    // val rspaceStore                        = kvm.rSpaceStores.runSyncUnsafe()
+    // val runtime =
+    //   RhoRuntime.createRuntime[Task](rspaceStore, Genesis.NonNegativeMergeableTagName).unsafeRunSync
     val runtime =
-      RhoRuntime.createRuntime[Task](rspaceStore, Genesis.NonNegativeMergeableTagName).unsafeRunSync
+      RhoRuntime.createRuntime[Task](Genesis.NonNegativeMergeableTagName).unsafeRunSync
     new Interactive(runtime)
   }
 }

@@ -499,10 +499,13 @@ object TestNode {
       blockDagStorage     <- Resource.eval(BlockDagKeyValueStorage.create(kvm))
       deployStorage       <- Resource.eval(KeyValueDeployStorage[F](kvm))
       casperBufferStorage <- Resource.eval(CasperBufferKeyValueStorage.create[F](kvm))
-      rSpaceStore         <- Resource.eval(kvm.rSpaceStores)
-      mStore              <- Resource.eval(RuntimeManager.mergeableStore(kvm))
+      // rSpaceStore         <- Resource.eval(kvm.rSpaceStores)
+      mStore <- Resource.eval(RuntimeManager.mergeableStore(kvm))
+      // runtimeManager <- Resource.eval(
+      //                    RuntimeManager(rSpaceStore, mStore, Genesis.NonNegativeMergeableTagName)
+      //                  )
       runtimeManager <- Resource.eval(
-                         RuntimeManager(rSpaceStore, mStore, Genesis.NonNegativeMergeableTagName)
+                         RuntimeManager(mStore, Genesis.NonNegativeMergeableTagName)
                        )
 
       node <- Resource.eval({

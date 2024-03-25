@@ -32,6 +32,8 @@ import fs2.concurrent.Queue
 import monix.eval.Task
 import monix.execution.Scheduler
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 object Setup {
   def apply() = new {
 
@@ -58,9 +60,12 @@ object Setup {
     val networkId = "test"
     val spaceKVManager =
       mkTestRNodeStoreManager[Task](context.storageDirectory).runSyncUnsafe()
-    val store = spaceKVManager.rSpaceStores.runSyncUnsafe()
-    val spaces = RSpace
-      .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+    // val store = spaceKVManager.rSpaceStores.runSyncUnsafe()
+    // val spaces = RSpace
+    //   .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+    //   .runSyncUnsafe()
+    val spaces = RSpacePlusPlus_RhoTypes
+      .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
       .runSyncUnsafe()
     val (rspace, replay) = spaces
     val historyRepo      = rspace.historyRepo

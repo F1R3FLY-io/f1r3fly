@@ -46,10 +46,11 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val kvm                       = InMemoryStoreManager[Task]
 
     val resources = for {
-      costLog      <- costLog[Task]()
-      store        <- kvm.rSpaceStores
-      spaces       <- createRuntimesWithCostLog[Task](store, costLog)
-      (runtime, _) = spaces
+      costLog <- costLog[Task]()
+      // store           <- kvm.rSpaceStores
+      // spaces          <- createRuntimesWithCostLog[Task](store, costLog)
+      spaces          <- createRuntimesWithCostLog[Task](costLog)
+      (runtime, _, _) = spaces
     } yield (runtime, costLog)
 
     resources
@@ -63,11 +64,11 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
   }
 
   private def createRuntimesWithCostLog[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
-      stores: RSpaceStore[F],
+      // stores: RSpaceStore[F],
       costLog: FunctorTell[F, Chain[Cost]],
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
-  ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] = {
+  ): F[(RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     // TODO: Shadows global (dummy) implicit which should be removed.
@@ -88,7 +89,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
                            additionalSystemProcesses,
                            initRegistry
                          )
-    } yield (rhoRuntime, replayRhoRuntime)
+    } yield (rhoRuntime, replayRhoRuntime, space.historyRepo)
   }
 
   def evaluateAndReplay(
@@ -103,11 +104,12 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val kvm                       = InMemoryStoreManager[Task]
 
     val evaluaResult = for {
-      costLog                  <- costLog[Task]()
-      cost                     <- CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms)
-      store                    <- kvm.rSpaceStores
-      spaces                   <- Resources.createRuntimes[Task](store)
-      (runtime, replayRuntime) = spaces
+      costLog <- costLog[Task]()
+      cost    <- CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms)
+      // store                    <- kvm.rSpaceStores
+      // spaces                   <- Resources.createRuntimes[Task](store)
+      spaces                      <- Resources.createRuntimes[Task]()
+      (runtime, replayRuntime, _) = spaces
       result <- {
         implicit def rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])
         runtime.evaluate(

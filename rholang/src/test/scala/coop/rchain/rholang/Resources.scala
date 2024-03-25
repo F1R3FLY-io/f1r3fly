@@ -64,26 +64,27 @@ object Resources {
     //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
     //   .evalMap(_.rSpaceStores)
     //   .evalMap(RhoRuntime.createRuntime(_, Par()))
-		RhoRuntime.createRuntime[F](Par())
+    Resource.eval(RhoRuntime.createRuntime[F](Par()))
 
   def mkRuntimes[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String,
       initRegistry: Boolean = false
   )(
       // implicit scheduler: Scheduler
-  ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F])] =
-    mkTempDir(prefix)
-      .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
-      .evalMap(_.rSpaceStores)
-      .evalMap(createRuntimes(_, initRegistry = initRegistry))
+  ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] =
+    // mkTempDir(prefix)
+    //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
+    //   .evalMap(_.rSpaceStores)
+    //   .evalMap(createRuntimes(_, initRegistry = initRegistry))
+    Resource.eval(createRuntimes(initRegistry = initRegistry))
 
   def createRuntimes[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
-      stores: RSpaceStore[F],
+      // stores: RSpaceStore[F],
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
       // implicit scheduler: Scheduler
-  ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] = {
+  ): F[(RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     for {
@@ -97,7 +98,7 @@ object Resources {
       runtimes <- RhoRuntime
                    .createRuntimes[F](space, replay, initRegistry, additionalSystemProcesses, Par())
       (runtime, replayRuntime) = runtimes
-    } yield (runtime, replayRuntime)
+    } yield (runtime, replayRuntime, space.historyRepo)
   }
 
 }

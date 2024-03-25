@@ -65,9 +65,10 @@ object Resources {
     implicit val noopSpan: Span[F] = NoopSpan[F]()
 
     for {
-      rStore         <- kvm.rSpaceStores
-      mStore         <- RuntimeManager.mergeableStore(kvm)
-      runtimeManager <- RuntimeManager(rStore, mStore, mergeableTagName)
+      // rStore         <- kvm.rSpaceStores
+      mStore <- RuntimeManager.mergeableStore(kvm)
+      // runtimeManager <- RuntimeManager(rStore, mStore, mergeableTagName)
+      runtimeManager <- RuntimeManager(mStore, mergeableTagName)
     } yield runtimeManager
   }
 
@@ -81,10 +82,14 @@ object Resources {
     implicit val noopSpan: Span[F] = NoopSpan[F]()
 
     for {
-      rStore <- kvm.rSpaceStores
+      // rStore <- kvm.rSpaceStores
       mStore <- RuntimeManager.mergeableStore(kvm)
+      // runtimeManagerWithHistory <- RuntimeManager.createWithHistory(
+      //                               rStore,
+      //                               mStore,
+      //                               Genesis.NonNegativeMergeableTagName
+      //                             )
       runtimeManagerWithHistory <- RuntimeManager.createWithHistory(
-                                    rStore,
                                     mStore,
                                     Genesis.NonNegativeMergeableTagName
                                   )

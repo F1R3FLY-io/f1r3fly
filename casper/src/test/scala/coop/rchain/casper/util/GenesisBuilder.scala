@@ -149,10 +149,11 @@ object GenesisBuilder {
     implicit val scheduler = monix.execution.Scheduler.Implicits.global
 
     (for {
-      kvsManager      <- mkTestRNodeStoreManager[Task](storageDirectory)
-      rStore          <- kvsManager.rSpaceStores
-      mStore          <- RuntimeManager.mergeableStore(kvsManager)
-      runtimeManager  <- RuntimeManager(rStore, mStore, Genesis.NonNegativeMergeableTagName)
+      kvsManager <- mkTestRNodeStoreManager[Task](storageDirectory)
+      // rStore     <- kvsManager.rSpaceStores
+      mStore <- RuntimeManager.mergeableStore(kvsManager)
+      // runtimeManager  <- RuntimeManager(rStore, mStore, Genesis.NonNegativeMergeableTagName)
+      runtimeManager  <- RuntimeManager(mStore, Genesis.NonNegativeMergeableTagName)
       genesis         <- Genesis.createGenesisBlock(runtimeManager, genesisParameters)
       blockStore      <- KeyValueBlockStore[Task](kvsManager)
       _               <- blockStore.put(genesis.blockHash, genesis)
