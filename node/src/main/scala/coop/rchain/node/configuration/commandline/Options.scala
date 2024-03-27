@@ -541,11 +541,6 @@ final case class Options(arguments: Seq[String]) extends ScallopConf(arguments) 
       descr = "MinPhloPrice",
       validate = _ >= 0
     )
-
-    val rspacePlusPlus = opt[Flag](
-      descr = "Enable rpsace++"
-    )
-
   }
   addSubcommand(run)
 

@@ -71,4 +71,4 @@ These indicate that the node is not waiting for other validators, is unilaterall
 
 Run `sbt "nodeCli/run"`. This will perform the remaining steps in `docs/paul_brain_dump.md` using Scala.
 
-NOTE: To start a genesis ceremoney each time, you need to delete relative files. You can run: `rm -rf rspace++_lmdb/ && rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/rspace/ ~/.rnode/blockstorage/`
+NOTE: To start a genesis ceremoney each time, you need to delete relative files. You can run: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/`
