@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 pub struct LmdbKeyValueStore {
-    env: Arc<Env>,
-    db: Arc<Mutex<Database<SerdeBincode<ByteBuffer>, SerdeBincode<ByteBuffer>>>>,
+    pub env: Arc<Env>,
+    pub db: Arc<Mutex<Database<SerdeBincode<ByteBuffer>, SerdeBincode<ByteBuffer>>>>,
 }
 
 impl KeyValueStore for LmdbKeyValueStore {
