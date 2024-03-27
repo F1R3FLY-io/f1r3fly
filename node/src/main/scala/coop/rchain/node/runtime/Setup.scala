@@ -153,7 +153,7 @@ object Setup {
       evalRuntime <- {
         implicit val sp = span
         // rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](Par()))
-        RhoRuntime.createRuntime[F](Par())
+        RhoRuntime.createRuntime[F](conf.storage.dataDir.toString(), Par())
       }
 
       // Runtime manager (play and replay runtimes)
@@ -163,7 +163,11 @@ object Setup {
           // rStores    <- rnodeStoreManager.rSpaceStores
           mergeStore <- RuntimeManager.mergeableStore(rnodeStoreManager)
           rm <- RuntimeManager
-                 .createWithHistory[F](mergeStore, Genesis.NonNegativeMergeableTagName)
+                 .createWithHistory[F](
+                   conf.storage.dataDir.toString(),
+                   mergeStore,
+                   Genesis.NonNegativeMergeableTagName
+                 )
         } yield rm
       }
       (runtimeManager, historyRepo) = runtimeManagerWithHistory

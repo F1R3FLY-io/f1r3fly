@@ -232,7 +232,9 @@ object TransactionBalances {
       //              store
       //            )
       spaces <- RSpacePlusPlus_RhoTypes
-                 .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
+                 .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+                   dataDir.toString()
+                 )
       (rSpacePlay, rSpaceReplay) = spaces
       runtimes <- RhoRuntime
                    .createRuntimes[F](

@@ -175,7 +175,9 @@ object MergeBalanceMain {
       //              store
       //            )
       spaces <- RSpacePlusPlus_RhoTypes
-                 .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
+                 .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+                   dataDir.toString()
+                 )
       (rSpacePlay, rSpaceReplay) = spaces
       runtimes                   <- RhoRuntime.createRuntimes[Task](rSpacePlay, rSpaceReplay, true, Seq.empty, Par())
       (rhoRuntime, _)            = runtimes

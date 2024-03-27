@@ -51,7 +51,6 @@ class HoconConfigurationSpec extends FunSuite with Matchers {
     val expectedConfig = NodeConf(
       defaultDataDir = "/var/lib/rnode",
       standalone = false,
-      rspacePlusPlus = false,
       autopropose = false,
       devMode = false,
       protocolServer = ProtocolServer(
@@ -166,8 +165,7 @@ class HoconConfigurationSpec extends FunSuite with Matchers {
         zipkin = false,
         sigar = false
       ),
-      dev = DevConf(deployerPrivateKey = None),
-      rspacePlusPlus = false
+      dev = DevConf(deployerPrivateKey = None)
     )
     config shouldEqual expectedConfig
   }

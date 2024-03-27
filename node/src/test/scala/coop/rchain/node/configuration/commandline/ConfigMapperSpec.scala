@@ -147,7 +147,6 @@ class ConfigMapperSpec extends FunSuite with Matchers {
     val expectedConfig = NodeConf(
       defaultDataDir = "/var/lib/rnode",
       standalone = true,
-      rspacePlusPlus = false,
       autopropose = false,
       devMode = true,
       protocolServer = ProtocolServer(
@@ -262,8 +261,7 @@ class ConfigMapperSpec extends FunSuite with Matchers {
         zipkin = true,
         sigar = true
       ),
-      dev = DevConf(deployerPrivateKey = None),
-      rspacePlusPlus = false
+      dev = DevConf(deployerPrivateKey = None)
     )
     config shouldEqual expectedConfig
   }
