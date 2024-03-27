@@ -1016,6 +1016,7 @@ dependencies = [
  "heed",
  "hex",
  "itertools",
+ "lazy_static",
  "log",
  "monadic",
  "proptest",
@@ -1037,6 +1038,7 @@ version = "0.1.0"
 dependencies = [
  "dashmap",
  "prost",
+ "rand",
  "rspace_plus_plus",
  "serde_json",
  "tokio",

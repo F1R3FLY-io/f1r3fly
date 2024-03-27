@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use prost::Message;
+use rand::Rng;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
@@ -9,9 +10,8 @@ use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
-use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
-use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use rspace_plus_plus::rspace::shared::rspace_store_manager::get_or_create_rspace_store;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     ChannelsProto, CheckpointProto, DatumsProto, HotStoreStateProto, JoinProto, JoinsProto,
     ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
@@ -34,8 +34,17 @@ pub extern "C" fn space_new() -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            let mut kvm = mk_rspace_store_manager("./rspace++_lmdb".into(), 1 * GB);
-            let store = kvm.r_space_stores().await.unwrap();
+            println!("\nHit space_new");
+
+            // let mut rng = rand::thread_rng();
+            // let unique_id: u32 = rng.gen();
+            // let mut kvm =
+            //     mk_rspace_store_manager(format!("./rspace++_lmdb_{}", unique_id).into(), 1 * GB);
+
+            // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
+            let store = get_or_create_rspace_store("./rspace++_lmdb".into(), 1 * GB);
+
+            // let store = kvm.r_space_stores().await.unwrap();
 
             RSpaceInstances::create(store, Matcher).await
         })
@@ -54,6 +63,7 @@ pub extern "C" fn space_print(rspace: *mut Space) -> () {
 pub extern "C" fn space_clear(rspace: *mut Space) -> () {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        println!("\nHit space_clear");
         unsafe {
             (*rspace)
                 .rspace
@@ -106,6 +116,8 @@ pub extern "C" fn produce(
     data_bytes_len: usize,
     persist: bool,
 ) -> *const u8 {
+    // println!("\nHit produce");
+
     let payload_slice =
         unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
     let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
@@ -159,6 +171,8 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
+    // println!("\nHit consume");
+
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
 
@@ -219,6 +233,8 @@ pub extern "C" fn install(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
+    // println!("\nHit install");
+
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = InstallParams::decode(payload_slice).unwrap();
 
@@ -248,6 +264,8 @@ pub extern "C" fn install(
 pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        // println!("\nHit create_checkpoint");
+
         let checkpoint = unsafe {
             (*rspace)
                 .rspace
@@ -271,6 +289,8 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_len: usize) -> () {
+    // println!("\nHit reset");
+
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
@@ -472,6 +492,8 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
 pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt.block_on(async {
+        // println!("\nHit spawn");
+
         unsafe {
             (*rspace)
                 .rspace
@@ -488,6 +510,8 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        // println!("\nHit create_soft_checkpoint");
+
         let soft_checkpoint = unsafe { (*rspace).rspace.create_soft_checkpoint().await };
 
         let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
@@ -638,6 +662,8 @@ pub extern "C" fn revert_to_soft_checkpoint(
 ) -> () {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        // println!("\nHit revert_to_soft_checkpoint");
+
         let payload_slice =
             unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
         let soft_checkpoint_proto = SoftCheckpointProto::decode(payload_slice).unwrap();

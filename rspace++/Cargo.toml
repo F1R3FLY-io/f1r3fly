@@ -33,6 +33,7 @@ log = "0.4.20"
 rayon = "1.8.1"
 hex = "0.4.3"
 proptest = "1.4.0"
+lazy_static = "1.4.0"
 
 [dependencies.uuid]
 version = "1.4.0"

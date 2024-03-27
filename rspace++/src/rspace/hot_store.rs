@@ -233,6 +233,8 @@ where
     async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel).await;
 
+        // println!("\nfrom_history_store in get_data: {:?}", from_history_store);
+
         let maybe_data = {
             let state = self.hot_store_state.lock().unwrap();
             state.data.get(channel).map(|data| data.clone())

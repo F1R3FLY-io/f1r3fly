@@ -27,6 +27,8 @@ import org.scalatest.{EitherValues, FlatSpec, Matchers}
 import java.io.PrintWriter
 import java.nio.file.{Files, Path}
 
+import java.nio.file.Paths
+
 class GenesisTest extends FlatSpec with Matchers with EitherValues with BlockDagStorageFixture {
   import GenesisTest._
 
@@ -307,6 +309,7 @@ object GenesisTest {
       result         <- body(runtimeManager, genesisPath, log, time)
       _              <- Sync[F].delay { storePath.recursivelyDelete() }
       _              <- Sync[F].delay { gp.recursivelyDelete() }
+      _              <- Sync[F].delay { Paths.get("rspace++_lmdb").recursivelyDelete() }
     } yield result
   }
 

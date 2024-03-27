@@ -686,6 +686,7 @@ where
 
 pub struct RSpaceInstances;
 
+#[derive(Clone)]
 pub struct RSpaceStore {
     pub history: Arc<Mutex<Box<dyn KeyValueStore>>>,
     pub roots: Arc<Mutex<Box<dyn KeyValueStore>>>,
