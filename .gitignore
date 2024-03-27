@@ -110,7 +110,5 @@ rspacePlusPlus/
 docker/data/**/rnode.log
 docker/data/**/*.mdb
 
-rspace++/tests/lmdb
-rholang/rspace++_lmdb/
-rspace++_lmdb
+rholang/**/*.mdb
 rspace++/tests/*.proptest-regressions

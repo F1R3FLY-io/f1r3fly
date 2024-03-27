@@ -116,7 +116,7 @@ object BasicBench {
     implicit val ms: Metrics.Source                             = Metrics.BaseSource
     private val dbDir: Path                                     = Files.createTempDirectory("rchain-storage-test-")
     implicit val kvm                                            = RholangCLI.mkRSpaceStoreManager[Task](dbDir).runSyncUnsafe()
-    val rSpaceStore                                             = kvm.rSpaceStores.runSyncUnsafe()
+    // val rSpaceStore                                             = kvm.rSpaceStores.runSyncUnsafe()
 
     // val testSpace: ISpace[
     //   Task,
@@ -135,7 +135,7 @@ object BasicBench {
     //     ](rSpaceStore)
     //     .unsafeRunSync
 
-    val testSpace = RSpacePlusPlus_RhoTypes.create[Task].unsafeRunSync
+    val testSpace = RSpacePlusPlus_RhoTypes.create[Task](dbDir.toString()).unsafeRunSync
 
     implicit val cost = CostAccounting.initialCost[Task](Cost.UNSAFE_MAX).unsafeRunSync
 

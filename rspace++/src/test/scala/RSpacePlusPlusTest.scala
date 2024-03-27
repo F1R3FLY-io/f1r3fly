@@ -12,7 +12,7 @@ class RSpacePlusPlusTest extends AnyFunSuite with Matchers {
   implicit val log                  = Log.log[IO]
 
   val _                = System.setProperty("jna.library.path", "./target/release/")
-  val space            = RSpacePlusPlus_RhoTypes.create[IO].unsafeRunSync();
+  val space            = RSpacePlusPlus_RhoTypes.create[IO]("./rspace++_lmdb").unsafeRunSync();
   val rhotypesDefaults = new Defaults();
 
   test(

@@ -544,8 +544,8 @@ class ReduceSpec extends FlatSpec with Matchers with AppendedClues with Persiste
       case (channels, row) => (channels, produceEventsWithoutHashes(row))
     }
 
-    println("\nExpectedResult: " + transformedExpectedResult)
-    println("\nResult: " + transformedSendFirstResult)
+    // println("\nExpectedResult: " + transformedExpectedResult)
+    // println("\nResult: " + transformedSendFirstResult)
 
     transformedSendFirstResult.toIterable should contain theSameElementsAs transformedExpectedResult
 
