@@ -305,11 +305,14 @@ object GenesisTest {
       // rStore         <- kvsManager.rSpaceStores
       mStore <- RuntimeManager.mergeableStore(kvsManager)
       // runtimeManager <- RuntimeManager[F](rStore, mStore, Genesis.NonNegativeMergeableTagName)
-      runtimeManager <- RuntimeManager[F](mStore, Genesis.NonNegativeMergeableTagName)
-      result         <- body(runtimeManager, genesisPath, log, time)
-      _              <- Sync[F].delay { storePath.recursivelyDelete() }
-      _              <- Sync[F].delay { gp.recursivelyDelete() }
-      _              <- Sync[F].delay { Paths.get("rspace++_lmdb").recursivelyDelete() }
+      runtimeManager <- RuntimeManager[F](
+                         storePath.toString,
+                         mStore,
+                         Genesis.NonNegativeMergeableTagName
+                       )
+      result <- body(runtimeManager, genesisPath, log, time)
+      _      <- Sync[F].delay { storePath.recursivelyDelete() }
+      _      <- Sync[F].delay { gp.recursivelyDelete() }
     } yield result
   }
 

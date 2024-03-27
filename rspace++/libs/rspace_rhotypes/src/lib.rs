@@ -1,6 +1,5 @@
 use dashmap::DashMap;
 use prost::Message;
-use rand::Rng;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
@@ -19,6 +18,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreToMapValue, WaitingContinuationsProto,
 };
 use std::collections::HashMap;
+use std::ffi::{c_char, CStr};
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -30,21 +30,18 @@ pub struct Space {
 }
 
 #[no_mangle]
-pub extern "C" fn space_new() -> *mut Space {
+pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
+    let c_str = unsafe { CStr::from_ptr(path) };
+    let store_path = c_str.to_str().unwrap();
+
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            println!("\nHit space_new");
-
-            // let mut rng = rand::thread_rng();
-            // let unique_id: u32 = rng.gen();
-            // let mut kvm =
-            //     mk_rspace_store_manager(format!("./rspace++_lmdb_{}", unique_id).into(), 1 * GB);
+            // println!("\nHit space_new");
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
-            let store = get_or_create_rspace_store("./rspace++_lmdb".into(), 1 * GB);
-
             // let store = kvm.r_space_stores().await.unwrap();
+            let store = get_or_create_rspace_store(&format!("{}_rspace++", store_path), 1 * GB);
 
             RSpaceInstances::create(store, Matcher).await
         })

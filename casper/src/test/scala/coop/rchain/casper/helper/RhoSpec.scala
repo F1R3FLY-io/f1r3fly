@@ -153,8 +153,9 @@ class RhoSpec(
       //   )
       // )
         .evalMap(
-          _ =>
+          path =>
             RhoRuntime.createRuntime(
+              path.toString(),
               Genesis.NonNegativeMergeableTagName,
               additionalSystemProcesses = testFrameworkContracts(testResultCollector)
             )

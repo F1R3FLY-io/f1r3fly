@@ -505,7 +505,11 @@ object TestNode {
       //                    RuntimeManager(rSpaceStore, mStore, Genesis.NonNegativeMergeableTagName)
       //                  )
       runtimeManager <- Resource.eval(
-                         RuntimeManager(mStore, Genesis.NonNegativeMergeableTagName)
+                         RuntimeManager(
+                           newStorageDir.toString,
+                           mStore,
+                           Genesis.NonNegativeMergeableTagName
+                         )
                        )
 
       node <- Resource.eval({

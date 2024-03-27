@@ -7,7 +7,7 @@ import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuati
   * The JNA interface for Rust RSpace++
   */
 trait JNAInterface extends Library {
-  def space_new(): Pointer
+  def space_new(storePath: String): Pointer
   def space_print(rspace: Pointer): Unit
   def space_clear(rspace: Pointer): Unit
 

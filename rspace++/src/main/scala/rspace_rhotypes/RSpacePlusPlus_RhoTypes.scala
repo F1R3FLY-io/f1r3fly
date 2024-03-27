@@ -91,47 +91,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   def clear(): F[Unit] =
     Applicative[F].pure { INSTANCE.space_clear(rspacePointer) }
 
-  def spatialMatchResult(target: C, pattern: C): F[Option[(Map[Int, Par], Unit)]] =
-    for {
-      result <- Sync[F].delay {
-                 val targetBytes        = target.toByteArray
-                 val targetBytesLength  = targetBytes.length
-                 val patternBytes       = pattern.toByteArray
-                 val patternBytesLength = patternBytes.length
-
-                 val payloadSize   = targetBytesLength.toLong + patternBytesLength.toLong
-                 val payloadMemory = new Memory(payloadSize)
-
-                 payloadMemory.write(0, targetBytes, 0, targetBytesLength)
-                 payloadMemory.write(targetBytesLength.toLong, patternBytes, 0, patternBytesLength)
-
-                 val spatialMatchResultPtr = INSTANCE.spatial_match_result(
-                   payloadMemory,
-                   targetBytesLength,
-                   patternBytesLength
-                 )
-
-                 // Not sure is this line is needed
-                 // Need to figure out how to deallocate 'payloadMemory'
-                 payloadMemory.clear()
-
-                 if (spatialMatchResultPtr != null) {
-                   val resultByteslength = spatialMatchResultPtr.getInt(0)
-
-                   try {
-                     val resultBytes  = spatialMatchResultPtr.getByteArray(4, resultByteslength)
-                     val freeMapProto = FreeMapProto.parseFrom(resultBytes)
-
-                     Some((freeMapProto.entries, ()))
-                   } finally {
-                     INSTANCE.deallocate_memory(spatialMatchResultPtr, resultByteslength)
-                   }
-                 } else {
-                   None
-                 }
-               }
-    } yield result
-
   // TuplespacePlusPlus trait functions
 
   def produce(channel: C, data: A, persist: Boolean): F[MaybeActionResult] =
@@ -952,30 +911,69 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 }
 
 object RSpacePlusPlus_RhoTypes {
-  def create[F[_]: Concurrent: Log](
-      ): F[RSpacePlusPlus_RhoTypes[F]] =
-    Sync[F].delay {
-      val INSTANCE: JNAInterface =
-        Native
-          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
-          .asInstanceOf[JNAInterface]
+  val INSTANCE: JNAInterface =
+    Native
+      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+      .asInstanceOf[JNAInterface]
 
-      val rspacePointer = INSTANCE.space_new();
+  def create[F[_]: Concurrent: Log](storePath: String): F[RSpacePlusPlus_RhoTypes[F]] =
+    Sync[F].delay {
+      val rspacePointer = INSTANCE.space_new(storePath);
       new RSpacePlusPlus_RhoTypes[F](rspacePointer)
     }
 
   def createWithReplay[F[_]: Concurrent: Log, C, P, A, K](
-      ): F[(RSpacePlusPlus_RhoTypes[F], ReplayRSpacePlusPlus[F, C, P, A, K])] =
+      storePath: String
+  ): F[(RSpacePlusPlus_RhoTypes[F], ReplayRSpacePlusPlus[F, C, P, A, K])] =
     Sync[F].delay {
-      val INSTANCE: JNAInterface =
-        Native
-          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
-          .asInstanceOf[JNAInterface]
-
-      val rspacePointer = INSTANCE.space_new();
+      val rspacePointer = INSTANCE.space_new(storePath);
       (
         new RSpacePlusPlus_RhoTypes[F](rspacePointer),
         new ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer)
       )
     }
+
+  def spatialMatchResult[F[_]: Concurrent: Log, C, P, A, K](
+      target: Par,
+      pattern: Par
+  ): F[Option[(Map[Int, Par], Unit)]] =
+    for {
+      result <- Sync[F].delay {
+                 val targetBytes        = target.toByteArray
+                 val targetBytesLength  = targetBytes.length
+                 val patternBytes       = pattern.toByteArray
+                 val patternBytesLength = patternBytes.length
+
+                 val payloadSize   = targetBytesLength.toLong + patternBytesLength.toLong
+                 val payloadMemory = new Memory(payloadSize)
+
+                 payloadMemory.write(0, targetBytes, 0, targetBytesLength)
+                 payloadMemory.write(targetBytesLength.toLong, patternBytes, 0, patternBytesLength)
+
+                 val spatialMatchResultPtr = INSTANCE.spatial_match_result(
+                   payloadMemory,
+                   targetBytesLength,
+                   patternBytesLength
+                 )
+
+                 // Not sure is this line is needed
+                 // Need to figure out how to deallocate 'payloadMemory'
+                 payloadMemory.clear()
+
+                 if (spatialMatchResultPtr != null) {
+                   val resultByteslength = spatialMatchResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes  = spatialMatchResultPtr.getByteArray(4, resultByteslength)
+                     val freeMapProto = FreeMapProto.parseFrom(resultBytes)
+
+                     Some((freeMapProto.entries, ()))
+                   } finally {
+                     INSTANCE.deallocate_memory(spatialMatchResultPtr, resultByteslength)
+                   }
+                 } else {
+                   None
+                 }
+               }
+    } yield result
 }

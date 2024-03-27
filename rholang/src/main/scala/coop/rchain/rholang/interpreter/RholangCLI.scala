@@ -71,7 +71,7 @@ object RholangCLI {
 
     val runtime = (for {
       // store   <- kvm.rSpaceStores
-      runtime <- RhoRuntime.createRuntime[Task](Par())
+      runtime <- RhoRuntime.createRuntime[Task](conf.dataDir().toString(), Par())
     } yield runtime).unsafeRunSync
 
     val problems = try {

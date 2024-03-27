@@ -19,7 +19,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: Log, C, P, A, K](rspacePointer: Poi
   def spawnReplay
       : F[IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
     ReplayRSpacePlusPlus
-      .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
+      .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]("./rspace++_lmdb")
       .asInstanceOf[F[
         IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
       ]]
@@ -27,14 +27,15 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: Log, C, P, A, K](rspacePointer: Poi
 
 object ReplayRSpacePlusPlus {
   def create[F[_]: Concurrent: Log, C, P, A, K](
-      ): F[ReplayRSpacePlusPlus[F, C, P, A, K]] =
+      storePath: String
+  ): F[ReplayRSpacePlusPlus[F, C, P, A, K]] =
     Sync[F].delay {
       val INSTANCE: JNAInterface =
         Native
           .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
           .asInstanceOf[JNAInterface]
 
-      val rspacePointer = INSTANCE.space_new();
+      val rspacePointer = INSTANCE.space_new(storePath);
       new ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer)
     }
 

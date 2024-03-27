@@ -639,6 +639,7 @@ object RhoRuntime {
 
   def createRuntime[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
       // stores: RSpaceStore[F],
+      storePath: String,
       mergeableTagName: Par,
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
@@ -652,7 +653,7 @@ object RhoRuntime {
       //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
       //             stores
       //           )
-      space <- RSpacePlusPlus_RhoTypes.create[F]
+      space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
       runtime <- createRhoRuntime[F](
                   space,
                   mergeableTagName,

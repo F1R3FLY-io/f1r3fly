@@ -776,8 +776,12 @@ class ValidateTest
         // rStore         <- kvm.rSpaceStores
         mStore <- RuntimeManager.mergeableStore(kvm)
         // runtimeManager <- RuntimeManager[Task](rStore, mStore, Genesis.NonNegativeMergeableTagName)
-        runtimeManager <- RuntimeManager[Task](mStore, Genesis.NonNegativeMergeableTagName)
-        dag            <- blockDagStorage.getRepresentation
+        runtimeManager <- RuntimeManager[Task](
+                           storageDirectory.toString,
+                           mStore,
+                           Genesis.NonNegativeMergeableTagName
+                         )
+        dag <- blockDagStorage.getRepresentation
         _ <- InterpreterUtil
               .validateBlockCheckpoint[Task](genesis, mkCasperSnapshot(dag), runtimeManager)
         _                 <- Validate.bondsCache[Task](genesis, runtimeManager) shouldBeF Right(Valid)

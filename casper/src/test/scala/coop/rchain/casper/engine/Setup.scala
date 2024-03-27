@@ -65,7 +65,9 @@ object Setup {
     //   .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
     //   .runSyncUnsafe()
     val spaces = RSpacePlusPlus_RhoTypes
-      .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
+      .createWithReplay[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+        context.storageDirectory.toString()
+      )
       .runSyncUnsafe()
     val (rspace, replay) = spaces
     val historyRepo      = rspace.historyRepo

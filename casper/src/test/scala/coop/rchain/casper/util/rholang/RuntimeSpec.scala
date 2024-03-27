@@ -27,7 +27,8 @@ class RuntimeSpec extends FlatSpec with Matchers {
     for {
       // store   <- kvm.rSpaceStores
       // runtime <- RhoRuntime.createRuntime(store, Genesis.NonNegativeMergeableTagName)
-      runtime <- RhoRuntime.createRuntime[Task](Genesis.NonNegativeMergeableTagName)
+      runtime <- RhoRuntime
+                  .createRuntime[Task]("casper-runtime-spec-", Genesis.NonNegativeMergeableTagName)
 
       /**
         * Root hashes compatible with RChain main net network
@@ -79,7 +80,8 @@ class RuntimeSpec extends FlatSpec with Matchers {
     for {
       // store      <- kvm.rSpaceStores
       // runtime    <- RhoRuntime.createRuntime(store, Genesis.NonNegativeMergeableTagName)
-      runtime    <- RhoRuntime.createRuntime[Task](Genesis.NonNegativeMergeableTagName)
+      runtime <- RhoRuntime
+                  .createRuntime[Task]("casper-runtime-spec-", Genesis.NonNegativeMergeableTagName)
       r          <- runtime.evaluate(contract, Cost.UNSAFE_MAX, Map.empty)
       _          = r.errors should be(Vector.empty)
       checkpoint <- runtime.createCheckpoint

@@ -52,7 +52,7 @@ object Resources {
       // store <- KeyValueStoreManager[F].rSpaceStores
       // space <- RSpace.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
       space <- RSpacePlusPlus_RhoTypes
-                .create[F]
+                .create[F]("rholang-resources-")
     } yield space
   }
 
@@ -60,11 +60,11 @@ object Resources {
   def mkRuntime[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String
   ): Resource[F, RhoRuntime[F]] =
-    // mkTempDir(prefix)
+    mkTempDir(prefix)
     //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
     //   .evalMap(_.rSpaceStores)
     //   .evalMap(RhoRuntime.createRuntime(_, Par()))
-    Resource.eval(RhoRuntime.createRuntime[F](Par()))
+      .evalMap(path => RhoRuntime.createRuntime[F](path.toString(), Par()))
 
   def mkRuntimes[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String,
@@ -72,14 +72,15 @@ object Resources {
   )(
       // implicit scheduler: Scheduler
   ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] =
-    // mkTempDir(prefix)
+    mkTempDir(prefix)
     //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
     //   .evalMap(_.rSpaceStores)
     //   .evalMap(createRuntimes(_, initRegistry = initRegistry))
-    Resource.eval(createRuntimes(initRegistry = initRegistry))
+      .evalMap(path => createRuntimes[F](path.toString(), initRegistry = initRegistry))
 
   def createRuntimes[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
       // stores: RSpaceStore[F],
+      storePath: String,
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
@@ -93,7 +94,9 @@ object Resources {
       //                stores
       //              )
       hrstores <- RSpacePlusPlus_RhoTypes
-                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
+                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+                     storePath
+                   )
       (space, replay) = hrstores
       runtimes <- RhoRuntime
                    .createRuntimes[F](space, replay, initRegistry, additionalSystemProcesses, Par())

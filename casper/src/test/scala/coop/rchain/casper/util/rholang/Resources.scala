@@ -68,7 +68,7 @@ object Resources {
       // rStore         <- kvm.rSpaceStores
       mStore <- RuntimeManager.mergeableStore(kvm)
       // runtimeManager <- RuntimeManager(rStore, mStore, mergeableTagName)
-      runtimeManager <- RuntimeManager(mStore, mergeableTagName)
+      runtimeManager <- RuntimeManager("casper-resources-", mStore, mergeableTagName)
     } yield runtimeManager
   }
 
@@ -90,6 +90,7 @@ object Resources {
       //                               Genesis.NonNegativeMergeableTagName
       //                             )
       runtimeManagerWithHistory <- RuntimeManager.createWithHistory(
+                                    "casper-resources-",
                                     mStore,
                                     Genesis.NonNegativeMergeableTagName
                                   )

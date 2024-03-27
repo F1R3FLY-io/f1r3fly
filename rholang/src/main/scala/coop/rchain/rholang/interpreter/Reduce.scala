@@ -374,10 +374,9 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
           case Nil => ().asRight[(Par, Seq[MatchCase])].pure[M]
           case singleCase +: caseRem =>
             for {
-              rspacePlusPlus <- RSpacePlusPlus_RhoTypes.create[M]
-              pattern        <- substituteAndCharge[Par, M](singleCase.pattern, depth = 1, env)
+              pattern <- substituteAndCharge[Par, M](singleCase.pattern, depth = 1, env)
               // matchResult <- spatialMatchResult[M](target, pattern)
-              matchResult <- rspacePlusPlus.spatialMatchResult(target, pattern)
+              matchResult <- RSpacePlusPlus_RhoTypes.spatialMatchResult(target, pattern)
               res <- matchResult match {
                       case None =>
                         (target, caseRem).asLeft[Unit].pure[M]
@@ -631,12 +630,11 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
 
         case EMatchesBody(EMatches(target, pattern)) =>
           for {
-            rspacePlusPlus <- RSpacePlusPlus_RhoTypes.create[M]
-            evaledTarget   <- evalExpr(target)
-            substTarget    <- substituteAndCharge[Par, M](evaledTarget, depth = 0, env)
-            substPattern   <- substituteAndCharge[Par, M](pattern, depth = 1, env)
+            evaledTarget <- evalExpr(target)
+            substTarget  <- substituteAndCharge[Par, M](evaledTarget, depth = 0, env)
+            substPattern <- substituteAndCharge[Par, M](pattern, depth = 1, env)
             // matchResult  <- spatialMatchResult[M](substTarget, substPattern)
-            matchResult <- rspacePlusPlus.spatialMatchResult(substTarget, substPattern)
+            matchResult <- RSpacePlusPlus_RhoTypes.spatialMatchResult(substTarget, substPattern)
           } yield GBool(matchResult.isDefined)
 
         case EPercentPercentBody(EPercentPercent(p1, p2)) =>

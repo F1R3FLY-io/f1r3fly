@@ -153,7 +153,11 @@ object GenesisBuilder {
       // rStore     <- kvsManager.rSpaceStores
       mStore <- RuntimeManager.mergeableStore(kvsManager)
       // runtimeManager  <- RuntimeManager(rStore, mStore, Genesis.NonNegativeMergeableTagName)
-      runtimeManager  <- RuntimeManager(mStore, Genesis.NonNegativeMergeableTagName)
+      runtimeManager <- RuntimeManager(
+                         storageDirectory.toString(),
+                         mStore,
+                         Genesis.NonNegativeMergeableTagName
+                       )
       genesis         <- Genesis.createGenesisBlock(runtimeManager, genesisParameters)
       blockStore      <- KeyValueBlockStore[Task](kvsManager)
       _               <- blockStore.put(genesis.blockHash, genesis)

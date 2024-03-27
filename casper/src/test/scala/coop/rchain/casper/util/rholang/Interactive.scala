@@ -95,7 +95,9 @@ object Interactive {
     // val runtime =
     //   RhoRuntime.createRuntime[Task](rspaceStore, Genesis.NonNegativeMergeableTagName).unsafeRunSync
     val runtime =
-      RhoRuntime.createRuntime[Task](Genesis.NonNegativeMergeableTagName).unsafeRunSync
+      RhoRuntime
+        .createRuntime[Task]("casper-interactive-", Genesis.NonNegativeMergeableTagName)
+        .unsafeRunSync
     new Interactive(runtime)
   }
 }

@@ -49,7 +49,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
       costLog <- costLog[Task]()
       // store           <- kvm.rSpaceStores
       // spaces          <- createRuntimesWithCostLog[Task](store, costLog)
-      spaces          <- createRuntimesWithCostLog[Task](costLog)
+      spaces          <- createRuntimesWithCostLog[Task]("./cost-accounting-spec-", costLog)
       (runtime, _, _) = spaces
     } yield (runtime, costLog)
 
@@ -65,6 +65,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
 
   private def createRuntimesWithCostLog[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
       // stores: RSpaceStore[F],
+      storePath: String,
       costLog: FunctorTell[F, Chain[Cost]],
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
@@ -79,7 +80,9 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
       //                stores
       //              )
       hrstores <- RSpacePlusPlus_RhoTypes
-                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
+                   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+                     storePath
+                   )
       (space, replay) = hrstores
       rhoRuntime <- RhoRuntime
                      .createRhoRuntime[F](space, Par(), initRegistry, additionalSystemProcesses)
@@ -108,7 +111,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
       cost    <- CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms)
       // store                    <- kvm.rSpaceStores
       // spaces                   <- Resources.createRuntimes[Task](store)
-      spaces                      <- Resources.createRuntimes[Task]()
+      spaces                      <- Resources.createRuntimes[Task]("cost-accounting-spec-")
       (runtime, replayRuntime, _) = spaces
       result <- {
         implicit def rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])

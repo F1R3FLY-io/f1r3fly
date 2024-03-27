@@ -829,7 +829,7 @@ class RholangMethodsCostsSpec
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
   implicit val ms: Metrics.Source         = Metrics.BaseSource
   implicit val kvm                        = InMemoryStoreManager[Task]
-  val rSpaceStore                         = kvm.rSpaceStores.runSyncUnsafe()
+  // val rSpaceStore                         = kvm.rSpaceStores.runSyncUnsafe()
   protected override def beforeAll(): Unit = {
     import coop.rchain.catscontrib.TaskContrib._
     import coop.rchain.rholang.interpreter.storage._
@@ -838,7 +838,7 @@ class RholangMethodsCostsSpec
     // space = RSpace
     //   .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](rSpaceStore)
     //   .unsafeRunSync
-    space = RSpacePlusPlus_RhoTypes.create[Task].unsafeRunSync
+    space = RSpacePlusPlus_RhoTypes.create[Task](dbDir.toString()).unsafeRunSync
   }
 
   protected override def afterAll(): Unit = {

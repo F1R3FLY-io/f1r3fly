@@ -91,14 +91,15 @@ object ReportingCasper {
 
   // NOTE: Removed "implicit scheduler: ExecutionContext" parameter
   def rhoReporter[F[_]: ContextShift: Concurrent: Log: Metrics: Span: Parallel: BlockStore: BlockDagStorage](
-      rspaceStore: RSpaceStore[F]
+      // rspaceStore: RSpaceStore[F]
+      storePath: String
   )(): ReportingCasper[F] =
     new ReportingCasper[F] {
       override def trace(
           block: BlockMessage
       ): F[ReplayResult] =
         for {
-          reportingRspace  <- ReportingRuntime.createReportingRSpace(rspaceStore)
+          reportingRspace  <- ReportingRuntime.createReportingRSpace(storePath)
           reportingRuntime <- ReportingRuntime.createReportingRuntime(reportingRspace)
           dag              <- BlockDagStorage[F].getRepresentation
           // TODO approvedBlock is not equal to genesisBlock
@@ -192,7 +193,8 @@ object ReportingRuntime {
     Metrics.Source(RholangMetricsSource, "reportingRuntime")
 
   def createReportingRSpace[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
-      store: RSpaceStore[F]
+      // store: RSpaceStore[F]
+      storePath: String
   )(
       // implicit scheduler: ExecutionContext
   ): F[RhoReportingRspace[F]] = {
@@ -200,7 +202,9 @@ object ReportingRuntime {
     // implicit val m: RSpaceMatch[F, BindPattern, ListParWithRandom] = matchListPar[F]
 
     // ReportingRspace.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
-    ReportingRSpacePlusPlus.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]()
+    ReportingRSpacePlusPlus.create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      storePath
+    )
   }
 
   def createReportingRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
