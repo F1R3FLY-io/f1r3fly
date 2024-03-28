@@ -1,5 +1,7 @@
 # RSpace++
 
+On branch `rhotypes`
+
 ## Quickstart
 
 Starting standalone node using RSpace++
@@ -9,7 +11,8 @@ Starting standalone node using RSpace++
 
 Standing up network using RSpace++
 1. `sbt ";clean ;compile ;project node ;assembly"`
-2. `./scripts/start_shard.sh`
+2. `java -Djna.library.path=./rspace++/target/release/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upn`
+3. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/`
 
 Standing up network using RSpace++ (Under Docker)
 1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell)
@@ -50,6 +53,7 @@ I have classified these as "working" if the output and deployment cost matches t
 
 - Run Rholang Reduce tests: `sbt "rholang/testOnly coop.rchain.rholang.interpreter.ReduceSpec"`
 - Run basic RSpace-Bench Benchmark: `sbt "rspaceBench/jmh:run -i 10 -wi 10 -f1 -t1 .BasicBench."`
+- Run Casper Genesis tests: `sbt "casper/testOnly coop.rchain.casper.genesis.GenesisTest"`
 
 ### Testing Rust (within rspace++ directory)
 
