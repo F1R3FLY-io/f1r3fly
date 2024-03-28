@@ -271,6 +271,8 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
                 .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
         };
 
+        // println!("create_checkpoint root hash: {}", checkpoint.root);
+
         let checkpoint_proto = CheckpointProto {
             root: checkpoint.root.bytes(),
         };

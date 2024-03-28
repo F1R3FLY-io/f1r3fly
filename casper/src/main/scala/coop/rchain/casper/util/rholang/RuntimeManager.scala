@@ -159,6 +159,10 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
           // Convert from final to diff values and persist mergeable (number) channels for post-state hash
           val preStateHash  = preState.toBlake2b256Hash
           val postStateHash = stateHash.toBlake2b256Hash
+
+          // println("\npreStateHash: " + preStateHash)
+          // println("postStateHash: " + postStateHash + '\n')
+
           this
             .saveMergeableChannels(postStateHash, Array(), seqNum = 0, mergeableChs, preStateHash)
             .as((preState, stateHash, processedDeploys))
@@ -252,8 +256,10 @@ object RuntimeManager {
     * Because of the value is actually the same all
     * the time. For some situations, we can just use the value directly for better performance.
     */
+  // val emptyStateHashFixed: StateHash =
+  //   "9619d9a34bdaf56d5de8cfb7c2304d63cd9e469a0bfc5600fd2f5b9808e290f1".unsafeHexToByteString
   val emptyStateHashFixed: StateHash =
-    "9619d9a34bdaf56d5de8cfb7c2304d63cd9e469a0bfc5600fd2f5b9808e290f1".unsafeHexToByteString
+    "575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508".unsafeHexToByteString
 
   def apply[F[_]](implicit F: RuntimeManager[F]): F.type = F
 
