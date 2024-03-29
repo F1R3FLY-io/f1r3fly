@@ -1,12 +1,12 @@
-use heed::EnvOpenOptions;
-
 use super::key_value_store_manager::KeyValueStoreManager;
 use crate::rspace::rspace::RSpaceStore;
 use crate::rspace::shared::lmdb_dir_store_manager::{Db, LmdbDirStoreManager, LmdbEnvConfig};
 use crate::rspace::shared::lmdb_key_value_store::LmdbKeyValueStore;
-use std::collections::HashMap;
+use heed::EnvOpenOptions;
+use lazy_static::lazy_static;
+use std::collections::{HashMap, HashSet};
 use std::fs::create_dir_all;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RholangCLI.scala
@@ -25,39 +25,50 @@ pub fn mk_rspace_store_manager(dir_path: PathBuf, map_size: usize) -> impl KeyVa
     LmdbDirStoreManager::new(dir_path, db_mapping)
 }
 
+lazy_static! {
+    static ref LMDB_DIR_STATE_MANAGER: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+}
+
 pub fn get_or_create_rspace_store(
     lmdb_path: &str,
     map_size: usize,
 ) -> Result<RSpaceStore, heed::Error> {
-    if Path::new(lmdb_path).exists() {
-        println!("RSpace++ storage path {} already exists.", lmdb_path);
+    let mut dir_state = LMDB_DIR_STATE_MANAGER.lock().unwrap();
 
-        let history_store = open_lmdb_store(lmdb_path, "rspace++_history")?;
-        let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots")?;
-        let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold")?;
+    match dir_state.contains(lmdb_path) {
+        true => {
+            println!("RSpace++ storage path {} already exists.", lmdb_path);
 
-        let rspace_store = RSpaceStore {
-            history: Arc::new(Mutex::new(Box::new(history_store))),
-            roots: Arc::new(Mutex::new(Box::new(roots_store))),
-            cold: Arc::new(Mutex::new(Box::new(cold_store))),
-        };
+            let history_store = open_lmdb_store(lmdb_path, "rspace++_history")?;
+            let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots")?;
+            let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold")?;
 
-        Ok(rspace_store)
-    } else {
-        println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
-        create_dir_all(lmdb_path).expect("Failed to create RSpace++ storage directory");
+            let rspace_store = RSpaceStore {
+                history: Arc::new(Mutex::new(Box::new(history_store))),
+                roots: Arc::new(Mutex::new(Box::new(roots_store))),
+                cold: Arc::new(Mutex::new(Box::new(cold_store))),
+            };
 
-        let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size)?;
-        let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size)?;
-        let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size)?;
+            Ok(rspace_store)
+        }
+        false => {
+            println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
+            create_dir_all(lmdb_path).expect("Failed to create RSpace++ storage directory");
 
-        let rspace_store = RSpaceStore {
-            history: Arc::new(Mutex::new(Box::new(history_store))),
-            roots: Arc::new(Mutex::new(Box::new(roots_store))),
-            cold: Arc::new(Mutex::new(Box::new(cold_store))),
-        };
+            let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size)?;
+            let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size)?;
+            let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size)?;
 
-        Ok(rspace_store)
+            dir_state.insert(lmdb_path.to_string());
+
+            let rspace_store = RSpaceStore {
+                history: Arc::new(Mutex::new(Box::new(history_store))),
+                roots: Arc::new(Mutex::new(Box::new(roots_store))),
+                cold: Arc::new(Mutex::new(Box::new(cold_store))),
+            };
+
+            Ok(rspace_store)
+        }
     }
 }
 
@@ -92,6 +103,6 @@ fn open_lmdb_store(lmdb_path: &str, db_name: &str) -> Result<LmdbKeyValueStore, 
             env: env.into(),
             db: Arc::new(Mutex::new(open_db)),
         }),
-        None => panic!("\nUnable to open database."),
+        None => panic!("\nFailed to open database: {}", db_name),
     }
 }
