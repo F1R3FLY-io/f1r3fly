@@ -25,13 +25,16 @@ pub fn mk_rspace_store_manager(dir_path: PathBuf, map_size: usize) -> impl KeyVa
     LmdbDirStoreManager::new(dir_path, db_mapping)
 }
 
-pub fn get_or_create_rspace_store(lmdb_path: &str, map_size: usize) -> RSpaceStore {
+pub fn get_or_create_rspace_store(
+    lmdb_path: &str,
+    map_size: usize,
+) -> Result<RSpaceStore, heed::Error> {
     if Path::new(lmdb_path).exists() {
-        // println!("RSpace++ storage path {} already exists.", lmdb_path);
+        println!("RSpace++ storage path {} already exists.", lmdb_path);
 
-        let history_store = open_lmdb_store(lmdb_path, "rspace++_history").unwrap();
-        let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots").unwrap();
-        let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold").unwrap();
+        let history_store = open_lmdb_store(lmdb_path, "rspace++_history")?;
+        let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots")?;
+        let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold")?;
 
         let rspace_store = RSpaceStore {
             history: Arc::new(Mutex::new(Box::new(history_store))),
@@ -39,14 +42,14 @@ pub fn get_or_create_rspace_store(lmdb_path: &str, map_size: usize) -> RSpaceSto
             cold: Arc::new(Mutex::new(Box::new(cold_store))),
         };
 
-        rspace_store
+        Ok(rspace_store)
     } else {
-        // println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
+        println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
         create_dir_all(lmdb_path).expect("Failed to create RSpace++ storage directory");
 
-        let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size).unwrap();
-        let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size).unwrap();
-        let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size).unwrap();
+        let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size)?;
+        let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size)?;
+        let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size)?;
 
         let rspace_store = RSpaceStore {
             history: Arc::new(Mutex::new(Box::new(history_store))),
@@ -54,7 +57,7 @@ pub fn get_or_create_rspace_store(lmdb_path: &str, map_size: usize) -> RSpaceSto
             cold: Arc::new(Mutex::new(Box::new(cold_store))),
         };
 
-        rspace_store
+        Ok(rspace_store)
     }
 }
 
@@ -79,7 +82,10 @@ fn create_lmdb_store(
 }
 
 fn open_lmdb_store(lmdb_path: &str, db_name: &str) -> Result<LmdbKeyValueStore, heed::Error> {
-    let env = EnvOpenOptions::new().open(lmdb_path)?;
+    let mut env_builder = EnvOpenOptions::new();
+    env_builder.max_dbs(20);
+
+    let env = env_builder.open(lmdb_path)?;
     let db = env.open_database(Some(db_name))?;
     match db {
         Some(open_db) => Ok(LmdbKeyValueStore {

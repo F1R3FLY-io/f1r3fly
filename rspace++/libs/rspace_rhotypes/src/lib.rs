@@ -41,7 +41,8 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
-            let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB);
+            let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
+                .expect("Error getting RSpaceStore: ");
 
             RSpaceInstances::create(store, Matcher).await
         })
