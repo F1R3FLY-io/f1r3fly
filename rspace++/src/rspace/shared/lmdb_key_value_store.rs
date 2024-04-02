@@ -26,6 +26,7 @@ impl KeyValueStore for LmdbKeyValueStore {
     }
 
     fn put(&mut self, kv_pairs: Vec<(ByteBuffer, ByteBuffer)>) -> Result<(), KvStoreError> {
+        // println!("\nhit put in lmdb kv");
         let db = self
             .db
             .lock()
@@ -35,6 +36,9 @@ impl KeyValueStore for LmdbKeyValueStore {
             db.put(&mut writer, &key, &value)?;
         }
         writer.commit()?;
+
+        // drop(db);
+        // self.print_store();
         Ok(())
     }
 

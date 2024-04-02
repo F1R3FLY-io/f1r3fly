@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use prost::Message;
+use rand::Rng;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
@@ -9,8 +10,11 @@ use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
-use rspace_plus_plus::rspace::shared::rspace_store_manager::get_or_create_rspace_store;
+use rspace_plus_plus::rspace::shared::rspace_store_manager::{
+    get_or_create_rspace_store, mk_rspace_store_manager,
+};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     ChannelsProto, CheckpointProto, DatumsProto, HotStoreStateProto, JoinProto, JoinsProto,
     ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
@@ -37,12 +41,22 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            // println!("\nHit space_new");
+            println!("\nHit space_new");
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
-            let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
-                .expect("Error getting RSpaceStore: ");
+
+            let mut rng = rand::thread_rng();
+            let unique_id: u32 = rng.gen();
+            let mut kvm =
+                mk_rspace_store_manager((&format!("{}/rspace++/", data_dir)).into(), 1 * GB);
+            let store = kvm.r_space_stores().await.unwrap();
+
+            // let store =
+            //     get_or_create_rspace_store(&format!("{}/rspace++_{}/", data_dir, unique_id), 1 * GB)
+            //         .expect("Error getting RSpaceStore: ");
+            // let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
+            //     .expect("Error getting RSpaceStore: ");
 
             RSpaceInstances::create(store, Matcher).await
         })

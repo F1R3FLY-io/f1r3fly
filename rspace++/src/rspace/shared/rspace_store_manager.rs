@@ -1,12 +1,13 @@
 use super::key_value_store_manager::KeyValueStoreManager;
 use crate::rspace::rspace::RSpaceStore;
+use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::shared::lmdb_dir_store_manager::{Db, LmdbDirStoreManager, LmdbEnvConfig};
 use crate::rspace::shared::lmdb_key_value_store::LmdbKeyValueStore;
 use heed::EnvOpenOptions;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fs::create_dir_all;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RholangCLI.scala
@@ -33,42 +34,47 @@ pub fn get_or_create_rspace_store(
     lmdb_path: &str,
     map_size: usize,
 ) -> Result<RSpaceStore, heed::Error> {
-    let mut dir_state = LMDB_DIR_STATE_MANAGER.lock().unwrap();
+    if Path::new(lmdb_path).exists() {
+        println!("RSpace++ storage path {} already exists.", lmdb_path);
 
-    match dir_state.contains(lmdb_path) {
-        true => {
-            println!("RSpace++ storage path {} already exists.", lmdb_path);
+        let history_store = open_lmdb_store(lmdb_path, "rspace++_history")?;
+        let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots")?;
+        let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold")?;
 
-            let history_store = open_lmdb_store(lmdb_path, "rspace++_history")?;
-            let roots_store = open_lmdb_store(lmdb_path, "rspace++_roots")?;
-            let cold_store = open_lmdb_store(lmdb_path, "rspace++_cold")?;
+        println!("\nhistory store: {}", history_store.to_map().unwrap().len());
+        println!("\nroots store: {}", roots_store.to_map().unwrap().len());
+        // roots_store.print_store();
+        println!("\ncold store: {}", cold_store.to_map().unwrap().len());
+        // cold_store.print_store();
 
-            let rspace_store = RSpaceStore {
-                history: Arc::new(Mutex::new(Box::new(history_store))),
-                roots: Arc::new(Mutex::new(Box::new(roots_store))),
-                cold: Arc::new(Mutex::new(Box::new(cold_store))),
-            };
+        let rspace_store = RSpaceStore {
+            history: Arc::new(Mutex::new(Box::new(history_store))),
+            roots: Arc::new(Mutex::new(Box::new(roots_store))),
+            cold: Arc::new(Mutex::new(Box::new(cold_store))),
+        };
 
-            Ok(rspace_store)
-        }
-        false => {
-            println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
-            create_dir_all(lmdb_path).expect("Failed to create RSpace++ storage directory");
+        Ok(rspace_store)
+    } else {
+        println!("RSpace++ storage path: {} does not exist, creating a new one.", lmdb_path);
+        create_dir_all(lmdb_path).expect("Failed to create RSpace++ storage directory");
 
-            let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size)?;
-            let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size)?;
-            let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size)?;
+        let history_store = create_lmdb_store(lmdb_path, "rspace++_history", map_size)?;
+        let roots_store = create_lmdb_store(lmdb_path, "rspace++_roots", map_size)?;
+        let cold_store = create_lmdb_store(lmdb_path, "rspace++_cold", map_size)?;
 
-            dir_state.insert(lmdb_path.to_string());
+        println!("\nhistory store: {}", history_store.to_map().unwrap().len());
+        println!("\nroots store: {}", roots_store.to_map().unwrap().len());
+        // roots_store.print_store();
+        println!("\ncold store: {}", cold_store.to_map().unwrap().len());
+        // cold_store.print_store();
 
-            let rspace_store = RSpaceStore {
-                history: Arc::new(Mutex::new(Box::new(history_store))),
-                roots: Arc::new(Mutex::new(Box::new(roots_store))),
-                cold: Arc::new(Mutex::new(Box::new(cold_store))),
-            };
+        let rspace_store = RSpaceStore {
+            history: Arc::new(Mutex::new(Box::new(history_store))),
+            roots: Arc::new(Mutex::new(Box::new(roots_store))),
+            cold: Arc::new(Mutex::new(Box::new(cold_store))),
+        };
 
-            Ok(rspace_store)
-        }
+        Ok(rspace_store)
     }
 }
 

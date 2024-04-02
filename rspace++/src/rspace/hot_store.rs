@@ -183,15 +183,12 @@ where
     ) -> Option<()> {
         // println!("hit install_continuation");
         let state = self.hot_store_state.lock().unwrap();
-        let result = state.installed_continuations.insert(channels, wc);
+        let _ = state.installed_continuations.insert(channels, wc);
 
         // println!("installed_continuation result: {:?}", result);
         // println!("to_map: {:?}\n", self.print());
 
-        match result {
-            Some(_) => Some(()),
-            None => None,
-        }
+        Some(())
     }
 
     async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
@@ -233,7 +230,10 @@ where
     async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel).await;
 
-        // println!("\nfrom_history_store in get_data: {:?}", from_history_store);
+        // println!(
+        //     "\nfrom_history_store in get_data: channel: {:?}, data: {:?}",
+        //     channel, from_history_store
+        // );
 
         let maybe_data = {
             let state = self.hot_store_state.lock().unwrap();
@@ -254,7 +254,7 @@ where
     }
 
     async fn put_datum(&self, channel: C, d: Datum<A>) -> () {
-        // println!("\nHit put_datum");
+        // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
 
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
         // println!(
@@ -539,39 +539,62 @@ where
     }
 
     async fn print(&self) {
-        let state = self.hot_store_state.lock().unwrap();
-        println!("\nCurrent Store:");
+        let hot_store_state = self.hot_store_state.lock().unwrap();
+        println!("\nHot Store");
 
         println!("Continuations:");
-        for entry in state.continuations.iter() {
+        for entry in hot_store_state.continuations.iter() {
             let (key, value) = entry.pair();
             println!("Key: {:?}, Value: {:?}", key, value);
         }
 
         println!("\nInstalled Continuations:");
-        for entry in state.installed_continuations.iter() {
+        for entry in hot_store_state.installed_continuations.iter() {
             let (key, value) = entry.pair();
             println!("Key: {:?}, Value: {:?}", key, value);
         }
 
         println!("\nData:");
-        for entry in state.data.iter() {
+        for entry in hot_store_state.data.iter() {
             let (key, value) = entry.pair();
             println!("Key: {:?}, Value: {:?}", key, value);
         }
 
         println!("\nJoins:");
-        for entry in state.joins.iter() {
+        for entry in hot_store_state.joins.iter() {
             let (key, value) = entry.pair();
             println!("Key: {:?}, Value: {:?}", key, value);
         }
 
         println!("\nInstalled Joins:");
-        for entry in state.installed_joins.iter() {
+        for entry in hot_store_state.installed_joins.iter() {
             let (key, value) = entry.pair();
             println!("Key: {:?}, Value: {:?}", key, value);
         }
-        println!();
+
+        let history_cache_state = self.history_store_cache.lock().unwrap();
+        println!("\nHistory Cache");
+
+        println!("Continuations:");
+        for entry in history_cache_state.continuations.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nData:");
+        for entry in history_cache_state.datums.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        println!("\nJoins:");
+        for entry in history_cache_state.joins.iter() {
+            let (key, value) = entry.pair();
+            println!("Key: {:?}, Value: {:?}", key, value);
+        }
+
+        // println!("\nHistory");
+        // println!("Continuations: {:?}", self.history_reader_base.get_continuations(channels));
     }
 
     async fn clear(&self) {
@@ -615,6 +638,7 @@ where
             Entry::Occupied(o) => o.get().clone(),
             Entry::Vacant(v) => {
                 let datums = self.history_reader_base.get_data(channel);
+                // println!("\ndatums from history store: {:?}", datums);
                 v.insert(datums.clone());
                 datums
             }

@@ -34,7 +34,6 @@ use std::sync::{Arc, Mutex};
 pub struct HistoryRepositoryImpl<C, P, A, K> {
     pub current_history: Arc<Mutex<Box<dyn History>>>,
     pub roots_repository: Arc<Mutex<RootRepository>>,
-    // pub leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
     pub leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     pub rspace_exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
     pub rspace_importer: Arc<Mutex<Box<dyn RSpaceImporter>>>,

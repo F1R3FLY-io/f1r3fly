@@ -70,7 +70,7 @@ where
         //     patterns, channels
         // );
 
-        let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await.unwrap();
+        let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await;
         // println!("\nchannel_to_indexed_data: {:?}", channel_to_indexed_data);
         let zipped: Vec<(C, P)> = channels
             .iter()
@@ -120,14 +120,14 @@ where
     async fn fetch_channel_to_index_data(
         &self,
         channels: &Vec<C>,
-    ) -> Option<DashMap<C, Vec<(Datum<A>, i32)>>> {
+    ) -> DashMap<C, Vec<(Datum<A>, i32)>> {
         let map = DashMap::new();
         for c in channels {
             let data = self.store.get_data(c).await;
             let shuffled_data = self.shuffle_with_index(data);
             map.insert(c.clone(), shuffled_data);
         }
-        Some(map)
+        map
     }
 
     async fn locked_produce(
@@ -244,6 +244,13 @@ where
         let rspace =
             RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
         rspace.restore_installs().await;
+
+        // println!("\nRSpace Store in spawn: ");
+        // rspace.store.print().await;
+
+        // println!("\nRSpace History Store in spawn: ");
+        // rspace.history_repository.
+
         Ok(rspace)
     }
 
@@ -414,7 +421,8 @@ where
 
             let consume_ref =
                 Consume::create(channels.clone(), patterns.clone(), continuation.clone(), true);
-            let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await?;
+            let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await;
+            // println!("channel_to_indexed_data in locked_install: {:?}", channel_to_indexed_data);
             let zipped: Vec<(C, P)> = channels
                 .iter()
                 .cloned()

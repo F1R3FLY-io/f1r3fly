@@ -23,7 +23,6 @@ use std::{
 #[derive(Clone)]
 pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
     target_history: Arc<Box<dyn History>>,
-    // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
     leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     _marker: PhantomData<(C, P, A, K)>,
 }
@@ -31,7 +30,6 @@ pub struct RSpaceHistoryReaderImpl<C, P, A, K> {
 impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
     pub fn new(
         target_history: Box<dyn History>,
-        // leaf_store: Arc<Mutex<Box<dyn KeyValueTypedStore<Blake2b256Hash, PersistedData>>>>,
         leaf_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     ) -> Self {
         RSpaceHistoryReaderImpl {
@@ -47,6 +45,7 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
         prefix: u8,
         key: &Blake2b256Hash,
     ) -> Result<Option<PersistedData>, HistoryError> {
+      // println!("\nhit fetch_data");
         let read_bytes = self
             .target_history
             .read(prepend_bytes(prefix, &key.bytes()))?;
@@ -60,7 +59,7 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
                     .expect("RSpace History Reader Impl: Unable to acquire leaf store lock");
 
                 let serialized_read_hash = bincode::serialize(&read_hash.bytes())
-                    .expect("RSpace History Reade rImpl: Unable to serialize");
+                    .expect("RSpace History Reader Impl: Unable to serialize");
 
                 let get_opt = leaf_store_lock.get_one(&serialized_read_hash)?;
 
