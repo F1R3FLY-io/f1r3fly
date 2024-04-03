@@ -52,6 +52,12 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
                 mk_rspace_store_manager((&format!("{}/rspace++/", data_dir)).into(), 1 * GB);
             let store = kvm.r_space_stores().await.unwrap();
 
+            // println!("\nhistory store: {:?}", store.history.lock().unwrap().to_map().unwrap());
+            // println!("\nroots store: {:?}", store.roots.lock().unwrap().to_map().unwrap());
+            // roots_store.print_store();
+            // println!("\ncold store: {:?}", store.cold.lock().unwrap().to_map().unwrap().len());
+            // cold_store.print_store();
+
             // let store =
             //     get_or_create_rspace_store(&format!("{}/rspace++_{}/", data_dir, unique_id), 1 * GB)
             //         .expect("Error getting RSpaceStore: ");

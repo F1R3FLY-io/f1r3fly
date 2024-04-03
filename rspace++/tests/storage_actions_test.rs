@@ -10,6 +10,8 @@ use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
+use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
@@ -101,6 +103,9 @@ fn run_k<C, P>(
 }
 
 async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, StringMatch> {
+    // let mut kvm = mk_rspace_store_manager("./storage_actions_test_lmdb/".into(), 1 * GB);
+    // let store = kvm.r_space_stores().await.unwrap();
+
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
 

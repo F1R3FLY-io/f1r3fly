@@ -407,8 +407,8 @@ where
         patterns: Vec<P>,
         continuation: K,
     ) -> Option<(K, Vec<A>)> {
-        // println!("\nhit locked_install");
-        // println!("channels: {:?}", channels);
+        println!("\nhit locked_install");
+        println!("channels: {:?}", channels);
         // println!("patterns: {:?}", patterns);
         // println!("continuation: {:?}", continuation);
         if channels.len() != patterns.len() {
@@ -422,7 +422,7 @@ where
             let consume_ref =
                 Consume::create(channels.clone(), patterns.clone(), continuation.clone(), true);
             let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await;
-            // println!("channel_to_indexed_data in locked_install: {:?}", channel_to_indexed_data);
+            println!("channel_to_indexed_data in locked_install: {:?}", channel_to_indexed_data);
             let zipped: Vec<(C, P)> = channels
                 .iter()
                 .cloned()

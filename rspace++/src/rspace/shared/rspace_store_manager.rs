@@ -44,7 +44,7 @@ pub fn get_or_create_rspace_store(
         println!("\nhistory store: {}", history_store.to_map().unwrap().len());
         println!("\nroots store: {}", roots_store.to_map().unwrap().len());
         // roots_store.print_store();
-        println!("\ncold store: {}", cold_store.to_map().unwrap().len());
+        // println!("\ncold store: {}", cold_store.to_map().unwrap().len());
         // cold_store.print_store();
 
         let rspace_store = RSpaceStore {
