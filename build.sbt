@@ -21,11 +21,15 @@ Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
 
-inThisBuild(List(
-  publish / skip := true,
-  publishMavenStyle := true,
-  publishTo := Option("GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly")
-))
+inThisBuild(
+  List(
+    publish / skip := true,
+    publishMavenStyle := true,
+    publishTo := Option(
+      "GitHub Package Registry" at "https://maven.pkg.github.com/F1R3FLY-io/f1r3fly"
+    )
+  )
+)
 
 val javaOpens = List(
   "--add-opens",
@@ -35,12 +39,14 @@ val javaOpens = List(
   "--add-opens",
   "java.base/sun.nio.ch=ALL-UNNAMED"
 )
-inThisBuild(List(
-  Test / javaOptions := javaOpens,
-  IntegrationTest / javaOptions := javaOpens
-))
+inThisBuild(
+  List(
+    Test / javaOptions := javaOpens,
+    IntegrationTest / javaOptions := javaOpens
+  )
+)
 
-lazy val ensureDockerBuildx = taskKey[Unit]("Ensure that docker buildx configuration exists")
+lazy val ensureDockerBuildx    = taskKey[Unit]("Ensure that docker buildx configuration exists")
 lazy val dockerBuildWithBuildx = taskKey[Unit]("Build docker images using buildx")
 lazy val dockerBuildxSettings = Seq(
   ensureDockerBuildx := {
@@ -51,20 +57,31 @@ lazy val dockerBuildxSettings = Seq(
   dockerBuildWithBuildx := {
     streams.value.log("Building and pushing image with Buildx")
     dockerAliases.value.foreach(
-      alias => Process("docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
-        alias + " .", baseDirectory.value / "target" / "docker"/ "stage").!
+      alias =>
+        Process(
+          "docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
+            alias + " .",
+          baseDirectory.value / "target" / "docker" / "stage"
+        ).!
     )
   },
-  publish in Docker := Def.sequential(
-    publishLocal in Docker,
-    ensureDockerBuildx,
-    dockerBuildWithBuildx
-  ).value
+  publish in Docker := Def
+    .sequential(
+      publishLocal in Docker,
+      ensureDockerBuildx,
+      dockerBuildWithBuildx
+    )
+    .value
 )
 
 lazy val projectSettings = Seq(
   organization := "f1r3fly-io",
   scalaVersion := "2.12.15",
+  // Added these lines to resolve library dependencies conflict when adding metta library imports in node
+  dependencyOverrides ++= Seq(
+    "com.thesamet.scalapb" %% "scalapb-runtime"      % "0.11.11",
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % "0.11.11"
+  ),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -182,7 +199,7 @@ release := {
     throw new IllegalStateException("Benchmark tests failed")
   }
 }
-*/
+ */
 
 lazy val benchmark = taskKey[Unit]("Run benchmark, and update changelog")
 
@@ -369,7 +386,10 @@ lazy val node = (project in file("node"))
         pureconfig,
         perfmark6,
         perfmark7,
-        perfmark9
+        perfmark9,
+        "io.f1r3fly" %% "compiler" % "0.1.0-SNAPSHOT",
+        "io.f1r3fly" %% "mettal"   % "0.1.0-SNAPSHOT",
+        "io.f1r3fly" %% "rholang"  % "0.1.0-SNAPSHOT"
       ),
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = false)  -> (sourceManaged in Compile).value / "protobuf",
@@ -381,10 +401,10 @@ lazy val node = (project in file("node"))
     discoveredMainClasses in Compile := Seq(),
     mainClass in assembly := Some("coop.rchain.node.Main"),
     assemblyMergeStrategy in assembly := {
-      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
-      case x if x.endsWith("scala/annotation/nowarn.class") => MergeStrategy.discard
+      case x if x.endsWith("io.netty.versions.properties")   => MergeStrategy.first
+      case x if x.endsWith("scala/annotation/nowarn.class")  => MergeStrategy.discard
       case x if x.endsWith("scala/annotation/nowarn$.class") => MergeStrategy.discard
-      case x if x.endsWith("module-info.class") => MergeStrategy.discard
+      case x if x.endsWith("module-info.class")              => MergeStrategy.discard
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
@@ -399,7 +419,11 @@ lazy val node = (project in file("node"))
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
     dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
-    dockerEntrypoint := List("/opt/docker/bin/rnode", "--profile=docker", "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"),
+    dockerEntrypoint := List(
+      "/opt/docker/bin/rnode",
+      "--profile=docker",
+      "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"
+    ),
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
@@ -408,17 +432,23 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd("RUN", """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
+        Cmd(
+          "RUN",
+          """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
                       microdnf update && \
                       microdnf install jq gzip && \
                       curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
                       chmod a+x grpcurl && \
-                      mv grpcurl /usr/local/bin"""),
-        Cmd("USER", (Docker/daemonUser).value),
-        Cmd("HEALTHCHECK CMD", """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
-                                  curl -s 127.0.0.1:40403/status | jq -e"""),
+                      mv grpcurl /usr/local/bin"""
+        ),
+        Cmd("USER", (Docker / daemonUser).value),
+        Cmd(
+          "HEALTHCHECK CMD",
+          """grpcurl -plaintext 127.0.0.1:40401 casper.v1.DeployService.status | jq -e && \
+                                  curl -s 127.0.0.1:40403/status | jq -e"""
+        ),
         ExecCmd("CMD", "run")
       )
     },
@@ -430,7 +460,7 @@ lazy val node = (project in file("node"))
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED"
     ),
-        // Replace unsupported character `+`
+    // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
     mappings in Docker ++= {
       val base = (defaultLinuxInstallLocation in Docker).value
@@ -438,7 +468,6 @@ lazy val node = (project in file("node"))
         .map { case (f, p) => f -> s"$base/$p" }
     },
     dockerBuildxSettings,
-
 // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
@@ -446,13 +475,12 @@ lazy val node = (project in file("node"))
       val version = scalaBinaryVersion.value match {
         case "2.10" => "1.0.3"
         case "2.11" => "1.6.7"
-        case _ ⇒ "2.5.11"
+        case _      ⇒ "2.5.11"
       }
       "com.lihaoyi" % "ammonite" % version % "test" cross CrossVersion.full
     },
-
-    (Test/sourceGenerators) += Def.task {
-      val file = (Test/sourceManaged).value / "amm.scala"
+    (Test / sourceGenerators) += Def.task {
+      val file = (Test / sourceManaged).value / "amm.scala"
       IO.write(file, """object amm extends App { ammonite.AmmoniteMain.main(args) }""")
       Seq(file)
     }.taskValue
@@ -519,7 +547,7 @@ lazy val rholangServer = (project in file("rholang-server"))
     nativeImageVersion := "22.3.3",
     libraryDependencies ++= List(
       fs2Io,
-      "org.jline"          % "jline"         % "3.21.0",
+      "org.jline"         % "jline"          % "3.21.0",
       "org.scodec"        %% "scodec-stream" % "2.0.3",
       "io.chrisdavenport" %% "fuuid"         % "0.7.0",
       "com.comcast"       %% "ip4s-core"     % "2.0.4",
