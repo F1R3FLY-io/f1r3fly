@@ -67,6 +67,8 @@ Run all tests: `cargo test`
 (`--test-threads=1` runs them sequentially)<br>
 (`--nocapture` prints output during tests)
 
+Run Scala tests for calling Rust functions (from root directory): `sbt "rspacePlusPlus/testOnly"`
+
 ## Scala and Rust Notes
 
 - Using Scala: `jna`; Rust: `prost`, `heed`, `dashmap`, `blake3`, `serde`. See `Cargo.toml` for complete list of crates.

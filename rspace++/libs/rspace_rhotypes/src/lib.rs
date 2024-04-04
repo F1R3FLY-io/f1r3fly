@@ -81,7 +81,7 @@ pub extern "C" fn space_print(rspace: *mut Space) -> () {
 pub extern "C" fn space_clear(rspace: *mut Space) -> () {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        println!("\nHit space_clear");
+        // println!("\nHit space_clear");
         unsafe {
             (*rspace)
                 .rspace

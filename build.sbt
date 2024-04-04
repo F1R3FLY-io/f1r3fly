@@ -632,7 +632,15 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
     ),
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
-    )
+    ),
+    runCargoBuild := {
+      import scala.sys.process._
+      val exitCode = Seq("./scripts/build_rspace++.sh").!
+      if (exitCode != 0) {
+        throw new Exception("Rust build script failed with exit code " + exitCode)
+      }
+    },
+    (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(models, rspace)
 
