@@ -1521,7 +1521,7 @@ proptest! {
 #[tokio::test]
 #[should_panic(expected = "RUST ERROR: Installing can be done only on startup")]
 async fn an_install_should_not_allow_installing_after_a_produce_operation() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let channel = "ch1".to_string();
     let datum = "datum1".to_string();
     let key = vec![channel.clone()];

@@ -166,6 +166,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   ): F[MaybeActionResult] =
     for {
       result <- Sync[F].delay {
+                 println("\nhit consume in scala");
                  val consumeParams = ConsumeParams(
                    channels,
                    patterns,

@@ -41,7 +41,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            println!("\nHit space_new");
+            // println!("\nHit space_new");
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
@@ -189,7 +189,7 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
-    // println!("\nHit consume");
+    println!("\nHit consume");
 
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
@@ -238,9 +238,14 @@ pub extern "C" fn consume(
                 let len_bytes = len.to_le_bytes().to_vec();
                 let mut result = len_bytes;
                 result.append(&mut bytes);
+
+                println!("\nlen: {:?}", len);
                 Box::leak(result.into_boxed_slice()).as_ptr()
             }
-            None => std::ptr::null(),
+            None => {
+                println!("\nnone in rust consume");
+                std::ptr::null()
+            }
         }
     })
 }

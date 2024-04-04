@@ -12,7 +12,7 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 
 #[tokio::test]
 async fn history_repository_should_process_insert_one_datum() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let continuation = TaggedContinuation::default();
     let channels = vec![
         Par::default().with_unforgeables(vec![GUnforgeable {
