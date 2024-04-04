@@ -32,8 +32,8 @@ use std::{
 
 use crate::history::history_action_tests::{random_blake, zeros_blake};
 
-#[tokio::test]
-async fn history_repository_should_process_insert_one_datum() {
+#[test]
+fn history_repository_should_process_insert_one_datum() {
     let repo = create_empty_repository();
     let test_datum = datum(1);
     let insert_data = InsertData {
@@ -41,9 +41,8 @@ async fn history_repository_should_process_insert_one_datum() {
         data: vec![test_datum.clone()],
     };
 
-    let next_repo = repo
-        .checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))])
-        .await;
+    let next_repo =
+        repo.checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))]);
     let history_reader = next_repo.get_history_reader(next_repo.root());
     let data = history_reader
         .unwrap()
@@ -54,8 +53,8 @@ async fn history_repository_should_process_insert_one_datum() {
     assert_eq!(fetched, test_datum);
 }
 
-#[tokio::test]
-async fn history_repository_should_allow_insert_of_joins_datum_continuation_on_same_channel() {
+#[test]
+fn history_repository_should_allow_insert_of_joins_datum_continuation_on_same_channel() {
     let repo = create_empty_repository();
     let channel = test_channel_continuations_prefix();
 
@@ -77,13 +76,11 @@ async fn history_repository_should_allow_insert_of_joins_datum_continuation_on_s
         continuations: vec![test_continuation.clone()],
     };
 
-    let next_repo = repo
-        .checkpoint(&vec![
-            HotStoreAction::Insert(InsertAction::InsertData(data)),
-            HotStoreAction::Insert(InsertAction::InsertJoins(joins.clone())),
-            HotStoreAction::Insert(InsertAction::InsertContinuations(continuations)),
-        ])
-        .await;
+    let next_repo = repo.checkpoint(&vec![
+        HotStoreAction::Insert(InsertAction::InsertData(data)),
+        HotStoreAction::Insert(InsertAction::InsertJoins(joins.clone())),
+        HotStoreAction::Insert(InsertAction::InsertContinuations(continuations)),
+    ]);
     let history_reader = next_repo.get_history_reader(next_repo.root());
     let reader = history_reader.as_ref().unwrap().base();
 
@@ -104,8 +101,8 @@ async fn history_repository_should_allow_insert_of_joins_datum_continuation_on_s
     );
 }
 
-#[tokio::test]
-async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_elements() {
+#[test]
+fn history_repository_should_process_insert_and_delete_of_thirty_mixed_elements() {
     let repo = create_empty_repository();
 
     let data: (Vec<_>, Vec<_>) = (0..=10).map(insert_datum).unzip();
@@ -149,7 +146,7 @@ async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_ele
 
     let delete_elems: Vec<_> = [&data_delete[..], &joins_delete[..], &conts_delete[..]].concat();
 
-    let next_repo = repo.checkpoint(&elems).await;
+    let next_repo = repo.checkpoint(&elems);
     let history_reader = next_repo.get_history_reader(next_repo.root()).unwrap();
     let next_reader = history_reader.base();
 
@@ -197,7 +194,7 @@ async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_ele
         .collect();
     assert_eq!(all_joins, expected_joins);
 
-    let deleted_repo = next_repo.checkpoint(&delete_elems).await;
+    let deleted_repo = next_repo.checkpoint(&delete_elems);
     let history_reader = deleted_repo
         .get_history_reader(deleted_repo.root())
         .unwrap();
@@ -270,8 +267,8 @@ async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_ele
         .is_empty());
 }
 
-#[tokio::test]
-async fn history_repository_should_not_allow_switching_to_a_not_existing_root() {
+#[test]
+fn history_repository_should_not_allow_switching_to_a_not_existing_root() {
     let repo = create_empty_repository();
 
     match repo.reset(&zeros_blake()) {
@@ -283,8 +280,8 @@ async fn history_repository_should_not_allow_switching_to_a_not_existing_root() 
     }
 }
 
-#[tokio::test]
-async fn history_repository_should_record_next_root_as_valid() {
+#[test]
+fn history_repository_should_record_next_root_as_valid() {
     let repo = create_empty_repository();
     let test_datum = datum(1);
     let insert_data = InsertData {
@@ -292,9 +289,8 @@ async fn history_repository_should_record_next_root_as_valid() {
         data: vec![test_datum.clone()],
     };
 
-    let next_repo = repo
-        .checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))])
-        .await;
+    let next_repo =
+        repo.checkpoint(&vec![HotStoreAction::Insert(InsertAction::InsertData(insert_data))]);
     let _ = repo.reset(&RadixHistory::empty_root_node_hash());
     let binding = next_repo.history();
     let next_repo_history = binding.lock().expect("Failed to acquire history lock");

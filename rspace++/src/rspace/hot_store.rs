@@ -4,7 +4,6 @@ use crate::rspace::hot_store_action::{
     InsertContinuations, InsertData, InsertJoins,
 };
 use crate::rspace::internal::{Datum, Row, WaitingContinuation};
-use async_trait::async_trait;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::collections::HashMap;
@@ -13,33 +12,27 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-#[async_trait]
 pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
-    async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
-    async fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>)
-        -> Option<()>;
-    async fn install_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()>;
-    async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()>;
+    fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
+    fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
+    fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
+    fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()>;
 
-    async fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
-    async fn put_datum(&self, channel: C, d: Datum<A>) -> ();
-    async fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
+    fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
+    fn put_datum(&self, channel: C, d: Datum<A>) -> ();
+    fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
 
-    async fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
-    async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
-    async fn install_join(&self, channel: C, join: Vec<C>) -> Option<()>;
-    async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
+    fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn install_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()>;
 
-    async fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
-    async fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
-    async fn snapshot(&self) -> HotStoreState<C, P, A, K>;
+    fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
+    fn snapshot(&self) -> HotStoreState<C, P, A, K>;
 
-    async fn print(&self) -> ();
-    async fn clear(&self) -> ();
+    fn print(&self) -> ();
+    fn clear(&self) -> ();
 }
 
 #[derive(Default)]
@@ -83,7 +76,6 @@ where
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-#[async_trait]
 impl<C, P, A, K> HotStore<C, P, A, K> for InMemHotStore<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq + Send + Sync,
@@ -91,7 +83,7 @@ where
     A: Clone + Debug + Send + Sync,
     K: Clone + Debug + Send + Sync,
 {
-    async fn snapshot(&self) -> HotStoreState<C, P, A, K> {
+    fn snapshot(&self) -> HotStoreState<C, P, A, K> {
         let hot_store_state_lock = self.hot_store_state.lock().unwrap();
         HotStoreState {
             continuations: hot_store_state_lock.continuations.clone(),
@@ -104,9 +96,9 @@ where
 
     // Continuations
 
-    async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+    fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
+            self.get_cont_from_history_store(&channels);
 
         let maybe_continuations = {
             let state = self.hot_store_state.lock().unwrap();
@@ -151,15 +143,11 @@ where
         }
     }
 
-    async fn put_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()> {
+    fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()> {
         // println!("\nHit put_continuation");
 
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
+            self.get_cont_from_history_store(&channels);
         // println!("\nfrom_history_store: {:?}", from_history_store);
 
         let state = self.hot_store_state.lock().unwrap();
@@ -176,11 +164,7 @@ where
         Some(())
     }
 
-    async fn install_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()> {
+    fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()> {
         // println!("hit install_continuation");
         let state = self.hot_store_state.lock().unwrap();
         let _ = state.installed_continuations.insert(channels, wc);
@@ -191,9 +175,9 @@ where
         Some(())
     }
 
-    async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
+    fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
+            self.get_cont_from_history_store(&channels);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_continuations = state
@@ -227,8 +211,8 @@ where
 
     // Data
 
-    async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel).await;
+    fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel);
 
         // println!(
         //     "\nfrom_history_store in get_data: channel: {:?}, data: {:?}",
@@ -253,10 +237,10 @@ where
         }
     }
 
-    async fn put_datum(&self, channel: C, d: Datum<A>) -> () {
+    fn put_datum(&self, channel: C, d: Datum<A>) -> () {
         // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
 
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
         // println!(
         //     "\nfrom_history_store in put_datum: {:?}",
         //     from_history_store
@@ -272,8 +256,8 @@ where
         let _ = state.data.insert(channel, update_data);
     }
 
-    async fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
+    fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_datums = state
@@ -297,10 +281,10 @@ where
 
     // Joins
 
-    async fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
         // println!("\nHit get_joins");
 
-        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
         // println!(
         //     "\nfrom_history_store in get_joins: {:?}",
         //     from_history_store
@@ -353,8 +337,8 @@ where
         }
     }
 
-    async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
-        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+    fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state
@@ -374,7 +358,7 @@ where
         }
     }
 
-    async fn install_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+    fn install_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         // println!("hit install_join");
         let state = self.hot_store_state.lock().unwrap();
         let current_installed_joins = state
@@ -391,10 +375,10 @@ where
         Some(())
     }
 
-    async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
-        let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+    fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+        let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
         let continuations_in_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&join).await;
+            self.get_cont_from_history_store(&join);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state
@@ -440,7 +424,7 @@ where
         }
     }
 
-    async fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>> {
+    fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>> {
         let cache = self.hot_store_state.lock().unwrap();
         let continuations: Vec<HotStoreAction<C, P, A, K>> = cache
             .continuations
@@ -495,7 +479,7 @@ where
         [continuations, data, joins].concat()
     }
 
-    async fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
         let state = self.hot_store_state.lock().unwrap();
         let data = state
             .data
@@ -538,7 +522,7 @@ where
         map
     }
 
-    async fn print(&self) {
+    fn print(&self) {
         let hot_store_state = self.hot_store_state.lock().unwrap();
         println!("\nHot Store");
 
@@ -597,7 +581,7 @@ where
         // println!("Continuations: {:?}", self.history_reader_base.get_continuations(channels));
     }
 
-    async fn clear(&self) {
+    fn clear(&self) {
         let mut state = self.hot_store_state.lock().unwrap();
         state.continuations = DashMap::new();
         state.installed_continuations = DashMap::new();
@@ -607,7 +591,7 @@ where
     }
 }
 
-// TODO: 'history_reader_base' calls should be async called in these three get methods
+// TODO: 'history_reader_base' calls should be  called in these three get methods
 impl<C, P, A, K> InMemHotStore<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq,
@@ -615,10 +599,7 @@ where
     A: Clone + Debug,
     K: Clone + Debug,
 {
-    async fn get_cont_from_history_store(
-        &self,
-        channels: &Vec<C>,
-    ) -> Vec<WaitingContinuation<P, K>> {
+    fn get_cont_from_history_store(&self, channels: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.continuations.entry(channels.clone());
         match entry {
@@ -631,7 +612,7 @@ where
         }
     }
 
-    async fn get_data_from_history_store(&self, channel: &C) -> Vec<Datum<A>> {
+    fn get_data_from_history_store(&self, channel: &C) -> Vec<Datum<A>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.datums.entry(channel.clone());
         match entry {
@@ -645,7 +626,7 @@ where
         }
     }
 
-    async fn get_joins_from_history_store(&self, channel: &C) -> Vec<Vec<C>> {
+    fn get_joins_from_history_store(&self, channel: &C) -> Vec<Vec<C>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.joins.entry(channel.clone());
         match entry {

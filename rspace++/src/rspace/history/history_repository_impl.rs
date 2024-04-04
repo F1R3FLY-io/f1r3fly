@@ -23,7 +23,6 @@ use crate::rspace::serializers::serializers::{
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use async_trait::async_trait;
 use log::debug;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -264,7 +263,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C, P, A, K> HistoryRepository<C, P, A, K> for HistoryRepositoryImpl<C, P, A, K>
 where
     C: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
@@ -272,7 +270,7 @@ where
     A: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
     K: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
 {
-    async fn checkpoint(
+    fn checkpoint(
         &self,
         actions: &Vec<HotStoreAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
@@ -281,12 +279,12 @@ where
             .map(|action| self.transform(action))
             .collect();
 
-        let hr = self.do_checkpoint(trie_actions).await;
+        let hr = self.do_checkpoint(trie_actions);
         let _ = self.measure(actions);
         hr
     }
 
-    async fn do_checkpoint(
+    fn do_checkpoint(
         &self,
         trie_actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>> {
@@ -310,7 +308,7 @@ where
             .collect();
 
         // save new root for state after checkpoint
-        let store_root = |root| async move {
+        let store_root = |root| {
             let roots_repo_lock = self
                 .roots_repository
                 .lock()
@@ -319,7 +317,7 @@ where
         };
 
         // store cold data
-        let store_leaves = async move {
+        let store_leaves = {
             let mut leaf_store_lock = self
                 .leaf_store
                 .lock()
@@ -356,16 +354,14 @@ where
         };
 
         let new_root = store_history.root();
-        store_root(&new_root)
-            .await
-            .expect("History Repository Impl: Unable to store root");
+        store_root(&new_root).expect("History Repository Impl: Unable to store root");
 
-        let combined = async move {
-            let leaves = store_leaves.await;
+        let combined = {
+            let leaves = store_leaves;
             let history = store_history;
             (leaves, history)
         };
-        let (_, new_history) = combined.await;
+        let (_, new_history) = combined;
 
         Box::new(HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(new_history)),

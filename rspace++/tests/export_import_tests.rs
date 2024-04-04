@@ -79,12 +79,10 @@ async fn export_and_import_of_one_page_should_works_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1
-            .produce(format!("ch{}", i), format!("data{}", i), false)
-            .await;
+        space1.produce(format!("ch{}", i), format!("data{}", i), false);
     }
 
-    let init_point = space1.create_checkpoint().await.unwrap();
+    let init_point = space1.create_checkpoint().unwrap();
 
     // Export 1 page from space1
     let init_start_path: Vec<(Blake2b256Hash, Option<Byte>)> = vec![(init_point.root, None)];
@@ -111,7 +109,6 @@ async fn test_setup() -> (
             Arc::new(Mutex::new(cold1)),
             Arc::new(Mutex::new(history1)),
         )
-        .await
         .unwrap();
 
     let cache1: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
@@ -140,7 +137,6 @@ async fn test_setup() -> (
             Arc::new(Mutex::new(cold2)),
             Arc::new(Mutex::new(history2)),
         )
-        .await
         .unwrap();
 
     let cache2: HotStoreState<String, Pattern, String, String> = HotStoreState::default();

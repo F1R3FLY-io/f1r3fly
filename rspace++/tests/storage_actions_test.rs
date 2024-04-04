@@ -109,7 +109,7 @@ async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, Strin
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
 
-    RSpaceInstances::create(store, StringMatch).await.unwrap()
+    RSpaceInstances::create(store, StringMatch).unwrap()
 }
 
 // NOTE: Not implementing test checks for Scala's side 'insertData' and 'insertContinuations'
@@ -121,13 +121,11 @@ async fn produce_should_persist_data_in_store() {
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r = rspace
-        .produce(key[0].clone(), "datum".to_string(), false)
-        .await;
-    let data = rspace.store.get_data(&channel).await;
+    let r = rspace.produce(key[0].clone(), "datum".to_string(), false);
+    let data = rspace.store.get_data(&channel);
     assert_eq!(data, vec![Datum::create(channel, "datum".to_string(), false)]);
 
-    let cont = rspace.store.get_continuations(key).await;
+    let cont = rspace.store.get_continuations(key);
     assert_eq!(cont.len(), 0);
     assert!(r.is_none());
 }
@@ -138,20 +136,16 @@ async fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_st
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r1 = rspace
-        .produce(key[0].clone(), "datum1".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
+    let d1 = rspace.store.get_data(&channel);
     assert_eq!(d1, vec![Datum::create(channel.clone(), "datum1".to_string(), false)]);
 
-    let wc1 = rspace.store.get_continuations(key.clone()).await;
+    let wc1 = rspace.store.get_continuations(key.clone());
     assert_eq!(wc1.len(), 0);
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce(key[0].clone(), "datum2".to_string(), false)
-        .await;
-    let d2 = rspace.store.get_data(&channel).await;
+    let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
+    let d2 = rspace.store.get_data(&channel);
     assert!(check_same_elements(
         d2,
         vec![
@@ -160,7 +154,7 @@ async fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_st
         ]
     ));
 
-    let wc2 = rspace.store.get_continuations(key.clone()).await;
+    let wc2 = rspace.store.get_continuations(key.clone());
     assert_eq!(wc2.len(), 0);
     assert!(r2.is_none());
 }
@@ -172,13 +166,11 @@ async fn consuming_on_one_channel_should_persist_continuation_in_store() {
     let key = vec![channel.clone()];
     let patterns = vec![Pattern::Wildcard];
 
-    let r = rspace
-        .consume(key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r = rspace.consume(key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default());
+    let d1 = rspace.store.get_data(&channel);
     assert_eq!(d1.len(), 0);
 
-    let c1 = rspace.store.get_continuations(key).await;
+    let c1 = rspace.store.get_continuations(key);
     assert_ne!(c1.len(), 0);
     assert!(r.is_none());
 }
@@ -189,16 +181,13 @@ async fn consuming_on_three_channels_should_persist_continuation_in_store() {
     let key = vec!["ch1".to_string(), "ch2".to_string(), "ch3".to_string()];
     let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
-    let r = rspace
-        .consume(key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
-    let futures: Vec<_> = key.iter().map(|k| rspace.store.get_data(k)).collect();
-    let d: Vec<Vec<Datum<String>>> = futures::future::join_all(futures).await;
+    let r = rspace.consume(key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default());
+    let d: Vec<_> = key.iter().map(|k| rspace.store.get_data(k)).collect();
     for seq in &d {
         assert!(seq.is_empty(), "d should be empty");
     }
 
-    let c1 = rspace.store.get_continuations(key).await;
+    let c1 = rspace.store.get_continuations(key);
     assert_ne!(c1.len(), 0);
     assert!(r.is_none());
 }
@@ -209,29 +198,25 @@ async fn producing_then_consuming_on_same_channel_should_return_continuation_and
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r1 = rspace
-        .produce(channel.clone(), "datum".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r1 = rspace.produce(channel.clone(), "datum".to_string(), false);
+    let d1 = rspace.store.get_data(&channel);
     assert_eq!(d1, vec![Datum::create(channel.clone(), "datum".to_string(), false)]);
 
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 0);
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&channel).await;
+    let r2 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let d2 = rspace.store.get_data(&channel);
     assert_eq!(d2.len(), 0);
 
-    let c2 = rspace.store.get_continuations(key).await;
+    let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
     assert!(r2.is_some());
 
@@ -246,29 +231,25 @@ async fn producing_then_consuming_on_same_channel_with_peek_should_return_contin
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r1 = rspace
-        .produce(channel.clone(), "datum".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r1 = rspace.produce(channel.clone(), "datum".to_string(), false);
+    let d1 = rspace.store.get_data(&channel);
     assert_eq!(d1, vec![Datum::create(channel.clone(), "datum".to_string(), false)]);
 
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 0);
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            std::iter::once(0).collect(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&channel).await;
+    let r2 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        std::iter::once(0).collect(),
+    );
+    let d2 = rspace.store.get_data(&channel);
     assert_eq!(d2.len(), 0);
 
-    let c2 = rspace.store.get_continuations(key).await;
+    let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
     assert!(r2.is_some());
 
@@ -283,26 +264,22 @@ async fn consuming_then_producing_on_same_channel_with_peek_should_return_contin
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r1 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            std::iter::once(0).collect(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        std::iter::once(0).collect(),
+    );
     assert!(r1.is_none());
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 1);
 
-    let r2 = rspace
-        .produce(channel.clone(), "datum".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r2 = rspace.produce(channel.clone(), "datum".to_string(), false);
+    let d1 = rspace.store.get_data(&channel);
     assert!(d1.is_empty());
 
-    let c2 = rspace.store.get_continuations(key).await;
+    let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
     assert!(r2.is_some());
 
@@ -317,26 +294,22 @@ async fn consuming_then_producing_on_same_channel_with_persistent_flag_should_re
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
 
-    let r1 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r1.is_none());
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 1);
 
-    let r2 = rspace
-        .produce(channel.clone(), "datum".to_string(), true)
-        .await;
-    let d1 = rspace.store.get_data(&channel).await;
+    let r2 = rspace.produce(channel.clone(), "datum".to_string(), true);
+    let d1 = rspace.store.get_data(&channel);
     assert!(d1.is_empty());
 
-    let c2 = rspace.store.get_continuations(key).await;
+    let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
     assert!(r2.is_some());
 
@@ -350,56 +323,44 @@ async fn producing_three_times_then_consuming_three_times_should_work() {
     let possible_cont_results =
         vec![vec!["datum1".to_string()], vec!["datum2".to_string()], vec!["datum3".to_string()]];
 
-    let r1 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum2".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum3".to_string(), false)
-        .await;
+    let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+    let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
     assert!(r1.is_none());
     assert!(r2.is_none());
     assert!(r3.is_none());
 
-    let r4 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r4 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     let cont_results_r4 = run_k(r4);
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r4.contains(v)));
 
-    let r5 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r5 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     let cont_results_r5 = run_k(r5);
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r5.contains(v)));
 
-    let r6 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r6 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     let cont_results_r6 = run_k(r6);
     assert!(possible_cont_results
         .iter()
@@ -417,42 +378,36 @@ async fn producing_on_channel_then_consuming_on_that_channel_and_another_then_pr
     let consume_key = vec!["ch1".to_string(), "ch2".to_string()];
     let consume_pattern = vec![Pattern::Wildcard, Pattern::Wildcard];
 
-    let r1 = rspace
-        .produce(produce_key_1[0].clone(), "datum1".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&produce_key_1[0]).await;
+    let r1 = rspace.produce(produce_key_1[0].clone(), "datum1".to_string(), false);
+    let d1 = rspace.store.get_data(&produce_key_1[0]);
     assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
-    let c1 = rspace.store.get_continuations(produce_key_1.clone()).await;
+    let c1 = rspace.store.get_continuations(produce_key_1.clone());
     assert!(c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            consume_key.clone(),
-            consume_pattern,
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&produce_key_1[0]).await;
+    let r2 = rspace.consume(
+        consume_key.clone(),
+        consume_pattern,
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let d2 = rspace.store.get_data(&produce_key_1[0]);
     assert_eq!(d2, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
-    let c2 = rspace.store.get_continuations(produce_key_1.clone()).await;
-    let d3 = rspace.store.get_data(&produce_key_2[0]).await;
-    let c3 = rspace.store.get_continuations(consume_key.clone()).await;
+    let c2 = rspace.store.get_continuations(produce_key_1.clone());
+    let d3 = rspace.store.get_data(&produce_key_2[0]);
+    let c3 = rspace.store.get_continuations(consume_key.clone());
     assert!(c2.is_empty());
     assert!(d3.is_empty());
     assert_ne!(c3.len(), 0);
     assert!(r2.is_none());
 
-    let r3 = rspace
-        .produce(produce_key_2[0].clone(), "datum2".to_string(), false)
-        .await;
-    let c4 = rspace.store.get_continuations(consume_key).await;
-    let d4 = rspace.store.get_data(&produce_key_1[0]).await;
-    let d5 = rspace.store.get_data(&produce_key_2[0]).await;
+    let r3 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
+    let c4 = rspace.store.get_continuations(consume_key);
+    let d4 = rspace.store.get_data(&produce_key_1[0]);
+    let d5 = rspace.store.get_data(&produce_key_2[0]);
     assert!(c4.is_empty());
     assert!(d4.is_empty());
     assert!(d5.is_empty());
@@ -474,49 +429,46 @@ async fn producing_on_three_channels_then_consuming_once_should_return_cont_and_
     let consume_key = vec!["ch1".to_string(), "ch2".to_string(), "ch3".to_string()];
     let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
-    let r1 = rspace
-        .produce(produce_key_1[0].clone(), "datum1".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&produce_key_1[0]).await;
+    let r1 = rspace.produce(produce_key_1[0].clone(), "datum1".to_string(), false);
+    let d1 = rspace.store.get_data(&produce_key_1[0]);
     assert_eq!(d1, vec![Datum::create(&produce_key_1[0], "datum1".to_string(), false)]);
 
-    let c1 = rspace.store.get_continuations(produce_key_1).await;
+    let c1 = rspace.store.get_continuations(produce_key_1);
     assert!(c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce(produce_key_2[0].clone(), "datum2".to_string(), false)
-        .await;
-    let d2 = rspace.store.get_data(&produce_key_2[0]).await;
+    let r2 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
+    let d2 = rspace.store.get_data(&produce_key_2[0]);
     assert_eq!(d2, vec![Datum::create(&produce_key_2[0], "datum2".to_string(), false)]);
 
-    let c2 = rspace.store.get_continuations(produce_key_2).await;
+    let c2 = rspace.store.get_continuations(produce_key_2);
     assert!(c2.is_empty());
     assert!(r2.is_none());
 
-    let r3 = rspace
-        .produce(produce_key_3[0].clone(), "datum3".to_string(), false)
-        .await;
-    let d3 = rspace.store.get_data(&produce_key_3[0]).await;
+    let r3 = rspace.produce(produce_key_3[0].clone(), "datum3".to_string(), false);
+    let d3 = rspace.store.get_data(&produce_key_3[0]);
     assert_eq!(d3, vec![Datum::create(produce_key_3[0].clone(), "datum3".to_string(), false)]);
 
-    let c3 = rspace.store.get_continuations(produce_key_3).await;
+    let c3 = rspace.store.get_continuations(produce_key_3);
     assert!(c3.is_empty());
     assert!(r3.is_none());
 
-    let r4 = rspace
-        .consume(consume_key.clone(), patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
-    let futures: Vec<_> = consume_key
+    let r4 = rspace.consume(
+        consume_key.clone(),
+        patterns,
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let d4: Vec<_> = consume_key
         .iter()
         .map(|k| rspace.store.get_data(k))
         .collect();
-    let d4: Vec<Vec<Datum<String>>> = futures::future::join_all(futures).await;
     for seq in &d4 {
         assert!(seq.is_empty(), "d should be empty");
     }
 
-    let c4 = rspace.store.get_continuations(consume_key).await;
+    let c4 = rspace.store.get_continuations(consume_key);
     assert!(c4.is_empty());
     assert!(r4.is_some());
 
@@ -534,29 +486,30 @@ async fn producing_then_consuming_three_times_on_same_channel_should_return_thre
     let captor = StringsCaptor::new();
     let key = vec!["ch1".to_string()];
 
-    let r1 = rspace
-        .produce(key[0].clone(), "datum1".to_string(), false)
-        .await;
-    let r2 = rspace
-        .produce(key[0].clone(), "datum2".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce(key[0].clone(), "datum3".to_string(), false)
-        .await;
+    let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
+    let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
+    let r3 = rspace.produce(key[0].clone(), "datum3".to_string(), false);
     assert!(r1.is_none());
     assert!(r2.is_none());
     assert!(r3.is_none());
 
-    let r4 = rspace
-        .consume(key.clone(), vec![Pattern::Wildcard], captor.clone(), false, BTreeSet::default())
-        .await;
-    let r5 = rspace
-        .consume(key.clone(), vec![Pattern::Wildcard], captor.clone(), false, BTreeSet::default())
-        .await;
-    let r6 = rspace
-        .consume(key.clone(), vec![Pattern::Wildcard], captor, false, BTreeSet::default())
-        .await;
-    let c1 = rspace.store.get_continuations(key).await;
+    let r4 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        captor.clone(),
+        false,
+        BTreeSet::default(),
+    );
+    let r5 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        captor.clone(),
+        false,
+        BTreeSet::default(),
+    );
+    let r6 =
+        rspace.consume(key.clone(), vec![Pattern::Wildcard], captor, false, BTreeSet::default());
+    let c1 = rspace.store.get_continuations(key);
     assert!(c1.is_empty());
 
     let continuations = vec![r4.clone(), r5.clone(), r6.clone()];
@@ -575,43 +528,31 @@ async fn producing_then_consuming_three_times_on_same_channel_should_return_thre
 async fn consuming_then_producing_three_times_on_same_channel_should_return_conts_each_paired_with_distinct_data(
 ) {
     let rspace = create_rspace().await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r1 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum2".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum3".to_string(), false)
-        .await;
+    let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+    let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
     assert!(r1.is_some());
     assert!(r2.is_some());
     assert!(r3.is_some());
@@ -640,43 +581,31 @@ async fn consuming_then_producing_three_times_on_same_channel_should_return_cont
 async fn consuming_then_producing_three_times_on_same_channel_with_non_trivial_matches_should_return_three_conts_each_paired_with_matching_data(
 ) {
     let rspace = create_rspace().await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::StringMatch("datum1".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::StringMatch("datum2".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::StringMatch("datum3".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::StringMatch("datum1".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::StringMatch("datum2".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::StringMatch("datum3".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r1 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum2".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum3".to_string(), false)
-        .await;
+    let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+    let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
     assert!(r1.is_some());
     assert!(r2.is_some());
     assert!(r3.is_some());
@@ -689,22 +618,16 @@ async fn consuming_then_producing_three_times_on_same_channel_with_non_trivial_m
 #[tokio::test]
 async fn consuming_on_two_channels_then_producing_on_each_should_return_cont_with_both_data() {
     let rspace = create_rspace().await;
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string(), "ch2".to_string()],
-            vec![Pattern::Wildcard, Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string(), "ch2".to_string()],
+        vec![Pattern::Wildcard, Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch2".to_string(), "datum2".to_string(), false)
-        .await;
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r3 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
     assert!(r1.is_none());
     assert!(r2.is_none());
@@ -717,24 +640,18 @@ async fn joined_consume_with_same_channel_given_twice_followed_by_produce_should
     let rspace = create_rspace().await;
     let channels = vec!["ch1".to_string(), "ch1".to_string()];
 
-    let r1 = rspace
-        .consume(
-            channels,
-            vec![
-                Pattern::StringMatch("datum1".to_string()),
-                Pattern::StringMatch("datum1".to_string()),
-            ],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
+    let r1 = rspace.consume(
+        channels,
+        vec![
+            Pattern::StringMatch("datum1".to_string()),
+            Pattern::StringMatch("datum1".to_string()),
+        ],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
     assert!(r1.is_none());
     assert!(r2.is_none());
@@ -748,43 +665,31 @@ async fn consuming_then_producing_twice_on_same_channel_with_different_patterns_
     let rspace = create_rspace().await;
     let channels = vec!["ch1".to_string(), "ch2".to_string()];
 
-    let r1 = rspace
-        .consume(
-            channels.clone(),
-            vec![
-                Pattern::StringMatch("datum1".to_string()),
-                Pattern::StringMatch("datum2".to_string()),
-            ],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let r2 = rspace
-        .consume(
-            channels,
-            vec![
-                Pattern::StringMatch("datum3".to_string()),
-                Pattern::StringMatch("datum4".to_string()),
-            ],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        channels.clone(),
+        vec![
+            Pattern::StringMatch("datum1".to_string()),
+            Pattern::StringMatch("datum2".to_string()),
+        ],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let r2 = rspace.consume(
+        channels,
+        vec![
+            Pattern::StringMatch("datum3".to_string()),
+            Pattern::StringMatch("datum4".to_string()),
+        ],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum3".to_string(), false)
-        .await;
-    let r4 = rspace
-        .produce("ch2".to_string(), "datum4".to_string(), false)
-        .await;
-    let r5 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r6 = rspace
-        .produce("ch2".to_string(), "datum2".to_string(), false)
-        .await;
+    let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
+    let r4 = rspace.produce("ch2".to_string(), "datum4".to_string(), false);
+    let r5 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r6 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
     assert!(r1.is_none());
     assert!(r2.is_none());
@@ -801,35 +706,30 @@ async fn consuming_then_producing_twice_on_same_channel_with_different_patterns_
 async fn consuming_and_producing_with_non_trivial_matches_should_work() {
     let rspace = create_rspace().await;
 
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string(), "ch2".to_string()],
-            vec![Pattern::Wildcard, Pattern::StringMatch("datum1".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string(), "ch2".to_string()],
+        vec![Pattern::Wildcard, Pattern::StringMatch("datum1".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
     assert!(r1.is_none());
     assert!(r2.is_none());
 
-    let d1 = rspace.store.get_data(&"ch2".to_string()).await;
+    let d1 = rspace.store.get_data(&"ch2".to_string());
     assert!(d1.is_empty());
-    let d2 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d2 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), false)]);
 
     let c1 = rspace
         .store
-        .get_continuations(vec!["ch1".to_string(), "ch2".to_string()])
-        .await;
+        .get_continuations(vec!["ch1".to_string(), "ch2".to_string()]);
     assert!(!c1.is_empty());
-    let j1 = rspace.store.get_joins("ch1".to_string()).await;
+    let j1 = rspace.store.get_joins("ch1".to_string());
     assert_eq!(j1, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
-    let j2 = rspace.store.get_joins("ch2".to_string()).await;
+    let j2 = rspace.store.get_joins("ch2".to_string());
     assert_eq!(j2, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
 }
 
@@ -837,35 +737,27 @@ async fn consuming_and_producing_with_non_trivial_matches_should_work() {
 async fn consuming_and_producing_twice_with_non_trivial_matches_should_work() {
     let rspace = create_rspace().await;
 
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::StringMatch("datum1".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch2".to_string()],
-            vec![Pattern::StringMatch("datum2".to_string())],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::StringMatch("datum1".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch2".to_string()],
+        vec![Pattern::StringMatch("datum2".to_string())],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r4 = rspace
-        .produce("ch2".to_string(), "datum2".to_string(), false)
-        .await;
+    let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r4 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert!(d1.is_empty());
-    let d2 = rspace.store.get_data(&"ch2".to_string()).await;
+    let d2 = rspace.store.get_data(&"ch2".to_string());
     assert!(d2.is_empty());
 
     assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
@@ -877,60 +769,45 @@ async fn consuming_on_two_channels_then_consuming_on_one_then_producing_on_both_
 ) {
     let rspace = create_rspace().await;
 
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string(), "ch2".to_string()],
-            vec![Pattern::Wildcard, Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let _ = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        vec!["ch1".to_string(), "ch2".to_string()],
+        vec![Pattern::Wildcard, Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let _ = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r4 = rspace
-        .produce("ch2".to_string(), "datum2".to_string(), false)
-        .await;
+    let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r4 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
     let c1 = rspace
         .store
-        .get_continuations(vec!["ch1".to_string(), "ch2".to_string()])
-        .await;
+        .get_continuations(vec!["ch1".to_string(), "ch2".to_string()]);
     assert!(!c1.is_empty());
-    let c2 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!((c2.is_empty()));
-    let c3 = rspace
-        .store
-        .get_continuations(vec!["ch2".to_string()])
-        .await;
+    let c3 = rspace.store.get_continuations(vec!["ch2".to_string()]);
     assert!(c3.is_empty());
 
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert!(d1.is_empty());
-    let d2 = rspace.store.get_data(&"ch2".to_string()).await;
+    let d2 = rspace.store.get_data(&"ch2".to_string());
     assert_eq!(d2, vec![Datum::create("ch2".to_string(), "datum2".to_string(), false)]);
 
     assert!(r3.is_some());
     assert!(r4.is_none());
     assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
 
-    let j1 = rspace.store.get_joins("ch1".to_string()).await;
+    let j1 = rspace.store.get_joins("ch1".to_string());
     assert_eq!(j1, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
-    let j2 = rspace.store.get_joins("ch2".to_string()).await;
+    let j2 = rspace.store.get_joins("ch2".to_string());
     assert_eq!(j2, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
 }
 
@@ -941,39 +818,33 @@ async fn producing_then_persistent_consume_on_same_channel_should_return_cont_an
     let rspace = create_rspace().await;
     let key = vec!["ch1".to_string()];
 
-    let r1 = rspace
-        .produce(key[0].clone(), "datum".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&key[0]).await;
+    let r1 = rspace.produce(key[0].clone(), "datum".to_string(), false);
+    let d1 = rspace.store.get_data(&key[0]);
     assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum".to_string(), false)]);
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert!(c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
+    let r2 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum".to_string()]]));
 
-    let r3 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&key[0]).await;
+    let r3 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
+    let d2 = rspace.store.get_data(&key[0]);
     assert!(d2.is_empty());
-    let c2 = rspace.store.get_continuations(key).await;
+    let c2 = rspace.store.get_continuations(key);
     assert!(!c2.is_empty());
     assert!(r3.is_none());
 }
@@ -984,50 +855,42 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
     let rspace = create_rspace().await;
     let key = vec!["ch1".to_string()];
 
-    let r1 = rspace
-        .produce(key[0].clone(), "datum1".to_string(), false)
-        .await;
-    let d1 = rspace.store.get_data(&key[0]).await;
+    let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
+    let d1 = rspace.store.get_data(&key[0]);
     assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum1".to_string(), false)]);
-    let c1 = rspace.store.get_continuations(key.clone()).await;
+    let c1 = rspace.store.get_continuations(key.clone());
     assert!(c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
+    let r2 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-    let r3 = rspace
-        .consume(
-            key.clone(),
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
+    let r3 = rspace.consume(
+        key.clone(),
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
     assert!(r3.is_none());
 
-    let d2 = rspace.store.get_data(&key[0]).await;
+    let d2 = rspace.store.get_data(&key[0]);
     assert!(d2.is_empty());
-    let c2 = rspace.store.get_continuations(key.clone()).await;
+    let c2 = rspace.store.get_continuations(key.clone());
     assert!(!c2.is_empty());
 
-    let r4 = rspace
-        .produce(key[0].clone(), "datum2".to_string(), false)
-        .await;
+    let r4 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
     assert!(r4.is_some());
-    let d3 = rspace.store.get_data(&key[0]).await;
+    let d3 = rspace.store.get_data(&key[0]);
     assert!(d3.is_empty());
-    let c3 = rspace.store.get_continuations(key).await;
+    let c3 = rspace.store.get_continuations(key);
     assert!(!c3.is_empty());
     assert!(check_same_elements(run_k(r4), vec![vec!["datum2".to_string()]]))
 }
@@ -1039,46 +902,31 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
 async fn doing_persistent_consume_and_producing_multiple_times_should_work() {
     let rspace = create_rspace().await;
 
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert!(d1.is_empty());
-    let c1 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let d2 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let d2 = rspace.store.get_data(&"ch1".to_string());
     assert!(d2.is_empty());
-    let c2 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c2.is_empty());
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2.clone()), vec![vec!["datum1".to_string()]]));
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum2".to_string(), false)
-        .await;
-    let d3 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r3 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+    let d3 = rspace.store.get_data(&"ch1".to_string());
     assert!(d3.is_empty());
-    let c3 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c3.is_empty());
     assert!(r3.is_some());
     assert!(check_same_elements(
@@ -1093,33 +941,24 @@ async fn doing_persistent_consume_and_producing_multiple_times_should_work() {
 async fn consuming_and_doing_persistent_produce_should_work() {
     let rspace = create_rspace().await;
 
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), true)
-        .await;
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), true)
-        .await;
+    let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
     assert!(r3.is_none());
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c1 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
 }
 
@@ -1127,51 +966,37 @@ async fn consuming_and_doing_persistent_produce_should_work() {
 async fn consuming_then_persistent_produce_then_consuming_should_work() {
     let rspace = create_rspace().await;
 
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), true)
-        .await;
+    let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), true)
-        .await;
+    let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
     assert!(r3.is_none());
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c1 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
 
-    let r4 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r4 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r4.is_some());
-    let d2 = rspace.store.get_data(&"ch1".to_string()).await;
+    let d2 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c2 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
     assert!(check_same_elements(run_k(r4), vec![vec!["datum1".to_string()]]))
 }
@@ -1180,52 +1005,37 @@ async fn consuming_then_persistent_produce_then_consuming_should_work() {
 async fn doing_persistent_produce_and_consuming_twice_should_work() {
     let rspace = create_rspace().await;
 
-    let r1 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), true)
-        .await;
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c1 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r2 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let d2 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c2 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
 
-    let r3 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
-    let d3 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r3 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
+    let d3 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d3, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
-    let c3 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c3.is_empty());
     assert!(r3.is_some());
     assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
@@ -1242,34 +1052,23 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
     let expected_conts =
         vec![vec!["datum1".to_string()], vec!["datum2".to_string()], vec!["datum3".to_string()]];
 
-    let r1 = rspace
-        .produce("ch1".to_string(), "datum1".to_string(), false)
-        .await;
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum2".to_string(), false)
-        .await;
-    let r3 = rspace
-        .produce("ch1".to_string(), "datum3".to_string(), false)
-        .await;
+    let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
+    let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
+    let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
     assert!(r1.is_none());
     assert!(r2.is_none());
     assert!(r3.is_none());
 
-    let r4 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
-    let d1 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r4 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
+    let d1 = rspace.store.get_data(&"ch1".to_string());
     assert!(expected_data.iter().any(|datum| d1.contains(datum)));
-    let c1 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
     assert!(r4.is_some());
     let cont_results_r4 = run_k(r4);
@@ -1277,21 +1076,16 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
         .iter()
         .any(|cont| cont_results_r4.contains(cont)));
 
-    let r5 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
-    let d2 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r5 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
+    let d2 = rspace.store.get_data(&"ch1".to_string());
     assert!(expected_data.iter().any(|datum| d2.contains(datum)));
-    let c2 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
     assert!(r5.is_some());
     let cont_results_r5 = run_k(r5);
@@ -1299,36 +1093,29 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
         .iter()
         .any(|cont| cont_results_r5.contains(cont)));
 
-    let r6 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
+    let r6 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
     assert!(r6.is_some());
     let cont_results_r6 = run_k(r6);
     assert!(expected_conts
         .iter()
         .any(|cont| cont_results_r6.contains(cont)));
 
-    let r7 = rspace
-        .consume(
-            vec!["ch1".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            true,
-            BTreeSet::default(),
-        )
-        .await;
-    let d3 = rspace.store.get_data(&"ch1".to_string()).await;
+    let r7 = rspace.consume(
+        vec!["ch1".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        true,
+        BTreeSet::default(),
+    );
+    let d3 = rspace.store.get_data(&"ch1".to_string());
     assert!(d3.is_empty());
-    let c3 = rspace
-        .store
-        .get_continuations(vec!["ch1".to_string()])
-        .await;
+    let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c3.is_empty());
     assert!(r7.is_none());
 }
@@ -1338,20 +1125,16 @@ async fn persistent_produce_should_be_available_for_multiple_matches() {
     let rspace = create_rspace().await;
     let channel = "chan".to_string();
 
-    let r1 = rspace
-        .produce(channel.clone(), "datum".to_string(), true)
-        .await;
+    let r1 = rspace.produce(channel.clone(), "datum".to_string(), true);
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .consume(
-            vec![channel.clone(), channel.clone()],
-            vec![Pattern::Wildcard, Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r2 = rspace.consume(
+        vec![channel.clone(), channel.clone()],
+        vec![Pattern::Wildcard, Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r2.is_some());
     assert!(check_same_elements(run_k(r2), vec![vec!["datum".to_string(), "datum".to_string()]]));
 }
@@ -1362,22 +1145,20 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
     let key = vec!["ch1".to_string()];
     let patterns = vec![Pattern::Wildcard];
 
-    let empty_checkpoint = rspace.create_checkpoint().await.unwrap();
+    let empty_checkpoint = rspace.create_checkpoint().unwrap();
 
     // put some data so the checkpoint is != empty
-    let _ = rspace
-        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
+    let _ = rspace.consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default());
 
-    let _checkpoint0 = rspace.create_checkpoint().await.unwrap();
+    let _checkpoint0 = rspace.create_checkpoint().unwrap();
     // _checkpoint0 log should not be empty
-    let _ = rspace.create_checkpoint().await.unwrap();
+    let _ = rspace.create_checkpoint().unwrap();
 
     // force clearing of trie store state
-    let _ = rspace.clear().await.unwrap();
+    let _ = rspace.clear().unwrap();
 
     // the checkpointing mechanism should not interfere with the empty root
-    let checkpoint2 = rspace.create_checkpoint().await.unwrap();
+    let checkpoint2 = rspace.create_checkpoint().unwrap();
     // checkpoint2 log should be empty
     assert_eq!(checkpoint2.root, empty_checkpoint.root);
 }
@@ -1385,7 +1166,7 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
 #[tokio::test]
 async fn create_checkpoint_on_an_empty_store_should_return_the_expected_hash() {
     let mut rspace = create_rspace().await;
-    let empty_checkpoint = rspace.create_checkpoint().await.unwrap();
+    let empty_checkpoint = rspace.create_checkpoint().unwrap();
     assert_eq!(empty_checkpoint.root, RadixHistory::empty_root_node_hash());
 }
 
@@ -1395,12 +1176,10 @@ async fn create_checkpoint_should_clear_the_store_contents() {
     let key = vec!["ch1".to_string()];
     let patterns = vec![Pattern::Wildcard];
 
-    let _ = rspace
-        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
+    let _ = rspace.consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default());
 
-    let _ = rspace.create_checkpoint().await.unwrap();
-    let checkpoint0_changes = rspace.store.changes().await;
+    let _ = rspace.create_checkpoint().unwrap();
+    let checkpoint0_changes = rspace.store.changes();
     assert_eq!(checkpoint0_changes.len(), 0);
 }
 
@@ -1410,16 +1189,13 @@ async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_l
     let key = vec!["ch1".to_string()];
     let patterns = vec![Pattern::Wildcard];
 
-    let checkpint0 = rspace.create_checkpoint().await.unwrap();
-    let r = rspace
-        .consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default())
-        .await;
+    let checkpint0 = rspace.create_checkpoint().unwrap();
+    let r = rspace.consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default());
     assert!(r.is_none());
 
     let checkpoint0_changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
         .store
         .changes()
-        .await
         .into_iter()
         .filter_map(|action| {
             if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
@@ -1432,12 +1208,12 @@ async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_l
     assert!(!checkpoint0_changes.is_empty());
     assert_eq!(checkpoint0_changes.len(), 1);
 
-    let _ = rspace.reset(checkpint0.root).await.unwrap();
-    let reset_changes = rspace.store.changes().await;
+    let _ = rspace.reset(checkpint0.root).unwrap();
+    let reset_changes = rspace.store.changes();
     assert!(reset_changes.is_empty());
     assert_eq!(reset_changes.len(), 0);
 
-    let _checkpoint1 = rspace.create_checkpoint().await.unwrap();
+    let _checkpoint1 = rspace.create_checkpoint().unwrap();
     // checkpoint1 log should be empty
 }
 
@@ -1446,30 +1222,26 @@ async fn consume_and_produce_a_match_and_then_checkpoint_should_result_in_an_emp
     let mut rspace = create_rspace().await;
     let channels = vec!["ch1".to_string()];
 
-    let checkpoint_init = rspace.create_checkpoint().await.unwrap();
+    let checkpoint_init = rspace.create_checkpoint().unwrap();
     assert_eq!(checkpoint_init.root, RadixHistory::empty_root_node_hash());
 
-    let r1 = rspace
-        .consume(
-            channels,
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        channels,
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r1.is_none());
 
-    let r2 = rspace
-        .produce("ch1".to_string(), "datum".to_string(), false)
-        .await;
+    let r2 = rspace.produce("ch1".to_string(), "datum".to_string(), false);
     assert!(r2.is_some());
 
-    let checkpoint = rspace.create_checkpoint().await.unwrap();
+    let checkpoint = rspace.create_checkpoint().unwrap();
     assert_eq!(checkpoint.root, RadixHistory::empty_root_node_hash());
 
     let _ = rspace.create_checkpoint();
-    let checkpoint0_changes = rspace.store.changes().await;
+    let checkpoint0_changes = rspace.store.changes();
     assert_eq!(checkpoint0_changes.len(), 0);
 }
 
@@ -1486,32 +1258,32 @@ proptest! {
       let mut rspace = create_rspace().await;
 
       for channel in data.clone() {
-        let _ = rspace.produce(channel, "data".to_string(),false).await;
+        let _ = rspace.produce(channel, "data".to_string(),false);
       }
 
-      let checkpoint1 = rspace.create_checkpoint().await.unwrap();
+      let checkpoint1 = rspace.create_checkpoint().unwrap();
 
       for channel in data.iter() {
-        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
         assert!(result.is_some());
       }
 
-      let checkpoint2 = rspace.create_checkpoint().await.unwrap();
+      let checkpoint2 = rspace.create_checkpoint().unwrap();
 
       for channel in data.iter() {
-        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
         assert!(result.is_none());
       }
 
       assert_eq!(checkpoint2.root, RadixHistory::empty_root_node_hash());
-      let _ = rspace.reset(checkpoint1.root).await.unwrap();
+      let _ = rspace.reset(checkpoint1.root).unwrap();
 
       for channel in data.iter() {
-        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default()).await;
+        let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
         assert!(result.is_some());
       }
 
-      let checkpoint3 = rspace.create_checkpoint().await.unwrap();
+      let checkpoint3 = rspace.create_checkpoint().unwrap();
       assert_eq!(checkpoint3.root, RadixHistory::empty_root_node_hash());
 
     });
@@ -1527,23 +1299,21 @@ async fn an_install_should_not_allow_installing_after_a_produce_operation() {
     let key = vec![channel.clone()];
     let patterns = vec![Pattern::Wildcard];
 
-    let _ = rspace.produce(channel, datum, false).await;
-    let _install_attempt = rspace.install(key, patterns, StringsCaptor::new()).await;
+    let _ = rspace.produce(channel, datum, false);
+    let _install_attempt = rspace.install(key, patterns, StringsCaptor::new());
 }
 
 #[tokio::test]
 #[should_panic(expected = "RUST ERROR: channels.length must equal patterns.length")]
 async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
     let rspace = create_rspace().await;
-    let r1 = rspace
-        .consume(
-            vec!["ch1".to_string(), "ch2".to_string()],
-            vec![Pattern::Wildcard],
-            StringsCaptor::new(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let r1 = rspace.consume(
+        vec!["ch1".to_string(), "ch2".to_string()],
+        vec![Pattern::Wildcard],
+        StringsCaptor::new(),
+        false,
+        BTreeSet::default(),
+    );
     assert!(r1.is_none());
 }
 
@@ -1564,18 +1334,16 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
     }];
 
     // do an operation
-    let _ = rspace
-        .consume(
-            channels.clone(),
-            patterns.clone(),
-            continuation.clone(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        channels.clone(),
+        patterns.clone(),
+        continuation.clone(),
+        false,
+        BTreeSet::default(),
+    );
 
     // create a soft checkpoint
-    let s = rspace.create_soft_checkpoint().await;
+    let s = rspace.create_soft_checkpoint();
 
     // assert that the snapshot contains the continuation
     let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s
@@ -1587,9 +1355,7 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
     assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
 
     // consume again
-    let _ = rspace
-        .consume(channels, patterns, continuation, false, BTreeSet::default())
-        .await;
+    let _ = rspace.consume(channels, patterns, continuation, false, BTreeSet::default());
 
     // assert that the snapshot contains only the first continuation
     let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s
@@ -1619,18 +1385,16 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
     }];
 
     // do an operation
-    let _ = rspace
-        .consume(
-            channels.clone(),
-            patterns.clone(),
-            continuation.clone(),
-            false,
-            BTreeSet::default(),
-        )
-        .await;
+    let _ = rspace.consume(
+        channels.clone(),
+        patterns.clone(),
+        continuation.clone(),
+        false,
+        BTreeSet::default(),
+    );
 
     // create a soft checkpoint
-    let s1 = rspace.create_soft_checkpoint().await;
+    let s1 = rspace.create_soft_checkpoint();
 
     // assert that the snapshot contains the continuation
     let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s1
@@ -1642,8 +1406,8 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
     assert_eq!(snapshot_continuations_values, vec![expected_continuation.clone()]);
 
     // produce thus removing the continuation
-    let _ = rspace.produce(channel, datum, false).await;
-    let s2 = rspace.create_soft_checkpoint().await;
+    let _ = rspace.produce(channel, datum, false);
+    let s2 = rspace.create_soft_checkpoint();
 
     // assert that the first snapshot still contains the first continuation
     let snapshot_continuations_values: Vec<Vec<WaitingContinuation<Pattern, StringsCaptor>>> = s1
@@ -1677,16 +1441,13 @@ async fn revert_to_soft_checkpoint_should_revert_the_state_of_the_store_to_the_g
     let continuation = StringsCaptor::new();
 
     // create an initial soft checkpoint
-    let s1 = rspace.create_soft_checkpoint().await;
+    let s1 = rspace.create_soft_checkpoint();
     // do an operation
-    let _ = rspace
-        .consume(channels, patterns, continuation, false, BTreeSet::new())
-        .await;
+    let _ = rspace.consume(channels, patterns, continuation, false, BTreeSet::new());
 
     let changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
         .store
         .changes()
-        .await
         .into_iter()
         .filter_map(|action| {
             if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
@@ -1699,12 +1460,11 @@ async fn revert_to_soft_checkpoint_should_revert_the_state_of_the_store_to_the_g
 
     // the operation should be on the list of changes
     assert!(!changes.is_empty());
-    let _ = rspace.revert_to_soft_checkpoint(s1).await.unwrap();
+    let _ = rspace.revert_to_soft_checkpoint(s1).unwrap();
 
     let changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
         .store
         .changes()
-        .await
         .into_iter()
         .filter_map(|action| {
             if let HotStoreAction::Insert(InsertAction::InsertContinuations(val)) = action {
