@@ -19,11 +19,13 @@ import coop.rchain.models.rholang.implicits._
 import coop.rchain.crypto.hash.Blake2b512Random
 import cats.instances.boolean
 import coop.rchain.models.rspace_plus_plus_types.ConsumeParams
+import coop.rchain.models.rspace_plus_plus_types.ActionResult
 
 class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val log                  = Log.log[IO]
 
+  val _                 = System.setProperty("jna.library.path", "./target/release/")
   val testDirectoryPath = "./src/test/scala/scala-to-rust_lmdb"
   var spacePtr: Pointer = _
 
@@ -46,6 +48,17 @@ class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach 
   test("single consume should return null pointer (none)") {
     val result = doConsume(spacePtr, channels, patterns, cont, false)
     result shouldBe null
+  }
+
+  test("produce then consume should parse correct type") {
+    val produceRes = doProduce(spacePtr, channel, data, false)
+    produceRes shouldBe null
+
+    val consumeRes            = doConsume(spacePtr, channels, patterns, cont, false)
+    val consumeResByteslength = consumeRes.getInt(0)
+    val consumeResBytes       = consumeRes.getByteArray(4, consumeResByteslength)
+
+    noException should be thrownBy ActionResult.parseFrom(consumeResBytes)
   }
 
   def doProduce(
@@ -99,10 +112,8 @@ class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach 
     )
   }
 
-  override def beforeEach(): Unit = {
-    val _ = System.setProperty("jna.library.path", "./target/release/")
+  override def beforeEach(): Unit =
     spacePtr = INSTANCE.space_new(testDirectoryPath)
-  }
 
   override def afterEach(): Unit = {
     INSTANCE.space_clear(spacePtr)
