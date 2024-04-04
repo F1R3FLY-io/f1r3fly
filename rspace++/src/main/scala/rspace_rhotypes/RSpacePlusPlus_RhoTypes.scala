@@ -191,9 +191,11 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 
                  if (consumeResultPtr != null) {
                    val resultByteslength = consumeResultPtr.getInt(0)
+                   println("\nresultByteslength: " + resultByteslength)
 
                    try {
-                     val resultBytes  = consumeResultPtr.getByteArray(4, resultByteslength)
+                     val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
+                     println("resultBytes length: " + resultBytes.length)
                      val actionResult = ActionResult.parseFrom(resultBytes)
                      val contResult   = actionResult.contResult.get
                      val results      = actionResult.results
