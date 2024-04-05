@@ -68,6 +68,11 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
         })
         .unwrap();
 
+    // let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
+    //     .expect("Error getting RSpaceStore: ");
+
+    // let rspace = RSpaceInstances::create(store, Matcher).unwrap();
+
     Box::into_raw(Box::new(Space { rspace }))
 }
 
@@ -180,7 +185,7 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
-    println!("\nHit consume");
+    println!("\nHit consume in rust");
 
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
@@ -807,6 +812,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
 pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
     // SAFETY: The caller must guarantee that `ptr` is a valid pointer to a memory block
     // allocated by Rust, and that `len` is the correct size of the block.
+    // println!("\nhit deallocate_memory");
     unsafe {
         // Convert the raw pointer back to a Box to allow Rust to deallocate the memory.
         let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));

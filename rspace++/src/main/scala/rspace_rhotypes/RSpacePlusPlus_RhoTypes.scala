@@ -148,6 +148,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                          )
                        )
                      )
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala produce operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(produceResultPtr, resultByteslength)
                    }
@@ -220,6 +224,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                          )
                        )
                      )
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala consume operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(consumeResultPtr, resultByteslength)
                    }
@@ -253,6 +261,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                  payloadMemory.clear()
 
                  if (installResultPtr != null) {
+                   println("Error during install operation: Installing can be done only on startup")
                    throw new RuntimeException("Installing can be done only on startup")
                  } else {
                    None
@@ -284,10 +293,17 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                        log = Seq.empty[Event]
                      )
 
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala createCheckpoint operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(checkpointResultPtr, resultByteslength)
                    }
                  } else {
+                   println(
+                     "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
+                   )
                    throw new RuntimeException("Checkpoint pointer from rust was null")
                  }
                }
@@ -357,7 +373,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                                    persistent = produceEvent.persistent
                                  )
                                case None => {
-                                 Log[F].debug("ProduceEvent is None");
+                                 println("ProduceEvent is None");
                                  throw new RuntimeException("ProduceEvent is None")
                                }
                              }
@@ -365,10 +381,15 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                        )
 
                      datums
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala getData operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(getDataResultPtr, resultByteslength)
                    }
                  } else {
+                   println("getDataResultPtr is null")
                    throw new RuntimeException("getDataResultPtr is null")
                  }
                }
@@ -421,7 +442,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                                    persistent = consumeEvent.persistent
                                  )
                                case None => {
-                                 Log[F].debug("ConsumeEvent is None");
+                                 println("ConsumeEvent is None");
                                  throw new RuntimeException("ConsumeEvent is None")
                                }
                              }
@@ -429,10 +450,15 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                        )
 
                      wks
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala getWaitingContinuations operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(getWaitingContinuationResultPtr, resultByteslength)
                    }
                  } else {
+                   println("getWaitingContinuationResultPtr is null")
                    throw new RuntimeException("getWaitingContinuationResultPtr is null")
                  }
                }
@@ -471,10 +497,15 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
 
                      joins
 
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala getJoins operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(getJoinsResultPtr, resultByteslength)
                    }
                  } else {
+                   println("getJoinsResultPtr is null")
                    throw new RuntimeException("getJoinsResultPtr is null")
                  }
                }
@@ -507,7 +538,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                           persistent = produceEvent.persistent
                         )
                       case None => {
-                        Log[F].debug("ProduceEvent is None");
+                        println("ProduceEvent is None");
                         throw new RuntimeException("ProduceEvent is None")
                       }
                     }
@@ -530,7 +561,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                           persistent = consumeEvent.persistent
                         )
                       case None => {
-                        Log[F].debug("ConsumeEvent is None");
+                        println("ConsumeEvent is None");
                         throw new RuntimeException("ConsumeEvent is None")
                       }
                     }
@@ -538,6 +569,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
               )
             )
           case None => {
+            println("Row is None")
             Log[F].debug("Row is None"); throw new RuntimeException("Row is None")
           }
         }
@@ -574,7 +606,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                   persistent = consumeEvent.persistent
                 )
               case None => {
-                Log[F].debug("ConsumeEvent is None");
+                println("ConsumeEvent is None");
                 throw new RuntimeException("ConsumeEvent is None")
               }
             }
@@ -604,12 +636,16 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                   )
                 case None => {
                   Log[F].debug("ConsumeEvent is None");
+                  println("ConsumeEvent is None");
                   throw new RuntimeException("ConsumeEvent is None")
                 }
               }
             )
           }
-          case None => throw new RuntimeException("wkProto is None")
+          case None => {
+            println("wkProto is None");
+            throw new RuntimeException("wkProto is None")
+          }
         }
 
         (key, value)
@@ -631,6 +667,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                     persistent = produceEvent.persistent
                   )
                 case None => {
+                  println("ProduceEvent is None")
                   Log[F].debug("ProduceEvent is None");
                   throw new RuntimeException("ProduceEvent is None")
                 }
@@ -971,6 +1008,10 @@ object RSpacePlusPlus_RhoTypes {
                      val freeMapProto = FreeMapProto.parseFrom(resultBytes)
 
                      Some((freeMapProto.entries, ()))
+                   } catch {
+                     case e =>
+                       println("Error during scala spatialMatchResult operation: " + e)
+                       throw e
                    } finally {
                      INSTANCE.deallocate_memory(spatialMatchResultPtr, resultByteslength)
                    }
