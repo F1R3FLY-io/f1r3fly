@@ -185,7 +185,7 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
-    println!("\nHit consume in rust");
+    // println!("\nHit consume in rust");
 
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
@@ -226,17 +226,19 @@ pub extern "C" fn consume(
                 results: protobuf_results,
             };
 
+            // println!("\nmaybe_action_result: {:?}", maybe_action_result);
+
             let mut bytes = maybe_action_result.encode_to_vec();
             let len = bytes.len() as u32;
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
 
-            println!("\nlen: {:?}", len);
+            // println!("\nlen: {:?}", len);
             Box::leak(result.into_boxed_slice()).as_ptr()
         }
         None => {
-            println!("\nnone in rust consume");
+            // println!("\nnone in rust consume");
             std::ptr::null()
         }
     }
