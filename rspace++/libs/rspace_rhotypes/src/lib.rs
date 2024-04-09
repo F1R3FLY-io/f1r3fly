@@ -23,6 +23,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
 };
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
+use std::sync::Mutex;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -30,7 +31,7 @@ use std::ffi::{c_char, CStr};
  */
 #[repr(C)]
 pub struct Space {
-    rspace: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>,
+    rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>>,
 }
 
 #[no_mangle]
@@ -41,7 +42,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            // println!("\nHit space_new");
+            println!("\nHit space_new");
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
@@ -73,22 +74,24 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 
     // let rspace = RSpaceInstances::create(store, Matcher).unwrap();
 
-    Box::into_raw(Box::new(Space { rspace }))
+    Box::into_raw(Box::new(Space {
+        rspace: Mutex::new(rspace),
+    }))
 }
 
 #[no_mangle]
 pub extern "C" fn space_print(rspace: *mut Space) -> () {
-    unsafe { (*rspace).rspace.store.print() }
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    rspace_lock.store.print()
 }
 
 #[no_mangle]
 pub extern "C" fn space_clear(rspace: *mut Space) -> () {
-    unsafe {
-        (*rspace)
-            .rspace
-            .clear()
-            .expect("Rust RSpacePlusPlus Library: Failed to clear")
-    }
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+
+    rspace_lock
+        .clear()
+        .expect("Rust RSpacePlusPlus Library: Failed to clear")
 }
 
 #[no_mangle]
@@ -142,7 +145,8 @@ pub extern "C" fn produce(
     let channel = Par::decode(channel_slice).unwrap();
     let data = ListParWithRandom::decode(data_slice).unwrap();
 
-    let result_option = unsafe { (*rspace).rspace.produce(channel, data, persist) };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let result_option = rspace_lock.produce(channel, data, persist);
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -185,7 +189,7 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
-    // println!("\nHit consume in rust");
+    println!("\nHit consume in rust");
 
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
@@ -196,11 +200,8 @@ pub extern "C" fn consume(
     let persist = consume_params.persist;
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
-    let result_option = unsafe {
-        (*rspace)
-            .rspace
-            .consume(channels, patterns, continuation, persist, peeks)
-    };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let result_option = rspace_lock.consume(channels, patterns, continuation, persist, peeks);
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -228,13 +229,36 @@ pub extern "C" fn consume(
 
             // println!("\nmaybe_action_result: {:?}", maybe_action_result);
 
+            let bytes_test = maybe_action_result.encode_length_delimited_to_vec();
+            // Read the length prefix from the encoded bytes
+            let mut length_bytes = &bytes_test[..];
+            let length_prefix = match prost::encoding::decode_varint(&mut length_bytes) {
+                Ok(len) => len,
+                Err(e) => {
+                    panic!("\nError decoding length prefix: {:?}", e);
+                }
+            };
+            // Compare the length prefix to the length of the remaining bytes
+            let remaining_bytes = length_bytes.len();
+            if length_prefix as usize != remaining_bytes {
+                eprintln!("\nMismatch between length prefix and actual data length. Prefix: {}, Actual: {}", length_prefix, remaining_bytes);
+            }
+
+            match ActionResult::decode_length_delimited(&*bytes_test) {
+                Ok(decoded) => {
+                    println!("\nSucessfully decoded")
+                }
+                Err(e) => eprintln!("\nError decoding ActionResult: {:?}", e),
+            }
+
             let mut bytes = maybe_action_result.encode_to_vec();
             let len = bytes.len() as u32;
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
 
-            // println!("\nlen: {:?}", len);
+            println!("\nlen: {:?}", len);
+
             Box::leak(result.into_boxed_slice()).as_ptr()
         }
         None => {
@@ -259,7 +283,8 @@ pub extern "C" fn install(
     let patterns = consume_params.patterns;
     let continuation = consume_params.continuation.unwrap();
 
-    let result_option = unsafe { (*rspace).rspace.install(channels, patterns, continuation) };
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let result_option = rspace_lock.install(channels, patterns, continuation);
 
     match result_option {
         None => std::ptr::null(),
@@ -273,12 +298,10 @@ pub extern "C" fn install(
 pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
     // println!("\nHit create_checkpoint");
 
-    let checkpoint = unsafe {
-        (*rspace)
-            .rspace
-            .create_checkpoint()
-            .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
-    };
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let checkpoint = rspace_lock
+        .create_checkpoint()
+        .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint");
 
     // println!("create_checkpoint root hash: {}", checkpoint.root);
 
@@ -291,6 +314,9 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
+
+    // println!("\nAAA. after: {:?}", ActionResult::decode(&*bytes).unwrap());
+
     Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
@@ -301,12 +327,10 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
-    unsafe {
-        (*rspace)
-            .rspace
-            .reset(root)
-            .expect("Rust RSpacePlusPlus Library: Failed to reset")
-    }
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    rspace_lock
+        .reset(root)
+        .expect("Rust RSpacePlusPlus Library: Failed to reset")
 }
 
 #[no_mangle]
@@ -318,7 +342,8 @@ pub extern "C" fn get_data(
     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
     let channel = Par::decode(channel_slice).unwrap();
 
-    let datums = unsafe { (*rspace).rspace.get_data(channel) };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let datums = rspace_lock.get_data(channel);
 
     let datums_protos: Vec<DatumProto> = datums
         .into_iter()
@@ -355,11 +380,8 @@ pub extern "C" fn get_waiting_continuations(
         unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
     let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
 
-    let wks = unsafe {
-        (*rspace)
-            .rspace
-            .get_waiting_continuations(channels_proto.channels)
-    };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let wks = rspace_lock.get_waiting_continuations(channels_proto.channels);
 
     let wks_protos: Vec<WaitingContinuationProto> = wks
         .into_iter()
@@ -404,7 +426,8 @@ pub extern "C" fn get_joins(
     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
     let channel = Par::decode(channel_slice).unwrap();
 
-    let joins = unsafe { (*rspace).rspace.get_joins(channel) };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let joins = rspace_lock.get_joins(channel);
     let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
     let joins_proto = JoinsProto { joins: vec_join };
 
@@ -418,7 +441,8 @@ pub extern "C" fn get_joins(
 
 #[no_mangle]
 pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
-    let hot_store_mapped = unsafe { (*rspace).rspace.store.to_map() };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let hot_store_mapped = rspace_lock.store.to_map();
     let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
 
     for (key, value) in hot_store_mapped {
@@ -480,19 +504,20 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
-    let rspace = unsafe {
-        (*rspace)
-            .rspace
-            .spawn()
-            .expect("Rust RSpacePlusPlus Library: Failed to spawn")
-    };
+    let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let rspace = rspace_lock
+        .spawn()
+        .expect("Rust RSpacePlusPlus Library: Failed to spawn");
 
-    Box::into_raw(Box::new(Space { rspace }))
+    Box::into_raw(Box::new(Space {
+        rspace: Mutex::new(rspace),
+    }))
 }
 
 #[no_mangle]
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
-    let soft_checkpoint = unsafe { (*rspace).rspace.create_soft_checkpoint() };
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+    let soft_checkpoint = rspace_lock.create_soft_checkpoint();
 
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
     let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
@@ -802,12 +827,11 @@ pub extern "C" fn revert_to_soft_checkpoint(
         produce_counter: produce_counter_map,
     };
 
-    unsafe {
-        (*rspace)
-            .rspace
-            .revert_to_soft_checkpoint(soft_checkpoint)
-            .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
-    };
+    let mut rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+
+    rspace_lock
+        .revert_to_soft_checkpoint(soft_checkpoint)
+        .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint");
 }
 
 #[no_mangle]
