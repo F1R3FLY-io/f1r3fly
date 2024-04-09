@@ -1,8 +1,11 @@
 # RSpace++
 
-On branch `rhotypes`
+On branch `rhotypes` using `nix` and `direnv`
 
 ## Quickstart
+
+- For setting up `nix` and `direnv`, see [project overview](../docs/paul_brain_dump.md)
+- Make sure you have [protobuf](https://grpc.io/docs/protoc-installation/) installed
 
 Starting standalone node using RSpace++
 1. `sbt ";clean ;compile ;stage"`
