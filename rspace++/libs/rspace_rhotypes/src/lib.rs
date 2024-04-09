@@ -21,8 +21,9 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
+use serde::Serialize;
 use std::collections::HashMap;
-use std::ffi::{c_char, CStr};
+use std::ffi::{c_char, c_void, CStr, CString};
 use std::sync::Mutex;
 
 /*
@@ -189,7 +190,7 @@ pub extern "C" fn consume(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> *const u8 {
-    println!("\nHit consume in rust");
+    // println!("\nHit consume in rust");
 
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
@@ -214,11 +215,14 @@ pub extern "C" fn consume(
             };
             let protobuf_results = rspace_results
                 .into_iter()
-                .map(|result| RSpaceResultProto {
-                    channel: Some(result.channel),
-                    matched_datum: Some(result.matched_datum),
-                    removed_datum: Some(result.removed_datum),
-                    persistent: result.persistent,
+                .map(|result| {
+                    let r = RSpaceResultProto {
+                        channel: Some(result.channel),
+                        matched_datum: Some(result.matched_datum),
+                        removed_datum: Some(result.removed_datum),
+                        persistent: result.persistent,
+                    };
+                    r
                 })
                 .collect();
 
@@ -228,6 +232,9 @@ pub extern "C" fn consume(
             };
 
             // println!("\nmaybe_action_result: {:?}", maybe_action_result);
+
+            // let bytes_test = bincode::serialize(&maybe_action_result).unwrap();
+            // println!("\ndecoded: {:?}", bincode::deserialize::<ActionResult>(&bytes_test).is_ok());
 
             let bytes_test = maybe_action_result.encode_length_delimited_to_vec();
             // Read the length prefix from the encoded bytes
@@ -252,12 +259,13 @@ pub extern "C" fn consume(
             }
 
             let mut bytes = maybe_action_result.encode_to_vec();
+            // println!("\ndecoded actual bytes: {:?}", ActionResult::decode(&*bytes));
             let len = bytes.len() as u32;
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
 
-            println!("\nlen: {:?}", len);
+            // println!("\nlen: {:?}", len);
 
             Box::leak(result.into_boxed_slice()).as_ptr()
         }
@@ -267,6 +275,67 @@ pub extern "C" fn consume(
         }
     }
 }
+
+// #[no_mangle]
+// pub extern "C" fn consume(
+//     rspace: *mut Space,
+//     payload_pointer: *const u8,
+//     payload_bytes_len: usize,
+// ) -> *mut c_void {
+//     println!("\nHit consume in rust");
+
+//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+//     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
+
+//     let channels = consume_params.channels;
+//     let patterns = consume_params.patterns;
+//     let continuation = consume_params.continuation.unwrap();
+//     let persist = consume_params.persist;
+//     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+
+//     let rspace_lock = unsafe { (*rspace).rspace.lock().unwrap() };
+//     let result_option = rspace_lock.consume(channels, patterns, continuation, persist, peeks);
+
+//     match result_option {
+//         Some((cont_result, rspace_results)) => {
+//             let protobuf_cont_result = ContResultProto {
+//                 continuation: Some(cont_result.continuation),
+//                 persistent: cont_result.persistent,
+//                 channels: cont_result.channels,
+//                 patterns: cont_result.patterns,
+//                 peek: cont_result.peek,
+//             };
+//             let protobuf_results = rspace_results
+//                 .into_iter()
+//                 .map(|result| {
+//                     let r = RSpaceResultProto {
+//                         channel: Some(result.channel),
+//                         matched_datum: Some(result.matched_datum),
+//                         removed_datum: Some(result.removed_datum),
+//                         persistent: result.persistent,
+//                     };
+//                     r
+//                 })
+//                 .collect();
+
+//             let maybe_action_result = ActionResult {
+//                 cont_result: Some(protobuf_cont_result),
+//                 results: protobuf_results,
+//             };
+
+//             let bytes_test = serde_json::to_string(&maybe_action_result).unwrap();
+//             println!("\nbytes_test: {:?}", bytes_test);
+//             // println!("\ndecoded: {:?}", serde_json::from_str::<ActionResult>(&bytes_test));
+
+//             let c_str = CString::new(bytes_test).unwrap();
+//             c_str.into_raw() as *mut c_void
+//         }
+//         None => {
+//             let c_str = CString::new("").unwrap();
+//             c_str.into_raw() as *mut c_void
+//         }
+//     }
+// }
 
 #[no_mangle]
 pub extern "C" fn install(

@@ -54,6 +54,9 @@ import coop.rchain.rspace.history.History
 import coop.rchain.state.TrieNode
 import java.nio.ByteBuffer
 import scodec.bits.ByteVector
+import com.typesafe.scalalogging.Logger
+
+// import scalapb.json4s.Parser
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -75,6 +78,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
           Seq[Result[C, A]]
       )
     ]
+
+  protected[this] val dataLogger: Logger =
+    Logger("rspacePlusPlus")
 
   // val jnaLibraryPath = System.getProperty("jna.library.path")
   // println(s"Current jna.library.path: $jnaLibraryPath")
@@ -171,6 +177,8 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
     for {
       result <- Sync[F].delay {
                  //  println("\nhit consume in scala");
+                 //  dataLogger.debug("hit consume in scala")
+
                  val consumeParams = ConsumeParams(
                    channels,
                    patterns,
@@ -193,16 +201,22 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
                  // Need to figure out how to deallocate each memory instance
                  payloadMemory.clear()
 
+                 //  val jsonString = consumeResultPtr.getString(0)
+                 //  println("\njsonString: " + jsonString)
+
+                 //  if (jsonString != "") {
                  if (consumeResultPtr != null) {
                    val resultByteslength = consumeResultPtr.getInt(0)
-                   //  println("\nresultByteslength: " + resultByteslength)
-
                    try {
+                     // println("\nresultByteslength: " + resultByteslength)
                      val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
-                     //  println("resultBytes length: " + resultBytes.length)
+                     // println("resultBytes length: " + resultBytes.length)
                      val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult   = actionResult.contResult.get
-                     val results      = actionResult.results
+
+                     //  val actionResult = ActionResult.parseFrom(jsonString.getBytes())
+
+                     val contResult = actionResult.contResult.get
+                     val results    = actionResult.results
 
                      Some(
                        (
