@@ -109,7 +109,8 @@ message ScalaPbOptions {
   // This is useful when you can't add a dependency on scalapb.proto from the proto file that
   // defines the message.
   message AuxMessageOptions {
-    // The fully-qualified name of the message in the proto name space.
+    // The fully-qualified name of the message in the proto name space. Set to `*` to apply to all
+    // messages in scope.
     optional string target = 1;
 
     // Options to apply to the message. If there are any options defined on the target message
@@ -121,7 +122,8 @@ message ScalaPbOptions {
   // This is useful when you can't add a dependency on scalapb.proto from the proto file that
   // defines the field.
   message AuxFieldOptions {
-    // The fully-qualified name of the field in the proto name space.
+    // The fully-qualified name of the field in the proto name space. Set to `*` to apply to all
+    // fields in scope.
     optional string target = 1;
 
     // Options to apply to the field. If there are any options defined on the target message
@@ -133,7 +135,8 @@ message ScalaPbOptions {
   // This is useful when you can't add a dependency on scalapb.proto from the proto file that
   // defines the enum.
   message AuxEnumOptions {
-    // The fully-qualified name of the enum in the proto name space.
+    // The fully-qualified name of the enum in the proto name space. Set to `*` to apply to
+    // all enums in scope.
     optional string target = 1;
 
     // Options to apply to the enum. If there are any options defined on the target enum
@@ -145,7 +148,8 @@ message ScalaPbOptions {
   // options.  This is useful when you can't add a dependency on scalapb.proto from the proto
   // file that defines the enum.
   message AuxEnumValueOptions {
-    // The fully-qualified name of the enum value in the proto name space.
+    // The fully-qualified name of the enum value in the proto name space. Set to `*` to apply
+    // to all enum values in scope.
     optional string target = 1;
 
     // Options to apply to the enum value. If there are any options defined on
@@ -176,6 +180,12 @@ message ScalaPbOptions {
 
   // If true, getters will be generated.
   optional bool getters = 27 [default=true];
+
+  // Generate sources that are compatible with Scala 3
+  optional bool scala3_sources = 28;
+
+  // Makes constructor parameters public, including defaults and TypeMappers.
+  optional bool public_constructor_parameters = 29;
 
   // For use in tests only. Inhibit Java conversions even when when generator parameters
   // request for it.
@@ -224,6 +234,15 @@ message MessageOptions {
 
   // Additional classes and traits to mix in to generated sealed oneof base trait's companion object.
   repeated string sealed_oneof_companion_extends = 10;
+
+  // Adds a derives clause to the message case class
+  repeated string derives = 11;
+
+  // Additional classes and traits to add to the derives clause of a sealed oneof.
+  repeated string sealed_oneof_derives = 12;
+
+  // Additional traits to mixin for the empty case object of sealed oneofs.
+  repeated string sealed_oneof_empty_extends = 13;
 
   extensions 1000 to max;
 }
@@ -274,7 +293,7 @@ message FieldOptions {
   // it falls back to the file option named `map_type` which defaults to
   // `scala.collection.immutable.Map`
   optional string map_type = 7;
-  
+
   // If true, no default value will be generated for this field in the message
   // constructor. If this field is set, it has the highest precedence and overrides the
   // values at the message-level and file-level.

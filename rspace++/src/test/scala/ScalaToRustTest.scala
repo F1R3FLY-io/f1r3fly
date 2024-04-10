@@ -50,7 +50,7 @@ class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach 
     result shouldBe null
   }
 
-  test("produce then consume should parse correct type") {
+  test("produce then consume should parse correct proto message") {
     val produceRes = doProduce(spacePtr, channel, data, false)
     produceRes shouldBe null
 

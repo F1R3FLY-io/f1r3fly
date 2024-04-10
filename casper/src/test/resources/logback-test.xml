@@ -14,6 +14,8 @@
     <logger name="coop.rchain.blockstorage" level="error"/>
     <logger name="coop.rchain.rspace" level="error"/>
     <logger name="coop.rchain.rspace.merger" level="debug"/>
+		
+		<logger name="rspacePlusPlus" level="debug"/>
 
     <root level="warn">
         <appender-ref ref="STDOUT"/>
