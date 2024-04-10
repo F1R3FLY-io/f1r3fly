@@ -241,7 +241,7 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace =
+        let rspace =
             RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
         rspace.restore_installs().await;
 
@@ -344,13 +344,20 @@ where
         }
     }
 
-    async fn restore_installs(&mut self) -> () {
-        let installs = std::mem::take(&mut self.installs);
-        for (channels, install) in &installs {
+    // async fn restore_installs(&mut self) -> () {
+    //     let installs = std::mem::take(&mut self.installs);
+    //     for (channels, install) in &installs {
+    //         self.install(channels.clone(), install.patterns.clone(), install.continuation.clone())
+    //             .await;
+    //     }
+    //     self.installs = installs;
+    // }
+
+    async fn restore_installs(&self) -> () {
+        for (channels, install) in &self.installs {
             self.install(channels.clone(), install.patterns.clone(), install.continuation.clone())
                 .await;
         }
-        self.installs = installs;
     }
 
     pub async fn consume(
@@ -395,7 +402,8 @@ where
     }
 
     pub async fn install(
-        &mut self,
+        // &mut self,
+        &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -404,7 +412,8 @@ where
     }
 
     async fn locked_install(
-        &mut self,
+        // &mut self,
+        &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -440,13 +449,13 @@ where
 
             let result = match options {
                 None => {
-                    self.installs.insert(
-                        channels.clone(),
-                        Install {
-                            patterns: patterns.clone(),
-                            continuation: continuation.clone(),
-                        },
-                    );
+                    // self.installs.insert(
+                    //     channels.clone(),
+                    //     Install {
+                    //         patterns: patterns.clone(),
+                    //         continuation: continuation.clone(),
+                    //     },
+                    // );
 
                     self.store
                         .install_continuation(
