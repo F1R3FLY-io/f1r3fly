@@ -388,8 +388,10 @@ lazy val node = (project in file("node"))
         perfmark7,
         perfmark9,
         "io.f1r3fly" %% "compiler" % "0.1.0-SNAPSHOT",
-        "io.f1r3fly" %% "mettal"   % "0.1.0-SNAPSHOT",
-        "io.f1r3fly" %% "rholang"  % "0.1.0-SNAPSHOT"
+        //"io.f1r3fly" %% "mettal"   % "0.1.0-SNAPSHOT",
+        //"io.f1r3fly" %% "rholang"  % "0.1.0-SNAPSHOT",
+        //"io.f1r3fly" %% "mettalurgy"  % "0.1.0-SNAPSHOT",
+//        "io.f1r3fly" %% "togl"  % "0.1.0-SNAPSHOT",
       ),
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = false)  -> (sourceManaged in Compile).value / "protobuf",
@@ -405,6 +407,9 @@ lazy val node = (project in file("node"))
       case x if x.endsWith("scala/annotation/nowarn.class")  => MergeStrategy.discard
       case x if x.endsWith("scala/annotation/nowarn$.class") => MergeStrategy.discard
       case x if x.endsWith("module-info.class")              => MergeStrategy.discard
+      // need to resolve 86 classes between rnode-assembly-1.0.0-SNAPSHOT and external shared_2.12-0.1.jar provided by io.f1r3fly, but mainly this classes come from cats, cats-effect and other dependencies.
+      //case x if x.startsWith("coop/rchain/")                 => MergeStrategy.first // take all classes from rnode-assembly-1.0.0-SNAPSHOT
+      case x if x.startsWith("coop/rchain/")                 => MergeStrategy.last // take all classes from shared_2.12-0.1.jar
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)

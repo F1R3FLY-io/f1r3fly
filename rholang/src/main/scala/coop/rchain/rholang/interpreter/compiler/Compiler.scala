@@ -10,7 +10,7 @@ import coop.rchain.rholang.ast.rholang_mercury.Absyn.Proc
 import coop.rchain.rholang.ast.rholang_mercury.{parser, Yylex}
 import coop.rchain.rholang.interpreter.errors._
 
-import java.io.{Reader, StringReader}
+import java.io.{BufferedReader, Reader, StringReader}
 
 trait Compiler[F[_]] {
 
@@ -49,6 +49,19 @@ object Compiler {
         par  <- astToADT(proc, normalizerEnv)
       } yield par
 
+    //noah code
+//    def sourceToADT(reader: Reader, normalizerEnv: Map[String, Par]): F[Par] = {
+//      val content = new BufferedReader(reader).lines().toArray().mkString("\n")
+//      //println(s"Starting sourceToADT function content: \n$content")
+//      for {
+//        proc <- sourceToAST(new StringReader(content))
+//        par  <- astToADT(proc, normalizerEnv)
+//      } yield {
+//        //println("Completed sourceToADT function.")
+//        par
+//      }
+//    }
+
     def astToADT(proc: Proc, normalizerEnv: Map[String, Par]): F[Par] =
       for {
         par       <- normalizeTerm(proc)(normalizerEnv)
@@ -60,7 +73,7 @@ object Compiler {
         lexer  <- lexer(reader)
         parser <- parser(lexer)
         proc <- F.delay(parser.pProc()).adaptError {
-                 case ex: SyntaxError =>
+                 case ex: SyntaxError => //TODO ERROR with simple Reader
                    ex
                  case ex: Exception if ex.getMessage.startsWith("Syntax error") =>
                    SyntaxError(ex.getMessage)
@@ -68,7 +81,7 @@ object Compiler {
                      if er.getMessage.startsWith("Unterminated string at EOF, beginning at") =>
                    LexerError(er.getMessage)
                  case er: Error if er.getMessage.startsWith("Illegal Character") =>
-                   LexerError(er.getMessage)
+                   LexerError(er.getMessage) //TODO ERROR with stringReader
                  case er: Error if er.getMessage.startsWith("Unterminated string on line") =>
                    LexerError(er.getMessage)
                  case th: Throwable => UnrecognizedInterpreterError(th)

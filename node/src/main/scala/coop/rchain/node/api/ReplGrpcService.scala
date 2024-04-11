@@ -15,16 +15,47 @@ import coop.rchain.rholang.interpreter.{RhoRuntime, _}
 import coop.rchain.shared.syntax._
 import monix.eval.Task
 import monix.execution.Scheduler
+//import io.f1r3fly.metta2rho.compiler._
+//import MeTTa2Rho._
+//import CompilerWorldState._
+//import StdMeTTalParserCaps._
+
+import java.io.File
+import io.f1r3fly.metta2rho.compiler._
+import Bitters._
+import io.f1r3fly.metta2rho.ast.mettalurgy.Absyn._
+import CompilerWorldState._
 
 object ReplGrpcService {
 
   def apply[F[_]: Monixable: Sync](runtime: RhoRuntime[F], worker: Scheduler): ReplGrpcMonix.Repl =
     new ReplGrpcMonix.Repl {
-      def exec(source: String, printUnmatchedSendsOnly: Boolean = false): F[ReplResponse] =
+      def exec(
+          source: String,
+          printUnmatchedSendsOnly: Boolean = false,
+          language: String = "rholang"
+      ): F[ReplResponse] = {
+        System.out.println("input source: " + source)
+        val modifiedSource =
+          if (language == "metta") { // Need to convert source from metta to rholang
+// noah logic           MeTTa2Rho.ppSemantics(source).toString()
+            //logic from doc.
+            //val f1       = new File("/Users/nazaryanovets/firefly/f1r3fly/rholang/examples/message.txt")
+            //val prog1    = withASTFromFile[Prog](f1)((x) => x)
+
+            //new logic from string
+            val prog1    = withASTFromString[Prog](source)((x) => x)
+            val rhoProg1 = compile(prog1)
+            m2rPP.buildString(rhoProg1)
+
+          } else {
+            source // source should be fine -> assumed to be rholang
+          }
+        System.out.println("input modifiedSource: " + modifiedSource)
         Sync[F]
           .attempt(
             Compiler[F]
-              .sourceToADT(source, Map.empty[String, Par])
+              .sourceToADT(modifiedSource, Map.empty[String, Par])
           )
           .flatMap {
             case Left(er) =>
@@ -37,7 +68,7 @@ object ReplGrpcService {
                 _ <- Sync[F].delay(printNormalizedTerm(term))
                 res <- {
                   implicit val rand = Blake2b512Random(10)
-                  runtime.evaluate(source, Cost.UNSAFE_MAX, Map.empty[String, Par])
+                  runtime.evaluate(modifiedSource, Cost.UNSAFE_MAX, Map.empty[String, Par])
                 }
                 prettyStorage <- if (printUnmatchedSendsOnly)
                                   StoragePrinter.prettyPrintUnmatchedSends(runtime)
@@ -56,6 +87,7 @@ object ReplGrpcService {
               }
           }
           .map(ReplResponse(_))
+      }
 
       private def defer[A](task: F[A]): Task[A] =
         task.toTask.executeOn(worker)
@@ -64,11 +96,11 @@ object ReplGrpcService {
         defer(exec(request.line))
 
       def eval(request: EvalRequest): Task[ReplResponse] =
-        defer(exec(request.program, request.printUnmatchedSendsOnly))
+        defer(exec(request.program, request.printUnmatchedSendsOnly, request.language))
 
       private def printNormalizedTerm(normalizedTerm: Par): Unit = {
         Console.println("\nEvaluating:")
-        Console.println(PrettyPrinter().buildString(normalizedTerm))
+        Console.println(coop.rchain.rholang.interpreter.PrettyPrinter().buildString(normalizedTerm))
       }
     }
 }

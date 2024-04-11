@@ -24,6 +24,7 @@ message CmdRequest {
 message EvalRequest {
   string program = 1;
   bool printUnmatchedSendsOnly = 2;
+  string language = 3;
 }
 
 message ReplResponse {
