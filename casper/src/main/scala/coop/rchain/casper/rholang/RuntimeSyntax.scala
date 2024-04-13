@@ -168,7 +168,13 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         _ <- runtime.setBlockData(
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
-        genesisPreStateHash           <- emptyStateHash
+        genesisPreStateHash <- emptyStateHash
+        _ <- Sync[F].delay(
+              println(
+                "\ngenesisPreStateHash: " + PrettyPrinter
+                  .buildString(genesisPreStateHash)
+              )
+            )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
       } yield (genesisPreStateHash, stateHash, processedDeploys)
@@ -467,6 +473,8 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       import coop.rchain.models.rholang.implicits._
       val returnName: Par = GPrivate(ByteString.copyFrom(rand.next()))
 
+      // println("\nhash in playExploratoryDeploy: " + hash)
+
       // Execute deploy on top of specified block hash
       captureResults(hash, deploy, returnName)
     } match {
@@ -519,13 +527,15 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       start: StateHash,
       deploy: Signed[DeployData],
       name: Par
-  ): F[Seq[Par]] =
+  ): F[Seq[Par]] = {
+    println("\nresetting runtime to: " + start.toBlake2b256Hash)
     runtime.reset(start.toBlake2b256Hash) >>
       evaluate(deploy)
         .flatMap({ res =>
           if (res.errors.nonEmpty) Sync[F].raiseError[EvaluateResult](res.errors.head)
           else res.pure[F]
         }) >> getDataPar(name)
+  }
 
   /* Evaluates Rholang source code */
 
@@ -544,7 +554,11 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
     )
 
   def getDataPar(channel: Par): F[Seq[Par]] =
-    runtime.getData(channel).map(_.flatMap(_.a.pars))
+    for {
+      data <- runtime.getData(channel)
+      pars = data.flatMap(_.a.pars)
+      _    = println(s"getDataPar called with: $channel, returning: ${pars.length}")
+    } yield pars
 
   def getContinuationPar(channels: Seq[Par]): F[Seq[(Seq[BindPattern], Par)]] =
     runtime
