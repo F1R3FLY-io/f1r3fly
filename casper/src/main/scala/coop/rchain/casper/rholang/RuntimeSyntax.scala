@@ -169,12 +169,12 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
         genesisPreStateHash <- emptyStateHash
-        _ <- Sync[F].delay(
-              println(
-                "\ngenesisPreStateHash: " + PrettyPrinter
-                  .buildString(genesisPreStateHash)
-              )
-            )
+        // _ <- Sync[F].delay(
+        //       println(
+        //         "\ngenesisPreStateHash: " + PrettyPrinter
+        //           .buildString(genesisPreStateHash)
+        //       )
+        //     )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
       } yield (genesisPreStateHash, stateHash, processedDeploys)

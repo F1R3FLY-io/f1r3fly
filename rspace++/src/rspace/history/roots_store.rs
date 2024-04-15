@@ -49,7 +49,7 @@ impl RootsStoreInstances {
                 &self,
                 key: Blake2b256Hash,
             ) -> Result<Option<Blake2b256Hash>, RootError> {
-                println!("\nhit validate_and_set_current_root, key: {}", key);
+                // println!("\nhit validate_and_set_current_root, key: {}", key);
 
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();
                 let key_bytes = key.bytes();
@@ -75,7 +75,7 @@ impl RootsStoreInstances {
             }
 
             fn record_root(&self, key: &Blake2b256Hash) -> Result<(), RootError> {
-                println!("\nhit record_root, key: {}", key);
+                // println!("\nhit record_root, key: {}", key);
 
                 let tag: ByteBuffer = "tag".as_bytes().to_vec();
                 let current_root_name: ByteBuffer = "current-root".as_bytes().to_vec();

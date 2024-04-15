@@ -37,7 +37,7 @@ where
     history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
-    installs: HashMap<Vec<C>, Install<P, K>>,
+    installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     produce_counter: HashMap<Produce, i32>,
 }
 
@@ -241,7 +241,7 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let rspace =
+        let mut rspace =
             RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
         rspace.restore_installs().await;
 
@@ -344,18 +344,10 @@ where
         }
     }
 
-    // async fn restore_installs(&mut self) -> () {
-    //     let installs = std::mem::take(&mut self.installs);
-    //     for (channels, install) in &installs {
-    //         self.install(channels.clone(), install.patterns.clone(), install.continuation.clone())
-    //             .await;
-    //     }
-    //     self.installs = installs;
-    // }
-
-    async fn restore_installs(&self) -> () {
-        for (channels, install) in &self.installs {
-            self.install(channels.clone(), install.patterns.clone(), install.continuation.clone())
+    async fn restore_installs(&mut self) -> () {
+        let installs = self.installs.lock().unwrap().clone();
+        for (channels, install) in installs {
+            self.install(channels, install.patterns, install.continuation)
                 .await;
         }
     }
@@ -402,8 +394,8 @@ where
     }
 
     pub async fn install(
-        // &mut self,
-        &self,
+        &mut self,
+        // &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -412,8 +404,8 @@ where
     }
 
     async fn locked_install(
-        // &mut self,
-        &self,
+        &mut self,
+        // &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -449,7 +441,7 @@ where
 
             let result = match options {
                 None => {
-                    // self.installs.insert(
+                    // self.installs.lock().unwrap().insert(
                     //     channels.clone(),
                     //     Install {
                     //         patterns: patterns.clone(),
@@ -749,7 +741,7 @@ impl RSpaceInstances {
             history_repository,
             store,
             space_matcher: SpaceMatcher::create(matcher),
-            installs: HashMap::new(),
+            installs: Mutex::new(HashMap::new()),
             produce_counter: HashMap::new(),
         }
     }
