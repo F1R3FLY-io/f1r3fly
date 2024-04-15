@@ -55,6 +55,8 @@ import coop.rchain.state.TrieNode
 import java.nio.ByteBuffer
 import scodec.bits.ByteVector
 import com.typesafe.scalalogging.Logger
+import cats.effect.ContextShift
+import scala.concurrent.ExecutionContext
 
 // import scalapb.json4s.Parser
 
@@ -62,8 +64,9 @@ import com.typesafe.scalalogging.Logger
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
   * These types (C, P, A, K) MUST MATCH the corresponding types on the Rust side in 'rspace_rhotypes/lib.rs'
   */
-class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
-    extends RSpaceOpsPlusPlus[F]
+class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer: Pointer)(
+    implicit scheduler: ExecutionContext
+) extends RSpaceOpsPlusPlus[F]
     with ISpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation] {
 
   type C = Par;
@@ -100,72 +103,74 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
   // TuplespacePlusPlus trait functions
 
   def produce(channel: C, data: A, persist: Boolean): F[MaybeActionResult] =
-    for {
-      result <- Sync[F].delay {
-                 val channelBytes       = channel.toByteArray
-                 val channelBytesLength = channelBytes.length
-                 val dataBytes          = data.toByteArray
-                 val dataBytesLength    = dataBytes.length
+    ContextShift[F].evalOn(scheduler) {
+      for {
+        result <- Sync[F].delay {
+                   val channelBytes       = channel.toByteArray
+                   val channelBytesLength = channelBytes.length
+                   val dataBytes          = data.toByteArray
+                   val dataBytesLength    = dataBytes.length
 
-                 val payloadSize   = channelBytesLength.toLong + dataBytesLength.toLong
-                 val payloadMemory = new Memory(payloadSize)
+                   val payloadSize   = channelBytesLength.toLong + dataBytesLength.toLong
+                   val payloadMemory = new Memory(payloadSize)
 
-                 payloadMemory.write(0, channelBytes, 0, channelBytesLength)
-                 payloadMemory.write(channelBytesLength.toLong, dataBytes, 0, dataBytesLength)
+                   payloadMemory.write(0, channelBytes, 0, channelBytesLength)
+                   payloadMemory.write(channelBytesLength.toLong, dataBytes, 0, dataBytesLength)
 
-                 val produceResultPtr = INSTANCE.produce(
-                   rspacePointer,
-                   payloadMemory,
-                   channelBytesLength,
-                   dataBytesLength,
-                   persist
-                 )
+                   val produceResultPtr = INSTANCE.produce(
+                     rspacePointer,
+                     payloadMemory,
+                     channelBytesLength,
+                     dataBytesLength,
+                     persist
+                   )
 
-                 // Not sure is this line is needed
-                 // Need to figure out how to deallocate 'payloadMemory'
-                 payloadMemory.clear()
+                   // Not sure is this line is needed
+                   // Need to figure out how to deallocate 'payloadMemory'
+                   payloadMemory.clear()
 
-                 if (produceResultPtr != null) {
-                   val resultByteslength = produceResultPtr.getInt(0)
+                   if (produceResultPtr != null) {
+                     val resultByteslength = produceResultPtr.getInt(0)
 
-                   try {
-                     val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult   = actionResult.contResult.get
-                     val results      = actionResult.results
+                     try {
+                       val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
+                       val actionResult = ActionResult.parseFrom(resultBytes)
+                       val contResult   = actionResult.contResult.get
+                       val results      = actionResult.results
 
-                     Some(
-                       (
-                         ContResult(
-                           continuation = contResult.continuation.get,
-                           persistent = contResult.persistent,
-                           channels = contResult.channels,
-                           patterns = contResult.patterns,
-                           peek = contResult.peek
-                         ),
-                         results.map(
-                           r =>
-                             Result(
-                               channel = r.channel.get,
-                               matchedDatum = r.matchedDatum.get,
-                               removedDatum = r.removedDatum.get,
-                               persistent = r.persistent
-                             )
+                       Some(
+                         (
+                           ContResult(
+                             continuation = contResult.continuation.get,
+                             persistent = contResult.persistent,
+                             channels = contResult.channels,
+                             patterns = contResult.patterns,
+                             peek = contResult.peek
+                           ),
+                           results.map(
+                             r =>
+                               Result(
+                                 channel = r.channel.get,
+                                 matchedDatum = r.matchedDatum.get,
+                                 removedDatum = r.removedDatum.get,
+                                 persistent = r.persistent
+                               )
+                           )
                          )
                        )
-                     )
-                   } catch {
-                     case e: Throwable =>
-                       println("Error during scala produce operation: " + e)
-                       throw e
-                   } finally {
-                     INSTANCE.deallocate_memory(produceResultPtr, resultByteslength)
+                     } catch {
+                       case e: Throwable =>
+                         println("Error during scala produce operation: " + e)
+                         throw e
+                     } finally {
+                       INSTANCE.deallocate_memory(produceResultPtr, resultByteslength)
+                     }
+                   } else {
+                     None
                    }
-                 } else {
-                   None
                  }
-               }
-    } yield result
+      } yield result
+    }
 
   def consume(
       channels: Seq[C],
@@ -174,82 +179,84 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: Log](rspacePointer: Pointer)
       persist: Boolean,
       peeks: SortedSet[Int] = SortedSet.empty
   ): F[MaybeActionResult] =
-    for {
-      result <- Sync[F].delay {
-                 //  println("\nhit consume in scala");
-                 //  dataLogger.debug("hit consume in scala")
+    ContextShift[F].evalOn(scheduler) {
+      for {
+        result <- Sync[F].delay {
+                   //  println("\nhit consume in scala");
+                   //  dataLogger.debug("hit consume in scala")
 
-                 val consumeParams = ConsumeParams(
-                   channels,
-                   patterns,
-                   Some(continuation),
-                   persist,
-                   peeks.map(SortedSetElement(_)).toSeq
-                 )
-                 val consumeParamsBytes = consumeParams.toByteArray
+                   val consumeParams = ConsumeParams(
+                     channels,
+                     patterns,
+                     Some(continuation),
+                     persist,
+                     peeks.map(SortedSetElement(_)).toSeq
+                   )
+                   val consumeParamsBytes = consumeParams.toByteArray
 
-                 val payloadMemory = new Memory(consumeParamsBytes.length.toLong)
-                 payloadMemory.write(0, consumeParamsBytes, 0, consumeParamsBytes.length)
+                   val payloadMemory = new Memory(consumeParamsBytes.length.toLong)
+                   payloadMemory.write(0, consumeParamsBytes, 0, consumeParamsBytes.length)
 
-                 val consumeResultPtr = INSTANCE.consume(
-                   rspacePointer,
-                   payloadMemory,
-                   consumeParamsBytes.length
-                 )
+                   val consumeResultPtr = INSTANCE.consume(
+                     rspacePointer,
+                     payloadMemory,
+                     consumeParamsBytes.length
+                   )
 
-                 // Not sure if these lines are needed
-                 // Need to figure out how to deallocate each memory instance
-                 payloadMemory.clear()
+                   // Not sure if these lines are needed
+                   // Need to figure out how to deallocate each memory instance
+                   payloadMemory.clear()
 
-                 //  val jsonString = consumeResultPtr.getString(0)
-                 //  println("\njsonString: " + jsonString)
+                   //  val jsonString = consumeResultPtr.getString(0)
+                   //  println("\njsonString: " + jsonString)
 
-                 //  if (jsonString != "") {
-                 if (consumeResultPtr != null) {
-                   val resultByteslength = consumeResultPtr.getInt(0)
-                   try {
-                     // println("\nresultByteslength: " + resultByteslength)
-                     val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
-                     // println("resultBytes length: " + resultBytes.length)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
+                   //  if (jsonString != "") {
+                   if (consumeResultPtr != null) {
+                     val resultByteslength = consumeResultPtr.getInt(0)
+                     try {
+                       // println("\nresultByteslength: " + resultByteslength)
+                       val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
+                       // println("resultBytes length: " + resultBytes.length)
+                       val actionResult = ActionResult.parseFrom(resultBytes)
 
-                     //  val actionResult = ActionResult.parseFrom(jsonString.getBytes())
+                       //  val actionResult = ActionResult.parseFrom(jsonString.getBytes())
 
-                     val contResult = actionResult.contResult.get
-                     val results    = actionResult.results
+                       val contResult = actionResult.contResult.get
+                       val results    = actionResult.results
 
-                     Some(
-                       (
-                         ContResult(
-                           continuation = contResult.continuation.get,
-                           persistent = contResult.persistent,
-                           channels = contResult.channels,
-                           patterns = contResult.patterns,
-                           peek = contResult.peek
-                         ),
-                         results.map(
-                           r =>
-                             Result(
-                               channel = r.channel.get,
-                               matchedDatum = r.matchedDatum.get,
-                               removedDatum = r.removedDatum.get,
-                               persistent = r.persistent
-                             )
+                       Some(
+                         (
+                           ContResult(
+                             continuation = contResult.continuation.get,
+                             persistent = contResult.persistent,
+                             channels = contResult.channels,
+                             patterns = contResult.patterns,
+                             peek = contResult.peek
+                           ),
+                           results.map(
+                             r =>
+                               Result(
+                                 channel = r.channel.get,
+                                 matchedDatum = r.matchedDatum.get,
+                                 removedDatum = r.removedDatum.get,
+                                 persistent = r.persistent
+                               )
+                           )
                          )
                        )
-                     )
-                   } catch {
-                     case e: Throwable =>
-                       println("Error during scala consume operation: " + e)
-                       throw e
-                   } finally {
-                     INSTANCE.deallocate_memory(consumeResultPtr, resultByteslength)
+                     } catch {
+                       case e: Throwable =>
+                         println("Error during scala consume operation: " + e)
+                         throw e
+                     } finally {
+                       INSTANCE.deallocate_memory(consumeResultPtr, resultByteslength)
+                     }
+                   } else {
+                     None
                    }
-                 } else {
-                   None
                  }
-               }
-    } yield result
+      } yield result
+    }
 
   def install(channels: Seq[C], patterns: Seq[P], continuation: K): F[Option[(K, Seq[A])]] =
     for {
@@ -993,14 +1000,18 @@ object RSpacePlusPlus_RhoTypes {
       .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
       .asInstanceOf[JNAInterface]
 
-  def create[F[_]: Concurrent: Log](storePath: String): F[RSpacePlusPlus_RhoTypes[F]] =
+  def create[F[_]: Concurrent: ContextShift: Log](storePath: String)(
+      implicit scheduler: ExecutionContext
+  ): F[RSpacePlusPlus_RhoTypes[F]] =
     Sync[F].delay {
       val rspacePointer = INSTANCE.space_new(storePath);
       new RSpacePlusPlus_RhoTypes[F](rspacePointer)
     }
 
-  def createWithReplay[F[_]: Concurrent: Log, C, P, A, K](
+  def createWithReplay[F[_]: Concurrent: ContextShift: Log, C, P, A, K](
       storePath: String
+  )(
+      implicit scheduler: ExecutionContext
   ): F[(RSpacePlusPlus_RhoTypes[F], ReplayRSpacePlusPlus[F, C, P, A, K])] =
     Sync[F].delay {
       val rspacePointer = INSTANCE.space_new(storePath);

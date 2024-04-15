@@ -89,11 +89,10 @@ object ReportingCasper {
   type RhoReportingRspace[F[_]] =
     ReportingRSpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
 
-  // NOTE: Removed "implicit scheduler: ExecutionContext" parameter
   def rhoReporter[F[_]: ContextShift: Concurrent: Log: Metrics: Span: Parallel: BlockStore: BlockDagStorage](
       // rspaceStore: RSpaceStore[F]
       storePath: String
-  )(): ReportingCasper[F] =
+  )(implicit scheduler: ExecutionContext): ReportingCasper[F] =
     new ReportingCasper[F] {
       override def trace(
           block: BlockMessage
@@ -196,7 +195,7 @@ object ReportingRuntime {
       // store: RSpaceStore[F]
       storePath: String
   )(
-      // implicit scheduler: ExecutionContext
+      implicit scheduler: ExecutionContext
   ): F[RhoReportingRspace[F]] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: RSpaceMatch[F, BindPattern, ListParWithRandom] = matchListPar[F]

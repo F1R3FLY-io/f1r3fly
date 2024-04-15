@@ -42,7 +42,7 @@ object Resources {
     )
 
   def mkRhoISpace[F[_]: Concurrent: Parallel: ContextShift: KeyValueStoreManager: Metrics: Span: Log](
-      // implicit scheduler: Scheduler
+      implicit scheduler: Scheduler
   ): F[RhoISpace[F]] = {
     import coop.rchain.rholang.interpreter.storage._
 
@@ -56,10 +56,9 @@ object Resources {
     } yield space
   }
 
-  // NOTE: Removed "implicit scheduler" parameter
   def mkRuntime[F[_]: Concurrent: Parallel: ContextShift: Metrics: Span: Log](
       prefix: String
-  ): Resource[F, RhoRuntime[F]] =
+  )(implicit scheduler: Scheduler): Resource[F, RhoRuntime[F]] =
     mkTempDir(prefix)
     //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
     //   .evalMap(_.rSpaceStores)
@@ -70,7 +69,7 @@ object Resources {
       prefix: String,
       initRegistry: Boolean = false
   )(
-      // implicit scheduler: Scheduler
+      implicit scheduler: Scheduler
   ): Resource[F, (RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] =
     mkTempDir(prefix)
     //   .evalMap(RholangCLI.mkRSpaceStoreManager[F](_))
@@ -84,7 +83,7 @@ object Resources {
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
-      // implicit scheduler: Scheduler
+      implicit scheduler: Scheduler
   ): F[(RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]

@@ -644,7 +644,7 @@ object RhoRuntime {
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
-      // implicit scheduler: Scheduler
+      implicit scheduler: Scheduler
   ): F[RhoRuntime[F]] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
