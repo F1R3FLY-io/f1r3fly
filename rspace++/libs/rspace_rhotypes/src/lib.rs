@@ -76,8 +76,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 
 #[no_mangle]
 pub extern "C" fn space_print(rspace: *mut Space) -> () {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().store.print().await } })
+    unsafe { (*rspace).rspace.lock().unwrap().store.print() }
 }
 
 #[no_mangle]
@@ -399,17 +398,13 @@ pub extern "C" fn get_waiting_continuations(
         unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
     let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let wks = rt.block_on(async {
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .get_waiting_continuations(channels_proto.channels)
-                .await
-        }
-    });
+    let wks = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .get_waiting_continuations(channels_proto.channels)
+    };
 
     let wks_protos: Vec<WaitingContinuationProto> = wks
         .into_iter()
@@ -454,9 +449,7 @@ pub extern "C" fn get_joins(
     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
     let channel = Par::decode(channel_slice).unwrap();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let joins =
-        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().get_joins(channel).await } });
+    let joins = unsafe { (*rspace).rspace.lock().unwrap().get_joins(channel) };
 
     let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
     let joins_proto = JoinsProto { joins: vec_join };
@@ -471,9 +464,7 @@ pub extern "C" fn get_joins(
 
 #[no_mangle]
 pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let hot_store_mapped =
-        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().store.to_map().await } });
+    let hot_store_mapped = unsafe { (*rspace).rspace.lock().unwrap().store.to_map() };
 
     let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
 
@@ -558,19 +549,7 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 
 #[no_mangle]
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let soft_checkpoint = rt.block_on(async {
-        // println!("\nHit create_soft_checkpoint");
-
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .create_soft_checkpoint()
-                .await
-        }
-    });
+    let soft_checkpoint = unsafe { (*rspace).rspace.lock().unwrap().create_soft_checkpoint() };
 
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
     let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
@@ -878,20 +857,14 @@ pub extern "C" fn revert_to_soft_checkpoint(
         produce_counter: produce_counter_map,
     };
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        // println!("\nHit revert_to_soft_checkpoint");
-
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .revert_to_soft_checkpoint(soft_checkpoint)
-                .await
-                .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
-        };
-    })
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .revert_to_soft_checkpoint(soft_checkpoint)
+            .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
+    }
 }
 
 #[no_mangle]

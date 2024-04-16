@@ -103,7 +103,7 @@ where
                 self.wrap_result(channels, wk, consume_ref, data_candidates)
             }
             None => {
-                self.store_waiting_continuation(channels, wk).await;
+                self.store_waiting_continuation(channels, wk);
                 None
             }
         }
@@ -138,7 +138,7 @@ where
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit locked_produce");
-        let grouped_channels = self.store.get_joins(channel.clone()).await;
+        let grouped_channels = self.store.get_joins(channel.clone());
         // println!("\ngrouped_channels: {:?}", grouped_channels);
         // println!(
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
@@ -160,7 +160,7 @@ where
 
         match extracted {
             Some(produce_candidate) => self.process_match_found(produce_candidate).await,
-            None => self.store_data(channel, data, persist, produce_ref).await,
+            None => self.store_data(channel, data, persist, produce_ref),
         }
     }
 
@@ -202,12 +202,10 @@ where
 
         if !persist {
             self.store
-                .remove_continuation(channels.clone(), continuation_index)
-                .await;
+                .remove_continuation(channels.clone(), continuation_index);
         }
 
-        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone())
-            .await;
+        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone()).await;
 
         // println!(
         //     "produce: matching continuation found at <channels: {:?}>",
@@ -218,7 +216,7 @@ where
     }
 
     pub async fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        let changes = self.store.changes().await;
+        let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes).await;
         self.history_repository = next_history;
 
@@ -260,32 +258,29 @@ where
         self.store.get_data(&channel).await
     }
 
-    pub async fn get_waiting_continuations(
-        &self,
-        channels: Vec<C>,
-    ) -> Vec<WaitingContinuation<P, K>> {
-        self.store.get_continuations(channels).await
+    pub fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+        self.store.get_continuations(channels)
     }
 
-    pub async fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
-        self.store.get_joins(channel).await
+    pub fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+        self.store.get_joins(channel)
     }
 
-    async fn store_waiting_continuation(
+    fn store_waiting_continuation(
         &self,
         channels: Vec<C>,
         wc: WaitingContinuation<P, K>,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_waiting_continuation");
-        self.store.put_continuation(channels.clone(), wc).await;
+        self.store.put_continuation(channels.clone(), wc);
         for channel in channels.iter() {
-            self.store.put_join(channel.clone(), channels.clone()).await;
+            self.store.put_join(channel.clone(), channels.clone());
             // println!("consume: no data found, storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>", wc.patterns, wc.continuation, channels)
         }
         None
     }
 
-    async fn store_data(
+    fn store_data(
         &self,
         channel: C,
         data: A,
@@ -293,16 +288,14 @@ where
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_data");
-        self.store
-            .put_datum(
-                channel,
-                Datum {
-                    a: data,
-                    persist,
-                    source: produce_ref,
-                },
-            )
-            .await;
+        self.store.put_datum(
+            channel,
+            Datum {
+                a: data,
+                persist,
+                source: produce_ref,
+            },
+        );
         // println!(
         //     "produce: persisted <data: {:?}> at <channel: {:?}>",
         //     data, channel
@@ -451,23 +444,19 @@ where
                     //     },
                     // );
 
-                    self.store
-                        .install_continuation(
-                            channels.clone(),
-                            WaitingContinuation {
-                                patterns,
-                                continuation,
-                                persist: true,
-                                peeks: BTreeSet::default(),
-                                source: consume_ref,
-                            },
-                        )
-                        .await;
+                    self.store.install_continuation(
+                        channels.clone(),
+                        WaitingContinuation {
+                            patterns,
+                            continuation,
+                            persist: true,
+                            peeks: BTreeSet::default(),
+                            source: consume_ref,
+                        },
+                    );
 
                     for channel in channels.iter() {
-                        self.store
-                            .install_join(channel.clone(), channels.clone())
-                            .await;
+                        self.store.install_join(channel.clone(), channels.clone());
                     }
                     // println!(
                     //     "storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>",
@@ -493,8 +482,8 @@ where
         }
     }
 
-    pub async fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
-        self.store.to_map().await
+    pub fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+        self.store.to_map()
     }
 
     pub async fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
@@ -522,8 +511,8 @@ where
         self.store = next_hot_store;
     }
 
-    pub async fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
-        let cache_snapshot = self.store.snapshot().await;
+    pub fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
+        let cache_snapshot = self.store.snapshot();
         self.produce_counter = HashMap::new();
         SoftCheckpoint {
             cache_snapshot,
@@ -531,7 +520,7 @@ where
         }
     }
 
-    pub async fn revert_to_soft_checkpoint(
+    pub fn revert_to_soft_checkpoint(
         &mut self,
         checkpoint: SoftCheckpoint<C, P, A, K>,
     ) -> Result<(), RSpaceError> {
@@ -614,11 +603,11 @@ where
     }
 
     // NOTE: This function is a parameter on the Scala side for the function 'run_matcher_for_channels'
-    async fn fetch_matching_continuations(
+    fn fetch_matching_continuations(
         &self,
         channels: Vec<C>,
     ) -> Vec<(WaitingContinuation<P, K>, i32)> {
-        let continuations = self.store.get_continuations(channels).await;
+        let continuations = self.store.get_continuations(channels);
         self.shuffle_with_index(continuations)
     }
 
@@ -663,8 +652,7 @@ where
         loop {
             match remaining.split_first() {
                 Some((channels, rest)) => {
-                    let match_candidates =
-                        self.fetch_matching_continuations(channels.to_vec()).await;
+                    let match_candidates = self.fetch_matching_continuations(channels.to_vec());
                     // println!("match_candidates: {:?}", match_candidates);
                     let fetch_data_futures: Vec<_> = channels
                         .iter()

@@ -15,31 +15,26 @@ use std::sync::{Arc, Mutex};
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
 #[async_trait]
 pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
-    async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
-    async fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>)
-        -> Option<()>;
-    async fn install_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()>;
-    async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()>;
+    fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
+    fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
+    fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
+    fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()>;
 
     async fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
-    async fn put_datum(&self, channel: C, d: Datum<A>) -> ();
+    fn put_datum(&self, channel: C, d: Datum<A>) -> ();
     async fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
 
-    async fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
-    async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
-    async fn install_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
+    fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn install_join(&self, channel: C, join: Vec<C>) -> Option<()>;
     async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()>;
 
-    async fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
-    async fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
-    async fn snapshot(&self) -> HotStoreState<C, P, A, K>;
+    fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
+    fn snapshot(&self) -> HotStoreState<C, P, A, K>;
 
-    async fn print(&self) -> ();
-    async fn clear(&self) -> ();
+    fn print(&self) -> ();
+    fn clear(&self) -> ();
 }
 
 #[derive(Default)]
@@ -91,7 +86,7 @@ where
     A: Clone + Debug + Send + Sync,
     K: Clone + Debug + Send + Sync,
 {
-    async fn snapshot(&self) -> HotStoreState<C, P, A, K> {
+    fn snapshot(&self) -> HotStoreState<C, P, A, K> {
         let hot_store_state_lock = self.hot_store_state.lock().unwrap();
         HotStoreState {
             continuations: hot_store_state_lock.continuations.clone(),
@@ -104,7 +99,7 @@ where
 
     // Continuations
 
-    async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+    fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&channels);
 
@@ -151,11 +146,7 @@ where
         }
     }
 
-    async fn put_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()> {
+    fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()> {
         // println!("\nHit put_continuation");
 
         let from_history_store: Vec<WaitingContinuation<P, K>> =
@@ -176,11 +167,7 @@ where
         Some(())
     }
 
-    async fn install_continuation(
-        &self,
-        channels: Vec<C>,
-        wc: WaitingContinuation<P, K>,
-    ) -> Option<()> {
+    fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()> {
         // println!("hit install_continuation");
         let state = self.hot_store_state.lock().unwrap();
         let _ = state.installed_continuations.insert(channels, wc);
@@ -191,7 +178,7 @@ where
         Some(())
     }
 
-    async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
+    fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&channels);
 
@@ -253,7 +240,7 @@ where
         }
     }
 
-    async fn put_datum(&self, channel: C, d: Datum<A>) -> () {
+    fn put_datum(&self, channel: C, d: Datum<A>) -> () {
         // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
 
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
@@ -297,7 +284,7 @@ where
 
     // Joins
 
-    async fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
         // println!("\nHit get_joins");
 
         let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
@@ -353,7 +340,7 @@ where
         }
     }
 
-    async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+    fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();
@@ -374,7 +361,7 @@ where
         }
     }
 
-    async fn install_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+    fn install_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         // println!("hit install_join");
         let state = self.hot_store_state.lock().unwrap();
         let current_installed_joins = state
@@ -439,7 +426,7 @@ where
         }
     }
 
-    async fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>> {
+    fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>> {
         let cache = self.hot_store_state.lock().unwrap();
         let continuations: Vec<HotStoreAction<C, P, A, K>> = cache
             .continuations
@@ -494,7 +481,7 @@ where
         [continuations, data, joins].concat()
     }
 
-    async fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
         let state = self.hot_store_state.lock().unwrap();
         let data = state
             .data
@@ -537,7 +524,7 @@ where
         map
     }
 
-    async fn print(&self) {
+    fn print(&self) {
         let hot_store_state = self.hot_store_state.lock().unwrap();
         println!("\nHot Store");
 
@@ -596,7 +583,7 @@ where
         // println!("Continuations: {:?}", self.history_reader_base.get_continuations(channels));
     }
 
-    async fn clear(&self) {
+    fn clear(&self) {
         let mut state = self.hot_store_state.lock().unwrap();
         state.continuations = DashMap::new();
         state.installed_continuations = DashMap::new();
