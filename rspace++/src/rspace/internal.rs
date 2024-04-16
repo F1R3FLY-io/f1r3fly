@@ -78,7 +78,7 @@ pub struct Row<P: Clone, A: Clone, K: Clone> {
     pub wks: Vec<WaitingContinuation<P, K>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Install<P, K> {
     pub patterns: Vec<P>,
     pub continuation: K,

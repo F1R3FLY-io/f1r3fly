@@ -23,6 +23,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
 };
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
+use std::sync::Mutex;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -30,7 +31,7 @@ use std::ffi::{c_char, CStr};
  */
 #[repr(C)]
 pub struct Space {
-    rspace: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>,
+    rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>>,
 }
 
 #[no_mangle]
@@ -68,13 +69,15 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
         })
         .unwrap();
 
-    Box::into_raw(Box::new(Space { rspace }))
+    Box::into_raw(Box::new(Space {
+        rspace: Mutex::new(rspace),
+    }))
 }
 
 #[no_mangle]
 pub extern "C" fn space_print(rspace: *mut Space) -> () {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async { unsafe { (*rspace).rspace.store.print().await } })
+    rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().store.print().await } })
 }
 
 #[no_mangle]
@@ -85,6 +88,8 @@ pub extern "C" fn space_clear(rspace: *mut Space) -> () {
         unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .clear()
                 .await
                 .expect("Rust RSpacePlusPlus Library: Failed to clear");
@@ -144,43 +149,50 @@ pub extern "C" fn produce(
     let data = ListParWithRandom::decode(data_slice).unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let result_option = unsafe { (*rspace).rspace.produce(channel, data, persist).await };
-
-        match result_option {
-            Some((cont_result, rspace_results)) => {
-                let protobuf_cont_result = ContResultProto {
-                    continuation: Some(cont_result.continuation),
-                    persistent: cont_result.persistent,
-                    channels: cont_result.channels,
-                    patterns: cont_result.patterns,
-                    peek: cont_result.peek,
-                };
-                let protobuf_results = rspace_results
-                    .into_iter()
-                    .map(|result| RSpaceResultProto {
-                        channel: Some(result.channel),
-                        matched_datum: Some(result.matched_datum),
-                        removed_datum: Some(result.removed_datum),
-                        persistent: result.persistent,
-                    })
-                    .collect();
-
-                let maybe_action_result = ActionResult {
-                    cont_result: Some(protobuf_cont_result),
-                    results: protobuf_results,
-                };
-
-                let mut bytes = maybe_action_result.encode_to_vec();
-                let len = bytes.len() as u32;
-                let len_bytes = len.to_le_bytes().to_vec();
-                let mut result = len_bytes;
-                result.append(&mut bytes);
-                Box::leak(result.into_boxed_slice()).as_ptr()
-            }
-            None => std::ptr::null(),
+    let result_option = rt.block_on(async {
+        unsafe {
+            (*rspace)
+                .rspace
+                .lock()
+                .unwrap()
+                .produce(channel, data, persist)
+                .await
         }
-    })
+    });
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => std::ptr::null(),
+    }
 }
 
 #[no_mangle]
@@ -201,53 +213,55 @@ pub extern "C" fn consume(
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let result_option = unsafe {
+    let result_option = rt.block_on(async {
+        unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .consume(channels, patterns, continuation, persist, peeks)
                 .await
-        };
-
-        match result_option {
-            Some((cont_result, rspace_results)) => {
-                let protobuf_cont_result = ContResultProto {
-                    continuation: Some(cont_result.continuation),
-                    persistent: cont_result.persistent,
-                    channels: cont_result.channels,
-                    patterns: cont_result.patterns,
-                    peek: cont_result.peek,
-                };
-                let protobuf_results = rspace_results
-                    .into_iter()
-                    .map(|result| RSpaceResultProto {
-                        channel: Some(result.channel),
-                        matched_datum: Some(result.matched_datum),
-                        removed_datum: Some(result.removed_datum),
-                        persistent: result.persistent,
-                    })
-                    .collect();
-
-                let maybe_action_result = ActionResult {
-                    cont_result: Some(protobuf_cont_result),
-                    results: protobuf_results,
-                };
-
-                let mut bytes = maybe_action_result.encode_to_vec();
-                let len = bytes.len() as u32;
-                let len_bytes = len.to_le_bytes().to_vec();
-                let mut result = len_bytes;
-                result.append(&mut bytes);
-
-                // println!("\nlen: {:?}", len);
-                Box::leak(result.into_boxed_slice()).as_ptr()
-            }
-            None => {
-                // println!("\nnone in rust consume");
-                std::ptr::null()
-            }
         }
-    })
+    });
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+
+            // println!("\nlen: {:?}", len);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => {
+            // println!("\nnone in rust consume");
+            std::ptr::null()
+        }
+    }
 }
 
 #[no_mangle]
@@ -266,50 +280,54 @@ pub extern "C" fn install(
     let continuation = consume_params.continuation.unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let result_option = unsafe {
+    let result_option = rt.block_on(async {
+        unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .install(channels, patterns, continuation)
                 .await
-        };
-
-        match result_option {
-            None => std::ptr::null(),
-            Some(_) => {
-                panic!("RUST ERROR: Installing can be done only on startup")
-            }
         }
-    })
+    });
+
+    match result_option {
+        None => std::ptr::null(),
+        Some(_) => {
+            panic!("RUST ERROR: Installing can be done only on startup")
+        }
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
+    let checkpoint = rt.block_on(async {
         // println!("\nHit create_checkpoint");
 
-        let checkpoint = unsafe {
+        unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .create_checkpoint()
                 .await
                 .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
-        };
+        }
 
         // println!("create_checkpoint root hash: {}", checkpoint.root);
+    });
 
-        let checkpoint_proto = CheckpointProto {
-            root: checkpoint.root.bytes(),
-        };
+    let checkpoint_proto = CheckpointProto {
+        root: checkpoint.root.bytes(),
+    };
 
-        let mut bytes = checkpoint_proto.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
+    let mut bytes = checkpoint_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]
@@ -324,6 +342,8 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
         unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .reset(root)
                 .await
                 .expect("Rust RSpacePlusPlus Library: Failed to reset")
@@ -341,33 +361,32 @@ pub extern "C" fn get_data(
     let channel = Par::decode(channel_slice).unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let datums = unsafe { (*rspace).rspace.get_data(channel).await };
+    let datums =
+        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().get_data(channel).await } });
 
-        let datums_protos: Vec<DatumProto> = datums
-            .into_iter()
-            .map(|datum| DatumProto {
-                a: Some(datum.a),
-                persist: datum.persist,
-                source: Some(ProduceProto {
-                    channel_hash: datum.source.channel_hash.bytes(),
-                    hash: datum.source.hash.bytes(),
-                    persistent: datum.source.persistent,
-                }),
-            })
-            .collect();
+    let datums_protos: Vec<DatumProto> = datums
+        .into_iter()
+        .map(|datum| DatumProto {
+            a: Some(datum.a),
+            persist: datum.persist,
+            source: Some(ProduceProto {
+                channel_hash: datum.source.channel_hash.bytes(),
+                hash: datum.source.hash.bytes(),
+                persistent: datum.source.persistent,
+            }),
+        })
+        .collect();
 
-        let datums_proto = DatumsProto {
-            datums: datums_protos,
-        };
+    let datums_proto = DatumsProto {
+        datums: datums_protos,
+    };
 
-        let mut bytes = datums_proto.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
+    let mut bytes = datums_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]
@@ -381,15 +400,100 @@ pub extern "C" fn get_waiting_continuations(
     let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let wks = unsafe {
+    let wks = rt.block_on(async {
+        unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .get_waiting_continuations(channels_proto.channels)
                 .await
-        };
+        }
+    });
 
-        let wks_protos: Vec<WaitingContinuationProto> = wks
+    let wks_protos: Vec<WaitingContinuationProto> = wks
+        .into_iter()
+        .map(|wk| WaitingContinuationProto {
+            patterns: wk.patterns,
+            continuation: Some(wk.continuation),
+            persist: wk.persist,
+            peeks: wk
+                .peeks
+                .into_iter()
+                .map(|peek| SortedSetElement { value: peek as i32 })
+                .collect(),
+            source: Some(ConsumeProto {
+                channel_hashes: wk
+                    .source
+                    .channel_hashes
+                    .iter()
+                    .map(|hash| hash.bytes())
+                    .collect(),
+                hash: wk.source.hash.bytes(),
+                persistent: wk.source.persistent,
+            }),
+        })
+        .collect();
+
+    let wks_proto = WaitingContinuationsProto { wks: wks_protos };
+
+    let mut bytes = wks_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_joins(
+    rspace: *mut Space,
+    channel_pointer: *const u8,
+    channel_bytes_len: usize,
+) -> *const u8 {
+    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
+    let channel = Par::decode(channel_slice).unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let joins =
+        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().get_joins(channel).await } });
+
+    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+    let joins_proto = JoinsProto { joins: vec_join };
+
+    let mut bytes = joins_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let hot_store_mapped =
+        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().store.to_map().await } });
+
+    let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
+
+    for (key, value) in hot_store_mapped {
+        let datums = value
+            .data
+            .into_iter()
+            .map(|datum| DatumProto {
+                a: Some(datum.a),
+                persist: datum.persist,
+                source: Some(ProduceProto {
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
+                    persistent: datum.source.persistent,
+                }),
+            })
+            .collect();
+
+        let wks = value
+            .wks
             .into_iter()
             .map(|wk| WaitingContinuationProto {
                 patterns: wk.patterns,
@@ -413,104 +517,21 @@ pub extern "C" fn get_waiting_continuations(
             })
             .collect();
 
-        let wks_proto = WaitingContinuationsProto { wks: wks_protos };
+        let value = StoreToMapValue { data: datums, wks };
+        map_entries.push(StoreToMapEntry {
+            key,
+            value: Some(value),
+        });
+    }
 
-        let mut bytes = wks_proto.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
-}
+    let to_map_result = StoreToMapResult { map_entries };
 
-#[no_mangle]
-pub extern "C" fn get_joins(
-    rspace: *mut Space,
-    channel_pointer: *const u8,
-    channel_bytes_len: usize,
-) -> *const u8 {
-    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
-    let channel = Par::decode(channel_slice).unwrap();
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let joins = unsafe { (*rspace).rspace.get_joins(channel).await };
-        let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
-        let joins_proto = JoinsProto { joins: vec_join };
-
-        let mut bytes = joins_proto.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let hot_store_mapped = unsafe { (*rspace).rspace.store.to_map().await };
-        let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
-
-        for (key, value) in hot_store_mapped {
-            let datums = value
-                .data
-                .into_iter()
-                .map(|datum| DatumProto {
-                    a: Some(datum.a),
-                    persist: datum.persist,
-                    source: Some(ProduceProto {
-                        channel_hash: datum.source.channel_hash.bytes(),
-                        hash: datum.source.hash.bytes(),
-                        persistent: datum.source.persistent,
-                    }),
-                })
-                .collect();
-
-            let wks = value
-                .wks
-                .into_iter()
-                .map(|wk| WaitingContinuationProto {
-                    patterns: wk.patterns,
-                    continuation: Some(wk.continuation),
-                    persist: wk.persist,
-                    peeks: wk
-                        .peeks
-                        .into_iter()
-                        .map(|peek| SortedSetElement { value: peek as i32 })
-                        .collect(),
-                    source: Some(ConsumeProto {
-                        channel_hashes: wk
-                            .source
-                            .channel_hashes
-                            .iter()
-                            .map(|hash| hash.bytes())
-                            .collect(),
-                        hash: wk.source.hash.bytes(),
-                        persistent: wk.source.persistent,
-                    }),
-                })
-                .collect();
-
-            let value = StoreToMapValue { data: datums, wks };
-            map_entries.push(StoreToMapEntry {
-                key,
-                value: Some(value),
-            });
-        }
-
-        let to_map_result = StoreToMapResult { map_entries };
-
-        let mut bytes = to_map_result.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
+    let mut bytes = to_map_result.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]
@@ -522,161 +543,172 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
         unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .spawn()
                 .await
                 .expect("Rust RSpacePlusPlus Library: Failed to spawn")
         }
     });
 
-    Box::into_raw(Box::new(Space { rspace }))
+    Box::into_raw(Box::new(Space {
+        rspace: Mutex::new(rspace),
+    }))
 }
 
 #[no_mangle]
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
+    let soft_checkpoint = rt.block_on(async {
         // println!("\nHit create_soft_checkpoint");
 
-        let soft_checkpoint = unsafe { (*rspace).rspace.create_soft_checkpoint().await };
-
-        let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
-        let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
-        let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
-        let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
-        let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
-
-        let hot_store_state = soft_checkpoint.cache_snapshot;
-
-        for (key, value) in hot_store_state.continuations.clone().into_iter() {
-            let wks: Vec<WaitingContinuationProto> = value
-                .into_iter()
-                .map(|wk| WaitingContinuationProto {
-                    patterns: wk.patterns,
-                    continuation: Some(wk.continuation),
-                    persist: wk.persist,
-                    peeks: wk
-                        .peeks
-                        .into_iter()
-                        .map(|peek| SortedSetElement { value: peek as i32 })
-                        .collect(),
-                    source: Some(ConsumeProto {
-                        channel_hashes: wk
-                            .source
-                            .channel_hashes
-                            .iter()
-                            .map(|hash| hash.bytes())
-                            .collect(),
-                        hash: wk.source.hash.bytes(),
-                        persistent: wk.source.persistent,
-                    }),
-                })
-                .collect();
-
-            conts_map_entries.push(StoreStateContMapEntry { key, value: wks });
+        unsafe {
+            (*rspace)
+                .rspace
+                .lock()
+                .unwrap()
+                .create_soft_checkpoint()
+                .await
         }
+    });
 
-        for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
-            let wk = WaitingContinuationProto {
-                patterns: value.patterns,
-                continuation: Some(value.continuation),
-                persist: value.persist,
-                peeks: value
+    let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
+    let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
+    let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
+    let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
+    let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
+
+    let hot_store_state = soft_checkpoint.cache_snapshot;
+
+    for (key, value) in hot_store_state.continuations.clone().into_iter() {
+        let wks: Vec<WaitingContinuationProto> = value
+            .into_iter()
+            .map(|wk| WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(wk.continuation),
+                persist: wk.persist,
+                peeks: wk
                     .peeks
                     .into_iter()
                     .map(|peek| SortedSetElement { value: peek as i32 })
                     .collect(),
                 source: Some(ConsumeProto {
-                    channel_hashes: value
+                    channel_hashes: wk
                         .source
                         .channel_hashes
                         .iter()
                         .map(|hash| hash.bytes())
                         .collect(),
-                    hash: value.source.hash.bytes(),
-                    persistent: value.source.persistent,
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
                 }),
-            };
+            })
+            .collect();
 
-            installed_conts_map_entries.push(StoreStateInstalledContMapEntry {
-                key,
-                value: Some(wk),
-            });
-        }
+        conts_map_entries.push(StoreStateContMapEntry { key, value: wks });
+    }
 
-        for (key, value) in hot_store_state.data.clone().into_iter() {
-            let datums = value
+    for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
+        let wk = WaitingContinuationProto {
+            patterns: value.patterns,
+            continuation: Some(value.continuation),
+            persist: value.persist,
+            peeks: value
+                .peeks
                 .into_iter()
-                .map(|datum| DatumProto {
-                    a: Some(datum.a),
-                    persist: datum.persist,
-                    source: Some(ProduceProto {
-                        channel_hash: datum.source.channel_hash.bytes(),
-                        hash: datum.source.hash.bytes(),
-                        persistent: datum.source.persistent,
-                    }),
-                })
-                .collect();
-
-            data_map_entries.push(StoreStateDataMapEntry {
-                key: Some(key),
-                value: datums,
-            });
-        }
-
-        for (key, value) in hot_store_state.joins.clone().into_iter() {
-            let joins = value.into_iter().map(|join| JoinProto { join }).collect();
-
-            joins_map_entries.push(StoreStateJoinsMapEntry {
-                key: Some(key),
-                value: joins,
-            });
-        }
-
-        for (key, value) in hot_store_state.installed_joins.clone().into_iter() {
-            let joins = value.into_iter().map(|join| JoinProto { join }).collect();
-
-            installed_joins_map_entries.push(StoreStateInstalledJoinsMapEntry {
-                key: Some(key),
-                value: joins,
-            });
-        }
-
-        let hot_store_state_proto = HotStoreStateProto {
-            continuations: conts_map_entries,
-            installed_continuations: installed_conts_map_entries,
-            data: data_map_entries,
-            joins: joins_map_entries,
-            installed_joins: installed_joins_map_entries,
+                .map(|peek| SortedSetElement { value: peek as i32 })
+                .collect(),
+            source: Some(ConsumeProto {
+                channel_hashes: value
+                    .source
+                    .channel_hashes
+                    .iter()
+                    .map(|hash| hash.bytes())
+                    .collect(),
+                hash: value.source.hash.bytes(),
+                persistent: value.source.persistent,
+            }),
         };
 
-        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> = Vec::new();
-        let produce_counter_map = soft_checkpoint.produce_counter;
+        installed_conts_map_entries.push(StoreStateInstalledContMapEntry {
+            key,
+            value: Some(wk),
+        });
+    }
 
-        for (key, value) in produce_counter_map {
-            let produce = ProduceProto {
-                channel_hash: key.channel_hash.bytes(),
-                hash: key.hash.bytes(),
-                persistent: key.persistent,
-            };
+    for (key, value) in hot_store_state.data.clone().into_iter() {
+        let datums = value
+            .into_iter()
+            .map(|datum| DatumProto {
+                a: Some(datum.a),
+                persist: datum.persist,
+                source: Some(ProduceProto {
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
+                    persistent: datum.source.persistent,
+                }),
+            })
+            .collect();
 
-            produce_counter_map_entries.push(ProduceCounterMapEntry {
-                key: Some(produce),
-                value,
-            });
-        }
+        data_map_entries.push(StoreStateDataMapEntry {
+            key: Some(key),
+            value: datums,
+        });
+    }
 
-        let soft_checkpoint_proto = SoftCheckpointProto {
-            cache_snapshot: Some(hot_store_state_proto),
-            produce_counter: produce_counter_map_entries,
+    for (key, value) in hot_store_state.joins.clone().into_iter() {
+        let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+
+        joins_map_entries.push(StoreStateJoinsMapEntry {
+            key: Some(key),
+            value: joins,
+        });
+    }
+
+    for (key, value) in hot_store_state.installed_joins.clone().into_iter() {
+        let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+
+        installed_joins_map_entries.push(StoreStateInstalledJoinsMapEntry {
+            key: Some(key),
+            value: joins,
+        });
+    }
+
+    let hot_store_state_proto = HotStoreStateProto {
+        continuations: conts_map_entries,
+        installed_continuations: installed_conts_map_entries,
+        data: data_map_entries,
+        joins: joins_map_entries,
+        installed_joins: installed_joins_map_entries,
+    };
+
+    let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> = Vec::new();
+    let produce_counter_map = soft_checkpoint.produce_counter;
+
+    for (key, value) in produce_counter_map {
+        let produce = ProduceProto {
+            channel_hash: key.channel_hash.bytes(),
+            hash: key.hash.bytes(),
+            persistent: key.persistent,
         };
 
-        let mut bytes = soft_checkpoint_proto.encode_to_vec();
-        let len = bytes.len() as u32;
-        let len_bytes = len.to_le_bytes().to_vec();
-        let mut result = len_bytes;
-        result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
-    })
+        produce_counter_map_entries.push(ProduceCounterMapEntry {
+            key: Some(produce),
+            value,
+        });
+    }
+
+    let soft_checkpoint_proto = SoftCheckpointProto {
+        cache_snapshot: Some(hot_store_state_proto),
+        produce_counter: produce_counter_map_entries,
+    };
+
+    let mut bytes = soft_checkpoint_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]
@@ -685,19 +717,12 @@ pub extern "C" fn revert_to_soft_checkpoint(
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> () {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        // println!("\nHit revert_to_soft_checkpoint");
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let soft_checkpoint_proto = SoftCheckpointProto::decode(payload_slice).unwrap();
+    let cache_snapshot_proto = soft_checkpoint_proto.cache_snapshot.unwrap();
 
-        let payload_slice =
-            unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-        let soft_checkpoint_proto = SoftCheckpointProto::decode(payload_slice).unwrap();
-        let cache_snapshot_proto = soft_checkpoint_proto.cache_snapshot.unwrap();
-
-        let conts_map: DashMap<
-            Vec<Par>,
-            Vec<WaitingContinuation<BindPattern, TaggedContinuation>>,
-        > = cache_snapshot_proto
+    let conts_map: DashMap<Vec<Par>, Vec<WaitingContinuation<BindPattern, TaggedContinuation>>> =
+        cache_snapshot_proto
             .continuations
             .into_iter()
             .map(|map_entry| {
@@ -735,129 +760,133 @@ pub extern "C" fn revert_to_soft_checkpoint(
             })
             .collect();
 
-        let installed_conts_map: DashMap<
-            Vec<Par>,
-            WaitingContinuation<BindPattern, TaggedContinuation>,
-        > = cache_snapshot_proto
-            .installed_continuations
-            .into_iter()
-            .map(|map_entry| {
-                let key = map_entry.key;
-                let wk_proto = map_entry.value.unwrap();
-                let value = WaitingContinuation {
-                    patterns: wk_proto.patterns,
-                    continuation: wk_proto.continuation.unwrap(),
-                    persist: wk_proto.persist,
-                    peeks: wk_proto.peeks.iter().map(|element| element.value).collect(),
+    let installed_conts_map: DashMap<
+        Vec<Par>,
+        WaitingContinuation<BindPattern, TaggedContinuation>,
+    > = cache_snapshot_proto
+        .installed_continuations
+        .into_iter()
+        .map(|map_entry| {
+            let key = map_entry.key;
+            let wk_proto = map_entry.value.unwrap();
+            let value = WaitingContinuation {
+                patterns: wk_proto.patterns,
+                continuation: wk_proto.continuation.unwrap(),
+                persist: wk_proto.persist,
+                peeks: wk_proto.peeks.iter().map(|element| element.value).collect(),
+                source: {
+                    let consume_proto = wk_proto.source.unwrap();
+                    Consume {
+                        channel_hashes: consume_proto
+                            .channel_hashes
+                            .iter()
+                            .map(|hash_bytes| Blake2b256Hash::from_bytes(hash_bytes.to_vec()))
+                            .collect(),
+                        hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                        persistent: consume_proto.persistent,
+                    }
+                },
+            };
+
+            (key, value)
+        })
+        .collect();
+
+    let datums_map: DashMap<Par, Vec<Datum<ListParWithRandom>>> = cache_snapshot_proto
+        .data
+        .into_iter()
+        .map(|map_entry| {
+            let key = map_entry.key.unwrap();
+            let value = map_entry
+                .value
+                .into_iter()
+                .map(|datum_proto| Datum {
+                    a: datum_proto.a.unwrap(),
+                    persist: datum_proto.persist,
                     source: {
-                        let consume_proto = wk_proto.source.unwrap();
-                        Consume {
-                            channel_hashes: consume_proto
-                                .channel_hashes
-                                .iter()
-                                .map(|hash_bytes| Blake2b256Hash::from_bytes(hash_bytes.to_vec()))
-                                .collect(),
-                            hash: Blake2b256Hash::from_bytes(consume_proto.hash),
-                            persistent: consume_proto.persistent,
+                        let produce_proto = datum_proto.source.unwrap();
+                        Produce {
+                            channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                            hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                            persistent: produce_proto.persistent,
                         }
                     },
-                };
+                })
+                .collect();
 
-                (key, value)
-            })
-            .collect();
+            (key, value)
+        })
+        .collect();
 
-        let datums_map: DashMap<Par, Vec<Datum<ListParWithRandom>>> = cache_snapshot_proto
-            .data
-            .into_iter()
-            .map(|map_entry| {
-                let key = map_entry.key.unwrap();
-                let value = map_entry
-                    .value
-                    .into_iter()
-                    .map(|datum_proto| Datum {
-                        a: datum_proto.a.unwrap(),
-                        persist: datum_proto.persist,
-                        source: {
-                            let produce_proto = datum_proto.source.unwrap();
-                            Produce {
-                                channel_hash: Blake2b256Hash::from_bytes(
-                                    produce_proto.channel_hash,
-                                ),
-                                hash: Blake2b256Hash::from_bytes(produce_proto.hash),
-                                persistent: produce_proto.persistent,
-                            }
-                        },
-                    })
-                    .collect();
+    let joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
+        .joins
+        .into_iter()
+        .map(|map_entry| {
+            let key = map_entry.key.unwrap();
+            let value = map_entry
+                .value
+                .into_iter()
+                .map(|join_proto| join_proto.join)
+                .collect();
 
-                (key, value)
-            })
-            .collect();
+            (key, value)
+        })
+        .collect();
 
-        let joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
-            .joins
-            .into_iter()
-            .map(|map_entry| {
-                let key = map_entry.key.unwrap();
-                let value = map_entry
-                    .value
-                    .into_iter()
-                    .map(|join_proto| join_proto.join)
-                    .collect();
+    let installed_joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
+        .installed_joins
+        .into_iter()
+        .map(|map_entry| {
+            let key = map_entry.key.unwrap();
+            let value = map_entry
+                .value
+                .into_iter()
+                .map(|join_proto| join_proto.join)
+                .collect();
 
-                (key, value)
-            })
-            .collect();
+            (key, value)
+        })
+        .collect();
 
-        let installed_joins_map: DashMap<Par, Vec<Vec<Par>>> = cache_snapshot_proto
-            .installed_joins
-            .into_iter()
-            .map(|map_entry| {
-                let key = map_entry.key.unwrap();
-                let value = map_entry
-                    .value
-                    .into_iter()
-                    .map(|join_proto| join_proto.join)
-                    .collect();
+    let produce_counter_map: HashMap<Produce, i32> = soft_checkpoint_proto
+        .produce_counter
+        .into_iter()
+        .map(|map_entry| {
+            let key_proto = map_entry.key.unwrap();
+            let produce = Produce {
+                channel_hash: Blake2b256Hash::from_bytes(key_proto.channel_hash),
+                hash: Blake2b256Hash::from_bytes(key_proto.hash),
+                persistent: key_proto.persistent,
+            };
 
-                (key, value)
-            })
-            .collect();
+            let value = map_entry.value;
 
-        let produce_counter_map: HashMap<Produce, i32> = soft_checkpoint_proto
-            .produce_counter
-            .into_iter()
-            .map(|map_entry| {
-                let key_proto = map_entry.key.unwrap();
-                let produce = Produce {
-                    channel_hash: Blake2b256Hash::from_bytes(key_proto.channel_hash),
-                    hash: Blake2b256Hash::from_bytes(key_proto.hash),
-                    persistent: key_proto.persistent,
-                };
+            (produce, value)
+        })
+        .collect();
 
-                let value = map_entry.value;
+    let cache_snapshot = HotStoreState {
+        continuations: conts_map,
+        installed_continuations: installed_conts_map,
+        data: datums_map,
+        joins: joins_map,
+        installed_joins: installed_joins_map,
+    };
 
-                (produce, value)
-            })
-            .collect();
+    let soft_checkpoint = SoftCheckpoint {
+        cache_snapshot,
+        produce_counter: produce_counter_map,
+    };
 
-        let cache_snapshot = HotStoreState {
-            continuations: conts_map,
-            installed_continuations: installed_conts_map,
-            data: datums_map,
-            joins: joins_map,
-            installed_joins: installed_joins_map,
-        };
-
-        let soft_checkpoint = SoftCheckpoint {
-            cache_snapshot,
-            produce_counter: produce_counter_map,
-        };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        // println!("\nHit revert_to_soft_checkpoint");
 
         unsafe {
             (*rspace)
                 .rspace
+                .lock()
+                .unwrap()
                 .revert_to_soft_checkpoint(soft_checkpoint)
                 .await
                 .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
