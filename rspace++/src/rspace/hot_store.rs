@@ -107,6 +107,7 @@ where
     async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&channels).await;
+        // let from_history_store = Vec::new();
 
         let maybe_continuations = {
             let state = self.hot_store_state.lock().unwrap();
@@ -160,6 +161,7 @@ where
 
         let from_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&channels).await;
+        // let from_history_store = Vec::new();
         // println!("\nfrom_history_store: {:?}", from_history_store);
 
         let state = self.hot_store_state.lock().unwrap();
@@ -194,6 +196,7 @@ where
     async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&channels).await;
+        // let from_history_store = Vec::new();
 
         let state = self.hot_store_state.lock().unwrap();
         let current_continuations = state
@@ -229,6 +232,7 @@ where
 
     async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel).await;
+        // let from_history_store = Vec::new();
 
         // println!(
         //     "\nfrom_history_store in get_data: channel: {:?}, data: {:?}",
@@ -257,6 +261,7 @@ where
         // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
 
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
+        // let from_history_store = Vec::new();
         // println!(
         //     "\nfrom_history_store in put_datum: {:?}",
         //     from_history_store
@@ -274,6 +279,7 @@ where
 
     async fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
+        // let from_history_store = Vec::new();
 
         let state = self.hot_store_state.lock().unwrap();
         let current_datums = state
@@ -301,6 +307,7 @@ where
         // println!("\nHit get_joins");
 
         let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+        // let from_history_store = Vec::new();
         // println!(
         //     "\nfrom_history_store in get_joins: {:?}",
         //     from_history_store
@@ -320,7 +327,7 @@ where
                         .installed_joins
                         .get(&channel)
                         .map(|joins| joins.clone())
-                        .unwrap_or_default()
+                        .unwrap_or(Vec::new())
                 };
 
                 let mut result = installed_joins;
@@ -343,7 +350,7 @@ where
                         .installed_joins
                         .get(&channel)
                         .map(|joins| joins.clone())
-                        .unwrap_or_default()
+                        .unwrap_or(Vec::new())
                 };
 
                 let mut result = installed_joins;
@@ -355,6 +362,7 @@ where
 
     async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+        // let from_history_store = Vec::new();
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state
@@ -381,11 +389,10 @@ where
             .installed_joins
             .get(&channel)
             .map(|c| c.clone())
-            .unwrap_or(Vec::new())
-            .clone();
+            .unwrap_or(Vec::new());
         if !current_installed_joins.contains(&join) {
             let mut new_installed_joins = current_installed_joins;
-            new_installed_joins.push(join);
+            new_installed_joins.insert(0, join);
             let _ = state.installed_joins.insert(channel, new_installed_joins);
         }
         Some(())
@@ -393,8 +400,10 @@ where
 
     async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
+        // let joins_in_history_store = Vec::new();
         let continuations_in_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&join).await;
+        // let continuations_in_history_store = Vec::new();
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state

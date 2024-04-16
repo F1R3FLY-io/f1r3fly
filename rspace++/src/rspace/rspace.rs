@@ -442,13 +442,13 @@ where
 
             let result = match options {
                 None => {
-                    // self.installs.lock().unwrap().insert(
-                    //     channels.clone(),
-                    //     Install {
-                    //         patterns: patterns.clone(),
-                    //         continuation: continuation.clone(),
-                    //     },
-                    // );
+                    self.installs.lock().unwrap().insert(
+                        channels.clone(),
+                        Install {
+                            patterns: patterns.clone(),
+                            continuation: continuation.clone(),
+                        },
+                    );
 
                     self.store
                         .install_continuation(
@@ -474,7 +474,7 @@ where
                     // println!("to_map: {:?}\n", self.store.to_map());
                     None
                 }
-                Some(consume_candidates) => {
+                Some(_) => {
                     panic!("RUST ERROR: Installing can be done only on startup")
                     // println!("\nNOT throwing error \"Installing can be done only on startup\" and panicking");
                     // println!("Removing data from channel");
