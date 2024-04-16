@@ -65,7 +65,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
             // let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
             //     .expect("Error getting RSpaceStore: ");
 
-            RSpaceInstances::create(store, Matcher).await
+            RSpaceInstances::create(store, Matcher)
         })
         .unwrap();
 

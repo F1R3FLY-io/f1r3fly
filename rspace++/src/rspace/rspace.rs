@@ -750,7 +750,7 @@ impl RSpaceInstances {
         }
     }
 
-    pub async fn create<C, P, A, K, M>(
+    pub fn create<C, P, A, K, M>(
         store: RSpaceStore,
         matcher: M,
     ) -> Result<RSpace<C, P, A, K, M>, HistoryRepositoryError>
@@ -770,7 +770,7 @@ impl RSpaceInstances {
         K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
         M: Match<P, A>,
     {
-        let setup = RSpaceInstances::create_history_repo(store).await?;
+        let setup = RSpaceInstances::create_history_repo(store).unwrap();
         let (history_reader, store) = setup;
         let space = RSpaceInstances::apply(history_reader, store, matcher);
         Ok(space)
@@ -779,7 +779,7 @@ impl RSpaceInstances {
     /**
      * Creates [[HistoryRepository]] and [[HotStore]].
      */
-    pub async fn create_history_repo<C, P, A, K>(
+    pub fn create_history_repo<C, P, A, K>(
         store: RSpaceStore,
     ) -> Result<
         (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>),
@@ -801,8 +801,7 @@ impl RSpaceInstances {
         K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
     {
         let history_repo =
-            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)
-                .await?;
+            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)?;
 
         let history_reader = history_repo.get_history_reader(history_repo.root())?;
 

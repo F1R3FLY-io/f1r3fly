@@ -67,7 +67,7 @@ where
     A: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
     K: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
 {
-    pub async fn lmdb_repository(
+    pub fn lmdb_repository(
         history_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
         roots_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
         cold_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
