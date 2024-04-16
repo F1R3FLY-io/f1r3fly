@@ -106,8 +106,7 @@ where
 
     async fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
-        // let from_history_store = Vec::new();
+            self.get_cont_from_history_store(&channels);
 
         let maybe_continuations = {
             let state = self.hot_store_state.lock().unwrap();
@@ -160,8 +159,7 @@ where
         // println!("\nHit put_continuation");
 
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
-        // let from_history_store = Vec::new();
+            self.get_cont_from_history_store(&channels);
         // println!("\nfrom_history_store: {:?}", from_history_store);
 
         let state = self.hot_store_state.lock().unwrap();
@@ -195,8 +193,7 @@ where
 
     async fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()> {
         let from_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&channels).await;
-        // let from_history_store = Vec::new();
+            self.get_cont_from_history_store(&channels);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_continuations = state
@@ -231,8 +228,7 @@ where
     // Data
 
     async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel).await;
-        // let from_history_store = Vec::new();
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel);
 
         // println!(
         //     "\nfrom_history_store in get_data: channel: {:?}, data: {:?}",
@@ -260,8 +256,7 @@ where
     async fn put_datum(&self, channel: C, d: Datum<A>) -> () {
         // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
 
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
-        // let from_history_store = Vec::new();
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
         // println!(
         //     "\nfrom_history_store in put_datum: {:?}",
         //     from_history_store
@@ -278,8 +273,7 @@ where
     }
 
     async fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
-        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel).await;
-        // let from_history_store = Vec::new();
+        let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_datums = state
@@ -306,8 +300,7 @@ where
     async fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
         // println!("\nHit get_joins");
 
-        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
-        // let from_history_store = Vec::new();
+        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
         // println!(
         //     "\nfrom_history_store in get_joins: {:?}",
         //     from_history_store
@@ -361,8 +354,7 @@ where
     }
 
     async fn put_join(&self, channel: C, join: Vec<C>) -> Option<()> {
-        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
-        // let from_history_store = Vec::new();
+        let from_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state
@@ -399,11 +391,9 @@ where
     }
 
     async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
-        let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel).await;
-        // let joins_in_history_store = Vec::new();
+        let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
         let continuations_in_history_store: Vec<WaitingContinuation<P, K>> =
-            self.get_cont_from_history_store(&join).await;
-        // let continuations_in_history_store = Vec::new();
+            self.get_cont_from_history_store(&join);
 
         let state = self.hot_store_state.lock().unwrap();
         let current_joins = state
@@ -616,7 +606,6 @@ where
     }
 }
 
-// TODO: 'history_reader_base' calls should be async called in these three get methods
 impl<C, P, A, K> InMemHotStore<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq,
@@ -624,10 +613,7 @@ where
     A: Clone + Debug,
     K: Clone + Debug,
 {
-    async fn get_cont_from_history_store(
-        &self,
-        channels: &Vec<C>,
-    ) -> Vec<WaitingContinuation<P, K>> {
+    fn get_cont_from_history_store(&self, channels: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.continuations.entry(channels.clone());
         match entry {
@@ -640,7 +626,7 @@ where
         }
     }
 
-    async fn get_data_from_history_store(&self, channel: &C) -> Vec<Datum<A>> {
+    fn get_data_from_history_store(&self, channel: &C) -> Vec<Datum<A>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.datums.entry(channel.clone());
         match entry {
@@ -654,7 +640,7 @@ where
         }
     }
 
-    async fn get_joins_from_history_store(&self, channel: &C) -> Vec<Vec<C>> {
+    fn get_joins_from_history_store(&self, channel: &C) -> Vec<Vec<C>> {
         let cache = self.history_store_cache.lock().unwrap();
         let entry = cache.joins.entry(channel.clone());
         match entry {

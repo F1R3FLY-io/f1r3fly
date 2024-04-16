@@ -182,7 +182,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
     ContextShift[F].evalOn(scheduler) {
       for {
         result <- Sync[F].delay {
-                   println("\nhit consume in scala");
+                   //  println("\nhit consume in scala");
                    //  dataLogger.debug("hit consume in scala")
 
                    val consumeParams = ConsumeParams(
