@@ -313,8 +313,9 @@ where
 
     async fn store_persistent_data(
         &self,
-        data_candidates: Vec<ConsumeCandidate<C, A>>,
+        mut data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> Option<Vec<()>> {
+        data_candidates.sort_by(|a, b| b.datum_index.cmp(&a.datum_index));
         let futures: Vec<_> = data_candidates
             .into_iter()
             .rev()
@@ -462,6 +463,7 @@ where
                             },
                         )
                         .await;
+
                     for channel in channels.iter() {
                         self.store
                             .install_join(channel.clone(), channels.clone())
@@ -577,8 +579,9 @@ where
     async fn remove_matched_datum_and_join(
         &self,
         channels: Vec<C>,
-        data_candidates: Vec<ConsumeCandidate<C, A>>,
+        mut data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> Option<Vec<()>> {
+        data_candidates.sort_by(|a, b| b.datum_index.cmp(&a.datum_index));
         let futures: Vec<_> = data_candidates
             .into_iter()
             .rev()
