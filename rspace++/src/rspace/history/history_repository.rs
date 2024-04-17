@@ -12,7 +12,6 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -21,14 +20,13 @@ use super::history::HistoryError;
 use super::roots_store::RootError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
-#[async_trait]
 pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync {
-    async fn checkpoint(
+    fn checkpoint(
         &self,
         actions: &Vec<HotStoreAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>>;
 
-    async fn do_checkpoint(
+    fn do_checkpoint(
         &self,
         actions: Vec<HotStoreTrieAction<C, P, A, K>>,
     ) -> Box<dyn HistoryRepository<C, P, A, K>>;

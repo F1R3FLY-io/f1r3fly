@@ -211,7 +211,7 @@ where
 
     pub async fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
         let changes = self.store.changes();
-        let next_history = self.history_repository.checkpoint(&changes).await;
+        let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = next_history;
 
         self.produce_counter = HashMap::new();
