@@ -20,7 +20,7 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
     fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
     fn remove_continuation(&self, channels: Vec<C>, index: i32) -> Option<()>;
 
-    async fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
+    fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
     fn put_datum(&self, channel: C, d: Datum<A>) -> ();
     async fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
 
@@ -214,7 +214,7 @@ where
 
     // Data
 
-    async fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
+    fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel);
 
         // println!(

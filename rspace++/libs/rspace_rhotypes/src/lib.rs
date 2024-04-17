@@ -359,9 +359,7 @@ pub extern "C" fn get_data(
     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
     let channel = Par::decode(channel_slice).unwrap();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let datums =
-        rt.block_on(async { unsafe { (*rspace).rspace.lock().unwrap().get_data(channel).await } });
+    let datums = unsafe { (*rspace).rspace.lock().unwrap().get_data(channel) };
 
     let datums_protos: Vec<DatumProto> = datums
         .into_iter()

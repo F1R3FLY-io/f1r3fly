@@ -45,7 +45,6 @@ type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
 pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
 
 // NOTE: Currently NOT implementing any 'Log' functions
-// NOTE: Currently NOT implementing any 'produceCounter' operations
 // NOTE: Implementing 'RSpaceOps' functions in this file
 impl<C, P, A, K, M> RSpace<C, P, A, K, M>
 where
@@ -70,7 +69,7 @@ where
         //     patterns, channels
         // );
 
-        let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await;
+        let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels);
         // println!("\nchannel_to_indexed_data: {:?}", channel_to_indexed_data);
         let zipped: Vec<(C, P)> = channels
             .iter()
@@ -117,13 +116,10 @@ where
      * Put another way, this allows us to speculatively remove matching data without
      * affecting the actual store contents.
      */
-    async fn fetch_channel_to_index_data(
-        &self,
-        channels: &Vec<C>,
-    ) -> DashMap<C, Vec<(Datum<A>, i32)>> {
+    fn fetch_channel_to_index_data(&self, channels: &Vec<C>) -> DashMap<C, Vec<(Datum<A>, i32)>> {
         let map = DashMap::new();
         for c in channels {
-            let data = self.store.get_data(c).await;
+            let data = self.store.get_data(c);
             let shuffled_data = self.shuffle_with_index(data);
             map.insert(c.clone(), shuffled_data);
         }
@@ -144,17 +140,15 @@ where
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
         //     grouped_channels
         // );
-        let extracted = self
-            .extract_produce_candidate(
-                grouped_channels,
-                channel.clone(),
-                Datum {
-                    a: data.clone(),
-                    persist,
-                    source: produce_ref.clone(),
-                },
-            )
-            .await;
+        let extracted = self.extract_produce_candidate(
+            grouped_channels,
+            channel.clone(),
+            Datum {
+                a: data.clone(),
+                persist,
+                source: produce_ref.clone(),
+            },
+        );
 
         // println!("extracted in lockedProduce: {:?}", extracted);
 
@@ -170,7 +164,7 @@ where
      * NOTE: On Rust side, we are NOT passing functions through. Instead just the data.
      * And then in 'run_matcher_for_channels' we call the functions defined below
      */
-    async fn extract_produce_candidate(
+    fn extract_produce_candidate(
         &self,
         grouped_channels: Vec<Vec<C>>,
         bat_channel: C,
@@ -178,7 +172,6 @@ where
     ) -> MaybeProduceCandidate<C, P, A, K> {
         // println!("\nHit extract_produce_candidate");
         self.run_matcher_for_channels(grouped_channels, bat_channel, data)
-            .await
     }
 
     async fn process_match_found(
@@ -205,7 +198,8 @@ where
                 .remove_continuation(channels.clone(), continuation_index);
         }
 
-        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone()).await;
+        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone())
+            .await;
 
         // println!(
         //     "produce: matching continuation found at <channels: {:?}>",
@@ -254,8 +248,8 @@ where
 
     /* RSpaceOps */
 
-    pub async fn get_data(&self, channel: C) -> Vec<Datum<A>> {
-        self.store.get_data(&channel).await
+    pub fn get_data(&self, channel: C) -> Vec<Datum<A>> {
+        self.store.get_data(&channel)
     }
 
     pub fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
@@ -419,7 +413,7 @@ where
 
             let consume_ref =
                 Consume::create(channels.clone(), patterns.clone(), continuation.clone(), true);
-            let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels).await;
+            let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels);
             // println!("channel_to_indexed_data in locked_install: {:?}", channel_to_indexed_data);
             let zipped: Vec<(C, P)> = channels
                 .iter()
@@ -622,13 +616,13 @@ where
      * In this version, we also add the produced data directly to this cache.
      */
     // NOTE: This function is a parameter on the Scala side for the function 'run_matcher_for_channels'
-    async fn fetch_matching_data(
+    fn fetch_matching_data(
         &self,
         channel: C,
         bat_channel: C,
         data: Datum<A>,
     ) -> Option<(C, Vec<(Datum<A>, i32)>)> {
-        let data_vec = self.store.get_data(&channel).await;
+        let data_vec = self.store.get_data(&channel);
         let mut shuffled_data = self.shuffle_with_index(data_vec);
         if channel == bat_channel {
             shuffled_data.insert(0, (data, -1));
@@ -641,7 +635,7 @@ where
      * 'fetchMatchingContinuations' and 'fetchMatchingData'.
      * Instead we call them directly with the corresponding data passed through
      */
-    async fn run_matcher_for_channels(
+    fn run_matcher_for_channels(
         &self,
         grouped_channels: Vec<Vec<C>>,
         bat_channel_for_data_function: C,
@@ -654,7 +648,7 @@ where
                 Some((channels, rest)) => {
                     let match_candidates = self.fetch_matching_continuations(channels.to_vec());
                     // println!("match_candidates: {:?}", match_candidates);
-                    let fetch_data_futures: Vec<_> = channels
+                    let fetch_data: Vec<_> = channels
                         .iter()
                         .map(|c| {
                             let bat_channel_clone = bat_channel_for_data_function.clone();
@@ -664,11 +658,7 @@ where
                         .collect();
 
                     let channel_to_indexed_data_list: Vec<(C, Vec<(Datum<A>, i32)>)> =
-                        futures::future::join_all(fetch_data_futures)
-                            .await
-                            .into_iter()
-                            .filter_map(|x| x)
-                            .collect();
+                        fetch_data.into_iter().filter_map(|x| x).collect();
                     // println!("channel_to_indexed_data_list: {:?}", channel_to_indexed_data_list);
 
                     let first_match = self.space_matcher.extract_first_match(
