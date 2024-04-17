@@ -16,7 +16,6 @@ use crate::rspace::matcher::r#match::Match;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
-use futures::future::join_all;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -220,7 +219,7 @@ where
             .get_history_reader(self.history_repository.root())?;
 
         self.create_new_hot_store(history_reader);
-        self.restore_installs().await;
+        self.restore_installs();
 
         Ok(Checkpoint {
             root: self.history_repository.root(),
@@ -234,7 +233,7 @@ where
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let mut rspace =
             RSpaceInstances::apply(next_history, hot_store, self.space_matcher.matcher.clone());
-        rspace.restore_installs().await;
+        rspace.restore_installs();
 
         // println!("\nRSpace Store in spawn: ");
         // rspace.store.print().await;
@@ -328,7 +327,7 @@ where
         }
     }
 
-    async fn restore_installs(&mut self) -> () {
+    fn restore_installs(&mut self) -> () {
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
@@ -480,7 +479,7 @@ where
 
         let history_reader = self.history_repository.get_history_reader(root)?;
         self.create_new_hot_store(history_reader);
-        self.restore_installs().await;
+        self.restore_installs();
 
         Ok(())
     }
