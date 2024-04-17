@@ -54,7 +54,7 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     M: Clone + Match<P, A>,
 {
-    async fn locked_consume(
+    fn locked_consume(
         &self,
         channels: Vec<C>,
         patterns: Vec<P>,
@@ -98,7 +98,7 @@ where
                 //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
                 //     patterns, channels
                 // );
-                self.store_persistent_data(data_candidates.clone()).await;
+                self.store_persistent_data(data_candidates.clone());
                 self.wrap_result(channels, wk, consume_ref, data_candidates)
             }
             None => {
@@ -297,12 +297,12 @@ where
         None
     }
 
-    async fn store_persistent_data(
+    fn store_persistent_data(
         &self,
         mut data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> Option<Vec<()>> {
         data_candidates.sort_by(|a, b| b.datum_index.cmp(&a.datum_index));
-        let futures: Vec<_> = data_candidates
+        let results: Vec<_> = data_candidates
             .into_iter()
             .rev()
             .map(|consume_candidate| {
@@ -313,17 +313,14 @@ where
                     datum_index,
                 } = consume_candidate;
 
-                async move {
-                    if !persist {
-                        self.store.remove_datum(channel, datum_index)
-                    } else {
-                        Some(())
-                    }
+                if !persist {
+                    self.store.remove_datum(channel, datum_index)
+                } else {
+                    Some(())
                 }
             })
             .collect();
 
-        let results: Vec<Option<()>> = join_all(futures).await;
         if results.iter().any(|res| res.is_none()) {
             None
         } else {
@@ -339,7 +336,7 @@ where
         }
     }
 
-    pub async fn consume(
+    pub fn consume(
         &self,
         channels: Vec<C>,
         patterns: Vec<P>,
@@ -356,9 +353,8 @@ where
             let consume_ref =
                 Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
 
-            let result = self
-                .locked_consume(channels, patterns, continuation, persist, peeks, consume_ref)
-                .await;
+            let result =
+                self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
             // println!("\nlocked_consume result: {:?}", result);
             result
         }

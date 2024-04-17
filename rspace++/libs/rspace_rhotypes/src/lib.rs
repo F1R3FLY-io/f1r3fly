@@ -211,17 +211,13 @@ pub extern "C" fn consume(
     let persist = consume_params.persist;
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let result_option = rt.block_on(async {
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .consume(channels, patterns, continuation, persist, peeks)
-                .await
-        }
-    });
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .consume(channels, patterns, continuation, persist, peeks)
+    };
 
     match result_option {
         Some((cont_result, rspace_results)) => {
