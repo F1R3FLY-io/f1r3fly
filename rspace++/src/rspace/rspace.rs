@@ -207,7 +207,7 @@ where
         self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
     }
 
-    pub async fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+    pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = next_history;
@@ -226,7 +226,7 @@ where
         })
     }
 
-    pub async fn spawn(&self) -> Result<Self, RSpaceError> {
+    pub fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.history_repository;
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;

@@ -287,22 +287,14 @@ pub extern "C" fn install(
 
 #[no_mangle]
 pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let checkpoint = rt.block_on(async {
-        // println!("\nHit create_checkpoint");
-
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .create_checkpoint()
-                .await
-                .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
-        }
-
-        // println!("create_checkpoint root hash: {}", checkpoint.root);
-    });
+    let checkpoint = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .create_checkpoint()
+            .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
+    };
 
     let checkpoint_proto = CheckpointProto {
         root: checkpoint.root.bytes(),
@@ -508,20 +500,14 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let rspace = rt.block_on(async {
-        // println!("\nHit spawn");
-
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .spawn()
-                .await
-                .expect("Rust RSpacePlusPlus Library: Failed to spawn")
-        }
-    });
+    let rspace = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .spawn()
+            .expect("Rust RSpacePlusPlus Library: Failed to spawn")
+    };
 
     Box::into_raw(Box::new(Space {
         rspace: Mutex::new(rspace),
