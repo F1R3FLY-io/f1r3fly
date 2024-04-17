@@ -27,7 +27,7 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
     fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
     fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
     fn install_join(&self, channel: C, join: Vec<C>) -> Option<()>;
-    async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()>;
+    fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()>;
 
     fn changes(&self) -> Vec<HotStoreAction<C, P, A, K>>;
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
@@ -377,7 +377,7 @@ where
         Some(())
     }
 
-    async fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
+    fn remove_join(&self, channel: C, join: Vec<C>) -> Option<()> {
         let joins_in_history_store: Vec<Vec<C>> = self.get_joins_from_history_store(&channel);
         let continuations_in_history_store: Vec<WaitingContinuation<P, K>> =
             self.get_cont_from_history_store(&join);

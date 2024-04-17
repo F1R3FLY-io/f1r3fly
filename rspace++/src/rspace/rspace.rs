@@ -587,7 +587,7 @@ where
                     if datum_index >= 0 && !persist {
                         self.store.remove_datum(channel.clone(), datum_index).await;
                     }
-                    self.store.remove_join(channel, channels_clone).await;
+                    self.store.remove_join(channel, channels_clone);
 
                     Some(())
                 }
