@@ -4,7 +4,6 @@ use crate::rspace::hot_store_action::{
     InsertContinuations, InsertData, InsertJoins,
 };
 use crate::rspace::internal::{Datum, Row, WaitingContinuation};
-use async_trait::async_trait;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::collections::HashMap;
@@ -13,7 +12,6 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-#[async_trait]
 pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
     fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
@@ -22,7 +20,7 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
 
     fn get_data(&self, channel: &C) -> Vec<Datum<A>>;
     fn put_datum(&self, channel: C, d: Datum<A>) -> ();
-    async fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
+    fn remove_datum(&self, channel: C, index: i32) -> Option<()>;
 
     fn get_joins(&self, channel: C) -> Vec<Vec<C>>;
     fn put_join(&self, channel: C, join: Vec<C>) -> Option<()>;
@@ -78,7 +76,6 @@ where
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-#[async_trait]
 impl<C, P, A, K> HotStore<C, P, A, K> for InMemHotStore<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq + Send + Sync,
@@ -259,7 +256,7 @@ where
         let _ = state.data.insert(channel, update_data);
     }
 
-    async fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
+    fn remove_datum(&self, channel: C, index: i32) -> Option<()> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
 
         let state = self.hot_store_state.lock().unwrap();

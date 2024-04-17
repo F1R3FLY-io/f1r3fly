@@ -126,7 +126,7 @@ where
         map
     }
 
-    async fn locked_produce(
+    fn locked_produce(
         &self,
         channel: C,
         data: A,
@@ -153,7 +153,7 @@ where
         // println!("extracted in lockedProduce: {:?}", extracted);
 
         match extracted {
-            Some(produce_candidate) => self.process_match_found(produce_candidate).await,
+            Some(produce_candidate) => self.process_match_found(produce_candidate),
             None => self.store_data(channel, data, persist, produce_ref),
         }
     }
@@ -174,7 +174,7 @@ where
         self.run_matcher_for_channels(grouped_channels, bat_channel, data)
     }
 
-    async fn process_match_found(
+    fn process_match_found(
         &self,
         pc: ProduceCandidate<C, P, A, K>,
     ) -> MaybeActionResult<C, P, A, K> {
@@ -198,8 +198,7 @@ where
                 .remove_continuation(channels.clone(), continuation_index);
         }
 
-        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone())
-            .await;
+        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
 
         // println!(
         //     "produce: matching continuation found at <channels: {:?}>",
@@ -316,7 +315,7 @@ where
 
                 async move {
                     if !persist {
-                        self.store.remove_datum(channel, datum_index).await
+                        self.store.remove_datum(channel, datum_index)
                     } else {
                         Some(())
                     }
@@ -375,9 +374,7 @@ where
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
-        let result = self
-            .locked_produce(channel, data, persist, produce_ref)
-            .await;
+        let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);
         result
     }
@@ -559,13 +556,13 @@ where
         Some((cont_result, rspace_results))
     }
 
-    async fn remove_matched_datum_and_join(
+    fn remove_matched_datum_and_join(
         &self,
         channels: Vec<C>,
         mut data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> Option<Vec<()>> {
         data_candidates.sort_by(|a, b| b.datum_index.cmp(&a.datum_index));
-        let futures: Vec<_> = data_candidates
+        let results: Vec<_> = data_candidates
             .into_iter()
             .rev()
             .map(|consume_candidate| {
@@ -577,18 +574,15 @@ where
                 } = consume_candidate;
 
                 let channels_clone = channels.clone();
-                async move {
-                    if datum_index >= 0 && !persist {
-                        self.store.remove_datum(channel.clone(), datum_index).await;
-                    }
-                    self.store.remove_join(channel, channels_clone);
-
-                    Some(())
+                if datum_index >= 0 && !persist {
+                    self.store.remove_datum(channel.clone(), datum_index);
                 }
+                self.store.remove_join(channel, channels_clone);
+
+                Some(())
             })
             .collect();
 
-        let results: Vec<Option<()>> = join_all(futures).await;
         if results.iter().any(|res| res.is_none()) {
             None
         } else {
