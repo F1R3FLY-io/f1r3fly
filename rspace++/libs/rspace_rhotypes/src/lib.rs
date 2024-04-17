@@ -278,17 +278,13 @@ pub extern "C" fn install(
     let patterns = consume_params.patterns;
     let continuation = consume_params.continuation.unwrap();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let result_option = rt.block_on(async {
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .install(channels, patterns, continuation)
-                .await
-        }
-    });
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .install(channels, patterns, continuation)
+    };
 
     match result_option {
         None => std::ptr::null(),

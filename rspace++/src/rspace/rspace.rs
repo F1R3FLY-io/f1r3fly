@@ -335,8 +335,7 @@ where
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self.install(channels, install.patterns, install.continuation)
-                .await;
+            self.install(channels, install.patterns, install.continuation);
         }
     }
 
@@ -379,17 +378,17 @@ where
         result
     }
 
-    pub async fn install(
+    pub fn install(
         &mut self,
         // &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
     ) -> Option<(K, Vec<A>)> {
-        self.locked_install(channels, patterns, continuation).await
+        self.locked_install(channels, patterns, continuation)
     }
 
-    async fn locked_install(
+    fn locked_install(
         &mut self,
         // &self,
         channels: Vec<C>,
