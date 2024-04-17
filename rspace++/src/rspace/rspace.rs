@@ -471,7 +471,7 @@ where
         self.store.to_map()
     }
 
-    pub async fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+    pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
@@ -484,8 +484,8 @@ where
         Ok(())
     }
 
-    pub async fn clear(&mut self) -> Result<(), RSpaceError> {
-        self.reset(RadixHistory::empty_root_node_hash()).await
+    pub fn clear(&mut self) -> Result<(), RSpaceError> {
+        self.reset(RadixHistory::empty_root_node_hash())
     }
 
     fn create_new_hot_store(

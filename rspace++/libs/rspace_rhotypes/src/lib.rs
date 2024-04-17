@@ -81,19 +81,14 @@ pub extern "C" fn space_print(rspace: *mut Space) -> () {
 
 #[no_mangle]
 pub extern "C" fn space_clear(rspace: *mut Space) -> () {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        // println!("\nHit space_clear");
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .clear()
-                .await
-                .expect("Rust RSpacePlusPlus Library: Failed to clear");
-        }
-    })
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .clear()
+            .expect("Rust RSpacePlusPlus Library: Failed to clear");
+    }
 }
 
 #[no_mangle]
@@ -328,18 +323,14 @@ pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .reset(root)
-                .await
-                .expect("Rust RSpacePlusPlus Library: Failed to reset")
-        }
-    })
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reset(root)
+            .expect("Rust RSpacePlusPlus Library: Failed to reset")
+    }
 }
 
 #[no_mangle]
