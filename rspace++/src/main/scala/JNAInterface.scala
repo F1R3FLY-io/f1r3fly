@@ -73,7 +73,7 @@ trait JNAInterface extends Library {
       rspace: Pointer,
       payload_pointer: Pointer,
       payload_bytes_len: Int
-  ): Pointer
+  ): Unit
 
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }
