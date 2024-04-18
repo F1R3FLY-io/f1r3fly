@@ -50,6 +50,7 @@ class RSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, K](
         _ <- Log[F].debug(
               s"consume: searching for data matching <patterns: $patterns> at <channels: $channels>"
             )
+        _                    <- Sync[F].delay(println("\nhit lockedConsume"))
         _                    <- logConsume(consumeRef, channels, patterns, continuation, persist, peeks)
         channelToIndexedData <- fetchChannelToIndexData(channels)
         options <- extractDataCandidates(

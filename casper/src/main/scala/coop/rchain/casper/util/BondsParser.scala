@@ -84,6 +84,8 @@ object BondsParser {
   ): F[Map[PublicKey, Long]] = {
     val genesisFolder = bondsFilePath.getParent
 
+    // println("\nhit newValidators")
+
     // Generate private/public key pairs
     val keys         = Vector.fill(autogenShardSize)(Secp256k1.newKeyPair)
     val (_, pubKeys) = keys.unzip

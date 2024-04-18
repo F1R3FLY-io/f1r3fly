@@ -49,6 +49,7 @@ object RootsStoreInstances {
         result <- byteBuf.traverse(
                    _ => store.put1(currentRootName, bytes, identity[ByteBuffer]).as(key)
                  )
+        // _ <- Sync[F].delay(println("\nhit validateAndSetCurrentRoot, key: " + key))
       } yield result
 
     override def recordRoot(key: Blake2b256Hash): F[Unit] =
@@ -57,6 +58,7 @@ object RootsStoreInstances {
         bytes = bits.toByteVector.toDirectByteBuffer
         _     <- store.put1(bytes, tag, identity[ByteBuffer])
         _     <- store.put1(currentRootName, bytes, identity[ByteBuffer])
+        // _     <- Sync[F].delay(println("\nhit recordRoot, key: " + key))
       } yield ()
 
   }

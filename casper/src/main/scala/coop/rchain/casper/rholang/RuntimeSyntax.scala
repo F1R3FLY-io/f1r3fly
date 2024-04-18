@@ -168,7 +168,13 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         _ <- runtime.setBlockData(
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
-        genesisPreStateHash           <- emptyStateHash
+        genesisPreStateHash <- emptyStateHash
+        // _ <- Sync[F].delay(
+        //       println(
+        //         "\ngenesisPreStateHash: " + PrettyPrinter
+        //           .buildString(genesisPreStateHash)
+        //       )
+        //     )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
       } yield (genesisPreStateHash, stateHash, processedDeploys)
@@ -520,6 +526,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       deploy: Signed[DeployData],
       name: Par
   ): F[Seq[Par]] =
+    // println("\nresetting runtime to: " + start.toBlake2b256Hash)
     runtime.reset(start.toBlake2b256Hash) >>
       evaluate(deploy)
         .flatMap({ res =>
@@ -544,7 +551,11 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
     )
 
   def getDataPar(channel: Par): F[Seq[Par]] =
-    runtime.getData(channel).map(_.flatMap(_.a.pars))
+    for {
+      data <- runtime.getData(channel)
+      pars = data.flatMap(_.a.pars)
+      // _    = println(s"getDataPar called with: $channel, returning: ${pars.length}")
+    } yield pars
 
   def getContinuationPar(channels: Seq[Par]): F[Seq[(Seq[BindPattern], Par)]] =
     runtime
@@ -581,6 +592,8 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       }
       .flatTap { validators =>
         val vlds = validators.map(_.toHexString)
+        // println(s"""*** ACTIVE VALIDATORS FOR StateHash ${startHash.toHexString}:\n${vlds
+        //   .mkString("\n")} ***""")
         Log[F].info(s"""*** ACTIVE VALIDATORS FOR StateHash ${startHash.toHexString}:\n${vlds
           .mkString("\n")} ***""")
       }

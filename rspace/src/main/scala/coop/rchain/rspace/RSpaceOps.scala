@@ -82,7 +82,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
     historyRepository
   )
 
-  protected[this] val logger: Logger
+  protected[this] val logger = Logger("coop.rchain.rspace")
 
   private[this] val installs: SyncVar[Installs[F, C, P, A, K]] = {
     val installs = new SyncVar[Installs[F, C, P, A, K]]()
@@ -172,6 +172,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
 
   def restoreInstalls(): F[Unit] =
     /*spanF.trace(restoreInstallsSpanLabel)*/
+    // println("\ninstalls: " + installs.get.toList)
     installs.get.toList
       .traverse {
         case (channels, Install(patterns, continuation)) =>
@@ -197,6 +198,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
           .raiseError[MaybeActionResult](new IllegalArgumentException(msg))
       } else
         (for {
+          // _          <- Sync[F].delay(logger.debug("\nHit consume"))
+          _          <- Sync[F].delay(println("\nHit consume"))
           consumeRef <- Sync[F].delay(Consume(channels, patterns, continuation, persist))
           result <- consumeLockF(channels) {
                      lockedConsume(
@@ -306,10 +309,12 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
                              s"storing <(patterns, continuation): ($patterns, $continuation)> at <channels: $channels>"
                            )
                      } yield None
-                   case Some(_) =>
+                   case Some(_) => {
+                     println("\nInstalling can be done only on startup")
                      Sync[F].raiseError(
                        new RuntimeException("Installing can be done only on startup")
                      )
+                   }
                  }
       } yield result
     }
