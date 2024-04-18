@@ -41,12 +41,10 @@ async fn history_repository_should_process_insert_one_datum() {
     //     .await;
     // assert!(install_opt.is_none());
 
-    let produce = rspace
-        .produce(channels[0].clone(), ListParWithRandom::default(), false)
-        .await;
+    let produce = rspace.produce(channels[0].clone(), ListParWithRandom::default(), false);
     assert!(produce.is_none());
 
-    let install_opt2 = rspace.install(channels, patterns, continuation).await;
+    let install_opt2 = rspace.install(channels, patterns, continuation);
     assert!(install_opt2.is_none());
 
     teardown();
@@ -57,7 +55,7 @@ async fn create_rspace() -> RSpace<Par, BindPattern, ListParWithRandom, TaggedCo
     let mut kvm = mk_rspace_store_manager("./install_test/".into(), 1 * GB);
     let store = kvm.r_space_stores().await.unwrap();
 
-    RSpaceInstances::create(store, Matcher).await.unwrap()
+    RSpaceInstances::create(store, Matcher).unwrap()
 }
 
 fn teardown() -> () {
