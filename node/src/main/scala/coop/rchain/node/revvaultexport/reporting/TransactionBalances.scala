@@ -209,13 +209,12 @@ object TransactionBalances {
       blockMes  = block.get
     } yield blockMes
 
-  // NOTE: Removed "implicit scheduler: ExecutionContext" parameter
   def main[F[_]: Concurrent: Parallel: ContextShift](
       dataDir: Path,
       walletPath: Path,
       bondPath: Path,
       targetBlockHash: String
-  )(): F[GlobalVaultsInfo] = {
+  )(implicit scheduler: ExecutionContext): F[GlobalVaultsInfo] = {
     val oldRSpacePath                           = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
     val legacyRSpaceDirSupport                  = Files.exists(oldRSpacePath)
     implicit val metrics: Metrics.MetricsNOP[F] = new Metrics.MetricsNOP[F]()

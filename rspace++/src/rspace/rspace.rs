@@ -421,13 +421,13 @@ where
 
             let result = match options {
                 None => {
-                    // self.installs.lock().unwrap().insert(
-                    //     channels.clone(),
-                    //     Install {
-                    //         patterns: patterns.clone(),
-                    //         continuation: continuation.clone(),
-                    //     },
-                    // );
+                    self.installs.lock().unwrap().insert(
+                        channels.clone(),
+                        Install {
+                            patterns: patterns.clone(),
+                            continuation: continuation.clone(),
+                        },
+                    );
 
                     self.store.install_continuation(
                         channels.clone(),

@@ -23,13 +23,12 @@ import rspacePlusPlus.RSpacePlusPlus_RhoTypes
 
 object StateBalances {
 
-  // NOTE: Removed "implicit scheduler: ExecutionContext" parameter
   def read[F[_]: Concurrent: Parallel: ContextShift](
       blockHash: String,
       vaultTreeHashMapDepth: Int,
       vaultChannel: Par,
       dataDir: Path
-  )(): F[List[(ByteString, Long)]] = {
+  )(implicit scheduler: ExecutionContext): F[List[(ByteString, Long)]] = {
     val oldRSpacePath = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
     import coop.rchain.rholang.interpreter.storage._
     implicit val span        = NoopSpan[F]()

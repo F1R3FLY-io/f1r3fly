@@ -1053,40 +1053,50 @@ object RSpacePlusPlus_RhoTypes {
                  val patternBytes       = pattern.toByteArray
                  val patternBytesLength = patternBytes.length
 
-                 val payloadSize   = targetBytesLength.toLong + patternBytesLength.toLong
-                 val payloadMemory = new Memory(payloadSize)
-
-                 payloadMemory.write(0, targetBytes, 0, targetBytesLength)
-                 payloadMemory.write(targetBytesLength.toLong, patternBytes, 0, patternBytesLength)
-
-                 val spatialMatchResultPtr = INSTANCE.spatial_match_result(
-                   payloadMemory,
-                   targetBytesLength,
-                   patternBytesLength
-                 )
-
-                 // Not sure is this line is needed
-                 // Need to figure out how to deallocate 'payloadMemory'
-                 payloadMemory.clear()
-
-                 if (spatialMatchResultPtr != null) {
-                   val resultByteslength = spatialMatchResultPtr.getInt(0)
-
-                   try {
-                     val resultBytes  = spatialMatchResultPtr.getByteArray(4, resultByteslength)
-                     val freeMapProto = FreeMapProto.parseFrom(resultBytes)
-
-                     Some((freeMapProto.entries, ()))
-                   } catch {
-                     case e =>
-                       println("Error during scala spatialMatchResult operation: " + e)
-                       throw e
-                   } finally {
-                     INSTANCE.deallocate_memory(spatialMatchResultPtr, resultByteslength)
-                   }
-                 } else {
+                 if (targetBytesLength == 0 && patternBytesLength == 0) {
                    None
+                 } else {
+                   val payloadSize   = targetBytesLength.toLong + patternBytesLength.toLong
+                   val payloadMemory = new Memory(payloadSize)
+
+                   payloadMemory.write(0, targetBytes, 0, targetBytesLength)
+                   payloadMemory.write(
+                     targetBytesLength.toLong,
+                     patternBytes,
+                     0,
+                     patternBytesLength
+                   )
+
+                   val spatialMatchResultPtr = INSTANCE.spatial_match_result(
+                     payloadMemory,
+                     targetBytesLength,
+                     patternBytesLength
+                   )
+
+                   // Not sure is this line is needed
+                   // Need to figure out how to deallocate 'payloadMemory'
+                   payloadMemory.clear()
+
+                   if (spatialMatchResultPtr != null) {
+                     val resultByteslength = spatialMatchResultPtr.getInt(0)
+
+                     try {
+                       val resultBytes  = spatialMatchResultPtr.getByteArray(4, resultByteslength)
+                       val freeMapProto = FreeMapProto.parseFrom(resultBytes)
+
+                       Some((freeMapProto.entries, ()))
+                     } catch {
+                       case e =>
+                         println("Error during scala spatialMatchResult operation: " + e)
+                         throw e
+                     } finally {
+                       INSTANCE.deallocate_memory(spatialMatchResultPtr, resultByteslength)
+                     }
+                   } else {
+                     None
+                   }
                  }
+
                }
     } yield result
 }
