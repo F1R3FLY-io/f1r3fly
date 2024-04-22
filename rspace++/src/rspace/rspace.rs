@@ -452,15 +452,6 @@ where
                 }
                 Some(_) => {
                     panic!("RUST ERROR: Installing can be done only on startup")
-                    // println!("\nNOT throwing error \"Installing can be done only on startup\" and panicking");
-                    // println!("Removing data from channel");
-                    // for candidate in consume_candidates.into_iter() {
-                    //     let x = self
-                    //         .store
-                    //         .remove_datum(candidate.channel, candidate.datum_index)
-                    //         .await;
-                    // }
-                    // None
                 }
             };
             result
