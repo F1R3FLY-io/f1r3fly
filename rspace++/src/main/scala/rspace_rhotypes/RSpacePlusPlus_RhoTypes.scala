@@ -106,6 +106,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
     ContextShift[F].evalOn(scheduler) {
       for {
         result <- Sync[F].delay {
+                  //  println("\nHit scala produce, data: " + data)
                    val channelBytes       = channel.toByteArray
                    val channelBytesLength = channelBytes.length
                    val dataBytes          = data.toByteArray

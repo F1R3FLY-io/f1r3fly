@@ -214,10 +214,7 @@ where
     fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(channel);
 
-        // println!(
-        //     "\nfrom_history_store in get_data: channel: {:?}, data: {:?}",
-        //     channel, from_history_store
-        // );
+        // println!("\nfrom_history_store in hot store get_data: {:?}", from_history_store);
 
         let maybe_data = {
             let state = self.hot_store_state.lock().unwrap();
@@ -239,6 +236,7 @@ where
 
     fn put_datum(&self, channel: C, d: Datum<A>) -> () {
         // println!("\nHit put_datum, channel: {:?}, data: {:?}", channel, d);
+        // println!("\nHit put_datum, data: {:?}", d);
 
         let from_history_store: Vec<Datum<A>> = self.get_data_from_history_store(&channel);
         // println!(

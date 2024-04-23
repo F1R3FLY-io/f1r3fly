@@ -280,6 +280,7 @@ where
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_data");
+        // println!("\nHit store_data, data: {:?}", data);
         self.store.put_datum(
             channel,
             Datum {
@@ -367,6 +368,7 @@ where
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
+        // println!("\nHit produce, data: {:?}", data);
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);

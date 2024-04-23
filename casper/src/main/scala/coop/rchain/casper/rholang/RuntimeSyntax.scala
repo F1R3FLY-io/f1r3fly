@@ -527,15 +527,14 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       start: StateHash,
       deploy: Signed[DeployData],
       name: Par
-  ): F[Seq[Par]] = {
-    println("\nresetting runtime to: " + start.toBlake2b256Hash)
+  ): F[Seq[Par]] =
+    // println("\nresetting runtime to: " + start.toBlake2b256Hash)
     runtime.reset(start.toBlake2b256Hash) >>
       evaluate(deploy)
         .flatMap({ res =>
           if (res.errors.nonEmpty) Sync[F].raiseError[EvaluateResult](res.errors.head)
           else res.pure[F]
         }) >> getDataPar(name)
-  }
 
   /* Evaluates Rholang source code */
 
