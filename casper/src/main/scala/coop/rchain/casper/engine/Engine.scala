@@ -25,7 +25,8 @@ import coop.rchain.casper.state.RNodeStateManager
 import coop.rchain.casper.util.comm.CommUtil
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.state.RSpaceStateManager
+// import coop.rchain.rspace.state.RSpaceStateManager
+import rspacePlusPlus.state.RSpacePlusPlusStateManager
 import fs2.concurrent.Queue
 
 trait Engine[F[_]] {
@@ -89,7 +90,8 @@ object Engine {
     /* Execution */   : Concurrent: Time
     /* Transport */   : TransportLayer: CommUtil: BlockRetriever: EventPublisher
     /* State */       : EngineCell: RPConfAsk: ConnectionsCell
-    /* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpaceStateManager
+    // /* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpaceStateManager
+		/* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpacePlusPlusStateManager
     /* Diagnostics */ : Log: EventLog: Metrics] // format: on
   (
       blockProcessingQueue: Queue[F, (Casper[F], BlockMessage)],
@@ -129,7 +131,8 @@ object Engine {
     /* State */       : EngineCell: RPConfAsk: ConnectionsCell: LastApprovedBlock
     /* Rholang */     : RuntimeManager
     /* Casper */      : Estimator: SafetyOracle: LastFinalizedHeightConstraintChecker: SynchronyConstraintChecker
-    /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+    // /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+		/* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpacePlusPlusStateManager
     /* Diagnostics */ : Log: EventLog: Metrics: Span] // format: on
   (
       blockProcessingQueue: Queue[F, (Casper[F], BlockMessage)],

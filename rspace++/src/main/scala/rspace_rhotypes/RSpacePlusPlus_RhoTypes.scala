@@ -43,7 +43,6 @@ import coop.rchain.rspace.HotStoreState
 
 import scala.collection.immutable.Map
 import com.google.protobuf.ByteString
-import coop.rchain.rspace.history.HistoryRepository
 import coop.rchain.rspace.state.RSpaceExporter
 import coop.rchain.rspace.state.RSpaceImporter
 import coop.rchain.shared.Serialize
@@ -57,6 +56,9 @@ import scodec.bits.ByteVector
 import com.typesafe.scalalogging.Logger
 import cats.effect.ContextShift
 import scala.concurrent.ExecutionContext
+import rspacePlusPlus.state.{RSpacePlusPlusExporter, RSpacePlusPlusImporter}
+import coop.rchain.rspace.state.exporters.RSpaceExporterItems.StoreItems
+import java.nio.file.Path
 
 // import scalapb.json4s.Parser
 
@@ -106,7 +108,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
     ContextShift[F].evalOn(scheduler) {
       for {
         result <- Sync[F].delay {
-                  //  println("\nHit scala produce, data: " + data)
+                   //  println("\nHit scala produce, data: " + data)
                    val channelBytes       = channel.toByteArray
                    val channelBytesLength = channelBytes.length
                    val dataBytes          = data.toByteArray
@@ -953,10 +955,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
 
     override def history: History[F] = { println("\nhistory"); ??? }
 
-    override def exporter: F[RSpaceExporter[F]] =
+    override def exporter: F[RSpacePlusPlusExporter[F]] =
       for {
         rspaceExporter <- Sync[F].delay {
-                           new RSpaceExporter[F] {
+                           new RSpacePlusPlusExporter[F] {
 
                              override def getNodes(
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
@@ -976,14 +978,64 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
 
                              override def getRoot: F[Blake2b256Hash] = ???
 
+                             def traverseHistory(
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 skip: Int,
+                                 take: Int,
+                                 getFromHistory: ByteVector => F[Option[ByteVector]]
+                             ): F[Vector[TrieNode[Blake2b256Hash]]] = ???
+
+                             def getHistory[Value](
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 skip: Int,
+                                 take: Int,
+                                 fromBuffer: ByteBuffer => Value
+                             )(
+                                 implicit m: Sync[F],
+                                 l: Log[F]
+                             ): F[StoreItems[Blake2b256Hash, Value]] = ???
+
+                             def getData[Value](
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 skip: Int,
+                                 take: Int,
+                                 fromBuffer: ByteBuffer => Value
+                             )(
+                                 implicit m: Sync[F],
+                                 l: Log[F]
+                             ): F[StoreItems[Blake2b256Hash, Value]] = ???
+
+                             def getHistoryAndData[Value](
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 skip: Int,
+                                 take: Int,
+                                 fromBuffer: ByteBuffer => Value
+                             )(
+                                 implicit m: Sync[F],
+                                 l: Log[F]
+                             ): F[
+                               (
+                                   StoreItems[Blake2b256Hash, Value],
+                                   StoreItems[Blake2b256Hash, Value]
+                               )
+                             ] = ???
+
+                             def writeToDisk[C, P, A, K](
+                                 root: Blake2b256Hash,
+                                 dirPath: Path,
+                                 chunkSize: Int
+                             )(
+                                 implicit m: Concurrent[F],
+                                 l: Log[F]
+                             ): F[Unit] = ???
                            }
                          }
       } yield rspaceExporter
 
-    override def importer: F[RSpaceImporter[F]] =
+    override def importer: F[RSpacePlusPlusImporter[F]] =
       for {
         rspaceImporter <- Sync[F].delay {
-                           new RSpaceImporter[F] {
+                           new RSpacePlusPlusImporter[F] {
 
                              override def setHistoryItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],

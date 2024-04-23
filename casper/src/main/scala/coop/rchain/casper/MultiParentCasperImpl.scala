@@ -28,7 +28,7 @@ import coop.rchain.models.syntax._
 import coop.rchain.models.{BlockHash => _, _}
 import coop.rchain.rholang.interpreter.merging.RholangMergingLogic
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.internal
+// import coop.rchain.rspace.internal
 import coop.rchain.shared._
 import coop.rchain.shared.syntax._
 

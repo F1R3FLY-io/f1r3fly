@@ -4,7 +4,8 @@ import cats.effect.Concurrent
 import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.history.HistoryRepository
+// import coop.rchain.rspace.history.HistoryRepository
+import rspacePlusPlus.HistoryRepository
 import coop.rchain.rspace.merger._
 import coop.rchain.rspace.syntax._
 

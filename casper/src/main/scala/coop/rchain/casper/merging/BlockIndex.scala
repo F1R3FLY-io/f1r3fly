@@ -8,7 +8,8 @@ import coop.rchain.casper.protocol._
 import coop.rchain.casper.util.EventConverter
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.history.HistoryRepository
+// import coop.rchain.rspace.history.HistoryRepository
+import rspacePlusPlus.HistoryRepository
 import coop.rchain.rspace.merger.MergingLogic.{computeRelatedSets, NumberChannelsDiff}
 import coop.rchain.rspace.merger._
 import coop.rchain.rspace.trace.Produce

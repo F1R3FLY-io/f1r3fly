@@ -6,7 +6,8 @@ import cats.syntax.all._
 import coop.rchain.casper.protocol._
 import coop.rchain.casper.util.ProtoUtil
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.state.RSpaceImporter
+// import coop.rchain.rspace.state.RSpaceImporter
+import rspacePlusPlus.state.RSpacePlusPlusImporter
 import coop.rchain.shared.ByteVectorOps._
 import coop.rchain.shared.syntax._
 import coop.rchain.shared.{Log, Stopwatch, Time}
@@ -98,7 +99,8 @@ object LfsTupleSpaceRequester {
       tupleSpaceMessageQueue: Queue[F, StoreItemsMessage],
       requestForStoreItem: (StatePartPath, Int) => F[Unit],
       requestTimeout: FiniteDuration,
-      stateImporter: RSpaceImporter[F],
+      // stateImporter: RSpaceImporter[F],
+      stateImporter: RSpacePlusPlusImporter[F],
       validateTupleSpaceItems: (
           Seq[(Blake2b256Hash, ByteVector)],
           Seq[(Blake2b256Hash, ByteVector)],

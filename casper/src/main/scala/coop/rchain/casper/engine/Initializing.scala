@@ -24,7 +24,8 @@ import coop.rchain.metrics.{Metrics, Span}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.interpreter.storage
-import coop.rchain.rspace.state.{RSpaceImporter, RSpaceStateManager}
+// import coop.rchain.rspace.state.{RSpaceImporter, RSpaceStateManager}
+import rspacePlusPlus.state.{RSpacePlusPlusImporter, RSpacePlusPlusStateManager}
 import coop.rchain.shared
 import coop.rchain.shared._
 import fs2.concurrent.Queue
@@ -42,7 +43,8 @@ class Initializing[F[_]
   /* State */       : EngineCell: RPConfAsk: ConnectionsCell: LastApprovedBlock
   /* Rholang */     : RuntimeManager
   /* Casper */      : Estimator: SafetyOracle: LastFinalizedHeightConstraintChecker: SynchronyConstraintChecker
-  /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+  // /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+	/* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpacePlusPlusStateManager
   /* Diagnostics */ : Log: EventLog: Metrics: Span] // format: on
 (
     blockProcessingQueue: Queue[F, (Casper[F], BlockMessage)],
@@ -174,7 +176,8 @@ class Initializing[F[_]
                            )
 
       // Request tuple space state for Last Finalized State
-      stateValidator = RSpaceImporter.validateStateItems[F] _
+      // stateValidator = RSpaceImporter.validateStateItems[F] _
+      stateValidator = RSpacePlusPlusImporter.validateStateItems[F] _
       tupleSpaceStream <- LfsTupleSpaceRequester.stream(
                            approvedBlock,
                            tupleSpaceQueue,
@@ -183,7 +186,8 @@ class Initializing[F[_]
                                StoreItemsMessageRequest(statePartPath, 0, pageSize).toProto
                              ),
                            requestTimeout = 2.minutes,
-                           RSpaceStateManager[F].importer,
+                           // RSpaceStateManager[F].importer,
+                           RSpacePlusPlusStateManager[F].importer,
                            stateValidator
                          )
 

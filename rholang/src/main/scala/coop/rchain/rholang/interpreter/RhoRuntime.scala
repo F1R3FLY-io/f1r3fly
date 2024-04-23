@@ -22,9 +22,10 @@ import coop.rchain.rholang.interpreter.SystemProcesses._
 import coop.rchain.rholang.interpreter.accounting.{_cost, Cost, CostAccounting, HasCost}
 import coop.rchain.rholang.interpreter.registry.RegistryBootstrap
 import coop.rchain.rholang.interpreter.storage.ChargingRSpace
-import coop.rchain.rspace.RSpace.RSpaceStore
+// import coop.rchain.rspace.RSpace.RSpaceStore
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.history.HistoryRepository
+// import coop.rchain.rspace.history.HistoryRepository
+import rspacePlusPlus.HistoryRepository
 import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
 import coop.rchain.rspace.util.unpackOption
 import coop.rchain.rspace.{Match, RSpace, _}

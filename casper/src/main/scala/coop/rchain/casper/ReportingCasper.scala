@@ -28,10 +28,10 @@ import coop.rchain.rholang.interpreter.RhoRuntime.{bootstrapRegistry, createRhoE
 import coop.rchain.rholang.interpreter.SystemProcesses.{BlockData, Definition, InvalidBlocks}
 import coop.rchain.rholang.interpreter.accounting.{_cost, CostAccounting}
 import coop.rchain.rholang.interpreter.{Reduce, ReplayRhoRuntimeImpl}
-import coop.rchain.rspace.RSpace.RSpaceStore
+// import coop.rchain.rspace.RSpace.RSpaceStore
 import coop.rchain.rspace.ReportingRspace.ReportingEvent
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.{ReportingRspace, Match => RSpaceMatch}
+// import coop.rchain.rspace.{ReportingRspace, Match => RSpaceMatch}
 import coop.rchain.shared.Log
 
 import scala.concurrent.ExecutionContext

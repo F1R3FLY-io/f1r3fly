@@ -20,7 +20,8 @@ import coop.rchain.comm.rp.Connect.{ConnectionsCell, RPConfAsk}
 import coop.rchain.comm.transport.TransportLayer
 import coop.rchain.metrics.{Metrics, Span}
 import coop.rchain.models.BlockHash.BlockHash
-import coop.rchain.rspace.state.RSpaceStateManager
+// import coop.rchain.rspace.state.RSpaceStateManager
+import rspacePlusPlus.state.RSpacePlusPlusStateManager
 import coop.rchain.shared._
 import fs2.concurrent.Queue
 
@@ -37,7 +38,8 @@ object CasperLaunch {
     /* State */       : EnvVars: EngineCell: RPConfAsk: ConnectionsCell: LastApprovedBlock
     /* Rholang */     : RuntimeManager
     /* Casper */      : Estimator: SafetyOracle: LastFinalizedHeightConstraintChecker: SynchronyConstraintChecker
-    /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+    // /* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpaceStateManager
+		/* Storage */     : BlockStore: BlockDagStorage: DeployStorage: CasperBufferStorage: RSpacePlusPlusStateManager
     /* Diagnostics */ : Log: EventLog: Metrics: Span] // format: on
   (
       blockProcessingQueue: Queue[F, (Casper[F], BlockMessage)],

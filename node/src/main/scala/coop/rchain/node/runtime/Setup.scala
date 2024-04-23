@@ -43,7 +43,8 @@ import coop.rchain.node.web.ReportingRoutes.ReportingHttpRoutes
 import coop.rchain.node.web.{ReportingRoutes, Transaction}
 import coop.rchain.p2p.effects.PacketHandler
 import coop.rchain.rholang.interpreter.RhoRuntime
-import coop.rchain.rspace.state.instances.RSpaceStateManagerImpl
+// import coop.rchain.rspace.state.instances.RSpaceStateManagerImpl
+import rspacePlusPlus.state.RSpacePlusPlusStateManagerImpl
 import coop.rchain.rspace.syntax._
 import coop.rchain.shared._
 import coop.rchain.shared.syntax.sharedSyntaxKeyValueStoreManager
@@ -187,9 +188,10 @@ object Setup {
       // RNodeStateManager
       stateManagers <- {
         for {
-          exporter           <- historyRepo.exporter
-          importer           <- historyRepo.importer
-          rspaceStateManager = RSpaceStateManagerImpl(exporter, importer)
+          exporter <- historyRepo.exporter
+          importer <- historyRepo.importer
+          // rspaceStateManager = RSpaceStateManagerImpl(exporter, importer)
+          rspaceStateManager = RSpacePlusPlusStateManagerImpl(exporter, importer)
           blockStateManager  = BlockStateManagerImpl(blockStore, blockDagStorage)
           rnodeStateManager  = RNodeStateManagerImpl(rspaceStateManager, blockStateManager)
         } yield (rnodeStateManager, rspaceStateManager)

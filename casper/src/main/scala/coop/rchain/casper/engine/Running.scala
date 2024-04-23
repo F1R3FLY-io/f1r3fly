@@ -21,7 +21,8 @@ import coop.rchain.comm.transport.TransportLayer
 import coop.rchain.metrics.{Metrics, MetricsSemaphore}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.state.{RSpaceExporter, RSpaceStateManager}
+// import coop.rchain.rspace.state.{RSpaceExporter, RSpaceStateManager}
+import rspacePlusPlus.state.{RSpacePlusPlusExporter, RSpacePlusPlusStateManager}
 import fs2.concurrent.Queue
 import coop.rchain.shared.{Log, Time}
 import fs2.Stream
@@ -214,7 +215,8 @@ object Running {
   final case object LastFinalizedBlockNotFoundError
       extends Exception("Last finalized block not found in the block storage.")
 
-  private def handleStateItemsMessageRequest[F[_]: Sync: TransportLayer: RPConfAsk: RSpaceStateManager: Log](
+  // private def handleStateItemsMessageRequest[F[_]: Sync: TransportLayer: RPConfAsk: RSpaceStateManager: Log](
+  private def handleStateItemsMessageRequest[F[_]: Sync: TransportLayer: RPConfAsk: RSpacePlusPlusStateManager: Log](
       peer: PeerNode,
       startPath: Seq[(Blake2b256Hash, Option[Byte])],
       skip: Int,
@@ -223,7 +225,8 @@ object Running {
     import coop.rchain.rspace.syntax._
     for {
       // Export chunk of store items from RSpace
-      exportedItems <- RSpaceStateManager[F].exporter.getHistoryAndData(
+      // exportedItems <- RSpaceStateManager[F].exporter.getHistoryAndData(
+      exportedItems <- RSpacePlusPlusStateManager[F].exporter.getHistoryAndData(
                         startPath,
                         skip,
                         take,
@@ -251,7 +254,8 @@ class Running[F[_]
   /* Execution */   : Concurrent: Time
   /* Transport */   : TransportLayer: CommUtil: BlockRetriever
   /* State */       : RPConfAsk: ConnectionsCell
-  /* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpaceStateManager
+  // /* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpaceStateManager
+	/* Storage */     : BlockStore: BlockDagStorage: CasperBufferStorage: RSpacePlusPlusStateManager
   /* Diagnostics */ : Log: Metrics] // format: on
 (
     blockProcessingQueue: Queue[F, (Casper[F], BlockMessage)],
@@ -347,7 +351,8 @@ class Running[F[_]
 
     // Approved state store records
     case StoreItemsMessageRequest(startPath, skip, take) =>
-      val start = startPath.map(RSpaceExporter.pathPretty).mkString(" ")
+      // val start = startPath.map(RSpaceExporter.pathPretty).mkString(" ")
+      val start = startPath.map(RSpacePlusPlusExporter.pathPretty).mkString(" ")
       val logRequest = Log[F].info(
         s"Received request for store items, startPath: [$start], chunk: $take, skip: $skip, from: $peer"
       )
