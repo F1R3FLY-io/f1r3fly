@@ -10,10 +10,10 @@ import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuati
 import coop.rchain.rholang.interpreter.RhoRuntime.{RhoHistoryRepository, RhoISpace}
 import coop.rchain.rholang.interpreter.SystemProcesses.Definition
 import coop.rchain.rholang.interpreter.{ReplayRhoRuntime, RhoRuntime, RholangCLI}
-import coop.rchain.rspace
-import coop.rchain.rspace.RSpace.RSpaceStore
-import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
-import coop.rchain.rspace.{Match, RSpace}
+// import coop.rchain.rspace
+// import coop.rchain.rspace.RSpace.RSpaceStore
+// import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+// import coop.rchain.rspace.{Match, RSpace}
 import coop.rchain.shared.Log
 import coop.rchain.store.KeyValueStoreManager
 import monix.execution.Scheduler

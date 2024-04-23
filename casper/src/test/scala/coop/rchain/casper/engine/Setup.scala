@@ -23,9 +23,10 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.p2p.EffectsTestInstances._
-import coop.rchain.rspace.RSpace
-import coop.rchain.rspace.state.instances.RSpaceStateManagerImpl
-import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+// import coop.rchain.rspace.RSpace
+// import coop.rchain.rspace.state.instances.RSpaceStateManagerImpl
+// import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+import rspacePlusPlus.state.RSpacePlusPlusStateManagerImpl
 import coop.rchain.shared.Cell
 import coop.rchain.store.InMemoryStoreManager
 import fs2.concurrent.Queue
@@ -75,7 +76,8 @@ object Setup {
     val (exporter, importer) = {
       (historyRepo.exporter.unsafeRunSync, historyRepo.importer.unsafeRunSync)
     }
-    implicit val rspaceStateManager = RSpaceStateManagerImpl(exporter, importer)
+    // implicit val rspaceStateManager = RSpaceStateManagerImpl(exporter, importer)
+    implicit val rspaceStateManager = RSpacePlusPlusStateManagerImpl(exporter, importer)
 
     val mStore = RuntimeManager.mergeableStore(spaceKVManager).unsafeRunSync(scheduler)
     implicit val runtimeManager =

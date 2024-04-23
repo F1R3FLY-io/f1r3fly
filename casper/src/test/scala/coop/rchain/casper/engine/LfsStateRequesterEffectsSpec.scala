@@ -9,7 +9,9 @@ import coop.rchain.casper.util.TestTime
 import coop.rchain.casper.util.scalatest.Fs2StreamMatchers
 import coop.rchain.models.blockImplicits
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.state.{RSpaceImporter, StateValidationError}
+// import coop.rchain.rspace.state.{RSpaceImporter, StateValidationError}
+import coop.rchain.rspace.state.StateValidationError
+import rspacePlusPlus.state.RSpacePlusPlusImporter
 import coop.rchain.shared.{Log, Time}
 import fs2.Stream
 import fs2.concurrent.Queue
@@ -107,7 +109,8 @@ class LfsStateRequesterEffectsSpec extends FlatSpec with Matchers with Fs2Stream
       savedHistoryQueue <- Queue.unbounded[F, SavedStoreItems]
       savedDataQueue    <- Queue.unbounded[F, SavedStoreItems]
 
-      importer = new RSpaceImporter[F] {
+      // importer = new RSpaceImporter[F] {
+      importer = new RSpacePlusPlusImporter[F] {
         override type KeyHash = Blake2b256Hash
 
         override def setHistoryItems[Value](

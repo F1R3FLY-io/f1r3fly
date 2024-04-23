@@ -12,9 +12,9 @@ object RSpacePlusPlusStateManagerImpl {
       exporter: RSpacePlusPlusExporter[F],
       importer: RSpacePlusPlusImporter[F]
   ): RSpacePlusPlusStateManager[F] =
-    RSpaceStateManagerImpl[F](exporter, importer)
+    RSpacePlusPlusStateManagerImpl[F](exporter, importer)
 
-  private final case class RSpaceStateManagerImpl[F[_]: Sync](
+  private final case class RSpacePlusPlusStateManagerImpl[F[_]: Sync](
       exporter: RSpacePlusPlusExporter[F],
       importer: RSpacePlusPlusImporter[F]
   ) extends RSpacePlusPlusStateManager[F] {

@@ -9,8 +9,8 @@ import coop.rchain.models.rholang.implicits._
 import coop.rchain.rholang.interpreter.RhoRuntime.RhoTuplespace
 import coop.rchain.rholang.interpreter._
 import coop.rchain.rholang.interpreter.accounting.Chargeable._
-import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
-import coop.rchain.rspace.{Match, RSpace}
+// import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+// import coop.rchain.rspace.{Match, RSpace}
 import coop.rchain.shared.Log
 import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task

@@ -11,7 +11,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.interpreter.RhoRuntime
 import coop.rchain.rspace.syntax._
-import coop.rchain.rspace.{Match, RSpace}
+// import coop.rchain.rspace.{Match, RSpace}
 import coop.rchain.models.syntax._
 import coop.rchain.shared.{Base16, Log}
 import monix.eval.Task

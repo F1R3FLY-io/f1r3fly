@@ -21,10 +21,10 @@ import coop.rchain.rholang.interpreter.merging.RholangMergingLogic.{
   DeployMergeableData
 }
 import coop.rchain.rholang.interpreter.{ReplayRhoRuntime, RhoRuntime}
-import coop.rchain.rspace
-import coop.rchain.rspace.RSpace.RSpaceStore
+// import coop.rchain.rspace
+// import coop.rchain.rspace.RSpace.RSpaceStore
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.rspace.{RSpace, ReplayRSpace}
+// import coop.rchain.rspace.{RSpace, ReplayRSpace}
 import coop.rchain.shared.syntax._
 import coop.rchain.store.{KeyValueStoreManager, KeyValueTypedStore}
 import coop.rchain.models.syntax._
@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 import rspacePlusPlus.{IReplaySpacePlusPlus, RSpacePlusPlus_RhoTypes, ReplayRSpacePlusPlus}
-import coop.rchain.rspace.history.HistoryRepositoryInstances
+// import coop.rchain.rspace.history.HistoryRepositoryInstances
 
 trait RuntimeManager[F[_]] {
   def captureResults(

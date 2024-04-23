@@ -16,9 +16,10 @@ import coop.rchain.rholang.interpreter.accounting.utils._
 import coop.rchain.rholang.interpreter.errors.OutOfPhlogistonsError
 import coop.rchain.rholang.interpreter.{EvaluateResult, RhoRuntime, _}
 import coop.rchain.rholang.syntax._
-import coop.rchain.rspace.RSpace.RSpaceStore
-import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
-import coop.rchain.rspace.{Checkpoint, Match, RSpace}
+// import coop.rchain.rspace.RSpace.RSpaceStore
+// import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+// import coop.rchain.rspace.{Checkpoint, Match, RSpace}
+import coop.rchain.rspace.{Checkpoint}
 import coop.rchain.shared.Log
 import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task

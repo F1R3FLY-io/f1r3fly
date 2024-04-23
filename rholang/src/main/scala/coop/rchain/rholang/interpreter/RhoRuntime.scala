@@ -28,7 +28,7 @@ import coop.rchain.rspace.hashing.Blake2b256Hash
 import rspacePlusPlus.HistoryRepository
 import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
 import coop.rchain.rspace.util.unpackOption
-import coop.rchain.rspace.{Match, RSpace, _}
+import coop.rchain.rspace._
 import coop.rchain.shared.Log
 import monix.execution.Scheduler
 

@@ -162,7 +162,8 @@ case class TestNode[F[_]: Timer](
     genesis
   )
 
-  implicit val rspaceMan = RSpaceStateManagerTestImpl()
+  // implicit val rspaceMan = RSpaceStateManagerTestImpl()
+  implicit val rspaceMan = RSpacePlusPlusStateManagerTestImpl()
   val engine =
     new coop.rchain.casper.engine.Running(
       blockProcessorQueue,

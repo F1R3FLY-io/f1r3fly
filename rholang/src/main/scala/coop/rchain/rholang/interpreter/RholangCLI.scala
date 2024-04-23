@@ -11,7 +11,7 @@ import coop.rchain.rholang.interpreter.compiler.Compiler
 import coop.rchain.rholang.interpreter.errors._
 import coop.rchain.rholang.interpreter.storage.StoragePrinter
 import coop.rchain.rholang.syntax._
-import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
+// import coop.rchain.rspace.syntax.rspaceSyntaxKeyValueStoreManager
 import coop.rchain.shared.{Log, Resources}
 import coop.rchain.store.LmdbDirStoreManager.{mb, Db, LmdbEnvConfig}
 import coop.rchain.store.{KeyValueStoreManager, LmdbDirStoreManager}
