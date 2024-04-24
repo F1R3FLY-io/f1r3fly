@@ -5,7 +5,7 @@ import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.KeyValueBlockStore
 import coop.rchain.casper.storage.RNodeKeyValueStoreManager
-import coop.rchain.casper.storage.RNodeKeyValueStoreManager.legacyRSpacePathPrefix
+// import coop.rchain.casper.storage.RNodeKeyValueStoreManager.legacyRSpacePathPrefix
 import coop.rchain.casper.syntax._
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
@@ -157,8 +157,8 @@ object MergeBalanceMain {
     val outputDir              = options.outputDir()
     val mergeFile              = outputDir.resolve("mergeBalances.csv")
 
-    val oldRSpacePath                              = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
-    val legacyRSpaceDirSupport                     = Files.exists(oldRSpacePath)
+    // val oldRSpacePath                              = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
+    // val legacyRSpaceDirSupport                     = Files.exists(oldRSpacePath)
     implicit val log: Log[Task]                    = Log.log
     implicit val span: NoopSpan[Task]              = NoopSpan[Task]()
     implicit val metrics: Metrics.MetricsNOP[Task] = new Metrics.MetricsNOP[Task]()
@@ -166,8 +166,9 @@ object MergeBalanceMain {
     // implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
 
     val task: Task[Vector[Account]] = for {
-      accountMap        <- getVaultMap(stateBalanceFile, transactionBalanceFile).pure[Task]
-      rnodeStoreManager <- RNodeKeyValueStoreManager[Task](dataDir, legacyRSpaceDirSupport)
+      accountMap <- getVaultMap(stateBalanceFile, transactionBalanceFile).pure[Task]
+      // rnodeStoreManager <- RNodeKeyValueStoreManager[Task](dataDir, legacyRSpaceDirSupport)
+      rnodeStoreManager <- RNodeKeyValueStoreManager[Task](dataDir)
       blockStore        <- KeyValueBlockStore[Task](rnodeStoreManager)
       // store             <- rnodeStoreManager.rSpaceStores
       // spaces <- RSpace

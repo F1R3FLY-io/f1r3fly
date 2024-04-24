@@ -6,7 +6,7 @@ import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.KeyValueBlockStore
 import coop.rchain.casper.storage.RNodeKeyValueStoreManager
-import coop.rchain.casper.storage.RNodeKeyValueStoreManager.legacyRSpacePathPrefix
+// import coop.rchain.casper.storage.RNodeKeyValueStoreManager.legacyRSpacePathPrefix
 import coop.rchain.metrics.{Metrics, NoopSpan}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.interpreter.RhoRuntime
@@ -29,17 +29,18 @@ object StateBalances {
       vaultChannel: Par,
       dataDir: Path
   )(implicit scheduler: ExecutionContext): F[List[(ByteString, Long)]] = {
-    val oldRSpacePath = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
+    // val oldRSpacePath = dataDir.resolve(s"$legacyRSpacePathPrefix/history/data.mdb")
     import coop.rchain.rholang.interpreter.storage._
     implicit val span        = NoopSpan[F]()
     implicit val log: Log[F] = Log.log
     implicit val metrics     = new Metrics.MetricsNOP[F]()
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
-    val legacyRSpaceDirSupport = Files.exists(oldRSpacePath)
+    // val legacyRSpaceDirSupport = Files.exists(oldRSpacePath)
     for {
       // The following below of creating stores is not actually being used.
       // This is being done on the Rust side.
-      rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir, legacyRSpaceDirSupport)
+      // rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir, legacyRSpaceDirSupport)
+      rnodeStoreManager <- RNodeKeyValueStoreManager[F](dataDir)
       blockStore        <- KeyValueBlockStore(rnodeStoreManager)
       blockOpt          <- blockStore.get(blockHash.unsafeHexToByteString)
       block             = blockOpt.get
