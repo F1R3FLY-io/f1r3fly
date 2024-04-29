@@ -41,7 +41,11 @@ spec:
             {{- toYaml $.Values.securityContext | nindent 12 }}
           image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
-          args: 
+#          command:
+#            - "sh"
+#            - "-c"
+#            - "sleep 6000"
+          args:
             {{- toYaml $.Values.containerArgs | nindent 12 }}
           ports:
           {{- range $port := $.Values.service.ports }}

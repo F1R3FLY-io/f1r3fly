@@ -99,16 +99,22 @@ nodeKeys:
     privateKey: d584a35257491a26f26389f6cc5cc551b66060910d6aed529d3005b27fc0edb4
 
 image:
-  repository: ghcr.io/f1r3fly-io/rnode
-  pullPolicy: Never # Use `IfNotPresent` at Cloud Provider
+  #repository: ghcr.io/f1r3fly-io/rnode #local
+  # repository: eu-frankfurt-1.ocir.io/frqbavregu95/random/rnode #remote
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #remote
+  #pullPolicy: Never # Use `IfNotPresent` at Cloud Provider
+  pullPolicy: IfNotPresent # Use `IfNotPresent` at Cloud Provider
   # Overrides the image tag whose default is the chart appVersion.
+  #tag: "latest" #local
+  #tag: "test" #remote
   tag: "latest"
 
 containerArgs:
   - "run"
     
 
-imagePullSecrets: []
+imagePullSecrets:
+  - name: k8s-secret
 nameOverride: ""
 fullnameOverride: ""
 
@@ -131,7 +137,8 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  runAsUser: 0 #root user
   # capabilities:
   #   drop:
   #   - ALL
@@ -143,10 +150,15 @@ service:
   type: NodePort
   ports: 
   - containerPort: 40400
+    nodePort: 30400
   - containerPort: 40401
+    nodePort: 30401
   - containerPort: 40402
+    nodePort: 30402
   - containerPort: 40403
-  - containerPort: 40405
+    nodePort: 30403
+  - containerPort: 40404
+    nodePort: 30404
 
 # TODO: not needed now
 # NOT TESTED YET
@@ -172,8 +184,11 @@ resources:
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   limits:
-    cpu: 500m
-    memory: 512Mi
+    # for cluster with boot + 4 nodes
+    # our cluster had 6 OCPU and 18 memory, 6-5=1additional OCPU and 18-16(3.2*5) = 2 additional memory
+    # additional node resources kubernetes uses for internal resources (pods)
+    cpu: 1
+    memory: 3.2G
   # requests:
   #   cpu: 100m
   #   memory: 128Mi

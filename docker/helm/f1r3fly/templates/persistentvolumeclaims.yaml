@@ -7,8 +7,10 @@ metadata:
   labels: 
     {{- include "f1r3fly.labels" $ | nindent 4 }}
 spec:
+  #volumeMode: Block
+  storageClassName: oci
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 100Mi
