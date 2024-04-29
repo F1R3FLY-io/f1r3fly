@@ -160,8 +160,8 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
           val preStateHash  = preState.toBlake2b256Hash
           val postStateHash = stateHash.toBlake2b256Hash
 
-          // println("\npreStateHash: " + preStateHash)
-          // println("postStateHash: " + postStateHash + '\n')
+          println("\npreStateHash: " + preStateHash)
+          println("postStateHash: " + postStateHash)
 
           this
             .saveMergeableChannels(postStateHash, Array(), seqNum = 0, mergeableChs, preStateHash)

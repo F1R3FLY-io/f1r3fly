@@ -155,6 +155,7 @@ object Setup {
       evalRuntime <- {
         implicit val sp = span
         // rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](Par()))
+        println("\nhit evalRuntime, evalStores should be called here")
         RhoRuntime.createRuntime[F](conf.storage.dataDir.toString(), Par())
       }
 

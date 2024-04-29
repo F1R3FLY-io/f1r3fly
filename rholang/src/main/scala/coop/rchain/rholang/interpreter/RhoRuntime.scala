@@ -520,11 +520,13 @@ object RhoRuntime {
 
   def bootstrapRegistry[F[_]: Monad](runtime: RhoRuntime[F]): F[Unit] = {
     implicit val rand: Blake2b512Random = bootstrapRand
+    println("\nhit bootstrapRegistry")
     for {
       cost <- runtime.cost.get
       _    <- runtime.cost.set(Cost.UNSAFE_MAX)
-      _    <- runtime.inj(RegistryBootstrap.AST)
-      _    <- runtime.cost.set(cost)
+      // _    = println("\nRegistryBootstrap.AST: " + RegistryBootstrap.AST)
+      _ <- runtime.inj(RegistryBootstrap.AST)
+      _ <- runtime.cost.set(cost)
     } yield ()
   }
 
@@ -537,6 +539,7 @@ object RhoRuntime {
     Span[F].trace(createPlayRuntime) {
       for {
         cost     <- CostAccounting.emptyCost[F]
+        _        = println("\nhit createRuntime")
         mergeChs <- Ref.of(Set[Par]())
         rhoEnv <- {
           implicit val c: _cost[F] = cost

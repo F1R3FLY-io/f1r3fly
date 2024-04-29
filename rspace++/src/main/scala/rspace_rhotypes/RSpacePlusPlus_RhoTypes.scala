@@ -312,6 +312,11 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log](rspacePointer
                      val checkpoint     = CheckpointProto.parseFrom(resultBytes)
                      val checkpointRoot = checkpoint.root
 
+                     //  println(
+                     //    "\nscala createCheckpoint root: " + Blake2b256Hash
+                     //      .fromByteArray(checkpointRoot.toByteArray)
+                     //  )
+
                      Checkpoint(
                        root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
                        log = Seq.empty[Event]

@@ -105,6 +105,8 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       _          <- bootstrapRegistry(runtime)
       checkpoint <- runtime.createCheckpoint
       hash       = ByteString.copyFrom(checkpoint.root.bytes.toArray)
+      // _          = println("\ncheckpoint root in emptyStateHash: " + checkpoint.root)
+      // _          = println("\nemptyStateHash: " + hash.toBlake2b256Hash)
     } yield hash
 
   /* Compute state with deploys (genesis block) and System deploys (regular block) */
@@ -168,15 +170,20 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         _ <- runtime.setBlockData(
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
+        _                   <- Sync[F].delay(println("\nhit computeGenesis"))
         genesisPreStateHash <- emptyStateHash
-        // _ <- Sync[F].delay(
-        //       println(
-        //         "\ngenesisPreStateHash: " + PrettyPrinter
-        //           .buildString(genesisPreStateHash)
-        //       )
-        //     )
+        _ <- Sync[F].delay(
+              println(
+                "\ngenesisPreStateHash: " + PrettyPrinter
+                  .buildString(genesisPreStateHash)
+              )
+            )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
+        _ = println(
+          "\nstateHash after playDeploys in computeGenesis: " + PrettyPrinter
+            .buildString(stateHash)
+        )
       } yield (genesisPreStateHash, stateHash, processedDeploys)
     }
 
@@ -298,6 +305,8 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         checkpoint <- runtime.createSoftCheckpoint
 
         evalSucceeded = evaluateResult.errors.isEmpty
+        // _             = println("\nhit processDeploy, evalSucceeded: " + evalSucceeded)
+        // _ = println("\nhit processDeploy, term: " + deploy.data.term)
         deployResult = ProcessedDeploy(
           deploy,
           Cost.toProto(evaluateResult.cost),
@@ -479,10 +488,12 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       captureResults(hash, deploy, returnName)
     } match {
       case Success(result) => result
-      case Failure(ex) =>
+      case Failure(ex) => {
+        println(s"\nExploratory deploy failed with exception: ${ex.getMessage}")
         Log[F].error(s"Exploratory deploy failed with exception: ${ex.getMessage}") *> Sync[F].pure(
           Seq.empty[Par]
         )
+      }
     }
 
   /* Checkpoints */
@@ -556,7 +567,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
     for {
       data <- runtime.getData(channel)
       pars = data.flatMap(_.a.pars)
-      _    = println(s"getDataPar called with: $channel, returning: ${pars.length}")
+      _    = println(s"\ngetDataPar called with: $channel, returning: ${pars.length}")
     } yield pars
 
   def getContinuationPar(channels: Seq[Par]): F[Seq[(Seq[BindPattern], Par)]] =

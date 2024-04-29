@@ -41,6 +41,7 @@ class ContractCall[F[_]: Concurrent: Span](
                         ListParWithRandom(values, rand),
                         persist = false
                       )
+      // _ = println("\nhit produce in ContractCall, values: " + values)
       _ <- produceResult.fold(Sync[F].unit) {
             case (cont, channels) =>
               dispatcher.dispatch(

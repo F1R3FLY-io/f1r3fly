@@ -12,6 +12,8 @@ import coop.rchain.casper.util.rholang.{RuntimeManager, Tools}
 import coop.rchain.crypto.signatures.Signed
 import coop.rchain.models.{GPrivate, Par}
 
+import coop.rchain.casper.{PrettyPrinter}
+
 final case class Genesis(
     shardId: String,
     timestamp: Long,
@@ -73,6 +75,8 @@ object Genesis {
   ): F[BlockMessage] = {
     import genesis._
 
+    // println("\nhit createGenesisBlock, pos: " + genesis.proofOfStake)
+
     val blessedTerms = defaultBlessedTerms(
       timestamp,
       proofOfStake,
@@ -97,6 +101,18 @@ object Genesis {
   ): BlockMessage = {
     import genesis._
 
+    println("\nhit createProcessedDeploy")
+    // println("genesis: " + genesis)
+    // println(
+    //   "start hash: " + PrettyPrinter
+    //     .buildString(startHash)
+    // )
+    // println(
+    //   "state hash: " + PrettyPrinter
+    //     .buildString(stateHash)
+    // )
+    println("processedDeploys: " + processedDeploys.length)
+
     val state = RChainState(
       preStateHash = startHash,
       postStateHash = stateHash,
@@ -105,6 +121,8 @@ object Genesis {
     )
 
     //FIXME any failures here should terminate the genesis ceremony
+    val failedDeploys = processedDeploys.filter(_.isFailed)
+    failedDeploys.foreach(deploy => println(s"Failed deploy: ${deploy}"))
     val blockDeploys = processedDeploys.filterNot(_.isFailed)
     val sortedDeploys =
       blockDeploys.map(d => d.copy(deployLog = d.deployLog.sortBy(_.toProto.toByteArray)))

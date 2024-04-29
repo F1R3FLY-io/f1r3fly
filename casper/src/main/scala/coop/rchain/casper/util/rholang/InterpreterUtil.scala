@@ -233,6 +233,7 @@ object InterpreterUtil {
       errors: Seq[InterpreterError]
   ): F[Unit] = Sync[F].defer {
     val deployInfo = PrettyPrinter.buildStringSig(deploySig)
+    println(s"Deploy ($deployInfo) errors: ${errors.mkString(", ")}")
     Log[F].info(s"Deploy ($deployInfo) errors: ${errors.mkString(", ")}")
   }
 

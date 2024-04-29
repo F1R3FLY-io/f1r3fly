@@ -74,7 +74,10 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       space.produce(chan, data, persist = persistent) >>= { produceResult =>
       {
         // Log[M].debug("produceResult in Reduce produce: " + produceResult) *>
-        //   Sync[M].delay(println("produceResult in Reduce produce: " + produceResult)) *>
+        // Sync[M].delay {
+        //   println("\nHit produce in Reduce, data: " + data)
+        //   println("channel: " + chan)
+        // } *>
         continue(
           unpackOptionWithPeek(produceResult),
           produce(chan, data, persistent),

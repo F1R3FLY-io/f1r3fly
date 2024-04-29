@@ -31,7 +31,7 @@ class GenesisCeremonyMasterSpec extends WordSpec {
       val startTime = System.currentTimeMillis()
 
       implicit val engineCell = Cell.unsafe[Task, Engine[Task]](Engine.noop)
-      implicit val rspaceMan  = RSpaceStateManagerTestImpl[Task]()
+      // implicit val rspaceMan  = RSpaceStateManagerTestImpl[Task]()
 
       def waitUtilCasperIsDefined: Task[MultiParentCasper[Task]] =
         EngineCell[Task].read >>= (_.withCasper(

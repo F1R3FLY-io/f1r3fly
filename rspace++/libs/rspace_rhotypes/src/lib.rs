@@ -42,7 +42,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            // println!("\nHit space_new");
+            println!("\nHit space_new"); 
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
