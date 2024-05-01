@@ -102,19 +102,19 @@ private class HostnameTrustManager extends X509ExtendedTrustManager {
       hostname: Option[String],
       cert: X509Certificate,
       algorithm: String
-  ): Unit =
-    // import sun.security.util.HostnameChecker
-    // algorithm.toLowerCase match {
-    //   case "https" =>
-    //     val host = hostname
-    //       .filter(_.startsWith("["))
-    //       .filter(_.endsWith("]"))
-    //       .map(h => h.substring(1, h.length - 1))
-    //       .orElse(hostname)
-    //       .getOrElse("")
-    //     HostnameChecker.getInstance(HostnameChecker.TYPE_TLS).`match`(host, cert)
-    //   case _ =>
-    //     throw new CertificateException(s"Unknown identification algorithm: $algorithm")
-    // }
-    ???
+  ): Unit = {
+    import sun.security.util.HostnameChecker
+    algorithm.toLowerCase match {
+      case "https" =>
+        val host = hostname
+          .filter(_.startsWith("["))
+          .filter(_.endsWith("]"))
+          .map(h => h.substring(1, h.length - 1))
+          .orElse(hostname)
+          .getOrElse("")
+        HostnameChecker.getInstance(HostnameChecker.TYPE_TLS).`match`(host, cert)
+      case _ =>
+        throw new CertificateException(s"Unknown identification algorithm: $algorithm")
+    }
+  }
 }
