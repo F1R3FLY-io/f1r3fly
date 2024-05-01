@@ -449,7 +449,7 @@ where
                     //     "storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>",
                     //     patterns, continuation, channels
                     // );
-                    // println!("to_map: {:?}\n", self.store.to_map());
+                    // println!("store after install: {:?}\n", self.store.to_map().len());
                     None
                 }
                 Some(_) => {

@@ -305,8 +305,9 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         checkpoint <- runtime.createSoftCheckpoint
 
         evalSucceeded = evaluateResult.errors.isEmpty
-        // _             = println("\nhit processDeploy, evalSucceeded: " + evalSucceeded)
-        // _ = println("\nhit processDeploy, term: " + deploy.data.term)
+        hotChanges    <- runtime.getHotChanges
+        // _             = println("\nhit processDeploy, space toMap: " + hotChanges)
+        _ = println("\nhit processDeploy, evaluateResult: " + evaluateResult)
         deployResult = ProcessedDeploy(
           deploy,
           Cost.toProto(evaluateResult.cost),

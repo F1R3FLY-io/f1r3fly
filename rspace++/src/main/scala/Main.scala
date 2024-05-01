@@ -21,7 +21,7 @@ import coop.rchain.rspace.history.RadixTree
 object Main {
   def main(args: Array[String]): Unit = {
     def testFunction(): Unit = {
-      System.setProperty("jna.library.path", "./rspace++/target/release/")
+      System.setProperty("jna.library.path", "./rspace++/target/debug/")
 
       // val currentDir = java.nio.file.Paths.get("").toAbsolutePath.toString
       // println(s"Current directory: $currentDir")

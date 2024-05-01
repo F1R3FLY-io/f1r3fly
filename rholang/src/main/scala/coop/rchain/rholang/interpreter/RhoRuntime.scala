@@ -298,6 +298,9 @@ object RhoRuntime {
       spaces: List[RhoTuplespace[F]],
       processes: List[(Name, Arity, Remainder, BodyRef)]
   ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] =
+    // println("\nhit introduceSystemProcesses")
+    // println("spaces: " + spaces)
+    // println("processes: " + processes)
     processes.flatMap {
       case (name, arity, remainder, ref) =>
         val channels = List(name)

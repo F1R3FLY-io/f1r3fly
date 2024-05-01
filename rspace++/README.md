@@ -7,18 +7,23 @@ On branch `rhotypes` using `nix` and `direnv`
 - For setting up `nix` and `direnv`, see [project overview](../docs/paul_brain_dump.md)
 - Make sure you have [protobuf](https://grpc.io/docs/protoc-installation/) installed
 
-Starting standalone node using RSpace++
+To get in and out of `direnv` you can use the following:
+- `direnv revoke` then exit root project directory
+- `direnv allow` then enter root project directory
+
+Starting standalone node using RSpace++ (Currently not working within Nix shell)
 1. `sbt ";clean ;compile ;stage"`
-2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release  run --standalone` in one terminal
-3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release eval rholang/examples/stdout.rho`
+2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/debug  run --standalone` in one terminal
+3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/debug eval rholang/examples/stdout.rho`
 
-Standing up network using RSpace++
-1. `sbt ";clean ;compile ;project node ;assembly"`
-2. `java -Djna.library.path=./rspace++/target/release/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upn`
-3. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/`
+Standing up network using RSpace++ (Currently not working within Nix shell)
+1. Follow these instructions on setting up `.rnode` directory [setting up rnode directory](../docs/paul_brain_dump.md#an-example-tying-the-above-together-hopefully) stopping just before you execute the java command that starts the node
+2. `sbt ";clean ;compile ;project node ;assembly ;project rchain"`
+3. `java -Djna.library.path=./rspace++/target/debug/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key <your_validator_key>`
+4. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/ ~/.rnode/node.certificate.pem ~/.rnode/node.key.pem`
 
-Standing up network using RSpace++ (Under Docker)
-1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell)
+Standing up network using RSpace++ (Under Docker) (Currently not working within Nix shell)
+1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 2. `docker compose -f docker/shard.yml up`
 
 ### Working Rholang Contracts using RSpace++ (under standalone node)
@@ -78,5 +83,5 @@ Run Scala tests for calling Rust functions (from root directory): `sbt "rspacePl
 
 ## Rust
 
-- Within rspace++ directory, `cargo build --release -p rspace_plus_plus_rhotypes` to build `rspace_plus_plus` library. Outputs to `rspace++/target/release/`. Scala code pulls from here.
+- Within rspace++ directory, `cargo build --profile dev -p rspace_plus_plus_rhotypes` to build `rspace_plus_plus` library. Outputs to `rspace++/target/debug/`. Scala code pulls from here.
 

@@ -286,7 +286,7 @@ lazy val casper = (project in file("casper"))
       scalacheck % "slowcooker"
     ),
     javaOptions in Test ++= Seq(
-      "-Djna.library.path=../rspace++/target/release/"
+      "-Djna.library.path=../rspace++/target/debug/"
     )
   )
   .dependsOn(
@@ -510,8 +510,6 @@ lazy val nodeCli = (project in file("node-cli"))
     name := "nodeCli",
     version := "0.1.0-SNAPSHOT",
     libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
-      // "net.java.dev.jna" % "jna"          % "5.13.0",
-      // "net.java.dev.jna" % "jna-platform" % "5.13.0",
       circeParser,
       circeGenericExtras
     ),
@@ -557,7 +555,7 @@ lazy val rholang = (project in file("rholang"))
       "-Xss240k",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      "-Djna.library.path=../rspace++/target/release/"
+      "-Djna.library.path=../rspace++/target/debug/"
     ),
     runCargoBuild := {
       import scala.sys.process._
@@ -698,7 +696,7 @@ lazy val rspaceBench = (project in file("rspace-bench"))
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail),
     compile in Jmh := (compile in Jmh).dependsOn(compile in Test).value,
     run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated,
-    javaOptions in Jmh += "-Djna.library.path=../rspace++/target/release/"
+    javaOptions in Jmh += "-Djna.library.path=../rspace++/target/debug/"
   )
   .enablePlugins(JmhPlugin)
   .dependsOn(rspace % "test->test", rholang % "test->test", models % "test->test", rspacePlusPlus)

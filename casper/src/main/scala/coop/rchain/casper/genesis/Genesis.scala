@@ -111,7 +111,10 @@ object Genesis {
     //   "state hash: " + PrettyPrinter
     //     .buildString(stateHash)
     // )
-    println("processedDeploys: " + processedDeploys.length)
+    // println("processedDeploys: " + processedDeploys)
+    // processedDeploys.foreach(
+    //   deploy => println(s"processedDeploy field: ${deploy.deployLog}")
+    // )
 
     val state = RChainState(
       preStateHash = startHash,

@@ -28,9 +28,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/bootstrap.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+      - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
     environment:
-      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator1:
     <<: *default-rnode
@@ -53,9 +53,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator1.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+      - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
     environment:
-      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator2:
     <<: *default-rnode
@@ -78,9 +78,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator2.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+      - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
     environment:
-      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator3:
     <<: *default-rnode
@@ -103,9 +103,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator3.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+      - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
     environment:
-      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
 networks:
   f1r3fly:
