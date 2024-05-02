@@ -11,18 +11,18 @@ To get in and out of `direnv` you can use the following:
 - `direnv revoke` then exit root project directory
 - `direnv allow` then enter root project directory
 
-Starting standalone node using RSpace++ (Currently not working within Nix shell)
+Starting standalone node using RSpace++
 1. `sbt ";clean ;compile ;stage"`
 2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/debug  run --standalone` in one terminal
 3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/debug eval rholang/examples/stdout.rho`
 
-Standing up network using RSpace++ (Currently not working within Nix shell)
+Standing up network using RSpace++
 1. Follow these instructions on setting up `.rnode` directory [setting up rnode directory](../docs/paul_brain_dump.md#an-example-tying-the-above-together-hopefully) stopping just before you execute the java command that starts the node
 2. `sbt ";clean ;compile ;project node ;assembly ;project rchain"`
 3. `java -Djna.library.path=./rspace++/target/debug/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key <your_validator_key>`
 4. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/ ~/.rnode/node.certificate.pem ~/.rnode/node.key.pem`
 
-Standing up network using RSpace++ (Under Docker) (Currently not working within Nix shell)
+Standing up network using RSpace++ (Under Docker)
 1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 2. `docker compose -f docker/shard.yml up`
 
