@@ -41,6 +41,13 @@
         devShells.default = devshell.mkShell {
           commands = [
             {
+              name = "rust-std-x86_64-apple-darwin";
+              package = rust-bin.stable.latest.default.override {
+                targets = [ "x86_64-apple-darwin" ];
+              };
+              help = "Rust standard library for x86_64-apple-darwin target";
+            }
+            {
               name = "docker";
               package = docker;
             }

@@ -14,8 +14,8 @@ import org.scalatest.{FlatSpec, Inspectors, Matchers}
 
 class MultiParentCasperRholangSpec extends FlatSpec with Matchers with Inspectors {
 
-	// Uncomment this to use the debugger 
-	// May need to modify if architecture required is different. See ./scripts/build_rspace++.sh
+  // Uncomment this to use the debugger on M2
+  // May need to modify if architecture required is different or if path is different. See ./scripts/build_rspace++.sh
   // System.setProperty("jna.library.path", "../rspace++/target/x86_64-apple-darwin/debug/")
 
   import RSpaceUtil._
