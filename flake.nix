@@ -35,17 +35,19 @@
           inherit system overlays;
           config.allowUnfree = true;
         };
+        pkgsCross = import nixpkgs {
+          inherit system overlays;
+          crossSystem = nixpkgs.lib.systems.examples.aarch64-multiplatform;
+        };
       in
       with pkgs;
       {
         devShells.default = devshell.mkShell {
           commands = [
             {
-              name = "rust-std-x86_64-apple-darwin";
-              package = rust-bin.stable.latest.default.override {
-                targets = [ "x86_64-apple-darwin" ];
-              };
-              help = "Rust standard library for x86_64-apple-darwin target";
+               name = "aarch64-linux-gnu-gcc";
+               package = pkgsCross.buildPackages.gcc;
+               help = "Cross-compiler for AArch64 targets";
             }
             {
               name = "docker";
@@ -53,12 +55,16 @@
             }
             {
               name = "cargo";
-              package = "rust-bin.stable.latest.default";
+              package = rust-bin.stable.latest.default.override {
+                targets = [ "x86_64-apple-darwin" "x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu" ];
+              };
               help = "The Rust package management tool";
             }
             {
               name = "rustc";
-              package = "rust-bin.stable.latest.default";
+              package = rust-bin.stable.latest.default.override {
+                targets = [ "x86_64-apple-darwin" "x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu" ];
+              };
               help = "The Rust compiler";
             }
             { name = "rust-analyzer";

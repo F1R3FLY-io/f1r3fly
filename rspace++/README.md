@@ -8,8 +8,8 @@ On branch `rhotypes` using `nix` and `direnv`
 - Make sure you have [protobuf](https://grpc.io/docs/protoc-installation/) installed
 
 To get in and out of `direnv` you can use the following:
-- `direnv revoke` then exit root project directory
-- `direnv allow` then enter root project directory
+- `direnv allow` in root project directory
+- `direnv revoke` then exit root project directory. Coming back into root project directory you will be out of nix shell
 
 Starting standalone node using RSpace++
 1. `sbt ";clean ;compile ;stage"`
@@ -22,7 +22,7 @@ Standing up network using RSpace++
 3. `java -Djna.library.path=./rspace++/target/debug/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key <your_validator_key>`
 4. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/ ~/.rnode/node.certificate.pem ~/.rnode/node.key.pem`
 
-Standing up network using RSpace++ (Under Docker)
+Standing up network using RSpace++ (Under Docker) (Currently not working under Nix shell)
 1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 2. `docker compose -f docker/shard.yml up`
 
