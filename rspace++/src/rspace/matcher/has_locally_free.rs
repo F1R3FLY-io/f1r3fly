@@ -305,10 +305,7 @@ impl HasLocallyFree<MatchCase> for SpatialMatcherContext {
     }
 
     fn locally_free(&self, mc: MatchCase, depth: i32) -> Vec<u8> {
-        union(
-            mc.source.unwrap().locally_free,
-            self.locally_free(mc.pattern.unwrap(), depth + 1),
-        )
+        union(mc.source.unwrap().locally_free, self.locally_free(mc.pattern.unwrap(), depth + 1))
     }
 }
 
@@ -345,16 +342,16 @@ impl HasLocallyFree<Connective> for SpatialMatcherContext {
     }
 }
 
-// This implementation for type 'KeyValuePair' is NOT on the Scala side
-// Need to handle setting field types in 'RhoTypes.proto' with specific Rust structs
-// STUBBED OUT
+// See models/src/main/scala/coop/rchain/models/HasLocallyFree.scala
 impl HasLocallyFree<KeyValuePair> for SpatialMatcherContext {
     fn connective_used(&self, kv: KeyValuePair) -> bool {
-        kv.value.unwrap().connective_used
+        self.connective_used(kv.key.unwrap()) || self.connective_used(kv.value.unwrap())
     }
 
-    fn locally_free(&self, kv: KeyValuePair, _depth: i32) -> Vec<u8> {
-        kv.value.unwrap().locally_free
+    fn locally_free(&self, kv: KeyValuePair, depth: i32) -> Vec<u8> {
+        let mut result = self.locally_free(kv.key.unwrap(), depth);
+        result.append(&mut self.locally_free(kv.value.unwrap(), depth));
+        result
     }
 }
 

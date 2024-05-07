@@ -62,15 +62,15 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
 
     Sync[F].delay {
       println("\nhit findMatches")
-      println("\ntargets in findMatches: " + targets)
-      println("\npatterns in findMatches: " + patterns)
+      // println("\ntargets in findMatches: " + targets)
+      // println("\npatterns in findMatches: " + patterns)
     } *> {
       val ts: Seq[Candidate] = targets.zipWithIndex.map(tupled(Indexed[T]))
       val ps: List[Pattern]  = patterns.toList.zip(Stream.continually(ts))
 
       Sync[F].delay {
-        println("\nts: " + ts)
-        println("\nps: " + ps)
+        // println("\nts: " + ts.toList)
+        println("\nps: " + ps.length)
       } *> {
         val findMatches             = ps.forallM(MBM.resetSeen() >> findMatch(_))
         val result: F[(S, Boolean)] = findMatches.run(S(Map.empty, Set.empty))
@@ -78,7 +78,10 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
           case (state, true) =>
             val matches: Seq[(Candidate, ((P, _), R))] = state.matches.toSeq
             Some(matches.map(tupled((t, p) => (t.value, p._1._1, p._2))))
-          case _ => { println("\nreturning None in findMatches"); None }
+          case _ => {
+            Sync[F].delay(println("\nreturning None in findMatches"));
+            None
+          }
         }
       }
     }
@@ -89,10 +92,10 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
 
   private def findMatch(pattern: Pattern): MBM[Boolean] = {
     println("\nhit findMatch")
-    println("\nfindMatch pattern: " + pattern)
+    // println("\nfindMatch pattern: " + pattern._1 + pattern._2.toList)
     pattern match {
       //there are no more candidates for this pattern, there's not a match
-      case (_, Stream.Empty) => { println("\ncandidates empty"); pure(false) }
+      case (_, Stream.Empty) => { println("\ncandidates empty, returning false"); pure(false) }
       case (p, candidate +: candidates) => {
         notSeen(candidate).ifM(
           //that is a new candidate, let's try to match it
@@ -153,10 +156,12 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
     def getMatch(candidate: Candidate): MBM[Option[Pattern]] =
       StateT.inspect(_.matches.get(candidate).map(_._1))
 
-    def claimMatch(candidate: Candidate, pattern: Pattern, result: R): MBM[Unit] =
+    def claimMatch(candidate: Candidate, pattern: Pattern, result: R): MBM[Unit] = {
+      println("\nreturning true, claiming match")
       StateT.modify[F, S](s => {
         val newMatch = (candidate, (pattern, result))
         s.copy(matches = s.matches + newMatch)
       })
+    }
   }
 }
