@@ -2,10 +2,11 @@ use blake2::{digest::consts::U32, Blake2b, Digest};
 use hex::ToHex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter};
 
 // See src/firefly/f1r3fly/rspace/src/main/scala/coop/rchain/rspace/hashing/Blake2b256Hash.scala
 // The 'Hash' macro is needed here for test util function 'check_same_elements'
-#[derive(Eq, Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Eq, Clone, Serialize, Deserialize, Hash)]
 pub struct Blake2b256Hash(pub Vec<u8>);
 
 impl Blake2b256Hash {
@@ -46,5 +47,11 @@ impl PartialEq for Blake2b256Hash {
 impl std::fmt::Display for Blake2b256Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Blake2b256Hash({})", self.0.encode_hex::<String>())
+    }
+}
+
+impl Debug for Blake2b256Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
