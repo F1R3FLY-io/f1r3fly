@@ -298,6 +298,9 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         checkpoint <- runtime.createSoftCheckpoint
 
         evalSucceeded = evaluateResult.errors.isEmpty
+        hotChanges    <- runtime.getHotChanges
+        // _             = println("\nhit processDeploy, space toMap: " + hotChanges)
+        _ = println("\nhit processDeploy, evaluateResult: " + evaluateResult)
         deployResult = ProcessedDeploy(
           deploy,
           Cost.toProto(evaluateResult.cost),
@@ -554,7 +557,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
     for {
       data <- runtime.getData(channel)
       pars = data.flatMap(_.a.pars)
-      // _    = println(s"getDataPar called with: $channel, returning: ${pars.length}")
+      _    = println(s"\ngetDataPar called with: $channel, returning: ${pars.length}")
     } yield pars
 
   def getContinuationPar(channels: Seq[Par]): F[Seq[(Seq[BindPattern], Par)]] =

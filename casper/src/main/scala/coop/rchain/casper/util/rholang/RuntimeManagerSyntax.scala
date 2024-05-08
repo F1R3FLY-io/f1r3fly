@@ -68,6 +68,8 @@ final class RuntimeManagerOps[F[_]](private val rm: RuntimeManager[F]) extends A
       // Calculate difference values from final values on number channels
       diffs <- convertNumberChannelsToDiff(channelsData, preStateHash)
 
+      // _ = println("\ndiffs in saveMergeableChannels: " + diffs)
+
       // Convert to storage types
       deployChannels = diffs.map { data =>
         val channels = data.map(NumberChannel.tupled)

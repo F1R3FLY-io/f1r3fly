@@ -286,6 +286,9 @@ object RhoRuntime {
       spaces: List[RhoTuplespace[F]],
       processes: List[(Name, Arity, Remainder, BodyRef)]
   ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] =
+    // println("\nhit introduceSystemProcesses")
+    // println("spaces: " + spaces)
+    // println("processes: " + processes)
     processes.flatMap {
       case (name, arity, remainder, ref) =>
         val channels = List(name)
@@ -508,11 +511,13 @@ object RhoRuntime {
 
   def bootstrapRegistry[F[_]: Monad](runtime: RhoRuntime[F]): F[Unit] = {
     implicit val rand: Blake2b512Random = bootstrapRand
+    println("\nhit bootstrapRegistry")
     for {
       cost <- runtime.cost.get
       _    <- runtime.cost.set(Cost.UNSAFE_MAX)
-      _    <- runtime.inj(RegistryBootstrap.AST)
-      _    <- runtime.cost.set(cost)
+      // _    = println("\nRegistryBootstrap.AST: " + RegistryBootstrap.AST)
+      _ <- runtime.inj(RegistryBootstrap.AST)
+      _ <- runtime.cost.set(cost)
     } yield ()
   }
 

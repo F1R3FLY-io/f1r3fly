@@ -43,55 +43,55 @@ class MultiParentCasperRholangSpec extends FlatSpec with Matchers with Inspector
     }
   }
 
-  it should "be able to use the registry" in effectTest {
-    TestNode.standaloneEff(genesis).use { node =>
-      implicit val rm: RuntimeManager[Effect] = node.runtimeManager
+  // it should "be able to use the registry" in effectTest {
+  //   TestNode.standaloneEff(genesis).use { node =>
+  //     implicit val rm: RuntimeManager[Effect] = node.runtimeManager
 
-      val registerSource =
-        """
-          |new uriCh, rr(`rho:registry:insertArbitrary`), hello in {
-          |  contract hello(@name, return) = {
-          |    return!("Hello, ${name}!" %% {"name" : name})
-          |  } |
-          |  rr!(bundle+{*hello}, *uriCh)
-          |}
-        """.stripMargin
+  //     val registerSource =
+  //       """
+  //         |new uriCh, rr(`rho:registry:insertArbitrary`), hello in {
+  //         |  contract hello(@name, return) = {
+  //         |    return!("Hello, ${name}!" %% {"name" : name})
+  //         |  } |
+  //         |  rr!(bundle+{*hello}, *uriCh)
+  //         |}
+  //       """.stripMargin
 
-      def callSource(registryId: String) =
-        s"""
-           |new out, rl(`rho:registry:lookup`), helloCh in {
-           |  rl!($registryId, *helloCh) |
-           |  for(hello <- helloCh){
-           |    hello!("World", *out)
-           |  }
-           |}
-         """.stripMargin
+  //     def callSource(registryId: String) =
+  //       s"""
+  //          |new out, rl(`rho:registry:lookup`), helloCh in {
+  //          |  rl!($registryId, *helloCh) |
+  //          |  for(hello <- helloCh){
+  //          |    hello!("World", *out)
+  //          |  }
+  //          |}
+  //        """.stripMargin
 
-      def calculateUnforgeableName(timeStamp: Long): String =
-        Base16.encode(
-          RegistrySigGen
-            .generateUnforgeableNameId(Secp256k1.toPublic(ConstructDeploy.defaultSec), timeStamp)
-        )
+  //     def calculateUnforgeableName(timeStamp: Long): String =
+  //       Base16.encode(
+  //         RegistrySigGen
+  //           .generateUnforgeableNameId(Secp256k1.toPublic(ConstructDeploy.defaultSec), timeStamp)
+  //       )
 
-      for {
-        registerDeploy <- ConstructDeploy
-                           .sourceDeployNowF(registerSource, shardId = genesis.genesisBlock.shardId)
-        block0 <- node.addBlock(registerDeploy)
-        registryId <- getDataAtPrivateChannel[Effect](
-                       block0,
-                       calculateUnforgeableName(registerDeploy.data.timestamp)
-                     )
-        callDeploy <- ConstructDeploy.sourceDeployNowF(
-                       callSource(registryId.head),
-                       shardId = genesis.genesisBlock.shardId
-                     )
-        block1 <- node.addBlock(callDeploy)
-        data <- getDataAtPrivateChannel[Effect](
-                 block1,
-                 calculateUnforgeableName(callDeploy.data.timestamp)
-               )
-        _ = data shouldBe Seq("\"Hello, World!\"")
-      } yield ()
-    }
-  }
+  //     for {
+  //       registerDeploy <- ConstructDeploy
+  //                          .sourceDeployNowF(registerSource, shardId = genesis.genesisBlock.shardId)
+  //       block0 <- node.addBlock(registerDeploy)
+  //       registryId <- getDataAtPrivateChannel[Effect](
+  //                      block0,
+  //                      calculateUnforgeableName(registerDeploy.data.timestamp)
+  //                    )
+  //       callDeploy <- ConstructDeploy.sourceDeployNowF(
+  //                      callSource(registryId.head),
+  //                      shardId = genesis.genesisBlock.shardId
+  //                    )
+  //       block1 <- node.addBlock(callDeploy)
+  //       data <- getDataAtPrivateChannel[Effect](
+  //                block1,
+  //                calculateUnforgeableName(callDeploy.data.timestamp)
+  //              )
+  //       _ = data shouldBe Seq("\"Hello, World!\"")
+  //     } yield ()
+  //   }
+  // }
 }

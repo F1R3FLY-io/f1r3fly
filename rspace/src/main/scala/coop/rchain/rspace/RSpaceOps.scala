@@ -150,6 +150,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
   ): F[MaybeActionResult] =
     for {
       _ <- Log[F].debug(s"produce: no matching continuation found")
+      // _ <- Sync[F].delay(println("\nHit storeData, data: " + data))
       _ <- store.putDatum(channel, Datum(data, persist, produceRef))
       _ <- Log[F].debug(s"produce: persisted <data: $data> at <channel: $channel>")
     } yield None
@@ -199,7 +200,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
       } else
         (for {
           // _          <- Sync[F].delay(logger.debug("\nHit consume"))
-          _          <- Sync[F].delay(println("\nHit consume"))
+          // _          <- Sync[F].delay(println("\nHit consume"))
           consumeRef <- Sync[F].delay(Consume(channels, patterns, continuation, persist))
           result <- consumeLockF(channels) {
                      lockedConsume(
@@ -231,6 +232,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
     ContextShift[F].evalOn(scheduler) {
       (for {
         produceRef <- Sync[F].delay(Produce(channel, data, persist))
+        // _          <- Sync[F].delay(println("\nHit produce, data: " + data))
         result <- produceLockF(channel)(
                    lockedProduce(channel, data, persist, produceRef)
                  )
@@ -308,6 +310,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
                        _ <- Log[F].debug(
                              s"storing <(patterns, continuation): ($patterns, $continuation)> at <channels: $channels>"
                            )
+                       //  map <- store.toMap
+                       //  _   = println("\nstore map after install: " + map.toArray.length)
                      } yield None
                    case Some(_) => {
                      println("\nInstalling can be done only on startup")

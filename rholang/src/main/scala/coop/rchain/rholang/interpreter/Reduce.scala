@@ -69,11 +69,17 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: _cost](
   ): M[Unit] =
     updateMergeableChannels(chan) *>
       space.produce(chan, data, persist = persistent) >>= { produceResult =>
-      continue(
-        unpackOptionWithPeek(produceResult),
-        produce(chan, data, persistent),
-        persistent
-      )
+      {
+        // Sync[M].delay {
+        //   println("\nHit produce in Reduce, data: " + data)
+        //   println("channel: " + chan)
+        // } *>
+        continue(
+          unpackOptionWithPeek(produceResult),
+          produce(chan, data, persistent),
+          persistent
+        )
+      }
     }
 
   /**

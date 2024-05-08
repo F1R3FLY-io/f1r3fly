@@ -29,14 +29,18 @@ object RSpaceImporterStore {
     override def setHistoryItems[Value](
         data: Seq[(Blake2b256Hash, Value)],
         toBuffer: Value => ByteBuffer
-    ): F[Unit] =
+    ): F[Unit] = {
+      println("\nhit setHistoryItems")
       historyStore.put(data.map(_.leftMap(_.bytes.toDirectByteBuffer)), toBuffer)
+    }
 
     override def setDataItems[Value](
         data: Seq[(Blake2b256Hash, Value)],
         toBuffer: Value => ByteBuffer
-    ): F[Unit] =
+    ): F[Unit] = {
+      println("\nhit setDataItems")
       valueStore.put(data.map(_.leftMap(_.bytes.toDirectByteBuffer)), toBuffer)
+    }
 
     override def setRoot(key: Blake2b256Hash): F[Unit] =
       roots.recordRoot(key)

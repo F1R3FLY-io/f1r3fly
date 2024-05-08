@@ -160,6 +160,7 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
   def getData(channel: C): F[Seq[Datum[A]]] =
     for {
       fromHistoryStore <- getDataFromHistoryStore(channel)
+      // _                <- Sync[F].delay(println("fromHistoryStore in HotStore getData: " + fromHistoryStore))
       result <- hotStoreState.modify { state =>
                  state.data
                    .get(channel)
@@ -175,6 +176,7 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
   def putDatum(channel: C, datum: Datum[A]): F[Unit] =
     for {
       fromHistoryStore <- getDataFromHistoryStore(channel)
+      // _                <- Sync[F].delay(println("\nHit putDatum, datum: " + datum))
       _ <- hotStoreState.update { state =>
             state.copy(
               data = state.data

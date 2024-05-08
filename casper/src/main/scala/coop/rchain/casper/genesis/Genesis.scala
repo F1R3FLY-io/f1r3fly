@@ -12,6 +12,8 @@ import coop.rchain.casper.util.rholang.{RuntimeManager, Tools}
 import coop.rchain.crypto.signatures.Signed
 import coop.rchain.models.{GPrivate, Par}
 
+import coop.rchain.casper.{PrettyPrinter}
+
 final case class Genesis(
     shardId: String,
     timestamp: Long,
@@ -73,6 +75,8 @@ object Genesis {
   ): F[BlockMessage] = {
     import genesis._
 
+    // println("\nhit createGenesisBlock, pos: " + genesis)
+
     val blessedTerms = defaultBlessedTerms(
       timestamp,
       proofOfStake,
@@ -96,6 +100,21 @@ object Genesis {
       processedDeploys: Seq[ProcessedDeploy]
   ): BlockMessage = {
     import genesis._
+
+    println("\nhit createProcessedDeploy")
+    // println("genesis: " + genesis)
+    // println(
+    //   "start hash: " + PrettyPrinter
+    //     .buildString(startHash)
+    // )
+    // println(
+    //   "state hash: " + PrettyPrinter
+    //     .buildString(stateHash)
+    // )
+    // println("processedDeploys: " + processedDeploys)
+    // processedDeploys.foreach(
+    //   deploy => println(s"processedDeploy field: ${deploy.deployLog}")
+    // )
 
     val state = RChainState(
       preStateHash = startHash,
