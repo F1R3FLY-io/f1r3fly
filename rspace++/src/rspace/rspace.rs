@@ -376,12 +376,7 @@ where
         }
     }
 
-    pub async fn produce(
-        &mut self,
-        channel: C,
-        data: A,
-        persist: bool,
-    ) -> MaybeActionResult<C, P, A, K> {
+    pub fn produce(&mut self, channel: C, data: A, persist: bool) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);

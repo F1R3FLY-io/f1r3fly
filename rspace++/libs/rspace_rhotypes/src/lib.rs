@@ -42,7 +42,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let rspace = rt
         .block_on(async {
-            println!("\nHit space_new"); 
+            println!("\nHit space_new");
 
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
@@ -142,17 +142,24 @@ pub extern "C" fn produce(
     let channel = Par::decode(channel_slice).unwrap();
     let data = ListParWithRandom::decode(data_slice).unwrap();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let result_option = rt.block_on(async {
-        unsafe {
-            (*rspace)
-                .rspace
-                .lock()
-                .unwrap()
-                .produce(channel, data, persist)
-                .await
-        }
-    });
+    // let rt = tokio::runtime::Runtime::new().unwrap();
+    // let result_option = rt.block_on(async {
+    //     unsafe {
+    //         (*rspace)
+    //             .rspace
+    //             .lock()
+    //             .unwrap()
+    //             .produce(channel, data, persist)
+    //             .await
+    //     }
+    // });
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .produce(channel, data, persist)
+    };
 
     match result_option {
         Some((cont_result, rspace_results)) => {
