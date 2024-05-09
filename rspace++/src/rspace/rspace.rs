@@ -207,7 +207,23 @@ where
         self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
     }
 
+    fn log_produce(
+        &mut self,
+        produce_ref: Produce,
+        _channel: C,
+        _data: A,
+        persist: bool,
+    ) -> Produce {
+        if !persist {
+            let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
+            *entry += 1;
+        }
+
+        produce_ref
+    }
+
     pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        println!("\nhit rspace++ create_checkpoint");
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = next_history;
@@ -361,7 +377,7 @@ where
     }
 
     pub async fn produce(
-        &self,
+        &mut self,
         channel: C,
         data: A,
         persist: bool,
@@ -370,6 +386,7 @@ where
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
+        _ = self.log_produce(produce_ref.clone(), channel.clone(), data.clone(), persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);
         result
@@ -449,7 +466,7 @@ where
                     //     "storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>",
                     //     patterns, continuation, channels
                     // );
-                    // println!("store after install: {:?}\n", self.store.to_map().len());
+                    // println!("store length after install: {:?}\n", self.store.to_map().len());
                     None
                 }
                 Some(_) => {
@@ -465,6 +482,7 @@ where
     }
 
     pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+        println!("\nhit rspace++ reset");
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
@@ -490,11 +508,15 @@ where
     }
 
     pub fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
+        println!("\nhit rspace++ create_soft_checkpoint");
+
         let cache_snapshot = self.store.snapshot();
+        let curr_produce_counter = self.produce_counter.clone();
         self.produce_counter = HashMap::new();
+
         SoftCheckpoint {
             cache_snapshot,
-            produce_counter: HashMap::new(),
+            produce_counter: curr_produce_counter,
         }
     }
 
