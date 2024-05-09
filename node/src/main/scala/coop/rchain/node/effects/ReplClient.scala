@@ -19,7 +19,8 @@ trait ReplClient[F[_]] {
   def run(line: String): F[Either[Throwable, String]]
   def eval(
       fileNames: List[String],
-      printUnmatchedSendsOnly: Boolean
+      printUnmatchedSendsOnly: Boolean,
+      language: String
   ): F[List[Either[Throwable, String]]]
 }
 
@@ -50,23 +51,29 @@ class GrpcReplClient[F[_]: Monixable: Sync](host: String, port: Int, maxMessageS
 
   def eval(
       fileNames: List[String],
-      unmatchedSends: Boolean
+      unmatchedSends: Boolean,
+      language: String
   ): F[List[Either[Throwable, String]]] = {
     import cats.instances.list._
 
-    fileNames.traverse(eval(_, unmatchedSends))
+    fileNames.traverse(eval(_, unmatchedSends, language))
   }
 
-  def eval(fileName: String, printUnmatchedSendsOnly: Boolean): F[Either[Throwable, String]] = {
+  def eval(
+      fileName: String,
+      printUnmatchedSendsOnly: Boolean,
+      language: String
+  ): F[Either[Throwable, String]] = {
     val filePath = Paths.get(fileName)
-    if (Files.exists(filePath))
-      stub
-        .eval(EvalRequest(readContent(filePath), printUnmatchedSendsOnly))
+    if (Files.exists(filePath)) {
+      val stbResult = stub
+        .eval(EvalRequest(readContent(filePath), printUnmatchedSendsOnly, language))
         .fromTask
         .map(_.output)
         .attempt
         .map(_.leftMap(processError))
-    else Sync[F].delay(new FileNotFoundException("File not found").asLeft)
+      stbResult
+    } else Sync[F].delay(new FileNotFoundException("File not found").asLeft)
   }
 
   private def readContent(filePath: Path): String =

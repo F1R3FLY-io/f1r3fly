@@ -145,7 +145,7 @@ object RholangCLI {
     Console.print("\nrholang> ")
 
   private def printNormalizedTerm(normalizedTerm: Par): Unit = {
-    Console.println("\nEvaluating:")
+    Console.println("\nEvaluating rhocli:")
     Console.println(PrettyPrinter().buildString(normalizedTerm))
   }
 
