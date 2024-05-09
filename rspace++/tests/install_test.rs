@@ -41,9 +41,7 @@ async fn history_repository_should_process_insert_one_datum() {
     //     .await;
     // assert!(install_opt.is_none());
 
-    let produce = rspace
-        .produce(channels[0].clone(), ListParWithRandom::default(), false)
-        .await;
+    let produce = rspace.produce(channels[0].clone(), ListParWithRandom::default(), false);
     assert!(produce.is_none());
 
     let install_opt2 = rspace.install(channels, patterns, continuation);
