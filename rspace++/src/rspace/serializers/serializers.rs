@@ -29,8 +29,8 @@ pub fn encode_continuations<P: Clone + Serialize, K: Clone + Serialize>(
 ) -> Vec<u8> {
     let mut serialized_continuations: Vec<Vec<u8>> = conts
         .iter()
-        .map(|datum| {
-            bincode::serialize(datum).expect("Serializers: Unable to serialize continuation")
+        .map(|wk| {
+            bincode::serialize(wk).expect("Serializers: Unable to serialize continuation")
         })
         .collect();
 

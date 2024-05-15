@@ -1,3 +1,4 @@
+use chrono::Local;
 use dashmap::DashMap;
 use prost::Message;
 use rand::Rng;
@@ -23,7 +24,8 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
 };
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -142,17 +144,6 @@ pub extern "C" fn produce(
     let channel = Par::decode(channel_slice).unwrap();
     let data = ListParWithRandom::decode(data_slice).unwrap();
 
-    // let rt = tokio::runtime::Runtime::new().unwrap();
-    // let result_option = rt.block_on(async {
-    //     unsafe {
-    //         (*rspace)
-    //             .rspace
-    //             .lock()
-    //             .unwrap()
-    //             .produce(channel, data, persist)
-    //             .await
-    //     }
-    // });
     let result_option = unsafe {
         (*rspace)
             .rspace
@@ -163,13 +154,16 @@ pub extern "C" fn produce(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
+            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_result.continuation),
+                continuation: Some(cont_lock.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
+            drop(cont_lock);
+
             let protobuf_results = rspace_results
                 .into_iter()
                 .map(|result| RSpaceResultProto {
@@ -204,6 +198,11 @@ pub extern "C" fn consume(
 ) -> *const u8 {
     // println!("\nHit rust consume");
 
+    // let thread_id = thread::current().id();
+    // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
+
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
 
@@ -223,13 +222,16 @@ pub extern "C" fn consume(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
+            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_result.continuation),
+                continuation: Some(cont_lock.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
+            drop(cont_lock);
+
             let protobuf_results = rspace_results
                 .into_iter()
                 .map(|result| RSpaceResultProto {
@@ -393,25 +395,30 @@ pub extern "C" fn get_waiting_continuations(
 
     let wks_protos: Vec<WaitingContinuationProto> = wks
         .into_iter()
-        .map(|wk| WaitingContinuationProto {
-            patterns: wk.patterns,
-            continuation: Some(wk.continuation),
-            persist: wk.persist,
-            peeks: wk
-                .peeks
-                .into_iter()
-                .map(|peek| SortedSetElement { value: peek as i32 })
-                .collect(),
-            source: Some(ConsumeProto {
-                channel_hashes: wk
-                    .source
-                    .channel_hashes
-                    .iter()
-                    .map(|hash| hash.bytes())
+        .map(|wk| {
+            let cont_lock = wk.continuation.lock().unwrap();
+            let res = WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(cont_lock.clone()),
+                persist: wk.persist,
+                peeks: wk
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
                     .collect(),
-                hash: wk.source.hash.bytes(),
-                persistent: wk.source.persistent,
-            }),
+                source: Some(ConsumeProto {
+                    channel_hashes: wk
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
+                }),
+            };
+            drop(cont_lock);
+            res
         })
         .collect();
 
@@ -471,25 +478,30 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
         let wks = value
             .wks
             .into_iter()
-            .map(|wk| WaitingContinuationProto {
-                patterns: wk.patterns,
-                continuation: Some(wk.continuation),
-                persist: wk.persist,
-                peeks: wk
-                    .peeks
-                    .into_iter()
-                    .map(|peek| SortedSetElement { value: peek as i32 })
-                    .collect(),
-                source: Some(ConsumeProto {
-                    channel_hashes: wk
-                        .source
-                        .channel_hashes
-                        .iter()
-                        .map(|hash| hash.bytes())
+            .map(|wk| {
+                let cont_lock = wk.continuation.lock().unwrap();
+                let res = WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(cont_lock.clone()),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
                         .collect(),
-                    hash: wk.source.hash.bytes(),
-                    persistent: wk.source.persistent,
-                }),
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                };
+                drop(cont_lock);
+                res
             })
             .collect();
 
@@ -541,25 +553,30 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     for (key, value) in hot_store_state.continuations.clone().into_iter() {
         let wks: Vec<WaitingContinuationProto> = value
             .into_iter()
-            .map(|wk| WaitingContinuationProto {
-                patterns: wk.patterns,
-                continuation: Some(wk.continuation),
-                persist: wk.persist,
-                peeks: wk
-                    .peeks
-                    .into_iter()
-                    .map(|peek| SortedSetElement { value: peek as i32 })
-                    .collect(),
-                source: Some(ConsumeProto {
-                    channel_hashes: wk
-                        .source
-                        .channel_hashes
-                        .iter()
-                        .map(|hash| hash.bytes())
+            .map(|wk| {
+                let cont_lock = wk.continuation.lock().unwrap();
+                let res = WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(cont_lock.clone()),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
                         .collect(),
-                    hash: wk.source.hash.bytes(),
-                    persistent: wk.source.persistent,
-                }),
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                };
+                drop(cont_lock);
+                res
             })
             .collect();
 
@@ -567,9 +584,10 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     }
 
     for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
+        let cont_lock = value.continuation.lock().unwrap();
         let wk = WaitingContinuationProto {
             patterns: value.patterns,
-            continuation: Some(value.continuation),
+            continuation: Some(cont_lock.clone()),
             persist: value.persist,
             peeks: value
                 .peeks
@@ -690,7 +708,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
                     .into_iter()
                     .map(|cont_proto| WaitingContinuation {
                         patterns: cont_proto.patterns,
-                        continuation: cont_proto.continuation.unwrap(),
+                        continuation: Arc::new(Mutex::new(cont_proto.continuation.unwrap())),
                         persist: cont_proto.persist,
                         peeks: cont_proto
                             .peeks
@@ -729,7 +747,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
             let wk_proto = map_entry.value.unwrap();
             let value = WaitingContinuation {
                 patterns: wk_proto.patterns,
-                continuation: wk_proto.continuation.unwrap(),
+                continuation: Arc::new(Mutex::new(wk_proto.continuation.unwrap())),
                 persist: wk_proto.persist,
                 peeks: wk_proto.peeks.iter().map(|element| element.value).collect(),
                 source: {

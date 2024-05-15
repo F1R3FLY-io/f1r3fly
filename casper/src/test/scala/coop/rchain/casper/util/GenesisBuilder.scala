@@ -158,7 +158,7 @@ object GenesisBuilder {
                          mStore,
                          Genesis.NonNegativeMergeableTagName
                        )
-      _               = println("\ncreating genesis block")
+      // _               = println("\ncreating genesis block")
       genesis         <- Genesis.createGenesisBlock(runtimeManager, genesisParameters)
       blockStore      <- KeyValueBlockStore[Task](kvsManager)
       _               <- blockStore.put(genesis.blockHash, genesis)

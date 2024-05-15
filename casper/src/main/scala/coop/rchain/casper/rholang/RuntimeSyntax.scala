@@ -299,10 +299,21 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       for {
         fallback <- runtime.createSoftCheckpoint
 
+        // _ = println("\npre-evaluate soft-checkpoint")
+        // _ = println("continuations: " + fallback.cacheSnapshot.continuations)
+
         // Evaluate deploy
         evaluateResult <- evaluate(deploy)
 
         checkpoint <- runtime.createSoftCheckpoint
+
+        _ = println(
+          "\npost-evaluate soft-checkpoint continuations length: " + checkpoint.cacheSnapshot.continuations.toArray.length
+        )
+
+        // _ = println(
+        //   "\npost-evaluate soft-checkpoint produceCounter length: " + checkpoint.produceCounter.toArray.length
+        // )
 
         evalSucceeded = evaluateResult.errors.isEmpty
         hotChanges    <- runtime.getHotChanges

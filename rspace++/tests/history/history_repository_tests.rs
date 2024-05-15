@@ -350,7 +350,7 @@ fn join(s: i32) -> Vec<Vec<String>> {
 fn continuation(s: i32) -> WaitingContinuation<String, String> {
     WaitingContinuation {
         patterns: vec![format!("pattern-{}", s)],
-        continuation: format!("cont-{}", s),
+        continuation: Arc::new(Mutex::new(format!("cont-{}", s))),
         persist: true,
         peeks: BTreeSet::new(),
         source: Consume {

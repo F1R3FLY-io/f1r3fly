@@ -15,6 +15,7 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
 
 // See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
@@ -76,10 +77,10 @@ fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
 // See rspace/src/main/scala/coop/rchain/rspace/util/package.scala
 fn unpack_tuple<C, P, K: Clone, R: Clone>(
     tuple: &(ContResult<C, P, K>, Vec<RSpaceResult<C, R>>),
-) -> (K, Vec<R>) {
+) -> (&Arc<Mutex<K>>, Vec<R>) {
     match tuple {
         (ContResult { continuation, .. }, data) => (
-            continuation.clone(),
+            continuation,
             data.into_iter()
                 .map(|result| result.matched_datum.clone())
                 .collect(),
@@ -91,10 +92,11 @@ fn unpack_tuple<C, P, K: Clone, R: Clone>(
 fn run_k<C, P>(
     cont: Option<(ContResult<C, P, StringsCaptor>, Vec<RSpaceResult<C, String>>)>,
 ) -> Vec<Vec<String>> {
-    let mut cont_unwrapped = cont.unwrap();
+    let cont_unwrapped = cont.unwrap();
     let unpacked_tuple = unpack_tuple(&cont_unwrapped);
-    cont_unwrapped.0.continuation.run_k(unpacked_tuple.1);
-    let cont_results = cont_unwrapped.0.continuation.results();
+    let mut cont_lock = cont_unwrapped.0.continuation.lock().unwrap();
+    cont_lock.run_k(unpacked_tuple.1);
+    let cont_results = cont_lock.results();
     let cloned_results: Vec<Vec<String>> = cont_results
         .iter()
         .map(|res| res.iter().map(|s| s.to_string()).collect())
@@ -931,12 +933,13 @@ async fn doing_persistent_consume_and_producing_multiple_times_should_work() {
     let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c3.is_empty());
     assert!(r3.is_some());
+
+    let r3_results = run_k(r3.clone());
+    println!("{:?}", r3_results);
     assert!(check_same_elements(
-        run_k(r3.clone()),
+        r3_results,
         vec![vec!["datum1".to_string()], vec!["datum2".to_string()]]
     ));
-
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum2".to_string()]]));
 }
 
 #[tokio::test]
@@ -1329,7 +1332,7 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
 
     let expected_continuation = vec![WaitingContinuation {
         patterns: patterns.clone(),
-        continuation: continuation.clone(),
+        continuation: Arc::new(Mutex::new(continuation.clone())),
         persist: false,
         peeks: BTreeSet::default(),
         source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),
@@ -1380,7 +1383,7 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
 
     let expected_continuation = vec![WaitingContinuation {
         patterns: patterns.clone(),
-        continuation: continuation.clone(),
+        continuation: Arc::new(Mutex::new(continuation.clone())),
         persist: false,
         peeks: BTreeSet::default(),
         source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),

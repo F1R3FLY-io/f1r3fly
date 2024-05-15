@@ -85,7 +85,7 @@ where
 
         let wk = WaitingContinuation {
             patterns,
-            continuation,
+            continuation: Arc::new(Mutex::new(continuation)),
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),
@@ -223,7 +223,7 @@ where
     }
 
     pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        println!("\nhit rspace++ create_checkpoint");
+        // println!("\nhit rspace++ create_checkpoint");
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = next_history;
@@ -447,7 +447,7 @@ where
                         channels.clone(),
                         WaitingContinuation {
                             patterns,
-                            continuation,
+                            continuation: Arc::new(Mutex::new(continuation)),
                             persist: true,
                             peeks: BTreeSet::default(),
                             source: consume_ref,
@@ -477,7 +477,7 @@ where
     }
 
     pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-        println!("\nhit rspace++ reset");
+        // println!("\nhit rspace++ reset");
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
@@ -503,7 +503,7 @@ where
     }
 
     pub fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
-        println!("\nhit rspace++ create_soft_checkpoint");
+        // println!("\nhit rspace++ create_soft_checkpoint");
 
         let cache_snapshot = self.store.snapshot();
         let curr_produce_counter = self.produce_counter.clone();
