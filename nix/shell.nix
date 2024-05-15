@@ -23,6 +23,7 @@ in mkShell {
     ammonite
     rustc
     cargo
+    maven
     rustfmt
     rust-analyzer
     clippy
@@ -43,6 +44,7 @@ in mkShell {
     libiconv
     scala
 		protobuf
+    nix
   ];
 
     shellHook = ''

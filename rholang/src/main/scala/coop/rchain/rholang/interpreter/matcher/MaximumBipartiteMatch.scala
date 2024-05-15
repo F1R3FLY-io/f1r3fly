@@ -6,9 +6,10 @@ import cats.syntax.all._
 
 import scala.Function.tupled
 import scala.collection.immutable.Stream
+import cats.effect.Sync
 
 object MaximumBipartiteMatch {
-  def apply[P, T, R, F[_]: Monad](
+  def apply[P, T, R, F[_]: Monad: Sync](
       matchFun: (P, T) => F[Option[R]]
   ): MaximumBipartiteMatch[P, T, R, F] = {
     val fM = implicitly[Monad[F]]
@@ -54,45 +55,69 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
   private type Candidate = Indexed[T]
   private case class Indexed[A](value: A, index: Int)
 
-  def findMatches(patterns: Seq[P], targets: Seq[T]): F[Option[Seq[(T, P, R)]]] = {
+  def findMatches(patterns: Seq[P], targets: Seq[T])(
+      implicit s: Sync[F]
+  ): F[Option[Seq[(T, P, R)]]] = {
     import cats.instances.list._
 
-    val ts: Seq[Candidate]      = targets.zipWithIndex.map(tupled(Indexed[T]))
-    val ps: List[Pattern]       = patterns.toList.zip(Stream.continually(ts))
-    val findMatches             = ps.forallM(MBM.resetSeen() >> findMatch(_))
-    val result: F[(S, Boolean)] = findMatches.run(S(Map.empty, Set.empty))
-    result.map {
-      case (state, true) =>
-        val matches: Seq[(Candidate, ((P, _), R))] = state.matches.toSeq
-        Some(matches.map(tupled((t, p) => (t.value, p._1._1, p._2))))
-      case _ => None
+    Sync[F].delay {
+      println("\nhit findMatches")
+      println("\ntargets in findMatches: " + targets)
+      println("\npatterns in findMatches: " + patterns)
+    } *> {
+      val ts: Seq[Candidate] = targets.zipWithIndex.map(tupled(Indexed[T]))
+      val ps: List[Pattern]  = patterns.toList.zip(Stream.continually(ts))
+
+      Sync[F].delay {
+        println("\nts: " + ts)
+        println("\nps: " + ps)
+      } *> {
+        val findMatches             = ps.forallM(MBM.resetSeen() >> findMatch(_))
+        val result: F[(S, Boolean)] = findMatches.run(S(Map.empty, Set.empty))
+        result.map {
+          case (state, true) =>
+            val matches: Seq[(Candidate, ((P, _), R))] = state.matches.toSeq
+            Some(matches.map(tupled((t, p) => (t.value, p._1._1, p._2))))
+          case _ => { println("\nreturning None in findMatches"); None }
+        }
+      }
     }
   }
 
   private type MBM[A] = StateT[F, S, A]
   import MBM._
 
-  private def findMatch(pattern: Pattern): MBM[Boolean] =
+  private def findMatch(pattern: Pattern): MBM[Boolean] = {
+    println("\nhit findMatch")
+    println("\nfindMatch pattern: " + pattern)
     pattern match {
       //there are no more candidates for this pattern, there's not a match
-      case (_, Stream.Empty) => pure(false)
-      case (p, candidate +: candidates) =>
+      case (_, Stream.Empty) => { println("\ncandidates empty"); pure(false) }
+      case (p, candidate +: candidates) => {
         notSeen(candidate).ifM(
           //that is a new candidate, let's try to match it
           liftF(matchFunction(p, candidate.value)) >>= {
-            case Some(matchResult) =>
+            case Some(matchResult) => {
               //this candidate matches the pattern, let's try to assign it a match
               addSeen(candidate) >> tryClaimMatch(candidate, pattern, matchResult)
-            case None =>
+            }
+            case None => {
               //this candidate doesn't match, proceed to the others
               findMatch((p, candidates))
+            }
           },
           //we've seen this candidate already, proceed to the others
           findMatch((p, candidates))
         )
+      }
     }
+  }
 
-  private def tryClaimMatch(candidate: Candidate, pattern: Pattern, result: R): MBM[Boolean] =
+  private def tryClaimMatch(candidate: Candidate, pattern: Pattern, result: R): MBM[Boolean] = {
+    println("\nhit tryClaimMatch")
+    // println("\ncandidate in tryClaimMatch: " + candidate)
+    // println("\npattern in tryClaimMatch: " + pattern)
+    // println("\nresult in tryClaimMatch: " + result)
     for {
       previousMatch <- getMatch(candidate)
       result <- previousMatch match {
@@ -109,6 +134,7 @@ trait MaximumBipartiteMatch[P, T, R, F[_]] {
                    )
                }
     } yield result
+  }
 
   private object MBM {
 
