@@ -1,4 +1,5 @@
 use crate::rspace::event::{Consume, Produce};
+use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
@@ -80,7 +81,8 @@ where
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Clone, Debug)]
+// The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
+#[derive(Clone, Debug, Arbitrary)]
 pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
     pub continuation: Arc<Mutex<K>>,

@@ -1,12 +1,14 @@
 use blake2::{digest::consts::U32, Blake2b, Digest};
 use hex::ToHex;
+use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 
 // See src/firefly/f1r3fly/rspace/src/main/scala/coop/rchain/rspace/hashing/Blake2b256Hash.scala
 // The 'Hash' macro is needed here for test util function 'check_same_elements'
-#[derive(Eq, Clone, Serialize, Deserialize, Hash)]
+// The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
+#[derive(Eq, Clone, Serialize, Deserialize, Hash, Arbitrary)]
 pub struct Blake2b256Hash(pub Vec<u8>);
 
 impl Blake2b256Hash {
