@@ -93,11 +93,21 @@ pub struct WaitingContinuation<P: Clone, K: Clone> {
 
 impl<P: Clone + PartialEq, K: Clone + PartialEq> PartialEq for WaitingContinuation<P, K> {
     fn eq(&self, other: &Self) -> bool {
-        self.patterns == other.patterns
-            && *self.continuation.lock().unwrap() == *other.continuation.lock().unwrap()
+        let self_cont = self.continuation.lock().unwrap();
+        let self_cont_cloned = self_cont.clone();
+        drop(self_cont);
+
+        let other_cont = other.continuation.lock().unwrap();
+        let other_cont_cloned = other_cont.clone();
+        drop(other_cont);
+
+        let result = self.patterns == other.patterns
+            && self_cont_cloned == other_cont_cloned
             && self.persist == other.persist
             && self.peeks == other.peeks
-            && self.source == other.source
+            && self.source == other.source;
+
+        result
     }
 }
 

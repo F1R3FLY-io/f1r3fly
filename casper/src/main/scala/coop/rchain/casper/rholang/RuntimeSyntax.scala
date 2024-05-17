@@ -307,9 +307,9 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
 
         checkpoint <- runtime.createSoftCheckpoint
 
-        _ = println(
-          "\npost-evaluate soft-checkpoint continuations length: " + checkpoint.cacheSnapshot.continuations.toArray.length
-        )
+        // _ = println(
+        //   "\npost-evaluate soft-checkpoint continuations length: " + checkpoint.cacheSnapshot.continuations.toArray.length
+        // )
 
         // _ = println(
         //   "\npost-evaluate soft-checkpoint produceCounter length: " + checkpoint.produceCounter.toArray.length

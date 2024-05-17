@@ -24,11 +24,11 @@ type Testing = (Pattern, StringsCaptor);
 type Join = Vec<Channel>;
 type Joins = Vec<Join>;
 
-const SIZE_RANGE: usize = 2;
+const SIZE_RANGE: usize = 2; // 10
 
 proptest! {
   #![proptest_config(ProptestConfig {
-    cases: 1,
+    cases: 1, // 20
     failure_persistence: None,
     .. ProptestConfig::default()
 })]
@@ -40,16 +40,13 @@ in vec(any::<Continuation>(), 0..=SIZE_RANGE)) {
 
       history.put_continuations(channels.clone(), history_continuations.clone());
 
-      // println!("\ntesting");
-
       let cache = state.lock().unwrap();
-      // println!("{:?}", cache.continuations.len());
       assert!(cache.continuations.is_empty());
       drop(cache);
 
       let read_continuations = hot_store.get_continuations(channels.clone());
-      // let cache = state.lock().unwrap();
-      // assert_eq!(cache.continuations.get(&channels).unwrap().value().clone(), history_continuations);
+      let cache = state.lock().unwrap();
+      assert_eq!(cache.continuations.get(&channels).unwrap().clone(), history_continuations);
       assert_eq!(read_continuations, history_continuations);
   }
 }
