@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use dashmap::DashMap;
 use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
@@ -35,7 +36,7 @@ proptest! {
 
   #[test]
   fn get_continuations_when_cache_is_empty_should_read_from_history_and_put_into_cache(channels in  vec(any::<Channel>(), 0..=SIZE_RANGE), history_continuations
-in vec(any::<Continuation>(), 0..=SIZE_RANGE)) {
+    in vec(any::<Continuation>(), 0..=SIZE_RANGE)) {
       let (state, history, hot_store) = fixture();
 
       history.put_continuations(channels.clone(), history_continuations.clone());
@@ -48,6 +49,22 @@ in vec(any::<Continuation>(), 0..=SIZE_RANGE)) {
       let cache = state.lock().unwrap();
       assert_eq!(cache.continuations.get(&channels).unwrap().clone(), history_continuations);
       assert_eq!(read_continuations, history_continuations);
+  }
+
+  #[test]
+  fn get_continuations_when_cache_contains_data_should_read_from_cache_ignoring_history(channels in  vec(any::<Channel>(), 0..=SIZE_RANGE), history_continuations
+    in vec(any::<Continuation>(), 0..=SIZE_RANGE), cached_continuations in vec(any::<Continuation>(), 0..=SIZE_RANGE)) {
+      let (state, history, hot_store) = fixture();
+
+      history.put_continuations(channels.clone(), history_continuations.clone());
+      let mut state_lock = state.lock().unwrap();
+      *state_lock = HotStoreState { continuations: DashMap::from_iter(vec![(channels.clone(), cached_continuations.clone())]), installed_continuations: DashMap::new(), data: DashMap::new(), joins: DashMap::new(), installed_joins: DashMap::new() };
+      drop(state_lock);
+
+      let read_continuations = hot_store.get_continuations(channels.clone());
+      let cache = state.lock().unwrap();
+      assert_eq!(cache.continuations.get(&channels).unwrap().clone(), cached_continuations);
+      assert_eq!(read_continuations, cached_continuations);
   }
 }
 
