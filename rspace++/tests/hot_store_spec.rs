@@ -17,7 +17,6 @@ use rspace_plus_plus::rspace::{
         InsertContinuations, InsertData, InsertJoins,
     },
     internal::{Datum, WaitingContinuation},
-    matcher::r#match::Match,
 };
 use rstest::*;
 use serde::Serialize;
@@ -392,7 +391,7 @@ proptest! {
 
   #[test]
   fn remove_join_when_cache_is_empty_should_read_from_history_and_remove_join(channel in  any::<Channel>(), history_joins in any::<Joins>(), index in any::<i32>(), join in any::<Join>()) {
-      prop_assert!(!history_joins.contains(&join));
+      prop_assume!(!history_joins.contains(&join));
       let (state, history, hot_store) = fixture();
 
       history.put_joins(channel.clone(), history_joins.clone());
@@ -406,24 +405,23 @@ proptest! {
   #[test]
   fn remove_join_when_cache_contains_data_should_read_from_the_cache_and_remove_join(channel in  any::<Channel>(), history_joins in any::<Joins>(), cached_joins in any::<Joins>(),
     index in any::<i32>(), join in any::<Join>()) {
-      prop_assert!(!cached_joins.contains(&join));
+      prop_assume!(!cached_joins.contains(&join));
       let (state, history, hot_store) = fixture();
 
       history.put_joins(channel.clone(), history_joins.clone());
-      let to_remove = history_joins.get(index as usize).unwrap_or(&join).clone();
+      let to_remove = cached_joins.get(index as usize).unwrap_or(&join).clone();
       let mut cache = state.lock().unwrap();
       *cache = HotStoreState { continuations: DashMap::new(), installed_continuations: DashMap::new(), data: DashMap::new(), joins: DashMap::from_iter(vec![(channel.clone(), cached_joins.clone())]), installed_joins: DashMap::new() };
       drop(cache);
 
       let res = hot_store.remove_join(channel.clone(), to_remove);
-
       let cache = state.lock().unwrap();
       assert!(check_removal_works_or_ignores_errors(res, cache.joins.get(&channel).unwrap().clone(), cached_joins, index).is_ok());
   }
 
   #[test]
   fn remove_join_when_installed_joins_are_present_should_not_allow_removing_them(channel in  any::<Channel>(), cached_joins in any::<Joins>(), installed_joins in any::<Joins>()) {
-      prop_assert!(cached_joins != installed_joins && !installed_joins.is_empty());
+      prop_assume!(cached_joins != installed_joins && !installed_joins.is_empty());
       let (state, _, hot_store) = fixture();
 
       let mut cache = state.lock().unwrap();
@@ -451,8 +449,8 @@ proptest! {
   }
 
   #[test]
-  fn remove_join_should_not_remove_a_join_when_a_continuation_is_present(channel in  any::<Channel>(), cached_joins in any::<Joins>()) {
-      prop_assert!(!cached_joins.is_empty());
+  fn remove_join_should_not_remove_a_join_when_a_continuation_is_present(channel in  any::<Channel>(), continuation in any::<Continuation>(), cached_joins in any::<Joins>()) {
+      prop_assume!(!cached_joins.is_empty());
       let (state, _, hot_store) = fixture();
 
       let mut cache = state.lock().unwrap();
@@ -465,6 +463,7 @@ proptest! {
       shuffled_joins.shuffle(&mut rng);
       let to_remove = shuffled_joins.first().unwrap().clone();
 
+      hot_store.put_continuation(to_remove.clone(), continuation);
       let res = hot_store.remove_join(channel.clone(), to_remove.clone());
       let cache = state.lock().unwrap();
 
@@ -703,7 +702,7 @@ proptest! {
 
   #[test]
   fn remove_join_should_create_a_deep_copy_of_the_continuations_in_the_cache(channels in  vec(any::<String>(), 0..=SIZE_RANGE), continuation1 in any::<Continuation>(), continuation2 in any::<Continuation>()) {
-      prop_assert!(continuation1 != continuation2);
+      prop_assume!(continuation1 != continuation2);
       let (_, _, hot_store) = fixture();
 
       hot_store.put_continuation(channels.clone(), continuation1.clone());
@@ -715,7 +714,7 @@ proptest! {
 
   #[test]
   fn remove_join_should_create_a_deep_copy_of_the_installed_continuations_in_the_cache(channels in  vec(any::<String>(), 0..=SIZE_RANGE), continuation1 in any::<Continuation>(), continuation2 in any::<Continuation>()) {
-      prop_assert!(continuation1 != continuation2);
+      prop_assume!(continuation1 != continuation2);
       let (_, _, hot_store) = fixture();
 
       hot_store.install_continuation(channels.clone(), continuation1.clone());
@@ -726,7 +725,7 @@ proptest! {
 
   #[test]
   fn remove_join_should_create_a_deep_copy_of_the_data_in_the_cache(channel in  any::<String>(), data1 in any::<Data>(), data2 in any::<Data>()) {
-      prop_assert!(data1 != data2);
+      prop_assume!(data1 != data2);
       let (_, _, hot_store) = fixture();
 
       hot_store.put_datum(channel.clone(), data1.clone());
@@ -737,7 +736,7 @@ proptest! {
 
   #[test]
   fn remove_join_should_create_a_deep_copy_of_the_joins_in_the_cache(channel in  any::<String>(), join1 in any::<Join>(), join2 in any::<Join>()) {
-      prop_assert!(join1 != join2);
+      prop_assume!(join1 != join2);
       let (_, _, hot_store) = fixture();
 
       hot_store.put_join(channel.clone(), join1.clone());
@@ -748,7 +747,7 @@ proptest! {
 
   #[test]
   fn remove_join_should_create_a_deep_copy_of_the_installed_joins_in_the_cache(channel in  any::<String>(), join1 in any::<Join>(), join2 in any::<Join>()) {
-      prop_assert!(join1 != join2);
+      prop_assume!(join1 != join2);
       let (_, _, hot_store) = fixture();
 
       hot_store.install_join(channel.clone(), join1.clone());
@@ -824,24 +823,6 @@ enum Pattern {
     StringMatch(String),
 }
 
-#[derive(Clone)]
-struct StringMatch;
-
-impl Match<Pattern, String> for StringMatch {
-    fn get(&self, p: Pattern, a: String) -> Option<String> {
-        match p {
-            Pattern::Wildcard => Some(a),
-            Pattern::StringMatch(value) => {
-                if value == a {
-                    Some(a)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq, Arbitrary, Serialize, Eq, Hash)]
 struct StringsCaptor {
     res: LinkedList<Vec<String>>,
@@ -852,14 +833,6 @@ impl StringsCaptor {
         StringsCaptor {
             res: LinkedList::new(),
         }
-    }
-
-    fn run_k(&mut self, data: Vec<String>) {
-        self.res.push_back(data);
-    }
-
-    fn results(&self) -> Vec<Vec<String>> {
-        self.res.iter().cloned().collect()
     }
 }
 

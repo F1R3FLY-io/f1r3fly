@@ -12,7 +12,7 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
+pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync + Send {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
     fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
     fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
@@ -402,13 +402,16 @@ where
 
         let index = current_joins.iter().position(|x| *x == join);
         let out_of_bounds = index.is_none();
+
+        // Remove join is called when continuation is removed, so it can be called when
+        // continuations are present in which case we just want to skip removal.
         let do_remove = current_continuations.is_empty();
 
         if do_remove {
             if out_of_bounds {
                 println!("ERROR: Join not found when removing join");
                 state.joins.insert(channel, current_joins);
-                None
+                Some(())
             } else {
                 let mut new_joins = current_joins;
                 new_joins.remove(index.unwrap());
@@ -417,7 +420,7 @@ where
             }
         } else {
             state.joins.insert(channel, current_joins);
-            None
+            Some(())
         }
     }
 
