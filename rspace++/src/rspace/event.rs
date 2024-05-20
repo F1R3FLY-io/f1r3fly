@@ -4,7 +4,8 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+// The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary)]
 pub struct Produce {
     pub channel_hash: Blake2b256Hash,
     pub hash: Blake2b256Hash,
