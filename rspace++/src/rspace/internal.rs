@@ -3,6 +3,7 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
+use std::hash::{Hash, Hasher};
 
 // See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -92,6 +93,28 @@ pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub source: Consume,
 }
 
+impl<P, K> WaitingContinuation<P, K>
+where
+    P: Clone + Serialize,
+    K: Clone + Serialize,
+{
+    pub fn create<C: Clone + Serialize>(
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> WaitingContinuation<P, K> {
+        WaitingContinuation {
+            patterns: patterns.clone(),
+            continuation: Arc::new(Mutex::new(continuation.clone())),
+            persist,
+            peeks,
+            source: Consume::create(channels, patterns, continuation, persist),
+        }
+    }
+}
+
 impl<P: Clone + PartialEq, K: Clone + PartialEq> PartialEq for WaitingContinuation<P, K> {
     fn eq(&self, other: &Self) -> bool {
         let self_cont = self.continuation.lock().unwrap();
@@ -149,6 +172,18 @@ where
             peeks,
             source,
         })
+    }
+}
+
+impl<P: Clone + Hash, K: Clone + Hash> Hash for WaitingContinuation<P, K> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.patterns.hash(state);
+        if let Ok(continuation) = self.continuation.lock() {
+            continuation.hash(state);
+        }
+        self.persist.hash(state);
+        self.peeks.hash(state);
+        self.source.hash(state);
     }
 }
 

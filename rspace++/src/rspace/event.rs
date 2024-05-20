@@ -26,7 +26,7 @@ impl Produce {
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Arbitrary)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Arbitrary, Hash)]
 pub struct Consume {
     pub channel_hashes: Vec<Blake2b256Hash>,
     pub hash: Blake2b256Hash,

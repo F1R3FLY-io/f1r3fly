@@ -1,5 +1,5 @@
 use std::{
-    collections::LinkedList,
+    collections::{BTreeSet, HashSet, LinkedList},
     sync::{Arc, Mutex},
 };
 
@@ -7,13 +7,20 @@ use dashmap::DashMap;
 use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
+use rand::prelude::SliceRandom;
+use rand::thread_rng;
 use rspace_plus_plus::rspace::{
     history::history_reader::HistoryReaderBase,
     hot_store::{HotStore, HotStoreInstances, HotStoreState},
+    hot_store_action::{
+        DeleteAction, DeleteContinuations, DeleteData, DeleteJoins, HotStoreAction, InsertAction,
+        InsertContinuations, InsertData, InsertJoins,
+    },
     internal::{Datum, WaitingContinuation},
     matcher::r#match::Match,
 };
 use rstest::*;
+use serde::Serialize;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -382,6 +389,374 @@ proptest! {
       let cache = state.lock().unwrap();
       assert_eq!(cache.installed_joins.get(&channel).unwrap().clone(), vec![installed_join]);
   }
+
+  #[test]
+  fn remove_join_when_cache_is_empty_should_read_from_history_and_remove_join(channel in  any::<Channel>(), history_joins in any::<Joins>(), index in any::<i32>(), join in any::<Join>()) {
+      prop_assert!(!history_joins.contains(&join));
+      let (state, history, hot_store) = fixture();
+
+      history.put_joins(channel.clone(), history_joins.clone());
+      let to_remove = history_joins.get(index as usize).unwrap_or(&join).clone();
+      let res = hot_store.remove_join(channel.clone(), to_remove);
+
+      let cache = state.lock().unwrap();
+      assert!(check_removal_works_or_ignores_errors(res, cache.joins.get(&channel).unwrap().clone(), history_joins, index).is_ok());
+  }
+
+  #[test]
+  fn remove_join_when_cache_contains_data_should_read_from_the_cache_and_remove_join(channel in  any::<Channel>(), history_joins in any::<Joins>(), cached_joins in any::<Joins>(),
+    index in any::<i32>(), join in any::<Join>()) {
+      prop_assert!(!cached_joins.contains(&join));
+      let (state, history, hot_store) = fixture();
+
+      history.put_joins(channel.clone(), history_joins.clone());
+      let to_remove = history_joins.get(index as usize).unwrap_or(&join).clone();
+      let mut cache = state.lock().unwrap();
+      *cache = HotStoreState { continuations: DashMap::new(), installed_continuations: DashMap::new(), data: DashMap::new(), joins: DashMap::from_iter(vec![(channel.clone(), cached_joins.clone())]), installed_joins: DashMap::new() };
+      drop(cache);
+
+      let res = hot_store.remove_join(channel.clone(), to_remove);
+
+      let cache = state.lock().unwrap();
+      assert!(check_removal_works_or_ignores_errors(res, cache.joins.get(&channel).unwrap().clone(), cached_joins, index).is_ok());
+  }
+
+  #[test]
+  fn remove_join_when_installed_joins_are_present_should_not_allow_removing_them(channel in  any::<Channel>(), cached_joins in any::<Joins>(), installed_joins in any::<Joins>()) {
+      prop_assert!(cached_joins != installed_joins && !installed_joins.is_empty());
+      let (state, _, hot_store) = fixture();
+
+      let mut cache = state.lock().unwrap();
+      *cache = HotStoreState { continuations: DashMap::new(), installed_continuations: DashMap::new(), data: DashMap::new(), joins: DashMap::from_iter(vec![(channel.clone(), cached_joins.clone())]),
+        installed_joins: DashMap::from_iter(vec![(channel.clone(), installed_joins.clone())]) };
+      drop(cache);
+
+      let mut rng = thread_rng();
+      let mut shuffled_joins = installed_joins.clone();
+      shuffled_joins.shuffle(&mut rng);
+      let to_remove = shuffled_joins.first().unwrap().clone();
+
+      let res = hot_store.remove_join(channel.clone(), to_remove.clone());
+      let cache = state.lock().unwrap();
+
+      if !cached_joins.contains(&to_remove) {
+        assert!(res.is_some());
+        assert_eq!(cache.joins.get(&channel).unwrap().clone(), cached_joins);
+      } else {
+        let to_remove_count_in_cache = cache.joins.get(&channel).unwrap().clone().into_iter().filter(|x| x.clone() == to_remove).count();
+        let to_remove_count_in_cached_joins = cached_joins.into_iter().filter(|x| x.clone() == to_remove).count();
+        assert_eq!(to_remove_count_in_cache, to_remove_count_in_cached_joins - 1);
+        assert_eq!(cache.installed_joins.get(&channel).unwrap().clone(), installed_joins);
+      }
+  }
+
+  #[test]
+  fn remove_join_should_not_remove_a_join_when_a_continuation_is_present(channel in  any::<Channel>(), cached_joins in any::<Joins>()) {
+      prop_assert!(!cached_joins.is_empty());
+      let (state, _, hot_store) = fixture();
+
+      let mut cache = state.lock().unwrap();
+      *cache = HotStoreState { continuations: DashMap::new(), installed_continuations: DashMap::new(), data: DashMap::new(), joins: DashMap::from_iter(vec![(channel.clone(), cached_joins.clone())]),
+        installed_joins: DashMap::new() };
+      drop(cache);
+
+      let mut rng = thread_rng();
+      let mut shuffled_joins = cached_joins.clone();
+      shuffled_joins.shuffle(&mut rng);
+      let to_remove = shuffled_joins.first().unwrap().clone();
+
+      let res = hot_store.remove_join(channel.clone(), to_remove.clone());
+      let cache = state.lock().unwrap();
+
+      assert!(res.is_some());
+      assert_eq!(cache.joins.get(&channel).unwrap().clone(), cached_joins);
+  }
+
+    #[test]
+  fn changes_should_return_information_to_be_persisted_in_history(channels in vec(any::<Channel>(), 0..=SIZE_RANGE), channel in  any::<Channel>(), continuations in  vec(any::<Continuation>(), 0..=SIZE_RANGE),
+        installed_continuation in any::<Continuation>(), data in vec(any::<Data>(), 0..=SIZE_RANGE), joins in any::<Joins>()) {
+      let (state, _, hot_store) = fixture();
+
+      let mut cache = state.lock().unwrap();
+      *cache = HotStoreState { continuations: DashMap::from_iter(vec![(channels.clone(), continuations.clone())]), installed_continuations: DashMap::from_iter(vec![(channels.clone(), installed_continuation.clone())]),
+                data: DashMap::from_iter(vec![(channel.clone(), data.clone())]), joins: DashMap::from_iter(vec![(channel.clone(), joins.clone())]),
+        installed_joins: DashMap::new() };
+      drop(cache);
+
+            let res = hot_store.changes();
+            let cache = state.lock().unwrap();
+            assert_eq!(res.len(), cache.continuations.len() + cache.data.len() + cache.joins.len());
+
+            if continuations.is_empty() {
+        assert!(res.contains(&HotStoreAction::Delete(DeleteAction::DeleteContinuations(DeleteContinuations { channels }))));
+      } else {
+        assert!(res.contains(&HotStoreAction::Insert(InsertAction::InsertContinuations(InsertContinuations { channels, continuations }))));
+      }
+
+      if data.is_empty() {
+        assert!(res.contains(&HotStoreAction::Delete(DeleteAction::DeleteData(DeleteData { channel: channel.clone() }))));
+      } else {
+        assert!(res.contains(&HotStoreAction::Insert(InsertAction::InsertData(InsertData { channel: channel.clone(), data }))));
+      }
+
+      if joins.is_empty() {
+        assert!(res.contains(&HotStoreAction::Delete(DeleteAction::DeleteJoins(DeleteJoins { channel }))));
+      } else {
+        assert!(res.contains(&HotStoreAction::Insert(InsertAction::InsertJoins(InsertJoins { channel, joins }))));
+      }
+  }
+
+  // TODO: Update this test case so put_datum calls run in parallel
+  #[test]
+  fn concurrent_data_operations_on_disjoint_channels_should_not_mess_up_the_cache(channel1 in  any::<Channel>(), channel2 in  any::<Channel>(), mut history_data1 in vec(any::<Data>(), 0..=SIZE_RANGE), mut history_data2 in vec(any::<Data>(), 0..=SIZE_RANGE),
+    inserted_data1 in any::<Data>(), inserted_data2 in any::<Data>()) {
+      prop_assume!(channel1 != channel2);
+      let (_, history, hot_store) = fixture();
+
+      history.put_data(channel1.clone(), history_data1.clone());
+      history.put_data(channel2.clone(), history_data2.clone());
+
+      // Spawn two threads to run put_datum in parallel and waits for both threads to complete using join.
+      // let handle1 = std::thread::spawn(&move || {
+      //   hot_store.put_datum(channel1.clone(), inserted_data1.clone());
+      // });
+      // let handle2 = std::thread::spawn(&move || {
+      //   hot_store.put_datum(channel2.clone(), inserted_data2.clone());
+      // });
+      // handle1.join().unwrap();
+      // handle2.join().unwrap();
+
+      hot_store.put_datum(channel1.clone(), inserted_data1.clone());
+      hot_store.put_datum(channel2.clone(), inserted_data2.clone());
+
+      let r1 = hot_store.get_data(&channel1);
+      let r2 = hot_store.get_data(&channel2);
+      history_data1.insert(0, inserted_data1);
+      history_data2.insert(0, inserted_data2);
+
+      assert_eq!(r1, history_data1);
+      assert_eq!(r2, history_data2);
+  }
+
+  // TODO: Update this test case so put_datum calls run in parallel
+  #[test]
+  fn concurrent_coninuation_operations_on_disjoint_channels_should_not_mess_up_the_cache(channels1 in  vec(any::<Channel>(), 0..=SIZE_RANGE), channels2 in  vec(any::<Channel>(), 0..=SIZE_RANGE), mut history_continuations1 in vec(any::<Continuation>(), 0..=SIZE_RANGE),
+    mut history_continuations2 in vec(any::<Continuation>(), 0..=SIZE_RANGE), inserted_continuation1 in any::<Continuation>(), inserted_continuation2 in any::<Continuation>()) {
+      prop_assume!(channels1 != channels2);
+      let (_, history, hot_store) = fixture();
+
+      history.put_continuations(channels1.clone(), history_continuations1.clone());
+      history.put_continuations(channels2.clone(), history_continuations2.clone());
+
+      // Spawn two threads to run put_continuation in parallel and waits for both threads to complete using join.
+      // let handle1 = std::thread::spawn(&move || {
+      //   hot_store.put_continuation(channels1.clone(), inserted_continuation1.clone());
+      // });
+      // let handle2 = std::thread::spawn(&move || {
+      //   hot_store.put_continuation(channels2.clone(), inserted_continuation2.clone());
+      // });
+      // handle1.join().unwrap();
+      // handle2.join().unwrap();
+
+      hot_store.put_continuation(channels1.clone(), inserted_continuation1.clone());
+      hot_store.put_continuation(channels2.clone(), inserted_continuation2.clone());
+
+      let r1 = hot_store.get_continuations(channels1);
+      let r2 = hot_store.get_continuations(channels2);
+      history_continuations1.insert(0, inserted_continuation1);
+      history_continuations2.insert(0, inserted_continuation2);
+
+      assert_eq!(r1, history_continuations1);
+      assert_eq!(r2, history_continuations2);
+  }
+
+  /* BREAK */
+
+  #[test]
+  fn put_datum_should_put_datum_in_a_new_channel(channel in  any::<String>(), datum_value in any::<String>()) {
+      let (_, _, hot_store) = fixture();
+      let key = channel.clone();
+      let datum = Datum::create(channel, datum_value, false);
+
+      hot_store.put_datum(key.clone(), datum.clone());
+      let res = hot_store.get_data(&key);
+      assert!(check_same_elements(res, vec![datum]));
+  }
+
+  #[test]
+  fn put_datum_should_append_datum_if_channel_already_exists(channel in  any::<String>(), datum_value in any::<String>()) {
+      let (_, _, hot_store) = fixture();
+      let key = channel.clone();
+      let datum1 = Datum::create(channel.clone(), datum_value.clone(), false);
+      let datum2 = Datum::create(channel, datum_value + "2", false);
+
+      hot_store.put_datum(key.clone(), datum1.clone());
+      hot_store.put_datum(key.clone(), datum2.clone());
+      let res = hot_store.get_data(&key);
+      assert!(check_same_elements(res, vec![datum1, datum2]));
+  }
+
+  // TODO: Set min_successful to 10
+  // TODO: Update this test case so put_datum calls run in parallel
+  // TODO: Double chck test case matches because of validIndices on Scala side
+  #[test]
+  fn remove_datum_should_remove_datum_at_index(channel in  any::<String>(), datum_value in any::<String>(), index in any::<i32>()) {
+      let (_, _, hot_store) = fixture();
+      let key = channel.clone();
+      let data: Vec<Datum<String>> = (0..11)
+        .map(|i| Datum::create(channel.clone(), datum_value.clone() + &i.to_string(), false))
+        .collect();
+
+      for d in data.clone() {
+        hot_store.put_datum(key.clone(), d);
+      }
+
+      hot_store.remove_datum(key.clone(), index - 1);
+      let res = hot_store.get_data(&key);
+      let expected: Vec<Datum<String>> = data.into_iter()
+         .filter(|d| d.a != datum_value.clone() + &(11 - index).to_string())
+         .collect();
+      assert!(check_same_elements(res, expected));
+  }
+
+  #[test]
+  fn put_waiting_continuation_should_put_waiting_continuation_in_a_new_channel(channel in  any::<String>(), pattern in any::<String>()) {
+      let (_, _, hot_store) = fixture();
+      let key = vec![channel.clone()];
+      let patterns = vec![Pattern::StringMatch(pattern)];
+      let continuation = StringsCaptor::new();
+      let wc = WaitingContinuation::create(key.clone(), patterns, continuation, false, BTreeSet::default());
+
+      hot_store.put_continuation(key.clone(), wc.clone());
+      let res = hot_store.get_continuations(key);
+      assert_eq!(res, vec![wc]);
+  }
+
+  #[test]
+  fn put_waiting_continuation_should_append_continuation_if_channel_already_exists(channel in  any::<String>(), pattern in any::<String>()) {
+      let (_, _, hot_store) = fixture();
+      let key = vec![channel.clone()];
+      let patterns = vec![Pattern::StringMatch(pattern.clone())];
+      let continuation = StringsCaptor::new();
+      let wc1 = WaitingContinuation::create(key.clone(), patterns, continuation.clone(), false, BTreeSet::default());
+      let wc2 = WaitingContinuation::create(key.clone(), vec![Pattern::StringMatch(pattern + "2")], continuation, false, BTreeSet::default());
+
+      hot_store.put_continuation(key.clone(), wc1.clone());
+      hot_store.put_continuation(key.clone(), wc2.clone());
+      let res = hot_store.get_continuations(key);
+      assert!(check_same_elements(res, vec![wc1, wc2]));
+  }
+
+  #[test]
+  fn remove_waiting_continuation_should_remove_waiting_continuation_from_index(channel in  any::<String>(), pattern in any::<String>()) {
+      let (_, _, hot_store) = fixture();
+      let key = vec![channel.clone()];
+      let patterns = vec![Pattern::StringMatch(pattern.clone())];
+      let continuation = StringsCaptor::new();
+      let wc1 = WaitingContinuation::create(key.clone(), patterns, continuation.clone(), false, BTreeSet::default());
+      let wc2 = WaitingContinuation::create(key.clone(), vec![Pattern::StringMatch(pattern + "2")], continuation, false, BTreeSet::default());
+
+      hot_store.put_continuation(key.clone(), wc1.clone());
+      hot_store.put_continuation(key.clone(), wc2.clone());
+      hot_store.remove_continuation(key.clone(), 0);
+      let res = hot_store.get_continuations(key);
+      assert!(check_same_elements(res, vec![wc1]));
+  }
+
+  #[test]
+  fn add_join_should_add_join_for_a_channel(channel in  any::<String>(), channels in vec(any::<String>(), 0..=SIZE_RANGE)) {
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_join(channel.clone(), channels.clone());
+      let res = hot_store.get_joins(channel);
+      assert_eq!(res, vec![channels]);
+  }
+
+  #[test]
+  fn remove_join_should_remove_join_for_a_channel(channel in  any::<String>(), channels in vec(any::<String>(), 0..=SIZE_RANGE)) {
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_join(channel.clone(), channels.clone());
+      hot_store.remove_join(channel.clone(), channels.clone());
+      let res = hot_store.get_joins(channel);
+      assert!(res.is_empty());
+  }
+
+  #[test]
+  fn remove_join_should_remove_only_passed_in_joins_for_a_channel(channel in  any::<String>(), channels in vec(any::<String>(), 0..=SIZE_RANGE)) {
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_join(channel.clone(), channels.clone());
+      hot_store.put_join(channel.clone(), vec!["other_channel".to_string()]);
+      hot_store.remove_join(channel.clone(), channels.clone());
+      let res = hot_store.get_joins(channel);
+      assert_eq!(res, vec![vec!["other_channel".to_string()]]);
+  }
+
+  // TODO: Finish this test case
+  #[test]
+  fn snapshot_should_create_a_copy_of_the_cache(channel in  any::<String>(), channels in vec(any::<String>(), 0..=SIZE_RANGE)) {
+      let (_, _, hot_store) = fixture();
+
+      assert!(false)
+  }
+
+  #[test]
+  fn remove_join_should_create_a_deep_copy_of_the_continuations_in_the_cache(channels in  vec(any::<String>(), 0..=SIZE_RANGE), continuation1 in any::<Continuation>(), continuation2 in any::<Continuation>()) {
+      prop_assert!(continuation1 != continuation2);
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_continuation(channels.clone(), continuation1.clone());
+      let snapshot = hot_store.snapshot();
+      hot_store.put_continuation(channels.clone(), continuation2.clone());
+      assert!(snapshot.continuations.get(&channels).unwrap().clone().contains(&continuation1));
+      assert!(!snapshot.continuations.get(&channels).unwrap().clone().contains(&continuation2));
+  }
+
+  #[test]
+  fn remove_join_should_create_a_deep_copy_of_the_installed_continuations_in_the_cache(channels in  vec(any::<String>(), 0..=SIZE_RANGE), continuation1 in any::<Continuation>(), continuation2 in any::<Continuation>()) {
+      prop_assert!(continuation1 != continuation2);
+      let (_, _, hot_store) = fixture();
+
+      hot_store.install_continuation(channels.clone(), continuation1.clone());
+      let snapshot = hot_store.snapshot();
+      hot_store.install_continuation(channels.clone(), continuation2.clone());
+      assert_eq!(snapshot.installed_continuations.get(&channels).unwrap().clone(), continuation1);
+  }
+
+  #[test]
+  fn remove_join_should_create_a_deep_copy_of_the_data_in_the_cache(channel in  any::<String>(), data1 in any::<Data>(), data2 in any::<Data>()) {
+      prop_assert!(data1 != data2);
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_datum(channel.clone(), data1.clone());
+      let snapshot = hot_store.snapshot();
+      hot_store.put_datum(channel.clone(), data2.clone());
+      assert!(!snapshot.data.get(&channel).unwrap().clone().contains(&data2));
+  }
+
+  #[test]
+  fn remove_join_should_create_a_deep_copy_of_the_joins_in_the_cache(channel in  any::<String>(), join1 in any::<Join>(), join2 in any::<Join>()) {
+      prop_assert!(join1 != join2);
+      let (_, _, hot_store) = fixture();
+
+      hot_store.put_join(channel.clone(), join1.clone());
+      let snapshot = hot_store.snapshot();
+      hot_store.put_join(channel.clone(), join2.clone());
+      assert!(!snapshot.joins.get(&channel).unwrap().clone().contains(&join2));
+  }
+
+  #[test]
+  fn remove_join_should_create_a_deep_copy_of_the_installed_joins_in_the_cache(channel in  any::<String>(), join1 in any::<Join>(), join2 in any::<Join>()) {
+      prop_assert!(join1 != join2);
+      let (_, _, hot_store) = fixture();
+
+      hot_store.install_join(channel.clone(), join1.clone());
+      let snapshot = hot_store.snapshot();
+      hot_store.install_join(channel.clone(), join2.clone());
+      assert!(snapshot.installed_joins.get(&channel).unwrap().clone().contains(&join1));
+      assert!(!snapshot.installed_joins.get(&channel).unwrap().clone().contains(&join2));
+  }
 }
 
 fn check_removal_works_or_fails_on_error<T>(
@@ -409,8 +784,40 @@ where
     Ok(())
 }
 
+fn check_removal_works_or_ignores_errors<T>(
+    res: Option<()>,
+    actual: Vec<T>,
+    initial: Vec<T>,
+    index: i32,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    T: PartialEq + Debug + Clone,
+{
+    if index < 0 || index >= initial.len().try_into().unwrap() {
+        assert!(res.is_some());
+        assert_eq!(actual, initial);
+    } else {
+        assert!(res.is_some());
+        let expected: Vec<T> = initial
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| i as i32 != index)
+            .map(|(_, item)| item.clone())
+            .collect();
+        assert_eq!(actual, expected);
+    }
+    Ok(())
+}
+
+// We only care that both vectors contain the same elements, not their ordering
+fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
+    let set1: HashSet<_> = vec1.into_iter().collect();
+    let set2: HashSet<_> = vec2.into_iter().collect();
+    set1 == set2
+}
+
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
-#[derive(Clone, Debug, Default, PartialEq, Arbitrary)]
+#[derive(Clone, Debug, Default, PartialEq, Arbitrary, Serialize, Eq, Hash)]
 enum Pattern {
     #[default]
     Wildcard,
@@ -435,7 +842,7 @@ impl Match<Pattern, String> for StringMatch {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Arbitrary)]
+#[derive(Clone, Debug, Default, PartialEq, Arbitrary, Serialize, Eq, Hash)]
 struct StringsCaptor {
     res: LinkedList<Vec<String>>,
 }
