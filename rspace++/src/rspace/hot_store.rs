@@ -6,6 +6,8 @@ use crate::rspace::hot_store_action::{
 use crate::rspace::internal::{Datum, Row, WaitingContinuation};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
+use proptest::prelude::*;
+use rand::thread_rng;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -35,7 +37,7 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
     fn clear(&self) -> ();
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct HotStoreState<C, P, A, K>
 where
     C: Eq + Hash,
@@ -48,6 +50,51 @@ where
     pub data: DashMap<C, Vec<Datum<A>>>,
     pub joins: DashMap<C, Vec<Vec<C>>>,
     pub installed_joins: DashMap<C, Vec<Vec<C>>>,
+}
+
+// This impl is needed for hot_store_spec.rs
+impl<C, P, A, K> HotStoreState<C, P, A, K>
+where
+    C: Eq + Hash + Debug + Arbitrary + Default + Clone,
+    A: Clone + Debug + Arbitrary + Default,
+    P: Clone + Debug + Arbitrary + Default,
+    K: Clone + Debug + Arbitrary + Default,
+{
+    fn random_vec<T>(size: usize) -> Vec<T>
+    where
+        T: Default + Clone,
+    {
+        let mut rng = thread_rng();
+        (0..size)
+            .map(|_| T::default())
+            .collect::<Vec<T>>()
+            .iter()
+            .cloned()
+            .take(rng.gen_range(0..size + 1))
+            .collect()
+    }
+
+    pub fn random_state() -> Self {
+        let channels: Vec<C> = HotStoreState::<C, P, A, K>::random_vec(10);
+        let continuations: Vec<WaitingContinuation<P, K>> =
+            HotStoreState::<C, P, A, K>::random_vec(10);
+        let installed_continuations = WaitingContinuation::default();
+        let data: Vec<Datum<A>> = HotStoreState::<C, P, A, K>::random_vec(10);
+        let channel = C::default();
+        let joins: Vec<Vec<C>> = HotStoreState::<C, P, A, K>::random_vec(10);
+        let installed_joins: Vec<Vec<C>> = HotStoreState::<C, P, A, K>::random_vec(10);
+
+        HotStoreState {
+            continuations: DashMap::from_iter(vec![(channels.clone(), continuations.clone())]),
+            installed_continuations: DashMap::from_iter(vec![(
+                channels.clone(),
+                installed_continuations.clone(),
+            )]),
+            data: DashMap::from_iter(vec![(channel.clone(), data.clone())]),
+            joins: DashMap::from_iter(vec![(channel.clone(), joins)]),
+            installed_joins: DashMap::from_iter(vec![(channel, installed_joins)]),
+        }
+    }
 }
 
 #[derive(Default)]

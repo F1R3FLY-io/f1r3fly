@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary)]
+// The 'Default' macro is needed here for hot_store_spec.rs
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary, Default)]
 pub struct Produce {
     pub channel_hash: Blake2b256Hash,
     pub hash: Blake2b256Hash,
@@ -26,7 +27,8 @@ impl Produce {
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Arbitrary, Hash)]
+// The 'Default' macro is needed here for hot_store_spec.rs
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Arbitrary, Hash, Default)]
 pub struct Consume {
     pub channel_hashes: Vec<Blake2b256Hash>,
     pub hash: Blake2b256Hash,

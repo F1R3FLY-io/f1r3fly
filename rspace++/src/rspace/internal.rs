@@ -62,7 +62,8 @@ where
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary)]
+// The 'Default' macro is needed here for hot_store_spec.rs
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary, Default)]
 pub struct Datum<A: Clone> {
     pub a: A,
     pub persist: bool,
@@ -84,7 +85,8 @@ where
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Clone, Debug, Arbitrary)]
+// The 'Default' macro is needed here for hot_store_spec.rs
+#[derive(Clone, Debug, Arbitrary, Default)]
 pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
     pub continuation: Arc<Mutex<K>>,

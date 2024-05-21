@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashSet, LinkedList},
+    collections::{BTreeSet, HashMap, HashSet, LinkedList},
     sync::{Arc, Mutex},
 };
 
@@ -692,12 +692,17 @@ proptest! {
       assert_eq!(res, vec![vec!["other_channel".to_string()]]);
   }
 
-  // TODO: Finish this test case
   #[test]
-  fn snapshot_should_create_a_copy_of_the_cache(channel in  any::<String>(), channels in vec(any::<String>(), 0..=SIZE_RANGE)) {
-      let (_, _, hot_store) = fixture();
+  fn snapshot_should_create_a_copy_of_the_cache(_cache in  any::<String>()) {
+      let cache: HotStoreState<String, Pattern, String, StringsCaptor> = HotStoreState::random_state();
+      let (_, _, hot_store) = fixture_with_cache(cache.clone());
 
-      assert!(false)
+      let snapshot = hot_store.snapshot();
+      assert!(compare_dashmaps(&snapshot.continuations, &cache.continuations));
+      assert!(compare_dashmaps(&snapshot.installed_continuations, &cache.installed_continuations));
+      assert!(compare_dashmaps(&snapshot.data, &cache.data));
+      assert!(compare_dashmaps(&snapshot.joins, &cache.joins));
+      assert!(compare_dashmaps(&snapshot.installed_joins, &cache.installed_joins));
   }
 
   #[test]
@@ -815,16 +820,32 @@ fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
     set1 == set2
 }
 
+pub fn compare_dashmaps<K, V>(map1: &DashMap<K, V>, map2: &DashMap<K, V>) -> bool
+where
+    K: Eq + Hash + Clone,
+    V: PartialEq + Clone,
+{
+    let hash_map1: HashMap<K, V> = map1
+        .iter()
+        .map(|entry| (entry.key().clone(), entry.value().clone()))
+        .collect();
+    let hash_map2: HashMap<K, V> = map2
+        .iter()
+        .map(|entry| (entry.key().clone(), entry.value().clone()))
+        .collect();
+    hash_map1 == hash_map2
+}
+
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
 #[derive(Clone, Debug, Default, PartialEq, Arbitrary, Serialize, Eq, Hash)]
-enum Pattern {
+pub enum Pattern {
     #[default]
     Wildcard,
     StringMatch(String),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Arbitrary, Serialize, Eq, Hash)]
-struct StringsCaptor {
+pub struct StringsCaptor {
     res: LinkedList<Vec<String>>,
 }
 
@@ -838,7 +859,7 @@ impl StringsCaptor {
 
 // See rspace/src/test/scala/coop/rchain/rspace/HotStoreSpec.scala
 #[derive(Clone)]
-struct TestHistory<C: Eq + Hash, P: Clone, A: Clone, K: Clone> {
+pub struct TestHistory<C: Eq + Hash, P: Clone, A: Clone, K: Clone> {
     state: Arc<Mutex<HotStoreState<C, P, A, K>>>,
 }
 
@@ -926,6 +947,23 @@ pub fn fixture() -> StateSetup {
 
     let cache =
         Arc::new(Mutex::new(HotStoreState::<String, Pattern, String, StringsCaptor>::default()));
+
+    let hot_store =
+        HotStoreInstances::create_from_mhs_and_hr(cache.clone(), Box::new(history.clone()));
+    (cache, history, Box::new(hot_store))
+}
+
+pub fn fixture_with_cache(
+    cache: HotStoreState<String, Pattern, String, StringsCaptor>,
+) -> StateSetup {
+    let history_state =
+        Arc::new(Mutex::new(HotStoreState::<String, Pattern, String, StringsCaptor>::default()));
+
+    let history = TestHistory {
+        state: history_state.clone(),
+    };
+
+    let cache = Arc::new(Mutex::new(cache));
 
     let hot_store =
         HotStoreInstances::create_from_mhs_and_hr(cache.clone(), Box::new(history.clone()));

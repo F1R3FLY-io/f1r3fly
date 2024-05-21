@@ -8,7 +8,8 @@ use std::fmt::{Debug, Display, Formatter};
 // See src/firefly/f1r3fly/rspace/src/main/scala/coop/rchain/rspace/hashing/Blake2b256Hash.scala
 // The 'Hash' macro is needed here for test util function 'check_same_elements'
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
-#[derive(Eq, Clone, Serialize, Deserialize, Hash, Arbitrary)]
+// The 'Default' macro is needed here for hot_store_spec.rs
+#[derive(Eq, Clone, Serialize, Deserialize, Hash, Arbitrary, Default)]
 pub struct Blake2b256Hash(pub Vec<u8>);
 
 impl Blake2b256Hash {
