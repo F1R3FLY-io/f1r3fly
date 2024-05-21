@@ -505,31 +505,40 @@ proptest! {
       }
   }
 
-  // TODO: Update this test case so put_datum calls run in parallel
   #[test]
   fn concurrent_data_operations_on_disjoint_channels_should_not_mess_up_the_cache(channel1 in  any::<Channel>(), channel2 in  any::<Channel>(), mut history_data1 in vec(any::<Data>(), 0..=SIZE_RANGE), mut history_data2 in vec(any::<Data>(), 0..=SIZE_RANGE),
     inserted_data1 in any::<Data>(), inserted_data2 in any::<Data>()) {
       prop_assume!(channel1 != channel2);
       let (_, history, hot_store) = fixture();
+      let hot_store = Arc::new(Mutex::new(hot_store));
 
       history.put_data(channel1.clone(), history_data1.clone());
       history.put_data(channel2.clone(), history_data2.clone());
 
+      // Clone the Arc to share it between threads
+     let hot_store1 = Arc::clone(&hot_store);
+     let hot_store2 = Arc::clone(&hot_store);
+
+     // Clone the channels and data to move them into the threads
+     let channel1_clone = channel1.clone();
+     let channel2_clone = channel2.clone();
+     let inserted_data1_clone = inserted_data1.clone();
+     let inserted_data2_clone = inserted_data2.clone();
+
       // Spawn two threads to run put_datum in parallel and waits for both threads to complete using join.
-      // let handle1 = std::thread::spawn(&move || {
-      //   hot_store.put_datum(channel1.clone(), inserted_data1.clone());
-      // });
-      // let handle2 = std::thread::spawn(&move || {
-      //   hot_store.put_datum(channel2.clone(), inserted_data2.clone());
-      // });
-      // handle1.join().unwrap();
-      // handle2.join().unwrap();
+      let handle1 = std::thread::spawn(move || {
+        let hot_store = hot_store1.lock().unwrap();
+        hot_store.put_datum(channel1_clone, inserted_data1_clone);
+      });
+      let handle2 = std::thread::spawn(move || {
+        let hot_store = hot_store2.lock().unwrap();
+        hot_store.put_datum(channel2_clone, inserted_data2_clone);
+      });
+      handle1.join().unwrap();
+      handle2.join().unwrap();
 
-      hot_store.put_datum(channel1.clone(), inserted_data1.clone());
-      hot_store.put_datum(channel2.clone(), inserted_data2.clone());
-
-      let r1 = hot_store.get_data(&channel1);
-      let r2 = hot_store.get_data(&channel2);
+      let r1 = hot_store.lock().unwrap().get_data(&channel1);
+      let r2 = hot_store.lock().unwrap().get_data(&channel2);
       history_data1.insert(0, inserted_data1);
       history_data2.insert(0, inserted_data2);
 
@@ -537,31 +546,40 @@ proptest! {
       assert_eq!(r2, history_data2);
   }
 
-  // TODO: Update this test case so put_datum calls run in parallel
   #[test]
   fn concurrent_coninuation_operations_on_disjoint_channels_should_not_mess_up_the_cache(channels1 in  vec(any::<Channel>(), 0..=SIZE_RANGE), channels2 in  vec(any::<Channel>(), 0..=SIZE_RANGE), mut history_continuations1 in vec(any::<Continuation>(), 0..=SIZE_RANGE),
     mut history_continuations2 in vec(any::<Continuation>(), 0..=SIZE_RANGE), inserted_continuation1 in any::<Continuation>(), inserted_continuation2 in any::<Continuation>()) {
       prop_assume!(channels1 != channels2);
       let (_, history, hot_store) = fixture();
+      let hot_store = Arc::new(Mutex::new(hot_store));
 
       history.put_continuations(channels1.clone(), history_continuations1.clone());
       history.put_continuations(channels2.clone(), history_continuations2.clone());
 
-      // Spawn two threads to run put_continuation in parallel and waits for both threads to complete using join.
-      // let handle1 = std::thread::spawn(&move || {
-      //   hot_store.put_continuation(channels1.clone(), inserted_continuation1.clone());
-      // });
-      // let handle2 = std::thread::spawn(&move || {
-      //   hot_store.put_continuation(channels2.clone(), inserted_continuation2.clone());
-      // });
-      // handle1.join().unwrap();
-      // handle2.join().unwrap();
+      // Clone the Arc to share it between threads
+     let hot_store1 = Arc::clone(&hot_store);
+     let hot_store2 = Arc::clone(&hot_store);
 
-      hot_store.put_continuation(channels1.clone(), inserted_continuation1.clone());
-      hot_store.put_continuation(channels2.clone(), inserted_continuation2.clone());
+     // Clone the channels and data to move them into the threads
+     let channels1_clone = channels1.clone();
+     let channels2_clone = channels2.clone();
+     let inserted_continuation1_clone = inserted_continuation1.clone();
+     let inserted_continuation2_clone = inserted_continuation2.clone();
 
-      let r1 = hot_store.get_continuations(channels1);
-      let r2 = hot_store.get_continuations(channels2);
+      // Spawn two threads to run put_datum in parallel and waits for both threads to complete using join.
+      let handle1 = std::thread::spawn(move || {
+        let hot_store = hot_store1.lock().unwrap();
+        hot_store.put_continuation(channels1_clone, inserted_continuation1_clone);
+      });
+      let handle2 = std::thread::spawn(move || {
+        let hot_store = hot_store2.lock().unwrap();
+        hot_store.put_continuation(channels2_clone, inserted_continuation2_clone);
+      });
+      handle1.join().unwrap();
+      handle2.join().unwrap();
+
+      let r1 = hot_store.lock().unwrap().get_continuations(channels1);
+      let r2 = hot_store.lock().unwrap().get_continuations(channels2);
       history_continuations1.insert(0, inserted_continuation1);
       history_continuations2.insert(0, inserted_continuation2);
 
@@ -596,7 +614,6 @@ proptest! {
   }
 
   // TODO: Set min_successful to 10
-  // TODO: Update this test case so put_datum calls run in parallel
   // TODO: Double chck test case matches because of validIndices on Scala side
   #[test]
   fn remove_datum_should_remove_datum_at_index(channel in  any::<String>(), datum_value in any::<String>(), index in any::<i32>()) {

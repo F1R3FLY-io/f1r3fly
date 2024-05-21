@@ -14,7 +14,7 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/main/scala/coop/rchain/rspace/HotStore.scala
-pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync {
+pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync + Send {
     fn get_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
     fn put_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
     fn install_continuation(&self, channels: Vec<C>, wc: WaitingContinuation<P, K>) -> Option<()>;
