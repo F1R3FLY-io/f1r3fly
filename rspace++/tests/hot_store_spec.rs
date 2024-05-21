@@ -31,11 +31,11 @@ type Continuation = WaitingContinuation<Pattern, StringsCaptor>;
 type Join = Vec<Channel>;
 type Joins = Vec<Join>;
 
-const SIZE_RANGE: usize = 2; // 10
+const SIZE_RANGE: usize = 10; // 10
 
 proptest! {
   #![proptest_config(ProptestConfig {
-    cases: 1, // 20
+    cases: 20, // 20
     failure_persistence: None,
     .. ProptestConfig::default()
 })]

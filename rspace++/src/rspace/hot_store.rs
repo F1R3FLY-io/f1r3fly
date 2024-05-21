@@ -241,11 +241,11 @@ where
             removed_index < 0 || removed_index as usize >= current_continuations.len();
 
         if removing_installed {
-            println!("ERROR: Attempted to remove an installed continuation");
+            println!("WARNING: Attempted to remove an installed continuation");
             state.continuations.insert(channels, current_continuations);
             None
         } else if out_of_bounds {
-            println!("ERROR: Index {index} out of bounds when removing continuation");
+            println!("WARNING: Index {index} out of bounds when removing continuation");
             state.continuations.insert(channels, current_continuations);
             None
         } else {
@@ -313,7 +313,7 @@ where
         let out_of_bounds = index as usize >= current_datums.len();
 
         if out_of_bounds {
-            println!("ERROR: Index {index} out of bounds when removing datum");
+            println!("WARNING: Index {index} out of bounds when removing datum");
             state.data.insert(channel, current_datums);
             None
         } else {
@@ -456,7 +456,7 @@ where
 
         if do_remove {
             if out_of_bounds {
-                println!("ERROR: Join not found when removing join");
+                println!("WARNING: Join not found when removing join");
                 state.joins.insert(channel, current_joins);
                 Some(())
             } else {
