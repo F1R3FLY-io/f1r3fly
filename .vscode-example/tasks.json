@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-rust",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/build_rspace++.sh",
+      "problemMatcher": []
+    },
+    {
+      "label": "sbt-compile",
+      "type": "shell",
+      "command": "sbt \";Test / compile\"",
+      "presentation": {
+        "reveal": "always",
+        "revealProblems": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+  ]
+}

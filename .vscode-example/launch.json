@@ -1,0 +1,49 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+
+  /* 
+   * Setup
+   * Run VS Code with sudo: sudo code <project>
+   * Ensure the VS Code 'Metals' extension is properly initialized
+   * Set a breakpoint early in your code so application is in a running state
+   * Start 'Debug Scala Test' configuration
+   * In your terminal, run `jps -l` to find the scala application process ID. Look for scala.meta.metals.Main
+   * When your are paused at a breakpoint, run the 'Attach to Rust' configuration and search for the process ID you just looked up
+   *
+   * Notes:
+   *
+   * You may need to allow MacOS full disk access to VS Code in System Preferences
+   * For 'sbt-compile' task to work, you may need to clean the projet first with sbt in your terminal.
+   * Configure this as necessary for the jna library path and the testClass
+  */
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "scala",
+      "request": "launch",
+      "name": "Debug Scala Test",
+      "testClass": "coop.rchain.casper.batch1.MultiParentCasperRholangSpec",
+      "buildTarget": "casper-test",
+      "args": [],
+      "jvmOptions": [
+        "-Djna.library.path=${workspaceFolder}/rspace++/target/x86_64-apple-darwin/debug/"
+      ],
+      "preLaunchTask": "sbt-compile",
+    },
+    {
+      "name": "Attach to Rust",
+      "type": "lldb",
+      "request": "attach",
+      "pid": "${command:pickProcess}",
+      "sourceLanguages": ["rust"]
+  }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Scala and Rust",
+      "configurations": ["Debug Scala Test", "Attach to Rust"]
+    }
+  ]
+}
