@@ -241,13 +241,13 @@ where
             removed_index < 0 || removed_index as usize >= current_continuations.len();
 
         if removing_installed {
-            println!("WARNING: Attempted to remove an installed continuation");
-            state.continuations.insert(channels, current_continuations);
-            None
+            panic!("ERROR: Attempted to remove an installed continuation");
+            // state.continuations.insert(channels, current_continuations);
+            // None
         } else if out_of_bounds {
-            println!("WARNING: Index {index} out of bounds when removing continuation");
-            state.continuations.insert(channels, current_continuations);
-            None
+            panic!("ERROR: Index {index} out of bounds when removing continuation");
+            // state.continuations.insert(channels, current_continuations);
+            // None
         } else {
             let mut new_continuations = current_continuations;
             new_continuations.remove(removed_index as usize);
@@ -313,9 +313,9 @@ where
         let out_of_bounds = index as usize >= current_datums.len();
 
         if out_of_bounds {
-            println!("WARNING: Index {index} out of bounds when removing datum");
-            state.data.insert(channel, current_datums);
-            None
+            panic!("ERROR: Index {index} out of bounds when removing datum");
+            // state.data.insert(channel, current_datums);
+            // None
         } else {
             let mut new_datums = current_datums;
             new_datums.remove(index as usize);
