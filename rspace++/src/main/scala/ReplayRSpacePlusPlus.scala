@@ -10,9 +10,18 @@ import com.sun.jna.{Native, Pointer}
 import java.nio.file.Files
 import cats.effect.ContextShift
 import scala.concurrent.ExecutionContext
+import coop.rchain.metrics.Metrics
+import coop.rchain.shared.Serialize
 
-class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log, C, P, A, K](rspacePointer: Pointer)(
-    implicit scheduler: ExecutionContext
+class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
+    rspacePointer: Pointer
+)(
+    implicit
+    serializeC: Serialize[Par],
+    serializeP: Serialize[BindPattern],
+    serializeA: Serialize[ListParWithRandom],
+    serializeK: Serialize[TaggedContinuation],
+    scheduler: ExecutionContext
 ) extends RSpacePlusPlus_RhoTypes[F](rspacePointer)
     with IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation] {
 
@@ -46,10 +55,15 @@ object ReplayRSpacePlusPlus {
       .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
       .asInstanceOf[JNAInterface]
 
-  def create[F[_]: Concurrent: ContextShift: Log, C, P, A, K](
+  def create[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
       storePath: String
   )(
-      implicit scheduler: ExecutionContext
+      implicit
+      serializeC: Serialize[Par],
+      serializeP: Serialize[BindPattern],
+      serializeA: Serialize[ListParWithRandom],
+      serializeK: Serialize[TaggedContinuation],
+      scheduler: ExecutionContext
   ): F[ReplayRSpacePlusPlus[F, C, P, A, K]] =
     Sync[F].delay {
       val rspacePointer = INSTANCE.space_new(storePath);

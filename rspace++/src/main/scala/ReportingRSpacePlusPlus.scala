@@ -6,12 +6,23 @@ import coop.rchain.rspace.ReportingRspace.{ReportingEvent}
 import com.sun.jna.{Native, Pointer}
 import cats.effect.ContextShift
 import scala.concurrent.ExecutionContext
+import coop.rchain.shared.Serialize
+import coop.rchain.models.Par
+import coop.rchain.models.BindPattern
+import coop.rchain.models.ListParWithRandom
+import coop.rchain.models.TaggedContinuation
+import coop.rchain.metrics.Metrics
 
 object ReportingRSpacePlusPlus {
-  def create[F[_]: Concurrent: ContextShift: Log, C, P, A, K](
+  def create[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
       storePath: String
   )(
-      implicit scheduler: ExecutionContext
+      implicit
+      serializeC: Serialize[Par],
+      serializeP: Serialize[BindPattern],
+      serializeA: Serialize[ListParWithRandom],
+      serializeK: Serialize[TaggedContinuation],
+      scheduler: ExecutionContext
   ): F[ReportingRSpacePlusPlus[F, C, P, A, K]] =
     Sync[F].delay {
       val INSTANCE: JNAInterface =
@@ -24,10 +35,15 @@ object ReportingRSpacePlusPlus {
     }
 }
 
-class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log, C, P, A, K](
+class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
     rspacePointer: Pointer
 )(
-    implicit scheduler: ExecutionContext
+    implicit
+    serializeC: Serialize[Par],
+    serializeP: Serialize[BindPattern],
+    serializeA: Serialize[ListParWithRandom],
+    serializeK: Serialize[TaggedContinuation],
+    scheduler: ExecutionContext
 ) extends ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer) {
 
   def getReport: F[Seq[Seq[ReportingEvent]]] =
