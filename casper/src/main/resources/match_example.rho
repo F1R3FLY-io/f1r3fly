@@ -1,0 +1,19 @@
+new stdout(`rho:io:stdout`) in {
+  // Define a sample list and a function to match on different patterns
+  new listCh in {
+    listCh!(Nil) |
+
+    for (@list <- listCh) {
+      match list {
+
+                Nil => {
+                  stdout!("Matched an empty list")
+                }
+                //_ => {
+                  //stdout!("Matched a non-empty list")
+                //}
+
+      }
+    }
+  }
+}

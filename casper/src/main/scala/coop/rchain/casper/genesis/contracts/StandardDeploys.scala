@@ -75,6 +75,13 @@ object StandardDeploys {
     shardId
   )
 
+  def match_test(shardId: String): Signed[DeployData] = toDeploy(
+    CompiledRholangSource("match_example.rho"),
+    registryPk,
+    registryTimestamp,
+    shardId
+  )
+
   def listOps(shardId: String): Signed[DeployData] = toDeploy(
     CompiledRholangSource("ListOps.rho"),
     listOpsPk,

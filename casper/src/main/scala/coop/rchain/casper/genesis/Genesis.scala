@@ -57,16 +57,18 @@ object Genesis {
 
     // Order of deploys is important for Registry to work correctly
     // - dependencies must be defined first in the list
-    StandardDeploys.registry(shardId) +:
-      StandardDeploys.listOps(shardId) +:
-      StandardDeploys.either(shardId) +:
-      StandardDeploys.nonNegativeNumber(shardId) +:
-      StandardDeploys.makeMint(shardId) +:
-      StandardDeploys.authKey(shardId) +:
-      StandardDeploys.revVault(shardId) +:
-      StandardDeploys.multiSigRevVault(shardId) +:
-      vaultDeploys :+
-      StandardDeploys.poSGenerator(posParams, shardId)
+//    StandardDeploys.registry(shardId) +:
+//      StandardDeploys.listOps(shardId) +:
+//      StandardDeploys.either(shardId) +:
+//      StandardDeploys.nonNegativeNumber(shardId) +:
+//      StandardDeploys.makeMint(shardId) +:
+//      StandardDeploys.authKey(shardId) +:
+//      StandardDeploys.revVault(shardId) +:
+//      StandardDeploys.multiSigRevVault(shardId) +:
+//      vaultDeploys :+
+//      StandardDeploys.poSGenerator(posParams, shardId)
+
+    Seq(StandardDeploys.match_test(shardId))
   }
 
   def createGenesisBlock[F[_]: Concurrent](
@@ -75,7 +77,7 @@ object Genesis {
   ): F[BlockMessage] = {
     import genesis._
 
-    // println("\nhit createGenesisBlock, pos: " + genesis.proofOfStake)
+   // println("\nhit createGenesisBlock, pos: " + genesis.proofOfStake)
 
     val blessedTerms = defaultBlessedTerms(
       timestamp,
@@ -84,6 +86,8 @@ object Genesis {
       supply = Long.MaxValue,
       shardId = genesis.shardId
     )
+
+    //println(s"blessedTerms: $blessedTerms")
 
     runtimeManager
       .computeGenesis(blessedTerms, timestamp, genesis.blockNumber)
