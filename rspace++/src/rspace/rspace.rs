@@ -361,6 +361,7 @@ where
         peeks: BTreeSet<i32>,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit consume");
+
         if channels.is_empty() {
             panic!("RUST ERROR: channels can't be empty");
         } else if channels.len() != patterns.len() {
@@ -380,6 +381,8 @@ where
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
+        // println!("\n\nHit produce, channel: {:?}", channel);
+
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
         _ = self.log_produce(produce_ref.clone(), channel.clone(), data.clone(), persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
@@ -504,6 +507,7 @@ where
 
     pub fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
         // println!("\nhit rspace++ create_soft_checkpoint");
+        // println!("current hot_store state: {:?}", self.store.snapshot());
 
         let cache_snapshot = self.store.snapshot();
         let curr_produce_counter = self.produce_counter.clone();

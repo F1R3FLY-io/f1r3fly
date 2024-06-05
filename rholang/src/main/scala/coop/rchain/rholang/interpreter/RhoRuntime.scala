@@ -297,8 +297,8 @@ object RhoRuntime {
   def introduceSystemProcesses[F[_]: Sync: _cost: Span](
       spaces: List[RhoTuplespace[F]],
       processes: List[(Name, Arity, Remainder, BodyRef)]
-  ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] =
-    // println("\nhit introduceSystemProcesses")
+  ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] = {
+    println("\nhit introduceSystemProcesses")
     // println("spaces: " + spaces)
     // println("processes: " + processes)
     processes.flatMap {
@@ -314,6 +314,7 @@ object RhoRuntime {
         val continuation = TaggedContinuation(ScalaBodyRef(ref))
         spaces.map(_.install(channels, patterns, continuation))
     }.sequence
+  }
 
   def stdSystemProcesses[F[_]]: Seq[Definition[F]] = Seq(
     Definition[F]("rho:io:stdout", FixedChannels.STDOUT, 1, BodyRefs.STDOUT, {

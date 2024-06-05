@@ -20,6 +20,9 @@ impl Match<BindPattern, ListParWithRandom> for Matcher {
     fn get(&self, pattern: BindPattern, data: ListParWithRandom) -> Option<ListParWithRandom> {
         let mut spatial_matcher = SpatialMatcherContext::new();
 
+        // println!("\npattern in get: {:?}", pattern);
+        // println!("\ndata in get: {:?}", data);
+
         let fold_match_result =
             spatial_matcher.fold_match(data.pars, pattern.patterns, pattern.remainder.clone());
         let match_result = match fold_match_result {
@@ -27,7 +30,9 @@ impl Match<BindPattern, ListParWithRandom> for Matcher {
             None => None,
         };
 
-        match match_result {
+        // println!("\nmatch_result: {:?}", match_result);
+
+        let result = match match_result {
             Some((mut free_map, caught_rem)) => {
                 let remainder_map = match pattern.remainder {
                     Some(Var {
@@ -52,6 +57,9 @@ impl Match<BindPattern, ListParWithRandom> for Matcher {
                 })
             }
             None => None,
-        }
+        };
+
+        // println!("\nresult: {:?}", result);
+        result
     }
 }

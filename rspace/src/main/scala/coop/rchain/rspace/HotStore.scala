@@ -125,7 +125,11 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
             // The first one would be always `installedContinuation` if it exist which need the
             // index to -1 to exclude installedContinuation
             val removedIndex = if (isInstalled) index - 1 else index
-            val outOfBounds  = !curVal.isDefinedAt(removedIndex)
+            // println("Index: {}" + index);
+            // println("Removed Index: {}" + removedIndex);
+            // println("Current Continuations Length: {}" + curVal.size);
+            val outOfBounds = !curVal.isDefinedAt(removedIndex)
+            // println("outofBounds: " + outOfBounds);
 
             if (removingInstalled || outOfBounds)
               (
@@ -147,11 +151,12 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
             }
             .whenA(removingInstalled)
       _ <- Sync[F]
-            .raiseError(
+            .raiseError {
+              println("what is going on")
               new IndexOutOfBoundsException(
                 s"Index $index out of bounds when removing continuation"
               )
-            )
+            }
             .whenA(invalidIndex)
     } yield ()
 
