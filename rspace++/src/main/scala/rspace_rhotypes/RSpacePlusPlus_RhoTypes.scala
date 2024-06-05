@@ -1175,7 +1175,8 @@ object RSpacePlusPlus_RhoTypes {
                  val patternBytesLength = patternBytes.length
 
                  if (targetBytesLength == 0 && patternBytesLength == 0) {
-                   None
+                   // This case means target and pattern are empty
+                   Some(Map.empty[Int, Par], ())
                  } else {
                    val payloadSize   = targetBytesLength.toLong + patternBytesLength.toLong
                    val payloadMemory = new Memory(payloadSize)
