@@ -8,6 +8,7 @@ import coop.rchain.shared.Serialize
 import coop.rchain.rspace.HotStoreTrieAction
 import rspacePlusPlus.state.RSpacePlusPlusExporter
 import rspacePlusPlus.state.RSpacePlusPlusImporter
+import rspacePlusPlus.history.RSpacePlusPlusHistoryReader
 
 trait HistoryRepository[F[_], C, P, A, K] {
   def checkpoint(actions: List[HotStoreAction]): F[HistoryRepository[F, C, P, A, K]]
@@ -22,7 +23,9 @@ trait HistoryRepository[F[_], C, P, A, K] {
 
   def importer: F[RSpacePlusPlusImporter[F]]
 
-  def getHistoryReader(stateHash: Blake2b256Hash): F[HistoryReader[F, Blake2b256Hash, C, P, A, K]]
+  def getHistoryReader(
+      stateHash: Blake2b256Hash
+  ): F[RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K]]
 
   def getSerializeC: Serialize[C]
 

@@ -16,6 +16,8 @@ import coop.rchain.rspace.syntax._
 import coop.rchain.shared.Log
 import scodec.bits.ByteVector
 
+import rspacePlusPlus.merger.{RSpacePlusPlusStateChange, RSpacePlusPlusStateChangeMerger}
+
 object DagMerger {
 
   def costOptimalRejectionAlg: DeployChainIndex => Long =
@@ -58,8 +60,15 @@ object DagMerger {
         numberChs.get(hash).traverse {
           RholangMergingLogic.calculateNumberChannelMerge(hash, _, changes, baseGetData)
         }
-      computeTrieActions = (changes: StateChange, mergeableChs: NumberChannelsDiff) =>
-        StateChangeMerger.computeTrieActions(
+      // computeTrieActions = (changes: StateChange, mergeableChs: NumberChannelsDiff) =>
+      //   StateChangeMerger.computeTrieActions(
+      //     changes,
+      //     baseReader,
+      //     mergeableChs,
+      //     overrideTrieAction
+      //   )
+      computeTrieActions = (changes: RSpacePlusPlusStateChange, mergeableChs: NumberChannelsDiff) =>
+        RSpacePlusPlusStateChangeMerger.computeTrieActions(
           changes,
           baseReader,
           mergeableChs,

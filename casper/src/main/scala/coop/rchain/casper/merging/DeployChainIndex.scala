@@ -6,6 +6,7 @@ import com.google.protobuf.ByteString
 import coop.rchain.rspace.hashing.Blake2b256Hash
 // import coop.rchain.rspace.history.HistoryRepository
 import rspacePlusPlus.HistoryRepository
+import rspacePlusPlus.merger.RSpacePlusPlusStateChange
 import coop.rchain.rspace.merger._
 import coop.rchain.rspace.syntax._
 
@@ -20,7 +21,8 @@ final case class DeployChainIndex(
     preStateHash: Blake2b256Hash,
     postStateHash: Blake2b256Hash,
     eventLogIndex: EventLogIndex,
-    stateChanges: StateChange,
+    // stateChanges: StateChange,
+    stateChanges: RSpacePlusPlusStateChange,
     private val hashCodeVal: Int
 ) {
   // equals and hash overrides are required to make conflict resolution faster, particularly rejection options calculation
@@ -53,7 +55,13 @@ object DeployChainIndex {
       postHistoryReader <- historyRepository.getHistoryReader(postStateHash)
       postStateReader   = postHistoryReader.readerBinary
 
-      stateChanges <- StateChange[F, C, P, A, K](
+      // stateChanges <- StateChange[F, C, P, A, K](
+      //                  preStateReader = preStateReader,
+      //                  postStateReader = postStateReader,
+      //                  eventLogIndex,
+      //                  historyRepository.getSerializeC
+      //                )
+      stateChanges <- RSpacePlusPlusStateChange[F, C, P, A, K](
                        preStateReader = preStateReader,
                        postStateReader = postStateReader,
                        eventLogIndex,
@@ -80,7 +88,7 @@ object DeployChainIndex {
         Blake2b256Hash.fromByteArray(new Array[Byte](32)),
         Blake2b256Hash.fromByteArray(new Array[Byte](32)),
         EventLogIndex.empty,
-        StateChange.empty,
+        RSpacePlusPlusStateChange.empty,
         Objects.hash(deployIds.map(id => DeployIdWithCost(id, 0)).map(_.id): _*)
       )
     }

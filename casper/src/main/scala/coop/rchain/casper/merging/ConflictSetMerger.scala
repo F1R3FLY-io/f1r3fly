@@ -14,6 +14,8 @@ import coop.rchain.shared.{Log, Stopwatch}
 import coop.rchain.rholang.interpreter.merging.RholangMergingLogic.convertToReadNumber
 import coop.rchain.rspace.internal.Datum
 
+import rspacePlusPlus.merger.RSpacePlusPlusStateChange
+
 object ConflictSetMerger {
 
   /** R is a type for minimal rejection unit */
@@ -23,9 +25,14 @@ object ConflictSetMerger {
       depends: (R, R) => Boolean,
       conflicts: (Set[R], Set[R]) => Boolean,
       cost: R => Long,
-      stateChanges: R => F[StateChange],
+      // stateChanges: R => F[StateChange],
+      stateChanges: R => F[RSpacePlusPlusStateChange],
       mergeableChannels: R => NumberChannelsDiff,
-      computeTrieActions: (StateChange, NumberChannelsDiff) => F[Vector[HotStoreTrieAction]],
+      // computeTrieActions: (StateChange, NumberChannelsDiff) => F[Vector[HotStoreTrieAction]],
+      computeTrieActions: (
+          RSpacePlusPlusStateChange,
+          NumberChannelsDiff
+      ) => F[Vector[HotStoreTrieAction]],
       applyTrieActions: Seq[HotStoreTrieAction] => F[Blake2b256Hash],
       getData: Blake2b256Hash => F[Seq[Datum[ListParWithRandom]]]
   ): F[(Blake2b256Hash, Set[R])] = {

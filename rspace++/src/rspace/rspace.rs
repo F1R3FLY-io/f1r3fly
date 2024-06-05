@@ -33,7 +33,7 @@ where
     C: Clone + Ord,
     M: Match<P, A>,
 {
-    history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
+    pub history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,

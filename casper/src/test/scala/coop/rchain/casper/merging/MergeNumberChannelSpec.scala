@@ -28,6 +28,8 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalatest.FlatSpec
 import scodec.bits.ByteVector
 
+import rspacePlusPlus.merger.{RSpacePlusPlusStateChange, RSpacePlusPlusStateChangeMerger}
+
 final case class DeployTestInfo(term: String, cost: Long, sig: String)
 
 class MergeNumberChannelSpec extends FlatSpec {
@@ -216,8 +218,15 @@ class MergeNumberChannelSpec extends FlatSpec {
           }
 
         // Create store actions / uses handler for number channels
-        computeTrieActions = (changes: StateChange, mergeableChs: NumberChannelsDiff) => {
-          StateChangeMerger
+        // computeTrieActions = (changes: StateChange, mergeableChs: NumberChannelsDiff) => {
+        //   StateChangeMerger
+        //     .computeTrieActions(changes, baseReaderBinary, mergeableChs, overrideTrieAction)
+        // }
+        computeTrieActions = (
+            changes: RSpacePlusPlusStateChange,
+            mergeableChs: NumberChannelsDiff
+        ) => {
+          RSpacePlusPlusStateChangeMerger
             .computeTrieActions(changes, baseReaderBinary, mergeableChs, overrideTrieAction)
         }
 

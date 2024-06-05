@@ -58,6 +58,7 @@ import com.typesafe.scalalogging.Logger
 import cats.effect.ContextShift
 import scala.concurrent.ExecutionContext
 import rspacePlusPlus.state.{RSpacePlusPlusExporter, RSpacePlusPlusImporter}
+import rspacePlusPlus.history.{RSpacePlusPlusHistoryReader}
 import coop.rchain.rspace.state.exporters.RSpaceExporterItems.StoreItems
 import java.nio.file.Path
 import coop.rchain.rspace.hashing.StableHashProvider
@@ -65,6 +66,11 @@ import coop.rchain.rspace.concurrent.ConcurrentTwoStepLockF
 import coop.rchain.metrics.Metrics
 import coop.rchain.metrics.Metrics.Source
 import coop.rchain.rspace.RSpaceMetricsSource
+import coop.rchain.rspace.history.HistoryReaderBase
+import rspacePlusPlus.history.{RSpacePlusPlusHistoryReaderBase, RSpacePlusPlusHistoryReaderBinary}
+import coop.rchain.rspace.serializers.ScodecSerialize.DatumB
+import coop.rchain.rspace.serializers.ScodecSerialize.WaitingContinuationB
+import coop.rchain.rspace.serializers.ScodecSerialize.JoinsB
 
 // import scalapb.json4s.Parser
 
@@ -1117,7 +1123,134 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
 
     override def getHistoryReader(
         stateHash: Blake2b256Hash
-    ): F[HistoryReader[F, Blake2b256Hash, C, P, A, K]] = { println("\ngetHistoryReader"); ??? }
+    ): F[RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K]] =
+      for {
+        historyReader <- Sync[F].delay {
+                          new RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K] {
+
+                            override def root: Blake2b256Hash = ???
+
+                            override def getData(key: Blake2b256Hash): F[Seq[Datum[A]]] =
+                              for {
+                                result <- Sync[F].delay {
+
+                                           val stateHashBytes       = stateHash.bytes.toArray
+                                           val stateHashBytesLength = stateHashBytes.length
+                                           val keyBytes             = key.bytes.toArray
+                                           val keyBytesLength       = keyBytes.length
+
+                                           val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                           val payloadMemory = new Memory(payloadSize)
+
+                                           payloadMemory
+                                             .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                           payloadMemory.write(
+                                             stateHashBytesLength.toLong,
+                                             keyBytes,
+                                             0,
+                                             keyBytesLength
+                                           )
+
+                                           val getHistoryDataResultPtr = INSTANCE.get_history_data(
+                                             rspacePointer,
+                                             payloadMemory,
+                                             stateHashBytesLength,
+                                             keyBytesLength
+                                           )
+
+                                           // Not sure is this line is needed
+                                           // Need to figure out how to deallocate 'payloadMemory'
+                                           payloadMemory.clear()
+
+                                           if (getHistoryDataResultPtr != null) {
+                                             val resultByteslength =
+                                               getHistoryDataResultPtr.getInt(0)
+
+                                             try {
+                                               val resultBytes =
+                                                 getHistoryDataResultPtr
+                                                   .getByteArray(4, resultByteslength)
+                                               val datumsProto  = DatumsProto.parseFrom(resultBytes)
+                                               val datumsProtos = datumsProto.datums
+
+                                               val datums: Seq[Datum[A]] =
+                                                 datumsProtos.map(
+                                                   datum =>
+                                                     Datum(
+                                                       datum.a.get,
+                                                       datum.persist,
+                                                       source = datum.source match {
+                                                         case Some(produceEvent) =>
+                                                           Produce(
+                                                             channelsHash =
+                                                               Blake2b256Hash.fromByteArray(
+                                                                 produceEvent.channelHash.toByteArray
+                                                               ),
+                                                             hash = Blake2b256Hash.fromByteArray(
+                                                               produceEvent.hash.toByteArray
+                                                             ),
+                                                             persistent = produceEvent.persistent
+                                                           )
+                                                         case None => {
+                                                           println("ProduceEvent is None");
+                                                           throw new RuntimeException(
+                                                             "ProduceEvent is None"
+                                                           )
+                                                         }
+                                                       }
+                                                     )
+                                                 )
+
+                                               datums
+                                             } catch {
+                                               case e: Throwable =>
+                                                 println(
+                                                   "Error during scala getHistoryData operation: " + e
+                                                 )
+                                                 throw e
+                                             } finally {
+                                               INSTANCE.deallocate_memory(
+                                                 getHistoryDataResultPtr,
+                                                 resultByteslength
+                                               )
+                                             }
+                                           } else {
+                                             println("getHistoryDataResultPtr is null")
+                                             throw new RuntimeException(
+                                               "getHistoryDataResultPtr is null"
+                                             )
+                                           }
+                                         }
+
+                              } yield result
+
+                            override def getContinuations(
+                                key: Blake2b256Hash
+                            ): F[Seq[WaitingContinuation[P, K]]] = ???
+
+                            override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] = ???
+
+                            override def base: RSpacePlusPlusHistoryReaderBase[F, C, P, A, K] = ???
+
+                            // See rspace/src/main/scala/coop/rchain/rspace/history/syntax/HistoryReaderSyntax.scala
+                            override def readerBinary
+                                : RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] =
+                              new RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] {
+                                override def getData(key: Blake2b256Hash): F[Seq[DatumB[A]]] =
+                                  ???
+
+                                override def getContinuations(
+                                    key: Blake2b256Hash
+                                ): F[Seq[WaitingContinuationB[P, K]]] =
+                                  ???
+
+                                override def getJoins(key: Blake2b256Hash): F[Seq[JoinsB[C]]] =
+                                  ???
+                              }
+
+                          }
+                        }
+      } yield historyReader
 
     override def getSerializeC: Serialize[C] = { println("\ngetSerialize"); ??? }
 
