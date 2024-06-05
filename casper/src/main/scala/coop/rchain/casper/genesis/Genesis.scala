@@ -105,7 +105,7 @@ object Genesis {
   ): BlockMessage = {
     import genesis._
 
-    println("\nhit createProcessedDeploy")
+    // println("\nhit createProcessedDeploy")
     // println("genesis: " + genesis)
     // println(
     //   "start hash: " + PrettyPrinter

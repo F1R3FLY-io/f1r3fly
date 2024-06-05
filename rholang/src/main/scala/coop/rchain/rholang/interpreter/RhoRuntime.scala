@@ -297,8 +297,8 @@ object RhoRuntime {
   def introduceSystemProcesses[F[_]: Sync: _cost: Span](
       spaces: List[RhoTuplespace[F]],
       processes: List[(Name, Arity, Remainder, BodyRef)]
-  ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] = {
-    println("\nhit introduceSystemProcesses")
+  ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] =
+    // println("\nhit introduceSystemProcesses")
     // println("spaces: " + spaces)
     // println("processes: " + processes)
     processes.flatMap {
@@ -314,7 +314,6 @@ object RhoRuntime {
         val continuation = TaggedContinuation(ScalaBodyRef(ref))
         spaces.map(_.install(channels, patterns, continuation))
     }.sequence
-  }
 
   def stdSystemProcesses[F[_]]: Seq[Definition[F]] = Seq(
     Definition[F]("rho:io:stdout", FixedChannels.STDOUT, 1, BodyRefs.STDOUT, {
@@ -524,7 +523,7 @@ object RhoRuntime {
 
   def bootstrapRegistry[F[_]: Monad](runtime: RhoRuntime[F]): F[Unit] = {
     implicit val rand: Blake2b512Random = bootstrapRand
-    println("\nhit bootstrapRegistry")
+    // println("\nhit bootstrapRegistry")
     for {
       cost <- runtime.cost.get
       _    <- runtime.cost.set(Cost.UNSAFE_MAX)
@@ -542,8 +541,8 @@ object RhoRuntime {
   )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
     Span[F].trace(createPlayRuntime) {
       for {
-        cost     <- CostAccounting.emptyCost[F]
-        _        = println("\nhit createRuntime")
+        cost <- CostAccounting.emptyCost[F]
+        // _        = println("\nhit createRuntime")
         mergeChs <- Ref.of(Set[Par]())
         rhoEnv <- {
           implicit val c: _cost[F] = cost
