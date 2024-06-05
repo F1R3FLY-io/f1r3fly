@@ -1252,7 +1252,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                         }
       } yield historyReader
 
-    override def getSerializeC: Serialize[C] = { println("\ngetSerialize"); ??? }
+    override def getSerializeC: Serialize[C] = serializeC
 
     override def root: Blake2b256Hash = { println("\nroot"); ??? }
 
