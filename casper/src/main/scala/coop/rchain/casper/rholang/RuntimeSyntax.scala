@@ -168,13 +168,14 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         _ <- runtime.setBlockData(
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
+        _                   <- Sync[F].delay(println("\nhit computeGenesis"))
         genesisPreStateHash <- emptyStateHash
-        // _ <- Sync[F].delay(
-        //       println(
-        //         "\ngenesisPreStateHash: " + PrettyPrinter
-        //           .buildString(genesisPreStateHash)
-        //       )
-        //     )
+        _ <- Sync[F].delay(
+              println(
+                "\ngenesisPreStateHash: " + PrettyPrinter
+                  .buildString(genesisPreStateHash)
+              )
+            )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
       } yield (genesisPreStateHash, stateHash, processedDeploys)
@@ -296,6 +297,14 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         evaluateResult <- evaluate(deploy)
 
         checkpoint <- runtime.createSoftCheckpoint
+
+        // _ = println(
+        //   "\npost-evaluate soft-checkpoint continuations length: " + checkpoint.cacheSnapshot.continuations.toArray.length
+        // )
+
+        // _ = println(
+        //   "\npost-evaluate soft-checkpoint produceCounter length: " + checkpoint.produceCounter.toArray.length
+        // )
 
         evalSucceeded = evaluateResult.errors.isEmpty
         hotChanges    <- runtime.getHotChanges

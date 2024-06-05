@@ -34,6 +34,10 @@ package object storage {
         type R[A] = MatcherMonadT[F, A]
         implicit val matcherMonadError = implicitly[Sync[R]]
         for {
+          // _ <- Sync[F].delay {
+          //       println("\npattern in get: " + pattern)
+          //       println("\ndata in get: " + data)
+          //     }
           matchResult <- runFirst[F, Seq[Par]](
                           SpatialMatcher
                             .foldMatch[R, Par, Par](
@@ -42,8 +46,10 @@ package object storage {
                               pattern.remainder
                             )
                         )
+
+          // _ = println("\nmatchResult: " + matchResult)
         } yield {
-          matchResult.map {
+          val result = matchResult.map {
             case (freeMap, caughtRem) =>
               val remainderMap = pattern.remainder match {
                 case Some(Var(FreeVar(level))) =>
@@ -55,10 +61,11 @@ package object storage {
                 data.randomState
               )
           }
+          // println("\nresult: " + result)
+          result
         }
       }
     }
-
   /* Serialize instances */
 
   implicit val serializeBindPattern: Serialize[BindPattern] =

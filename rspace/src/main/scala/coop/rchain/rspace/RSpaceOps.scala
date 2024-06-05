@@ -20,6 +20,9 @@ import scala.collection.SortedSet
 import scala.concurrent.{ExecutionContext, SyncVar}
 import scala.util.Random
 
+import java.text.SimpleDateFormat
+import java.util.Date
+
 abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, K](
     historyRepository: HistoryRepository[F, C, P, A, K],
     val storeAtom: AtomicAny[HotStore[F, C, P, A, K]]
@@ -200,7 +203,12 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
       } else
         (for {
           // _          <- Sync[F].delay(logger.debug("\nHit consume"))
-          // _          <- Sync[F].delay(println("\nHit consume"))
+          // _ <- Sync[F].delay(println("\nHit consume"))
+          // threadName = Thread.currentThread().getName
+          // currentTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(
+          // new Date(System.currentTimeMillis())
+          // )
+          // _          <- Sync[F].delay(println(s"Thread: $threadName, Current Time: $currentTime"))
           consumeRef <- Sync[F].delay(Consume(channels, patterns, continuation, persist))
           result <- consumeLockF(channels) {
                      lockedConsume(
@@ -212,6 +220,15 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
                        consumeRef
                      )
                    }
+          // result <- lockedConsume(
+          //            channels,
+          //            patterns,
+          //            continuation,
+          //            persist,
+          //            peeks,
+          //            consumeRef
+          //          )
+          _ = println("\nlockedConsume result: " + result)
         } yield result).timer(consumeTimeCommLabel)(Metrics[F], MetricsSource)
     }
 
@@ -232,10 +249,14 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
     ContextShift[F].evalOn(scheduler) {
       (for {
         produceRef <- Sync[F].delay(Produce(channel, data, persist))
-        // _          <- Sync[F].delay(println("\nHit produce, data: " + data))
+        _ <- Sync[F].delay {
+              println("\nHit produce, data: " + data)
+              println("\nHit produce, channel: " + channel)
+            }
         result <- produceLockF(channel)(
                    lockedProduce(channel, data, persist, produceRef)
                  )
+        // result <- lockedProduce(channel, data, persist, produceRef)
       } yield result).timer(produceTimeCommLabel)(Metrics[F], MetricsSource)
     }
 
@@ -252,7 +273,11 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
       continuation: K
   ): F[Option[(K, Seq[A])]] =
     /* spanF.trace(installSpanLabel) */
-    installLockF(channels) {
+    // installLockF(channels) {
+    //   implicit val ms = MetricsSource
+    //   lockedInstall(channels, patterns, continuation).timer("install-time")
+    // }
+    {
       implicit val ms = MetricsSource
       lockedInstall(channels, patterns, continuation).timer("install-time")
     }
@@ -310,8 +335,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
                        _ <- Log[F].debug(
                              s"storing <(patterns, continuation): ($patterns, $continuation)> at <channels: $channels>"
                            )
-                       //  map <- store.toMap
-                       //  _   = println("\nstore map after install: " + map.toArray.length)
+                       map <- store.toMap
+                       //  _   = println("\nstore length after install: " + map.toArray.length)
                      } yield None
                    case Some(_) => {
                      println("\nInstalling can be done only on startup")
@@ -327,7 +352,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
 
   override def reset(root: Blake2b256Hash): F[Unit] = spanF.trace(resetSpanLabel) {
     for {
-      nextHistory   <- historyRepositoryAtom.get().reset(root)
+      nextHistory <- historyRepositoryAtom.get().reset(root)
+      // _             = println("\nhit rspace reset")
       _             = historyRepositoryAtom.set(nextHistory)
       _             = eventLog.take()
       _             = eventLog.put(Seq.empty)
@@ -355,7 +381,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
   override def createSoftCheckpoint(): F[SoftCheckpoint[C, P, A, K]] =
     /*spanF.trace(createSoftCheckpointSpanLabel) */
     for {
-      cache    <- storeAtom.get().snapshot
+      cache <- storeAtom.get().snapshot
+      // _        = println("\nhit rspace createSoftCheckpoint")
       log      = eventLog.take()
       _        = eventLog.put(Seq.empty)
       pCounter = produceCounter.take()
