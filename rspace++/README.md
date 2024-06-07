@@ -22,6 +22,10 @@ Standing up network using RSpace++
 3. `java -Djna.library.path=./rspace++/target/debug/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key <your_validator_key>`
 4. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/ ~/.rnode/node.certificate.pem ~/.rnode/node.key.pem`
 
+Propose and finalize block using rspace++
+1. Complete the steps in 'Standing up network using RSpace++'.
+2. In a new terminal tab, run: `sbt "nodeCli/run"`
+
 Standing up network using RSpace++ (Under Docker) (Currently not working under Nix shell)
 1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 2. `docker compose -f docker/shard.yml up`
@@ -63,6 +67,8 @@ I have classified these as "working" if the output and deployment cost matches t
 - Run basic RSpace-Bench Benchmark: `sbt "rspaceBench/jmh:run -i 10 -wi 10 -f1 -t1 .BasicBench."`
 - Run Casper Genesis tests: `sbt "casper/testOnly coop.rchain.casper.genesis.GenesisTest"`
 - Run Casper Rholang tests: `sbt ";casper/testOnly coop.rchain.casper.batch1.MultiParentCasperRholangSpec"`
+- Run Casper Block tests: `sbt ";casper/testOnly coop.rchain.casper.addblock.MultiParentCasperAddBlockSpec"`
+- Run Casper Propose test: `sbt ";casper/testOnly coop.rchain.casper.addblock.ProposerSpec"`
 
 ### Testing Rust (within rspace++ directory)
 
