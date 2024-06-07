@@ -1,4 +1,3 @@
-mod concurrent;
 pub mod event;
 pub mod hashing;
 pub mod history;

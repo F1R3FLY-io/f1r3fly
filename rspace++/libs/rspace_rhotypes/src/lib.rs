@@ -1,7 +1,5 @@
-use chrono::Local;
 use dashmap::DashMap;
 use prost::Message;
-use rand::Rng;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
@@ -13,9 +11,7 @@ use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
-use rspace_plus_plus::rspace::shared::rspace_store_manager::{
-    get_or_create_rspace_store, mk_rspace_store_manager,
-};
+use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     ChannelsProto, CheckpointProto, DatumsProto, HotStoreStateProto, JoinProto, JoinsProto,
     ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
@@ -25,7 +21,6 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
-use std::thread;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -49,8 +44,6 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
             // let mut kvm = mk_rspace_store_manager(lmdb_path.into(), 1 * GB);
             // let store = kvm.r_space_stores().await.unwrap();
 
-            let mut rng = rand::thread_rng();
-            let unique_id: u32 = rng.gen();
             let mut kvm =
                 mk_rspace_store_manager((&format!("{}/rspace++/", data_dir)).into(), 1 * GB);
             let store = kvm.r_space_stores().await.unwrap();
