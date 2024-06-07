@@ -9,6 +9,16 @@ import java.nio.file.Files
 import java.nio.charset.StandardCharsets
 import coop.rchain.crypto.signatures.Secp256k1
 import coop.rchain.crypto.signatures.Signed
+import scala.util.{Failure, Success, Try}
+import scodec.bits.ByteVector
+import coop.rchain.casper.protocol.FindDeployQuery
+import io.circe.Decoder
+import coop.rchain.casper.protocol.LightBlockInfo
+
+import io.circe._
+import io.circe.generic.semiauto._
+import scala.util.matching.Regex
+import coop.rchain.casper.protocol.IsFinalizedQuery
 
 class NodeCliPlayground {
   val rhoContractPath = "./rholang/examples/stdout.rho"
@@ -52,7 +62,7 @@ class NodeCliPlayground {
             deployId match {
               case Some(id) => {
                 propose()
-                useDeployId(id)
+                findDeploy(id)
               }
               case None =>
                 println("Deploy ID not found in the output.")
@@ -60,14 +70,12 @@ class NodeCliPlayground {
           }
           case Left(errors) => errors.foreach(println)
         }
-
       }
       case Left(err) => println(s"Deploy failed: $err")
     }
-
   }
 
-  def propose(): Boolean = {
+  def propose(): Unit = {
     implicit val proposeServiceClient: GrpcProposeService[Task] =
       new GrpcProposeService[Task](
         host,
@@ -83,20 +91,65 @@ class NodeCliPlayground {
 
         res match {
           case Right(str) => {
-            println(s"Propose $str")
+            // println(str)
           }
           case Left(errors) => errors.foreach(println)
         }
-
       }
       case Left(err) => println(s"Propose failed: $err")
     }
-
-    true
   }
 
-  def useDeployId(deployId: String): Unit =
-    println(s"Using deploy ID: $deployId")
+  def findDeploy(deployId: String): Unit = {
+    implicit val deployServiceClient: GrpcDeployService[Task] =
+      new GrpcDeployService[Task](
+        host,
+        port,
+        16 * 1024 * 1024
+      )
+
+    val base64String = convert(deployId)
+    base64String match {
+      case Some(value) => {
+        val findDeployTask =
+          DeployService[Task].findDeploy(
+            FindDeployQuery(ByteString.copyFrom(value))
+          )
+
+        findDeployTask.runAsync {
+          case Right(res) => {
+
+            res match {
+              case Right(str) => {
+                // println(s"findDeploy result: $str")
+
+                val blockHash = extractBlockHash(str).getOrElse("Not found")
+                val isFinalizedTask =
+                  DeployService[Task].isFinalized(
+                    IsFinalizedQuery(blockHash)
+                  )
+
+                isFinalizedTask.runAsync {
+                  case Right(res) => {
+                    res match {
+                      case Right(str) => {
+                        println(s"isFinalized Result: $str")
+                      }
+                      case Left(errors) => errors.foreach(println)
+                    }
+                  }
+                  case Left(err) => println(s"findDeploy failed: $err")
+                }
+              }
+              case Left(errors) => errors.foreach(println)
+            }
+          }
+          case Left(err) => println(s"findDeploy failed: $err")
+        }
+      }
+      case None => println("Error converting hex to base64.")
+    }
+  }
 
   def loadFileContent(filePath: String): String =
     new String(Files.readAllBytes(Paths.get(filePath)), StandardCharsets.UTF_8)
@@ -104,6 +157,17 @@ class NodeCliPlayground {
   def printCurrentDirectory(): Unit = {
     val currentPath = Paths.get("").toAbsolutePath.toString
     println(s"Current working directory: $currentPath")
+  }
+
+  def convert(hexString: String): Option[Array[Byte]] =
+    Try(ByteVector.fromHex(hexString).get.toArray) match {
+      case Success(base64String) => Some(base64String)
+      case Failure(exception)    => None
+    }
+
+  def extractBlockHash(input: String): Option[String] = {
+    val blockHashPattern: Regex = """blockHash: "([a-fA-F0-9]+)"""".r
+    blockHashPattern.findFirstMatchIn(input).map(_.group(1))
   }
 
 }
