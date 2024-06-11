@@ -1,8 +1,9 @@
 #!/bin/bash
 
 cd rspace++/
-cargo build --profile dev -p rspace_plus_plus_rhotypes
-# cargo install cross --git https://github.com/cross-rs/cross
+# cargo clean
+# cargo build --profile dev -p rspace_plus_plus_rhotypes
+cargo install cross --git https://github.com/cross-rs/cross
 
 OS_TYPE=$(uname -s)
 ARCH_TYPE=$(uname -m)
@@ -17,8 +18,8 @@ else
 	exit 1
 fi
 
-# cross build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes
-cargo build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes
+cross build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes
+# cargo build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes --locked
 
 BUILD_ARTIFACTS_PATH="../rspace++/target/$TARGET/debug"
 COMMON_RELEASE_PATH="../rspace++/target/docker/debug"

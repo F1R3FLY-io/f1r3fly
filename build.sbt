@@ -435,7 +435,8 @@ lazy val node = (project in file("node"))
         .toSeq
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
-    dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
+    // dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
+    dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless",
     dockerEntrypoint := List(
       "/opt/docker/bin/rnode",
       "--profile=docker",
@@ -449,17 +450,17 @@ lazy val node = (project in file("node"))
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        Cmd(
-          "RUN",
-          """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
-                      microdnf update && \
-                      microdnf install jq gzip && \
-                      curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-                      tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-                      rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-                      chmod a+x grpcurl && \
-                      mv grpcurl /usr/local/bin"""
-        ),
+        // Cmd(
+        //   "RUN",
+        //   """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
+        //               microdnf update && \
+        //               microdnf install jq gzip && \
+        //               curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
+        //               tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
+        //               rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
+        //               chmod a+x grpcurl && \
+        //               mv grpcurl /usr/local/bin"""
+        // ),
         Cmd("USER", (Docker / daemonUser).value),
         Cmd(
           "HEALTHCHECK CMD",
