@@ -57,16 +57,16 @@ object Genesis {
 
     // Order of deploys is important for Registry to work correctly
     // - dependencies must be defined first in the list
-   StandardDeploys.registry(shardId) +:
-     StandardDeploys.listOps(shardId) +:
-     StandardDeploys.either(shardId) +:
-     StandardDeploys.nonNegativeNumber(shardId) +:
-     StandardDeploys.makeMint(shardId) +:
-     StandardDeploys.authKey(shardId) +:
-     StandardDeploys.revVault(shardId) +:
-     StandardDeploys.multiSigRevVault(shardId) +:
-     vaultDeploys :+
-     StandardDeploys.poSGenerator(posParams, shardId)
+    StandardDeploys.registry(shardId) +:
+      StandardDeploys.listOps(shardId) +:
+      StandardDeploys.either(shardId) +:
+      StandardDeploys.nonNegativeNumber(shardId) +:
+      StandardDeploys.makeMint(shardId) +:
+      StandardDeploys.authKey(shardId) +:
+      StandardDeploys.revVault(shardId) +:
+      StandardDeploys.multiSigRevVault(shardId) +:
+      vaultDeploys :+
+      StandardDeploys.poSGenerator(posParams, shardId)
 
     // Seq(StandardDeploys.match_test(shardId))
   }
@@ -105,7 +105,7 @@ object Genesis {
   ): BlockMessage = {
     import genesis._
 
-    println("\nhit createProcessedDeploy")
+    // println("\nhit createProcessedDeploy")
     // println("genesis: " + genesis)
     // println(
     //   "start hash: " + PrettyPrinter

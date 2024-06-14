@@ -168,14 +168,14 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         _ <- runtime.setBlockData(
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
-        _                   <- Sync[F].delay(println("\nhit computeGenesis"))
+        // _                   <- Sync[F].delay(println("\nhit computeGenesis"))
         genesisPreStateHash <- emptyStateHash
-        _ <- Sync[F].delay(
-              println(
-                "\ngenesisPreStateHash: " + PrettyPrinter
-                  .buildString(genesisPreStateHash)
-              )
-            )
+        // _ <- Sync[F].delay(
+        //       println(
+        //         "\ngenesisPreStateHash: " + PrettyPrinter
+        //           .buildString(genesisPreStateHash)
+        //       )
+        //     )
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
       } yield (genesisPreStateHash, stateHash, processedDeploys)
@@ -309,7 +309,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         evalSucceeded = evaluateResult.errors.isEmpty
         hotChanges    <- runtime.getHotChanges
         // _             = println("\nhit processDeploy, space toMap: " + hotChanges)
-        _ = println("\nhit processDeploy, evaluateResult: " + evaluateResult)
+        // _ = println("\nhit processDeploy, evaluateResult: " + evaluateResult)
         deployResult = ProcessedDeploy(
           deploy,
           Cost.toProto(evaluateResult.cost),
@@ -566,7 +566,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
     for {
       data <- runtime.getData(channel)
       pars = data.flatMap(_.a.pars)
-      _    = println(s"\ngetDataPar called with: $channel, returning: ${pars.length}")
+      // _    = println(s"\ngetDataPar called with: $channel, returning: ${pars.length}")
     } yield pars
 
   def getContinuationPar(channels: Seq[Par]): F[Seq[(Seq[BindPattern], Par)]] =

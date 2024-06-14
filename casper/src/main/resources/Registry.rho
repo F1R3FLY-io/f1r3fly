@@ -9,8 +9,6 @@ new _registryStore,
     ops(`rho:registry:ops`),
     secpVerify(`rho:crypto:secp256k1Verify`),
     blake2b256(`rho:crypto:blake2b256Hash`),
-    stdout(`rho:io:stdout`),
-    stdoutAcc(`rho:io:stdoutAck`), waiter,
     TreeHashMap
 in {
 
@@ -388,68 +386,38 @@ in {
   for (insertSigned <- insertSignedCh) {
 
     contract insertSigned(@pubKeyBytes, @value, @sig, ret) = {
-      stdout!(["Registry input params: ",
-      pubKeyBytes,
-      value,
-      sig]) |
-
-
-      // stdoutAcc!("registry pubKeyBytes", *waiter) |
-      //     for(_ <- waiter) {
-      //       stdoutAcc!("registry value", *waiter) |
-      //         for(_ <- waiter) {
-      //           stdoutAcc!("registry sig", *waiter)
-      //       }
-      //     } |
-
-      // STD OUTS DEBUG HERE
       match value {
         (nonce, data) => {
           new uriCh, hashCh, verifyCh in {
-            stdout!(["Registry blake2b256:", blake2b256!((nonce, data).toByteArray(), *hashCh)]) |
             blake2b256!((nonce, data).toByteArray(), *hashCh) |
             for (@hash <- hashCh) {
-              stdout!(["Registry secpVerify:", secpVerify!(hash, sig, pubKeyBytes, *verifyCh)]) |
               secpVerify!(hash, sig, pubKeyBytes, *verifyCh) |
               for (@verified <- verifyCh) {
                 if (verified) {
-                stdout!(["Registry verified:", verified]) |
-                stdout!(["Registry buildUri:", ops!("buildUri", pubKeyBytes, *uriCh)]) |
                   ops!("buildUri", pubKeyBytes, *uriCh) |
                   for (@uri <- uriCh) {
-                    stdout!(["Registry for @uri <-uriCh"]) |
                     for (@map <<- _registryStore) {
-                      stdout!(["Registry for @map <<- _registryStore"]) |
                       new responseCh in {
-                        stdout!(["Registry TreeHashMap get: ", TreeHashMap!("get", map, uri, *responseCh)]) |
                         TreeHashMap!("get", map, uri, *responseCh) |
                         for (@response <- responseCh) {
-                          stdout!(["Registry for @response <- responseCh, response result: ", response]) |
                           match response {
                             Nil => {
-                              stdout!("Response Nil case") |
                               new ack in {
-                                stdout!(["Response Nil case, ThreeHashMap set result: ", TreeHashMap!("set", map, uri, (nonce, data), *ack)]) |
                                 TreeHashMap!("set", map, uri, (nonce, data), *ack) |
                                 for (_ <- ack) {
-                                  stdout!(["Response Nil case, for (_ <- ack), ret! result ", ret!(uri)]) |
                                   ret!(uri)
                                 }
                               }
                             }
                             (oldNonce, _) => {
-                              stdout!("Response (oldNonce, _) case") |
                               if (nonce > oldNonce) {
                                 new ack in {
-                                  stdout!(["Response (oldNonce, _) case, ThreeHashMap set result: ", TreeHashMap!("set", map, uri, (nonce, data), *ack)]) |
                                   TreeHashMap!("set", map, uri, (nonce, data), *ack) |
                                   for (_ <- ack) {
-                                    stdout!(["Response (oldNonce, _) case, for (_ <- ack), ret! result ", ret!(uri)]) |
                                     ret!(uri)
                                   }
                                 }
                               } else {
-                                stdout!("Response else case") |
                                 ret!(Nil)
                               }
                             }
@@ -459,7 +427,6 @@ in {
                     }
                   }
                 } else {
-                  stdout!(["Registry NOT verified:", verified]) |
                   ret!(Nil)
                 }
               }

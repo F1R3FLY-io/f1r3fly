@@ -47,8 +47,8 @@ object SpatialMatcher extends SpatialMatcherInstances {
   ): M[Option[(FreeMap, Unit)]] = {
     type R[A] = MatcherMonadT[M, A]
 
-    println("\nspatialMatchResult target: " + target)
-    println("spatialMatchResult pattern: " + pattern)
+    // println("\nspatialMatchResult target: " + target)
+    // println("spatialMatchResult pattern: " + pattern)
 
     implicit val matcherMonadError: _error[R] = implicitly[Sync[R]]
 
@@ -207,7 +207,7 @@ object SpatialMatcher extends SpatialMatcherInstances {
 
     // Log[F].debug("Hit listMatch") *>
     Sync[F].delay {
-      println("\nhit listMatch")
+      // println("\nhit listMatch")
       // println("\nlistMatch targets: " + targets)
       // println("\nlistMatch patterns: " + patterns)
     } *> {
@@ -224,16 +224,16 @@ object SpatialMatcher extends SpatialMatcherInstances {
 
       val matchFunction: (Pattern, T) => F[Option[FreeMap]] =
         (pattern: Pattern, t: T) => {
-          println("\nhit matchFunction")
-          println("\nmatchFunction pattern: " + pattern)
+          // println("\nhit matchFunction")
+          // println("\nmatchFunction pattern: " + pattern)
           val matchEffect = pattern match {
             case Term(p) => {
-              println("\np: " + p.getClass())
+              // println("\np: " + p.getClass())
               if (!lf.connectiveUsed(p)) {
                 //match using `==` if pattern is a concrete term
                 Alternative_[F].guard(t == p)
               } else {
-                println("\ncalling spatialMatch in matchFunction")
+                // println("\ncalling spatialMatch in matchFunction")
                 // println("\nt in matchFunction: " + t)
                 // println("\np in matchFunction: " + p)
                 spatialMatch(t, p)

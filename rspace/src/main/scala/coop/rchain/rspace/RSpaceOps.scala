@@ -228,7 +228,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
           //            peeks,
           //            consumeRef
           //          )
-          _ = println("\nlockedConsume result: " + result)
+          // _ = println("\nlockedConsume result: " + result)
         } yield result).timer(consumeTimeCommLabel)(Metrics[F], MetricsSource)
     }
 
@@ -250,8 +250,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
       (for {
         produceRef <- Sync[F].delay(Produce(channel, data, persist))
         _ <- Sync[F].delay {
-              println("\nHit produce, data: " + data)
-              println("\nHit produce, channel: " + channel)
+              // println("\nHit produce, data: " + data)
+              // println("\nHit produce, channel: " + channel)
             }
         result <- produceLockF(channel)(
                    lockedProduce(channel, data, persist, produceRef)
