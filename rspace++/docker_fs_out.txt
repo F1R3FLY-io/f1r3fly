@@ -1,0 +1,101 @@
+2024-06-13 13:04:30 20:04:30.180 [INFO ] [main                ] [coop.rchain.node.Main$       ] - RChain Node 1.0.0-SNAPSHOT (8d45f0dada74e4c6145d9d3bc5d29617d815ea91)
+2024-06-13 13:04:30 20:04:30.183 [INFO ] [main                ] [coop.rchain.node.Main$       ] - Starting with profile docker
+2024-06-13 13:04:30 20:04:30.184 [WARN ] [main                ] [coop.rchain.node.Main$       ] - No configuration file found, using defaults
+2024-06-13 13:04:30 20:04:30.185 [INFO ] [main                ] [coop.rchain.node.Main$       ] - Running on network: testnet
+2024-06-13 13:04:30 20:04:30.289 [INFO ] [main                ] [c.r.node.NodeEnvironment$    ] - Using data dir: /var/lib/rnode
+2024-06-13 13:04:30 20:04:30.653 [INFO ] [main                ] [coop.rchain.comm.WhoAmI$     ] - flag --host was not provided, guessing your external IP address
+2024-06-13 13:04:30 20:04:30.840 [INFO ] [main                ] [coop.rchain.comm.WhoAmI$     ] - guessed 136.52.47.200 from source: AmazonAWS service
+2024-06-13 13:04:31 20:04:31.141 [INFO ] [main                ] [c.r.b.dag.BlockMetadataStore$] - Building in-memory blockMetadataStore.
+2024-06-13 13:04:31 20:04:31.148 [INFO ] [main                ] [c.r.b.dag.BlockMetadataStore$] - Reading data from blockMetadataStore done.
+2024-06-13 13:04:31 20:04:31.161 [INFO ] [main                ] [c.r.b.dag.BlockMetadataStore$] - Successfully built in-memory blockMetadataStore.
+2024-06-13 13:04:32 privKey = Some(f9854c5199bc86237206c75b25c6aeca024dccc0f55df3a553131111fd25dd85)
+2024-06-13 13:04:32 initBootstrap
+2024-06-13 13:04:32 privKey = Some(f9854c5199bc86237206c75b25c6aeca024dccc0f55df3a553131111fd25dd85)
+2024-06-13 13:04:32 20:04:32.240 [INFO ] [node-runner-21      ] [c.r.c.e.CasperLaunch$$anon$1 ] - Approved block not found, taking part in ceremony as ceremony master
+2024-06-13 13:04:32 20:04:32.264 [INFO ] [node-runner-21      ] [c.r.casper.util.VaultParser$ ] - Parsing wallets file /var/lib/rnode/genesis/wallets.txt.
+2024-06-13 13:04:32 20:04:32.349 [INFO ] [node-runner-21      ] [c.r.casper.util.VaultParser$ ] - Wallet loaded: 11112ZM9yrfaTrzCCbKjPbxBncjNCkMFsPqtcLFvhBf4Kqx6rpir2w,50000000000000000
+2024-06-13 13:04:32 20:04:32.357 [INFO ] [node-runner-21      ] [c.r.casper.util.BondsParser$ ] - Parsing bonds file /var/lib/rnode/genesis/bonds.txt.
+2024-06-13 13:04:32 20:04:32.366 [INFO ] [node-runner-21      ] [c.r.casper.util.BondsParser$ ] - Bond loaded 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba => 4
+2024-06-13 13:04:41 20:04:41.467 [INFO ] [node-runner-29      ] [c.r.node.runtime.NodeRuntime ] - Starting stand-alone node.
+2024-06-13 13:04:41 20:04:41.469 [INFO ] [node-runner-29      ] [c.r.node.runtime.NodeRuntime ] - Starting node using rspace.
+2024-06-13 13:04:42 20:04:42.405 [INFO ] [node-runner-29      ] [c.r.n.r.ServersInstances$    ] - HTTP API server started at 0.0.0.0:40403
+2024-06-13 13:04:42 20:04:42.415 [INFO ] [node-runner-29      ] [c.r.n.r.ServersInstances$    ] - Admin HTTP API server started at 0.0.0.0:40405
+2024-06-13 13:04:42 20:04:42.446 [INFO ] [node-runner-31      ] [ocol$ApproveBlockProtocolImpl] - Starting execution of ApprovedBlockProtocol. Waiting for 0 approvals from genesis validators.
+2024-06-13 13:04:42 20:04:42.450 [INFO ] [node-runner-31      ] [ocol$ApproveBlockProtocolImpl] - Self-approving genesis block.
+2024-06-13 13:04:42 20:04:42.462 [INFO ] [node-runner-31      ] [ocol$ApproveBlockProtocolImpl] - Sending ApprovedBlock 87aa8524b8... to peers...
+2024-06-13 13:04:42 20:04:42.469 [INFO ] [node-runner-31      ] [ocol$ApproveBlockProtocolImpl] - Finished execution of ApprovedBlockProtocol
+2024-06-13 13:04:42 20:04:42.542 [INFO ] [node-runner-43      ] [c.r.n.r.ServersInstances$    ] - Kademlia RPC server started at 136.52.47.200:40404
+2024-06-13 13:04:42 20:04:42.543 [INFO ] [node-runner-41      ] [c.r.n.r.ServersInstances$    ] - Internal API server started at 136.52.47.200:40402
+2024-06-13 13:04:42 20:04:42.542 [INFO ] [node-runner-42      ] [c.r.n.r.ServersInstances$    ] - External API server started at 0.0.0.0:40401
+2024-06-13 13:04:42 20:04:42.813 [INFO ] [node-runner-29      ] [c.r.n.r.ServersInstances$    ] - Listening for traffic on rnode://17e4e1fb1540554e72dbf91abe4647b85d8bd655@136.52.47.200?protocol=40400&discovery=40404.
+2024-06-13 13:04:43 20:04:43.493 [WARN ] [node-runner-27      ] [.b.d.BlockDagKeyValueStorage$] - Block Block #0 (87aa8524b8...) with empty parents (supposedly genesis) sender is empty.
+2024-06-13 13:04:43 20:04:43.554 [INFO ] [node-runner-27      ] [c.r.casper.engine.Engine$    ] - Making a transition to Running state. Approved Block #0 (87aa8524b8...) with empty parents (supposedly genesis)
+2024-06-13 13:04:43 20:04:43.573 [INFO ] [node-runner-27      ] [c.r.c.util.comm.CommUtilOps  ] - Requested fork tip from peers
+2024-06-13 13:04:53 20:04:53.529 [INFO ] [node-runner-27      ] [c.r.c.MultiParentCasperImpl  ] - Received DeployData #0 -- @"f1r3flyfs-1102813055"!({}), Sig: 3045022100fc21f3aa64...f2eb5d3c70ad8a3ca16e, SigAlgorithm: secp256k1, ValidAfterBlockNumber: 0
+2024-06-13 13:04:53 20:04:53.667 [INFO ] [node-runner-42      ] [c.r.n.i.ProposerInstance$    ] - Propose started
+2024-06-13 13:04:54 20:04:54.427 [INFO ] [node-runner-41      ] [c.r.casper.rholang.RuntimeOps] - *** ACTIVE VALIDATORS FOR StateHash a52075f2671865866ea7668f26758bed91ef7266cbae8e3608234b93f40db653:
+2024-06-13 13:04:54 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba ***
+2024-06-13 13:04:54 20:04:54.487 [INFO ] [node-runner-41      ] [c.r.c.b.proposer.Proposer    ] - getCasperSnapshot [813.6645 ms]
+2024-06-13 13:04:54 20:04:54.493 [INFO ] [node-runner-42      ] [alizedHeightConstraintChecker] - Latest message is 0 blocks ahead of the last finalized block
+2024-06-13 13:04:54 20:04:54.499 [INFO ] [node-runner-42      ] [c.r.c.b.p.BlockCreator$      ] - Creating block #1 (seqNum 1)
+2024-06-13 13:04:54 20:04:54.571 [INFO ] [node-runner-42      ] [c.r.casper.rholang.RuntimeOps] - PreCharging 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 for 100000
+2024-06-13 13:04:55 20:04:55.208 [INFO ] [node-runner-31      ] [c.r.casper.rholang.RuntimeOps] - Refunding 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 with 99839
+2024-06-13 13:04:55 20:04:55.988 [INFO ] [node-runner-21      ] [c.r.c.b.p.BlockCreator$      ] - Block created: #1 (168eece5ca...) (1d) [1.487762834 sec]
+2024-06-13 13:04:55 20:04:55.993 [INFO ] [node-runner-21      ] [c.r.c.MultiParentCasperImpl  ] - Validating block #1 (168eece5ca...).
+2024-06-13 13:04:56 20:04:56.043 [INFO ] [node-runner-21      ] [c.r.c.u.r.InterpreterUtil$   ] - Computed parents post state for Block #1 (168eece5ca...) -- Sender ID 0494eb76a9... -- M Parent Hash 87aa8524b8... -- Contents c16ce86fb1...-- Shard ID root.
+2024-06-13 13:04:57 20:04:57.156 [INFO ] [node-runner-28      ] [c.r.c.EquivocationDetector$  ] - Calculate checkNeglectedEquivocationsWithUpdate
+2024-06-13 13:04:57 20:04:57.163 [INFO ] [node-runner-28      ] [c.r.c.EquivocationDetector$  ] - Calculate checkEquivocations.
+2024-06-13 13:04:57 20:04:57.165 [INFO ] [node-runner-28      ] [c.r.c.MultiParentCasperImpl  ] - Block replayed: #1 (168eece5ca...) (1d) (Valid) [1.170234917 sec]
+2024-06-13 13:04:57 20:04:57.633 [INFO ] [node-runner-28      ] [c.r.c.MultiParentCasperImpl  ] - Removed 1 deploys from deploy history as we finalized block [168eece5ca...].
+2024-06-13 13:04:57 20:04:57.639 [INFO ] [node-runner-28      ] [.r.c.e.BlockRetriever$$anon$1] - Block 168eece5ca... is not in RequestedBlocks. Adding and marking recieved.
+2024-06-13 13:04:57 20:04:57.642 [INFO ] [node-runner-28      ] [c.r.c.util.comm.CommUtilOps  ] - Sent hash 168eece5ca... to peers
+2024-06-13 13:04:57 20:04:57.646 [INFO ] [node-runner-27      ] [c.rchain.casper.api.BlockAPI$] - Success! Block 168eece5cafe65fe28b414751875bd14e3b729bb16eca1bceac0ffc1be009b72 created and added.
+2024-06-13 13:04:57 20:04:57.648 [INFO ] [node-runner-28      ] [c.r.n.i.ProposerInstance$    ] - Propose finished: ProposeSuccess(Valid) Block #1 (168eece5ca...) created and added.
+2024-06-13 13:04:57 20:04:57.922 [INFO ] [node-runner-43      ] [c.r.c.MultiParentCasperImpl  ] - Received DeployData #0 -- @"f1r3flyfs-1102813055://tmp/f1r3flyfs"!({"type": "d","value": "[]","lastUpdated": "1718309097915"}), Sig: 3045022100aec614c5c3...c853fd47d989e95df87f, SigAlgorithm: secp256k1, ValidAfterBlockNumber: 0
+2024-06-13 13:04:57 20:04:57.929 [INFO ] [node-runner-29      ] [c.r.n.i.ProposerInstance$    ] - Propose started
+2024-06-13 13:04:58 20:04:58.094 [INFO ] [node-runner-29      ] [c.r.casper.rholang.RuntimeOps] - *** ACTIVE VALIDATORS FOR StateHash c16ce86fb194deeb342dedb3e624b95ab3f0f996fa77fb191723f068b0a2d0b0:
+2024-06-13 13:04:58 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba ***
+2024-06-13 13:04:58 20:04:58.102 [INFO ] [node-runner-29      ] [c.r.c.b.proposer.Proposer    ] - getCasperSnapshot [172.306333 ms]
+2024-06-13 13:04:58 20:04:58.104 [INFO ] [node-runner-43      ] [alizedHeightConstraintChecker] - Latest message is 0 blocks ahead of the last finalized block
+2024-06-13 13:04:58 20:04:58.272 [INFO ] [node-runner-44      ] [c.r.casper.rholang.RuntimeOps] - *** ACTIVE VALIDATORS FOR StateHash c16ce86fb194deeb342dedb3e624b95ab3f0f996fa77fb191723f068b0a2d0b0:
+2024-06-13 13:04:58 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba ***
+2024-06-13 13:04:58 20:04:58.276 [INFO ] [node-runner-44      ] [.c.SynchronyConstraintChecker] - Seen 0 senders with weight 0 out of total 0 (1.0 out of 0.0 needed)
+2024-06-13 13:04:58 20:04:58.278 [INFO ] [node-runner-26      ] [c.r.c.b.p.BlockCreator$      ] - Creating block #2 (seqNum 2)
+2024-06-13 13:04:58 20:04:58.312 [INFO ] [node-runner-42      ] [c.r.casper.rholang.RuntimeOps] - PreCharging 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 for 100000
+2024-06-13 13:04:58 20:04:58.670 [INFO ] [node-runner-26      ] [c.r.casper.rholang.RuntimeOps] - Refunding 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 with 99579
+2024-06-13 13:04:59 20:04:59.357 [INFO ] [node-runner-44      ] [c.r.c.b.p.BlockCreator$      ] - Block created: #2 (07d4bac329...) (1d) [1.079661834 sec]
+2024-06-13 13:04:59 20:04:59.358 [INFO ] [node-runner-44      ] [c.r.c.MultiParentCasperImpl  ] - Validating block #2 (07d4bac329...).
+2024-06-13 13:04:59 20:04:59.371 [INFO ] [node-runner-44      ] [c.r.c.u.r.InterpreterUtil$   ] - Computed parents post state for Block #2 (07d4bac329...) -- Sender ID 0494eb76a9... -- M Parent Hash 168eece5ca... -- Contents 4b603f7c35...-- Shard ID root.
+2024-06-13 13:05:00 20:05:00.336 [INFO ] [node-runner-21      ] [c.r.c.EquivocationDetector$  ] - Calculate checkNeglectedEquivocationsWithUpdate
+2024-06-13 13:05:00 20:05:00.336 [INFO ] [node-runner-21      ] [c.r.c.EquivocationDetector$  ] - Calculate checkEquivocations.
+2024-06-13 13:05:00 20:05:00.337 [INFO ] [node-runner-21      ] [c.r.c.MultiParentCasperImpl  ] - Block replayed: #2 (07d4bac329...) (1d) (Valid) [978.534417 ms]
+2024-06-13 13:05:00 20:05:00.548 [INFO ] [node-runner-26      ] [c.r.c.MultiParentCasperImpl  ] - Removed 1 deploys from deploy history as we finalized block [07d4bac329...].
+2024-06-13 13:05:00 20:05:00.551 [INFO ] [node-runner-26      ] [.r.c.e.BlockRetriever$$anon$1] - Block 07d4bac329... is not in RequestedBlocks. Adding and marking recieved.
+2024-06-13 13:05:00 20:05:00.552 [INFO ] [node-runner-26      ] [c.r.c.util.comm.CommUtilOps  ] - Sent hash 07d4bac329... to peers
+2024-06-13 13:05:00 20:05:00.553 [INFO ] [node-runner-26      ] [c.r.n.i.ProposerInstance$    ] - Propose finished: ProposeSuccess(Valid) Block #2 (07d4bac329...) created and added.
+2024-06-13 13:05:00 20:05:00.553 [INFO ] [node-runner-28      ] [c.rchain.casper.api.BlockAPI$] - Success! Block 07d4bac3295033430f6a5386072ac5271b53284382ae17a365bc6193c26bd2d3 created and added.
+2024-06-13 13:05:00 20:05:00.579 [INFO ] [node-runner-44      ] [c.r.c.MultiParentCasperImpl  ] - Received DeployData #0 -- for(_ <- @"f1r3flyfs-1102813055"){@"f1r3flyfs-1102813055"!({"lastUpdated": "1718309100574","f1r3flyfs-1102813055://tmp/f1r3flyfs": "07d4bac3295033430f6a5386072ac5271b53284382ae17a365bc6193c26bd2d3"})}, Sig: 304402201a1ed2cb8d34...963fa46740b4a0633396, SigAlgorithm: secp256k1, ValidAfterBlockNumber: 0
+2024-06-13 13:05:00 20:05:00.586 [INFO ] [node-runner-29      ] [c.r.n.i.ProposerInstance$    ] - Propose started
+2024-06-13 13:05:00 20:05:00.727 [INFO ] [node-runner-31      ] [c.r.casper.rholang.RuntimeOps] - *** ACTIVE VALIDATORS FOR StateHash 4b603f7c3550a791247c38d75b692211dfeee772405c18097e6ac2872b88c7b7:
+2024-06-13 13:05:00 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba ***
+2024-06-13 13:05:00 20:05:00.734 [INFO ] [node-runner-31      ] [c.r.c.b.proposer.Proposer    ] - getCasperSnapshot [144.638375 ms]
+2024-06-13 13:05:00 20:05:00.735 [INFO ] [node-runner-43      ] [alizedHeightConstraintChecker] - Latest message is 0 blocks ahead of the last finalized block
+2024-06-13 13:05:00 20:05:00.866 [INFO ] [node-runner-42      ] [c.r.casper.rholang.RuntimeOps] - *** ACTIVE VALIDATORS FOR StateHash 4b603f7c3550a791247c38d75b692211dfeee772405c18097e6ac2872b88c7b7:
+2024-06-13 13:05:00 0494eb76a9afa326ecd805592f1553f88ccc1f7992daf88703cc5af1d2894af50b97d077830706dbb447b2d5d8456b1fe4d4bafe4853d544b45ac6ce9ce0684bba ***
+2024-06-13 13:05:00 20:05:00.867 [INFO ] [node-runner-42      ] [.c.SynchronyConstraintChecker] - Seen 0 senders with weight 0 out of total 0 (1.0 out of 0.0 needed)
+2024-06-13 13:05:00 20:05:00.868 [INFO ] [node-runner-29      ] [c.r.c.b.p.BlockCreator$      ] - Creating block #3 (seqNum 3)
+2024-06-13 13:05:00 20:05:00.901 [INFO ] [node-runner-41      ] [c.r.casper.rholang.RuntimeOps] - PreCharging 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 for 100000
+2024-06-13 13:05:01 20:05:01.227 [INFO ] [node-runner-42      ] [c.r.casper.rholang.RuntimeOps] - Refunding 04a677c1bc00d84b85733ca39dda8912231da1925538d3558564a78e5457b65030d6914354cab8ce765732d732962c9b949a2f5fd277af7d06fafd50f87e4185e3 with 98959
+2024-06-13 13:05:01 20:05:01.849 [INFO ] [node-runner-43      ] [c.r.c.b.p.BlockCreator$      ] - Block created: #3 (c7a002dd7f...) (1d) [980.643 ms]
+2024-06-13 13:05:01 20:05:01.850 [INFO ] [node-runner-43      ] [c.r.c.MultiParentCasperImpl  ] - Validating block #3 (c7a002dd7f...).
+2024-06-13 13:05:01 20:05:01.865 [INFO ] [node-runner-43      ] [c.r.c.u.r.InterpreterUtil$   ] - Computed parents post state for Block #3 (c7a002dd7f...) -- Sender ID 0494eb76a9... -- M Parent Hash 07d4bac329... -- Contents e7c1833d92...-- Shard ID root.
+2024-06-13 13:05:02 20:05:02.748 [INFO ] [node-runner-29      ] [c.r.c.EquivocationDetector$  ] - Calculate checkNeglectedEquivocationsWithUpdate
+2024-06-13 13:05:02 20:05:02.749 [INFO ] [node-runner-29      ] [c.r.c.EquivocationDetector$  ] - Calculate checkEquivocations.
+2024-06-13 13:05:02 20:05:02.749 [INFO ] [node-runner-29      ] [c.r.c.MultiParentCasperImpl  ] - Block replayed: #3 (c7a002dd7f...) (1d) (Valid) [898.761501 ms]
+2024-06-13 13:05:02 20:05:02.921 [INFO ] [node-runner-42      ] [c.r.c.MultiParentCasperImpl  ] - Removed 1 deploys from deploy history as we finalized block [c7a002dd7f...].
+2024-06-13 13:05:02 20:05:02.923 [INFO ] [node-runner-42      ] [.r.c.e.BlockRetriever$$anon$1] - Block c7a002dd7f... is not in RequestedBlocks. Adding and marking recieved.
+2024-06-13 13:05:02 20:05:02.927 [INFO ] [node-runner-42      ] [c.r.c.util.comm.CommUtilOps  ] - Sent hash c7a002dd7f... to peers
+2024-06-13 13:05:02 20:05:02.928 [INFO ] [node-runner-27      ] [c.rchain.casper.api.BlockAPI$] - Success! Block c7a002dd7f03f09dfddbdbf76b4472ecd08d29520915ffe282be1a860d92e8a0 created and added.
+2024-06-13 13:05:02 20:05:02.928 [INFO ] [node-runner-42      ] [c.r.n.i.ProposerInstance$    ] - Propose finished: ProposeSuccess(Valid) Block #3 (c7a002dd7f...) created and added.
+2024-06-13 13:05:05 20:05:05.210 [INFO ] [node-runner-42      ] [c.r.c.MultiParentCasperImpl  ] - Received DeployData #0 -- @"f1r3flyfs-1102813055://tmp/f1r3flyfs/test.text"!({"size": 0,"type": "f","value": "","lastUpdated": "1718309105204"}), Sig: 304502210097f50e2615...2d33841906f7acb9089c, SigAlgorithm: secp256k1, ValidAfterBlockNumber: 0
+2024-06-13 13:05:05 20:05:05.216 [INFO ] [node-runner-27      ] [c.r.n.i.ProposerInstance$    ] - Propose started
