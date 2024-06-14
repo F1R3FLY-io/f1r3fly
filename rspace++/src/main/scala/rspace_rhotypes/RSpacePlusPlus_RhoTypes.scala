@@ -856,7 +856,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
   def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit] =
     for {
       _ <- Sync[F].delay {
-            println("\nhit scala revertToSoftCheckpoint")
+            // println("\nhit scala revertToSoftCheckpoint")
             val cacheSnapshot = checkpoint.cacheSnapshot
 
             val continuationsMapEntries          = Seq.empty

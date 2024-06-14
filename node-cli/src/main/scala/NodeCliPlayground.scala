@@ -21,7 +21,7 @@ import scala.util.matching.Regex
 import coop.rchain.casper.protocol.IsFinalizedQuery
 
 class NodeCliPlayground {
-  val rhoContractPath = "./rholang/examples/stdout.rho"
+  val rhoContractPath = "./rholang/examples/tut-registry.rho"
   val vpkHex          = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
   val vpkBytes        = javax.xml.bind.DatatypeConverter.parseHexBinary(vpkHex)
   val host            = "127.0.0.1"

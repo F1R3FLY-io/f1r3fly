@@ -266,6 +266,12 @@ object ReplayRhoRuntime {
 
 object RhoRuntime {
 
+  val currentDir = java.nio.file.Paths.get("").toAbsolutePath.toString
+  println(s"Current directory: $currentDir")
+
+  val jnaLibraryPath = System.getProperty("jna.library.path")
+  println(s"Current jna.library.path: $jnaLibraryPath")
+
   implicit val RuntimeMetricsSource: Source = Metrics.Source(RholangMetricsSource, "runtime")
   private[this] val createReplayRuntime     = Metrics.Source(RuntimeMetricsSource, "create-replay")
   private[this] val createPlayRuntime       = Metrics.Source(RuntimeMetricsSource, "create-play")
