@@ -6,8 +6,13 @@ use super::history::history_repository::HistoryRepositoryError;
 use super::history::instances::radix_history::RadixHistory;
 use super::history::radix_tree::RadixTreeError;
 use super::shared::key_value_store::KvStoreError;
+use super::trace::event::Consume;
+use super::trace::event::Event;
+use super::trace::event::IOEvent;
+use super::trace::event::Produce;
+use super::trace::event::COMM;
+use super::trace::Log;
 use crate::rspace::checkpoint::Checkpoint;
-use crate::rspace::event::{Consume, Produce};
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
@@ -37,13 +42,16 @@ where
     pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
+    event_log: Log,
     produce_counter: HashMap<Produce, i32>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
 pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
 
-// NOTE: Currently NOT implementing any 'Log' functions
+const CONSUME_COMM_LABEL: &str = "comm.consume";
+const PRODUCE_COMM_LABEL: &str = "comm.produce";
+
 // NOTE: Implementing 'RSpaceOps' functions in this file
 impl<C, P, A, K, M> RSpace<C, P, A, K, M>
 where
@@ -53,8 +61,15 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     M: Clone + Match<P, A>,
 {
+    fn produce_counters(&self, produce_refs: Vec<Produce>) -> HashMap<Produce, i32> {
+        produce_refs
+            .into_iter()
+            .map(|p| (p.clone(), self.produce_counter.get(&p).unwrap_or(&0).clone()))
+            .collect()
+    }
+
     fn locked_consume(
-        &self,
+        &mut self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -67,6 +82,8 @@ where
         //     "consume: searching for data matching <patterns: {:?}> at <channels: {:?}>",
         //     patterns, channels
         // );
+
+        self.log_consume(consume_ref.clone(), &channels, &patterns, &continuation, persist, &peeks);
 
         let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels);
         // println!("\nchannel_to_indexed_data: {:?}", channel_to_indexed_data);
@@ -93,11 +110,26 @@ where
 
         match options {
             Some(data_candidates) => {
+                let produce_counters_closure =
+                    |produces: Vec<Produce>| self.produce_counters(produces);
+
+                self.log_comm(
+                    &data_candidates,
+                    &channels,
+                    wk.clone(),
+                    COMM::new(
+                        data_candidates.clone(),
+                        consume_ref.clone(),
+                        peeks,
+                        produce_counters_closure,
+                    ),
+                    CONSUME_COMM_LABEL,
+                );
+                self.store_persistent_data(data_candidates.clone());
                 // println!(
                 //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
                 //     patterns, channels
                 // );
-                self.store_persistent_data(data_candidates.clone());
                 self.wrap_result(channels, wk, consume_ref, data_candidates)
             }
             None => {
@@ -126,7 +158,7 @@ where
     }
 
     fn locked_produce(
-        &self,
+        &mut self,
         channel: C,
         data: A,
         persist: bool,
@@ -139,6 +171,7 @@ where
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
         //     grouped_channels
         // );
+        self.log_produce(produce_ref.clone(), &channel, &data, persist);
         let extracted = self.extract_produce_candidate(
             grouped_channels,
             channel.clone(),
@@ -174,7 +207,7 @@ where
     }
 
     fn process_match_found(
-        &self,
+        &mut self,
         pc: ProduceCandidate<C, P, A, K>,
     ) -> MaybeActionResult<C, P, A, K> {
         let ProduceCandidate {
@@ -188,9 +221,23 @@ where
             patterns: _patterns,
             continuation: _cont,
             persist,
-            peeks: _peeks,
-            source,
+            peeks,
+            source: consume_ref,
         } = &continuation;
+
+        let produce_counters_closure = |produces: Vec<Produce>| self.produce_counters(produces);
+        self.log_comm(
+            &data_candidates,
+            &channels,
+            continuation.clone(),
+            COMM::new(
+                data_candidates.clone(),
+                consume_ref.clone(),
+                peeks.clone(),
+                produce_counters_closure,
+            ),
+            PRODUCE_COMM_LABEL,
+        );
 
         if !persist {
             self.store
@@ -204,16 +251,45 @@ where
         //     channels
         // );
 
-        self.wrap_result(channels, continuation.clone(), source.clone(), data_candidates)
+        self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
+    }
+
+    fn log_comm(
+        &mut self,
+        _data_candidates: &Vec<ConsumeCandidate<C, A>>,
+        _channels: &Vec<C>,
+        _wk: WaitingContinuation<P, K>,
+        comm: COMM,
+        _label: &str,
+    ) -> COMM {
+        self.event_log.insert(0, Event::Comm(comm.clone()));
+        comm
+    }
+
+    fn log_consume(
+        &mut self,
+        consume_ref: Consume,
+        _channels: &Vec<C>,
+        _patterns: &Vec<P>,
+        _continuation: &K,
+        _persist: bool,
+        _peeks: &BTreeSet<i32>,
+    ) -> Consume {
+        self.event_log
+            .insert(0, Event::IoEvent(IOEvent::Consume(consume_ref.clone())));
+
+        consume_ref
     }
 
     fn log_produce(
         &mut self,
         produce_ref: Produce,
-        _channel: C,
-        _data: A,
+        _channel: &C,
+        _data: &A,
         persist: bool,
     ) -> Produce {
+        self.event_log
+            .insert(0, Event::IoEvent(IOEvent::Produce(produce_ref.clone())));
         if !persist {
             let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
             *entry += 1;
@@ -228,6 +304,8 @@ where
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = next_history;
 
+        let log = self.event_log.clone();
+        self.event_log = Vec::new();
         self.produce_counter = HashMap::new();
 
         let history_reader = self
@@ -239,6 +317,7 @@ where
 
         Ok(Checkpoint {
             root: self.history_repository.root(),
+            log,
         })
     }
 
@@ -353,7 +432,7 @@ where
     }
 
     pub fn consume(
-        &self,
+        &mut self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -384,7 +463,7 @@ where
         // println!("\n\nHit produce, channel: {:?}", channel);
 
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
-        _ = self.log_produce(produce_ref.clone(), channel.clone(), data.clone(), persist);
+        _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);
         result
@@ -484,6 +563,7 @@ where
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = next_history;
 
+        self.event_log = Vec::new();
         self.produce_counter = HashMap::new();
 
         let history_reader = self.history_repository.get_history_reader(root)?;
@@ -510,11 +590,15 @@ where
         // println!("current hot_store state: {:?}", self.store.snapshot());
 
         let cache_snapshot = self.store.snapshot();
+        let curr_event_log = self.event_log.clone();
         let curr_produce_counter = self.produce_counter.clone();
+
+        self.event_log = Vec::new();
         self.produce_counter = HashMap::new();
 
         SoftCheckpoint {
             cache_snapshot,
+            log: curr_event_log,
             produce_counter: curr_produce_counter,
         }
     }
@@ -531,6 +615,7 @@ where
         );
 
         self.store = Box::new(hot_store);
+        self.event_log = checkpoint.log;
         self.produce_counter = checkpoint.produce_counter;
 
         Ok(())
@@ -726,6 +811,7 @@ impl RSpaceInstances {
             store,
             space_matcher: SpaceMatcher::create(matcher),
             installs: Mutex::new(HashMap::new()),
+            event_log: Vec::new(),
             produce_counter: HashMap::new(),
         }
     }

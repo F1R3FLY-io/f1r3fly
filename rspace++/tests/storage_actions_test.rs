@@ -1,5 +1,4 @@
 use proptest::prelude::*;
-use rspace_plus_plus::rspace::event::Consume;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store_action::{
     HotStoreAction, InsertAction, InsertContinuations, InsertData,
@@ -10,6 +9,9 @@ use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
+use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use rspace_plus_plus::rspace::trace::event::Consume;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
@@ -111,6 +113,7 @@ pub fn filter_enum_variants<C: Clone, P: Clone, A: Clone, K: Clone, V>(
 
 async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, StringMatch> {
     let mut kvm = InMemoryStoreManager::new();
+    // let mut kvm = mk_rspace_store_manager((&format!("{}/rspace++/", "./tests/storage_actions_test_lmdb")).into(), 1 * GB);
     let store = kvm.r_space_stores().await.unwrap();
 
     RSpaceInstances::create(store, StringMatch).unwrap()
@@ -196,7 +199,7 @@ async fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_st
 
 #[tokio::test]
 async fn consuming_on_one_channel_should_persist_continuation_in_store() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let channel = "ch1".to_string();
     let key = vec![channel.clone()];
     let patterns = vec![Pattern::Wildcard];
@@ -230,7 +233,7 @@ async fn consuming_on_one_channel_should_persist_continuation_in_store() {
 
 #[tokio::test]
 async fn consuming_on_three_channels_should_persist_continuation_in_store() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let key = vec!["ch1".to_string(), "ch2".to_string(), "ch3".to_string()];
     let patterns = vec![Pattern::Wildcard, Pattern::Wildcard, Pattern::Wildcard];
 
@@ -1580,7 +1583,7 @@ async fn an_install_should_not_allow_installing_after_a_produce_operation() {
 #[tokio::test]
 #[should_panic(expected = "RUST ERROR: channels.length must equal patterns.length")]
 async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
-    let rspace = create_rspace().await;
+    let mut rspace = create_rspace().await;
     let r1 = rspace.consume(
         vec!["ch1".to_string(), "ch2".to_string()],
         vec![Pattern::Wildcard],

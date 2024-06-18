@@ -1,9 +1,10 @@
-use crate::rspace::event::{Consume, Produce};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 use std::hash::{Hash, Hasher};
+
+use super::trace::event::{Consume, Produce};
 
 // See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
 #[derive(Serialize, Deserialize, Debug, Clone)]

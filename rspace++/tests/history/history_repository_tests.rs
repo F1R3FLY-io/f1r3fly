@@ -1,7 +1,6 @@
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 use rand::prelude::SliceRandom;
 use rspace_plus_plus::rspace::{
-    event::{Consume, Produce},
     hashing::blake2b256_hash::Blake2b256Hash,
     history::{
         history::{HistoryError, HistoryInstances},
@@ -23,6 +22,7 @@ use rspace_plus_plus::rspace::{
         trie_importer::TrieImporter,
     },
     state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
+    trace::event::{Consume, Produce},
     ByteVector,
 };
 use std::{

@@ -1,4 +1,3 @@
-pub mod event;
 pub mod hashing;
 pub mod history;
 pub mod hot_store;
@@ -12,6 +11,7 @@ pub mod shared;
 mod hot_store_trie_action;
 pub mod state;
 mod serializers;
+pub mod trace;
 
 pub type ByteVector = Vec<u8>;
 pub type ByteBuffer = Vec<u8>;

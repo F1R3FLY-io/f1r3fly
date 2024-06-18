@@ -152,8 +152,9 @@ message FreeMapProto {
  *
  * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
  */
-message CheckpointProto {
+ message CheckpointProto {
   bytes root = 1;
+  repeated EventProto log = 2;
 }
 
 message ChannelsProto {
@@ -222,7 +223,30 @@ message ProduceCounterMapEntry {
  *
  * See rspace/src/main/scala/coop/rchain/rspace/Checkpoint.scala
  */
-message SoftCheckpointProto {
+ message SoftCheckpointProto {
   HotStoreStateProto cacheSnapshot = 1;
-  repeated ProduceCounterMapEntry produceCounter = 2;
+  repeated EventProto log = 2;
+  repeated ProduceCounterMapEntry produceCounter = 3;
+}
+
+message IOEventProto {
+  oneof io_event_type {
+    ProduceProto produce = 1;
+    ConsumeProto consume = 2;
+  }
+}
+
+// Define the Event message with a oneof field
+message EventProto {
+  oneof event_type {
+    CommProto comm = 1;
+    IOEventProto io_event = 2;
+  }
+}
+
+message CommProto {
+  ConsumeProto consume = 1;
+  repeated ProduceProto produces = 2;
+  repeated SortedSetElement peeks = 3;
+  repeated ProduceCounterMapEntry times_repeated = 4;
 }

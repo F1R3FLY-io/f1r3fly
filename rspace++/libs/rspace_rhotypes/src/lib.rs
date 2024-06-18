@@ -1,7 +1,6 @@
 use dashmap::DashMap;
 use prost::Message;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
-use rspace_plus_plus::rspace::event::{Consume, Produce};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
@@ -12,9 +11,11 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    ChannelsProto, CheckpointProto, DatumsProto, HotStoreStateProto, JoinProto, JoinsProto,
-    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
+    event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
+    EventProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, ProduceCounterMapEntry,
+    SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
@@ -298,8 +299,103 @@ pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
             .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
     };
 
+    let log = checkpoint.log;
+    let log_proto: Vec<EventProto> = log
+        .into_iter()
+        .map(|event| match event {
+            Event::Comm(comm) => {
+                let comm_proto = CommProto {
+                    consume: {
+                        Some(ConsumeProto {
+                            channel_hashes: comm
+                                .consume
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| hash.bytes())
+                                .collect(),
+                            hash: comm.consume.hash.bytes(),
+                            persistent: comm.consume.persistent,
+                        })
+                    },
+                    produces: {
+                        comm.produces
+                            .into_iter()
+                            .map(|produce| ProduceProto {
+                                channel_hash: produce.channel_hash.bytes(),
+                                hash: produce.hash.bytes(),
+                                persistent: produce.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm.peeks
+                            .into_iter()
+                            .map(|peek| SortedSetElement { value: peek as i32 })
+                            .collect()
+                    },
+                    times_repeated: {
+                        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
+                            Vec::new();
+                        for (key, value) in comm.times_repeated {
+                            let produce = ProduceProto {
+                                channel_hash: key.channel_hash.bytes(),
+                                hash: key.hash.bytes(),
+                                persistent: key.persistent,
+                            };
+
+                            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                                key: Some(produce),
+                                value,
+                            });
+                        }
+                        produce_counter_map_entries
+                    },
+                };
+
+                EventProto {
+                    event_type: Some(event_proto::EventType::Comm(comm_proto)),
+                }
+            }
+            Event::IoEvent(io_event) => match io_event {
+                IOEvent::Produce(produce) => {
+                    let produce_proto = ProduceProto {
+                        channel_hash: produce.channel_hash.bytes(),
+                        hash: produce.hash.bytes(),
+                        persistent: produce.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Produce(
+                                produce_proto,
+                            )),
+                        })),
+                    }
+                }
+                IOEvent::Consume(consume) => {
+                    let consume_proto = ConsumeProto {
+                        channel_hashes: consume
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: consume.hash.bytes(),
+                        persistent: consume.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Consume(
+                                consume_proto,
+                            )),
+                        })),
+                    }
+                }
+            },
+        })
+        .collect();
+
     let checkpoint_proto = CheckpointProto {
         root: checkpoint.root.bytes(),
+        log: log_proto,
     };
 
     let mut bytes = checkpoint_proto.encode_to_vec();
@@ -701,6 +797,100 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
         installed_joins: installed_joins_map_entries,
     };
 
+    let log = soft_checkpoint.log;
+    let log_proto: Vec<EventProto> = log
+        .into_iter()
+        .map(|event| match event {
+            Event::Comm(comm) => {
+                let comm_proto = CommProto {
+                    consume: {
+                        Some(ConsumeProto {
+                            channel_hashes: comm
+                                .consume
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| hash.bytes())
+                                .collect(),
+                            hash: comm.consume.hash.bytes(),
+                            persistent: comm.consume.persistent,
+                        })
+                    },
+                    produces: {
+                        comm.produces
+                            .into_iter()
+                            .map(|produce| ProduceProto {
+                                channel_hash: produce.channel_hash.bytes(),
+                                hash: produce.hash.bytes(),
+                                persistent: produce.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm.peeks
+                            .into_iter()
+                            .map(|peek| SortedSetElement { value: peek as i32 })
+                            .collect()
+                    },
+                    times_repeated: {
+                        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
+                            Vec::new();
+                        for (key, value) in comm.times_repeated {
+                            let produce = ProduceProto {
+                                channel_hash: key.channel_hash.bytes(),
+                                hash: key.hash.bytes(),
+                                persistent: key.persistent,
+                            };
+
+                            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                                key: Some(produce),
+                                value,
+                            });
+                        }
+                        produce_counter_map_entries
+                    },
+                };
+
+                EventProto {
+                    event_type: Some(event_proto::EventType::Comm(comm_proto)),
+                }
+            }
+            Event::IoEvent(io_event) => match io_event {
+                IOEvent::Produce(produce) => {
+                    let produce_proto = ProduceProto {
+                        channel_hash: produce.channel_hash.bytes(),
+                        hash: produce.hash.bytes(),
+                        persistent: produce.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Produce(
+                                produce_proto,
+                            )),
+                        })),
+                    }
+                }
+                IOEvent::Consume(consume) => {
+                    let consume_proto = ConsumeProto {
+                        channel_hashes: consume
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: consume.hash.bytes(),
+                        persistent: consume.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Consume(
+                                consume_proto,
+                            )),
+                        })),
+                    }
+                }
+            },
+        })
+        .collect();
+
     let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> = Vec::new();
     let produce_counter_map = soft_checkpoint.produce_counter;
 
@@ -719,6 +909,7 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
 
     let soft_checkpoint_proto = SoftCheckpointProto {
         cache_snapshot: Some(hot_store_state_proto),
+        log: log_proto,
         produce_counter: produce_counter_map_entries,
     };
 
@@ -867,6 +1058,96 @@ pub extern "C" fn revert_to_soft_checkpoint(
         })
         .collect();
 
+    let log: Vec<Event> = soft_checkpoint_proto
+        .log
+        .into_iter()
+        .map(|log_entry| match log_entry.event_type.unwrap() {
+            event_proto::EventType::Comm(comm_proto) => {
+                let consume_proto = comm_proto.consume.unwrap();
+                let comm = COMM {
+                    consume: {
+                        Consume {
+                            channel_hashes: {
+                                consume_proto
+                                    .channel_hashes
+                                    .iter()
+                                    .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                    .collect()
+                            },
+                            hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                            persistent: consume_proto.persistent,
+                        }
+                    },
+                    produces: {
+                        comm_proto
+                            .produces
+                            .into_iter()
+                            .map(|produce_proto| Produce {
+                                channel_hash: Blake2b256Hash::from_bytes(
+                                    produce_proto.channel_hash,
+                                ),
+                                hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                                persistent: produce_proto.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm_proto
+                            .peeks
+                            .iter()
+                            .map(|element| element.value)
+                            .collect()
+                    },
+                    times_repeated: {
+                        comm_proto
+                            .times_repeated
+                            .into_iter()
+                            .map(|map_entry| {
+                                let key_proto = map_entry.key.unwrap();
+                                let produce = Produce {
+                                    channel_hash: Blake2b256Hash::from_bytes(
+                                        key_proto.channel_hash,
+                                    ),
+                                    hash: Blake2b256Hash::from_bytes(key_proto.hash),
+                                    persistent: key_proto.persistent,
+                                };
+
+                                let value = map_entry.value;
+
+                                (produce, value)
+                            })
+                            .collect()
+                    },
+                };
+                Event::Comm(comm)
+            }
+            event_proto::EventType::IoEvent(io_event) => match io_event.io_event_type.unwrap() {
+                io_event_proto::IoEventType::Produce(produce_proto) => {
+                    let produce = Produce {
+                        channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                        hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                        persistent: produce_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Produce(produce))
+                }
+                io_event_proto::IoEventType::Consume(consume_proto) => {
+                    let consume = Consume {
+                        channel_hashes: {
+                            consume_proto
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                .collect()
+                        },
+                        hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                        persistent: consume_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Consume(consume))
+                }
+            },
+        })
+        .collect();
+
     let produce_counter_map: HashMap<Produce, i32> = soft_checkpoint_proto
         .produce_counter
         .into_iter()
@@ -894,6 +1175,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
 
     let soft_checkpoint = SoftCheckpoint {
         cache_snapshot,
+        log,
         produce_counter: produce_counter_map,
     };
 
