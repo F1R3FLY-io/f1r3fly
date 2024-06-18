@@ -883,62 +883,68 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                        (key, value)
                      }.toMap
 
-                     val checkpointLog = softCheckpointProto.log.map {
-                       case eventProto if eventProto.eventType.isComm =>
-                         val commProto = eventProto.eventType.comm.get
-                         val consume   = commProto.consume
-                         val produces = commProto.produces.map { produceProto =>
-                           Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                         }
-                         val peeks = commProto.peeks.map(_.value).to[SortedSet]
-                         val timesRepeated = commProto.timesRepeated.map { entry =>
-                           val produceProto = entry.key.get
-                           val produce = Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                           produce -> entry.value
-                         }.toMap
-                         COMM(
-                           consume = Consume(
-                             channelsHashes = consume.get.channelHashes
-                               .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
-                             hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
-                             persistent = consume.get.persistent
-                           ),
-                           produces = produces,
-                           peeks = peeks,
-                           timesRepeated = timesRepeated
-                         )
-                       case eventProto if eventProto.eventType.isIoEvent =>
-                         val ioEventProto = eventProto.eventType.ioEvent.get
-                         ioEventProto.ioEventType match {
-                           case IOEventProto.IoEventType.Produce(produceProto) =>
+                     val checkpointLog: Seq[Event] = softCheckpointProto.log.map { eventProto =>
+                       eventProto match {
+                         case EventProto(EventProto.EventType.Comm(commProto)) => {
+                           val consumeProto = commProto.consume.get
+                           val produces = commProto.produces.map { produceProto =>
                              Produce(
                                channelsHash =
                                  Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                                hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
                                persistent = produceProto.persistent
                              )
-                           case IOEventProto.IoEventType.Consume(consumeProto) =>
-                             Consume(
+                           }
+                           val peeks = commProto.peeks.map(_.value).to[SortedSet]
+                           val timesRepeated = commProto.timesRepeated.map { entry =>
+                             val produceProto = entry.key.get
+                             val produce = Produce(
+                               channelsHash =
+                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                               persistent = produceProto.persistent
+                             )
+                             produce -> entry.value
+                           }.toMap
+                           COMM(
+                             consume = Consume(
                                channelsHashes = consumeProto.channelHashes
                                  .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
                                hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
                                persistent = consumeProto.persistent
-                             )
-                           case _ =>
-                             throw new RuntimeException("Unknown IOEvent type")
+                             ),
+                             produces = produces,
+                             peeks = peeks,
+                             timesRepeated = timesRepeated
+                           )
                          }
-                       case _ =>
-                         throw new RuntimeException("Unknown Event type")
+
+                         case EventProto(EventProto.EventType.IoEvent(ioEvent)) =>
+                           ioEvent.ioEventType match {
+                             case IOEventProto.IoEventType.Produce(produceProto) => {
+                               Produce(
+                                 channelsHash = Blake2b256Hash.fromByteArray(
+                                   produceProto.channelHash.toByteArray
+                                 ),
+                                 hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                                 persistent = produceProto.persistent
+                               )
+                             }
+
+                             case IOEventProto.IoEventType.Consume(consumeProto) => {
+                               Consume(
+                                 channelsHashes = consumeProto.channelHashes
+                                   .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                                 hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+                                 persistent = consumeProto.persistent
+                               )
+                             }
+
+                             case _ => throw new RuntimeException("unkown IOEventType")
+                           }
+
+                         case _ => throw new RuntimeException("unkown EventType")
+                       }
                      }
 
                      val produceCounterMap = softCheckpointProto.produceCounter.map { mapEntry =>
@@ -963,8 +969,8 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                          installedJoinsMap
                        )
 
-                     //  SoftCheckpoint(cacheSnapshot, checkpointLog, produceCounterMap)
-                     SoftCheckpoint(cacheSnapshot, Seq.empty, produceCounterMap)
+                     SoftCheckpoint(cacheSnapshot, checkpointLog, produceCounterMap)
+                     //  SoftCheckpoint(cacheSnapshot, Seq.empty, produceCounterMap)
                    } catch {
                      case e: Throwable =>
                        println("Error during scala createSoftCheckpoint operation: " + e)
@@ -1220,26 +1226,38 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
                                  skip: Int,
                                  take: Int
-                             ): F[Seq[TrieNode[Blake2b256Hash]]] = ???
+                             ): F[Seq[TrieNode[Blake2b256Hash]]] = {
+                               println("getNodes")
+                               ???
+                             }
 
                              override def getHistoryItems[Value](
                                  keys: Seq[Blake2b256Hash],
                                  fromBuffer: ByteBuffer => Value
-                             ): F[Seq[(Blake2b256Hash, Value)]] = ???
+                             ): F[Seq[(Blake2b256Hash, Value)]] = {
+                               println("getHistoryItems")
+                               ???
+                             }
 
                              override def getDataItems[Value](
                                  keys: Seq[Blake2b256Hash],
                                  fromBuffer: ByteBuffer => Value
-                             ): F[Seq[(Blake2b256Hash, Value)]] = ???
+                             ): F[Seq[(Blake2b256Hash, Value)]] = {
+                               println("getDataItems")
+                               ???
+                             }
 
-                             override def getRoot: F[Blake2b256Hash] = ???
+                             override def getRoot: F[Blake2b256Hash] = { println("getRoot"); ??? }
 
                              def traverseHistory(
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
                                  skip: Int,
                                  take: Int,
                                  getFromHistory: ByteVector => F[Option[ByteVector]]
-                             ): F[Vector[TrieNode[Blake2b256Hash]]] = ???
+                             ): F[Vector[TrieNode[Blake2b256Hash]]] = {
+                               println("traverseHistory")
+                               ???
+                             }
 
                              def getHistory[Value](
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
@@ -1249,7 +1267,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              )(
                                  implicit m: Sync[F],
                                  l: Log[F]
-                             ): F[StoreItems[Blake2b256Hash, Value]] = ???
+                             ): F[StoreItems[Blake2b256Hash, Value]] = {
+                               println("getHistory")
+                               ???
+                             }
 
                              def getData[Value](
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
@@ -1259,7 +1280,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              )(
                                  implicit m: Sync[F],
                                  l: Log[F]
-                             ): F[StoreItems[Blake2b256Hash, Value]] = ???
+                             ): F[StoreItems[Blake2b256Hash, Value]] = {
+                               println("getData")
+                               ???
+                             }
 
                              def getHistoryAndData[Value](
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
@@ -1274,7 +1298,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                                    StoreItems[Blake2b256Hash, Value],
                                    StoreItems[Blake2b256Hash, Value]
                                )
-                             ] = ???
+                             ] = {
+                               println("getHistoryAndData")
+                               ???
+                             }
 
                              def writeToDisk[C, P, A, K](
                                  root: Blake2b256Hash,
@@ -1283,7 +1310,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              )(
                                  implicit m: Concurrent[F],
                                  l: Log[F]
-                             ): F[Unit] = ???
+                             ): F[Unit] = {
+                               println("writeToDisk")
+                               ???
+                             }
                            }
                          }
       } yield rspaceExporter
@@ -1296,18 +1326,30 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              override def setHistoryItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
-                             ): F[Unit] = ???
+                             ): F[Unit] = {
+                               println("setHistoryItems")
+                               ???
+                             }
 
                              override def setDataItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
-                             ): F[Unit] = ???
+                             ): F[Unit] = {
+                               println("setDataItems")
+                               ???
+                             }
 
-                             override def setRoot(key: Blake2b256Hash): F[Unit] = ???
+                             override def setRoot(key: Blake2b256Hash): F[Unit] = {
+                               println("setRoot")
+                               ???
+                             }
 
                              override def getHistoryItem(
                                  hash: Blake2b256Hash
-                             ): F[Option[ByteVector]] = ???
+                             ): F[Option[ByteVector]] = {
+                               println("getHistoryItem")
+                               ???
+                             }
 
                            }
                          }
@@ -1320,7 +1362,10 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
         historyReader <- Sync[F].delay {
                           new RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K] {
 
-                            override def root: Blake2b256Hash = ???
+                            override def root: Blake2b256Hash = {
+                              println("root")
+                              ???
+                            }
 
                             override def getData(key: Blake2b256Hash): F[Seq[Datum[A]]] =
                               for {
@@ -1418,26 +1463,41 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
 
                             override def getContinuations(
                                 key: Blake2b256Hash
-                            ): F[Seq[WaitingContinuation[P, K]]] = ???
+                            ): F[Seq[WaitingContinuation[P, K]]] = {
+                              println("getContinuations")
+                              ???
+                            }
 
-                            override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] = ???
+                            override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] = {
+                              println("getJoins")
+                              ???
+                            }
 
-                            override def base: RSpacePlusPlusHistoryReaderBase[F, C, P, A, K] = ???
+                            override def base: RSpacePlusPlusHistoryReaderBase[F, C, P, A, K] = {
+                              println("base")
+                              ???
+                            }
 
                             // See rspace/src/main/scala/coop/rchain/rspace/history/syntax/HistoryReaderSyntax.scala
                             override def readerBinary
                                 : RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] =
                               new RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] {
-                                override def getData(key: Blake2b256Hash): F[Seq[DatumB[A]]] =
+                                override def getData(key: Blake2b256Hash): F[Seq[DatumB[A]]] = {
+                                  println("readerBinary-getData")
                                   ???
+                                }
 
                                 override def getContinuations(
                                     key: Blake2b256Hash
-                                ): F[Seq[WaitingContinuationB[P, K]]] =
+                                ): F[Seq[WaitingContinuationB[P, K]]] = {
+                                  println("readerBinary-getContinuations")
                                   ???
+                                }
 
-                                override def getJoins(key: Blake2b256Hash): F[Seq[JoinsB[C]]] =
+                                override def getJoins(key: Blake2b256Hash): F[Seq[JoinsB[C]]] = {
+                                  println("readerBinary-getJoins")
                                   ???
+                                }
                               }
 
                           }
