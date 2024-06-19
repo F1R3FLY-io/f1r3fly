@@ -7,7 +7,11 @@ use crate::rspace::{
 };
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::hash::Hash;
+use std::{
+    collections::{BTreeSet, HashMap},
+    hash::Hasher,
+};
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
 #[derive(Debug, Clone)]
@@ -22,7 +26,7 @@ pub enum IOEvent {
     Consume(Consume),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct COMM {
     pub consume: Consume,
     pub produces: Vec<Produce>,
@@ -62,6 +66,20 @@ impl COMM {
             produces: produce_refs.clone(),
             peeks,
             times_repeated: produce_counters(produce_refs),
+        }
+    }
+}
+
+// Needed for 'counter' crate
+impl Hash for COMM {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.consume.hash(state);
+        self.produces.hash(state);
+        self.peeks.hash(state);
+
+        for (key, value) in &self.times_repeated {
+            key.hash(state);
+            value.hash(state);
         }
     }
 }

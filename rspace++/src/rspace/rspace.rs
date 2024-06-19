@@ -20,6 +20,7 @@ use crate::rspace::internal::*;
 use crate::rspace::matcher::r#match::Match;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
+use counter::Counter;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -44,6 +45,7 @@ where
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
     produce_counter: HashMap<Produce, i32>,
+    replay_data: DashMap<IOEvent, Counter<COMM>>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
@@ -769,6 +771,139 @@ where
         }
     }
 
+    /* ReplayRSpace */
+
+    fn replay_locked_consume(
+        &self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+        consume_ref: Consume,
+    ) -> MaybeActionResult<C, P, A, K> {
+        todo!()
+    }
+
+    fn get_comm_and_consume_candidates(
+        &self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        comms: Vec<COMM>,
+    ) -> Option<(COMM, Vec<ConsumeCandidate<C, A>>)> {
+        todo!()
+    }
+
+    fn run_matcher_consume(
+        &self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        comm: COMM,
+    ) -> Option<Vec<ConsumeCandidate<C, A>>> {
+        todo!()
+    }
+
+    fn replay_locked_produce(
+        &self,
+        channel: C,
+        data: A,
+        persist: bool,
+        produce_ref: Produce,
+    ) -> MaybeActionResult<C, P, A, K> {
+        todo!()
+    }
+
+    fn get_comm_or_produce_candidate(
+        &self,
+        channel: C,
+        data: A,
+        persist: bool,
+        comms: Vec<COMM>,
+        produce_ref: Produce,
+        grouped_channels: Vec<Vec<C>>,
+    ) -> Option<(COMM, ProduceCandidate<C, P, A, K>)> {
+        todo!()
+    }
+
+    fn run_matcher_produce(
+        &self,
+        channel: C,
+        data: A,
+        persist: bool,
+        comm: COMM,
+        produceRef: Produce,
+        groupedChannels: Vec<Vec<C>>,
+    ) -> Option<ProduceCandidate<C, P, A, K>> {
+        todo!()
+    }
+
+    fn matches(&self, comm: COMM) -> bool {
+        todo!()
+    }
+
+    fn handleMatch(
+        &self,
+        pc: ProduceCandidate<C, P, A, K>,
+        comms: Counter<COMM>,
+    ) -> MaybeActionResult<C, P, A, K> {
+        todo!()
+    }
+
+    fn remove_bindings_for(&self, comm_ref: COMM) -> () {
+        todo!()
+    }
+
+    pub fn replay_create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        todo!()
+    }
+
+    fn replay_clear(&self) -> () {
+        todo!()
+    }
+
+    fn replay_log_comm(
+        &mut self,
+        _data_candidates: &Vec<ConsumeCandidate<C, A>>,
+        _channels: &Vec<C>,
+        _wk: WaitingContinuation<P, K>,
+        comm: COMM,
+        _label: &str,
+    ) -> COMM {
+        todo!()
+    }
+
+    fn replay_log_consume(
+        &mut self,
+        consume_ref: Consume,
+        _channels: &Vec<C>,
+        _patterns: &Vec<P>,
+        _continuation: &K,
+        _persist: bool,
+        _peeks: &BTreeSet<i32>,
+    ) -> Consume {
+        todo!()
+    }
+
+    fn replay_log_produce(
+        &mut self,
+        produce_ref: Produce,
+        _channel: &C,
+        _data: &A,
+        persist: bool,
+    ) -> Produce {
+        todo!()
+    }
+
+    fn get_comm_or_candidate(&self) -> () {
+        todo!()
+    }
+
+    pub fn replay_spawn(&self) -> Result<Self, RSpaceError> {
+        todo!()
+    }
+
+    /* Helper functions */
+
     fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
         let mut rng = thread_rng();
         let mut indexed_vec = t
@@ -813,6 +948,7 @@ impl RSpaceInstances {
             installs: Mutex::new(HashMap::new()),
             event_log: Vec::new(),
             produce_counter: HashMap::new(),
+            replay_data: DashMap::new(),
         }
     }
 
