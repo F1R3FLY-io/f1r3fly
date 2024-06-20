@@ -29,11 +29,6 @@ class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach 
   val testDirectoryPath = "./src/test/scala/scala-to-rust_lmdb"
   var spacePtr: Pointer = _
 
-  val INSTANCE: JNAInterface =
-    Native
-      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
-      .asInstanceOf[JNAInterface]
-
   val channels = channelsN(1)
   val patterns = patternsN(1)
   val cont     = continuation()

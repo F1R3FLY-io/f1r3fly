@@ -116,7 +116,7 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
                            ListParWithRandom,
                            TaggedContinuation
                          ]]
-                         .spawnReplay
+                         .spawn
       runtime <- RhoRuntime.createReplayRhoRuntime(newReplaySpace, mergeableTagName)
     } yield runtime
 

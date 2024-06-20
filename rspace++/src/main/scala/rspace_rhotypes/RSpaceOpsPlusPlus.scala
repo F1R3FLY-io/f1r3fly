@@ -72,6 +72,7 @@ import coop.rchain.models.rspace_plus_plus_types.EventProto
 import coop.rchain.models.rspace_plus_plus_types.CommProto
 import coop.rchain.rspace.RSpaceMetricsSource
 import coop.rchain.rspace.concurrent.ConcurrentTwoStepLockF
+import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE}
 
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
     rspacePointer: Pointer
@@ -88,10 +89,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   type P = BindPattern;
   type A = ListParWithRandom;
   type K = TaggedContinuation;
-
-  val INSTANCE: JNAInterface =
-    Native
-      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
 
   // override def syncF: Sync[F] = Sync[F]
 

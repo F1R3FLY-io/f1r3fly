@@ -248,5 +248,9 @@ message CommProto {
   ConsumeProto consume = 1;
   repeated ProduceProto produces = 2;
   repeated SortedSetElement peeks = 3;
-	repeated ProduceCounterMapEntry times_repeated = 4;
+  repeated ProduceCounterMapEntry times_repeated = 4;
+}
+
+message LogProto {
+  repeated EventProto log = 1;
 }

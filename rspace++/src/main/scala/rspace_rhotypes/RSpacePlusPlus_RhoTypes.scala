@@ -70,6 +70,7 @@ import coop.rchain.rspace.trace.COMM
 import coop.rchain.models.rspace_plus_plus_types.IOEventProto
 import coop.rchain.models.rspace_plus_plus_types.EventProto
 import coop.rchain.models.rspace_plus_plus_types.CommProto
+import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE => INSTANCE}
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -335,14 +336,14 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
 
                      //  println("\n log: " + checkpointLog)
 
-                     //  Checkpoint(
-                     //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
-                     //    log = checkpointLog
-                     //  )
                      Checkpoint(
                        root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
-                       log = Seq.empty[Event]
+                       log = checkpointLog
                      )
+                     //  Checkpoint(
+                     //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                     //    log = Seq.empty[Event]
+                     //  )
 
                    } catch {
                      case e: Throwable =>
@@ -375,9 +376,6 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
 }
 
 object RSpacePlusPlus_RhoTypes {
-  val INSTANCE: JNAInterface =
-    Native
-      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
 
   def create[F[_]: Concurrent: ContextShift: Log: Metrics](storePath: String)(
       implicit

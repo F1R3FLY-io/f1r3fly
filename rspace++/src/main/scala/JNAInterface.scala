@@ -1,6 +1,6 @@
 package rspacePlusPlus
 
-import com.sun.jna.{Library, Pointer}
+import com.sun.jna.{Library, Native, Pointer}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 
 /**
@@ -82,5 +82,41 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Unit
 
+  /* ReplayRSpace */
+
+  def replay_produce(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      channel_bytes_len: Int,
+      data_bytes_len: Int,
+      persist: Boolean
+  ): Pointer
+
+  def replay_consume(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
+  def replay_create_checkpoint(rspace: Pointer): Pointer
+
+  def replay_clear(rspace: Pointer): Unit
+
+  def replay_spawn(rspace: Pointer): Pointer
+
+  /* ReplayRSpace */
+
+  def rig(rspace: Pointer, log_pointer: Pointer, log_bytes_len: Int): Unit
+
+  def check_replay_data(rspace: Pointer): Unit
+
+  /* Helper Functions */
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
+}
+
+object JNAInterfaceLoader {
+  val INSTANCE: JNAInterface =
+    Native
+      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
 }
