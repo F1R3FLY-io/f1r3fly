@@ -20,6 +20,7 @@ import coop.rchain.crypto.hash.Blake2b512Random
 import cats.instances.boolean
 import coop.rchain.models.rspace_plus_plus_types.ConsumeParams
 import coop.rchain.models.rspace_plus_plus_types.ActionResult
+import rspacePlusPlus.JNAInterfaceLoader.INSTANCE
 
 class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)

@@ -173,7 +173,7 @@ where
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
         //     grouped_channels
         // );
-        self.log_produce(produce_ref.clone(), &channel, &data, persist);
+        let _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
         let extracted = self.extract_produce_candidate(
             grouped_channels,
             channel.clone(),
@@ -465,7 +465,6 @@ where
         // println!("\n\nHit produce, channel: {:?}", channel);
 
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
-        _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);
         result
@@ -773,6 +772,37 @@ where
 
     /* ReplayRSpace */
 
+    pub fn replay_consume(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> MaybeActionResult<C, P, A, K> {
+        // println!("\nHit consume");
+
+        if channels.is_empty() {
+            panic!("RUST ERROR: channels can't be empty");
+        } else if channels.len() != patterns.len() {
+            panic!("RUST ERROR: channels.length must equal patterns.length");
+        } else {
+            let consume_ref =
+                Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
+
+            let result = self.replay_locked_consume(
+                channels,
+                patterns,
+                continuation,
+                persist,
+                peeks,
+                consume_ref,
+            );
+            // println!("\nlocked_consume result: {:?}", result);
+            result
+        }
+    }
+
     fn replay_locked_consume(
         &self,
         channels: Vec<C>,
@@ -801,6 +831,23 @@ where
         comm: COMM,
     ) -> Option<Vec<ConsumeCandidate<C, A>>> {
         todo!()
+    }
+
+    pub fn replay_produce(
+        &mut self,
+        channel: C,
+        data: A,
+        persist: bool,
+    ) -> MaybeActionResult<C, P, A, K> {
+        // println!("\nHit produce");
+        // println!("\nto_map: {:?}", self.store.to_map());
+        // println!("\nHit produce, data: {:?}", data);
+        // println!("\n\nHit produce, channel: {:?}", channel);
+
+        let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
+        let result = self.replay_locked_produce(channel, data, persist, produce_ref);
+        // println!("\nlocked_produce result: {:?}", result);
+        result
     }
 
     fn replay_locked_produce(
@@ -857,7 +904,7 @@ where
         todo!()
     }
 
-    fn replay_clear(&self) -> () {
+    pub fn replay_clear(&mut self) -> Result<(), RSpaceError> {
         todo!()
     }
 
@@ -899,6 +946,16 @@ where
     }
 
     pub fn replay_spawn(&self) -> Result<Self, RSpaceError> {
+        todo!()
+    }
+
+    /* IReplayRSpace */
+
+    pub fn rig(&self, log: Log) -> () {
+        todo!()
+    }
+
+    pub fn check_replay_data(&self) -> () {
         todo!()
     }
 

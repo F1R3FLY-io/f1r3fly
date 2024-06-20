@@ -104,7 +104,7 @@ trait JNAInterface extends Library {
 
   def replay_spawn(rspace: Pointer): Pointer
 
-  /* ReplayRSpace */
+  /* IReplayRSpace */
 
   def rig(rspace: Pointer, log_pointer: Pointer, log_bytes_len: Int): Unit
 

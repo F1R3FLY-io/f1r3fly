@@ -14,8 +14,8 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
-    EventProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, ProduceCounterMapEntry,
-    SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
+    EventProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
+    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
@@ -1188,6 +1188,403 @@ pub extern "C" fn revert_to_soft_checkpoint(
             .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
     }
 }
+
+/* ReplayRSpace */
+
+#[no_mangle]
+pub extern "C" fn replay_produce(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    channel_bytes_len: usize,
+    data_bytes_len: usize,
+    persist: bool,
+) -> *const u8 {
+    // println!("\nHit produce");
+
+    let payload_slice =
+        unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
+    let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
+
+    let channel = Par::decode(channel_slice).unwrap();
+    let data = ListParWithRandom::decode(data_slice).unwrap();
+
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .replay_produce(channel, data, persist)
+    };
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let cont_lock = cont_result.continuation.lock().unwrap();
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_lock.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+            drop(cont_lock);
+
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => std::ptr::null(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn replay_consume(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    // println!("\nHit rust consume");
+
+    // let thread_id = thread::current().id();
+    // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
+
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let consume_params = ConsumeParams::decode(payload_slice).unwrap();
+
+    let channels = consume_params.channels;
+    let patterns = consume_params.patterns;
+    let continuation = consume_params.continuation.unwrap();
+    let persist = consume_params.persist;
+    let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+
+    let result_option = unsafe {
+        (*rspace).rspace.lock().unwrap().replay_consume(
+            channels,
+            patterns,
+            continuation,
+            persist,
+            peeks,
+        )
+    };
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let cont_lock = cont_result.continuation.lock().unwrap();
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_lock.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+            drop(cont_lock);
+
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+
+            // println!("\nlen: {:?}", len);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => {
+            // println!("\nnone in rust consume");
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
+    let checkpoint = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .replay_create_checkpoint()
+            .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
+    };
+
+    let log = checkpoint.log;
+    let log_proto: Vec<EventProto> = log
+        .into_iter()
+        .map(|event| match event {
+            Event::Comm(comm) => {
+                let comm_proto = CommProto {
+                    consume: {
+                        Some(ConsumeProto {
+                            channel_hashes: comm
+                                .consume
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| hash.bytes())
+                                .collect(),
+                            hash: comm.consume.hash.bytes(),
+                            persistent: comm.consume.persistent,
+                        })
+                    },
+                    produces: {
+                        comm.produces
+                            .into_iter()
+                            .map(|produce| ProduceProto {
+                                channel_hash: produce.channel_hash.bytes(),
+                                hash: produce.hash.bytes(),
+                                persistent: produce.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm.peeks
+                            .into_iter()
+                            .map(|peek| SortedSetElement { value: peek as i32 })
+                            .collect()
+                    },
+                    times_repeated: {
+                        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
+                            Vec::new();
+                        for (key, value) in comm.times_repeated {
+                            let produce = ProduceProto {
+                                channel_hash: key.channel_hash.bytes(),
+                                hash: key.hash.bytes(),
+                                persistent: key.persistent,
+                            };
+
+                            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                                key: Some(produce),
+                                value,
+                            });
+                        }
+                        produce_counter_map_entries
+                    },
+                };
+
+                EventProto {
+                    event_type: Some(event_proto::EventType::Comm(comm_proto)),
+                }
+            }
+            Event::IoEvent(io_event) => match io_event {
+                IOEvent::Produce(produce) => {
+                    let produce_proto = ProduceProto {
+                        channel_hash: produce.channel_hash.bytes(),
+                        hash: produce.hash.bytes(),
+                        persistent: produce.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Produce(
+                                produce_proto,
+                            )),
+                        })),
+                    }
+                }
+                IOEvent::Consume(consume) => {
+                    let consume_proto = ConsumeProto {
+                        channel_hashes: consume
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: consume.hash.bytes(),
+                        persistent: consume.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Consume(
+                                consume_proto,
+                            )),
+                        })),
+                    }
+                }
+            },
+        })
+        .collect();
+
+    let checkpoint_proto = CheckpointProto {
+        root: checkpoint.root.bytes(),
+        log: log_proto,
+    };
+
+    let mut bytes = checkpoint_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn replay_clear(rspace: *mut Space) -> () {
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .replay_clear()
+            .expect("Rust RSpacePlusPlus Library: Failed to clear");
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn replay_spawn(rspace: *mut Space) -> *mut Space {
+    let rspace = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .replay_spawn()
+            .expect("Rust RSpacePlusPlus Library: Failed to spawn")
+    };
+
+    Box::into_raw(Box::new(Space {
+        rspace: Mutex::new(rspace),
+    }))
+}
+
+/* IReplayRSpace */
+
+#[no_mangle]
+pub extern "C" fn rig(rspace: *mut Space, log_pointer: *const u8, log_bytes_len: usize) -> () {
+    let log_slice = unsafe { std::slice::from_raw_parts(log_pointer, log_bytes_len) };
+    let log_proto = LogProto::decode(log_slice).unwrap();
+
+    let log: Vec<Event> = log_proto
+        .log
+        .into_iter()
+        .map(|log_entry| match log_entry.event_type.unwrap() {
+            event_proto::EventType::Comm(comm_proto) => {
+                let consume_proto = comm_proto.consume.unwrap();
+                let comm = COMM {
+                    consume: {
+                        Consume {
+                            channel_hashes: {
+                                consume_proto
+                                    .channel_hashes
+                                    .iter()
+                                    .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                    .collect()
+                            },
+                            hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                            persistent: consume_proto.persistent,
+                        }
+                    },
+                    produces: {
+                        comm_proto
+                            .produces
+                            .into_iter()
+                            .map(|produce_proto| Produce {
+                                channel_hash: Blake2b256Hash::from_bytes(
+                                    produce_proto.channel_hash,
+                                ),
+                                hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                                persistent: produce_proto.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm_proto
+                            .peeks
+                            .iter()
+                            .map(|element| element.value)
+                            .collect()
+                    },
+                    times_repeated: {
+                        comm_proto
+                            .times_repeated
+                            .into_iter()
+                            .map(|map_entry| {
+                                let key_proto = map_entry.key.unwrap();
+                                let produce = Produce {
+                                    channel_hash: Blake2b256Hash::from_bytes(
+                                        key_proto.channel_hash,
+                                    ),
+                                    hash: Blake2b256Hash::from_bytes(key_proto.hash),
+                                    persistent: key_proto.persistent,
+                                };
+
+                                let value = map_entry.value;
+
+                                (produce, value)
+                            })
+                            .collect()
+                    },
+                };
+                Event::Comm(comm)
+            }
+            event_proto::EventType::IoEvent(io_event) => match io_event.io_event_type.unwrap() {
+                io_event_proto::IoEventType::Produce(produce_proto) => {
+                    let produce = Produce {
+                        channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                        hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                        persistent: produce_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Produce(produce))
+                }
+                io_event_proto::IoEventType::Consume(consume_proto) => {
+                    let consume = Consume {
+                        channel_hashes: {
+                            consume_proto
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                .collect()
+                        },
+                        hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                        persistent: consume_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Consume(consume))
+                }
+            },
+        })
+        .collect();
+
+    unsafe {
+        (*rspace).rspace.lock().unwrap().rig(log);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn check_replay_data(rspace: *mut Space) -> () {
+    unsafe {
+        (*rspace).rspace.lock().unwrap().check_replay_data();
+    }
+}
+
+/* Helper Functions */
 
 #[no_mangle]
 pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
