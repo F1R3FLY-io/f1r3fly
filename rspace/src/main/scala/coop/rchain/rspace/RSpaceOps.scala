@@ -228,8 +228,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
   ): F[MaybeActionResult] =
     ContextShift[F].evalOn(scheduler) {
       (for {
-        toMap      <- storeAtom.get().toMap
-        _          <- Sync[F].delay(println("toMap: " + toMap))
+        toMap <- storeAtom.get().toMap
+        // _          <- Sync[F].delay(println("toMap: " + toMap))
         produceRef <- Sync[F].delay(Produce(channel, data, persist))
         result <- produceLockF(channel)(
                    lockedProduce(channel, data, persist, produceRef)

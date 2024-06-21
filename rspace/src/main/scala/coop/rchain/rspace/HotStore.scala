@@ -152,7 +152,7 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
             .whenA(removingInstalled)
       _ <- Sync[F]
             .raiseError {
-              println("what is going on")
+              // println("what is going on")
               new IndexOutOfBoundsException(
                 s"Index $index out of bounds when removing continuation"
               )
