@@ -1,8 +1,10 @@
+use counter::Counter;
+use dashmap::DashMap;
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex};
 use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex};
 
 use super::trace::event::{Consume, Produce};
 
@@ -219,4 +221,45 @@ pub struct Row<P: Clone, A: Clone, K: Clone> {
 pub struct Install<P, K> {
     pub patterns: Vec<P>,
     pub continuation: K,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultisetMultiMap<K: Hash + Eq, V: Hash + Eq> {
+    pub map: DashMap<K, Counter<V>>,
+}
+
+impl<K, V> MultisetMultiMap<K, V>
+where
+    K: Eq + Hash,
+    V: Eq + Hash,
+{
+    pub fn empty() -> Self {
+        MultisetMultiMap {
+            map: DashMap::new(),
+        }
+    }
+
+    pub fn add_binding(&self, k: K, v: V) -> &Self {
+        let mut entry = self.map.entry(k).or_insert_with(Counter::new);
+        entry.insert(v, 1);
+        self
+    }
+
+    pub fn remove_binding(&self, k: K, v: V) -> &Self {
+        if let Some(mut entry) = self.map.get_mut(&k) {
+            entry.remove(&v);
+            if entry.is_empty() {
+                self.map.remove(&k);
+            }
+        }
+        self
+    }
+
+    pub fn clear(&self) {
+        self.map.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
 }

@@ -14,7 +14,7 @@ use std::{
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Event {
     Comm(COMM),
     IoEvent(IOEvent),
@@ -39,7 +39,6 @@ impl COMM {
         data_candidates: Vec<ConsumeCandidate<C, A>>,
         consume_ref: Consume,
         peeks: BTreeSet<i32>,
-        // produce_counters: fn(Vec<Produce>) -> HashMap<Produce, i32>,
         produce_counters: impl Fn(Vec<Produce>) -> HashMap<Produce, i32>,
     ) -> Self {
         let mut produce_refs: Vec<Produce> = data_candidates

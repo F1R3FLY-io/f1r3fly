@@ -109,18 +109,22 @@ trait IReplaySpacePlusPlus[F[_], C, P, A, K] extends ISpacePlusPlus[F, C, P, A, 
             val logProto      = LogProto(eventProtos)
             val logProtoBytes = logProto.toByteArray
 
-            val payloadMemory = new Memory(logProtoBytes.length.toLong)
-            payloadMemory.write(0, logProtoBytes, 0, logProtoBytes.length)
+            if (!logProtoBytes.isEmpty) {
+              val payloadMemory = new Memory(logProtoBytes.length.toLong)
+              payloadMemory.write(0, logProtoBytes, 0, logProtoBytes.length)
 
-            val _ = INSTANCE.rig(
-              rspacePointer,
-              payloadMemory,
-              logProtoBytes.length
-            )
+              val _ = INSTANCE.rig(
+                rspacePointer,
+                payloadMemory,
+                logProtoBytes.length
+              )
 
-            // Not sure if these lines are needed
-            // Need to figure out how to deallocate each memory instance
-            payloadMemory.clear()
+              // Not sure if these lines are needed
+              // Need to figure out how to deallocate each memory instance
+              payloadMemory.clear()
+            } else {
+              println("\nlog is empty in rig")
+            }
           }
     } yield ()
 
