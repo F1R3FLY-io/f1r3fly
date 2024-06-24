@@ -70,38 +70,21 @@ async fn create_rspace() -> RSpace<String, Pattern, String, String, StringMatch>
 }
 
 #[tokio::test]
-async fn produce_should_persist_data_in_store() {
-    let mut rspace = create_rspace().await;
+async fn reset_to_a_checkpiint_from_a_different_branch_should_work() {
+    let (store, replay_store, mut space, mut replay_space) = fixture().await;
 
-    let root_0 = rspace.replay_create_checkpoint().unwrap().root;
-    // assert!()
+    let root0 = replay_space.replay_create_checkpoint().unwrap().root;
+    assert!(replay_store.is_empty());
 
-    let channel = "ch1".to_string();
-    let key = vec![channel.clone()];
+    let _ = space.produce("ch1".to_string(), "datum".to_string(), false);
+    let root1 = space.create_checkpoint().unwrap().root;
 
-    let r = rspace.produce(key[0].clone(), "datum".to_string(), false);
-    let data = rspace.store.get_data(&channel);
-    assert_eq!(data, vec![Datum::create(channel.clone(), "datum".to_string(), false)]);
+    let _ = replay_space.reset(root1);
+    assert!(replay_store.is_empty());
 
-    let cont = rspace.store.get_continuations(key);
-    assert_eq!(cont.len(), 0);
-    assert!(r.is_none());
-
-    let insert_data: Vec<InsertData<_, _>> = filter_enum_variants(rspace.store.changes(), |e| {
-        if let HotStoreAction::Insert(InsertAction::InsertData(d)) = e {
-            Some(d)
-        } else {
-            None
-        }
-    });
-    assert_eq!(insert_data.len(), 1);
-    assert_eq!(
-        insert_data
-            .into_iter()
-            .map(|d| d.channel)
-            .collect::<String>(),
-        channel
-    );
+    let _ = space.reset(root0);
+    store.print();
+    assert!(store.is_empty());
 }
 
 type StateSetup = (
@@ -112,7 +95,8 @@ type StateSetup = (
 );
 
 async fn fixture() -> StateSetup {
-    let mut kvm = mk_rspace_store_manager("./lmdb/".into(), 1 * GB);
+    // let mut kvm = mk_rspace_store_manager("./lmdb/".into(), 1 * GB);
+    let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
 
     let history_repo_rspace =

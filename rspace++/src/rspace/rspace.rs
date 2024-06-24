@@ -358,8 +358,11 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace =
-            RSpaceInstances::apply(next_history, Arc::new(hot_store), self.space_matcher.matcher.clone());
+        let mut rspace = RSpaceInstances::apply(
+            next_history,
+            Arc::new(hot_store),
+            self.space_matcher.matcher.clone(),
+        );
         rspace.restore_installs();
 
         // println!("\nRSpace Store in spawn: ");
@@ -1229,8 +1232,11 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace =
-            RSpaceInstances::apply(next_history, Arc::new(hot_store), self.space_matcher.matcher.clone());
+        let mut rspace = RSpaceInstances::apply(
+            next_history,
+            Arc::new(hot_store),
+            self.space_matcher.matcher.clone(),
+        );
         rspace.restore_installs();
 
         Ok(rspace)

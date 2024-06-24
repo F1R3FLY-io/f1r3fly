@@ -35,6 +35,9 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync + S
 
     fn print(&self) -> ();
     fn clear(&self) -> ();
+
+    // See rspace/src/test/scala/coop/rchain/rspace/test/package.scala
+    fn is_empty(&self) -> bool;
 }
 
 #[derive(Default, Debug, Clone)]
@@ -112,10 +115,10 @@ where
 
 struct InMemHotStore<C, P, A, K>
 where
-    C: Eq + Hash,
-    A: Clone,
-    P: Clone,
-    K: Clone,
+    C: Eq + Hash + Sync + Send,
+    A: Clone + Sync + Send,
+    P: Clone + Sync + Send,
+    K: Clone + Sync + Send,
 {
     hot_store_state: Arc<Mutex<HotStoreState<C, P, A, K>>>,
     history_store_cache: Arc<Mutex<HistoryStoreCache<C, P, A, K>>>,
@@ -640,14 +643,24 @@ where
         state.joins = DashMap::new();
         state.installed_joins = DashMap::new();
     }
+
+    // See rspace/src/test/scala/coop/rchain/rspace/test/package.scala
+    fn is_empty(&self) -> bool {
+        let store_actions = self.changes();
+        let has_insert_actions = store_actions
+            .into_iter()
+            .any(|action| matches!(action, HotStoreAction::Insert(_)));
+
+        !has_insert_actions
+    }
 }
 
 impl<C, P, A, K> InMemHotStore<C, P, A, K>
 where
-    C: Clone + Debug + Hash + Eq,
-    P: Clone + Debug,
-    A: Clone + Debug,
-    K: Clone + Debug,
+    C: Clone + Debug + Hash + Eq + Sync + Send,
+    P: Clone + Debug + Sync + Send,
+    A: Clone + Debug + Sync + Send,
+    K: Clone + Debug + Sync + Send,
 {
     fn get_cont_from_history_store(&self, channels: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
         let cache = self.history_store_cache.lock().unwrap();
