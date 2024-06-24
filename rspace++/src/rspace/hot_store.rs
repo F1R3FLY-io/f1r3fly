@@ -696,29 +696,29 @@ impl HotStoreInstances {
     pub fn create_from_mhs_and_hr<C, P, A, K>(
         hot_store_state_ref: Arc<Mutex<HotStoreState<C, P, A, K>>>,
         history_reader_base: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> impl HotStore<C, P, A, K>
+    ) -> Box<dyn HotStore<C, P, A, K>>
     where
-        C: Default + Clone + Debug + Eq + Hash + Send + Sync,
-        P: Default + Clone + Debug + Send + Sync,
-        A: Default + Clone + Debug + Send + Sync,
-        K: Default + Clone + Debug + Send + Sync,
+        C: Default + Clone + Debug + Eq + Hash + Send + Sync + 'static,
+        P: Default + Clone + Debug + Send + Sync + 'static,
+        A: Default + Clone + Debug + Send + Sync + 'static,
+        K: Default + Clone + Debug + Send + Sync + 'static,
     {
-        InMemHotStore {
+        Box::new(InMemHotStore {
             hot_store_state: hot_store_state_ref,
             history_store_cache: Arc::new(Mutex::new(HistoryStoreCache::default())),
             history_reader_base,
-        }
+        })
     }
 
     pub fn create_from_hs_and_hr<C, P, A, K>(
         cache: HotStoreState<C, P, A, K>,
         history_reader: Box<dyn HistoryReaderBase<C, P, A, K>>,
-    ) -> impl HotStore<C, P, A, K>
+    ) -> Box<dyn HotStore<C, P, A, K>>
     where
-        C: Default + Clone + Debug + Eq + Hash + Send + Sync,
-        P: Default + Clone + Debug + Send + Sync,
-        A: Default + Clone + Debug + Send + Sync,
-        K: Default + Clone + Debug + Send + Sync,
+        C: Default + Clone + Debug + Eq + Hash + Send + Sync + 'static,
+        P: Default + Clone + Debug + Send + Sync + 'static,
+        A: Default + Clone + Debug + Send + Sync + 'static,
+        K: Default + Clone + Debug + Send + Sync + 'static,
     {
         let cache = Arc::new(Mutex::new(cache));
         let store = HotStoreInstances::create_from_mhs_and_hr(cache, history_reader);
@@ -734,6 +734,6 @@ impl HotStoreInstances {
         A: Default + Clone + Debug + 'static + Send + Sync,
         K: Default + Clone + Debug + 'static + Send + Sync,
     {
-        Box::new(HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader))
+        HotStoreInstances::create_from_hs_and_hr(HotStoreState::default(), history_reader)
     }
 }

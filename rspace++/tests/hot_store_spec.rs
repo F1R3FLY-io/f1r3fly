@@ -967,7 +967,7 @@ pub fn fixture() -> StateSetup {
 
     let hot_store =
         HotStoreInstances::create_from_mhs_and_hr(cache.clone(), Box::new(history.clone()));
-    (cache, history, Box::new(hot_store))
+    (cache, history, hot_store)
 }
 
 pub fn fixture_with_cache(
@@ -984,5 +984,5 @@ pub fn fixture_with_cache(
 
     let hot_store =
         HotStoreInstances::create_from_mhs_and_hr(cache.clone(), Box::new(history.clone()));
-    (cache, history, Box::new(hot_store))
+    (cache, history, hot_store)
 }

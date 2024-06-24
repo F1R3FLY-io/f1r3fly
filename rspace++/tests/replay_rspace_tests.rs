@@ -1,5 +1,7 @@
-use proptest::prelude::*;
-use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
+use rspace_plus_plus::rspace::history::history_repository::{
+    HistoryRepository, HistoryRepositoryInstances,
+};
+use rspace_plus_plus::rspace::hot_store::{HotStore, HotStoreInstances, HotStoreState};
 use rspace_plus_plus::rspace::hot_store_action::{
     HotStoreAction, InsertAction, InsertContinuations, InsertData,
 };
@@ -9,6 +11,8 @@ use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
+use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::trace::event::Consume;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet};
@@ -98,4 +102,60 @@ async fn produce_should_persist_data_in_store() {
             .collect::<String>(),
         channel
     );
+}
+
+type StateSetup = (
+    Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
+    Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
+    RSpace<String, Pattern, String, String, StringMatch>,
+    RSpace<String, Pattern, String, String, StringMatch>,
+);
+
+async fn fixture() -> StateSetup {
+    let mut kvm = mk_rspace_store_manager("./lmdb/".into(), 1 * GB);
+    let store = kvm.r_space_stores().await.unwrap();
+
+    let history_repo_rspace =
+        HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
+            store.history.clone(),
+            store.roots.clone(),
+            store.cold.clone(),
+        )
+        .unwrap();
+
+    let cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
+    let history_reader = history_repo_rspace
+        .get_history_reader(history_repo_rspace.root())
+        .unwrap();
+
+    let hot_store = {
+        let hr = history_reader.base();
+        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache, hr))
+    };
+
+    let rspace =
+        RSpaceInstances::apply(Box::new(history_repo_rspace), hot_store.clone(), StringMatch);
+
+    let history_cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
+    let replay_store = {
+        let hr = history_reader.base();
+        Arc::new(HotStoreInstances::create_from_hs_and_hr(history_cache, hr))
+    };
+
+    let history_repo_replay_rspace =
+        HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
+            store.history,
+            store.roots,
+            store.cold,
+        )
+        .unwrap();
+
+    let replay_rspace: RSpace<String, Pattern, String, String, StringMatch> =
+        RSpaceInstances::apply(
+            Box::new(history_repo_replay_rspace),
+            replay_store.clone(),
+            StringMatch,
+        );
+
+    (hot_store, replay_store, rspace, replay_rspace)
 }

@@ -118,14 +118,13 @@ async fn test_setup() -> (
 
     let store1 = {
         let hr = history_reader.base();
-        HotStoreInstances::create_from_hs_and_hr(cache1, hr)
+        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache1, hr))
     };
 
     let exporter1 = history_repository1.exporter();
     let importer1 = history_repository1.importer();
 
-    let space1 =
-        RSpaceInstances::apply(Box::new(history_repository1), Box::new(store1), StringMatch);
+    let space1 = RSpaceInstances::apply(Box::new(history_repository1), store1, StringMatch);
 
     let roots2 = kvm.store("roots2".to_string()).await.unwrap();
     let cold2 = kvm.store("cold2".to_string()).await.unwrap();
@@ -146,14 +145,13 @@ async fn test_setup() -> (
 
     let store2 = {
         let hr = history_reader.base();
-        HotStoreInstances::create_from_hs_and_hr(cache2, hr)
+        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache2, hr))
     };
 
     let exporter2 = history_repository2.exporter();
     let importer2 = history_repository2.importer();
 
-    let space2 =
-        RSpaceInstances::apply(Box::new(history_repository2), Box::new(store2), StringMatch);
+    let space2 = RSpaceInstances::apply(Box::new(history_repository2), store2, StringMatch);
 
     (space1, exporter1, importer1, space2, exporter2, importer2)
 }
