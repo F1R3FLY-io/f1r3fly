@@ -103,13 +103,14 @@ async fn test_setup() -> (
     let cold1 = kvm.store("cold1".to_string()).await.unwrap();
     let history1 = kvm.store("history1".to_string()).await.unwrap();
 
-    let history_repository1 =
+    let history_repository1 = Arc::new(
         HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
             Arc::new(Mutex::new(roots1)),
             Arc::new(Mutex::new(cold1)),
             Arc::new(Mutex::new(history1)),
         )
-        .unwrap();
+        .unwrap(),
+    );
 
     let cache1: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let history_reader = history_repository1
@@ -118,25 +119,26 @@ async fn test_setup() -> (
 
     let store1 = {
         let hr = history_reader.base();
-        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache1, hr))
+        HotStoreInstances::create_from_hs_and_hr(cache1, hr)
     };
 
     let exporter1 = history_repository1.exporter();
     let importer1 = history_repository1.importer();
 
-    let space1 = RSpaceInstances::apply(Box::new(history_repository1), store1, StringMatch);
+    let space1 = RSpaceInstances::apply(history_repository1, store1, StringMatch);
 
     let roots2 = kvm.store("roots2".to_string()).await.unwrap();
     let cold2 = kvm.store("cold2".to_string()).await.unwrap();
     let history2 = kvm.store("history2".to_string()).await.unwrap();
 
-    let history_repository2 =
+    let history_repository2 = Arc::new(
         HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
             Arc::new(Mutex::new(roots2)),
             Arc::new(Mutex::new(cold2)),
             Arc::new(Mutex::new(history2)),
         )
-        .unwrap();
+        .unwrap(),
+    );
 
     let cache2: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let history_reader = history_repository2
@@ -145,13 +147,13 @@ async fn test_setup() -> (
 
     let store2 = {
         let hr = history_reader.base();
-        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache2, hr))
+        HotStoreInstances::create_from_hs_and_hr(cache2, hr)
     };
 
     let exporter2 = history_repository2.exporter();
     let importer2 = history_repository2.importer();
 
-    let space2 = RSpaceInstances::apply(Box::new(history_repository2), store2, StringMatch);
+    let space2 = RSpaceInstances::apply(history_repository2, store2, StringMatch);
 
     (space1, exporter1, importer1, space2, exporter2, importer2)
 }

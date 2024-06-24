@@ -69,7 +69,7 @@ where
         history_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
         roots_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
         cold_key_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
-    ) -> Result<impl HistoryRepository<C, P, A, K>, HistoryRepositoryError> {
+    ) -> Result<Box<dyn HistoryRepository<C, P, A, K>>, HistoryRepositoryError> {
         // Roots store
         let roots_repository = RootRepository {
             roots_store: Box::new(RootsStoreInstances::roots_store(roots_key_value_store.clone())),
@@ -95,14 +95,14 @@ where
             roots_key_value_store,
         );
 
-        Ok(HistoryRepositoryImpl {
+        Ok(Box::new(HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(Box::new(history))),
             roots_repository: Arc::new(Mutex::new(roots_repository)),
             leaf_store: Arc::new(Mutex::new(cold_store)),
             rspace_exporter: Arc::new(Mutex::new(Box::new(exporter))),
             rspace_importer: Arc::new(Mutex::new(Box::new(importer))),
             _marker: PhantomData,
-        })
+        }))
     }
 }
 

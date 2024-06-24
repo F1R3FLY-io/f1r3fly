@@ -39,8 +39,8 @@ where
     C: Clone + Ord,
     M: Match<P, A>,
 {
-    pub history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
-    pub store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+    pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+    pub store: Box<dyn HotStore<C, P, A, K>>,
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
@@ -334,7 +334,7 @@ where
         // println!("\nhit rspace++ create_checkpoint");
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
-        self.history_repository = next_history;
+        self.history_repository = Arc::new(next_history);
 
         let log = self.event_log.clone();
         self.event_log = Vec::new();
@@ -359,8 +359,8 @@ where
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let mut rspace = RSpaceInstances::apply(
-            next_history,
-            Arc::new(hot_store),
+            Arc::new(next_history),
+            hot_store,
             self.space_matcher.matcher.clone(),
         );
         rspace.restore_installs();
@@ -596,7 +596,7 @@ where
     pub fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
         // println!("\nhit rspace++ reset");
         let next_history = self.history_repository.reset(&root)?;
-        self.history_repository = next_history;
+        self.history_repository = Arc::new(next_history);
 
         self.event_log = Vec::new();
         self.produce_counter = HashMap::new();
@@ -617,7 +617,7 @@ where
         history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
         let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        self.store = Arc::new(next_hot_store);
+        self.store = next_hot_store;
     }
 
     pub fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
@@ -649,7 +649,7 @@ where
             history_reader.base(),
         );
 
-        self.store = Arc::new(hot_store);
+        self.store = hot_store;
         self.event_log = checkpoint.log;
         self.produce_counter = checkpoint.produce_counter;
 
@@ -1136,7 +1136,7 @@ where
         // println!("\nhit rspace++ create_checkpoint");
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
-        self.history_repository = next_history;
+        self.history_repository = Arc::new(next_history);
 
         let history_reader = self
             .history_repository
@@ -1233,8 +1233,8 @@ where
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let mut rspace = RSpaceInstances::apply(
-            next_history,
-            Arc::new(hot_store),
+            Arc::new(next_history),
+            hot_store,
             self.space_matcher.matcher.clone(),
         );
         rspace.restore_installs();
@@ -1327,8 +1327,8 @@ impl RSpaceInstances {
      * Creates [[RSpace]] from [[HistoryRepository]] and [[HotStore]].
      */
     pub fn apply<C, P, A, K, M>(
-        history_repository: Box<dyn HistoryRepository<C, P, A, K>>,
-        store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+        history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+        store: Box<dyn HotStore<C, P, A, K>>,
         matcher: M,
     ) -> RSpace<C, P, A, K, M>
     where
@@ -1371,7 +1371,7 @@ impl RSpaceInstances {
     {
         let setup = RSpaceInstances::create_history_repo(store).unwrap();
         let (history_reader, store) = setup;
-        let space = RSpaceInstances::apply(history_reader, Arc::new(store), matcher);
+        let space = RSpaceInstances::apply(Arc::new(history_reader), store, matcher);
         Ok(space)
     }
 
@@ -1406,7 +1406,7 @@ impl RSpaceInstances {
 
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
-        Ok((Box::new(history_repo), hot_store))
+        Ok((history_repo, hot_store))
     }
 }
 

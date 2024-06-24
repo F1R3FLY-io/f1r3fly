@@ -71,25 +71,24 @@ async fn create_rspace() -> RSpace<String, Pattern, String, String, StringMatch>
 
 #[tokio::test]
 async fn reset_to_a_checkpiint_from_a_different_branch_should_work() {
-    let (store, replay_store, mut space, mut replay_space) = fixture().await;
+    let (mut space, mut replay_space) = fixture().await;
 
     let root0 = replay_space.replay_create_checkpoint().unwrap().root;
-    assert!(replay_store.is_empty());
+    assert!(replay_space.store.is_empty());
 
     let _ = space.produce("ch1".to_string(), "datum".to_string(), false);
     let root1 = space.create_checkpoint().unwrap().root;
 
     let _ = replay_space.reset(root1);
-    assert!(replay_store.is_empty());
+    assert!(replay_space.store.is_empty());
 
     let _ = space.reset(root0);
-    store.print();
-    assert!(store.is_empty());
+    assert!(space.store.is_empty());
 }
 
 type StateSetup = (
-    Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
-    Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
+    // Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
+    // Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
     RSpace<String, Pattern, String, String, StringMatch>,
     RSpace<String, Pattern, String, String, StringMatch>,
 );
@@ -99,47 +98,36 @@ async fn fixture() -> StateSetup {
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
 
-    let history_repo_rspace =
+    let history_repo = Arc::new(
         HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
             store.history.clone(),
             store.roots.clone(),
             store.cold.clone(),
         )
-        .unwrap();
+        .unwrap(),
+    );
 
     let cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
-    let history_reader = history_repo_rspace
-        .get_history_reader(history_repo_rspace.root())
+    let history_reader = history_repo
+        .get_history_reader(history_repo.root())
         .unwrap();
 
     let hot_store = {
         let hr = history_reader.base();
-        Arc::new(HotStoreInstances::create_from_hs_and_hr(cache, hr))
+        HotStoreInstances::create_from_hs_and_hr(cache, hr)
     };
 
-    let rspace =
-        RSpaceInstances::apply(Box::new(history_repo_rspace), hot_store.clone(), StringMatch);
+    let rspace = RSpaceInstances::apply(history_repo.clone(), hot_store, StringMatch);
 
     let history_cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let replay_store = {
         let hr = history_reader.base();
-        Arc::new(HotStoreInstances::create_from_hs_and_hr(history_cache, hr))
+        HotStoreInstances::create_from_hs_and_hr(history_cache, hr)
     };
 
-    let history_repo_replay_rspace =
-        HistoryRepositoryInstances::<String, Pattern, String, String>::lmdb_repository(
-            store.history,
-            store.roots,
-            store.cold,
-        )
-        .unwrap();
-
     let replay_rspace: RSpace<String, Pattern, String, String, StringMatch> =
-        RSpaceInstances::apply(
-            Box::new(history_repo_replay_rspace),
-            replay_store.clone(),
-            StringMatch,
-        );
+        RSpaceInstances::apply(history_repo, replay_store, StringMatch);
 
-    (hot_store, replay_store, rspace, replay_rspace)
+    // (hot_store, replay_store, rspace, replay_rspace)
+    (rspace, replay_rspace)
 }
