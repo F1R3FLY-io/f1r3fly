@@ -120,6 +120,7 @@ async fn creating_a_comm_event_should_replay_correctly() {
         false,
         BTreeSet::new(),
     );
+
     let replay_result_produce =
         replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
     let final_point = replay_space.replay_create_checkpoint().unwrap();

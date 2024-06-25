@@ -827,15 +827,25 @@ where
             source: consume_ref.clone(),
         };
 
-        match self
+        let comms_option = self
             .replay_data
             .map
             .get(&IOEvent::Consume(consume_ref.clone()))
-        {
+            .map(|comms| {
+                comms
+                    .iter()
+                    .map(|tuple| tuple.0.clone())
+                    .collect::<Vec<_>>()
+            });
+
+        match comms_option {
             None => self.store_waiting_continuation(channels, wk),
-            Some(comms) => {
-                let comms_list: Vec<_> = comms.iter().map(|tuple| tuple.0.clone()).collect();
-                match self.get_comm_and_consume_candidates(channels.clone(), patterns, comms_list) {
+            Some(comms_list) => {
+                match self.get_comm_and_consume_candidates(
+                    channels.clone(),
+                    patterns,
+                    comms_list.clone(),
+                ) {
                     None => self.store_waiting_continuation(channels, wk),
                     Some((_, data_candidates)) => {
                         let comm_ref = {
@@ -857,11 +867,11 @@ where
                         };
 
                         assert!(
-                            comms.contains_key(&comm_ref),
+                            comms_list.contains(&comm_ref),
                             "{}",
                             format!(
                                 "COMM Event {:?} was not contained in the trace {:?}",
-                                comm_ref, comms
+                                comm_ref, comms_list
                             )
                         );
 
@@ -958,14 +968,20 @@ where
         // );
         let _ = self.replay_log_produce(produce_ref.clone(), &channel, &data, persist);
 
-        match self
+        let comms_option = self
             .replay_data
             .map
             .get(&IOEvent::Produce(produce_ref.clone()))
-        {
+            .map(|comms| {
+                comms
+                    .iter()
+                    .map(|tuple| tuple.0.clone())
+                    .collect::<Vec<_>>()
+            });
+
+        match comms_option {
             None => self.store_data(channel, data, persist, produce_ref),
-            Some(comms) => {
-                let comms_list: Vec<_> = comms.iter().map(|tuple| tuple.0.clone()).collect();
+            Some(comms_list) => {
                 match self.get_comm_or_produce_candidate(
                     channel.clone(),
                     data.clone(),
@@ -1072,7 +1088,7 @@ where
     }
 
     fn handle_match(
-        &self,
+        &mut self,
         pc: ProduceCandidate<C, P, A, K>,
         comms: Vec<COMM>,
     ) -> MaybeActionResult<C, P, A, K> {
@@ -1115,17 +1131,18 @@ where
         );
 
         if !persist {
-            self.store
+            let _ = self
+                .store
                 .remove_continuation(channels.clone(), continuation_index);
         };
 
-        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
+        let _ = self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
         // println!("produce: matching continuation found at <channels: {:?}>", channels);
-        self.remove_bindings_for(comm_ref);
+        let _ = self.remove_bindings_for(comm_ref);
         self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
     }
 
-    fn remove_bindings_for(&self, comm_ref: COMM) -> () {
+    fn remove_bindings_for(&mut self, comm_ref: COMM) -> () {
         // println!("\nhit remove_bindings_for");
 
         let mut updated_replays = remove_binding(
@@ -1141,6 +1158,8 @@ where
                 comm_ref.clone(),
             );
         }
+
+        self.replay_data = updated_replays;
     }
 
     pub fn replay_create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
@@ -1295,6 +1314,7 @@ where
                         };
 
                         if new_stuff.contains(&io_event_converted) {
+                            // println!("\nadd_binding in rig");
                             self.replay_data.add_binding(io_event, comm.clone());
                         }
                     }
