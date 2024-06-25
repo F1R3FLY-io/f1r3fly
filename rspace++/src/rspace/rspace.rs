@@ -663,7 +663,7 @@ where
         _consume_ref: Consume,
         data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> MaybeActionResult<C, P, A, K> {
-        println!("\nhit wrap_result");
+        // println!("\nhit wrap_result");
 
         let cont_result = ContResult {
             continuation: wk.continuation,
@@ -931,14 +931,14 @@ where
         data: A,
         persist: bool,
     ) -> MaybeActionResult<C, P, A, K> {
-        println!("\nHit replay_produce");
+        // println!("\nHit replay_produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
         // println!("\n\nHit produce, channel: {:?}", channel);
 
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
         let result = self.replay_locked_produce(channel, data, persist, produce_ref);
-        println!("\nreplay_locked_produce result: {:?}", result);
+        // println!("\nreplay_locked_produce result: {:?}", result);
         result
     }
 
@@ -949,7 +949,7 @@ where
         persist: bool,
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
-        println!("\nHit replay_locked_produce");
+        // println!("\nHit replay_locked_produce");
 
         let grouped_channels = self.store.get_joins(channel.clone());
         // println!(
@@ -1076,7 +1076,7 @@ where
         pc: ProduceCandidate<C, P, A, K>,
         comms: Vec<COMM>,
     ) -> MaybeActionResult<C, P, A, K> {
-        println!("\nhit handle_match");
+        // println!("\nhit handle_match");
 
         let ProduceCandidate {
             channels,
@@ -1126,15 +1126,20 @@ where
     }
 
     fn remove_bindings_for(&self, comm_ref: COMM) -> () {
-        println!("\nhit remove_bindings_for");
+        // println!("\nhit remove_bindings_for");
 
-        let mut updated_replays = self
-            .replay_data
-            .remove_binding(IOEvent::Consume(comm_ref.clone().consume), comm_ref.clone());
+        let mut updated_replays = remove_binding(
+            self.replay_data.clone(),
+            IOEvent::Consume(comm_ref.clone().consume),
+            comm_ref.clone(),
+        );
 
         for produce_ref in comm_ref.produces.iter() {
-            updated_replays = updated_replays
-                .remove_binding(IOEvent::Produce(produce_ref.clone()), comm_ref.clone());
+            updated_replays = remove_binding(
+                updated_replays,
+                IOEvent::Produce(produce_ref.clone()),
+                comm_ref.clone(),
+            );
         }
     }
 

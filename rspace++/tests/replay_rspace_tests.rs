@@ -1,24 +1,15 @@
-use rspace_plus_plus::rspace::history::history_repository::{
-    HistoryRepository, HistoryRepositoryInstances,
-};
-use rspace_plus_plus::rspace::hot_store::{HotStore, HotStoreInstances, HotStoreState};
-use rspace_plus_plus::rspace::hot_store_action::{
-    HotStoreAction, InsertAction, InsertContinuations, InsertData,
-};
+use rspace_plus_plus::rspace::history::history_repository::HistoryRepositoryInstances;
+use rspace_plus_plus::rspace::hot_store::{HotStoreInstances, HotStoreState};
+use rspace_plus_plus::rspace::hot_store_action::HotStoreAction;
 use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
-use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
-use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
-use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-use rspace_plus_plus::rspace::trace::event::Consume;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
-use tokio::runtime::Runtime;
 
 // See rspace/src/test/scala/coop/rchain/rspace/ReplayRSpaceTests.scala
 
@@ -60,13 +51,6 @@ pub fn filter_enum_variants<C: Clone, P: Clone, A: Clone, K: Clone, V>(
     variant: fn(HotStoreAction<C, P, A, K>) -> Option<V>,
 ) -> Vec<V> {
     vec.into_iter().filter_map(variant).collect()
-}
-
-async fn create_rspace() -> RSpace<String, Pattern, String, String, StringMatch> {
-    let mut kvm = InMemoryStoreManager::new();
-    let store = kvm.r_space_stores().await.unwrap();
-
-    RSpaceInstances::create(store, StringMatch).unwrap()
 }
 
 #[tokio::test]
@@ -138,24 +122,21 @@ async fn creating_a_comm_event_should_replay_correctly() {
     );
     let replay_result_produce =
         replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
-    // let final_point = replay_space.replay_create_checkpoint().unwrap();
+    let final_point = replay_space.replay_create_checkpoint().unwrap();
 
-    // assert!(replay_result_consume.is_none());
-    // assert_eq!(replay_result_produce.clone().unwrap().0, result_produce.clone().unwrap().0);
-    // assert_eq!(replay_result_produce.unwrap().1, result_produce.unwrap().1);
-    // assert_eq!(final_point.root, rig_point.root);
-    // assert!(replay_space.replay_data.is_empty());
+    assert!(replay_result_consume.is_none());
+    assert_eq!(replay_result_produce.clone().unwrap().0, result_produce.clone().unwrap().0);
+    assert_eq!(replay_result_produce.unwrap().1, result_produce.unwrap().1);
+    assert_eq!(final_point.root, rig_point.root);
+    assert!(replay_space.replay_data.is_empty());
 }
 
 type StateSetup = (
-    // Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
-    // Arc<Box<dyn HotStore<String, Pattern, String, String>>>,
     RSpace<String, Pattern, String, String, StringMatch>,
     RSpace<String, Pattern, String, String, StringMatch>,
 );
 
 async fn fixture() -> StateSetup {
-    // let mut kvm = mk_rspace_store_manager("./lmdb/".into(), 1 * GB);
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
 
@@ -189,6 +170,5 @@ async fn fixture() -> StateSetup {
     let replay_rspace: RSpace<String, Pattern, String, String, StringMatch> =
         RSpaceInstances::apply(history_repo, replay_store, StringMatch);
 
-    // (hot_store, replay_store, rspace, replay_rspace)
     (rspace, replay_rspace)
 }

@@ -257,20 +257,17 @@ where
         }
     }
 
-    pub fn add_binding(&self, k: K, v: V) -> &Self {
-        let mut entry = self.map.entry(k).or_insert_with(Counter::new);
-        entry.insert(v, 1);
-        self
-    }
-
-    pub fn remove_binding(&self, k: K, v: V) -> &Self {
-        if let Some(mut entry) = self.map.get_mut(&k) {
-            entry.remove(&v);
-            if entry.is_empty() {
-                self.map.remove(&k);
+    pub fn add_binding(&self, k: K, v: V) {
+        match self.map.get_mut(&k) {
+            Some(mut current) => {
+                current.insert(v, 1);
+            }
+            None => {
+                let mut ms = Counter::new();
+                ms.insert(v, 1);
+                self.map.insert(k, ms);
             }
         }
-        self
     }
 
     pub fn clear(&self) {
@@ -280,4 +277,26 @@ where
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
+}
+
+// This functions is separate from impl because of deadlocking
+pub fn remove_binding<K: Hash + Eq, V: Hash + Eq>(
+    ms: MultisetMultiMap<K, V>,
+    k: K,
+    v: V,
+) -> MultisetMultiMap<K, V> {
+    let mut should_remove_key = false;
+
+    if let Some(mut current) = ms.map.get_mut(&k) {
+        current.remove(&v);
+        if current.is_empty() {
+            should_remove_key = true;
+        }
+    }
+
+    if should_remove_key {
+        ms.map.remove(&k);
+    }
+
+    ms
 }
