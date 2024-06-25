@@ -45,7 +45,7 @@ where
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
     produce_counter: HashMap<Produce, i32>,
-    replay_data: MultisetMultiMap<IOEvent, COMM>,
+    pub replay_data: MultisetMultiMap<IOEvent, COMM>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
@@ -663,6 +663,8 @@ where
         _consume_ref: Consume,
         data_candidates: Vec<ConsumeCandidate<C, A>>,
     ) -> MaybeActionResult<C, P, A, K> {
+        println!("\nhit wrap_result");
+
         let cont_result = ContResult {
             continuation: wk.continuation,
             persistent: wk.persist,
@@ -929,14 +931,14 @@ where
         data: A,
         persist: bool,
     ) -> MaybeActionResult<C, P, A, K> {
-        // println!("\nHit produce");
+        println!("\nHit replay_produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
         // println!("\n\nHit produce, channel: {:?}", channel);
 
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
         let result = self.replay_locked_produce(channel, data, persist, produce_ref);
-        // println!("\nlocked_produce result: {:?}", result);
+        println!("\nreplay_locked_produce result: {:?}", result);
         result
     }
 
@@ -947,9 +949,9 @@ where
         persist: bool,
         produce_ref: Produce,
     ) -> MaybeActionResult<C, P, A, K> {
-        // println!("\nHit locked_produce");
+        println!("\nHit replay_locked_produce");
+
         let grouped_channels = self.store.get_joins(channel.clone());
-        // println!("\ngrouped_channels: {:?}", grouped_channels);
         // println!(
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
         //     grouped_channels
@@ -1074,6 +1076,8 @@ where
         pc: ProduceCandidate<C, P, A, K>,
         comms: Vec<COMM>,
     ) -> MaybeActionResult<C, P, A, K> {
+        println!("\nhit handle_match");
+
         let ProduceCandidate {
             channels,
             continuation,
@@ -1116,12 +1120,14 @@ where
         };
 
         self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
-        println!("produce: matching continuation found at <channels: {:?}>", channels);
+        // println!("produce: matching continuation found at <channels: {:?}>", channels);
         self.remove_bindings_for(comm_ref);
         self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
     }
 
     fn remove_bindings_for(&self, comm_ref: COMM) -> () {
+        println!("\nhit remove_bindings_for");
+
         let mut updated_replays = self
             .replay_data
             .remove_binding(IOEvent::Consume(comm_ref.clone().consume), comm_ref.clone());
@@ -1243,6 +1249,12 @@ where
     }
 
     /* IReplayRSpace */
+
+    pub fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> () {
+        self.rig(log);
+        let reset_result = self.reset(start_root);
+        assert!(reset_result.is_ok(), "Failed to reset in 'rig_and_reset'")
+    }
 
     pub fn rig(&self, log: Log) -> () {
         let (io_events, comm_events): (Vec<_>, Vec<_>) =

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use super::trace::event::{Consume, Produce};
 
 // See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct RSpaceResult<C, A> {
     pub channel: C,
     pub matched_datum: A,
@@ -26,6 +26,24 @@ pub struct ContResult<C, P, K> {
     pub channels: Vec<C>,
     pub patterns: Vec<P>,
     pub peek: bool,
+}
+
+impl<C: Eq, P: Eq, K: Eq + Clone> PartialEq for ContResult<C, P, K> {
+    fn eq(&self, other: &ContResult<C, P, K>) -> bool {
+        let self_cont = self.continuation.lock().unwrap();
+        let self_cont_cloned = self_cont.clone();
+        drop(self_cont);
+
+        let other_cont = other.continuation.lock().unwrap();
+        let other_cont_cloned = other_cont.clone();
+        drop(other_cont);
+
+        self.persistent == other.persistent
+            && self.channels == other.channels
+            && self.patterns == other.patterns
+            && self.peek == other.peek
+            && self_cont_cloned == other_cont_cloned
+    }
 }
 
 impl<C: Serialize, P: Serialize, K: Serialize> Serialize for ContResult<C, P, K> {
