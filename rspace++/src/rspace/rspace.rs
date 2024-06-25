@@ -875,12 +875,12 @@ where
                             )
                         );
 
-                        self.store_persistent_data(data_candidates.clone(), &peeks);
+                        let _ = self.store_persistent_data(data_candidates.clone(), &peeks);
                         // println!(
                         //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
                         //     patterns, channels
                         // );
-                        self.remove_bindings_for(comm_ref);
+                        let _ = self.remove_bindings_for(comm_ref);
                         self.wrap_result(channels, wk, consume_ref, data_candidates)
                     }
                 }
