@@ -1,7 +1,7 @@
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository::HistoryRepositoryInstances;
 use rspace_plus_plus::rspace::hot_store::{HotStoreInstances, HotStoreState};
-use rspace_plus_plus::rspace::hot_store_action::HotStoreAction;
+use rspace_plus_plus::rspace::hot_store_action::{HotStoreAction, InsertAction};
 use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
 use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
@@ -337,6 +337,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     let final_point = replay_space.replay_create_checkpoint().unwrap();
 
     assert_eq!(final_point.root, rig_point.root);
+    println!("\nreplay_data: {:?}", replay_space.replay_data.map.len());
     assert!(replay_space.replay_data.is_empty());
 }
 
@@ -959,6 +960,7 @@ async fn peeking_data_stored_at_two_channels_in_100_continuations_should_replay_
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn replay_rspace_should_correctly_remove_things_from_replay_data() {
     let (mut space, mut replay_space) = fixture().await;
@@ -1001,7 +1003,7 @@ async fn replay_rspace_should_correctly_remove_things_from_replay_data() {
     );
 
     for _ in 0..2 {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             channels.clone(),
             patterns.clone(),
             continuation.clone(),
@@ -1010,7 +1012,7 @@ async fn replay_rspace_should_correctly_remove_things_from_replay_data() {
         );
     }
 
-    let _ = replay_space.produce(channels[0].clone(), datum.clone(), false);
+    let _ = replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
 
     assert_eq!(
         replay_space
@@ -1022,7 +1024,7 @@ async fn replay_rspace_should_correctly_remove_things_from_replay_data() {
         1
     );
 
-    let _ = replay_space.produce(channels[0].clone(), datum.clone(), false);
+    let _ = replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
 
     assert!(replay_space
         .replay_data
@@ -1097,7 +1099,7 @@ async fn reset_should_empty_the_replay_store_and_reset_the_replay_trie_updates_l
 
     let _ = replay_space.rig_and_reset(empty_point.root.clone(), rig_point.log);
 
-    let consume2 = replay_space.consume(
+    let consume2 = replay_space.replay_consume(
         channels.clone(),
         patterns.clone(),
         continuation.clone(),
@@ -1106,7 +1108,7 @@ async fn reset_should_empty_the_replay_store_and_reset_the_replay_trie_updates_l
     );
     assert!(consume2.is_none());
 
-    assert!(replay_space.store.is_empty());
+    assert!(!replay_space.store.is_empty());
 
     let _ = replay_space.reset(empty_point.root);
     assert!(replay_space.store.is_empty());
@@ -1116,6 +1118,7 @@ async fn reset_should_empty_the_replay_store_and_reset_the_replay_trie_updates_l
     assert!(checkpoint1.log.is_empty());
 }
 
+//
 #[tokio::test]
 async fn clear_should_empty_the_replay_store_reset_the_replay_event_log_reset_the_replay_trie_updates_log_and_reset_the_replay_data(
 ) {
@@ -1126,26 +1129,49 @@ async fn clear_should_empty_the_replay_store_reset_the_replay_event_log_reset_th
     let continuation = "continuation".to_string();
 
     let empty_point = space.create_checkpoint().unwrap();
-    let result_consume = space.consume(
+    let consume1 = space.consume(
         channels.clone(),
         patterns.clone(),
         continuation.clone(),
         false,
         BTreeSet::new(),
     );
-    assert!(result_consume.is_none());
+    assert!(consume1.is_none());
 
     let rig_point = space.create_checkpoint().unwrap();
     let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
-    let replay_result_consume = replay_space.replay_consume(
+    let consume2 = replay_space.replay_consume(
         channels.clone(),
         patterns.clone(),
         continuation.clone(),
         false,
         BTreeSet::new(),
     );
-    assert!(replay_result_consume.is_none());
-    assert!(replay_space.store.is_empty());
+    assert!(consume2.is_none());
+    assert!(!replay_space.store.is_empty());
+    assert_eq!(
+        replay_space
+            .store
+            .changes()
+            .into_iter()
+            .filter_map(|action| {
+                if let HotStoreAction::Insert(insert) = action {
+                    if let InsertAction::InsertContinuations(conts) = insert {
+                        Some(conts)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
+
+    let checkpoint0 = replay_space.replay_create_checkpoint().unwrap();
+    assert!(checkpoint0.log.is_empty()); // we don't record trace logs in ReplayRspace
 
     let _ = replay_space.clear();
     assert!(replay_space.store.is_empty());
@@ -1203,12 +1229,14 @@ async fn replay_should_not_allow_for_ambiguous_executions() {
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn check_replay_data_should_proceed_if_replay_data_is_empty() {
     let (_space, replay_space) = fixture().await;
     replay_space.check_replay_data();
 }
 
+//
 #[tokio::test]
 #[should_panic(expected = "Unused COMM event: replayData multimap has 2 elements left")]
 async fn check_replay_data_should_panic_if_replay_data_contains_elements() {
