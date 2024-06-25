@@ -1327,12 +1327,13 @@ where
     pub fn check_replay_data(&self) -> () {
         if self.replay_data.is_empty() {
         } else {
-            let msg = format!(
-                "Unused COMM event: replayData multimap has {} elements left",
-                self.replay_data.map.len()
+            panic!(
+                "{}",
+                format!(
+                    "Unused COMM event: replayData multimap has {} elements left",
+                    self.replay_data.map.len()
+                )
             );
-            println!("{}", msg);
-            panic!("{:?}", self.replay_data);
         }
     }
 
