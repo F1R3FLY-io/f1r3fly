@@ -46,14 +46,20 @@ impl COMM {
             .map(|candidate| candidate.datum.source)
             .collect();
 
+        // produce_refs.sort_by(|a, b| {
+        //     let a_cloned = a.clone();
+        //     let b_cloned = b.clone();
+        //     (a_cloned.channel_hash, a_cloned.hash, a.persistent).cmp(&(
+        //         b_cloned.channel_hash,
+        //         b_cloned.hash,
+        //         b.persistent,
+        //     ))
+        // });
         produce_refs.sort_by(|a, b| {
-            let a_cloned = a.clone();
-            let b_cloned = b.clone();
-            (a_cloned.channel_hash, a_cloned.hash, a.persistent).cmp(&(
-                b_cloned.channel_hash,
-                b_cloned.hash,
-                b.persistent,
-            ))
+            a.channel_hash
+                .cmp(&b.channel_hash)
+                .then_with(|| a.hash.cmp(&b.hash))
+                .then_with(|| a.persistent.cmp(&b.persistent))
         });
         // produce_refs.sort_by_key(|p| {
         //     let p_cloned = p.clone();

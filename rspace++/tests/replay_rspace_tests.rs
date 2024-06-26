@@ -294,7 +294,6 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     assert!(result_consume3.is_none());
     assert!(result_produce4.is_some());
 
-    println!("\nrig_point.log: {:?}", rig_point.log);
     let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let replay_result_consume1 = replay_space.replay_consume(
@@ -496,12 +495,14 @@ async fn creating_multiple_comm_events_with_peeking_a_produce_should_replay_corr
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.produce("ch1".to_string(), format!("datum{}", i), false);
     }
@@ -520,15 +521,15 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
     }
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.consume(
+        let result = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -545,19 +546,110 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     assert!(replay_space.replay_data.is_empty());
 }
 
-// TODO:
+// TODO: Update test parameters
 #[tokio::test]
 async fn a_matched_continuation_defined_for_multiple_channels_some_peeked_should_replay_correctly()
 {
     let (mut space, mut replay_space) = fixture().await;
+
+    let amount_of_channels = 10;
+    let amount_of_peeked_channels = 5;
+
+    let channels: Vec<String> = (0..amount_of_channels)
+        .map(|i| format!("channel{}", i))
+        .collect();
+    let patterns: Vec<Pattern> = channels.iter().map(|_| Pattern::Wildcard).collect();
+    let continuation = "continuation".to_string();
+    let peeks: BTreeSet<i32> = (0..amount_of_peeked_channels).collect();
+    let produces: Vec<String> = channels.clone();
+
+    fn consume_and_produce(
+        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        channels: &Vec<String>,
+        patterns: &Vec<Pattern>,
+        continuation: &String,
+        peeks: &BTreeSet<i32>,
+        produces: &Vec<String>,
+    ) -> Vec<Option<(ContResult<String, Pattern, String>, Vec<RSpaceResult<String, String>>)>> {
+        let mut results = vec![];
+        let result = space.consume(
+            channels.clone(),
+            patterns.clone(),
+            continuation.clone(),
+            false,
+            peeks.clone(),
+        );
+        results.push(result);
+        for ch in produces {
+            let result = space.produce(ch.clone(), format!("datum-{}", ch), false);
+            results.push(result);
+        }
+        results
+    }
+
+    fn replay_consume_and_produce(
+        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        channels: &Vec<String>,
+        patterns: &Vec<Pattern>,
+        continuation: &String,
+        peeks: &BTreeSet<i32>,
+        produces: &Vec<String>,
+    ) -> Vec<Option<(ContResult<String, Pattern, String>, Vec<RSpaceResult<String, String>>)>> {
+        let mut results = vec![];
+        let result = space.replay_consume(
+            channels.clone(),
+            patterns.clone(),
+            continuation.clone(),
+            false,
+            peeks.clone(),
+        );
+        results.push(result);
+        for ch in produces {
+            let result = space.replay_produce(ch.clone(), format!("datum-{}", ch), false);
+            results.push(result);
+        }
+        results
+    }
+
+    let empty_point = space.create_checkpoint().unwrap();
+    let rs =
+        consume_and_produce(&mut space, &channels, &patterns, &continuation, &peeks, &produces);
+    assert_eq!(rs.iter().flatten().count(), 1);
+
+    for i in 0..amount_of_channels {
+        let ch = format!("channel{}", i);
+        let data = space.store.get_data(&ch);
+        if !peeks.contains(&i) {
+            assert_eq!(data.len(), 0);
+        }
+    }
+
+    let rig_point = space.create_checkpoint().unwrap();
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
+
+    let rrs = replay_consume_and_produce(
+        &mut replay_space,
+        &channels,
+        &patterns,
+        &continuation,
+        &peeks,
+        &produces,
+    );
+    let final_point = replay_space.replay_create_checkpoint().unwrap();
+
+    assert_eq!(rs, rrs);
+    assert_eq!(final_point.root, rig_point.root);
+    assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn picking_n_datums_from_m_persistent_waiting_datums_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.produce("ch1".to_string(), format!("datum{}", i), true);
     }
@@ -576,15 +668,15 @@ async fn picking_n_datums_from_m_persistent_waiting_datums_should_replay_correct
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), true);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), true);
     }
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.consume(
+        let result = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -605,8 +697,8 @@ async fn picking_n_datums_from_m_persistent_waiting_datums_should_replay_correct
 async fn picking_n_continuations_from_m_waiting_continuations_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
 
+    let empty_point = space.create_checkpoint().unwrap();
     let range = (1..10).collect::<Vec<_>>();
-
     for i in &range {
         let _ = space.consume(
             vec!["ch1".to_string()],
@@ -625,10 +717,10 @@ async fn picking_n_continuations_from_m_waiting_continuations_should_replay_corr
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -639,7 +731,7 @@ async fn picking_n_continuations_from_m_waiting_continuations_should_replay_corr
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let result = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
         replay_results.push(result);
     }
 
@@ -650,12 +742,14 @@ async fn picking_n_continuations_from_m_waiting_continuations_should_replay_corr
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn picking_n_continuations_from_m_persistent_waiting_continuations_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.consume(
             vec!["ch1".to_string()],
@@ -674,7 +768,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_should_
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.replay_consume(
@@ -704,8 +798,9 @@ async fn pick_n_continuations_from_m_waiting_continuations_stored_at_two_channel
 ) {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.consume(
             vec!["ch1".to_string(), "ch2".to_string()],
@@ -728,10 +823,10 @@ async fn pick_n_continuations_from_m_waiting_continuations_stored_at_two_channel
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec!["ch1".to_string(), "ch2".to_string()],
             vec![Pattern::Wildcard, Pattern::Wildcard],
             format!("continuation{}", i),
@@ -741,12 +836,12 @@ async fn pick_n_continuations_from_m_waiting_continuations_stored_at_two_channel
     }
 
     for i in &range {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
     }
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.produce("ch2".to_string(), format!("datum{}", i), false);
+        let result = replay_space.replay_produce("ch2".to_string(), format!("datum{}", i), false);
         replay_results.push(result);
     }
 
@@ -757,13 +852,15 @@ async fn pick_n_continuations_from_m_waiting_continuations_stored_at_two_channel
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn picking_n_datums_from_m_waiting_datums_while_doing_a_bunch_of_other_junk_should_replay_correctly(
 ) {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.produce("ch1".to_string(), format!("datum{}", i), false);
     }
@@ -796,14 +893,14 @@ async fn picking_n_datums_from_m_waiting_datums_while_doing_a_bunch_of_other_jun
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
     }
 
     for i in 11..20 {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec![format!("ch{}", i)],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -813,12 +910,12 @@ async fn picking_n_datums_from_m_waiting_datums_while_doing_a_bunch_of_other_jun
     }
 
     for i in 21..30 {
-        let _ = replay_space.produce(format!("ch{}", i), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce(format!("ch{}", i), format!("datum{}", i), false);
     }
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.consume(
+        let result = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -835,13 +932,15 @@ async fn picking_n_datums_from_m_waiting_datums_while_doing_a_bunch_of_other_jun
     assert!(replay_space.replay_data.is_empty());
 }
 
+//
 #[tokio::test]
 async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_doing_a_bunch_of_other_junk_should_replay_correctly(
 ) {
     let (mut space, mut replay_space) = fixture().await;
 
-    let range = (1..10).collect::<Vec<_>>();
+    let empty_point = space.create_checkpoint().unwrap();
 
+    let range = (1..10).collect::<Vec<_>>();
     for i in &range {
         let _ = space.consume(
             vec![format!("ch{}", i)],
@@ -874,10 +973,10 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_d
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec![format!("ch{}", i)],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -887,11 +986,11 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_d
     }
 
     for i in 11..20 {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
     }
 
     for i in 21..30 {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -902,7 +1001,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_d
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.produce(format!("ch{}", i), format!("datum{}", i), false);
+        let result = replay_space.replay_produce(format!("ch{}", i), format!("datum{}", i), false);
         replay_results.push(result);
     }
 
@@ -916,6 +1015,8 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_d
 #[tokio::test]
 async fn peeking_data_stored_at_two_channels_in_100_continuations_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
+
+    let empty_point = space.create_checkpoint().unwrap();
 
     let range1 = (0..100).collect::<Vec<_>>();
     let range2 = (0..3).collect::<Vec<_>>();
@@ -943,19 +1044,19 @@ async fn peeking_data_stored_at_two_channels_in_100_continuations_should_replay_
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range2 {
-        let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
     }
 
     for i in &range3 {
-        let _ = replay_space.produce("ch2".to_string(), format!("datum{}", i), false);
+        let _ = replay_space.replay_produce("ch2".to_string(), format!("datum{}", i), false);
     }
 
     let mut replay_results = vec![];
     for i in &range1 {
-        let result = replay_space.consume(
+        let result = replay_space.replay_consume(
             vec!["ch1".to_string(), "ch2".to_string()],
             vec![Pattern::Wildcard, Pattern::Wildcard],
             format!("continuation{}", i),
