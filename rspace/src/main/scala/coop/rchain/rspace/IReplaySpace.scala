@@ -52,7 +52,8 @@ trait IReplaySpace[F[_], C, P, A, K] extends ISpace[F, C, P, A, K] {
         }
       }
 
-  def checkReplayData()(implicit syncF: Sync[F]): F[Unit] =
+  def checkReplayData()(implicit syncF: Sync[F]): F[Unit] = {
+    println("\nhit check replay data");
     syncF
       .delay(replayData.isEmpty)
       .ifM(
@@ -65,5 +66,6 @@ trait IReplaySpace[F[_], C, P, A, K] extends ISpace[F, C, P, A, K] {
           )
         }
       )
+  }
 
 }

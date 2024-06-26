@@ -250,6 +250,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     let datum = "datum1".to_string();
 
     let empty_point = space.create_checkpoint().unwrap();
+
     let result_consume1 = space.consume(
         channels.clone(),
         patterns.clone(),
@@ -257,9 +258,11 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::from([0]),
     );
+
     let result_produce1 = space.produce(channels[1].clone(), datum.clone(), false);
     let result_produce2 = space.produce(channels[0].clone(), datum.clone(), false);
     let _result_produce2a = space.produce(channels[0].clone(), datum.clone(), false);
+
     let result_consume2 = space.consume(
         channels.clone(),
         patterns.clone(),
@@ -267,8 +270,10 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::from([1]),
     );
+
     let result_produce3 = space.produce(channels[1].clone(), datum.clone(), false);
     let _result_produce3a = space.produce(channels[1].clone(), datum.clone(), false);
+
     let result_consume3 = space.consume(
         channels.clone(),
         patterns.clone(),
@@ -276,6 +281,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::new(),
     );
+
     let result_produce4 = space.produce(channels[0].clone(), datum.clone(), false);
 
     let rig_point = space.create_checkpoint().unwrap();
@@ -288,6 +294,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     assert!(result_consume3.is_none());
     assert!(result_produce4.is_some());
 
+    println!("\nrig_point.log: {:?}", rig_point.log);
     let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let replay_result_consume1 = replay_space.replay_consume(
@@ -297,12 +304,14 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::from([0]),
     );
+
     let replay_result_produce1 =
         replay_space.replay_produce(channels[1].clone(), datum.clone(), false);
     let replay_result_produce2 =
         replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
     let replay_result_produce2a =
         replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
+
     let replay_result_consume2 = replay_space.replay_consume(
         channels.clone(),
         patterns.clone(),
@@ -310,10 +319,12 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::from([1]),
     );
+
     let replay_result_produce3 =
         replay_space.replay_produce(channels[1].clone(), datum.clone(), false);
     let replay_result_produce3a =
         replay_space.replay_produce(channels[1].clone(), datum.clone(), false);
+
     let replay_result_consume3 = replay_space.replay_consume(
         channels.clone(),
         patterns.clone(),
@@ -321,6 +332,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
         false,
         BTreeSet::new(),
     );
+
     let replay_result_produce4 =
         replay_space.replay_produce(channels[0].clone(), datum.clone(), false);
 
@@ -665,7 +677,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_should_
     let _ = replay_space.rig_and_reset(rig_point.root.clone(), rig_point.log);
 
     for i in &range {
-        let _ = replay_space.consume(
+        let _ = replay_space.replay_consume(
             vec!["ch1".to_string()],
             vec![Pattern::Wildcard],
             format!("continuation{}", i),
@@ -676,7 +688,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_should_
 
     let mut replay_results = vec![];
     for i in &range {
-        let result = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
+        let result = replay_space.replay_produce("ch1".to_string(), format!("datum{}", i), false);
         replay_results.push(result);
     }
 

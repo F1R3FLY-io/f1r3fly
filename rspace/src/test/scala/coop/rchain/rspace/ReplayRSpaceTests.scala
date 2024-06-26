@@ -262,6 +262,7 @@ trait ReplayRSpaceTests extends ReplayRSpaceTestsBase[String, Pattern, String, S
         _ = resultConsume3 shouldBe None
         _ = resultProduce4 shouldBe defined
 
+        _ = println("\nrig_point.log: " + rigPoint.log);
         _ <- replaySpace.rigAndReset(emptyPoint.root, rigPoint.log)
 
         replayConsume1 <- replaySpace.consume(

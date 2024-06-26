@@ -1164,6 +1164,9 @@ where
 
     pub fn replay_create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
         // println!("\nhit rspace++ create_checkpoint");
+
+        self.check_replay_data();
+
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = Arc::new(next_history);
