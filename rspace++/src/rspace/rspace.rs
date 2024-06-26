@@ -24,6 +24,7 @@ use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
@@ -63,7 +64,7 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     M: Clone + Match<P, A>,
 {
-    fn produce_counters(&self, produce_refs: Vec<Produce>) -> HashMap<Produce, i32> {
+    fn produce_counters(&self, produce_refs: Vec<Produce>) -> BTreeMap<Produce, i32> {
         produce_refs
             .into_iter()
             .map(|p| (p.clone(), self.produce_counter.get(&p).unwrap_or(&0).clone()))

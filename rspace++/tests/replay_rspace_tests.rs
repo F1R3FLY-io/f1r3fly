@@ -9,8 +9,7 @@ use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::trace::event::{Consume, IOEvent};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashSet};
-use std::hash::Hash;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 // See rspace/src/test/scala/coop/rchain/rspace/ReplayRSpaceTests.scala
@@ -39,20 +38,6 @@ impl Match<Pattern, String> for StringMatch {
             }
         }
     }
-}
-
-// We only care that both vectors contain the same elements, not their ordering
-fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
-    let set1: HashSet<_> = vec1.into_iter().collect();
-    let set2: HashSet<_> = vec2.into_iter().collect();
-    set1 == set2
-}
-
-pub fn filter_enum_variants<C: Clone, P: Clone, A: Clone, K: Clone, V>(
-    vec: Vec<HotStoreAction<C, P, A, K>>,
-    variant: fn(HotStoreAction<C, P, A, K>) -> Option<V>,
-) -> Vec<V> {
-    vec.into_iter().filter_map(variant).collect()
 }
 
 #[tokio::test]
@@ -239,7 +224,6 @@ async fn creating_a_comm_event_with_peek_produce_first_should_replay_correctly()
     assert!(replay_space.replay_data.is_empty());
 }
 
-// This fails
 #[tokio::test]
 async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly() {
     let (mut space, mut replay_space) = fixture().await;
@@ -348,7 +332,6 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     let final_point = replay_space.replay_create_checkpoint().unwrap();
 
     assert_eq!(final_point.root, rig_point.root);
-    println!("\nreplay_data: {:?}", replay_space.replay_data.map.len());
     assert!(replay_space.replay_data.is_empty());
 }
 

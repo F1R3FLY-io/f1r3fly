@@ -7,11 +7,8 @@ use crate::rspace::{
 };
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
-use std::{
-    collections::{BTreeSet, HashMap},
-    hash::Hasher,
-};
+use std::{collections::BTreeMap, hash::Hash};
+use std::{collections::BTreeSet, hash::Hasher};
 
 // See rspace/src/main/scala/coop/rchain/rspace/trace/Event.scala
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -31,7 +28,7 @@ pub struct COMM {
     pub consume: Consume,
     pub produces: Vec<Produce>,
     pub peeks: BTreeSet<i32>,
-    pub times_repeated: HashMap<Produce, i32>,
+    pub times_repeated: BTreeMap<Produce, i32>,
 }
 
 impl COMM {
@@ -39,7 +36,7 @@ impl COMM {
         data_candidates: Vec<ConsumeCandidate<C, A>>,
         consume_ref: Consume,
         peeks: BTreeSet<i32>,
-        produce_counters: impl Fn(Vec<Produce>) -> HashMap<Produce, i32>,
+        produce_counters: impl Fn(Vec<Produce>) -> BTreeMap<Produce, i32>,
     ) -> Self {
         let mut produce_refs: Vec<Produce> = data_candidates
             .into_iter()
@@ -91,7 +88,19 @@ impl Hash for COMM {
 
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
 // The 'Default' macro is needed here for hot_store_spec.rs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary, Default)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    Arbitrary,
+    Default,
+    Ord,
+    PartialOrd
+)]
 pub struct Produce {
     pub channel_hash: Blake2b256Hash,
     pub hash: Blake2b256Hash,
