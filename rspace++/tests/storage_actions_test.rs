@@ -9,8 +9,6 @@ use rspace_plus_plus::rspace::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
-use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
-use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::trace::event::Consume;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
@@ -1427,8 +1425,8 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
     // put some data so the checkpoint is != empty
     let _ = rspace.consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default());
 
-    let _checkpoint0 = rspace.create_checkpoint().unwrap();
-    // _checkpoint0 log should not be empty
+    let checkpoint0 = rspace.create_checkpoint().unwrap();
+    assert!(!checkpoint0.log.is_empty());
     let _ = rspace.create_checkpoint().unwrap();
 
     // force clearing of trie store state
@@ -1436,7 +1434,7 @@ async fn clear_should_reset_to_the_same_hash_on_multiple_runs() {
 
     // the checkpointing mechanism should not interfere with the empty root
     let checkpoint2 = rspace.create_checkpoint().unwrap();
-    // checkpoint2 log should be empty
+    assert!(checkpoint2.log.is_empty());
     assert_eq!(checkpoint2.root, empty_checkpoint.root);
 }
 
@@ -1490,8 +1488,8 @@ async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_l
     assert!(reset_changes.is_empty());
     assert_eq!(reset_changes.len(), 0);
 
-    let _checkpoint1 = rspace.create_checkpoint().unwrap();
-    // checkpoint1 log should be empty
+    let checkpoint1 = rspace.create_checkpoint().unwrap();
+    assert!(checkpoint1.log.is_empty());
 }
 
 #[tokio::test]
@@ -1716,7 +1714,27 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
 
 #[tokio::test]
 async fn create_soft_checkpoint_should_clear_the_event_log() {
-    // TODO when log is implemented
+    let mut rspace = create_rspace().await;
+    let channel = "ch1".to_string();
+    let channels = vec![channel.clone()];
+    let patterns = vec![Pattern::Wildcard];
+    let continuation = StringsCaptor::new();
+
+    // do an operation
+    let _ = rspace.consume(
+        channels.clone(),
+        patterns.clone(),
+        continuation.clone(),
+        false,
+        BTreeSet::default(),
+    );
+
+    // create a soft checkpoint
+    let s1 = rspace.create_soft_checkpoint();
+    assert!(!s1.log.is_empty());
+
+    let s2 = rspace.create_soft_checkpoint();
+    assert!(s2.log.is_empty());
 }
 
 #[tokio::test]
@@ -1768,5 +1786,27 @@ async fn revert_to_soft_checkpoint_should_revert_the_state_of_the_store_to_the_g
 
 #[tokio::test]
 async fn revert_to_soft_checkpoint_should_inject_the_event_log() {
-    // TODO when log is implemented
+    let mut rspace = create_rspace().await;
+
+    let channel = "ch1".to_string();
+    let channels = vec![channel.clone()];
+    let patterns = vec![Pattern::Wildcard];
+    let continuation = StringsCaptor::new();
+
+    let _ = rspace.consume(
+        channels.clone(),
+        patterns.clone(),
+        continuation.clone(),
+        false,
+        BTreeSet::new(),
+    );
+    let s1 = rspace.create_soft_checkpoint();
+    let _ = rspace.consume(channels, patterns, continuation, true, BTreeSet::new());
+    let s2 = rspace.create_soft_checkpoint();
+
+    assert_ne!(s2.log, s1.log);
+
+    let _ = rspace.revert_to_soft_checkpoint(s1.clone());
+    let s3 = rspace.create_soft_checkpoint();
+    assert_eq!(s3.log, s1.log);
 }
