@@ -121,6 +121,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                      INSTANCE.deallocate_memory(consumeResultPtr, resultByteslength)
                    }
                  } else {
+                   //  println("\nreturning None because ptr was null")
                    None
                  }
                }
@@ -222,6 +223,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                      //      .fromByteArray(checkpointRoot.toByteArray)
                      //  )
 
+                     //TODO: No need to parse log here as it will always be empty
                      val checkpointLogProto = checkpointProto.log
                      val checkpointLog = checkpointLogProto.map {
                        case eventProto if eventProto.eventType.isComm =>
@@ -281,7 +283,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                          throw new RuntimeException("Unknown Event type")
                      }
 
-                     //  println("\n log: " + checkpointLog)
+                     //  println("\n log in replayCreateCheckpoint: " + checkpointLog.length)
 
                      Checkpoint(
                        root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),

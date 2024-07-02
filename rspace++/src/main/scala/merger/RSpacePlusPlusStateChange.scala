@@ -19,6 +19,7 @@ import scodec.bits.ByteVector
 import coop.rchain.rspace.merger.ChannelChange
 import coop.rchain.rspace.merger.EventLogIndex
 import rspacePlusPlus.history.RSpacePlusPlusHistoryReaderBinary
+import rspacePlusPlus.JNAInterfaceLoader
 
 // See rspace/src/main/scala/coop/rchain/rspace/merger/StateChange.scala
 /**
@@ -114,8 +115,10 @@ object RSpacePlusPlusStateChange {
               "join record corresponding to the consume channels."
             rawJoin <- (pre ++ post)
                         .find { j =>
+                          // val joinsChannels =
+                          //   j.decoded.toList.map(StableHashProvider.hash(_)(serializeC))
                           val joinsChannels =
-                            j.decoded.toList.map(StableHashProvider.hash(_)(serializeC))
+                            j.decoded.toList.map(JNAInterfaceLoader.hashChannel(_))
                           // sorting is required because channels of a consume in event log and channels of a join in
                           // history might not be ordered the same way
                           consumeChannels.sorted == joinsChannels.sorted

@@ -2,6 +2,7 @@ use dashmap::DashMap;
 use prost::Message;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use rspace_plus_plus::rspace::hashing::stable_hash_provider::hash;
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
@@ -14,7 +15,7 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
-    EventProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
+    EventProto, HashProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
     ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
@@ -1685,6 +1686,22 @@ pub extern "C" fn check_replay_data(rspace: *mut Space) -> () {
 }
 
 /* Helper Functions */
+
+#[no_mangle]
+pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: usize) -> *const u8 {
+    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
+    let channel = Par::decode(channel_slice).unwrap();
+
+    let hash = hash(&channel);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
 
 #[no_mangle]
 pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {

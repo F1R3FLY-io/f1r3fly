@@ -1,7 +1,9 @@
 package rspacePlusPlus
 
-import com.sun.jna.{Library, Native, Pointer}
+import com.sun.jna.{Library, Memory, Native, Pointer}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+import coop.rchain.rspace.hashing.Blake2b256Hash
+import coop.rchain.models.rspace_plus_plus_types.HashProto
 
 /**
   * The JNA interface for Rust RSpace++
@@ -126,11 +128,61 @@ trait JNAInterface extends Library {
 
   /* Helper Functions */
 
+  def hash_channel(channel_pointer: Pointer, channel_bytes_len: Int): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
+}
+
+trait ByteArrayConvertible {
+  def toByteArray: Array[Byte]
 }
 
 object JNAInterfaceLoader {
   val INSTANCE: JNAInterface =
     Native
       .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+
+  def hashChannel[C](channel: C): Blake2b256Hash =
+    channel match {
+      case value: { def toByteArray(): Array[Byte] } => {
+        val channelBytes = value.toByteArray
+
+        val payloadMemory = new Memory(channelBytes.length.toLong)
+        payloadMemory.write(0, channelBytes, 0, channelBytes.length)
+
+        val hashResultPtr = INSTANCE.hash_channel(
+          payloadMemory,
+          channelBytes.length
+        )
+
+        // Not sure if these lines are needed
+        // Need to figure out how to deallocate each memory instance
+        payloadMemory.clear()
+
+        if (hashResultPtr != null) {
+          val resultByteslength = hashResultPtr.getInt(0)
+
+          try {
+            val resultBytes = hashResultPtr.getByteArray(4, resultByteslength)
+            val hashProto   = HashProto.parseFrom(resultBytes)
+            val hash =
+              Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
+
+            hash
+
+          } catch {
+            case e: Throwable =>
+              println("Error during scala hashChannel operation: " + e)
+              throw e
+          } finally {
+            INSTANCE.deallocate_memory(hashResultPtr, resultByteslength)
+          }
+        } else {
+          println("hashResultPtr is null")
+          throw new RuntimeException("hashResultPtr is null")
+        }
+      }
+      case _ => throw new IllegalArgumentException("Type does not have a toByteArray method")
+    }
+
 }

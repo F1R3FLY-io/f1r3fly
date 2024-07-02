@@ -77,6 +77,7 @@ import coop.rchain.rspace.serializers.ScodecSerialize.encodeDatum
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeContinuation
 import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
 
+// NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
     rspacePointer: Pointer
 )(
@@ -93,12 +94,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   type A = ListParWithRandom;
   type K = TaggedContinuation;
 
-  // override def syncF: Sync[F] = Sync[F]
-
   type MaybeActionResult = Option[(ContResult[C, P, K], Seq[Result[C, A]])]
-
-  // implicit protected[this] lazy val MetricsSource: Metrics.Source = RSpaceMetricsSource
-  // private val lockF                                               = new ConcurrentTwoStepLockF[F, Blake2b256Hash](MetricsSource)
 
   protected[this] val dataLogger: Logger =
     Logger("rspacePlusPlus")
@@ -1032,33 +1028,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                  }
                }
     } yield result
-
-  // protected[this] def consumeLockF(
-  //     channels: Seq[C]
-  // )(
-  //     thunk: => F[MaybeActionResult]
-  // ): F[MaybeActionResult] = {
-  //   val hashes = channels.map(ch => StableHashProvider.hash(ch))
-  //   lockF.acquire(hashes)(() => hashes.pure[F])(thunk)
-  // }
-
-  // protected[this] def produceLockF(
-  //     channel: C
-  // )(
-  //     thunk: => F[MaybeActionResult]
-  // ): F[MaybeActionResult] =
-  //   lockF.acquire(Seq(StableHashProvider.hash(channel)))(
-  //     () => this.getJoins(channel).map(_.flatten.map(StableHashProvider.hash(_)))
-  //   )(thunk)
-
-  // protected[this] def installLockF(
-  //     channels: Seq[C]
-  // )(
-  //     thunk: => F[Option[(K, Seq[A])]]
-  // ): F[Option[(K, Seq[A])]] = {
-  //   val hashes = channels.map(ch => StableHashProvider.hash(ch))
-  //   lockF.acquire(hashes)(() => hashes.pure[F])(thunk)
-  // }
 
   override def consume(
       channels: Seq[C],

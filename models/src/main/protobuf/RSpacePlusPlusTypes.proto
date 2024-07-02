@@ -254,3 +254,7 @@ message CommProto {
 message LogProto {
   repeated EventProto log = 1;
 }
+
+message HashProto {
+  bytes hash = 1;
+}
