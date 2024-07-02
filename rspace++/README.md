@@ -76,6 +76,7 @@ Run all tests: `cargo test`
 
 - Run Spatial Matcher Tests: `cargo test matcher::match_test`
 - Run Storage Actions Tests: `cargo test --test storage_actions_test`
+- Run Replay RSpace Tests: `cargo test --test replay_rspace_tests`
 - Run Hot Store Spec Tests: `cargo test --test hot_store_spec -- --nocapture`
 - Run History Action Tests: `cargo test history::history_action_tests`
 - Run History Repository Tests: `cargo test history::history_repository_tests`
