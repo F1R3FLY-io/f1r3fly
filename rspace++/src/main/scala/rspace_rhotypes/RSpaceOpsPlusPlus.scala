@@ -367,10 +367,77 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                               ???
                             }
 
-                            override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] = {
-                              println("getJoins")
-                              ???
-                            }
+                            override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] =
+                              for {
+                                result <- Sync[F].delay {
+
+                                           val stateHashBytes       = stateHash.bytes.toArray
+                                           val stateHashBytesLength = stateHashBytes.length
+                                           val keyBytes             = key.bytes.toArray
+                                           val keyBytesLength       = keyBytes.length
+
+                                           val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                           val payloadMemory = new Memory(payloadSize)
+
+                                           payloadMemory
+                                             .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                           payloadMemory.write(
+                                             stateHashBytesLength.toLong,
+                                             keyBytes,
+                                             0,
+                                             keyBytesLength
+                                           )
+
+                                           val getHistoryJoinsResultPtr =
+                                             INSTANCE.get_history_joins(
+                                               rspacePointer,
+                                               payloadMemory,
+                                               stateHashBytesLength,
+                                               keyBytesLength
+                                             )
+
+                                           // Not sure is this line is needed
+                                           // Need to figure out how to deallocate 'payloadMemory'
+                                           payloadMemory.clear()
+
+                                           if (getHistoryJoinsResultPtr != null) {
+                                             val resultByteslength =
+                                               getHistoryJoinsResultPtr.getInt(0)
+
+                                             try {
+                                               val resultBytes =
+                                                 getHistoryJoinsResultPtr
+                                                   .getByteArray(4, resultByteslength)
+                                               val joinsProto  = JoinsProto.parseFrom(resultBytes)
+                                               val joinsProtos = joinsProto.joins
+
+                                               val joins: Seq[Seq[C]] =
+                                                 joinsProtos.map(
+                                                   join => join.join
+                                                 )
+
+                                               joins
+                                             } catch {
+                                               case e: Throwable =>
+                                                 println(
+                                                   "Error during scala getHistoryJoins operation: " + e
+                                                 )
+                                                 throw e
+                                             } finally {
+                                               INSTANCE.deallocate_memory(
+                                                 getHistoryJoinsResultPtr,
+                                                 resultByteslength
+                                               )
+                                             }
+                                           } else {
+                                             println("getHistoryJoinsResultPtr is null")
+                                             throw new RuntimeException(
+                                               "getHistoryJoinsResultPtr is null"
+                                             )
+                                           }
+                                         }
+
+                              } yield result
 
                             override def base: RSpacePlusPlusHistoryReaderBase[F, C, P, A, K] = {
                               println("base")
@@ -622,8 +689,8 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
       patterns: Seq[P],
       continuation: K,
       persist: Boolean,
-      // peeks: SortedSet[Int] = SortedSet.empty
-      peeks: SortedSet[Int]
+      peeks: SortedSet[Int] = SortedSet.empty
+      // peeks: SortedSet[Int]
   ): F[MaybeActionResult] =
     ContextShift[F].evalOn(scheduler) {
       for {
@@ -1027,8 +1094,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                          installedJoinsMap
                        )
 
-                     //  SoftCheckpoint(cacheSnapshot, checkpointLog, produceCounterMap)
-                     SoftCheckpoint(cacheSnapshot, Seq.empty, produceCounterMap)
+                     SoftCheckpoint(cacheSnapshot, checkpointLog, produceCounterMap)
                    } catch {
                      case e: Throwable =>
                        println("Error during scala createSoftCheckpoint operation: " + e)

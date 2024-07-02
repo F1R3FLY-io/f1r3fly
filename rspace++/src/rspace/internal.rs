@@ -46,6 +46,8 @@ impl<C: Eq, P: Eq, K: Eq + Clone> PartialEq for ContResult<C, P, K> {
     }
 }
 
+impl<C: Eq, P: Eq, K: Eq + Clone> Eq for ContResult<C, P, K> {}
+
 impl<C: Serialize, P: Serialize, K: Serialize> Serialize for ContResult<C, P, K> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -78,6 +80,18 @@ where
             patterns,
             peek,
         })
+    }
+}
+
+impl<C: Hash, P: Hash, K: Hash> Hash for ContResult<C, P, K> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if let Ok(continuation) = self.continuation.lock() {
+            continuation.hash(state);
+        }
+        self.persistent.hash(state);
+        self.patterns.hash(state);
+        self.channels.hash(state);
+        self.peek.hash(state);
     }
 }
 

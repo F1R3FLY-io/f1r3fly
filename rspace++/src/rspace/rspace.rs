@@ -45,7 +45,7 @@ where
     space_matcher: SpaceMatcher<C, P, A, K, M>,
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
-    produce_counter: HashMap<Produce, i32>,
+    produce_counter: BTreeMap<Produce, i32>,
     pub replay_data: MultisetMultiMap<IOEvent, COMM>,
 }
 
@@ -324,8 +324,14 @@ where
         self.event_log
             .insert(0, Event::IoEvent(IOEvent::Produce(produce_ref.clone())));
         if !persist {
-            let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
-            *entry += 1;
+            // let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
+            // *entry += 1;
+            match self.produce_counter.get(&produce_ref) {
+                Some(current_count) => self
+                    .produce_counter
+                    .insert(produce_ref.clone(), current_count + 1),
+                None => self.produce_counter.insert(produce_ref.clone(), 1),
+            };
         }
 
         produce_ref
@@ -339,7 +345,7 @@ where
 
         let log = self.event_log.clone();
         self.event_log = Vec::new();
-        self.produce_counter = HashMap::new();
+        self.produce_counter = BTreeMap::new();
 
         let history_reader = self
             .history_repository
@@ -600,7 +606,7 @@ where
         self.history_repository = Arc::new(next_history);
 
         self.event_log = Vec::new();
-        self.produce_counter = HashMap::new();
+        self.produce_counter = BTreeMap::new();
 
         let history_reader = self.history_repository.get_history_reader(root)?;
         self.create_new_hot_store(history_reader);
@@ -630,7 +636,7 @@ where
         let curr_produce_counter = self.produce_counter.clone();
 
         self.event_log = Vec::new();
-        self.produce_counter = HashMap::new();
+        self.produce_counter = BTreeMap::new();
 
         SoftCheckpoint {
             cache_snapshot,
@@ -792,7 +798,8 @@ where
                 peeks,
                 consume_ref,
             );
-            // println!("\nlocked_consume result: {:?}", result);
+            // println!("\n{:#?}", self.store.to_map().len());
+            // println!("\nreplay_consume none?: {:?}", result.is_none());
             result
         }
     }
@@ -828,6 +835,8 @@ where
             source: consume_ref.clone(),
         };
 
+        // println!("\nreplay_data len in replay_consume: {:?}", self.replay_data.map.len());
+
         let comms_option = self
             .replay_data
             .map
@@ -839,6 +848,8 @@ where
                     .collect::<Vec<_>>()
             });
 
+        // println!("\ncomms_options in replay_consume Some?: {:?}", comms_option.is_some());
+
         match comms_option {
             None => self.store_waiting_continuation(channels, wk),
             Some(comms_list) => {
@@ -847,7 +858,10 @@ where
                     patterns,
                     comms_list.clone(),
                 ) {
-                    None => self.store_waiting_continuation(channels, wk),
+                    None => {
+                        // println!("\nwas none");
+                        self.store_waiting_continuation(channels, wk)
+                    }
                     Some((_, data_candidates)) => {
                         let comm_ref = {
                             let produce_counters_closure =
@@ -912,6 +926,7 @@ where
 
         for c in &channels {
             let data = self.store.get_data(c);
+            // println!("\ndata len: {}", data.len());
             let filtered_data: Vec<(Datum<A>, i32)> = data
                 .into_iter()
                 .zip(0..)
@@ -919,6 +934,8 @@ where
                 .collect();
             channel_to_indexed_data_list.push((c.clone(), filtered_data));
         }
+
+        // println!("\nchannelToIndexedDataList: {:#?}", channel_to_indexed_data_list);
 
         let channel_to_indexed_data_map: DashMap<C, Vec<(Datum<A>, i32)>> =
             channel_to_indexed_data_list.into_iter().collect();
@@ -980,6 +997,8 @@ where
                     .collect::<Vec<_>>()
             });
 
+        // println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
+
         match comms_option {
             None => self.store_data(channel, data, persist, produce_ref),
             Some(comms_list) => {
@@ -992,7 +1011,10 @@ where
                     grouped_channels,
                 ) {
                     Some((_, pc)) => self.handle_match(pc, comms_list),
-                    None => self.store_data(channel, data, persist, produce_ref),
+                    None => {
+                        // println!("\nwas none");
+                        self.store_data(channel, data, persist, produce_ref)
+                    }
                 }
             }
         }
@@ -1076,13 +1098,24 @@ where
     }
 
     fn matches(&self, comm: COMM, datum_with_index: (Datum<A>, i32)) -> bool {
+        // println!("\ncomm in matches: {:?}", comm);
         let datum = datum_with_index.0;
-        comm.produces.contains(&datum.source) && self.was_repeated_enough_times(comm, datum)
+        let x = comm.produces.contains(&datum.source);
+        let res = x && self.was_repeated_enough_times(comm, datum);
+        // println!("\ncomm.produce.contains: {:?}", x);
+        // println!("\nmatches result: {:?}", res);
+        res
     }
 
     fn was_repeated_enough_times(&self, comm: COMM, datum: Datum<A>) -> bool {
+        // println!("\ncomm in was_repeated_enough_times: {:?}", comm);
+        // println!("\n\ndatum in was_repeated_enough_times: {:?}", datum);
+        // println!("\nproduce_counter: {:?}", self.produce_counter);
         if !datum.persist {
-            comm.times_repeated.get(&datum.source) == self.produce_counter.get(&datum.source)
+            let x = comm.times_repeated.get(&datum.source).unwrap_or(&0)
+                == self.produce_counter.get(&datum.source).unwrap_or(&0);
+            // println!("\nwas_repeated_enough_times result: {:?}", x);
+            x
         } else {
             true
         }
@@ -1191,7 +1224,7 @@ where
     }
 
     fn replay_log_comm(
-        &self,
+        &mut self,
         _data_candidates: &Vec<ConsumeCandidate<C, A>>,
         _channels: &Vec<C>,
         _wk: WaitingContinuation<P, K>,
@@ -1199,6 +1232,7 @@ where
         _label: &str,
     ) -> COMM {
         // TODO: Metrics?
+        // self.event_log.insert(0, Event::Comm(comm.clone()));
         comm
     }
 
@@ -1222,8 +1256,14 @@ where
         persist: bool,
     ) -> Produce {
         if !persist {
-            let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
-            *entry += 1;
+            // let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
+            // *entry += 1;
+            match self.produce_counter.get(&produce_ref) {
+                Some(current_count) => self
+                    .produce_counter
+                    .insert(produce_ref.clone(), current_count + 1),
+                None => self.produce_counter.insert(produce_ref.clone(), 1),
+            };
         }
 
         produce_ref
@@ -1238,7 +1278,6 @@ where
             [] => {
                 let msg = "List comms must not be empty";
                 panic!("{}", msg);
-                // return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg)));
             }
             [comm_ref] => match run_matcher(comm_ref.clone()) {
                 Some(data_candidates) => Ok(Ok((comm_ref.clone(), data_candidates))),
@@ -1279,12 +1318,13 @@ where
     /* IReplayRSpace */
 
     pub fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> () {
-        self.rig(log);
+        let _ = self.rig(log);
         let reset_result = self.reset(start_root);
         assert!(reset_result.is_ok(), "Failed to reset in 'rig_and_reset'")
     }
 
     pub fn rig(&self, log: Log) -> () {
+        // println!("\nlog len in rust rig: {:?}", log.len());
         let (io_events, comm_events): (Vec<_>, Vec<_>) =
             log.iter().partition(|event| match event {
                 Event::IoEvent(IOEvent::Produce(_)) => true,
@@ -1386,7 +1426,7 @@ impl RSpaceInstances {
             space_matcher: SpaceMatcher::create(matcher),
             installs: Mutex::new(HashMap::new()),
             event_log: Vec::new(),
-            produce_counter: HashMap::new(),
+            produce_counter: BTreeMap::new(),
             replay_data: MultisetMultiMap::empty(),
         }
     }

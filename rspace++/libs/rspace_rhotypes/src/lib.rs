@@ -19,7 +19,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
 
@@ -594,6 +594,42 @@ pub extern "C" fn get_joins(
 }
 
 #[no_mangle]
+pub extern "C" fn get_history_joins(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let joins = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_joins(&key)
+            .unwrap()
+    };
+
+    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+    let joins_proto = JoinsProto { joins: vec_join };
+
+    let mut bytes = joins_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
 pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
     let hot_store_mapped = unsafe { (*rspace).rspace.lock().unwrap().store.to_map() };
 
@@ -1148,7 +1184,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
         })
         .collect();
 
-    let produce_counter_map: HashMap<Produce, i32> = soft_checkpoint_proto
+    let produce_counter_map: BTreeMap<Produce, i32> = soft_checkpoint_proto
         .produce_counter
         .into_iter()
         .map(|map_entry| {

@@ -70,6 +70,13 @@ trait JNAInterface extends Library {
       channel_bytes_len: Int
   ): Pointer
 
+  def get_history_joins(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      state_hash_bytes_len: Int,
+      key_bytes_len: Int
+  ): Pointer
+
   def to_map(rspace: Pointer): Pointer
 
   def spawn(rspace: Pointer): Pointer
