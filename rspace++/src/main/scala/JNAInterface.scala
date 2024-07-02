@@ -64,6 +64,13 @@ trait JNAInterface extends Library {
       channels_bytes_len: Int
   ): Pointer
 
+  def get_history_waiting_continuations(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      state_hash_bytes_len: Int,
+      key_bytes_len: Int
+  ): Pointer
+
   def get_joins(
       rspace: Pointer,
       channel_pointer: Pointer,

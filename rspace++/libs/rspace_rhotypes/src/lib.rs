@@ -572,6 +572,70 @@ pub extern "C" fn get_waiting_continuations(
 }
 
 #[no_mangle]
+pub extern "C" fn get_history_waiting_continuations(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let wks = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_continuations(&key)
+            .unwrap()
+    };
+
+    let wks_protos: Vec<WaitingContinuationProto> = wks
+        .into_iter()
+        .map(|wk| {
+            let cont_lock = wk.continuation.lock().unwrap();
+            let res = WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(cont_lock.clone()),
+                persist: wk.persist,
+                peeks: wk
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
+                    .collect(),
+                source: Some(ConsumeProto {
+                    channel_hashes: wk
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
+                }),
+            };
+            drop(cont_lock);
+            res
+        })
+        .collect();
+
+    let wks_proto = WaitingContinuationsProto { wks: wks_protos };
+
+    let mut bytes = wks_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
 pub extern "C" fn get_joins(
     rspace: *mut Space,
     channel_pointer: *const u8,

@@ -73,6 +73,9 @@ import coop.rchain.models.rspace_plus_plus_types.CommProto
 import coop.rchain.rspace.RSpaceMetricsSource
 import coop.rchain.rspace.concurrent.ConcurrentTwoStepLockF
 import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE}
+import coop.rchain.rspace.serializers.ScodecSerialize.encodeDatum
+import coop.rchain.rspace.serializers.ScodecSerialize.encodeContinuation
+import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
 
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
     rspacePointer: Pointer
@@ -269,7 +272,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                             override def getData(key: Blake2b256Hash): F[Seq[Datum[A]]] =
                               for {
                                 result <- Sync[F].delay {
-
                                            val stateHashBytes       = stateHash.bytes.toArray
                                            val stateHashBytesLength = stateHashBytes.length
                                            val keyBytes             = key.bytes.toArray
@@ -362,15 +364,114 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
 
                             override def getContinuations(
                                 key: Blake2b256Hash
-                            ): F[Seq[WaitingContinuation[P, K]]] = {
-                              println("getContinuations")
-                              ???
-                            }
+                            ): F[Seq[WaitingContinuation[P, K]]] =
+                              for {
+                                result <- Sync[F].delay {
+                                           val stateHashBytes       = stateHash.bytes.toArray
+                                           val stateHashBytesLength = stateHashBytes.length
+                                           val keyBytes             = key.bytes.toArray
+                                           val keyBytesLength       = keyBytes.length
+
+                                           val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                           val payloadMemory = new Memory(payloadSize)
+
+                                           payloadMemory
+                                             .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                           payloadMemory.write(
+                                             stateHashBytesLength.toLong,
+                                             keyBytes,
+                                             0,
+                                             keyBytesLength
+                                           )
+
+                                           val getHistoryWaitingContinuationResultPtr =
+                                             INSTANCE.get_history_waiting_continuations(
+                                               rspacePointer,
+                                               payloadMemory,
+                                               stateHashBytesLength,
+                                               keyBytesLength
+                                             )
+
+                                           // Not sure if these lines are needed
+                                           // Need to figure out how to deallocate each memory instance
+                                           payloadMemory.clear()
+
+                                           if (getHistoryWaitingContinuationResultPtr != null) {
+                                             val resultByteslength =
+                                               getHistoryWaitingContinuationResultPtr.getInt(0)
+
+                                             try {
+                                               val resultBytes =
+                                                 getHistoryWaitingContinuationResultPtr
+                                                   .getByteArray(4, resultByteslength)
+                                               val wksProto =
+                                                 WaitingContinuationsProto.parseFrom(
+                                                   resultBytes
+                                                 )
+                                               val wksProtos = wksProto.wks
+
+                                               val wks: Seq[WaitingContinuation[P, K]] =
+                                                 wksProtos
+                                                   .map(
+                                                     wk =>
+                                                       WaitingContinuation(
+                                                         patterns = wk.patterns,
+                                                         continuation = wk.continuation.get,
+                                                         persist = wk.persist,
+                                                         peeks = wk.peeks.map(_.value).to[SortedSet],
+                                                         source = wk.source match {
+                                                           case Some(consumeEvent) =>
+                                                             Consume(
+                                                               channelsHashes =
+                                                                 consumeEvent.channelHashes.map(
+                                                                   bs =>
+                                                                     Blake2b256Hash
+                                                                       .fromByteArray(
+                                                                         bs.toByteArray
+                                                                       )
+                                                                 ),
+                                                               hash = Blake2b256Hash.fromByteArray(
+                                                                 consumeEvent.hash.toByteArray
+                                                               ),
+                                                               persistent = consumeEvent.persistent
+                                                             )
+                                                           case None => {
+                                                             println("ConsumeEvent is None");
+                                                             throw new RuntimeException(
+                                                               "ConsumeEvent is None"
+                                                             )
+                                                           }
+                                                         }
+                                                       )
+                                                   )
+
+                                               wks
+                                             } catch {
+                                               case e: Throwable =>
+                                                 println(
+                                                   "Error during scala getHistoryWaitingContinuations operation: " + e
+                                                 )
+                                                 throw e
+                                             } finally {
+                                               INSTANCE.deallocate_memory(
+                                                 getHistoryWaitingContinuationResultPtr,
+                                                 resultByteslength
+                                               )
+                                             }
+                                           } else {
+                                             println(
+                                               "getHistoryWaitingContinuationResultPtr is null"
+                                             )
+                                             throw new RuntimeException(
+                                               "getHistoryWaitingContinuationResultPtr is null"
+                                             )
+                                           }
+                                         }
+                              } yield result
 
                             override def getJoins(key: Blake2b256Hash): F[Seq[Seq[C]]] =
                               for {
                                 result <- Sync[F].delay {
-
                                            val stateHashBytes       = stateHash.bytes.toArray
                                            val stateHashBytesLength = stateHashBytes.length
                                            val keyBytes             = key.bytes.toArray
@@ -448,22 +549,297 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                             override def readerBinary
                                 : RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] =
                               new RSpacePlusPlusHistoryReaderBinary[F, C, P, A, K] {
-                                override def getData(key: Blake2b256Hash): F[Seq[DatumB[A]]] = {
-                                  println("readerBinary-getData")
-                                  ???
-                                }
+                                override def getData(key: Blake2b256Hash): F[Seq[DatumB[A]]] =
+                                  for {
+                                    result <- Sync[F].delay {
+                                               val stateHashBytes       = stateHash.bytes.toArray
+                                               val stateHashBytesLength = stateHashBytes.length
+                                               val keyBytes             = key.bytes.toArray
+                                               val keyBytesLength       = keyBytes.length
+
+                                               val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                               val payloadMemory = new Memory(payloadSize)
+
+                                               payloadMemory
+                                                 .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                               payloadMemory.write(
+                                                 stateHashBytesLength.toLong,
+                                                 keyBytes,
+                                                 0,
+                                                 keyBytesLength
+                                               )
+
+                                               val getHistoryDataResultPtr =
+                                                 INSTANCE.get_history_data(
+                                                   rspacePointer,
+                                                   payloadMemory,
+                                                   stateHashBytesLength,
+                                                   keyBytesLength
+                                                 )
+
+                                               // Not sure is this line is needed
+                                               // Need to figure out how to deallocate 'payloadMemory'
+                                               payloadMemory.clear()
+
+                                               if (getHistoryDataResultPtr != null) {
+                                                 val resultByteslength =
+                                                   getHistoryDataResultPtr.getInt(0)
+
+                                                 try {
+                                                   val resultBytes =
+                                                     getHistoryDataResultPtr
+                                                       .getByteArray(4, resultByteslength)
+                                                   val datumsProto =
+                                                     DatumsProto.parseFrom(resultBytes)
+                                                   val datumsProtos = datumsProto.datums
+
+                                                   val datums: Seq[DatumB[A]] =
+                                                     datumsProtos.map(
+                                                       datum => {
+                                                         val d = Datum(
+                                                           datum.a.get,
+                                                           datum.persist,
+                                                           source = datum.source match {
+                                                             case Some(produceEvent) =>
+                                                               Produce(
+                                                                 channelsHash =
+                                                                   Blake2b256Hash.fromByteArray(
+                                                                     produceEvent.channelHash.toByteArray
+                                                                   ),
+                                                                 hash =
+                                                                   Blake2b256Hash.fromByteArray(
+                                                                     produceEvent.hash.toByteArray
+                                                                   ),
+                                                                 persistent =
+                                                                   produceEvent.persistent
+                                                               )
+                                                             case None => {
+                                                               println("ProduceEvent is None");
+                                                               throw new RuntimeException(
+                                                                 "ProduceEvent is None"
+                                                               )
+                                                             }
+                                                           }
+                                                         )
+                                                         DatumB(
+                                                           d,
+                                                           encodeDatum(d)
+                                                         )
+                                                       }
+                                                     )
+
+                                                   datums
+                                                 } catch {
+                                                   case e: Throwable =>
+                                                     println(
+                                                       "Error during scala getHistoryBinaryData operation: " + e
+                                                     )
+                                                     throw e
+                                                 } finally {
+                                                   INSTANCE.deallocate_memory(
+                                                     getHistoryDataResultPtr,
+                                                     resultByteslength
+                                                   )
+                                                 }
+                                               } else {
+                                                 println("getHistoryBinaryDataResultPtr is null")
+                                                 throw new RuntimeException(
+                                                   "getHistoryBinaryDataResultPtr is null"
+                                                 )
+                                               }
+                                             }
+
+                                  } yield result
 
                                 override def getContinuations(
                                     key: Blake2b256Hash
-                                ): F[Seq[WaitingContinuationB[P, K]]] = {
-                                  println("readerBinary-getContinuations")
-                                  ???
-                                }
+                                ): F[Seq[WaitingContinuationB[P, K]]] =
+                                  for {
+                                    result <- Sync[F].delay {
+                                               val stateHashBytes       = stateHash.bytes.toArray
+                                               val stateHashBytesLength = stateHashBytes.length
+                                               val keyBytes             = key.bytes.toArray
+                                               val keyBytesLength       = keyBytes.length
 
-                                override def getJoins(key: Blake2b256Hash): F[Seq[JoinsB[C]]] = {
-                                  println("readerBinary-getJoins")
-                                  ???
-                                }
+                                               val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                               val payloadMemory = new Memory(payloadSize)
+
+                                               payloadMemory
+                                                 .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                               payloadMemory.write(
+                                                 stateHashBytesLength.toLong,
+                                                 keyBytes,
+                                                 0,
+                                                 keyBytesLength
+                                               )
+
+                                               val getHistoryWaitingContinuationResultPtr =
+                                                 INSTANCE.get_history_waiting_continuations(
+                                                   rspacePointer,
+                                                   payloadMemory,
+                                                   stateHashBytesLength,
+                                                   keyBytesLength
+                                                 )
+
+                                               // Not sure if these lines are needed
+                                               // Need to figure out how to deallocate each memory instance
+                                               payloadMemory.clear()
+
+                                               if (getHistoryWaitingContinuationResultPtr != null) {
+                                                 val resultByteslength =
+                                                   getHistoryWaitingContinuationResultPtr.getInt(0)
+
+                                                 try {
+                                                   val resultBytes =
+                                                     getHistoryWaitingContinuationResultPtr
+                                                       .getByteArray(4, resultByteslength)
+                                                   val wksProto =
+                                                     WaitingContinuationsProto.parseFrom(
+                                                       resultBytes
+                                                     )
+                                                   val wksProtos = wksProto.wks
+
+                                                   val wks: Seq[WaitingContinuationB[P, K]] =
+                                                     wksProtos.map(
+                                                       wk => {
+                                                         val waitingContinuation =
+                                                           WaitingContinuation(
+                                                             patterns = wk.patterns,
+                                                             continuation = wk.continuation.get,
+                                                             persist = wk.persist,
+                                                             peeks =
+                                                               wk.peeks.map(_.value).to[SortedSet],
+                                                             source = wk.source match {
+                                                               case Some(consumeEvent) =>
+                                                                 Consume(
+                                                                   channelsHashes =
+                                                                     consumeEvent.channelHashes.map(
+                                                                       bs =>
+                                                                         Blake2b256Hash
+                                                                           .fromByteArray(
+                                                                             bs.toByteArray
+                                                                           )
+                                                                     ),
+                                                                   hash =
+                                                                     Blake2b256Hash.fromByteArray(
+                                                                       consumeEvent.hash.toByteArray
+                                                                     ),
+                                                                   persistent =
+                                                                     consumeEvent.persistent
+                                                                 )
+                                                               case None => {
+                                                                 println("ConsumeEvent is None");
+                                                                 throw new RuntimeException(
+                                                                   "ConsumeEvent is None"
+                                                                 )
+                                                               }
+                                                             }
+                                                           )
+                                                         WaitingContinuationB(
+                                                           waitingContinuation,
+                                                           encodeContinuation(waitingContinuation)
+                                                         )
+                                                       }
+                                                     )
+
+                                                   wks
+                                                 } catch {
+                                                   case e: Throwable =>
+                                                     println(
+                                                       "Error during scala getHistoryBinaryWaitingContinuations operation: " + e
+                                                     )
+                                                     throw e
+                                                 } finally {
+                                                   INSTANCE.deallocate_memory(
+                                                     getHistoryWaitingContinuationResultPtr,
+                                                     resultByteslength
+                                                   )
+                                                 }
+                                               } else {
+                                                 println(
+                                                   "getHistoryBinaryWaitingContinuationResultPtr is null"
+                                                 )
+                                                 throw new RuntimeException(
+                                                   "getHistoryBinaryWaitingContinuationResultPtr is null"
+                                                 )
+                                               }
+                                             }
+                                  } yield result
+
+                                override def getJoins(key: Blake2b256Hash): F[Seq[JoinsB[C]]] =
+                                  for {
+                                    result <- Sync[F].delay {
+                                               val stateHashBytes       = stateHash.bytes.toArray
+                                               val stateHashBytesLength = stateHashBytes.length
+                                               val keyBytes             = key.bytes.toArray
+                                               val keyBytesLength       = keyBytes.length
+
+                                               val payloadSize   = stateHashBytesLength.toLong + keyBytesLength.toLong
+                                               val payloadMemory = new Memory(payloadSize)
+
+                                               payloadMemory
+                                                 .write(0, stateHashBytes, 0, stateHashBytesLength)
+                                               payloadMemory.write(
+                                                 stateHashBytesLength.toLong,
+                                                 keyBytes,
+                                                 0,
+                                                 keyBytesLength
+                                               )
+
+                                               val getHistoryJoinsResultPtr =
+                                                 INSTANCE.get_history_joins(
+                                                   rspacePointer,
+                                                   payloadMemory,
+                                                   stateHashBytesLength,
+                                                   keyBytesLength
+                                                 )
+
+                                               // Not sure is this line is needed
+                                               // Need to figure out how to deallocate 'payloadMemory'
+                                               payloadMemory.clear()
+
+                                               if (getHistoryJoinsResultPtr != null) {
+                                                 val resultByteslength =
+                                                   getHistoryJoinsResultPtr.getInt(0)
+
+                                                 try {
+                                                   val resultBytes =
+                                                     getHistoryJoinsResultPtr
+                                                       .getByteArray(4, resultByteslength)
+                                                   val joinsProto =
+                                                     JoinsProto.parseFrom(resultBytes)
+                                                   val joinsProtos = joinsProto.joins
+
+                                                   val joins: Seq[JoinsB[C]] =
+                                                     joinsProtos.map(
+                                                       join => {
+                                                         val j = join.join
+                                                         JoinsB(j, encodeJoin(j))
+                                                       }
+                                                     )
+
+                                                   joins
+                                                 } catch {
+                                                   case e: Throwable =>
+                                                     println(
+                                                       "Error during scala getHistoryBinaryJoins operation: " + e
+                                                     )
+                                                     throw e
+                                                 } finally {
+                                                   INSTANCE.deallocate_memory(
+                                                     getHistoryJoinsResultPtr,
+                                                     resultByteslength
+                                                   )
+                                                 }
+                                               } else {
+                                                 println("getHistoryBinaryJoinsResultPtr is null")
+                                                 throw new RuntimeException(
+                                                   "getHistoryBinaryJoinsResultPtr is null"
+                                                 )
+                                               }
+                                             }
+
+                                  } yield result
                               }
 
                           }

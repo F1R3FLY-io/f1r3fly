@@ -71,6 +71,16 @@ object ScodecSerialize {
     encodeSortedSeq[WaitingContinuation[P, K]](konts, codec)
   }
 
+  def encodeContinuation[P, K](kont: WaitingContinuation[P, K])(
+      implicit
+      sp: Serialize[P],
+      sk: Serialize[K]
+  ): ByteVector = {
+    val codec = serializeToCodecContinuationMemo(sp, sk)
+
+    codec.encode(kont).getUnsafe.toByteVector
+  }
+
   def encodeContinuationsBinary(konts: Seq[ByteVector]): ByteVector =
     encodeSortedSeq(konts, bytes)
 
@@ -104,6 +114,12 @@ object ScodecSerialize {
       .encode(joins.map(encodeSortedSeq(_, codec)).toVector.sorted(util.ordByteVector))
       .getUnsafe
       .toByteVector
+  }
+
+  def encodeJoin[C](join: Seq[C])(implicit sc: Serialize[C]): ByteVector = {
+    val codec = serializeToCodecMemo(sc)
+
+    encodeSortedSeq(join, codec)
   }
 
   def encodeJoinsBinary(joins: Seq[ByteVector]): ByteVector =
