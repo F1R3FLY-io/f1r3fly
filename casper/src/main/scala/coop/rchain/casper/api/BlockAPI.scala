@@ -272,8 +272,8 @@ object BlockAPI {
       runtimeManager: RuntimeManager[F],
       sortedListeningName: Par,
       block: BlockMessage
-  )(implicit casper: MultiParentCasper[F]): F[Option[DataWithBlockInfo]] = {
-    println("\nhit getDataWithBlockInfo")
+  )(implicit casper: MultiParentCasper[F]): F[Option[DataWithBlockInfo]] =
+    // println("\nhit getDataWithBlockInfo")
     // TODO: For Produce it doesn't make sense to have multiple names
     if (isListeningNameReduced(block, immutable.Seq(sortedListeningName))) {
       val stateHash = ProtoUtil.postStateHash(block)
@@ -284,7 +284,6 @@ object BlockAPI {
     } else {
       none[DataWithBlockInfo].pure[F]
     }
-  }
 
   private def getContinuationsWithBlockInfo[F[_]: Log: SafetyOracle: BlockStore: Concurrent](
       runtimeManager: RuntimeManager[F],
