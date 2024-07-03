@@ -35,6 +35,7 @@ import coop.rchain.models.syntax._
 import coop.rchain.shared.{Base16, Log}
 
 import scala.collection.immutable
+import rspacePlusPlus.JNAInterfaceLoader
 
 object BlockAPI {
   type Error     = String
@@ -318,18 +319,29 @@ object BlockAPI {
     log.exists {
       case Produce(channelHash, _, _) =>
         assert(sortedListeningName.size == 1, "Produce can have only one channel")
-        channelHash == StableHashProvider.hash(sortedListeningName.head)
+        // channelHash == StableHashProvider.hash(sortedListeningName.head)
+        channelHash == JNAInterfaceLoader.hashChannel(sortedListeningName.head)
       case Consume(channelsHashes, _, _) =>
+        // channelsHashes.toList.sorted == sortedListeningName
+        //   .map(StableHashProvider.hash(_))
+        //   .toList
+        //   .sorted
         channelsHashes.toList.sorted == sortedListeningName
-          .map(StableHashProvider.hash(_))
+          .map(JNAInterfaceLoader.hashChannel(_))
           .toList
           .sorted
-      case COMM(consume, produces, _, _) =>
+      case COMM(consume, produces, _, _) => {
+        // (consume.channelsHashes.toList.sorted ==
+        //   sortedListeningName.map(StableHashProvider.hash(_)).toList.sorted) ||
+        //   produces.exists(
+        //     produce => produce.channelsHash == StableHashProvider.hash(sortedListeningName)
+        //   )
         (consume.channelsHashes.toList.sorted ==
-          sortedListeningName.map(StableHashProvider.hash(_)).toList.sorted) ||
-          produces.exists(
-            produce => produce.channelsHash == StableHashProvider.hash(sortedListeningName)
-          )
+          sortedListeningName.map(JNAInterfaceLoader.hashChannel(_)).toList.sorted) ||
+        produces.exists(
+          produce => produce.channelsHash == JNAInterfaceLoader.hashChannels(sortedListeningName)
+        )
+      }
     }
   }
 

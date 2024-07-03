@@ -2,7 +2,7 @@ use dashmap::DashMap;
 use prost::Message;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use rspace_plus_plus::rspace::hashing::stable_hash_provider::hash;
+use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
@@ -1693,6 +1693,26 @@ pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: us
     let channel = Par::decode(channel_slice).unwrap();
 
     let hash = hash(&channel);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn hash_channels(
+    channels_pointer: *const u8,
+    channels_bytes_len: usize,
+) -> *const u8 {
+    let channels_slice =
+        unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
+    let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
+
+    let hash = hash_from_vec(&channels_proto.channels);
     let hash_proto = HashProto { hash: hash.bytes() };
 
     let mut bytes = hash_proto.encode_to_vec();

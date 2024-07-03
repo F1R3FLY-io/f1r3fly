@@ -130,6 +130,8 @@ trait JNAInterface extends Library {
 
   def hash_channel(channel_pointer: Pointer, channel_bytes_len: Int): Pointer
 
+  def hash_channels(channels_pointer: Pointer, channels_bytes_len: Int): Pointer
+
   def deallocate_memory(ptr: Pointer, len: Int): Unit
 }
 
@@ -185,4 +187,49 @@ object JNAInterfaceLoader {
       case _ => throw new IllegalArgumentException("Type does not have a toByteArray method")
     }
 
+  def hashChannels[C](channels: Seq[C]): Blake2b256Hash =
+    channels.head match {
+      case value: { def toByteArray(): Array[Byte] } => {
+        val channelsBytes = value.toByteArray
+
+        val payloadMemory = new Memory(channelsBytes.length.toLong)
+        payloadMemory.write(0, channelsBytes, 0, channelsBytes.length)
+
+        val hashResultPtr = INSTANCE.hash_channels(
+          payloadMemory,
+          channelsBytes.length
+        )
+
+        // Not sure if these lines are needed
+        // Need to figure out how to deallocate each memory instance
+        payloadMemory.clear()
+
+        if (hashResultPtr != null) {
+          val resultByteslength = hashResultPtr.getInt(0)
+
+          try {
+            val resultBytes = hashResultPtr.getByteArray(4, resultByteslength)
+            val hashProto   = HashProto.parseFrom(resultBytes)
+            val hash =
+              Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
+
+            hash
+
+          } catch {
+            case e: Throwable =>
+              println("Error during scala hashChannel operation: " + e)
+              throw e
+          } finally {
+            INSTANCE.deallocate_memory(hashResultPtr, resultByteslength)
+          }
+        } else {
+          println("hashResultPtr is null")
+          throw new RuntimeException("hashResultPtr is null")
+        }
+      }
+      case _ => {
+        println("\nType does not have a toByteArray method")
+        throw new IllegalArgumentException("Type does not have a toByteArray method")
+      }
+    }
 }
