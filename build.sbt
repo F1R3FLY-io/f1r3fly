@@ -485,7 +485,7 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    dockerBuildxSettings,
+    mappings in Docker += file("rspace++/target/docker/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
 // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
