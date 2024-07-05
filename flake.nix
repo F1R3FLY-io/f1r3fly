@@ -98,6 +98,11 @@
               package = dhall-yaml;
               help = "Dhall-to-YAML utility";
             }
+            {
+              name = "protobuf";
+              package = protobuf;
+              help = "Protocol Buffers compiler";
+            }
           ];
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";

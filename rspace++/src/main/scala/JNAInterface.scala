@@ -126,6 +126,14 @@ trait JNAInterface extends Library {
 
   def check_replay_data(rspace: Pointer): Unit
 
+  /* ReportingRspace */
+
+  def reporting_get_report(rspace: Pointer): Pointer
+
+  def reporting_create_checkpoint(rspace: Pointer): Pointer
+
+  def reporting_create_soft_checkpoint(rspace: Pointer): Pointer
+
   /* Helper Functions */
 
   def hash_channel(channel_pointer: Pointer, channel_bytes_len: Int): Pointer

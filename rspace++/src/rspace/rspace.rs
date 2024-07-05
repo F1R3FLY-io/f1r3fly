@@ -47,6 +47,8 @@ where
     event_log: Log,
     produce_counter: BTreeMap<Produce, i32>,
     pub replay_data: MultisetMultiMap<IOEvent, COMM>,
+    report: Vec<Vec<Box<ReportingEvent<C, A, P, K>>>>,
+    soft_report: Vec<Box<ReportingEvent<C, A, P, K>>>,
 }
 
 type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
@@ -119,8 +121,8 @@ where
                 self.log_comm(
                     &data_candidates,
                     &channels,
-                    wk.clone(),
-                    COMM::new(
+                    &wk,
+                &COMM::new(
                         data_candidates.clone(),
                         consume_ref.clone(),
                         peeks.clone(),
@@ -262,8 +264,8 @@ where
         self.log_comm(
             &data_candidates,
             &channels,
-            continuation.clone(),
-            COMM::new(
+            &continuation,
+            &COMM::new(
                 data_candidates.clone(),
                 consume_ref.clone(),
                 peeks.clone(),
@@ -287,16 +289,16 @@ where
         self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
     }
 
-    fn log_comm(
+    fn log_comm<'a>(
         &mut self,
         _data_candidates: &Vec<ConsumeCandidate<C, A>>,
         _channels: &Vec<C>,
-        _wk: WaitingContinuation<P, K>,
-        comm: COMM,
+        _wk: &WaitingContinuation<P, K>,
+        _comm: &'a COMM,
         _label: &str,
-    ) -> COMM {
-        self.event_log.insert(0, Event::Comm(comm.clone()));
-        comm
+    ) -> &'a COMM {
+        self.event_log.insert(0, Event::Comm(_comm.clone()));
+        _comm
     }
 
     fn log_consume(
@@ -1381,6 +1383,111 @@ where
         }
     }
 
+    /* ReportingRSpace */
+
+    fn collect_report(&mut self) {
+        if !self.soft_report.is_empty() {
+            // append softReport to report
+            self.report.push(self.soft_report.clone());
+            self.soft_report.clear();
+        }
+    }
+    
+    pub fn reporting_get_report(&mut self) -> Vec<Vec<Box<ReportingEvent<C, A, P, K>>>> {
+        self.collect_report();
+        let copy = self.report.clone();
+        self.report.clear();
+    
+        return copy;
+    }
+
+    fn reporting_log_comm<'a>(
+        &mut self, 
+        _data_candidates: &Vec<ConsumeCandidate<C, A>>, 
+        _channels: &Vec<C>, 
+        _wk: &WaitingContinuation<P, K>, 
+        _comm: &'a COMM, 
+        _label: &str) -> &'a COMM {
+        self.log_comm(_data_candidates, _channels, _wk, _comm, _label);
+        let reporting_consume: ReportingConsume<C, P, K> = ReportingConsume {
+            channels: _channels.clone(),
+            patterns: _wk.patterns.clone(),
+            continuation: _wk.continuation.lock().unwrap().clone(),
+            peeks: _wk.peeks.clone()
+        };
+
+        let reporting_produces = 
+            _data_candidates.iter().map(|dc| ReportingProduce{
+                channel: dc.channel.clone(), 
+                data: dc.datum.a.clone()
+            }).collect();
+        let reporting_comm: ReportingEvent<C, A, P, K> = ReportingEvent::ReportingComm(ReportingComm {
+            consume: reporting_consume,
+            produces: reporting_produces
+        });
+
+        self.soft_report.push(Box::new(reporting_comm));
+        
+        return _comm;
+    }
+
+    fn reporting_log_consume(
+        &mut self,
+        consume_ref: Consume,
+        _channels: &Vec<C>,
+        _patterns: &Vec<P>,
+        _continuation: &K,
+        _persist: bool,
+        _peeks: &BTreeSet<i32>) -> Consume {
+        let comm_ref = self.log_consume(consume_ref, _channels, _patterns, _continuation, _persist, _peeks);
+        let reporting_consume: ReportingConsume<C, P, K> = ReportingConsume {
+            channels: _channels.to_vec(),
+            patterns: _patterns.to_vec(),
+            continuation: _continuation.clone(),
+            peeks: _peeks.clone()
+        };
+
+        self.soft_report.push(Box::new(ReportingEvent::ReportingConsume(reporting_consume)));
+
+        return comm_ref;
+    }
+
+    fn reporting_log_produce(
+        &mut self,
+        produce_ref: Produce,
+        _channel: &C,
+        _data: &A,
+        persist: bool) -> Produce {
+        let produce_ref = self.log_produce(produce_ref, _channel, _data, persist);
+
+        let reporting_produce: ReportingProduce<C, A> = ReportingProduce {
+            channel: _channel.clone(),
+            data: _data.clone()
+        };
+
+        self.soft_report.push(Box::new(ReportingEvent::ReportingProduce(reporting_produce)));
+
+        return produce_ref;
+    }
+
+    pub fn reporting_create_checkpoint(&mut self) ->  Result<Checkpoint, RSpaceError> {
+        let checkpoint:  Result<Checkpoint, RSpaceError> = self.create_checkpoint();
+        
+        if checkpoint.is_ok() {
+            self.report.clear();
+            self.soft_report.clear();
+        }
+        
+        return checkpoint;
+    }
+    
+    pub fn reporting_create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
+        self.collect_report();
+        
+        return self.create_soft_checkpoint();
+    }
+
+
     /* Helper functions */
 
     fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
@@ -1420,6 +1527,10 @@ impl RSpaceInstances {
         K: Clone + Debug,
         M: Match<P, A>,
     {
+
+        let empty_reports: Vec<Vec<Box<ReportingEvent<C, A, P, K>>>> = Vec::new();
+        let empty_sofy_report: Vec<Box<ReportingEvent<C, A, P, K>>> = Vec::new();
+
         RSpace {
             history_repository,
             store,
@@ -1428,6 +1539,8 @@ impl RSpaceInstances {
             event_log: Vec::new(),
             produce_counter: BTreeMap::new(),
             replay_data: MultisetMultiMap::empty(),
+            soft_report: empty_sofy_report,
+            report: empty_reports,
         }
     }
 
@@ -1526,3 +1639,34 @@ impl From<HistoryError> for RSpaceError {
         RSpaceError::HistoryError(error)
     }
 }
+
+/* ReportingRspace */
+#[derive(Clone)]
+pub enum ReportingEvent<C, A, P, K> {
+    ReportingProduce(ReportingProduce<C, A>),
+    ReportingConsume(ReportingConsume<C, P, K>),
+    ReportingComm(ReportingComm<C, A, P, K>),
+}
+
+#[derive(Clone)]
+pub struct ReportingProduce<C, A> {
+    pub channel: C,
+    pub data: A,
+}
+
+
+
+#[derive(Clone)]
+pub struct ReportingConsume<C, P, K> {
+    pub channels: Vec<C>,
+    pub patterns: Vec<P>,
+    pub continuation: K,
+    pub peeks: BTreeSet<i32>,
+}
+
+#[derive(Clone)]
+pub struct ReportingComm<C, A, P, K> {
+    pub consume: ReportingConsume<C, P, K>,
+    pub produces: Vec<ReportingProduce<C, A>>,
+}
+

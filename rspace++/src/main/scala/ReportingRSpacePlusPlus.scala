@@ -13,6 +13,8 @@ import coop.rchain.models.ListParWithRandom
 import coop.rchain.models.TaggedContinuation
 import coop.rchain.metrics.Metrics
 
+// import coop.rchain.models.rspace_plus_plus_types.ReportingEventNestedListProto
+
 object ReportingRSpacePlusPlus {
   def create[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
       storePath: String

@@ -1,6 +1,6 @@
 use dashmap::DashMap;
 use prost::Message;
-use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
+use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
@@ -8,20 +8,22 @@ use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances, ReportingEvent, ReportingProduce};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
+    event_proto, io_event_proto, reporting_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
     EventProto, HashProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
-    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
+    ProduceCounterMapEntry, ReportingEventProto, ReportingCommProto, ReportingConsumeProto, ReportingProduceProto,
+    ReportingEventListProto, ReportingEventNestedListProto, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
+use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 /*
@@ -782,6 +784,10 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     let soft_checkpoint = unsafe { (*rspace).rspace.lock().unwrap().create_soft_checkpoint() };
 
+    return convert_soft_checkpoint_to_proto(soft_checkpoint)
+}
+
+fn convert_soft_checkpoint_to_proto(soft_checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>) -> *const u8 {
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
     let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
     let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
@@ -1441,6 +1447,10 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
             .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
     };
 
+    return convert_checkpoint_to_proto(checkpoint)
+}
+
+fn convert_checkpoint_to_proto(checkpoint: Checkpoint) -> *const u8 {
     let log = checkpoint.log;
     let log_proto: Vec<EventProto> = log
         .into_iter()
@@ -1684,6 +1694,108 @@ pub extern "C" fn check_replay_data(rspace: *mut Space) -> () {
         (*rspace).rspace.lock().unwrap().check_replay_data();
     }
 }
+
+/* ReportingRspace */
+
+#[no_mangle]
+pub extern "C" fn reporting_get_report(rspace: *mut Space) -> *const u8 {
+    let report = unsafe { (*rspace).rspace.lock().unwrap().reporting_get_report() };
+
+    let reporting_enent_protos: Vec<ReportingEventListProto> = report.into_iter().map(|inner_vec| {
+        let list: Vec<ReportingEventProto> = inner_vec.into_iter().map(|reporting_event| {
+            match *reporting_event {
+                ReportingEvent::ReportingProduce(reporting_produce) => {
+                    let produce_proto = ReportingProduceProto {
+                        channel: Some(reporting_produce.channel),
+                        data: Some(reporting_produce.data),
+                    };
+                    ReportingEventProto {
+                        event_type: Some(reporting_event_proto::EventType::Produce(
+                            produce_proto,
+                        )),
+                    }
+                }
+
+                ReportingEvent::ReportingConsume(reporting_consume) => {
+                    let consume_proto = ReportingConsumeProto {
+                        channels: reporting_consume.channels,
+                        patterns: reporting_consume.patterns,
+                        continuation: Some(reporting_consume.continuation),
+                        peeks: reporting_consume.peeks.into_iter().collect(),
+                    };
+                    ReportingEventProto {
+                        event_type: Some(reporting_event_proto::EventType::Consume(
+                            consume_proto,
+                        )),
+                    }
+                }
+
+                ReportingEvent::ReportingComm(reporting_comm) => {
+                    let comm_proto = ReportingCommProto {
+                        consume: Some(ReportingConsumeProto {
+                            channels: reporting_comm.consume.channels,
+                            patterns: reporting_comm.consume.patterns,
+                            continuation: Some(reporting_comm.consume.continuation),
+                            peeks: reporting_comm.consume.peeks.into_iter().collect(),
+                        }),
+                        produces: reporting_comm.produces.into_iter().map(|reporting_produce| ReportingProduceProto {
+                            channel: Some(reporting_produce.channel),
+                            data: Some(reporting_produce.data),
+                        }).collect(),
+                    };
+                    ReportingEventProto {
+                        event_type: Some(reporting_event_proto::EventType::Comm(
+                            comm_proto,
+                        )),
+                    }
+                }
+            }
+        }).collect::<Vec<ReportingEventProto>>();
+
+        return ReportingEventListProto {
+            events: list,
+        };
+    }).collect::<Vec<ReportingEventListProto>>();
+
+    let report_list: ReportingEventNestedListProto = ReportingEventNestedListProto {
+        events: reporting_enent_protos,
+    };
+
+    let mut bytes = report_list.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn reporting_create_checkpoint(rspace: *mut Space) -> *const u8 {
+    let checkpoint = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reporting_create_checkpoint()
+            .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
+    };
+
+    return convert_checkpoint_to_proto(checkpoint);
+}
+
+#[no_mangle]
+pub extern "C" fn reporting_create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
+    let soft_checkpoint = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reporting_create_soft_checkpoint()
+    };
+
+    return convert_soft_checkpoint_to_proto(soft_checkpoint);
+}
+
 
 /* Helper Functions */
 
