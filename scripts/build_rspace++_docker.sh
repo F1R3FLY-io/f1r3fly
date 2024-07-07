@@ -19,7 +19,6 @@ else
 fi
 
 cross build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes
-# cargo build --profile dev --target $TARGET -p rspace_plus_plus_rhotypes --locked
 
 BUILD_ARTIFACTS_PATH="../rspace++/target/$TARGET/debug"
 COMMON_RELEASE_PATH="../rspace++/target/docker/debug"

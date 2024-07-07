@@ -45,31 +45,13 @@
         devShells.default = devshell.mkShell {
           commands = [
             {
-               name = "aarch64-linux-gnu-gcc";
-               package = pkgsCross.buildPackages.gcc;
-               help = "Cross-compiler for AArch64 targets";
-            }
-            {
               name = "docker";
               package = docker;
             }
             {
-              name = "cargo";
-              package = rust-bin.stable.latest.default.override {
-                targets = [ "x86_64-apple-darwin" "x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu" ];
-              };
-              help = "The Rust package management tool";
-            }
-            {
-              name = "rustc";
-              package = rust-bin.stable.latest.default.override {
-                targets = [ "x86_64-apple-darwin" "x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu" ];
-              };
-              help = "The Rust compiler";
-            }
-            { name = "rust-analyzer";
-              package = "rust-analyzer-unwrapped";
-              help = "Language server for Rust";
+              name = "rustup";
+              package = rustup;
+              help = "The Rust toolchain installer";
             }
             {
               name = "bnfc";

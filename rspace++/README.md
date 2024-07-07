@@ -26,7 +26,7 @@ Propose and finalize block using rspace++
 1. Complete the steps in 'Standing up network using RSpace++'.
 2. In a new terminal tab, run: `sbt "nodeCli/run"`
 
-Standing up network using RSpace++ (Under Docker) (Currently does not work under nix due to cross-rs issue)
+Standing up network using RSpace++ (Under Docker)
 1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 2. `docker compose -f docker/shard.yml up`
 
