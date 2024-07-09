@@ -270,7 +270,7 @@ message ReportingConsumeProto {
   repeated rhoapi.Par channels = 1;
   repeated rhoapi.BindPattern patterns = 2;
   rhoapi.TaggedContinuation continuation = 3;
-  repeated int32 peeks = 4;
+  repeated SortedSetElement peeks = 4;
 }
 
 message ReportingCommProto {

@@ -258,3 +258,38 @@ message LogProto {
 message HashProto {
   bytes hash = 1;
 }
+
+// ReportingRspace messages
+
+message ReportingProduceProto {
+  rhoapi.Par channel = 1;
+  rhoapi.ListParWithRandom data = 2;
+}
+
+ message ReportingConsumeProto {
+   repeated rhoapi.Par channels = 1;
+   repeated rhoapi.BindPattern patterns = 2;
+   rhoapi.TaggedContinuation continuation = 3;
+   repeated SortedSetElement peeks = 4;
+ }
+
+message ReportingCommProto {
+  ReportingConsumeProto consume = 1;
+  repeated ReportingProduceProto produces = 2;
+}
+
+message ReportingEventProto {
+  oneof event_type {
+    ReportingProduceProto produce = 1;
+    ReportingConsumeProto consume = 2;
+    ReportingCommProto comm = 3;
+  }
+}
+
+message ReportingEventListProto {
+  repeated ReportingEventProto events = 1;
+}
+
+message ReportingEventNestedListProto {
+  repeated ReportingEventListProto events = 1;
+}

@@ -134,6 +134,20 @@ trait JNAInterface extends Library {
 
   def reporting_create_soft_checkpoint(rspace: Pointer): Pointer
 
+  def reporting_log_consume(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
+  def reporting_log_produce(
+      rspace: Pointer,
+      produce_pointer: Pointer,
+      channel_bytes_len: Int,
+      data_bytes_len: Int,
+      persist: Boolean
+  ): Pointer
+
   /* Helper Functions */
 
   def hash_channel(channel_pointer: Pointer, channel_bytes_len: Int): Pointer

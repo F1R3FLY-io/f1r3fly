@@ -1796,6 +1796,53 @@ pub extern "C" fn reporting_create_soft_checkpoint(rspace: *mut Space) -> *const
     return convert_soft_checkpoint_to_proto(soft_checkpoint);
 }
 
+#[no_mangle]
+pub extern "C" fn reporting_log_consume(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let consume_params = ConsumeParams::decode(payload_slice).unwrap();
+
+    let channels = consume_params.channels;
+    let patterns = consume_params.patterns;
+    let continuation = consume_params.continuation.unwrap();
+    let persist = consume_params.persist;
+    let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reporting_log_consume(channels, patterns, continuation, persist, peeks);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn reporting_log_produce(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    channel_bytes_len: usize,
+    data_bytes_len: usize,
+    persist: bool,
+) -> () {
+    let payload_slice =
+        unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
+    let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
+
+    let channel = Par::decode(channel_slice).unwrap();
+    let data = ListParWithRandom::decode(data_slice).unwrap();
+
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reporting_log_produce(channel, data, persist);
+    }
+}
 
 /* Helper Functions */
 
