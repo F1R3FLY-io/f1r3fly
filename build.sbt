@@ -384,7 +384,7 @@ lazy val node = (project in file("node"))
       System.err.println("Using the fallback version: " + v)
       v
     }),
-    name := "rnode",
+    name := "RSpacePlusPlus",
     maintainer := "F1r3fly.io LCA https://f1r3fly.io/",
     packageSummary := "F1R3FLY Node",
     packageDescription := "F1R3FLY Node - blockchain node server software.",
