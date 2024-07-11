@@ -434,6 +434,7 @@ lazy val node = (project in file("node"))
         .get("DRONE_BUILD_NUMBER")
         .toSeq
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
+		dockerAlias := dockerAlias.value.withName("rnode-rspaceplusplus"),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
     // dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
     dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless",
@@ -476,7 +477,8 @@ lazy val node = (project in file("node"))
       "-J--add-opens",
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
-      "-Jjava.base/sun.nio.ch=ALL-UNNAMED"
+      "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
+      "-Djna.library.path=/opt/docker/"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
