@@ -21,7 +21,7 @@ use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
     StoreToMapValue, WaitingContinuationsProto,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{c_char, CStr};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
@@ -1721,7 +1721,11 @@ pub extern "C" fn reporting_get_report(rspace: *mut Space) -> *const u8 {
                         channels: reporting_consume.channels,
                         patterns: reporting_consume.patterns,
                         continuation: Some(reporting_consume.continuation),
-                        peeks: reporting_consume.peeks.into_iter().collect(),
+                        peeks: reporting_consume.peeks.into_iter().map(|peek| {
+                          SortedSetElement {
+                            value: peek,
+                          }
+                        }).collect(),
                     };
                     ReportingEventProto {
                         event_type: Some(reporting_event_proto::EventType::Consume(
@@ -1736,7 +1740,11 @@ pub extern "C" fn reporting_get_report(rspace: *mut Space) -> *const u8 {
                             channels: reporting_comm.consume.channels,
                             patterns: reporting_comm.consume.patterns,
                             continuation: Some(reporting_comm.consume.continuation),
-                            peeks: reporting_comm.consume.peeks.into_iter().collect(),
+                            peeks: reporting_comm.consume.peeks.into_iter().map(|peek| {
+                              SortedSetElement {
+                                value: peek,
+                              }
+                            }).collect(),
                         }),
                         produces: reporting_comm.produces.into_iter().map(|reporting_produce| ReportingProduceProto {
                             channel: Some(reporting_produce.channel),
@@ -1809,14 +1817,16 @@ pub extern "C" fn reporting_log_consume(
     let patterns = consume_params.patterns;
     let continuation = consume_params.continuation.unwrap();
     let persist = consume_params.persist;
-    let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+    let peeks: BTreeSet<i32> = consume_params.peeks.into_iter().map(|e| e.value).collect();
+    let consume_ref = Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
 
-    unsafe {
+
+  unsafe {
         (*rspace)
             .rspace
             .lock()
             .unwrap()
-            .reporting_log_consume(channels, patterns, continuation, persist, peeks);
+            .reporting_log_consume(consume_ref, &channels, &patterns, &continuation, persist, &peeks);
     }
 }
 
@@ -1834,13 +1844,14 @@ pub extern "C" fn reporting_log_produce(
 
     let channel = Par::decode(channel_slice).unwrap();
     let data = ListParWithRandom::decode(data_slice).unwrap();
+    let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
 
     unsafe {
         (*rspace)
             .rspace
             .lock()
             .unwrap()
-            .reporting_log_produce(channel, data, persist);
+            .reporting_log_produce(produce_ref, &channel, &data, persist);
     }
 }
 

@@ -1431,7 +1431,7 @@ where
         return _comm;
     }
 
-    fn reporting_log_consume(
+    pub fn reporting_log_consume(
         &mut self,
         consume_ref: Consume,
         _channels: &Vec<C>,
@@ -1452,7 +1452,7 @@ where
         return comm_ref;
     }
 
-    fn reporting_log_produce(
+    pub fn reporting_log_produce(
         &mut self,
         produce_ref: Produce,
         _channel: &C,
