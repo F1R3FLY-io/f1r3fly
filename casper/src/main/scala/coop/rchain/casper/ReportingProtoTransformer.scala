@@ -2,7 +2,8 @@ package coop.rchain.casper
 
 import cats.syntax.all._
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
-import coop.rchain.rspace.{ReportingRspace, ReportingTransformer}
+import rspacePlusPlus.ReportingRSpacePlusPlus
+import rspacePlusPlus.ReportingTransformer
 import coop.rchain.casper.protocol.{
   PeekProto,
   ReportCommProto,
@@ -37,6 +38,8 @@ class ReportingProtoTransformer
       produces = rcm.produces.map(serializeProduce).toList
     )
 
-  override def transformEvent(re: ReportingRspace.ReportingEvent): ReportEventProto =
+  override def transformEvent(
+      re: rspacePlusPlus.ReportingRSpacePlusPlus.ReportingEvent
+  ): ReportEventProto =
     super.transformEvent(re)
 }

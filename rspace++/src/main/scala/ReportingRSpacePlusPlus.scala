@@ -7,12 +7,18 @@ import coop.rchain.metrics.Metrics
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.models.rspace_plus_plus_types._
 import coop.rchain.rspace.{Checkpoint, ContResult, Result}
-import coop.rchain.rspace.ReportingRspace.{
+import rspacePlusPlus.ReportingRSpacePlusPlus.{
   ReportingComm,
   ReportingConsume,
   ReportingEvent,
   ReportingProduce
 }
+//import coop.rchain.rspace.ReportingRspace.{
+//  ReportingComm,
+//  ReportingConsume,
+//  ReportingEvent,
+//  ReportingProduce
+//}
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.rspace.trace.{COMM, Consume, Produce}
 import coop.rchain.shared.{Log, Serialize}
@@ -22,6 +28,20 @@ import scala.collection.SortedSet
 import scala.concurrent.ExecutionContext
 
 object ReportingRSpacePlusPlus {
+  sealed trait ReportingEvent
+
+  final case class ReportingProduce[C, A](channel: C, data: A) extends ReportingEvent
+  final case class ReportingConsume[C, P, K](
+      channels: Seq[C],
+      patterns: Seq[P],
+      continuation: K,
+      peeks: Seq[Int]
+  ) extends ReportingEvent
+  final case class ReportingComm[C, P, A, K](
+      consume: ReportingConsume[C, P, K],
+      produces: Seq[ReportingProduce[C, A]]
+  ) extends ReportingEvent
+
   def create[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
       storePath: String
   )(
@@ -33,11 +53,6 @@ object ReportingRSpacePlusPlus {
       scheduler: ExecutionContext
   ): F[ReportingRSpacePlusPlus[F, C, P, A, K]] =
     Sync[F].delay {
-      val INSTANCE: JNAInterface =
-        Native
-          .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
-          .asInstanceOf[JNAInterface]
-
       val rspacePointer = INSTANCE.space_new(storePath);
       new ReportingRSpacePlusPlus[F, C, P, A, K](rspacePointer)
     }
@@ -52,7 +67,11 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
     serializeA: Serialize[ListParWithRandom],
     serializeK: Serialize[TaggedContinuation],
     scheduler: ExecutionContext
-) extends ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer) {
+) extends RSpaceOpsPlusPlus[F](rspacePointer)
+    with IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation] {
+
+  override def getRspacePointer: Pointer = rspacePointer
+  protected override def logF: Log[F]    = Log[F]
 
   def getReport: F[Seq[Seq[ReportingEvent]]] =
     for {

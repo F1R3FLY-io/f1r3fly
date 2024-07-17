@@ -28,7 +28,6 @@ import coop.rchain.models.syntax._
 import coop.rchain.models.rholang.sorter.Sortable._
 import coop.rchain.models.serialization.implicits.mkProtobufInstance
 import coop.rchain.models.{BindPattern, BlockMetadata, Par}
-import coop.rchain.rspace.ReportingRspace.ReportingEvent
 import coop.rchain.rspace.hashing.StableHashProvider
 import coop.rchain.rspace.trace._
 import coop.rchain.models.syntax._

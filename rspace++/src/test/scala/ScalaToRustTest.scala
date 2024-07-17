@@ -26,7 +26,7 @@ class ScalaToRustTest extends AnyFunSuite with Matchers with BeforeAndAfterEach 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val log                  = Log.log[IO]
 
-  val _                 = System.setProperty("jna.library.path", "./target/release/")
+  val _                 = System.setProperty("jna.library.path", "./target/debug")
   val testDirectoryPath = "./src/test/scala/scala-to-rust_lmdb"
   var spacePtr: Pointer = _
 

@@ -8,7 +8,7 @@ import coop.rchain.casper.util.rholang.Resources
 import coop.rchain.casper.{ReportStore, ReportingCasper}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.p2p.EffectsTestInstances.LogicalTime
-import coop.rchain.rspace.ReportingRspace.ReportingComm
+//import coop.rchain.rspace.ReportingRspace.ReportingComm
 import coop.rchain.shared.scalatestcontrib.effectTest
 import coop.rchain.store.InMemoryStoreManager
 import coop.rchain.rspace.syntax._
