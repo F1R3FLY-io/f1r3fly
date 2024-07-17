@@ -436,8 +436,8 @@ lazy val node = (project in file("node"))
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
     dockerAlias := dockerAlias.value.withName("rnode-rspaceplusplus"),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
-    dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
-    // dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless",
+    // dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
+    dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless", // Using this image because resolves error of GLIB_C version for rspace++
     dockerEntrypoint := List(
       "/opt/docker/bin/rnode",
       "--profile=docker",
@@ -487,8 +487,8 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    // mappings in Docker += file("rspace++/target/docker/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rspace++/target/oracle/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rspace++/target/docker/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
+    // mappings in Docker += file("rspace++/target/oracle/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
 		// End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),

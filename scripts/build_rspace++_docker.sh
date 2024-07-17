@@ -27,10 +27,10 @@ mkdir -p "$COMMON_RELEASE_PATH"
 cp -r "$BUILD_ARTIFACTS_PATH"/* "$COMMON_RELEASE_PATH"/
 
 # Build for Oracle Cloud Cluster
-cross build --profile dev --target x86_64-unknown-linux-gnu -p rspace_plus_plus_rhotypes
+# cross build --profile dev --target x86_64-unknown-linux-gnu -p rspace_plus_plus_rhotypes
 
-ORACLE_ARTIFACTS_PATH="../rspace++/target/x86_64-unknown-linux-gnu/debug"
-ORACLE_RELEASE_PATH="../rspace++/target/oracle/debug"
+# ORACLE_ARTIFACTS_PATH="../rspace++/target/x86_64-unknown-linux-gnu/debug"
+# ORACLE_RELEASE_PATH="../rspace++/target/oracle/debug"
 
-mkdir -p "$ORACLE_RELEASE_PATH"
-cp -r "$ORACLE_ARTIFACTS_PATH"/* "$ORACLE_RELEASE_PATH"/
+# mkdir -p "$ORACLE_RELEASE_PATH"
+# cp -r "$ORACLE_ARTIFACTS_PATH"/* "$ORACLE_RELEASE_PATH"/
