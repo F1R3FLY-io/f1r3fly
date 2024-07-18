@@ -134,13 +134,19 @@ message ConsumeParams {
 /**
  * Data structure for 'log_comm' function parameters
  */
+message ConsumeCandidateProto {
+  rhoapi.Par channels = 1;
+  DatumProto datum = 2;
+  rhoapi.ListParWithRandom removedDatum = 3;
+  int32 dataIndex = 4;
+}
+
 message CommParams {
   CommProto comm = 1;
-  repeated rhoapi.Par channels = 2;
-  repeated rhoapi.BindPattern patterns = 3;
-  rhoapi.TaggedContinuation continuation = 4;
-  bool persist = 5;
-  repeated SortedSetElement peeks = 6;
+  repeated ConsumeCandidateProto dataCandidates = 2;
+  repeated rhoapi.Par channels = 3;
+  WaitingContinuationProto continuation = 4;
+  string label = 5;
 }
 
 /**

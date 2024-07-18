@@ -4,28 +4,21 @@ use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
-use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
+use rspace_plus_plus::rspace::internal::{ConsumeCandidate, Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::matcher::exports::*;
 use rspace_plus_plus::rspace::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances, ReportingEvent, ReportingProduce};
+use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances, ReportingEvent};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
-use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    event_proto, io_event_proto, reporting_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
-    EventProto, HashProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
-    ProduceCounterMapEntry, ReportingEventProto, ReportingCommProto, ReportingConsumeProto, ReportingProduceProto,
-    ReportingEventListProto, ReportingEventNestedListProto, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
-    StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
-    StoreToMapValue, WaitingContinuationsProto,
-};
+use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{event_proto, io_event_proto, reporting_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto, EventProto, HashProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto, ProduceCounterMapEntry, ReportingEventProto, ReportingCommProto, ReportingConsumeProto, ReportingProduceProto, ReportingEventListProto, ReportingEventNestedListProto, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry, StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry, StoreToMapValue, WaitingContinuationsProto, CommParams, ConsumeCandidateProto};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{c_char, CStr};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
-use rspace_plus_plus::rspace::rspace::ReportingEvent::ReportingComm;
+
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
  * These types (C, P, A, K) MUST MATCH the corresponding types on the Scala side in 'RSpacePlusPlus_RhoTypes.scala'
@@ -1862,24 +1855,79 @@ pub extern "C" fn reporting_log_comm(
     payload_bytes_len: usize,
 ) -> () {
     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-    let comm_params = ReportingComm::decode(payload_slice).unwrap();
+    let comm_params = CommParams::decode(payload_slice).unwrap();
 
-    let consume = comm_params.consume;
-    let produces = comm_params.produces;
-    let peeks: BTreeSet<i32> = comm_params.peeks.into_iter().map(|e| e.value).collect();
-    let times_repeated = comm_params.times_repeated.into_iter().map(|(k, v)| {
-        let key = Produce::create(k.channel_hash.clone(), k.hash.clone(), k.persistent);
-        (key, v)
-    }).collect();
+  let _data_candidates: Vec<ConsumeCandidate<Par, ListParWithRandom>> =
+      comm_params.data_candidates.into_iter().map(|cc: ConsumeCandidateProto| {
+        let datum_proto = cc.datum.unwrap();
+        let produce_proto = datum_proto.source.unwrap();
 
-    let comm_ref = ReportingCommProto::create(consume.clone(), produces.clone(), peeks.clone(), times_repeated.clone());
+        ConsumeCandidate {
+          channel: cc.channels.unwrap(),
+          datum: Datum {
+            a: datum_proto.a.unwrap(),
+            persist: datum_proto.persist,
+            source: Produce {
+              channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+              hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+              persistent: produce_proto.persistent,
+            },
+          },
+          removed_datum: cc.removed_datum.unwrap(),
+          datum_index: cc.data_index,
+        }
+      }).collect();
+    let _channels = comm_params.channels;
+
+  let waiting_continuation_proto = comm_params.continuation.unwrap();
+  let consume_proto = waiting_continuation_proto.source.unwrap();
+  let _wk: WaitingContinuation<BindPattern, TaggedContinuation> = WaitingContinuation{
+      source: Consume {
+        channel_hashes: consume_proto.channel_hashes.into_iter().map(|e| Blake2b256Hash::from_bytes(e)).collect(),
+        hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+        persistent: consume_proto.persistent,
+      },
+      patterns: waiting_continuation_proto.patterns,
+      continuation: Arc::new(Mutex::new(waiting_continuation_proto.continuation.unwrap())),
+      persist: waiting_continuation_proto.persist,
+      peeks: waiting_continuation_proto.peeks.into_iter().map(|e| e.value).collect(),
+    };
+  let comm_proto = comm_params.comm.unwrap();
+  let comm_consume_proto = comm_proto.consume.unwrap();
+  let _comm: COMM = COMM {
+      consume: Consume {
+        channel_hashes: comm_consume_proto.channel_hashes.into_iter().map(|e| Blake2b256Hash::from_bytes(e)).collect(),
+        hash: Blake2b256Hash::from_bytes(comm_consume_proto.hash),
+        persistent: comm_consume_proto.persistent,
+      },
+      produces: comm_proto.produces.into_iter().map(|produce_proto| Produce {
+        channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+        hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+        persistent: produce_proto.persistent,
+      }).collect(),
+      peeks: comm_proto.peeks.into_iter().map(|e| e.value).collect(),
+      times_repeated: comm_proto.times_repeated.into_iter().map(|map_entry| {
+        let key_proto = map_entry.key.unwrap();
+        let produce = Produce {
+          channel_hash: Blake2b256Hash::from_bytes(key_proto.channel_hash),
+          hash: Blake2b256Hash::from_bytes(key_proto.hash),
+          persistent: key_proto.persistent,
+        };
+
+        let value = map_entry.value;
+
+        (produce, value)
+      }).collect(),
+    };
+    let _label = comm_params.label;
+
 
     unsafe {
         (*rspace)
             .rspace
             .lock()
             .unwrap()
-            .reporting_log_comm(comm_ref, &consume, &produces, &peeks, &times_repeated);
+            .reporting_log_comm(&_data_candidates, &_channels, &_wk, &_comm, &_label);
     }
 }
 

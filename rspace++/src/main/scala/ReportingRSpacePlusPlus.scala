@@ -216,7 +216,6 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
       comm: COMM,
       label: String
   ): F[COMM] =
-    // calls INSTANCE.reporting_log_comm
     for {
       result <- Sync[F].delay {
 
@@ -250,13 +249,37 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
                        }(collection.breakOut)
                      )
                    ),
-                   channels,
-                   wk.patterns,
-                   Some(wk.continuation),
-                   wk.persist,
-                   wk.peeks.map[SortedSetElement, Seq[SortedSetElement]](new SortedSetElement(_))(
-                     collection.breakOut
-                   )
+                   dataCandidates = dataCandidates.map(
+                     dc =>
+                       ConsumeCandidateProto(
+                         channels = Some(dc.channel),
+                         datum = Some(
+                           DatumProto(
+                             Some(dc.datum.a),
+                             dc.datum.persist,
+                             Some(
+                               ProduceProto(
+                                 channelHash = dc.datum.source.channelsHash.toByteString,
+                                 hash = dc.datum.source.hash.toByteString,
+                                 persistent = dc.datum.source.persistent
+                               )
+                             )
+                           )
+                         ),
+                         removedDatum = Some(dc.removedDatum),
+                         dataIndex = dc.datumIndex
+                       )
+                   ),
+                   channels = channels,
+                   continuation = Some(
+                     WaitingContinuationProto(
+                       patterns = wk.patterns,
+                       continuation = Some(wk.continuation),
+                       persist = wk.persist,
+                       peeks = wk.peeks.map(p => new SortedSetElement(p)).toSeq
+                     )
+                   ),
+                   label = label
                  )
 
                  val commParamsBytes = commParams.toByteArray
