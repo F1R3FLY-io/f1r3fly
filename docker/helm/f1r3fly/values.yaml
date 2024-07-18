@@ -99,16 +99,18 @@ nodeKeys:
     privateKey: d584a35257491a26f26389f6cc5cc551b66060910d6aed529d3005b27fc0edb4
 
 image:
-  #repository: ghcr.io/f1r3fly-io/rnode #local
+  # repository: ghcr.io/f1r3fly-io/rnode-rspaceplusplus #local
   # repository: eu-frankfurt-1.ocir.io/frqbavregu95/random/rnode #remote
   # repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #remote
-  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode-m2test #remote
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode-rspaceplusplus-from-node #remote
   #pullPolicy: Never # Use `IfNotPresent` at Cloud Provider
   pullPolicy: IfNotPresent # Use `IfNotPresent` at Cloud Provider
   # Overrides the image tag whose default is the chart appVersion.
   #tag: "latest" #local
   #tag: "test" #remote
   tag: "latest"
+  # nodeSelector:
+  #   kubernetes.io/arch: arm64
 
 containerArgs:
   - "run"
@@ -188,8 +190,8 @@ resources:
     # for cluster with boot + 4 nodes
     # our cluster had 6 OCPU and 18 memory, 6-5=1additional OCPU and 18-16(3.2*5) = 2 additional memory
     # additional node resources kubernetes uses for internal resources (pods)
-    #cpu: 1
-    #memory: 3.2G
+    cpu: 1
+    memory: 3.2G
 
     # for cluster with boot + 8 nodes
     # our cluster had 10 OCPU and 34 memory, 10-9=1additional OCPU and 34-32(3.5*9) = 2 additional memory
