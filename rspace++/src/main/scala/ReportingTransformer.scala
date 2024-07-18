@@ -1,12 +1,5 @@
 package rspacePlusPlus
 
-//import coop.rchain.rspace.ReportingRspace.{
-//  ReportingComm,
-//  ReportingConsume,
-//  ReportingEvent,
-//  ReportingProduce
-//}
-
 import rspacePlusPlus.ReportingRSpacePlusPlus.{
   ReportingComm,
   ReportingConsume,

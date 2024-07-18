@@ -2,11 +2,12 @@ package rspacePlusPlus
 
 import cats.effect.{Concurrent, ContextShift, Sync}
 import cats.syntax.all._
-import com.sun.jna.{Memory, Native, Pointer}
+import com.sun.jna.{Memory, Pointer}
 import coop.rchain.metrics.Metrics
-import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.models.rspace_plus_plus_types._
-import coop.rchain.rspace.{Checkpoint, ContResult, Result}
+import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+import coop.rchain.rspace.internal.{ConsumeCandidate, WaitingContinuation}
+import coop.rchain.rspace.{Checkpoint, ContResult, HotStoreState, Result, SoftCheckpoint}
 import rspacePlusPlus.ReportingRSpacePlusPlus.{
   ReportingComm,
   ReportingConsume,
@@ -31,12 +32,14 @@ object ReportingRSpacePlusPlus {
   sealed trait ReportingEvent
 
   final case class ReportingProduce[C, A](channel: C, data: A) extends ReportingEvent
+
   final case class ReportingConsume[C, P, K](
       channels: Seq[C],
       patterns: Seq[P],
       continuation: K,
       peeks: Seq[Int]
   ) extends ReportingEvent
+
   final case class ReportingComm[C, P, A, K](
       consume: ReportingConsume[C, P, K],
       produces: Seq[ReportingProduce[C, A]]
@@ -67,11 +70,11 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
     serializeA: Serialize[ListParWithRandom],
     serializeK: Serialize[TaggedContinuation],
     scheduler: ExecutionContext
-) extends RSpaceOpsPlusPlus[F](rspacePointer)
-    with IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation] {
+) extends ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer) {
 
   override def getRspacePointer: Pointer = rspacePointer
-  protected override def logF: Log[F]    = Log[F]
+
+  protected override def logF: Log[F] = Log[F]
 
   def getReport: F[Seq[Seq[ReportingEvent]]] =
     for {
@@ -83,38 +86,41 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
                         .map(_.events)
                     )
       reports = reportProto.map(_.map { x =>
-        x.eventType match {
-          case ReportingEventProto.EventType.Consume(consume) =>
-            ReportingConsume(
-              consume.channels,
-              consume.patterns,
-              consume.continuation.getOrElse(throw new RuntimeException("Continuation is None")),
-              consume.peeks.map(_.value)
-            )
-          case ReportingEventProto.EventType.Produce(produce) =>
-            ReportingProduce(
-              produce.channel,
-              produce.data
-            )
-          case ReportingEventProto.EventType.Comm(ReportingCommProto(Some(consume), produces)) =>
-            ReportingComm(
-              ReportingConsume(
-                consume.channels,
-                consume.patterns,
-                consume.continuation.getOrElse(throw new RuntimeException("Continuation is None")),
-                consume.peeks.map(_.value)
-              ),
-              produces.map(
-                p =>
-                  ReportingProduce(
-                    p.channel.getOrElse(throw new RuntimeException("channel is None")),
-                    p.data.getOrElse(throw new RuntimeException("data is None"))
-                  )
-              )
-            )
-        }
+        mapReportinEventProto(x.eventType)
       })
     } yield reports
+
+  private def mapReportinEventProto(x: ReportingEventProto.EventType): ReportingEvent =
+    x match {
+      case ReportingEventProto.EventType.Consume(consume) =>
+        ReportingConsume(
+          consume.channels,
+          consume.patterns,
+          consume.continuation.getOrElse(throw new RuntimeException("Continuation is None")),
+          consume.peeks.map(_.value)
+        )
+      case ReportingEventProto.EventType.Produce(produce) =>
+        ReportingProduce(
+          produce.channel,
+          produce.data
+        )
+      case ReportingEventProto.EventType.Comm(ReportingCommProto(Some(consume), produces)) =>
+        ReportingComm(
+          ReportingConsume(
+            consume.channels,
+            consume.patterns,
+            consume.continuation.getOrElse(throw new RuntimeException("Continuation is None")),
+            consume.peeks.map(_.value)
+          ),
+          produces.map(
+            p =>
+              ReportingProduce(
+                p.channel.getOrElse(throw new RuntimeException("channel is None")),
+                p.data.getOrElse(throw new RuntimeException("data is None"))
+              )
+          )
+        )
+    }
 
   protected[this] override def lockedConsume(
       channels: Seq[ReportingRSpacePlusPlus.this.C],
@@ -201,6 +207,70 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
                }
     } yield result
 
+  protected override def logComm(
+      dataCandidates: Seq[
+        ConsumeCandidate[ReportingRSpacePlusPlus.this.C, ReportingRSpacePlusPlus.this.A]
+      ],
+      channels: Seq[ReportingRSpacePlusPlus.this.C],
+      wk: WaitingContinuation[ReportingRSpacePlusPlus.this.P, ReportingRSpacePlusPlus.this.K],
+      comm: COMM,
+      label: String
+  ): F[COMM] =
+    // calls INSTANCE.reporting_log_comm
+    for {
+      result <- Sync[F].delay {
+
+                 val commParams = CommParams(
+                   Some(
+                     CommProto(
+                       Some(
+                         ConsumeProto(
+                           comm.consume.channelsHashes.map(_.toByteString),
+                           comm.consume.hash.toByteString,
+                           comm.consume.persistent
+                         )
+                       ),
+                       comm.produces.map(
+                         p =>
+                           ProduceProto(
+                             p.channelsHash.toByteString,
+                             p.hash.toByteString,
+                             p.persistent
+                           )
+                       ),
+                       comm.peeks.map(p => new SortedSetElement(p)).toSeq,
+                       comm.timesRepeated.map[ProduceCounterMapEntry, Seq[ProduceCounterMapEntry]] {
+                         case (produce, times) =>
+                           val produceProto = ProduceProto(
+                             channelHash = produce.channelsHash.toByteString,
+                             hash = produce.hash.toByteString,
+                             persistent = produce.persistent
+                           )
+                           ProduceCounterMapEntry(Some(produceProto), times)
+                       }(collection.breakOut)
+                     )
+                   ),
+                   channels,
+                   wk.patterns,
+                   Some(wk.continuation),
+                   wk.persist,
+                   wk.peeks.map[SortedSetElement, Seq[SortedSetElement]](new SortedSetElement(_))(
+                     collection.breakOut
+                   )
+                 )
+
+                 val commParamsBytes = commParams.toByteArray
+                 val payloadMemory   = new Memory(commParamsBytes.length.toLong)
+                 payloadMemory.write(0, commParamsBytes, 0, commParamsBytes.length)
+
+                 INSTANCE.reporting_log_comm(
+                   rspacePointer,
+                   payloadMemory,
+                   commParamsBytes.length
+                 )
+               }
+    } yield comm
+
   protected[this] override def lockedProduce(
       channel: ReportingRSpacePlusPlus.this.C,
       data: ReportingRSpacePlusPlus.this.A,
@@ -275,100 +345,15 @@ class ReportingRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P
                }
     } yield result
 
-  override def createCheckpoint(): F[Checkpoint] =
-    for {
-      result <- Sync[F].delay {
+  // overrides and changes the behaviour of this.createCheckpoint()
+  protected override def internalCallCreateCheckpoint(): Pointer =
+    INSTANCE.reporting_create_checkpoint(
+      rspacePointer
+    )
 
-                 val checkpointResultPtr = INSTANCE.reporting_create_checkpoint(
-                   rspacePointer
-                 )
-
-                 if (checkpointResultPtr != null) {
-                   val resultByteslength = checkpointResultPtr.getInt(0)
-
-                   try {
-                     val resultBytes     = checkpointResultPtr.getByteArray(4, resultByteslength)
-                     val checkpointProto = CheckpointProto.parseFrom(resultBytes)
-                     val checkpointRoot  = checkpointProto.root
-
-                     val checkpointLogProto = checkpointProto.log
-                     val checkpointLog = checkpointLogProto.map {
-                       case eventProto if eventProto.eventType.isComm =>
-                         val commProto = eventProto.eventType.comm.get
-                         val consume   = commProto.consume
-                         val produces = commProto.produces.map { produceProto =>
-                           Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                         }
-                         val peeks = commProto.peeks.map(_.value).to[SortedSet]
-                         val timesRepeated = commProto.timesRepeated.map { entry =>
-                           val produceProto = entry.key.get
-                           val produce = Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                           produce -> entry.value
-                         }.toMap
-                         COMM(
-                           consume = Consume(
-                             channelsHashes = consume.get.channelHashes
-                               .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
-                             hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
-                             persistent = consume.get.persistent
-                           ),
-                           produces = produces,
-                           peeks = peeks,
-                           timesRepeated = timesRepeated
-                         )
-                       case eventProto if eventProto.eventType.isIoEvent =>
-                         val ioEventProto = eventProto.eventType.ioEvent.get
-                         ioEventProto.ioEventType match {
-                           case IOEventProto.IoEventType.Produce(produceProto) =>
-                             Produce(
-                               channelsHash =
-                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
-                             )
-                           case IOEventProto.IoEventType.Consume(consumeProto) =>
-                             Consume(
-                               channelsHashes = consumeProto.channelHashes
-                                 .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
-                               hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
-                               persistent = consumeProto.persistent
-                             )
-                           case _ =>
-                             throw new RuntimeException("Unknown IOEvent type")
-                         }
-                       case _ =>
-                         throw new RuntimeException("Unknown Event type")
-                     }
-
-                     Checkpoint(
-                       root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
-                       log = checkpointLog
-                     )
-
-                   } catch {
-                     case e: Throwable =>
-                       println("Error during scala createCheckpoint operation: " + e)
-                       throw e
-                   } finally {
-                     INSTANCE.deallocate_memory(checkpointResultPtr, resultByteslength)
-                   }
-                 } else {
-                   println(
-                     "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
-                   )
-                   throw new RuntimeException("Checkpoint pointer from rust was null")
-                 }
-               }
-    } yield result
-
+  // overrides and changes the behaviour of this.createSoftCheckpoint()
+  protected override def internalCallCreateSoftCheckpoint(): Pointer =
+    INSTANCE.reporting_create_soft_checkpoint(
+      rspacePointer
+    )
 }

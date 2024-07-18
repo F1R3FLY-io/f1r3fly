@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{c_char, CStr};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
-
+use rspace_plus_plus::rspace::rspace::ReportingEvent::ReportingComm;
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
  * These types (C, P, A, K) MUST MATCH the corresponding types on the Scala side in 'RSpacePlusPlus_RhoTypes.scala'
@@ -1852,6 +1852,34 @@ pub extern "C" fn reporting_log_produce(
             .lock()
             .unwrap()
             .reporting_log_produce(produce_ref, &channel, &data, persist);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn reporting_log_comm(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let comm_params = ReportingComm::decode(payload_slice).unwrap();
+
+    let consume = comm_params.consume;
+    let produces = comm_params.produces;
+    let peeks: BTreeSet<i32> = comm_params.peeks.into_iter().map(|e| e.value).collect();
+    let times_repeated = comm_params.times_repeated.into_iter().map(|(k, v)| {
+        let key = Produce::create(k.channel_hash.clone(), k.hash.clone(), k.persistent);
+        (key, v)
+    }).collect();
+
+    let comm_ref = ReportingCommProto::create(consume.clone(), produces.clone(), peeks.clone(), times_repeated.clone());
+
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .reporting_log_comm(comm_ref, &consume, &produces, &peeks, &times_repeated);
     }
 }
 

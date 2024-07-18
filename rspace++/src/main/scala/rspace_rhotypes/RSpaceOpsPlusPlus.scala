@@ -29,11 +29,12 @@ import coop.rchain.models.rspace_plus_plus_types.{
   WaitingContinuationsProto
 }
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+
 import scala.collection.SortedSet
 import coop.rchain.rspace.{ContResult, Result}
 import coop.rchain.rspace.trace.{Consume, Produce}
 import coop.rchain.rspace.{Checkpoint, SoftCheckpoint}
-import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
+import coop.rchain.rspace.internal.{ConsumeCandidate, Datum, Row, WaitingContinuation}
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
@@ -51,14 +52,17 @@ import coop.rchain.rspace.HotStoreTrieAction
 import coop.rchain.rspace.HotStoreAction
 import coop.rchain.rspace.history.History
 import coop.rchain.state.TrieNode
+
 import java.nio.ByteBuffer
 import scodec.bits.ByteVector
 import com.typesafe.scalalogging.Logger
 import cats.effect.ContextShift
+
 import scala.concurrent.ExecutionContext
 import rspacePlusPlus.state.{RSpacePlusPlusExporter, RSpacePlusPlusImporter}
-import rspacePlusPlus.history.{RSpacePlusPlusHistoryReader}
+import rspacePlusPlus.history.RSpacePlusPlusHistoryReader
 import coop.rchain.rspace.state.exporters.RSpaceExporterItems.StoreItems
+
 import java.nio.file.Path
 import coop.rchain.metrics.Metrics
 import coop.rchain.rspace.history.HistoryReaderBase
@@ -72,7 +76,7 @@ import coop.rchain.models.rspace_plus_plus_types.EventProto
 import coop.rchain.models.rspace_plus_plus_types.CommProto
 import coop.rchain.rspace.RSpaceMetricsSource
 import coop.rchain.rspace.concurrent.ConcurrentTwoStepLockF
-import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE}
+import rspacePlusPlus.JNAInterfaceLoader.INSTANCE
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeDatum
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeContinuation
 import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
@@ -1231,7 +1235,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   override def createSoftCheckpoint(): F[SoftCheckpoint[C, P, A, K]] = {
     for {
       result <- Sync[F].delay {
-                 val softCheckpointPtr = INSTANCE.create_soft_checkpoint(rspacePointer)
+                 val softCheckpointPtr = internalCallCreateSoftCheckpoint()
 
                  if (softCheckpointPtr != null) {
                    val length = softCheckpointPtr.getInt(0)
@@ -1456,6 +1460,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
     } yield result
   }
 
+  protected def internalCallCreateSoftCheckpoint(): Pointer =
+    INSTANCE.create_soft_checkpoint(rspacePointer)
+
   override def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit] =
     for {
       _ <- Sync[F].delay {
@@ -1655,4 +1662,12 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
             payloadMemory.clear()
           }
     } yield ()
+
+  protected def logComm(
+      dataCandidates: Seq[ConsumeCandidate[C, A]],
+      channels: Seq[C],
+      wk: WaitingContinuation[P, K],
+      comm: COMM,
+      label: String
+  ): F[COMM]
 }

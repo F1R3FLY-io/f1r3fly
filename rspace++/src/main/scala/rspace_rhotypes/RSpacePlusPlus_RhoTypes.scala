@@ -29,17 +29,25 @@ import coop.rchain.models.rspace_plus_plus_types.{
   WaitingContinuationsProto
 }
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+
 import scala.collection.SortedSet
-import coop.rchain.rspace.{ContResult, Result}
+import coop.rchain.rspace.{
+  internal,
+  Checkpoint,
+  ContResult,
+  HotStoreAction,
+  HotStoreState,
+  HotStoreTrieAction,
+  Result,
+  SoftCheckpoint
+}
 import coop.rchain.rspace.trace.{Consume, Produce}
-import coop.rchain.rspace.{Checkpoint, SoftCheckpoint}
 import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
 import coop.rchain.models.rspace_plus_plus_types.CheckpointProto
 import coop.rchain.rspace.trace.Event
-import coop.rchain.rspace.HotStoreState
 
 import scala.collection.immutable.Map
 import com.google.protobuf.ByteString
@@ -47,18 +55,19 @@ import coop.rchain.rspace.state.RSpaceExporter
 import coop.rchain.rspace.state.RSpaceImporter
 import coop.rchain.shared.Serialize
 import coop.rchain.rspace.history.HistoryReader
-import coop.rchain.rspace.HotStoreTrieAction
-import coop.rchain.rspace.HotStoreAction
 import coop.rchain.rspace.history.History
 import coop.rchain.state.TrieNode
+
 import java.nio.ByteBuffer
 import scodec.bits.ByteVector
 import com.typesafe.scalalogging.Logger
 import cats.effect.ContextShift
+
 import scala.concurrent.ExecutionContext
 import rspacePlusPlus.state.{RSpacePlusPlusExporter, RSpacePlusPlusImporter}
-import rspacePlusPlus.history.{RSpacePlusPlusHistoryReader}
+import rspacePlusPlus.history.RSpacePlusPlusHistoryReader
 import coop.rchain.rspace.state.exporters.RSpaceExporterItems.StoreItems
+
 import java.nio.file.Path
 import coop.rchain.metrics.Metrics
 import coop.rchain.rspace.history.HistoryReaderBase
@@ -70,7 +79,7 @@ import coop.rchain.rspace.trace.COMM
 import coop.rchain.models.rspace_plus_plus_types.IOEventProto
 import coop.rchain.models.rspace_plus_plus_types.EventProto
 import coop.rchain.models.rspace_plus_plus_types.CommProto
-import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE => INSTANCE}
+import rspacePlusPlus.JNAInterfaceLoader.INSTANCE
 
 /**
   * This class contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -373,6 +382,16 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                  new RSpacePlusPlus_RhoTypes[F](rspace)
                }
     } yield result
+
+  protected override def logComm(
+      dataCandidates: Seq[internal.ConsumeCandidate[C, A]],
+      channels: Seq[C],
+      wk: WaitingContinuation[P, K],
+      comm: COMM,
+      label: String
+  ): F[COMM] =
+    //TODO: impl
+    Sync[F].delay(comm)
 }
 
 object RSpacePlusPlus_RhoTypes {

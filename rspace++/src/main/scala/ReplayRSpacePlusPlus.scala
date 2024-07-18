@@ -2,29 +2,30 @@ package rspacePlusPlus
 
 import cats.Applicative
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
-import coop.rchain.models.rspace_plus_plus_types.{ActionResult}
+import coop.rchain.models.rspace_plus_plus_types.ActionResult
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
 import com.sun.jna.{Memory, Native, Pointer}
+
 import java.nio.file.Files
 import cats.effect.ContextShift
+
 import scala.concurrent.ExecutionContext
 import coop.rchain.metrics.Metrics
 import coop.rchain.shared.Serialize
 import coop.rchain.rspace.trace.Produce
+
 import scala.collection.SortedSet
 import coop.rchain.rspace.trace.Consume
-import coop.rchain.rspace.Checkpoint
+import coop.rchain.rspace.{internal, Checkpoint, ContResult, Result}
 import coop.rchain.models.rspace_plus_plus_types.CheckpointProto
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.models.rspace_plus_plus_types.IOEventProto
 import coop.rchain.rspace.trace.COMM
-import coop.rchain.rspace.ContResult
-import coop.rchain.rspace.Result
 import coop.rchain.models.rspace_plus_plus_types.ConsumeParams
 import coop.rchain.models.rspace_plus_plus_types.SortedSetElement
-import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE => INSTANCE}
+import rspacePlusPlus.JNAInterfaceLoader.INSTANCE
 
 class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
     rspacePointer: Pointer
@@ -206,9 +207,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
       result <- Sync[F].delay {
                  //  println("\nhit scala createCheckpoint")
 
-                 val checkpointResultPtr = INSTANCE.replay_create_checkpoint(
-                   rspacePointer
-                 )
+                 val checkpointResultPtr = internalCallCreateCheckpoint()
 
                  if (checkpointResultPtr != null) {
                    val resultByteslength = checkpointResultPtr.getInt(0)
@@ -311,6 +310,11 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
     } yield result
   }
 
+  protected def internalCallCreateCheckpoint(): Pointer =
+    INSTANCE.replay_create_checkpoint(
+      rspacePointer
+    )
+
   override def clear(): F[Unit] = Sync[F].delay { INSTANCE.replay_clear(rspacePointer) }
 
   def spawn: F[IReplaySpacePlusPlus[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
@@ -332,6 +336,18 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
 
   def getRspacePointer: Pointer =
     rspacePointer
+
+  protected override def logComm(
+      dataCandidates: Seq[
+        internal.ConsumeCandidate[ReplayRSpacePlusPlus.this.C, ReplayRSpacePlusPlus.this.A]
+      ],
+      channels: Seq[ReplayRSpacePlusPlus.this.C],
+      wk: internal.WaitingContinuation[ReplayRSpacePlusPlus.this.P, ReplayRSpacePlusPlus.this.K],
+      comm: COMM,
+      label: String
+  ): F[COMM] =
+    //TODO: increment counter
+    Sync[F].delay(comm)
 }
 
 object ReplayRSpacePlusPlus {

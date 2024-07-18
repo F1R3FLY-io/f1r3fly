@@ -132,6 +132,18 @@ message ConsumeParams {
 }
 
 /**
+ * Data structure for 'log_comm' function parameters
+ */
+message CommParams {
+  CommProto comm = 1;
+  repeated rhoapi.Par channels = 2;
+  repeated rhoapi.BindPattern patterns = 3;
+  rhoapi.TaggedContinuation continuation = 4;
+  bool persist = 5;
+  repeated SortedSetElement peeks = 6;
+}
+
+/**
  * Data structure for 'install' function parameters
  */
 message InstallParams {

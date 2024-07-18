@@ -1401,7 +1401,7 @@ where
         return copy;
     }
 
-    fn reporting_log_comm<'a>(
+    pub fn reporting_log_comm<'a>(
         &mut self, 
         _data_candidates: &Vec<ConsumeCandidate<C, A>>, 
         _channels: &Vec<C>, 

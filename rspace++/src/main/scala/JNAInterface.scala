@@ -140,6 +140,12 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Pointer
 
+  def reporting_log_comm(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
   def reporting_log_produce(
       rspace: Pointer,
       produce_pointer: Pointer,
