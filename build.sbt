@@ -446,6 +446,7 @@ lazy val node = (project in file("node"))
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
+    dockerBuildOptions := Seq("--builder", "default", "--platform", "linux/amd64,linux/arm64", "-t", "ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"),
     dockerCommands ++= {
       Seq(
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
@@ -489,7 +490,7 @@ lazy val node = (project in file("node"))
     },
     mappings in Docker += file("rspace++/target/docker/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
     // mappings in Docker += file("rspace++/target/oracle/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
-		// End of sbt-native-packager settings
+    // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
     libraryDependencies += {

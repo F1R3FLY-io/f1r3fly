@@ -102,7 +102,7 @@ image:
   # repository: ghcr.io/f1r3fly-io/rnode-rspaceplusplus #local
   # repository: eu-frankfurt-1.ocir.io/frqbavregu95/random/rnode #remote
   # repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #remote
-  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode-rspaceplusplus-from-node #remote
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode-rspaceplusplus #remote
   #pullPolicy: Never # Use `IfNotPresent` at Cloud Provider
   pullPolicy: IfNotPresent # Use `IfNotPresent` at Cloud Provider
   # Overrides the image tag whose default is the chart appVersion.
