@@ -479,7 +479,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-Djna.library.path=/opt/docker/"
+      "-Djna.library.path=/opt/docker/arm64:opt/docker/amd64"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
@@ -488,8 +488,8 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    mappings in Docker += file("rspace++/target/docker/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
-    // mappings in Docker += file("rspace++/target/oracle/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rspace++/target/docker/arm64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/arm64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rspace++/target/docker/amd64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/amd64/librspace_plus_plus_rhotypes.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
