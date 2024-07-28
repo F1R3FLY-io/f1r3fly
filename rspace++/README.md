@@ -27,8 +27,10 @@ Propose and finalize block using rspace++
 2. In a new terminal tab, run: `sbt "nodeCli/run"`
 
 Standing up network using RSpace++ (Under Docker)
-1. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
-2. `docker compose -f docker/shard.yml up`
+1. `docker context use default`
+2. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
+3. `docker compose -f docker/shard.yml up`
+4. (Optional) Run this command to ensure nodes preform genesis ceremony: `./delete_data.sh`
 
 ### Working Rholang Contracts using RSpace++ (under standalone node)
 

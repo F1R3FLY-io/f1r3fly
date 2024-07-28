@@ -466,56 +466,6 @@ pub extern "C" fn get_data(
 }
 
 #[no_mangle]
-pub extern "C" fn get_history_data(
-    rspace: *mut Space,
-    payload_pointer: *const u8,
-    state_hash_bytes_len: usize,
-    key_bytes_len: usize,
-) -> *const u8 {
-    let payload_slice = unsafe {
-        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-    };
-    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-    let datums = unsafe {
-        let space = (*rspace).rspace.lock().unwrap();
-        space
-            .history_repository
-            .get_history_reader(state_hash)
-            .unwrap()
-            .get_data(&key)
-            .unwrap()
-    };
-
-    let datums_protos: Vec<DatumProto> = datums
-        .into_iter()
-        .map(|datum| DatumProto {
-            a: Some(datum.a),
-            persist: datum.persist,
-            source: Some(ProduceProto {
-                channel_hash: datum.source.channel_hash.bytes(),
-                hash: datum.source.hash.bytes(),
-                persistent: datum.source.persistent,
-            }),
-        })
-        .collect();
-
-    let datums_proto = DatumsProto {
-        datums: datums_protos,
-    };
-
-    let mut bytes = datums_proto.encode_to_vec();
-    let len = bytes.len() as u32;
-    let len_bytes = len.to_le_bytes().to_vec();
-    let mut result = len_bytes;
-    result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
-}
-
-#[no_mangle]
 pub extern "C" fn get_waiting_continuations(
     rspace: *mut Space,
     channels_pointer: *const u8,
@@ -573,70 +523,6 @@ pub extern "C" fn get_waiting_continuations(
 }
 
 #[no_mangle]
-pub extern "C" fn get_history_waiting_continuations(
-    rspace: *mut Space,
-    payload_pointer: *const u8,
-    state_hash_bytes_len: usize,
-    key_bytes_len: usize,
-) -> *const u8 {
-    let payload_slice = unsafe {
-        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-    };
-    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-    let wks = unsafe {
-        let space = (*rspace).rspace.lock().unwrap();
-        space
-            .history_repository
-            .get_history_reader(state_hash)
-            .unwrap()
-            .get_continuations(&key)
-            .unwrap()
-    };
-
-    let wks_protos: Vec<WaitingContinuationProto> = wks
-        .into_iter()
-        .map(|wk| {
-            let cont_lock = wk.continuation.lock().unwrap();
-            let res = WaitingContinuationProto {
-                patterns: wk.patterns,
-                continuation: Some(cont_lock.clone()),
-                persist: wk.persist,
-                peeks: wk
-                    .peeks
-                    .into_iter()
-                    .map(|peek| SortedSetElement { value: peek as i32 })
-                    .collect(),
-                source: Some(ConsumeProto {
-                    channel_hashes: wk
-                        .source
-                        .channel_hashes
-                        .iter()
-                        .map(|hash| hash.bytes())
-                        .collect(),
-                    hash: wk.source.hash.bytes(),
-                    persistent: wk.source.persistent,
-                }),
-            };
-            drop(cont_lock);
-            res
-        })
-        .collect();
-
-    let wks_proto = WaitingContinuationsProto { wks: wks_protos };
-
-    let mut bytes = wks_proto.encode_to_vec();
-    let len = bytes.len() as u32;
-    let len_bytes = len.to_le_bytes().to_vec();
-    let mut result = len_bytes;
-    result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
-}
-
-#[no_mangle]
 pub extern "C" fn get_joins(
     rspace: *mut Space,
     channel_pointer: *const u8,
@@ -646,42 +532,6 @@ pub extern "C" fn get_joins(
     let channel = Par::decode(channel_slice).unwrap();
 
     let joins = unsafe { (*rspace).rspace.lock().unwrap().get_joins(channel) };
-
-    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
-    let joins_proto = JoinsProto { joins: vec_join };
-
-    let mut bytes = joins_proto.encode_to_vec();
-    let len = bytes.len() as u32;
-    let len_bytes = len.to_le_bytes().to_vec();
-    let mut result = len_bytes;
-    result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
-}
-
-#[no_mangle]
-pub extern "C" fn get_history_joins(
-    rspace: *mut Space,
-    payload_pointer: *const u8,
-    state_hash_bytes_len: usize,
-    key_bytes_len: usize,
-) -> *const u8 {
-    let payload_slice = unsafe {
-        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-    };
-    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-    let joins = unsafe {
-        let space = (*rspace).rspace.lock().unwrap();
-        space
-            .history_repository
-            .get_history_reader(state_hash)
-            .unwrap()
-            .get_joins(&key)
-            .unwrap()
-    };
 
     let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
     let joins_proto = JoinsProto { joins: vec_join };
@@ -1288,6 +1138,184 @@ pub extern "C" fn revert_to_soft_checkpoint(
             .revert_to_soft_checkpoint(soft_checkpoint)
             .expect("Rust RSpacePlusPlus Library: Failed to revert to soft checkpoint")
     }
+}
+
+/* HistoryRepo */
+
+/* Importer */
+
+#[no_mangle]
+pub extern "C" fn set_root(
+    rspace: *mut Space,
+    root_pointer: *const u8,
+    root_bytes_len: usize,
+) -> () {
+    let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
+    let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
+
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_root(&root)
+    }
+}
+
+/* HistoryReader */
+
+#[no_mangle]
+pub extern "C" fn get_history_data(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let datums = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_data(&key)
+            .unwrap()
+    };
+
+    let datums_protos: Vec<DatumProto> = datums
+        .into_iter()
+        .map(|datum| DatumProto {
+            a: Some(datum.a),
+            persist: datum.persist,
+            source: Some(ProduceProto {
+                channel_hash: datum.source.channel_hash.bytes(),
+                hash: datum.source.hash.bytes(),
+                persistent: datum.source.persistent,
+            }),
+        })
+        .collect();
+
+    let datums_proto = DatumsProto {
+        datums: datums_protos,
+    };
+
+    let mut bytes = datums_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_waiting_continuations(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let wks = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_continuations(&key)
+            .unwrap()
+    };
+
+    let wks_protos: Vec<WaitingContinuationProto> = wks
+        .into_iter()
+        .map(|wk| {
+            let cont_lock = wk.continuation.lock().unwrap();
+            let res = WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(cont_lock.clone()),
+                persist: wk.persist,
+                peeks: wk
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
+                    .collect(),
+                source: Some(ConsumeProto {
+                    channel_hashes: wk
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
+                }),
+            };
+            drop(cont_lock);
+            res
+        })
+        .collect();
+
+    let wks_proto = WaitingContinuationsProto { wks: wks_protos };
+
+    let mut bytes = wks_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_joins(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let joins = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_joins(&key)
+            .unwrap()
+    };
+
+    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+    let joins_proto = JoinsProto { joins: vec_join };
+
+    let mut bytes = joins_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 /* ReplayRSpace */

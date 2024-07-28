@@ -98,6 +98,14 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Unit
 
+  /* Importer */
+
+  def set_root(
+      rspace: Pointer,
+      root_pointer: Pointer,
+      root_bytes_len: Int
+  ): Unit
+
   /* ReplayRSpace */
 
   def replay_produce(

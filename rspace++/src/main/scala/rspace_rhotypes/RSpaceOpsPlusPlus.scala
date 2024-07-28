@@ -237,10 +237,25 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                ???
                              }
 
-                             override def setRoot(key: Blake2b256Hash): F[Unit] = {
-                               println("setRoot")
-                               ???
-                             }
+                             override def setRoot(key: Blake2b256Hash): F[Unit] =
+                               for {
+                                 _ <- Sync[F].delay {
+                                       val rootBytes = root.bytes.toArray
+
+                                       val rootMemory = new Memory(rootBytes.length.toLong)
+                                       rootMemory.write(0, rootBytes, 0, rootBytes.length)
+
+                                       val _ = INSTANCE.set_root(
+                                         rspacePointer,
+                                         rootMemory,
+                                         rootBytes.length
+                                       )
+
+                                       // Not sure if these lines are needed
+                                       // Need to figure out how to deallocate each memory instance
+                                       rootMemory.clear()
+                                     }
+                               } yield ()
 
                              override def getHistoryItem(
                                  hash: Blake2b256Hash

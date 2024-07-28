@@ -1,5 +1,6 @@
 ### Quickstart:
 ```
+docker context use default
 sbt ";clean ;compile ;project node ;Docker/publishLocal"
 cd docker
 docker compose -f ./shard.yml up # to start shard
@@ -17,3 +18,5 @@ Should see something like this:
   "result": "Success!\nDeployId is: 3044022013ccc7913ed7947e50cf595774931ad61e829c0699a8b302dabc42d42c8592bd02206f4a17e369cea9dc8357a788fab7d365eba3ab7cae4a8d101c77e27812625d98"
 }
 ```
+
+(Optional) Run this command to ensure nodes preform genesis ceremony: `./delete_data.sh`
