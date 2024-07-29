@@ -1142,6 +1142,21 @@ pub extern "C" fn revert_to_soft_checkpoint(
 
 /* HistoryRepo */
 
+#[no_mangle]
+pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
+    let root = unsafe { (*rspace).rspace.lock().unwrap().history_repository.root() };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
 /* Importer */
 
 #[no_mangle]

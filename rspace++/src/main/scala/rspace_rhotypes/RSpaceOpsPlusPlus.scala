@@ -76,6 +76,7 @@ import rspacePlusPlus.JNAInterfaceLoader.{INSTANCE}
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeDatum
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeContinuation
 import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
+import coop.rchain.models.rspace_plus_plus_types.HashProto
 
 // NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
@@ -276,7 +277,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                           new RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K] {
 
                             override def root: Blake2b256Hash = {
-                              println("root")
+                              println("history reader root")
                               ???
                             }
 
@@ -859,7 +860,34 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
 
     override def getSerializeC: Serialize[C] = serializeC
 
-    override def root: Blake2b256Hash = { println("\nroot"); ??? }
+    override def root: Blake2b256Hash = {
+      val rootPtr = INSTANCE.history_repo_root(
+        rspacePointer
+      )
+
+      if (rootPtr != null) {
+        val resultByteslength = rootPtr.getInt(0)
+
+        try {
+          val resultBytes = rootPtr.getByteArray(4, resultByteslength)
+          val hashProto   = HashProto.parseFrom(resultBytes)
+          val hash =
+            Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
+
+          hash
+
+        } catch {
+          case e: Throwable =>
+            println("Error during scala hashChannel operation: " + e)
+            throw e
+        } finally {
+          INSTANCE.deallocate_memory(rootPtr, resultByteslength)
+        }
+      } else {
+        println("rootPtr is null")
+        throw new RuntimeException("rootPtr is null")
+      }
+    }
 
   }
 

@@ -53,37 +53,16 @@ trait JNAInterface extends Library {
       channel_bytes_len: Int
   ): Pointer
 
-  def get_history_data(
-      rspace: Pointer,
-      payload_pointer: Pointer,
-      state_hash_bytes_len: Int,
-      key_bytes_len: Int
-  ): Pointer
-
   def get_waiting_continuations(
       rspace: Pointer,
       channels_pointer: Pointer,
       channels_bytes_len: Int
   ): Pointer
 
-  def get_history_waiting_continuations(
-      rspace: Pointer,
-      payload_pointer: Pointer,
-      state_hash_bytes_len: Int,
-      key_bytes_len: Int
-  ): Pointer
-
   def get_joins(
       rspace: Pointer,
       channel_pointer: Pointer,
       channel_bytes_len: Int
-  ): Pointer
-
-  def get_history_joins(
-      rspace: Pointer,
-      payload_pointer: Pointer,
-      state_hash_bytes_len: Int,
-      key_bytes_len: Int
   ): Pointer
 
   def to_map(rspace: Pointer): Pointer
@@ -98,6 +77,10 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Unit
 
+  /* HistoryRepo */
+
+  def history_repo_root(rspace: Pointer): Pointer
+
   /* Importer */
 
   def set_root(
@@ -105,6 +88,29 @@ trait JNAInterface extends Library {
       root_pointer: Pointer,
       root_bytes_len: Int
   ): Unit
+
+  /* HistoryReader */
+
+  def get_history_data(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      state_hash_bytes_len: Int,
+      key_bytes_len: Int
+  ): Pointer
+
+  def get_history_waiting_continuations(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      state_hash_bytes_len: Int,
+      key_bytes_len: Int
+  ): Pointer
+
+  def get_history_joins(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      state_hash_bytes_len: Int,
+      key_bytes_len: Int
+  ): Pointer
 
   /* ReplayRSpace */
 
