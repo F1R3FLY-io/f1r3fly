@@ -15,9 +15,9 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace::ByteVector;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
-    EventProto, HashProto, HotStoreStateProto, IoEventProto, ItemsProto, JoinProto, JoinsProto,
-    LogProto, ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry,
+    event_proto, io_event_proto, ByteVectorProto, ChannelsProto, CheckpointProto, CommProto,
+    DatumsProto, EventProto, HashProto, HotStoreStateProto, IoEventProto, ItemsProto, JoinProto,
+    JoinsProto, LogProto, ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry,
     StoreStateDataMapEntry, StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry,
     StoreStateJoinsMapEntry, StoreToMapValue, WaitingContinuationsProto,
 };
@@ -1241,6 +1241,43 @@ pub extern "C" fn set_root(
             .lock()
             .unwrap()
             .set_root(&root)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_item(
+    rspace: *mut Space,
+    hash_pointer: *const u8,
+    hash_bytes_len: usize,
+) -> *const u8 {
+    let hash_slice = unsafe { std::slice::from_raw_parts(hash_pointer, hash_bytes_len) };
+    let hash = Blake2b256Hash::from_bytes(hash_slice.to_vec());
+
+    let history_item = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .get_history_item(hash)
+    };
+
+    if history_item.is_some() {
+        let history_item_proto = ByteVectorProto {
+            byte_vector: history_item.unwrap(),
+        };
+
+        let mut bytes = history_item_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    } else {
+        std::ptr::null()
     }
 }
 

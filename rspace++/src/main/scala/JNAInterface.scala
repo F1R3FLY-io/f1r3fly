@@ -101,6 +101,12 @@ trait JNAInterface extends Library {
       root_bytes_len: Int
   ): Unit
 
+  def get_history_item(
+      rspace: Pointer,
+      hash_pointer: Pointer,
+      hash_bytes_len: Int
+  ): Pointer
+
   /* HistoryReader */
 
   def history_reader_root(

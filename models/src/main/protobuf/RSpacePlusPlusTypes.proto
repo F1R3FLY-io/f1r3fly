@@ -267,3 +267,7 @@ message ItemProto {
 message ItemsProto {
   repeated ItemProto items = 1;
 }
+
+message ByteVectorProto {
+  bytes byte_vector = 1;
+}

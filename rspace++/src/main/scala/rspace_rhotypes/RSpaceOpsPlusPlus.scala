@@ -79,6 +79,7 @@ import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
 import coop.rchain.models.rspace_plus_plus_types.HashProto
 import coop.rchain.models.rspace_plus_plus_types.ItemsProto
 import coop.rchain.models.rspace_plus_plus_types.ItemProto
+import coop.rchain.models.rspace_plus_plus_types.ByteVectorProto
 
 // NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
@@ -350,11 +351,54 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
 
                              override def getHistoryItem(
                                  hash: Blake2b256Hash
-                             ): F[Option[ByteVector]] = {
-                               println("getHistoryItem")
-                               ???
-                             }
+                             ): F[Option[ByteVector]] =
+                               for {
+                                 result <- Sync[F].delay {
+                                            val hashBytes = hash.bytes.toArray
 
+                                            val hashMemory = new Memory(hashBytes.length.toLong)
+                                            hashMemory.write(0, hashBytes, 0, hashBytes.length)
+
+                                            val historyItemPtr = INSTANCE.get_history_item(
+                                              rspacePointer,
+                                              hashMemory,
+                                              hashBytes.length
+                                            )
+
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            hashMemory.clear()
+
+                                            if (historyItemPtr != null) {
+                                              val resultByteslength = historyItemPtr.getInt(0)
+
+                                              try {
+                                                val resultBytes =
+                                                  historyItemPtr.getByteArray(4, resultByteslength)
+                                                val byteVectorProto =
+                                                  ByteVectorProto.parseFrom(resultBytes)
+
+                                                val byteVector = byteVectorProto.byteVector
+                                                Some(ByteVector(byteVector.toByteArray()))
+
+                                              } catch {
+                                                case e: Throwable =>
+                                                  println(
+                                                    "Error during scala hashChannel operation: " + e
+                                                  )
+                                                  throw e
+                                              } finally {
+                                                INSTANCE
+                                                  .deallocate_memory(
+                                                    historyItemPtr,
+                                                    resultByteslength
+                                                  )
+                                              }
+                                            } else {
+                                              None
+                                            }
+                                          }
+                               } yield result
                            }
                          }
       } yield rspaceImporter
