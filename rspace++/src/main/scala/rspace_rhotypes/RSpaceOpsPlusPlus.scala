@@ -77,6 +77,8 @@ import coop.rchain.rspace.serializers.ScodecSerialize.encodeDatum
 import coop.rchain.rspace.serializers.ScodecSerialize.encodeContinuation
 import _root_.coop.rchain.rspace.serializers.ScodecSerialize.encodeJoin
 import coop.rchain.models.rspace_plus_plus_types.HashProto
+import coop.rchain.models.rspace_plus_plus_types.ItemsProto
+import coop.rchain.models.rspace_plus_plus_types.ItemProto
 
 // NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
@@ -225,18 +227,106 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                              override def setHistoryItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
-                             ): F[Unit] = {
-                               println("setHistoryItems")
-                               ???
-                             }
+                             ): F[Unit] =
+                               for {
+                                 result <- Sync[F].delay {
+                                            val itemsProto =
+                                              ItemsProto(
+                                                items = {
+                                                  data.map(d => {
+                                                    ItemProto(
+                                                      d._1.toByteString, {
+                                                        d._2 match {
+                                                          case value: {
+                                                                def toArray(): Array[Byte]
+                                                              } => {
+                                                            ByteString.copyFrom(value.toArray)
+                                                          }
+                                                          case _ =>
+                                                            throw new IllegalArgumentException(
+                                                              "Type does not have a toByteArray method"
+                                                            )
+                                                        }
+                                                      }
+                                                    )
+                                                  })
+                                                }
+                                              )
+
+                                            val itemsProtoBytes = itemsProto.toByteArray
+
+                                            val payloadMemory =
+                                              new Memory(itemsProtoBytes.length.toLong)
+                                            payloadMemory.write(
+                                              0,
+                                              itemsProtoBytes,
+                                              0,
+                                              itemsProtoBytes.length
+                                            )
+
+                                            val _ = INSTANCE.set_history_items(
+                                              rspacePointer,
+                                              payloadMemory,
+                                              itemsProtoBytes.length
+                                            )
+
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+                                          }
+                               } yield result
 
                              override def setDataItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
-                             ): F[Unit] = {
-                               println("setDataItems")
-                               ???
-                             }
+                             ): F[Unit] =
+                               for {
+                                 result <- Sync[F].delay {
+                                            val itemsProto =
+                                              ItemsProto(
+                                                items = {
+                                                  data.map(d => {
+                                                    ItemProto(
+                                                      d._1.toByteString, {
+                                                        d._2 match {
+                                                          case value: {
+                                                                def toArray(): Array[Byte]
+                                                              } => {
+                                                            ByteString.copyFrom(value.toArray)
+                                                          }
+                                                          case _ =>
+                                                            throw new IllegalArgumentException(
+                                                              "Type does not have a toByteArray method"
+                                                            )
+                                                        }
+                                                      }
+                                                    )
+                                                  })
+                                                }
+                                              )
+
+                                            val itemsProtoBytes = itemsProto.toByteArray
+
+                                            val payloadMemory =
+                                              new Memory(itemsProtoBytes.length.toLong)
+                                            payloadMemory.write(
+                                              0,
+                                              itemsProtoBytes,
+                                              0,
+                                              itemsProtoBytes.length
+                                            )
+
+                                            val _ = INSTANCE.set_data_items(
+                                              rspacePointer,
+                                              payloadMemory,
+                                              itemsProtoBytes.length
+                                            )
+
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+                                          }
+                               } yield result
 
                              override def setRoot(key: Blake2b256Hash): F[Unit] =
                                for {
@@ -277,8 +367,38 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                           new RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K] {
 
                             override def root: Blake2b256Hash = {
-                              println("history reader root")
-                              ???
+                              val rootBytes  = root.bytes.toArray
+                              val rootMemory = new Memory(rootBytes.length.toLong)
+                              rootMemory.write(0, rootBytes, 0, rootBytes.length)
+
+                              val rootPtr = INSTANCE.history_reader_root(
+                                rspacePointer,
+                                rootMemory,
+                                rootBytes.length
+                              )
+
+                              if (rootPtr != null) {
+                                val resultByteslength = rootPtr.getInt(0)
+
+                                try {
+                                  val resultBytes = rootPtr.getByteArray(4, resultByteslength)
+                                  val hashProto   = HashProto.parseFrom(resultBytes)
+                                  val hash =
+                                    Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
+
+                                  hash
+
+                                } catch {
+                                  case e: Throwable =>
+                                    println("Error during scala hashChannel operation: " + e)
+                                    throw e
+                                } finally {
+                                  INSTANCE.deallocate_memory(rootPtr, resultByteslength)
+                                }
+                              } else {
+                                println("rootPtr is null")
+                                throw new RuntimeException("rootPtr is null")
+                              }
                             }
 
                             override def getData(key: Blake2b256Hash): F[Seq[Datum[A]]] =
@@ -371,7 +491,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                              )
                                            }
                                          }
-
                               } yield result
 
                             override def getContinuations(
@@ -853,7 +972,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
 
                                   } yield result
                               }
-
                           }
                         }
       } yield historyReader
@@ -888,7 +1006,6 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
         throw new RuntimeException("rootPtr is null")
       }
     }
-
   }
 
   def getData(channel: C): F[Seq[Datum[A]]] =

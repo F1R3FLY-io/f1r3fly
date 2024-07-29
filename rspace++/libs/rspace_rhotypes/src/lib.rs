@@ -13,12 +13,13 @@ use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreMana
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
+use rspace_plus_plus::rspace::ByteVector;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     event_proto, io_event_proto, ChannelsProto, CheckpointProto, CommProto, DatumsProto,
-    EventProto, HashProto, HotStoreStateProto, IoEventProto, JoinProto, JoinsProto, LogProto,
-    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
-    StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
-    StoreToMapValue, WaitingContinuationsProto,
+    EventProto, HashProto, HotStoreStateProto, IoEventProto, ItemsProto, JoinProto, JoinsProto,
+    LogProto, ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry,
+    StoreStateDataMapEntry, StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry,
+    StoreStateJoinsMapEntry, StoreToMapValue, WaitingContinuationsProto,
 };
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
@@ -1160,6 +1161,68 @@ pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
 /* Importer */
 
 #[no_mangle]
+pub extern "C" fn set_history_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let items_proto = ItemsProto::decode(payload_slice).unwrap();
+
+    let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
+        .items
+        .into_iter()
+        .map(|item| {
+            let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
+            let value: ByteVector = item.value;
+
+            (key_hash, value)
+        })
+        .collect();
+
+    let _ = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_history_items(data)
+    };
+}
+
+#[no_mangle]
+pub extern "C" fn set_data_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let items_proto = ItemsProto::decode(payload_slice).unwrap();
+
+    let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
+        .items
+        .into_iter()
+        .map(|item| {
+            let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
+            let value: ByteVector = item.value;
+
+            (key_hash, value)
+        })
+        .collect();
+
+    let _ = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_data_items(data)
+    };
+}
+
+#[no_mangle]
 pub extern "C" fn set_root(
     rspace: *mut Space,
     root_pointer: *const u8,
@@ -1182,6 +1245,38 @@ pub extern "C" fn set_root(
 }
 
 /* HistoryReader */
+
+#[no_mangle]
+pub extern "C" fn history_reader_root(
+    rspace: *mut Space,
+    state_hash_pointer: *const u8,
+    state_hash_bytes_len: usize,
+) -> *const u8 {
+    let state_hash_slice =
+        unsafe { std::slice::from_raw_parts(state_hash_pointer, state_hash_bytes_len) };
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+
+    let root = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .root()
+    };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
 
 #[no_mangle]
 pub extern "C" fn get_history_data(

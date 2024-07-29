@@ -83,6 +83,18 @@ trait JNAInterface extends Library {
 
   /* Importer */
 
+  def set_history_items(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Unit
+
+  def set_data_items(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Unit
+
   def set_root(
       rspace: Pointer,
       root_pointer: Pointer,
@@ -90,6 +102,12 @@ trait JNAInterface extends Library {
   ): Unit
 
   /* HistoryReader */
+
+  def history_reader_root(
+      rspace: Pointer,
+      state_hash_pointer: Pointer,
+      state_hash_bytes_len: Int
+  ): Pointer
 
   def get_history_data(
       rspace: Pointer,
