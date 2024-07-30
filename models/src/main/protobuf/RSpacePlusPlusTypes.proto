@@ -271,3 +271,28 @@ message ItemsProto {
 message ByteVectorProto {
   bytes byte_vector = 1;
 }
+
+message PathProto {
+  bytes key_hash = 1;
+  bytes optional_byte = 2;
+}
+
+message ExporterParams {
+	repeated PathProto start_path = 1;
+	int32 skip = 2;	
+	int32 take = 3;
+}
+
+message TrieNodeProto {
+  bytes hash = 1;
+  bool is_leaf = 2;
+  repeated PathProto path = 3;
+}
+
+message TrieNodesProto {
+	repeated TrieNodeProto nodes = 1;
+}
+
+message KeysProto {
+	repeated HashProto keys = 1;
+}
