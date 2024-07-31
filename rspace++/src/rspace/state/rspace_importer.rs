@@ -23,11 +23,11 @@ impl RSpaceImporterInstance {
         history_items: Vec<(Blake2b256Hash, ByteVector)>,
         data_items: Vec<(Blake2b256Hash, ByteVector)>,
         start_path: Vec<(Blake2b256Hash, Option<u8>)>,
-        chunk_size: usize,
-        skip: usize,
+        chunk_size: i32,
+        skip: i32,
         get_from_history: impl Fn(Blake2b256Hash) -> Option<ByteVector> + 'static,
     ) -> () {
-        let received_history_size = history_items.len();
+        let received_history_size = history_items.len() as i32;
         let is_end = || received_history_size < chunk_size;
 
         // Validate history items size

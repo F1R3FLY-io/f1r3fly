@@ -63,8 +63,9 @@ impl RSpaceExporter for RSpaceExporterImpl {
 }
 
 impl TrieExporter for RSpaceExporterImpl {
-    fn get_nodes(&self, start_path: NodePath, skip: usize, take: usize) -> Vec<TrieNode<KeyHash>> {
+    fn get_nodes(&self, start_path: NodePath, skip: i32, take: i32) -> Vec<TrieNode<KeyHash>> {
         let source_trie_store = RadixHistory::create_store(self.source_history_store.clone());
+        // println!("\n{:#?}", source_trie_store.lock().unwrap().to_map());
         let nodes = RSpaceExporterInstance::traverse_history(
             start_path,
             skip,
@@ -87,7 +88,10 @@ impl TrieExporter for RSpaceExporterImpl {
         self.get_items(self.source_history_store.clone(), keys)
     }
 
-    fn get_data_items(&self, keys: Vec<Blake2b256Hash>) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
+    fn get_data_items(
+        &self,
+        keys: Vec<Blake2b256Hash>,
+    ) -> Result<Vec<(KeyHash, Value)>, KvStoreError> {
         self.get_items(self.source_value_store.clone(), keys)
     }
 }

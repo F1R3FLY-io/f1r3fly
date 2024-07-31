@@ -84,12 +84,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
         init_start_path,
         page_size,
         start_skip,
-        move |hash: Blake2b256Hash| {
-            importer1
-                .lock()
-                .unwrap()
-                .get_history_item(KeyHash::new(&hash.bytes()))
-        },
+        move |hash: Blake2b256Hash| importer1.lock().unwrap().get_history_item(hash),
     );
 
     // Import page to space2
@@ -168,7 +163,7 @@ async fn multipage_export_should_work_correctly() {
                     last_path,
                 );
 
-                if history_items_page.len() < page_size {
+                if (history_items_page.len() as i32) < page_size {
                     Err(r)
                 } else {
                     Ok(r)
@@ -245,7 +240,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
         Vec<(Blake2b256Hash, ByteVector)>,   // HistoryItems
         Vec<(Blake2b256Hash, ByteVector)>,   // DataItems
         Vec<(Blake2b256Hash, Option<Byte>)>, // StartPath
-        usize,                               // Size of skip
+        i32,                                 // Size of skip
     );
 
     let multipage_export_with_skip = |params: Params,
@@ -287,7 +282,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
                     skip + page_size,
                 );
 
-                if history_items_page.len() < page_size {
+                if (history_items_page.len() as i32) < page_size {
                     Err(r)
                 } else {
                     Ok(r)

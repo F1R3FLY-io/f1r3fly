@@ -18,8 +18,8 @@ impl RSpaceExporterItems {
         &self,
         exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
         start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
-        skip: usize,
-        take: usize,
+        skip: i32,
+        take: i32,
     ) -> StoreItems<Blake2b256Hash, ByteVector> {
         let exporter = exporter.lock().unwrap();
 
@@ -50,8 +50,8 @@ impl RSpaceExporterItems {
         &self,
         exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
         start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
-        skip: usize,
-        take: usize,
+        skip: i32,
+        take: i32,
     ) -> StoreItems<Blake2b256Hash, ByteVector> {
         let exporter = exporter.lock().unwrap();
 
@@ -82,8 +82,8 @@ impl RSpaceExporterItems {
         &self,
         exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
         start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
-        skip: usize,
-        take: usize,
+        skip: i32,
+        take: i32,
     ) -> (StoreItems<Blake2b256Hash, ByteVector>, StoreItems<Blake2b256Hash, ByteVector>) {
         let exporter = exporter.lock().unwrap();
 

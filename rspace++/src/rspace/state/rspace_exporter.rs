@@ -5,7 +5,7 @@ use crate::rspace::{
         roots_store::RootError,
     },
     shared::trie_exporter::{KeyHash, TrieExporter, TrieNode},
-    ByteVector,
+    Byte, ByteVector,
 };
 use std::sync::Arc;
 
@@ -19,9 +19,9 @@ pub struct RSpaceExporterInstance;
 
 impl RSpaceExporterInstance {
     pub fn traverse_history(
-        start_path: Vec<(Blake2b256Hash, Option<u8>)>,
-        skip: usize,
-        take: usize,
+        start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
+        skip: i32,
+        take: i32,
         get_from_history: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     ) -> Vec<TrieNode<Blake2b256Hash>> {
         let settings = ExportDataSettings {
@@ -32,7 +32,7 @@ impl RSpaceExporterInstance {
             flag_leaf_values: true,
         };
 
-        fn create_last_prefix(prefix_vec: Vec<Blake2b256Hash>) -> Option<Vec<u8>> {
+        fn create_last_prefix(prefix_vec: Vec<Blake2b256Hash>) -> Option<ByteVector> {
             if prefix_vec.is_empty() {
                 None // Start from root
             } else {
@@ -40,17 +40,15 @@ impl RSpaceExporterInstance {
                 // Prefix coded 5 Blake256 elements (0 - size, 1..4 - value of prefix).
                 assert!(prefix_vec.len() >= 5, "RSpace Exporter: Invalid path during export");
 
-                let (size_prefix, vec): (usize, Vec<Blake2b256Hash>) = (
-                    prefix_vec[0].bytes()[0] as usize & 0xff,
-                    prefix_vec.iter().map(|path| path.clone()).collect(),
-                );
+                let (size_prefix, vec): (usize, Vec<Blake2b256Hash>) =
+                    (prefix_vec[0].bytes()[0] as usize & 0xff, prefix_vec[1..].to_vec());
 
                 let mut prefix128 = vec[0].bytes();
                 prefix128.extend(vec[1].bytes());
                 prefix128.extend(vec[2].bytes());
                 prefix128.extend(vec[3].bytes());
 
-                Some(prefix128[..size_prefix].to_vec())
+                Some(prefix128.iter().take(size_prefix).cloned().collect())
             }
         }
 
@@ -59,17 +57,17 @@ impl RSpaceExporterInstance {
             node_keys: Vec<Vec<u8>>,
         ) -> Vec<TrieNode<Blake2b256Hash>> {
             let mut data_keys: Vec<TrieNode<Blake2b256Hash>> = leaf_keys
-                .iter()
+                .into_iter()
                 .map(|key| {
-                    let hash = Blake2b256Hash::new(&key);
+                    let hash = Blake2b256Hash::from_bytes(key);
                     TrieNode::new(hash, true, Vec::new())
                 })
                 .collect();
 
             let history_keys: Vec<TrieNode<Blake2b256Hash>> = node_keys
-                .iter()
+                .into_iter()
                 .map(|key| {
-                    let hash = Blake2b256Hash::new(&key);
+                    let hash = Blake2b256Hash::from_bytes(key);
                     TrieNode::new(hash, false, Vec::new())
                 })
                 .collect();
@@ -79,9 +77,9 @@ impl RSpaceExporterInstance {
         }
 
         fn construct_last_path(
-            last_prefix: Vec<u8>,
+            last_prefix: ByteVector,
             root_hash: Blake2b256Hash,
-        ) -> Vec<(Blake2b256Hash, Option<u8>)> {
+        ) -> Vec<(Blake2b256Hash, Option<Byte>)> {
             let prefix_size = last_prefix.len();
             let mut size_array: Vec<u8> = vec![prefix_size as u8];
             size_array.extend(std::iter::repeat(0x00).take(31));
@@ -107,21 +105,24 @@ impl RSpaceExporterInstance {
         }
 
         fn construct_last_node(
-            last_key: Vec<u8>,
-            last_path: Vec<(Blake2b256Hash, Option<u8>)>,
+            last_key: ByteVector,
+            last_path: Vec<(Blake2b256Hash, Option<Byte>)>,
         ) -> Vec<TrieNode<Blake2b256Hash>> {
-            let hash = Blake2b256Hash::new(&last_key);
+            let hash = Blake2b256Hash::from_bytes(last_key);
             vec![TrieNode::new(hash, false, last_path)]
         }
 
         if start_path.is_empty() {
             Vec::new()
         } else {
-            let path_vec: Vec<Blake2b256Hash> = start_path.iter().map(|path| path.0.clone()).collect();
+            let path_vec: Vec<Blake2b256Hash> =
+                start_path.iter().map(|path| path.0.clone()).collect();
             let (root_hash, prefix_vec) =
                 (path_vec.first().unwrap(), path_vec.split_first().map(|(_, tail)| tail).unwrap());
 
             let last_prefix = create_last_prefix(prefix_vec.to_vec());
+            // println!("\nroot_hash bytes: {:?}", root_hash.bytes());
+            println!("\nlast_prefix: {:?}", last_prefix);
 
             let exp_res = sequential_export(
                 root_hash.bytes(),
@@ -132,6 +133,8 @@ impl RSpaceExporterInstance {
                 settings,
             )
             .expect("RSpace Exporter: Failed to export");
+
+            println!("\nexported: {:?}", exp_res);
 
             let (data, new_last_prefix_opt) = exp_res;
             let ExportData {

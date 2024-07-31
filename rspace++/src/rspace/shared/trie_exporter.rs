@@ -17,7 +17,7 @@ pub type Value = Vec<u8>;
 pub trait TrieExporter {
     // Get trie nodes with offset from start path and number of nodes
     // - skipping nodes can be expensive as taking nodes
-    fn get_nodes(&self, start_path: NodePath, skip: usize, take: usize) -> Vec<TrieNode<KeyHash>>;
+    fn get_nodes(&self, start_path: NodePath, skip: i32, take: i32) -> Vec<TrieNode<KeyHash>>;
 
     // Get history values / from branch nodes in the trie
     fn get_history_items(&self, keys: Vec<KeyHash>) -> Result<Vec<(KeyHash, Value)>, KvStoreError>;

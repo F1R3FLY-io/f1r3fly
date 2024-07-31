@@ -216,7 +216,7 @@ fn byte_to_int(b: u8) -> usize {
  * @param leafPrefixes Leaf prefixes
  * @param leafValues Leaf values (it's pointer for data in datastore)
  */
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExportData {
     pub node_prefixes: Vec<ByteVector>,
     pub node_keys: Vec<ByteVector>,
@@ -279,8 +279,8 @@ pub struct ExportDataSettings {
 pub fn sequential_export(
     root_hash: ByteVector,
     last_prefix: Option<ByteVector>,
-    skip_size: usize,
-    take_size: usize,
+    skip_size: i32,
+    take_size: i32,
     get_node_data_from_store: Arc<dyn Fn(&ByteVector) -> Option<ByteVector>>,
     settings: ExportDataSettings,
 ) -> Result<(ExportData, Option<ByteVector>), RadixTreeError> {
@@ -376,7 +376,7 @@ pub fn sequential_export(
             }
         };
 
-        let node_opt = get_node_data_from_store(&p.hash);
+        let node_opt = get_node_data_from_store(&bincode::serialize(&p.hash).unwrap());
         if node_opt.is_none() {
             Err(RadixTreeError::KeyNotFound(format!(
                 "Radix Tree - Export error: node with key {} not found.",
@@ -435,13 +435,13 @@ pub fn sequential_export(
     #[derive(Clone)]
     struct StepData {
         path: Path,           // Path of node from current to root
-        skip: usize,          // Skip counter
-        take: usize,          // Take counter
+        skip: i32,            // Skip counter
+        take: i32,            // Take counter
         exp_data: ExportData, // Result of export
     }
 
     impl StepData {
-        fn new(path: Path, skip: usize, take: usize, exp_data: ExportData) -> Self {
+        fn new(path: Path, skip: i32, take: i32, exp_data: ExportData) -> Self {
             StepData {
                 path,
                 skip,
@@ -550,7 +550,7 @@ pub fn sequential_export(
                     StepData::new(child_path, p.skip, p.take - 1, new_data)
                 };
 
-            let child_node_opt = get_node_data_from_store(&ptr);
+            let child_node_opt = get_node_data_from_store(&bincode::serialize(&ptr).unwrap());
             if child_node_opt.is_none() {
                 Err(RadixTreeError::KeyNotFound(format!(
                     "Radix Tree - Export error: node with key {} not found.",
@@ -730,7 +730,8 @@ pub fn sequential_export(
         init_conditions_exception()
     }
 
-    let root_node_ser_opt = get_node_data_from_store(&root_hash);
+    let root_node_ser_opt = get_node_data_from_store(&bincode::serialize(&root_hash).unwrap());
+    println!("\nroot_node_ser_opt: {:?}", root_node_ser_opt);
     match root_node_ser_opt {
         Some(bytes) => do_export(bytes),
         None => Ok(empty_result()),
