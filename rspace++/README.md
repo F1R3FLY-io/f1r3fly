@@ -83,6 +83,7 @@ Run all tests: `cargo test`
 - Run History Action Tests: `cargo test history::history_action_tests`
 - Run History Repository Tests: `cargo test history::history_repository_tests`
 
+(Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>
 (`--test-threads=1` runs them sequentially)<br>
 (`--nocapture` prints output during tests)
 

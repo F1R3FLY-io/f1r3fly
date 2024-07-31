@@ -459,8 +459,8 @@ impl TrieExporter for EmptyExporter {
     fn get_nodes(
         &self,
         _start_path: NodePath,
-        _skip: usize,
-        _take: usize,
+        _skip: i32,
+        _take: i32,
     ) -> Vec<TrieNode<KeyHash>> {
         todo!()
     }
