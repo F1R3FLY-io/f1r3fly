@@ -15,6 +15,7 @@ import coop.rchain.models.rspace_plus_plus_types.{
   InstallParams,
   JoinProto,
   JoinsProto,
+  PathProto,
   ProduceCounterMapEntry,
   ProduceProto,
   SoftCheckpointProto,
@@ -80,6 +81,8 @@ import coop.rchain.models.rspace_plus_plus_types.HashProto
 import coop.rchain.models.rspace_plus_plus_types.ItemsProto
 import coop.rchain.models.rspace_plus_plus_types.ItemProto
 import coop.rchain.models.rspace_plus_plus_types.ByteVectorProto
+import coop.rchain.models.rspace_plus_plus_types.ExporterParams
+import coop.rchain.models.rspace_plus_plus_types.TrieNodesProto
 
 // NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
@@ -129,7 +132,110 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                  skip: Int,
                                  take: Int
                              ): F[Seq[TrieNode[Blake2b256Hash]]] = {
-                               println("getNodes")
+                               for {
+                                 result <- Sync[F].delay {
+                                            val exporterParamsProto = ExporterParams(
+                                              startPath.map(
+                                                pathItem =>
+                                                  PathProto(pathItem._1.toByteString, {
+                                                    if (pathItem._2.isEmpty) {
+                                                      ByteString.EMPTY
+                                                    } else {
+                                                      ByteString.copyFrom(Array(pathItem._2.get))
+                                                    }
+                                                  })
+                                              ),
+                                              skip,
+                                              take
+                                            )
+
+                                            val exporterParamsBytes =
+                                              exporterParamsProto.toByteArray
+
+                                            val payloadMemory =
+                                              new Memory(exporterParamsBytes.length.toLong)
+                                            payloadMemory
+                                              .write(
+                                                0,
+                                                exporterParamsBytes,
+                                                0,
+                                                exporterParamsBytes.length
+                                              )
+
+                                            val getNodesPtr =
+                                              INSTANCE.get_nodes(
+                                                rspacePointer,
+                                                payloadMemory,
+                                                exporterParamsBytes.length
+                                              )
+
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+
+                                            if (getNodesPtr != null) {
+                                              val resultByteslength =
+                                                getNodesPtr.getInt(0)
+
+                                              try {
+                                                val resultBytes =
+                                                  getNodesPtr
+                                                    .getByteArray(4, resultByteslength)
+                                                val trieNodesProto =
+                                                  TrieNodesProto.parseFrom(resultBytes)
+                                                val nodesProto = trieNodesProto.nodes
+
+                                                val nodes: Seq[TrieNode[Blake2b256Hash]] =
+                                                  nodesProto.map(
+                                                    node =>
+                                                      TrieNode(
+                                                        Blake2b256Hash.fromByteArray(
+                                                          node.hash.toByteArray
+                                                        ),
+                                                        node.isLeaf,
+                                                        node.path.map(
+                                                          pathItem =>
+                                                            (
+                                                              Blake2b256Hash.fromByteArray(
+                                                                pathItem.keyHash.toByteArray
+                                                              ), {
+                                                                if (pathItem.optionalByte
+                                                                      .size() > 0) {
+                                                                  Some(
+                                                                    pathItem.optionalByte.byteAt(0)
+                                                                  )
+                                                                } else {
+                                                                  None
+                                                                }
+                                                              }
+                                                            )
+                                                        )
+                                                      )
+                                                  )
+
+                                                nodes
+                                              } catch {
+                                                case e: Throwable =>
+                                                  println(
+                                                    "Error during scala getNodes operation: " + e
+                                                  )
+                                                  throw e
+                                              } finally {
+                                                INSTANCE.deallocate_memory(
+                                                  getNodesPtr,
+                                                  resultByteslength
+                                                )
+                                              }
+                                            } else {
+                                              println("getNodesPtr is null")
+                                              throw new RuntimeException(
+                                                "getNodesPtr is null"
+                                              )
+                                            }
+                                          }
+
+                               } yield result
+
                                ???
                              }
 

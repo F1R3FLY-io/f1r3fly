@@ -12,6 +12,7 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
+use rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace::{Byte, ByteVector};
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
@@ -1322,6 +1323,97 @@ pub extern "C" fn get_data_items(
     result.append(&mut bytes);
     Box::leak(result.into_boxed_slice()).as_ptr()
 }
+
+#[no_mangle]
+pub extern "C" fn get_exporter_root(rspace: *mut Space) -> *const u8 {
+    let root = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+            .lock()
+            .unwrap()
+            .get_root()
+            .unwrap()
+    };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+// #[no_mangle]
+// pub extern "C" fn traverse_history(
+//     rspace: *mut Space,
+//     payload_pointer: *const u8,
+//     payload_bytes_len: usize,
+// ) -> *const u8 {
+//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+//     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
+
+//     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
+//         .start_path
+//         .into_iter()
+//         .map(|path_proto| {
+//             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
+//             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
+//                 Some(path_proto.optional_byte[0])
+//             } else {
+//                 None
+//             };
+
+//             (key_hash, value)
+//         })
+//         .collect();
+
+//     let nodes = RSpaceExporterInstance::traverse_history(
+//         start_path,
+//         exporter_params.skip.try_into().unwrap(),
+//         exporter_params.take.try_into().unwrap(),
+//         get_from_history,
+//     );
+
+//     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
+//         .into_iter()
+//         .map(|node| TrieNodeProto {
+//             hash: node.hash.bytes(),
+//             is_leaf: node.is_leaf,
+//             path: node
+//                 .path
+//                 .into_iter()
+//                 .map(|path| PathProto {
+//                     key_hash: path.0.bytes(),
+//                     optional_byte: if path.1.is_some() {
+//                         vec![path.1.unwrap()]
+//                     } else {
+//                         Vec::new()
+//                     },
+//                 })
+//                 .collect(),
+//         })
+//         .collect();
+
+//     let trie_nodes_proto_vec = TrieNodesProto {
+//         nodes: trie_nodes_proto_vec,
+//     };
+
+//     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
+//     let len = bytes.len() as u32;
+//     let len_bytes = len.to_le_bytes().to_vec();
+//     let mut result = len_bytes;
+//     result.append(&mut bytes);
+//     Box::leak(result.into_boxed_slice()).as_ptr()
+// }
+
+
 
 /* Importer */
 

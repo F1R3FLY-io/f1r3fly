@@ -81,6 +81,14 @@ trait JNAInterface extends Library {
 
   def history_repo_root(rspace: Pointer): Pointer
 
+  /* Exporter */
+
+  def get_nodes(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
   /* Importer */
 
   def set_history_items(
