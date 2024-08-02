@@ -82,6 +82,7 @@ Run all tests: `cargo test`
 - Run Hot Store Spec Tests: `cargo test --test hot_store_spec -- --nocapture`
 - Run History Action Tests: `cargo test history::history_action_tests`
 - Run History Repository Tests: `cargo test history::history_repository_tests`
+- Run Import/Export Tests: `cargo test --test export_import_tests`
 
 (Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>
 (`--test-threads=1` runs them sequentially)<br>
