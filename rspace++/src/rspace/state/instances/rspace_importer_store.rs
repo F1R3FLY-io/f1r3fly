@@ -63,7 +63,9 @@ impl TrieImporter for RSpaceImporterImpl {
                     .map(|pair| (pair.0.bytes(), pair.1.clone()))
                     .collect(),
             )
-            .expect("Rspace Importer: failed to put in history store")
+            .expect("Rspace Importer: failed to put in history store");
+
+        // println!("\nhistory store after set_history_items: {:?}", history_store_lock.to_map());
     }
 
     fn set_data_items(&self, data: Vec<(KeyHash, Value)>) -> () {

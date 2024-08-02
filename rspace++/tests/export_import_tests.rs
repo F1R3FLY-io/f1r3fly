@@ -2,7 +2,6 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store::HotStoreInstances;
 use rspace_plus_plus::rspace::rspace::RSpaceInstances;
-use rspace_plus_plus::rspace::shared::trie_exporter::KeyHash;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::{
@@ -77,6 +76,8 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     let history_items = export_data.0.items;
     let data_items = export_data.1.items;
 
+    // println!("\ndata_items_page: {:?}", data_items);
+
     // Validate exporting page
     let _ = RSpaceImporterInstance::validate_state_items(
         history_items.clone(),
@@ -94,6 +95,8 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     let _ = importer2_lock.set_root(&init_point.root);
     let _ = space2.reset(init_point.root);
 
+    // space2.store.print();
+
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
         space2.consume(
@@ -104,6 +107,9 @@ async fn export_and_import_of_one_page_should_works_correctly() {
             BTreeSet::new(),
         );
     }
+
+    // println!("\nspace2: {:?}", space2.to_map());
+
     let end_point = space2.create_checkpoint().unwrap();
     assert_eq!(end_point.root, RadixHistory::empty_root_node_hash())
 }
@@ -149,12 +155,7 @@ async fn multipage_export_should_work_correctly() {
                     start_path,
                     page_size,
                     start_skip,
-                    move |hash: Blake2b256Hash| {
-                        importer1
-                            .lock()
-                            .unwrap()
-                            .get_history_item(KeyHash::new(&hash.bytes()))
-                    },
+                    move |hash: Blake2b256Hash| importer1.lock().unwrap().get_history_item(hash),
                 );
 
                 let r = (
@@ -267,12 +268,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
                     start_path.clone(),
                     page_size,
                     skip,
-                    move |hash: Blake2b256Hash| {
-                        importer1
-                            .lock()
-                            .unwrap()
-                            .get_history_item(KeyHash::new(&hash.bytes()))
-                    },
+                    move |hash: Blake2b256Hash| importer1.lock().unwrap().get_history_item(hash),
                 );
 
                 let r = (

@@ -35,6 +35,10 @@ pub trait KeyValueStore: Send + Sync {
     fn get_one(&self, key: &ByteBuffer) -> Result<Option<ByteBuffer>, KvStoreError> {
         let values = self.get(&vec![key.to_vec()])?;
 
+        // println!("\nkey in get_one: {:?}", key);
+        // let binding = self.to_map().unwrap();
+        // let keys: Vec<_> = binding.keys().collect();
+        // println!("\nkv store keys in get_one: {:?}", keys);
         // println!("\nget_values in get_one: {:?}", values);
 
         match values.split_first() {
@@ -55,10 +59,13 @@ pub trait KeyValueStore: Send + Sync {
         let if_absent = self.contains(&keys)?;
         let kv_if_absent: Vec<_> = kv_pairs.into_iter().zip(if_absent).collect();
         let kv_absent: Vec<_> = kv_if_absent
+            .clone()
             .into_iter()
             .filter(|(_, is_present)| !is_present)
             .map(|(kv, _)| kv)
             .collect();
+
+        // println!("\nkv_if_absent: {:?}", kv_if_absent.clone());
 
         self.put(kv_absent)
     }

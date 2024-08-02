@@ -88,11 +88,11 @@ impl RSpaceExporterInstance {
             let mut prefix128_array = last_prefix.to_vec();
             prefix128_array.extend(prefix_zeros);
 
-            let prefix_blake0 = Blake2b256Hash::new(&size_array);
-            let prefix_blake1 = Blake2b256Hash::new(&prefix128_array[0..32]);
-            let prefix_blake2 = Blake2b256Hash::new(&prefix128_array[32..64]);
-            let prefix_blake3 = Blake2b256Hash::new(&prefix128_array[64..96]);
-            let prefix_blake4 = Blake2b256Hash::new(&prefix128_array[96..128]);
+            let prefix_blake0 = Blake2b256Hash::from_bytes(size_array);
+            let prefix_blake1 = Blake2b256Hash::from_bytes((prefix128_array[0..32]).to_vec());
+            let prefix_blake2 = Blake2b256Hash::from_bytes(prefix128_array[32..64].to_vec());
+            let prefix_blake3 = Blake2b256Hash::from_bytes(prefix128_array[64..96].to_vec());
+            let prefix_blake4 = Blake2b256Hash::from_bytes(prefix128_array[96..128].to_vec());
 
             vec![
                 (root_hash, None),
@@ -122,7 +122,7 @@ impl RSpaceExporterInstance {
 
             let last_prefix = create_last_prefix(prefix_vec.to_vec());
             // println!("\nroot_hash bytes: {:?}", root_hash.bytes());
-            println!("\nlast_prefix: {:?}", last_prefix);
+            // println!("\nlast_prefix: {:?}", last_prefix);
 
             let exp_res = sequential_export(
                 root_hash.bytes(),
@@ -134,7 +134,7 @@ impl RSpaceExporterInstance {
             )
             .expect("RSpace Exporter: Failed to export");
 
-            println!("\nexported: {:?}", exp_res);
+            // println!("\nexported: {:?}", exp_res);
 
             let (data, new_last_prefix_opt) = exp_res;
             let ExportData {

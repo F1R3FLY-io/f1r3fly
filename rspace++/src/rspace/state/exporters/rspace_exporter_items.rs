@@ -108,13 +108,15 @@ impl RSpaceExporterItems {
             .into_iter()
             .collect();
 
-        // Load all data items / without history
+        // Load all history and data items
         let history_items = exporter
             .get_history_items(history_keys)
             .expect("Failed to get history items in rspace_exporter_items");
         let data_items = exporter
             .get_data_items(data_keys)
             .expect("Failed to get history items in rspace_exporter_items");
+
+        // println!("\ndata_items in exporter_items: {:?}", data_items);
 
         let mut history_last_path = last_entry.path.clone();
         history_last_path.push((last_entry.hash.clone(), None));

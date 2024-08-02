@@ -86,7 +86,7 @@ impl RSpaceImporterInstance {
             Arc::new(move |hash: &ByteVector| {
                 match st.get(hash) {
                 Some(value) => Some(value.clone()),
-                None => match get_from_history(Blake2b256Hash::new(hash)) {
+                None => match get_from_history(Blake2b256Hash::from_bytes(hash.to_vec())) {
                     Some(bytes) => Some(bytes),
                     None => panic!("RSpace Importer: Trie hash not found in received items or in history store, hash: {}", hex::encode(Blake2b256Hash::new(&hash).bytes())),
                 },
