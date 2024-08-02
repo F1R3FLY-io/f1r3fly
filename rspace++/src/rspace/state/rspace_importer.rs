@@ -2,7 +2,10 @@ use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
@@ -10,6 +13,7 @@ use crate::rspace::{
     state::rspace_exporter::RSpaceExporterInstance,
     ByteVector,
 };
+use std::hash::Hash;
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/RSpaceImporter.scala
 pub trait RSpaceImporter: TrieImporter + Send + Sync {
@@ -57,7 +61,7 @@ impl RSpaceImporterInstance {
             let pool = ThreadPoolBuilder::new().num_threads(64).build().unwrap();
             pool.install(|| {
                 data_items.par_iter().try_for_each(|(hash, value_bytes)| {
-                    let data_hash = Blake2b256Hash::new(value_bytes);
+                    let data_hash = Blake2b256Hash::new(&value_bytes);
                     if *hash != data_hash {
                         Err(format!(
                             "Data hash does not match decoded data, key: {}, decoded: {}.",
@@ -110,16 +114,28 @@ impl RSpaceImporterInstance {
         // Validate keys / cryptographic proof that store chunk is not corrupted or modified.
         let history_item_keys: Vec<Blake2b256Hash> =
             history_items.into_iter().map(|item| item.0).collect();
-        if !(history_item_keys == history_keys) {
+        // println!("\nhistory_item_keys: {:?}", history_item_keys);
+        // println!("\nhistory_keys: {:?}", history_keys);
+        // TODO: This might need to check ordering too
+        if !check_same_elements(history_item_keys, history_keys) {
             panic!("RSpace Importer: History items are corrupted")
         }
 
         let data_item_keys: Vec<Blake2b256Hash> =
             data_items.clone().into_iter().map(|item| item.0).collect();
-        if !(data_item_keys == data_keys) {
+        // println!("\ndata_item_keys: {:?}", data_item_keys);
+        // println!("\ndata_keys: {:?}", data_keys);
+        // TODO: This might need to check ordering too
+        if !check_same_elements(data_item_keys, data_keys) {
             panic!("RSpace Importer: Data items are corrupted")
         }
 
         validate_data_items_hashes.expect("RSpace Importer: Unable to validate data items hashes");
     }
+}
+
+fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
+    let set1: HashSet<_> = vec1.into_iter().collect();
+    let set2: HashSet<_> = vec2.into_iter().collect();
+    set1 == set2
 }

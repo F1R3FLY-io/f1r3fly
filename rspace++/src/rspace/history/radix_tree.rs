@@ -77,98 +77,191 @@ const HEAD_SIZE: usize = 2;
  */
 pub fn encode(node: &Node) -> ByteVector {
     // Calculate the size of the serialized data
-    let calc_size = node.iter().fold(0, |acc, item| match item {
-        Item::EmptyItem => acc,
-        Item::Leaf { prefix, value } => {
+    let calc_size = node.iter().fold(0, |size, item| match item {
+        Item::EmptyItem => size,
+
+        Item::Leaf {
+            prefix: leaf_prefix,
+            value,
+        } => {
+            let size_prefix = leaf_prefix.len();
             assert!(
-                prefix.len() <= 127,
+                size_prefix <= 127,
                 "Error during serialization: size of prefix more than 127."
             );
             assert!(
                 value.len() == DEF_SIZE,
                 "Error during serialization: size of leafValue not equal 32."
             );
-            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+            size + HEAD_SIZE + size_prefix + DEF_SIZE
         }
-        Item::NodePtr { prefix, ptr } => {
+
+        Item::NodePtr {
+            prefix: ptr_prefix,
+            ptr,
+        } => {
+            let size_prefix = ptr_prefix.len();
             assert!(
-                prefix.len() <= 127,
+                size_prefix <= 127,
                 "Error during serialization: size of prefix more than 127."
             );
             assert!(
                 ptr.len() == DEF_SIZE,
                 "Error during serialization: size of ptrPrefix not equal 32."
             );
-            acc + HEAD_SIZE + prefix.len() + DEF_SIZE
+            size + HEAD_SIZE + size_prefix + DEF_SIZE
         }
     });
 
-    let mut buf = Vec::with_capacity(calc_size);
+    let buf = vec![0u8; calc_size]; //Allocation memory
 
-    for (idx, item) in node.iter().enumerate() {
-        match item {
-            Item::EmptyItem => {
-                // EmptyItem - not encoded
-            }
-            Item::Leaf { prefix, value } => {
-                buf.push(idx as u8); // item index
-                buf.push(prefix.len() as u8); // second byte with Leaf identifier
-                buf.extend_from_slice(prefix);
-                buf.extend_from_slice(value);
-            }
-            Item::NodePtr { prefix, ptr } => {
-                buf.push(idx as u8); // item index
-                buf.push(0x80 | prefix.len() as u8); // second byte with NodePtr identifier
-                buf.extend_from_slice(prefix);
-                buf.extend_from_slice(ptr);
+    // Leaf second byte: Leaf identifier (most significant bit = 0) and prefixSize (lower 7 bits = size)
+    fn encode_leaf_second_byte(prefix_size: usize) -> u8 {
+        (prefix_size & 0x7F) as u8 // (size & 01111111b)
+    }
+
+    // NodePtr second byte: NodePtr identifier (most significant bit = 1) and prefixSize (lower 7 bits = size)
+    fn encode_node_ptr_second_byte(prefix_size: usize) -> u8 {
+        (0x80 | (prefix_size & 0x7F)) as u8 // 10000000b | (size & 01111111b)
+    }
+
+    fn put_item_into_array(
+        idx_item: usize,
+        pos0: usize,
+        mut arr: Vec<u8>,
+        node: &Node,
+        calc_size: usize,
+    ) -> Vec<u8> {
+        if pos0 == calc_size {
+            arr // Happy end (return serializing data).
+        } else {
+            match &node[idx_item] {
+                // If current item is empty - just skip serialization of this item
+                Item::EmptyItem => put_item_into_array(idx_item + 1, pos0, arr, node, calc_size), // Loop to the next item.
+
+                Item::Leaf { prefix, value } => {
+                    // Fill first byte - item index
+                    arr[pos0] = idx_item as u8;
+                    // Fill second byte - Leaf identifier
+                    let pos_second_byte = pos0 + 1;
+                    let prefix_size = prefix.len();
+                    arr[pos_second_byte] = encode_leaf_second_byte(prefix_size);
+                    // Fill prefix
+                    let pos_prefix_start = pos_second_byte + 1;
+                    for i in 0..prefix_size {
+                        arr[pos_prefix_start + i] = prefix[i];
+                    }
+                    // Fill leafValue
+                    let pos_value_start = pos_prefix_start + prefix_size;
+                    for i in 0..DEF_SIZE {
+                        arr[pos_value_start + i] = value[i];
+                    }
+
+                    // Loop to the next item.
+                    put_item_into_array(
+                        idx_item + 1,
+                        pos_value_start + DEF_SIZE,
+                        arr,
+                        node,
+                        calc_size,
+                    )
+                }
+
+                Item::NodePtr { prefix, ptr } => {
+                    // Fill first byte - item index
+                    arr[pos0] = idx_item as u8;
+                    // Fill second byte - NodePtr identifier (most significant bit = 1) and prefixSize (lower 7 bits = size)
+                    let pos_second_byte = pos0 + 1;
+                    let prefix_size = prefix.len();
+                    arr[pos_second_byte] = encode_node_ptr_second_byte(prefix_size);
+                    // Fill prefix
+                    let pos_prefix_start = pos_second_byte + 1;
+                    for i in 0..prefix_size {
+                        arr[pos_prefix_start + i] = prefix[i];
+                    }
+                    // Fill ptr
+                    let pos_ptr_start = pos_prefix_start + prefix_size;
+                    for i in 0..DEF_SIZE {
+                        arr[pos_ptr_start + i] = ptr[i];
+                    }
+
+                    // Loop to the next item.
+                    put_item_into_array(
+                        idx_item + 1,
+                        pos_ptr_start + DEF_SIZE,
+                        arr,
+                        node,
+                        calc_size,
+                    )
+                }
             }
         }
     }
 
-    assert_eq!(buf.len(), calc_size, "Serialized data size mismatch.");
-    buf
+    put_item_into_array(0, 0, buf, node, calc_size)
 }
 
 /** Deserialization [[ByteVector]] to [[Node]]
  */
-pub fn decode(encoded: ByteVector) -> Node {
-    let mut node = empty_node();
-    let mut pos = 0;
-    let max_size = encoded.len();
+pub fn decode(bv: ByteVector) -> Node {
+    let max_size = bv.len();
 
-    while pos < max_size {
-        let idx_item = encoded[pos] as usize; // Take first byte - it's item's index
-        assert_eq!(
-            node[idx_item],
-            Item::EmptyItem,
-            "Error during deserialization: wrong index of item."
-        );
-
-        let second_byte = encoded[pos + 1]; // Take second byte
-        let prefix_size = second_byte & 0x7F; // Lower 7 bits - it's size of prefix (0..127).
-        let prefix = &encoded[(pos + 2)..(pos + 2 + prefix_size as usize)]; // Take prefix
-
-        let val_or_ptr =
-            &encoded[(pos + 2 + prefix_size as usize)..(pos + 2 + prefix_size as usize + DEF_SIZE)]; // Take next 32 bytes - it's data
-
-        pos += HEAD_SIZE + prefix_size as usize + DEF_SIZE; // Calculating start position for next loop
-
-        let item = if (second_byte & 0x80) == 0 {
-            Item::Leaf {
-                prefix: prefix.to_vec(),
-                value: val_or_ptr.to_vec(),
-            }
-        } else {
-            Item::NodePtr {
-                prefix: prefix.to_vec(),
-                ptr: val_or_ptr.to_vec(),
-            }
-        };
-
-        node[idx_item] = item;
+    // If first bit 0 - return true, otherwise false.
+    fn is_leaf(second_byte: u8) -> bool {
+        (second_byte & 0x80) == 0x00
     }
 
-    node
+    // Each loop decodes one non-empty item.
+    fn decode_item(pos0: usize, node: Node, max_size: usize, arr: Vec<u8>) -> Node {
+        if pos0 == max_size {
+            node // End of deserialization
+        } else {
+            let idx_item = byte_to_int(arr[pos0]); // Take first byte - it's item's index
+            assert!(
+                node[idx_item] == Item::EmptyItem,
+                "Error during deserialization: wrong index of item."
+            );
+            let pos1 = pos0 + 1;
+            let second_byte = arr[pos1]; // Take second byte
+
+            // Decoding prefix
+            let prefix_size = (second_byte & 0x7F) as usize; // Lower 7 bits - it's size of prefix (0..127).
+            let mut prefix = vec![0u8; prefix_size];
+            let pos_prefix_start = pos1 + 1;
+            for i in 0..prefix_size {
+                prefix[i] = arr[pos_prefix_start + i]; // Take prefix
+            }
+
+            // Decoding leaf or nodePtr data
+            let mut val_or_ptr = vec![0u8; DEF_SIZE];
+            let pos_val_or_ptr_start = pos_prefix_start + prefix_size;
+            for i in 0..DEF_SIZE {
+                val_or_ptr[i] = arr[pos_val_or_ptr_start + i]; // Take next 32 bytes - it's data
+            }
+
+            let pos0_next = pos_val_or_ptr_start + DEF_SIZE; // Calculating start position for next loop
+
+            // Decoding type of non-empty item
+            let item = if is_leaf(second_byte) {
+                Item::Leaf {
+                    prefix,
+                    value: val_or_ptr,
+                }
+            } else {
+                Item::NodePtr {
+                    prefix,
+                    ptr: val_or_ptr,
+                }
+            };
+
+            let mut node_next = node.clone();
+            node_next[idx_item] = item;
+
+            decode_item(pos0_next, node_next, max_size, arr) // Try to decode next item.
+        }
+    }
+
+    decode_item(0, empty_node(), max_size, bv)
 }
 
 fn common_prefix(b1: ByteVector, b2: ByteVector) -> (ByteVector, ByteVector, ByteVector) {
@@ -371,19 +464,24 @@ pub fn sequential_export(
                         )
                     });
 
-                    Either::Right(Vec::<NodeData>::new())
+                    Either::Right(Vec::<NodeData>::new()) // Not found
                 }
             }
         };
 
-        let node_opt = get_node_data_from_store(&bincode::serialize(&p.hash).unwrap());
+        // let node_opt = get_node_data_from_store(&bincode::serialize(&p.hash).unwrap());
+        let node_opt = get_node_data_from_store(&p.hash);
+        // println!("\np.hash: {:?}", p.hash);
+        // let node_opt = get_node_data_from_store(&p.hash);
         if node_opt.is_none() {
             Err(RadixTreeError::KeyNotFound(format!(
                 "Radix Tree - Export error: node with key {} not found.",
                 { hex::encode(p.hash) }
             )))
         } else {
+            // let decoded_node = decode(bincode::deserialize(&node_opt.unwrap()).unwrap());
             let decoded_node = decode(node_opt.unwrap());
+            // println!("\nsuccessfully decoded node: {:?}", decoded_node);
             if p.rest_prefix.is_empty() {
                 let mut new_path = Vec::new();
                 new_path.push(NodeData::new(p.node_prefix, decoded_node, None));
@@ -550,14 +648,16 @@ pub fn sequential_export(
                     StepData::new(child_path, p.skip, p.take - 1, new_data)
                 };
 
-            let child_node_opt = get_node_data_from_store(&bincode::serialize(&ptr).unwrap());
+            // let child_node_opt = get_node_data_from_store(&bincode::serialize(&ptr).unwrap());
+            let child_node_opt = get_node_data_from_store(&ptr);
             if child_node_opt.is_none() {
                 Err(RadixTreeError::KeyNotFound(format!(
-                    "Radix Tree - Export error: node with key {} not found.",
+                    "Radix Tree - Export error: node with key {} not found. here",
                     { hex::encode(ptr) }
                 )))
             } else {
                 let child_nv = child_node_opt.unwrap();
+                // let child_decoded = decode(bincode::deserialize(&child_nv).unwrap());
                 let child_decoded = decode(child_nv.clone());
                 let mut child_np = curr_node_prefix;
                 child_np.push(item_index);
@@ -730,8 +830,9 @@ pub fn sequential_export(
         init_conditions_exception()
     }
 
-    let root_node_ser_opt = get_node_data_from_store(&bincode::serialize(&root_hash).unwrap());
-    println!("\nroot_node_ser_opt: {:?}", root_node_ser_opt);
+    // let root_node_ser_opt = get_node_data_from_store(&bincode::serialize(&root_hash).unwrap());
+    let root_node_ser_opt = get_node_data_from_store(&root_hash);
+    // println!("\nroot_node_ser_opt: {:?}", root_node_ser_opt);
     match root_node_ser_opt {
         Some(bytes) => do_export(bytes),
         None => Ok(empty_result()),
@@ -780,10 +881,10 @@ impl RadixTreeImpl {
             .lock()
             .expect("Radix Tree: Failed to acquire lock on store");
 
-        let serialized_node_ptr =
-            bincode::serialize(node_ptr).expect("Radix Tree: Failed to serialize");
+        // let serialized_node_ptr =
+        //     bincode::serialize(node_ptr).expect("Radix Tree: Failed to serialize");
 
-        let get_result = store_lock.get_one(&serialized_node_ptr)?;
+        let get_result = store_lock.get_one(&node_ptr)?;
 
         // println!("\nget_result in load_node_from_store: {:?}", get_result);
 
@@ -791,10 +892,10 @@ impl RadixTreeImpl {
 
         match get_result {
             Some(bytes) => {
-                let deserialized_node_bytes: ByteVector = bincode::deserialize(&bytes)
-                    .expect("Radix Tree: Failed to deserialize node bytes");
+                // let deserialized_node_bytes: ByteVector = bincode::deserialize(&bytes)
+                //     .expect("Radix Tree: Failed to deserialize node bytes");
 
-                let deserialized_node = decode(deserialized_node_bytes);
+                let deserialized_node = decode(bytes);
                 // println!("\ndeserialized: {:?}", deserialized);
                 Ok(Some(deserialized_node))
             }
@@ -983,13 +1084,14 @@ impl RadixTreeImpl {
             .collect();
 
         let serialized_kv_absent = kv_absent
-            .iter()
+            .into_iter()
             .map(|(key, value)| {
-                let serialized_key =
-                    bincode::serialize(key).expect("Radix Tree: Failed to serialize");
-                let serialized_value =
-                    bincode::serialize(value).expect("Radix Tree: Failed to serialize");
-                (serialized_key, serialized_value)
+                // let serialized_key =
+                //     bincode::serialize(key).expect("Radix Tree: Failed to serialize");
+                // let serialized_value =
+                //     bincode::serialize(value).expect("Radix Tree: Failed to serialize");
+                // (serialized_key, serialized_value)
+                (key, value)
             })
             .collect();
 

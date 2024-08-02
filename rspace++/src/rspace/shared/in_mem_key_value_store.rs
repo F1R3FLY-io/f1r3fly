@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use crate::rspace::{ByteBuffer, ByteVector};
-use bincode;
 
 // See shared/src/main/scala/coop/rchain/store/InMemoryKeyValueStore.scala
 #[derive(Clone)]
@@ -65,8 +64,10 @@ impl KeyValueStore for InMemoryKeyValueStore {
         for entry in self.state.iter() {
             let (key, value) = entry;
             map.insert(
-                bincode::deserialize(key).expect("Mem Key Value Store: Unable to deserialize"),
-                bincode::deserialize(value).expect("Mem Key Value Store: Unable to deserialize"),
+                // bincode::deserialize(key).expect("Mem Key Value Store: Unable to deserialize"),
+                // bincode::deserialize(value).expect("Mem Key Value Store: Unable to deserialize"),
+                key.to_vec(),
+                value.to_vec(),
             );
         }
         Ok(map)

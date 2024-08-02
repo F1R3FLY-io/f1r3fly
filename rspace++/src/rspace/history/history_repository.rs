@@ -81,7 +81,7 @@ where
         let history = HistoryInstances::create(current_root, history_key_value_store.clone())?;
 
         // Cold store
-        let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());
+        // let cold_store = ColdStoreInstances::cold_store(cold_key_value_store.clone());
 
         // RSpace importer/exporter / directly operates on Store (lmdb)
         let exporter = RSpaceExporterStore::create(
@@ -91,14 +91,14 @@ where
         );
         let importer = RSpaceImporterStore::create(
             history_key_value_store,
-            cold_key_value_store,
+            cold_key_value_store.clone(),
             roots_key_value_store,
         );
 
         Ok(Box::new(HistoryRepositoryImpl {
             current_history: Arc::new(Mutex::new(Box::new(history))),
             roots_repository: Arc::new(Mutex::new(roots_repository)),
-            leaf_store: Arc::new(Mutex::new(cold_store)),
+            leaf_store: cold_key_value_store,
             rspace_exporter: Arc::new(Mutex::new(Box::new(exporter))),
             rspace_importer: Arc::new(Mutex::new(Box::new(importer))),
             _marker: PhantomData,
