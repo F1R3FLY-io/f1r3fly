@@ -6,5 +6,5 @@ pub mod instances;
 pub mod radix_tree;
 pub mod roots_store;
 pub mod root_repository;
-mod cold_store;
+pub mod cold_store;
 pub mod history_repository_impl;

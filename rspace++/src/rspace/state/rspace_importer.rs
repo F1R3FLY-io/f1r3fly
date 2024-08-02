@@ -9,6 +9,7 @@ use std::{
 
 use crate::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
+    history::cold_store::PersistedData,
     shared::{trie_exporter::KeyHash, trie_importer::TrieImporter},
     state::rspace_exporter::RSpaceExporterInstance,
     ByteVector,
@@ -61,7 +62,13 @@ impl RSpaceImporterInstance {
             let pool = ThreadPoolBuilder::new().num_threads(64).build().unwrap();
             pool.install(|| {
                 data_items.par_iter().try_for_each(|(hash, value_bytes)| {
-                    let data_hash = Blake2b256Hash::new(&value_bytes);
+                    let persisted_data: PersistedData = bincode::deserialize(value_bytes).unwrap();
+                    let bytes = match persisted_data {
+                        PersistedData::Joins(ref leaf) => &leaf.bytes,
+                        PersistedData::Data(ref leaf) => &leaf.bytes,
+                        PersistedData::Continuations(ref leaf) => &leaf.bytes,
+                    };
+                    let data_hash = Blake2b256Hash::new(&bytes);
                     if *hash != data_hash {
                         Err(format!(
                             "Data hash does not match decoded data, key: {}, decoded: {}.",

@@ -102,9 +102,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertProduce(i)) => {
                 let data = encode_datums(&i.data);
                 let data_leaf = DataLeaf { bytes: data };
-                let data_leaf_encoded = bincode::serialize(&data_leaf)
-                    .expect("History Repository Impl: Unable to serialize DataLeaf");
-                let data_hash = Blake2b256Hash::new(&data_leaf_encoded);
+                // let data_leaf_encoded = bincode::serialize(&data_leaf)
+                //     .expect("History Repository Impl: Unable to serialize DataLeaf");
+                let data_hash = Blake2b256Hash::new(&data_leaf.bytes);
 
                 (
                     (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
@@ -117,9 +117,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertConsume(i)) => {
                 let data = encode_continuations(&i.continuations);
                 let continuations_leaf = ContinuationsLeaf { bytes: data };
-                let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
-                    .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
-                let continuations_hash = Blake2b256Hash::new(&continuations_leaf_encoded);
+                // let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
+                //     .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
+                let continuations_hash = Blake2b256Hash::new(&continuations_leaf.bytes);
 
                 (
                     (
@@ -135,9 +135,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertJoins(i)) => {
                 let data = encode_joins(&i.joins);
                 let joins_leaf = JoinsLeaf { bytes: data };
-                let joins_leaf_encoded = bincode::serialize(&joins_leaf)
-                    .expect("History Repository Impl: Unable to serialize JoinsLeaf");
-                let joins_hash = Blake2b256Hash::new(&joins_leaf_encoded);
+                // let joins_leaf_encoded = bincode::serialize(&joins_leaf)
+                //     .expect("History Repository Impl: Unable to serialize JoinsLeaf");
+                let joins_hash = Blake2b256Hash::new(&joins_leaf.bytes);
 
                 (
                     (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
@@ -150,9 +150,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryProduce(i)) => {
                 let data = encode_binary(&i.data);
                 let data_leaf = DataLeaf { bytes: data };
-                let data_leaf_encoded = bincode::serialize(&data_leaf)
-                    .expect("History Repository Impl: Unable to serialize DataLeaf");
-                let data_hash = Blake2b256Hash::new(&data_leaf_encoded);
+                // let data_leaf_encoded = bincode::serialize(&data_leaf)
+                //     .expect("History Repository Impl: Unable to serialize DataLeaf");
+                let data_hash = Blake2b256Hash::new(&data_leaf.bytes);
 
                 (
                     (data_hash.clone(), Some(PersistedData::Data(data_leaf))),
@@ -165,9 +165,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryConsume(i)) => {
                 let data = encode_binary(&i.continuations);
                 let continuations_leaf = ContinuationsLeaf { bytes: data };
-                let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
-                    .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
-                let continuations_hash = Blake2b256Hash::new(&continuations_leaf_encoded);
+                // let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
+                //     .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
+                let continuations_hash = Blake2b256Hash::new(&continuations_leaf.bytes);
 
                 (
                     (
@@ -183,9 +183,9 @@ where
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryJoins(i)) => {
                 let data = encode_binary(&i.joins);
                 let joins_leaf = JoinsLeaf { bytes: data };
-                let joins_leaf_encoded = bincode::serialize(&joins_leaf)
-                    .expect("History Repository Impl: Unable to serialize JoinsLeaf");
-                let joins_hash = Blake2b256Hash::new(&joins_leaf_encoded);
+                // let joins_leaf_encoded = bincode::serialize(&joins_leaf)
+                //     .expect("History Repository Impl: Unable to serialize JoinsLeaf");
+                let joins_hash = Blake2b256Hash::new(&joins_leaf.bytes);
 
                 (
                     (joins_hash.clone(), Some(PersistedData::Joins(joins_leaf))),
@@ -333,6 +333,8 @@ where
                     (serialized_key, serialized_value)
                 })
                 .collect();
+
+            // println!("\nserialized_cold_actions: {:?}", serialized_cold_actions);
 
             leaf_store_lock
                 .put_if_absent(serialized_cold_actions)
