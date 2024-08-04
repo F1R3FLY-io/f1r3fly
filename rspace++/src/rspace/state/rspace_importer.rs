@@ -64,9 +64,9 @@ impl RSpaceImporterInstance {
                 data_items.par_iter().try_for_each(|(hash, value_bytes)| {
                     let persisted_data: PersistedData = bincode::deserialize(value_bytes).unwrap();
                     let bytes = match persisted_data {
-                        PersistedData::Joins(ref leaf) => &leaf.bytes,
-                        PersistedData::Data(ref leaf) => &leaf.bytes,
-                        PersistedData::Continuations(ref leaf) => &leaf.bytes,
+                        PersistedData::Joins(ref leaf) => bincode::serialize(leaf).unwrap(),
+                        PersistedData::Data(ref leaf) => bincode::serialize(leaf).unwrap(),
+                        PersistedData::Continuations(ref leaf) => bincode::serialize(leaf).unwrap(),
                     };
                     let data_hash = Blake2b256Hash::new(&bytes);
                     if *hash != data_hash {

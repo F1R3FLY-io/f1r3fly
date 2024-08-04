@@ -51,8 +51,8 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
             .read(prepend_bytes(prefix, &key.bytes()))?;
 
         match read_bytes {
-            Some(ref bytes) => {
-                let read_hash = Blake2b256Hash::from_bytes(bytes.to_vec());
+            Some(bytes) => {
+                let read_hash = Blake2b256Hash::from_bytes(bytes);
                 let leaf_store_lock = self
                     .leaf_store
                     .lock()
@@ -64,12 +64,7 @@ impl<C, P, A, K> RSpaceHistoryReaderImpl<C, P, A, K> {
                 // println!("\nleaf_store_lock: {:?}", leaf_store_lock.to_map());
                 // println!("\nserialized_read_hash: {:?}", read_bytes);
 
-                let mut get_opt = leaf_store_lock.get_one(&serialized_read_hash)?;
-
-                if get_opt.is_none() {
-                    // Try fetch call for imported data. Ideally this should be removed.
-                    get_opt = leaf_store_lock.get_one(&bytes)?;
-                }
+                let get_opt = leaf_store_lock.get_one(&serialized_read_hash)?;
 
                 Ok(get_opt.map(|store_value_bytes| {
                     bincode::deserialize(&store_value_bytes)
