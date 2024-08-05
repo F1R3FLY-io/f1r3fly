@@ -89,7 +89,19 @@ trait JNAInterface extends Library {
       payload_bytes_len: Int
   ): Pointer
 
+  def get_history_and_data(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Pointer
+
   /* Importer */
+
+  def validate_state_items(
+      rspace: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Unit
 
   def set_history_items(
       rspace: Pointer,

@@ -12,16 +12,17 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
-use rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporterInstance;
+use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
+use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
-use rspace_plus_plus::rspace::{Byte, ByteVector};
+use rspace_plus_plus::rspace::ByteVector;
 use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
     event_proto, io_event_proto, ByteVectorProto, ChannelsProto, CheckpointProto, CommProto,
-    DatumsProto, EventProto, ExporterParams, HashProto, HotStoreStateProto, IoEventProto,
-    ItemProto, ItemsProto, JoinProto, JoinsProto, KeysProto, LogProto, PathProto,
-    ProduceCounterMapEntry, SoftCheckpointProto, StoreStateContMapEntry, StoreStateDataMapEntry,
-    StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry, StoreStateJoinsMapEntry,
-    StoreToMapValue, TrieNodeProto, TrieNodesProto, WaitingContinuationsProto,
+    DatumsProto, EventProto, ExporterParams, HashProto, HistoryAndDataItems, HotStoreStateProto,
+    IoEventProto, ItemProto, ItemsProto, JoinProto, JoinsProto, KeysProto, LogProto, PathElement,
+    ProduceCounterMapEntry, SoftCheckpointProto, StoreItemsProto, StoreStateContMapEntry,
+    StoreStateDataMapEntry, StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry,
+    StoreStateJoinsMapEntry, StoreToMapValue, ValidateStateParams, WaitingContinuationsProto,
 };
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
@@ -1162,75 +1163,75 @@ pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
 
 /* Exporter */
 
-#[no_mangle]
-pub extern "C" fn get_nodes(
-    rspace: *mut Space,
-    payload_pointer: *const u8,
-    payload_bytes_len: usize,
-) -> *const u8 {
-    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-    let exporter_params = ExporterParams::decode(payload_slice).unwrap();
+// #[no_mangle]
+// pub extern "C" fn get_nodes(
+//     rspace: *mut Space,
+//     payload_pointer: *const u8,
+//     payload_bytes_len: usize,
+// ) -> *const u8 {
+//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+//     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
 
-    let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
-        .start_path
-        .into_iter()
-        .map(|path_proto| {
-            let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
-            let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
-                Some(path_proto.optional_byte[0])
-            } else {
-                None
-            };
+//     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
+//         .start_path
+//         .into_iter()
+//         .map(|path_proto| {
+//             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
+//             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
+//                 Some(path_proto.optional_byte[0])
+//             } else {
+//                 None
+//             };
 
-            (key_hash, value)
-        })
-        .collect();
+//             (key_hash, value)
+//         })
+//         .collect();
 
-    let nodes = unsafe {
-        let space = (*rspace).rspace.lock().unwrap();
-        space
-            .history_repository
-            .exporter()
-            .lock()
-            .unwrap()
-            .get_nodes(
-                start_path,
-                exporter_params.skip.try_into().unwrap(),
-                exporter_params.take.try_into().unwrap(),
-            )
-    };
+//     let nodes = unsafe {
+//         let space = (*rspace).rspace.lock().unwrap();
+//         space
+//             .history_repository
+//             .exporter()
+//             .lock()
+//             .unwrap()
+//             .get_nodes(
+//                 start_path,
+//                 exporter_params.skip.try_into().unwrap(),
+//                 exporter_params.take.try_into().unwrap(),
+//             )
+//     };
 
-    let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
-        .into_iter()
-        .map(|node| TrieNodeProto {
-            hash: node.hash.bytes(),
-            is_leaf: node.is_leaf,
-            path: node
-                .path
-                .into_iter()
-                .map(|path| PathProto {
-                    key_hash: path.0.bytes(),
-                    optional_byte: if path.1.is_some() {
-                        vec![path.1.unwrap()]
-                    } else {
-                        Vec::new()
-                    },
-                })
-                .collect(),
-        })
-        .collect();
+//     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
+//         .into_iter()
+//         .map(|node| TrieNodeProto {
+//             hash: node.hash.bytes(),
+//             is_leaf: node.is_leaf,
+//             path: node
+//                 .path
+//                 .into_iter()
+//                 .map(|path| PathProto {
+//                     key_hash: path.0.bytes(),
+//                     optional_byte: if path.1.is_some() {
+//                         vec![path.1.unwrap()]
+//                     } else {
+//                         Vec::new()
+//                     },
+//                 })
+//                 .collect(),
+//         })
+//         .collect();
 
-    let trie_nodes_proto_vec = TrieNodesProto {
-        nodes: trie_nodes_proto_vec,
-    };
+//     let trie_nodes_proto_vec = TrieNodesProto {
+//         nodes: trie_nodes_proto_vec,
+//     };
 
-    let mut bytes = trie_nodes_proto_vec.encode_to_vec();
-    let len = bytes.len() as u32;
-    let len_bytes = len.to_le_bytes().to_vec();
-    let mut result = len_bytes;
-    result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
-}
+//     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
+//     let len = bytes.len() as u32;
+//     let len_bytes = len.to_le_bytes().to_vec();
+//     let mut result = len_bytes;
+//     result.append(&mut bytes);
+//     Box::leak(result.into_boxed_slice()).as_ptr()
+// }
 
 #[no_mangle]
 pub extern "C" fn get_history_items(
@@ -1317,6 +1318,113 @@ pub extern "C" fn get_data_items(
     };
 
     let mut bytes = data_items_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_and_data(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let exporter_params = ExporterParams::decode(payload_slice).unwrap();
+
+    let start_path: Vec<(Blake2b256Hash, Option<u8>)> = exporter_params
+        .path
+        .into_iter()
+        .map(|path_element| {
+            (
+                Blake2b256Hash::from_bytes(path_element.key_hash),
+                if path_element.optional_byte.len() > 0 {
+                    Some(path_element.optional_byte[0])
+                } else {
+                    None
+                },
+            )
+        })
+        .collect();
+
+    let exporter = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+    };
+
+    let history_and_data_items = RSpaceExporterItems::get_history_and_data(
+        exporter,
+        start_path,
+        exporter_params.skip,
+        exporter_params.take,
+    );
+
+    let history_items_proto = StoreItemsProto {
+        items: history_and_data_items
+            .0
+            .items
+            .into_iter()
+            .map(|history_item| ItemProto {
+                key_hash: history_item.0.bytes(),
+                value: history_item.1,
+            })
+            .collect(),
+        last_path: history_and_data_items
+            .0
+            .last_path
+            .into_iter()
+            .map(|path| PathElement {
+                key_hash: path.0.bytes(),
+                optional_byte: {
+                    if path.1.is_some() {
+                        vec![path.1.unwrap()]
+                    } else {
+                        Vec::new()
+                    }
+                },
+            })
+            .collect(),
+    };
+
+    let data_items_proto = StoreItemsProto {
+        items: history_and_data_items
+            .1
+            .items
+            .into_iter()
+            .map(|data_item| ItemProto {
+                key_hash: data_item.0.bytes(),
+                value: data_item.1,
+            })
+            .collect(),
+        last_path: history_and_data_items
+            .1
+            .last_path
+            .into_iter()
+            .map(|path| PathElement {
+                key_hash: path.0.bytes(),
+                optional_byte: {
+                    if path.1.is_some() {
+                        vec![path.1.unwrap()]
+                    } else {
+                        Vec::new()
+                    }
+                },
+            })
+            .collect(),
+    };
+
+    let history_and_data_items_proto = HistoryAndDataItems {
+        history_items: Some(history_items_proto),
+        data_items: Some(data_items_proto),
+    };
+
+    let mut bytes = history_and_data_items_proto.encode_to_vec();
     let len = bytes.len() as u32;
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
@@ -1413,9 +1521,66 @@ pub extern "C" fn get_exporter_root(rspace: *mut Space) -> *const u8 {
 //     Box::leak(result.into_boxed_slice()).as_ptr()
 // }
 
-
-
 /* Importer */
+
+#[no_mangle]
+pub extern "C" fn validate_state_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let params = ValidateStateParams::decode(payload_slice).unwrap();
+
+    let history_items: Vec<(Blake2b256Hash, ByteVector)> = params
+        .history_items
+        .into_iter()
+        .map(|history_item_proto| {
+            (Blake2b256Hash::from_bytes(history_item_proto.key_hash), history_item_proto.value)
+        })
+        .collect();
+
+    let data_items: Vec<(Blake2b256Hash, ByteVector)> = params
+        .data_items
+        .into_iter()
+        .map(|data_item_proto| {
+            (Blake2b256Hash::from_bytes(data_item_proto.key_hash), data_item_proto.value)
+        })
+        .collect();
+
+    let start_path: Vec<(Blake2b256Hash, Option<u8>)> = params
+        .start_path
+        .into_iter()
+        .map(|path_element| {
+            (
+                Blake2b256Hash::from_bytes(path_element.key_hash),
+                if path_element.optional_byte.len() > 0 {
+                    Some(path_element.optional_byte[0])
+                } else {
+                    None
+                },
+            )
+        })
+        .collect();
+
+    let importer = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+    };
+
+    let _ = RSpaceImporterInstance::validate_state_items(
+        history_items,
+        data_items,
+        start_path,
+        params.chunk_size,
+        params.skip,
+        move |hash: Blake2b256Hash| importer.lock().unwrap().get_history_item(hash),
+    );
+}
 
 #[no_mangle]
 pub extern "C" fn set_history_items(

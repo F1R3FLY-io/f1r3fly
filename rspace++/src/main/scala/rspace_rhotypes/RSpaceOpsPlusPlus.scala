@@ -15,7 +15,6 @@ import coop.rchain.models.rspace_plus_plus_types.{
   InstallParams,
   JoinProto,
   JoinsProto,
-  PathProto,
   ProduceCounterMapEntry,
   ProduceProto,
   SoftCheckpointProto,
@@ -83,6 +82,9 @@ import coop.rchain.models.rspace_plus_plus_types.ItemProto
 import coop.rchain.models.rspace_plus_plus_types.ByteVectorProto
 import coop.rchain.models.rspace_plus_plus_types.ExporterParams
 import coop.rchain.models.rspace_plus_plus_types.TrieNodesProto
+import coop.rchain.models.rspace_plus_plus_types.PathElement
+import coop.rchain.models.rspace_plus_plus_types.HistoryAndDataItems
+import coop.rchain.models.rspace_plus_plus_types.ValidateStateParams
 
 // NOTE: Concurrent two step lock NOT implemented
 abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
@@ -131,113 +133,111 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
                                  skip: Int,
                                  take: Int
-                             ): F[Seq[TrieNode[Blake2b256Hash]]] = {
-                               for {
-                                 result <- Sync[F].delay {
-                                            val exporterParamsProto = ExporterParams(
-                                              startPath.map(
-                                                pathItem =>
-                                                  PathProto(pathItem._1.toByteString, {
-                                                    if (pathItem._2.isEmpty) {
-                                                      ByteString.EMPTY
-                                                    } else {
-                                                      ByteString.copyFrom(Array(pathItem._2.get))
-                                                    }
-                                                  })
-                                              ),
-                                              skip,
-                                              take
-                                            )
+                             ): F[Seq[TrieNode[Blake2b256Hash]]] =
+                               //  for {
+                               //    result <- Sync[F].delay {
+                               //               val exporterParamsProto = ExporterParams(
+                               //                 startPath.map(
+                               //                   pathItem =>
+                               //                     PathProto(pathItem._1.toByteString, {
+                               //                       if (pathItem._2.isEmpty) {
+                               //                         ByteString.EMPTY
+                               //                       } else {
+                               //                         ByteString.copyFrom(Array(pathItem._2.get))
+                               //                       }
+                               //                     })
+                               //                 ),
+                               //                 skip,
+                               //                 take
+                               //               )
 
-                                            val exporterParamsBytes =
-                                              exporterParamsProto.toByteArray
+                               //               val exporterParamsBytes =
+                               //                 exporterParamsProto.toByteArray
 
-                                            val payloadMemory =
-                                              new Memory(exporterParamsBytes.length.toLong)
-                                            payloadMemory
-                                              .write(
-                                                0,
-                                                exporterParamsBytes,
-                                                0,
-                                                exporterParamsBytes.length
-                                              )
+                               //               val payloadMemory =
+                               //                 new Memory(exporterParamsBytes.length.toLong)
+                               //               payloadMemory
+                               //                 .write(
+                               //                   0,
+                               //                   exporterParamsBytes,
+                               //                   0,
+                               //                   exporterParamsBytes.length
+                               //                 )
 
-                                            val getNodesPtr =
-                                              INSTANCE.get_nodes(
-                                                rspacePointer,
-                                                payloadMemory,
-                                                exporterParamsBytes.length
-                                              )
+                               //               val getNodesPtr =
+                               //                 INSTANCE.get_nodes(
+                               //                   rspacePointer,
+                               //                   payloadMemory,
+                               //                   exporterParamsBytes.length
+                               //                 )
 
-                                            // Not sure if these lines are needed
-                                            // Need to figure out how to deallocate each memory instance
-                                            payloadMemory.clear()
+                               //               // Not sure if these lines are needed
+                               //               // Need to figure out how to deallocate each memory instance
+                               //               payloadMemory.clear()
 
-                                            if (getNodesPtr != null) {
-                                              val resultByteslength =
-                                                getNodesPtr.getInt(0)
+                               //               if (getNodesPtr != null) {
+                               //                 val resultByteslength =
+                               //                   getNodesPtr.getInt(0)
 
-                                              try {
-                                                val resultBytes =
-                                                  getNodesPtr
-                                                    .getByteArray(4, resultByteslength)
-                                                val trieNodesProto =
-                                                  TrieNodesProto.parseFrom(resultBytes)
-                                                val nodesProto = trieNodesProto.nodes
+                               //                 try {
+                               //                   val resultBytes =
+                               //                     getNodesPtr
+                               //                       .getByteArray(4, resultByteslength)
+                               //                   val trieNodesProto =
+                               //                     TrieNodesProto.parseFrom(resultBytes)
+                               //                   val nodesProto = trieNodesProto.nodes
 
-                                                val nodes: Seq[TrieNode[Blake2b256Hash]] =
-                                                  nodesProto.map(
-                                                    node =>
-                                                      TrieNode(
-                                                        Blake2b256Hash.fromByteArray(
-                                                          node.hash.toByteArray
-                                                        ),
-                                                        node.isLeaf,
-                                                        node.path.map(
-                                                          pathItem =>
-                                                            (
-                                                              Blake2b256Hash.fromByteArray(
-                                                                pathItem.keyHash.toByteArray
-                                                              ), {
-                                                                if (pathItem.optionalByte
-                                                                      .size() > 0) {
-                                                                  Some(
-                                                                    pathItem.optionalByte.byteAt(0)
-                                                                  )
-                                                                } else {
-                                                                  None
-                                                                }
-                                                              }
-                                                            )
-                                                        )
-                                                      )
-                                                  )
+                               //                   val nodes: Seq[TrieNode[Blake2b256Hash]] =
+                               //                     nodesProto.map(
+                               //                       node =>
+                               //                         TrieNode(
+                               //                           Blake2b256Hash.fromByteArray(
+                               //                             node.hash.toByteArray
+                               //                           ),
+                               //                           node.isLeaf,
+                               //                           node.path.map(
+                               //                             pathItem =>
+                               //                               (
+                               //                                 Blake2b256Hash.fromByteArray(
+                               //                                   pathItem.keyHash.toByteArray
+                               //                                 ), {
+                               //                                   if (pathItem.optionalByte
+                               //                                         .size() > 0) {
+                               //                                     Some(
+                               //                                       pathItem.optionalByte.byteAt(0)
+                               //                                     )
+                               //                                   } else {
+                               //                                     None
+                               //                                   }
+                               //                                 }
+                               //                               )
+                               //                           )
+                               //                         )
+                               //                     )
 
-                                                nodes
-                                              } catch {
-                                                case e: Throwable =>
-                                                  println(
-                                                    "Error during scala getNodes operation: " + e
-                                                  )
-                                                  throw e
-                                              } finally {
-                                                INSTANCE.deallocate_memory(
-                                                  getNodesPtr,
-                                                  resultByteslength
-                                                )
-                                              }
-                                            } else {
-                                              println("getNodesPtr is null")
-                                              throw new RuntimeException(
-                                                "getNodesPtr is null"
-                                              )
-                                            }
-                                          }
+                               //                   nodes
+                               //                 } catch {
+                               //                   case e: Throwable =>
+                               //                     println(
+                               //                       "Error during scala getNodes operation: " + e
+                               //                     )
+                               //                     throw e
+                               //                 } finally {
+                               //                   INSTANCE.deallocate_memory(
+                               //                     getNodesPtr,
+                               //                     resultByteslength
+                               //                   )
+                               //                 }
+                               //               } else {
+                               //                 println("getNodesPtr is null")
+                               //                 throw new RuntimeException(
+                               //                   "getNodesPtr is null"
+                               //                 )
+                               //               }
+                               //             }
 
-                               } yield result
-
+                               //  } yield result
                                ???
-                             }
 
                              override def getHistoryItems[Value](
                                  keys: Seq[Blake2b256Hash],
@@ -293,22 +293,153 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                ???
                              }
 
-                             def getHistoryAndData[Value](
+                             def getHistoryAndData(
                                  startPath: Seq[(Blake2b256Hash, Option[Byte])],
                                  skip: Int,
-                                 take: Int,
-                                 fromBuffer: ByteBuffer => Value
+                                 take: Int
+                                 //  fromBuffer: ByteBuffer => Value
                              )(
                                  implicit m: Sync[F],
                                  l: Log[F]
                              ): F[
                                (
-                                   StoreItems[Blake2b256Hash, Value],
-                                   StoreItems[Blake2b256Hash, Value]
+                                   StoreItems[Blake2b256Hash, ByteString],
+                                   StoreItems[Blake2b256Hash, ByteString]
                                )
                              ] = {
-                               println("getHistoryAndData")
-                               ???
+                               for {
+                                 result <- Sync[F].delay {
+                                            val exporterParamsProto = ExporterParams(
+                                              startPath.map(
+                                                pathItem =>
+                                                  PathElement(pathItem._1.toByteString, {
+                                                    if (pathItem._2.isEmpty) {
+                                                      ByteString.EMPTY
+                                                    } else {
+                                                      ByteString.copyFrom(Array(pathItem._2.get))
+                                                    }
+                                                  })
+                                              ),
+                                              skip,
+                                              take
+                                            )
+
+                                            val exporterParamsBytes =
+                                              exporterParamsProto.toByteArray
+
+                                            val payloadMemory =
+                                              new Memory(exporterParamsBytes.length.toLong)
+                                            payloadMemory
+                                              .write(
+                                                0,
+                                                exporterParamsBytes,
+                                                0,
+                                                exporterParamsBytes.length
+                                              )
+
+                                            val getHistoryAndDataPtr =
+                                              INSTANCE.get_history_and_data(
+                                                rspacePointer,
+                                                payloadMemory,
+                                                exporterParamsBytes.length
+                                              )
+
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+
+                                            if (getHistoryAndDataPtr != null) {
+                                              val resultByteslength =
+                                                getHistoryAndDataPtr.getInt(0)
+
+                                              try {
+                                                val resultBytes =
+                                                  getHistoryAndDataPtr
+                                                    .getByteArray(4, resultByteslength)
+                                                val historyAndDataProto =
+                                                  HistoryAndDataItems.parseFrom(resultBytes)
+                                                val historyItemsProto =
+                                                  historyAndDataProto.getHistoryItems
+                                                val dataItemsProto =
+                                                  historyAndDataProto.getDataItems
+
+                                                val historyItems = StoreItems(
+                                                  historyItemsProto.items.map(
+                                                    historyItemProto =>
+                                                      (
+                                                        Blake2b256Hash.fromByteArray(
+                                                          historyItemProto.keyHash.toByteArray
+                                                        ),
+                                                        historyItemProto.value
+                                                      )
+                                                  ),
+                                                  historyItemsProto.lastPath.map(
+                                                    pathElementProto =>
+                                                      (
+                                                        Blake2b256Hash.fromByteArray(
+                                                          pathElementProto.keyHash.toByteArray
+                                                        ),
+                                                        if (pathElementProto.optionalByte
+                                                              .size() > 0) {
+                                                          Some(
+                                                            pathElementProto.optionalByte.byteAt(0)
+                                                          )
+                                                        } else {
+                                                          None
+                                                        }
+                                                      )
+                                                  )
+                                                )
+
+                                                val dataItems = StoreItems(
+                                                  dataItemsProto.items.map(
+                                                    dataItemProto =>
+                                                      (
+                                                        Blake2b256Hash.fromByteArray(
+                                                          dataItemProto.keyHash.toByteArray
+                                                        ),
+                                                        dataItemProto.value
+                                                      )
+                                                  ),
+                                                  dataItemsProto.lastPath.map(
+                                                    pathElementProto =>
+                                                      (
+                                                        Blake2b256Hash.fromByteArray(
+                                                          pathElementProto.keyHash.toByteArray
+                                                        ),
+                                                        if (pathElementProto.optionalByte
+                                                              .size() > 0) {
+                                                          Some(
+                                                            pathElementProto.optionalByte.byteAt(0)
+                                                          )
+                                                        } else {
+                                                          None
+                                                        }
+                                                      )
+                                                  )
+                                                )
+
+                                                (historyItems, dataItems)
+                                              } catch {
+                                                case e: Throwable =>
+                                                  println(
+                                                    "Error during scala getHistoryAndData operation: " + e
+                                                  )
+                                                  throw e
+                                              } finally {
+                                                INSTANCE.deallocate_memory(
+                                                  getHistoryAndDataPtr,
+                                                  resultByteslength
+                                                )
+                                              }
+                                            } else {
+                                              println("getHistoryAndDataPtr is null")
+                                              throw new RuntimeException(
+                                                "getHistoryAndDataPtr is null"
+                                              )
+                                            }
+                                          }
+                               } yield result
                              }
 
                              def writeToDisk[C, P, A, K](
@@ -331,109 +462,182 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
         rspaceImporter <- Sync[F].delay {
                            new RSpacePlusPlusImporter[F] {
 
-                             override def setHistoryItems[Value](
-                                 data: Seq[(Blake2b256Hash, Value)],
-                                 toBuffer: Value => ByteBuffer
+                             def validateStateItems(
+                                 historyItems: Seq[(Blake2b256Hash, ByteVector)],
+                                 dataItems: Seq[(Blake2b256Hash, ByteVector)],
+                                 startPath: Seq[(Blake2b256Hash, Option[Byte])],
+                                 chunkSize: Int,
+                                 skip: Int,
+                                 getFromHistory: Blake2b256Hash => F[Option[ByteVector]]
                              ): F[Unit] =
                                for {
                                  result <- Sync[F].delay {
-                                            val itemsProto =
-                                              ItemsProto(
-                                                items = {
-                                                  data.map(d => {
-                                                    ItemProto(
-                                                      d._1.toByteString, {
-                                                        d._2 match {
-                                                          case value: {
-                                                                def toArray(): Array[Byte]
-                                                              } => {
-                                                            ByteString.copyFrom(value.toArray)
-                                                          }
-                                                          case _ =>
-                                                            throw new IllegalArgumentException(
-                                                              "Type does not have a toByteArray method"
-                                                            )
-                                                        }
-                                                      }
-                                                    )
-                                                  })
-                                                }
-                                              )
+                                            val historyItemsProto = historyItems.map(
+                                              historyItem =>
+                                                ItemProto(
+                                                  historyItem._1.toByteString,
+                                                  ByteString.copyFrom(historyItem._2.toArray)
+                                                )
+                                            )
 
-                                            val itemsProtoBytes = itemsProto.toByteArray
+                                            val dataItemsProto = dataItems.map(
+                                              dataItem =>
+                                                ItemProto(
+                                                  dataItem._1.toByteString,
+                                                  ByteString.copyFrom(dataItem._2.toArray)
+                                                )
+                                            )
+
+                                            val startPathProto = startPath.map(
+                                              pathItem =>
+                                                PathElement(pathItem._1.toByteString, {
+                                                  if (pathItem._2.isEmpty) {
+                                                    ByteString.EMPTY
+                                                  } else {
+                                                    ByteString.copyFrom(Array(pathItem._2.get))
+                                                  }
+                                                })
+                                            )
+
+                                            val paramsProto = ValidateStateParams(
+                                              historyItemsProto,
+                                              dataItemsProto,
+                                              startPathProto,
+                                              chunkSize,
+                                              skip
+                                            )
+
+                                            val paramsBytes =
+                                              paramsProto.toByteArray
 
                                             val payloadMemory =
-                                              new Memory(itemsProtoBytes.length.toLong)
-                                            payloadMemory.write(
-                                              0,
-                                              itemsProtoBytes,
-                                              0,
-                                              itemsProtoBytes.length
-                                            )
+                                              new Memory(paramsBytes.length.toLong)
+                                            payloadMemory
+                                              .write(
+                                                0,
+                                                paramsBytes,
+                                                0,
+                                                paramsBytes.length
+                                              )
 
-                                            val _ = INSTANCE.set_history_items(
-                                              rspacePointer,
-                                              payloadMemory,
-                                              itemsProtoBytes.length
-                                            )
+                                            val _ =
+                                              INSTANCE.get_history_and_data(
+                                                rspacePointer,
+                                                payloadMemory,
+                                                paramsBytes.length
+                                              )
 
                                             // Not sure if these lines are needed
                                             // Need to figure out how to deallocate each memory instance
                                             payloadMemory.clear()
                                           }
                                } yield result
+
+                             override def setHistoryItems[Value](
+                                 data: Seq[(Blake2b256Hash, Value)],
+                                 toBuffer: Value => ByteBuffer
+                             ): F[Unit] =
+                               //  for {
+                               //    result <- Sync[F].delay {
+                               //               val itemsProto =
+                               //                 ItemsProto(
+                               //                   items = {
+                               //                     data.map(d => {
+                               //                       ItemProto(
+                               //                         d._1.toByteString, {
+                               //                           d._2 match {
+                               //                             case value: {
+                               //                                   def toArray(): Array[Byte]
+                               //                                 } => {
+                               //                               ByteString.copyFrom(value.toArray)
+                               //                             }
+                               //                             case _ =>
+                               //                               throw new IllegalArgumentException(
+                               //                                 "Type does not have a toByteArray method"
+                               //                               )
+                               //                           }
+                               //                         }
+                               //                       )
+                               //                     })
+                               //                   }
+                               //                 )
+
+                               //               val itemsProtoBytes = itemsProto.toByteArray
+
+                               //               val payloadMemory =
+                               //                 new Memory(itemsProtoBytes.length.toLong)
+                               //               payloadMemory.write(
+                               //                 0,
+                               //                 itemsProtoBytes,
+                               //                 0,
+                               //                 itemsProtoBytes.length
+                               //               )
+
+                               //               val _ = INSTANCE.set_history_items(
+                               //                 rspacePointer,
+                               //                 payloadMemory,
+                               //                 itemsProtoBytes.length
+                               //               )
+
+                               //               // Not sure if these lines are needed
+                               //               // Need to figure out how to deallocate each memory instance
+                               //               payloadMemory.clear()
+                               //             }
+                               //  } yield result
+                               ???
 
                              override def setDataItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
                              ): F[Unit] =
-                               for {
-                                 result <- Sync[F].delay {
-                                            val itemsProto =
-                                              ItemsProto(
-                                                items = {
-                                                  data.map(d => {
-                                                    ItemProto(
-                                                      d._1.toByteString, {
-                                                        d._2 match {
-                                                          case value: {
-                                                                def toArray(): Array[Byte]
-                                                              } => {
-                                                            ByteString.copyFrom(value.toArray)
-                                                          }
-                                                          case _ =>
-                                                            throw new IllegalArgumentException(
-                                                              "Type does not have a toByteArray method"
-                                                            )
-                                                        }
-                                                      }
-                                                    )
-                                                  })
-                                                }
-                                              )
+                               //  for {
+                               //    result <- Sync[F].delay {
+                               //               val itemsProto =
+                               //                 ItemsProto(
+                               //                   items = {
+                               //                     data.map(d => {
+                               //                       ItemProto(
+                               //                         d._1.toByteString, {
+                               //                           d._2 match {
+                               //                             case value: {
+                               //                                   def toArray(): Array[Byte]
+                               //                                 } => {
+                               //                               ByteString.copyFrom(value.toArray)
+                               //                             }
+                               //                             case _ =>
+                               //                               throw new IllegalArgumentException(
+                               //                                 "Type does not have a toByteArray method"
+                               //                               )
+                               //                           }
+                               //                         }
+                               //                       )
+                               //                     })
+                               //                   }
+                               //                 )
 
-                                            val itemsProtoBytes = itemsProto.toByteArray
+                               //               val itemsProtoBytes = itemsProto.toByteArray
 
-                                            val payloadMemory =
-                                              new Memory(itemsProtoBytes.length.toLong)
-                                            payloadMemory.write(
-                                              0,
-                                              itemsProtoBytes,
-                                              0,
-                                              itemsProtoBytes.length
-                                            )
+                               //               val payloadMemory =
+                               //                 new Memory(itemsProtoBytes.length.toLong)
+                               //               payloadMemory.write(
+                               //                 0,
+                               //                 itemsProtoBytes,
+                               //                 0,
+                               //                 itemsProtoBytes.length
+                               //               )
 
-                                            val _ = INSTANCE.set_data_items(
-                                              rspacePointer,
-                                              payloadMemory,
-                                              itemsProtoBytes.length
-                                            )
+                               //               val _ = INSTANCE.set_data_items(
+                               //                 rspacePointer,
+                               //                 payloadMemory,
+                               //                 itemsProtoBytes.length
+                               //               )
 
-                                            // Not sure if these lines are needed
-                                            // Need to figure out how to deallocate each memory instance
-                                            payloadMemory.clear()
-                                          }
-                               } yield result
+                               //               // Not sure if these lines are needed
+                               //               // Need to figure out how to deallocate each memory instance
+                               //               payloadMemory.clear()
+                               //             }
+                               //  } yield result
+                               ???
 
                              override def setRoot(key: Blake2b256Hash): F[Unit] =
                                for {
@@ -458,53 +662,54 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                              override def getHistoryItem(
                                  hash: Blake2b256Hash
                              ): F[Option[ByteVector]] =
-                               for {
-                                 result <- Sync[F].delay {
-                                            val hashBytes = hash.bytes.toArray
+                               //  for {
+                               //    result <- Sync[F].delay {
+                               //               val hashBytes = hash.bytes.toArray
 
-                                            val hashMemory = new Memory(hashBytes.length.toLong)
-                                            hashMemory.write(0, hashBytes, 0, hashBytes.length)
+                               //               val hashMemory = new Memory(hashBytes.length.toLong)
+                               //               hashMemory.write(0, hashBytes, 0, hashBytes.length)
 
-                                            val historyItemPtr = INSTANCE.get_history_item(
-                                              rspacePointer,
-                                              hashMemory,
-                                              hashBytes.length
-                                            )
+                               //               val historyItemPtr = INSTANCE.get_history_item(
+                               //                 rspacePointer,
+                               //                 hashMemory,
+                               //                 hashBytes.length
+                               //               )
 
-                                            // Not sure if these lines are needed
-                                            // Need to figure out how to deallocate each memory instance
-                                            hashMemory.clear()
+                               //               // Not sure if these lines are needed
+                               //               // Need to figure out how to deallocate each memory instance
+                               //               hashMemory.clear()
 
-                                            if (historyItemPtr != null) {
-                                              val resultByteslength = historyItemPtr.getInt(0)
+                               //               if (historyItemPtr != null) {
+                               //                 val resultByteslength = historyItemPtr.getInt(0)
 
-                                              try {
-                                                val resultBytes =
-                                                  historyItemPtr.getByteArray(4, resultByteslength)
-                                                val byteVectorProto =
-                                                  ByteVectorProto.parseFrom(resultBytes)
+                               //                 try {
+                               //                   val resultBytes =
+                               //                     historyItemPtr.getByteArray(4, resultByteslength)
+                               //                   val byteVectorProto =
+                               //                     ByteVectorProto.parseFrom(resultBytes)
 
-                                                val byteVector = byteVectorProto.byteVector
-                                                Some(ByteVector(byteVector.toByteArray()))
+                               //                   val byteVector = byteVectorProto.byteVector
+                               //                   Some(ByteVector(byteVector.toByteArray()))
 
-                                              } catch {
-                                                case e: Throwable =>
-                                                  println(
-                                                    "Error during scala hashChannel operation: " + e
-                                                  )
-                                                  throw e
-                                              } finally {
-                                                INSTANCE
-                                                  .deallocate_memory(
-                                                    historyItemPtr,
-                                                    resultByteslength
-                                                  )
-                                              }
-                                            } else {
-                                              None
-                                            }
-                                          }
-                               } yield result
+                               //                 } catch {
+                               //                   case e: Throwable =>
+                               //                     println(
+                               //                       "Error during scala hashChannel operation: " + e
+                               //                     )
+                               //                     throw e
+                               //                 } finally {
+                               //                   INSTANCE
+                               //                     .deallocate_memory(
+                               //                       historyItemPtr,
+                               //                       resultByteslength
+                               //                     )
+                               //                 }
+                               //               } else {
+                               //                 None
+                               //               }
+                               //             }
+                               //  } yield result
+                               ???
                            }
                          }
       } yield rspaceImporter
@@ -516,40 +721,40 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
         historyReader <- Sync[F].delay {
                           new RSpacePlusPlusHistoryReader[F, Blake2b256Hash, C, P, A, K] {
 
-                            override def root: Blake2b256Hash = {
-                              val rootBytes  = root.bytes.toArray
-                              val rootMemory = new Memory(rootBytes.length.toLong)
-                              rootMemory.write(0, rootBytes, 0, rootBytes.length)
+                            override def root: Blake2b256Hash =
+                              // val rootBytes  = root.bytes.toArray
+                              // val rootMemory = new Memory(rootBytes.length.toLong)
+                              // rootMemory.write(0, rootBytes, 0, rootBytes.length)
 
-                              val rootPtr = INSTANCE.history_reader_root(
-                                rspacePointer,
-                                rootMemory,
-                                rootBytes.length
-                              )
+                              // val rootPtr = INSTANCE.history_reader_root(
+                              //   rspacePointer,
+                              //   rootMemory,
+                              //   rootBytes.length
+                              // )
 
-                              if (rootPtr != null) {
-                                val resultByteslength = rootPtr.getInt(0)
+                              // if (rootPtr != null) {
+                              //   val resultByteslength = rootPtr.getInt(0)
 
-                                try {
-                                  val resultBytes = rootPtr.getByteArray(4, resultByteslength)
-                                  val hashProto   = HashProto.parseFrom(resultBytes)
-                                  val hash =
-                                    Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
+                              //   try {
+                              //     val resultBytes = rootPtr.getByteArray(4, resultByteslength)
+                              //     val hashProto   = HashProto.parseFrom(resultBytes)
+                              //     val hash =
+                              //       Blake2b256Hash.fromByteArray(hashProto.hash.toByteArray)
 
-                                  hash
+                              //     hash
 
-                                } catch {
-                                  case e: Throwable =>
-                                    println("Error during scala hashChannel operation: " + e)
-                                    throw e
-                                } finally {
-                                  INSTANCE.deallocate_memory(rootPtr, resultByteslength)
-                                }
-                              } else {
-                                println("rootPtr is null")
-                                throw new RuntimeException("rootPtr is null")
-                              }
-                            }
+                              //   } catch {
+                              //     case e: Throwable =>
+                              //       println("Error during scala hashChannel operation: " + e)
+                              //       throw e
+                              //   } finally {
+                              //     INSTANCE.deallocate_memory(rootPtr, resultByteslength)
+                              //   }
+                              // } else {
+                              //   println("rootPtr is null")
+                              //   throw new RuntimeException("rootPtr is null")
+                              // }
+                              ???
 
                             override def getData(key: Blake2b256Hash): F[Seq[Datum[A]]] =
                               for {
@@ -1146,7 +1351,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
 
         } catch {
           case e: Throwable =>
-            println("Error during scala hashChannel operation: " + e)
+            println("Error during scala historyRepo root operation: " + e)
             throw e
         } finally {
           INSTANCE.deallocate_memory(rootPtr, resultByteslength)

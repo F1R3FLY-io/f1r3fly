@@ -10,6 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.file.Path
 import cats.effect.Concurrent
 import coop.rchain.rspace.state.exporters.RSpaceExporterItems.StoreItems
+import com.google.protobuf.ByteString
 
 trait RSpacePlusPlusExporter[F[_]] extends TrieExporter[F] {
   type KeyHash = Blake2b256Hash
@@ -38,15 +39,15 @@ trait RSpacePlusPlusExporter[F[_]] extends TrieExporter[F] {
       fromBuffer: ByteBuffer => Value
   )(implicit m: Sync[F], l: Log[F]): F[StoreItems[Blake2b256Hash, Value]]
 
-  def getHistoryAndData[Value](
+  def getHistoryAndData(
       startPath: Seq[(Blake2b256Hash, Option[Byte])],
       skip: Int,
-      take: Int,
-      fromBuffer: ByteBuffer => Value
+      take: Int
+      // fromBuffer: ByteBuffer => Value
   )(
       implicit m: Sync[F],
       l: Log[F]
-  ): F[(StoreItems[Blake2b256Hash, Value], StoreItems[Blake2b256Hash, Value])]
+  ): F[(StoreItems[Blake2b256Hash, ByteString], StoreItems[Blake2b256Hash, ByteString])]
 
   // Export to disk
 

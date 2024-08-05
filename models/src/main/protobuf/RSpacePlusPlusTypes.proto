@@ -272,27 +272,45 @@ message ByteVectorProto {
   bytes byte_vector = 1;
 }
 
-message PathProto {
+message PathElement {
   bytes key_hash = 1;
   bytes optional_byte = 2;
 }
 
 message ExporterParams {
-	repeated PathProto start_path = 1;
-	int32 skip = 2;	
-	int32 take = 3;
+  repeated PathElement path = 1;
+  int32 skip = 2;
+  int32 take = 3;
 }
 
 message TrieNodeProto {
   bytes hash = 1;
   bool is_leaf = 2;
-  repeated PathProto path = 3;
+  repeated PathElement path = 3;
 }
 
 message TrieNodesProto {
-	repeated TrieNodeProto nodes = 1;
+  repeated TrieNodeProto nodes = 1;
 }
 
 message KeysProto {
-	repeated HashProto keys = 1;
+  repeated HashProto keys = 1;
+}
+
+message StoreItemsProto {
+  repeated ItemProto items = 1;
+  repeated PathElement last_path = 2;
+}
+
+message HistoryAndDataItems {
+  StoreItemsProto history_items = 1;
+  StoreItemsProto data_items = 2;
+}
+
+message ValidateStateParams {
+  repeated ItemProto history_items = 1;
+  repeated ItemProto data_items = 2;
+  repeated PathElement start_path = 3;
+  int32 chunk_size = 4;
+  int32 skip = 5;
 }

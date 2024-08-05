@@ -10,15 +10,15 @@ trait RSpacePlusPlusImporter[F[_]] extends TrieImporter[F] {
   type KeyHash = Blake2b256Hash
 
   def getHistoryItem(hash: KeyHash): F[Option[ByteVector]]
-}
 
-object RSpacePlusPlusImporter {
-  def validateStateItems[F[_]: Concurrent](
+  def validateStateItems(
       historyItems: Seq[(Blake2b256Hash, ByteVector)],
       dataItems: Seq[(Blake2b256Hash, ByteVector)],
       startPath: Seq[(Blake2b256Hash, Option[Byte])],
       chunkSize: Int,
       skip: Int,
       getFromHistory: Blake2b256Hash => F[Option[ByteVector]]
-  ): F[Unit] = ???
+  ): F[Unit]
 }
+
+object RSpacePlusPlusImporter {}

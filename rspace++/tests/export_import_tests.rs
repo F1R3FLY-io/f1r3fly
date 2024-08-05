@@ -67,7 +67,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     // Export 1 page from space1
     let init_start_path: Vec<(Blake2b256Hash, Option<Byte>)> =
         vec![(init_point.root.clone(), None)];
-    let export_data = RSpaceExporterItems.get_history_and_data(
+    let export_data = RSpaceExporterItems::get_history_and_data(
         exporter1,
         init_start_path.clone(),
         start_skip,
@@ -137,7 +137,7 @@ async fn multipage_export_should_work_correctly() {
         match params {
             (history_items, data_items, start_path) => {
                 // Export 1 page from space1
-                let export_data = RSpaceExporterItems.get_history_and_data(
+                let export_data = RSpaceExporterItems::get_history_and_data(
                     exporter1,
                     start_path.clone(),
                     start_skip,
@@ -251,7 +251,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
         match params {
             (history_items, data_items, start_path, skip) => {
                 // Export 1 page from space1
-                let export_data = RSpaceExporterItems.get_history_and_data(
+                let export_data = RSpaceExporterItems::get_history_and_data(
                     exporter1,
                     start_path.clone(),
                     skip,

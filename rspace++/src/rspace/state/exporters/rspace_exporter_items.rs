@@ -79,7 +79,6 @@ impl RSpaceExporterItems {
     }
 
     pub fn get_history_and_data(
-        &self,
         exporter: Arc<Mutex<Box<dyn RSpaceExporter>>>,
         start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
         skip: i32,
