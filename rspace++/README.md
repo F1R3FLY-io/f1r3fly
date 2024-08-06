@@ -30,7 +30,9 @@ Standing up network using RSpace++ (Under Docker)
 1. `docker context use default`
 2. `sbt ";clean ;compile ;project node ;Docker/publishLocal ;project rchain"`
 3. `docker compose -f docker/shard.yml up`
-4. (Optional) Run this command to ensure nodes preform genesis ceremony: `./delete_data.sh`
+ 
+ - (Optional) Run this command to ensure nodes preform genesis ceremony: `./delete_data.sh`<br>
+ - Sometimes the nodes will not reach a fully complete state so it is recommended to delete the container after every restart
 
 ### Working Rholang Contracts using RSpace++ (under standalone node)
 
