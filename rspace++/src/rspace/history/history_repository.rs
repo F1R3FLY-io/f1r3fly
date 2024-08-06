@@ -1,5 +1,4 @@
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use crate::rspace::history::cold_store::ColdStoreInstances;
 use crate::rspace::history::history::{History, HistoryInstances};
 use crate::rspace::history::history_reader::HistoryReader;
 use crate::rspace::history::history_repository_impl::HistoryRepositoryImpl;

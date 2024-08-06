@@ -32,6 +32,7 @@ import fs2.concurrent.Queue
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
 
 /**
   * initializing engine makes sure node receives Approved State and transitions to Running after
@@ -177,7 +178,7 @@ class Initializing[F[_]
 
       // Request tuple space state for Last Finalized State
       // stateValidator = RSpaceImporter.validateStateItems[F] _
-      stateValidator = RSpacePlusPlusImporter.validateStateItems[F] _
+      stateValidator = RSpacePlusPlusStateManager[F].importer.validateStateItems _
       tupleSpaceStream <- LfsTupleSpaceRequester.stream(
                            approvedBlock,
                            tupleSpaceQueue,

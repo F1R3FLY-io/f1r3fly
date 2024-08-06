@@ -111,6 +111,16 @@ class LfsStateRequesterEffectsSpec extends FlatSpec with Matchers with Fs2Stream
 
       // importer = new RSpaceImporter[F] {
       importer = new RSpacePlusPlusImporter[F] {
+
+        override def validateStateItems(
+            historyItems: Seq[(Blake2b256Hash, ByteVector)],
+            dataItems: Seq[(Blake2b256Hash, ByteVector)],
+            startPath: Seq[(Blake2b256Hash, Option[Byte])],
+            chunkSize: Int,
+            skip: Int,
+            getFromHistory: Blake2b256Hash => F[Option[ByteVector]]
+        ): F[Unit] = ???
+
         override type KeyHash = Blake2b256Hash
 
         override def setHistoryItems[Value](

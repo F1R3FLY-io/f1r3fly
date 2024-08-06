@@ -309,17 +309,26 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                              ] = {
                                for {
                                  result <- Sync[F].delay {
+                                            // println("\nstartPath: " + startPath);
+                                            // println("\nskip: " + skip);
+                                            // println("\ntake: " + take);
+
                                             val exporterParamsProto = ExporterParams(
-                                              startPath.map(
-                                                pathItem =>
-                                                  PathElement(pathItem._1.toByteString, {
-                                                    if (pathItem._2.isEmpty) {
-                                                      ByteString.EMPTY
-                                                    } else {
-                                                      ByteString.copyFrom(Array(pathItem._2.get))
-                                                    }
-                                                  })
-                                              ),
+                                              startPath
+                                                .map(
+                                                  pathItem =>
+                                                    PathElement(
+                                                      pathItem._1.toByteString, {
+                                                        if (pathItem._2.isEmpty) {
+                                                          ByteString.EMPTY
+                                                        } else {
+                                                          ByteString.copyFrom(
+                                                            Array(pathItem._2.get)
+                                                          )
+                                                        }
+                                                      }
+                                                    )
+                                                ),
                                               skip,
                                               take
                                             )
@@ -521,7 +530,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                               )
 
                                             val _ =
-                                              INSTANCE.get_history_and_data(
+                                              INSTANCE.validate_state_items(
                                                 rspacePointer,
                                                 payloadMemory,
                                                 paramsBytes.length
@@ -537,107 +546,105 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
                              ): F[Unit] =
-                               //  for {
-                               //    result <- Sync[F].delay {
-                               //               val itemsProto =
-                               //                 ItemsProto(
-                               //                   items = {
-                               //                     data.map(d => {
-                               //                       ItemProto(
-                               //                         d._1.toByteString, {
-                               //                           d._2 match {
-                               //                             case value: {
-                               //                                   def toArray(): Array[Byte]
-                               //                                 } => {
-                               //                               ByteString.copyFrom(value.toArray)
-                               //                             }
-                               //                             case _ =>
-                               //                               throw new IllegalArgumentException(
-                               //                                 "Type does not have a toByteArray method"
-                               //                               )
-                               //                           }
-                               //                         }
-                               //                       )
-                               //                     })
-                               //                   }
-                               //                 )
+                               for {
+                                 result <- Sync[F].delay {
+                                            val itemsProto =
+                                              ItemsProto(
+                                                items = {
+                                                  data.map(d => {
+                                                    ItemProto(
+                                                      d._1.toByteString, {
+                                                        d._2 match {
+                                                          case value: {
+                                                                def toArray(): Array[Byte]
+                                                              } => {
+                                                            ByteString.copyFrom(value.toArray)
+                                                          }
+                                                          case _ =>
+                                                            throw new IllegalArgumentException(
+                                                              "Type does not have a toByteArray method"
+                                                            )
+                                                        }
+                                                      }
+                                                    )
+                                                  })
+                                                }
+                                              )
 
-                               //               val itemsProtoBytes = itemsProto.toByteArray
+                                            val itemsProtoBytes = itemsProto.toByteArray
 
-                               //               val payloadMemory =
-                               //                 new Memory(itemsProtoBytes.length.toLong)
-                               //               payloadMemory.write(
-                               //                 0,
-                               //                 itemsProtoBytes,
-                               //                 0,
-                               //                 itemsProtoBytes.length
-                               //               )
+                                            val payloadMemory =
+                                              new Memory(itemsProtoBytes.length.toLong)
+                                            payloadMemory.write(
+                                              0,
+                                              itemsProtoBytes,
+                                              0,
+                                              itemsProtoBytes.length
+                                            )
 
-                               //               val _ = INSTANCE.set_history_items(
-                               //                 rspacePointer,
-                               //                 payloadMemory,
-                               //                 itemsProtoBytes.length
-                               //               )
+                                            val _ = INSTANCE.set_history_items(
+                                              rspacePointer,
+                                              payloadMemory,
+                                              itemsProtoBytes.length
+                                            )
 
-                               //               // Not sure if these lines are needed
-                               //               // Need to figure out how to deallocate each memory instance
-                               //               payloadMemory.clear()
-                               //             }
-                               //  } yield result
-                               ???
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+                                          }
+                               } yield result
 
                              override def setDataItems[Value](
                                  data: Seq[(Blake2b256Hash, Value)],
                                  toBuffer: Value => ByteBuffer
                              ): F[Unit] =
-                               //  for {
-                               //    result <- Sync[F].delay {
-                               //               val itemsProto =
-                               //                 ItemsProto(
-                               //                   items = {
-                               //                     data.map(d => {
-                               //                       ItemProto(
-                               //                         d._1.toByteString, {
-                               //                           d._2 match {
-                               //                             case value: {
-                               //                                   def toArray(): Array[Byte]
-                               //                                 } => {
-                               //                               ByteString.copyFrom(value.toArray)
-                               //                             }
-                               //                             case _ =>
-                               //                               throw new IllegalArgumentException(
-                               //                                 "Type does not have a toByteArray method"
-                               //                               )
-                               //                           }
-                               //                         }
-                               //                       )
-                               //                     })
-                               //                   }
-                               //                 )
+                               for {
+                                 result <- Sync[F].delay {
+                                            val itemsProto =
+                                              ItemsProto(
+                                                items = {
+                                                  data.map(d => {
+                                                    ItemProto(
+                                                      d._1.toByteString, {
+                                                        d._2 match {
+                                                          case value: {
+                                                                def toArray(): Array[Byte]
+                                                              } => {
+                                                            ByteString.copyFrom(value.toArray)
+                                                          }
+                                                          case _ =>
+                                                            throw new IllegalArgumentException(
+                                                              "Type does not have a toByteArray method"
+                                                            )
+                                                        }
+                                                      }
+                                                    )
+                                                  })
+                                                }
+                                              )
 
-                               //               val itemsProtoBytes = itemsProto.toByteArray
+                                            val itemsProtoBytes = itemsProto.toByteArray
 
-                               //               val payloadMemory =
-                               //                 new Memory(itemsProtoBytes.length.toLong)
-                               //               payloadMemory.write(
-                               //                 0,
-                               //                 itemsProtoBytes,
-                               //                 0,
-                               //                 itemsProtoBytes.length
-                               //               )
+                                            val payloadMemory =
+                                              new Memory(itemsProtoBytes.length.toLong)
+                                            payloadMemory.write(
+                                              0,
+                                              itemsProtoBytes,
+                                              0,
+                                              itemsProtoBytes.length
+                                            )
 
-                               //               val _ = INSTANCE.set_data_items(
-                               //                 rspacePointer,
-                               //                 payloadMemory,
-                               //                 itemsProtoBytes.length
-                               //               )
+                                            val _ = INSTANCE.set_data_items(
+                                              rspacePointer,
+                                              payloadMemory,
+                                              itemsProtoBytes.length
+                                            )
 
-                               //               // Not sure if these lines are needed
-                               //               // Need to figure out how to deallocate each memory instance
-                               //               payloadMemory.clear()
-                               //             }
-                               //  } yield result
-                               ???
+                                            // Not sure if these lines are needed
+                                            // Need to figure out how to deallocate each memory instance
+                                            payloadMemory.clear()
+                                          }
+                               } yield result
 
                              override def setRoot(key: Blake2b256Hash): F[Unit] =
                                for {

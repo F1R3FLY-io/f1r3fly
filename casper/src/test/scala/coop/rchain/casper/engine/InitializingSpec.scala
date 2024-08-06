@@ -82,8 +82,8 @@ class InitializingSpec extends WordSpec with BeforeAndAfterEach {
           items <- genesisExporter.getHistoryAndData(
                     startPath,
                     skip = 0,
-                    take = chunkSize,
-                    ByteString.copyFrom
+                    take = chunkSize
+                    // ByteString.copyFrom
                   )
           // Exported history and data items
           (history, data) = items

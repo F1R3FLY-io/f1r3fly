@@ -229,8 +229,8 @@ object Running {
       exportedItems <- RSpacePlusPlusStateManager[F].exporter.getHistoryAndData(
                         startPath,
                         skip,
-                        take,
-                        ByteString.copyFrom
+                        take
+                        // ByteString.copyFrom
                       )
 
       (history, data) = exportedItems
