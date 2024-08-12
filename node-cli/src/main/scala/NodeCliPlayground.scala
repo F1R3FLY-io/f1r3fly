@@ -91,7 +91,7 @@ class NodeCliPlayground {
 
         res match {
           case Right(str) => {
-            // println(str)
+            println("\npropose result: " + str)
           }
           case Left(errors) => errors.foreach(println)
         }
