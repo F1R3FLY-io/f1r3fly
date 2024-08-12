@@ -325,7 +325,7 @@ data:
 
         # How many confirmations are necessary to use multi-sig vault.
         # The value should be less or equal the number of PoS multi-sig public keys.
-        pos-multi-sig-quorum = 2
+        pos-multi-sig-quorum = 1
       }
 
       # Genesis ceremony variables
