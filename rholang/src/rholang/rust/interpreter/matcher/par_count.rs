@@ -1,4 +1,4 @@
-use crate::rspace::matcher::exports::*;
+use super::exports::*;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParCount.scala
 #[derive(Clone, Debug)]

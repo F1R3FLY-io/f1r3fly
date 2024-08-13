@@ -1,6 +1,7 @@
-use crate::rspace::matcher::exports::*;
-use crate::rspace::matcher::utils::FreeMap;
+use models::rhoapi::rhoapi::Par;
 use std::collections::HashSet;
+
+use super::utils::FreeMap;
 
 #[derive(Clone, Debug)]
 pub enum Pattern<T: Clone> {
@@ -256,7 +257,10 @@ pub fn aggregate_updates(current_free_map: FreeMap, free_maps: Vec<FreeMap>) -> 
     // on our ability to aggregate the var assignments from subsequent matches.
     // This means all the variables populated by MBM must not duplicate each other.
     if added_vars.len() != added_vars.iter().collect::<HashSet<_>>().len() {
-        panic!("RUST ERROR: Aggregated updates conflicted with each other: {:?}", free_maps)
+        panic!(
+            "RUST ERROR: Aggregated updates conflicted with each other: {:?}",
+            free_maps
+        )
     }
 
     let updated_free_map = free_maps

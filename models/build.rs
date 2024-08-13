@@ -22,8 +22,8 @@ fn main() {
         .compile_protos(
             &[
                 "src/scalapb/scalapb.proto",
-                "src/protobuf/RhoTypes.proto",
-                "src/protobuf/RSpacePlusPlusTypes.proto",
+                "src/main/protobuf/RhoTypes.proto",
+                "src/main/protobuf/RSpacePlusPlusTypes.proto",
             ],
             &["src/"],
         )

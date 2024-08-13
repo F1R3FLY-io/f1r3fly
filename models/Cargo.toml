@@ -1,0 +1,16 @@
+[package]
+name = "models"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+debug = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prost = "0.12.4"
+serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+prost-build = "0.12.4"

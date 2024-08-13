@@ -1,11 +1,11 @@
+use super::exports::*;
+use super::fold_match::FoldMatch;
+use super::has_locally_free::HasLocallyFree;
+use super::list_match::{aggregate_updates, ListMatch, Pattern};
+use super::match_pars::match_pars;
+use super::par_count::ParCount;
+use super::sub_pars::sub_pars;
 use crate::list_match;
-use crate::rspace::matcher::exports::*;
-use crate::rspace::matcher::fold_match::FoldMatch;
-use crate::rspace::matcher::has_locally_free::HasLocallyFree;
-use crate::rspace::matcher::list_match::{aggregate_updates, ListMatch, Pattern};
-use crate::rspace::matcher::match_pars::match_pars;
-use crate::rspace::matcher::par_count::ParCount;
-use crate::rspace::matcher::sub_pars::sub_pars;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - trait SpatialMatcher
 pub trait SpatialMatcher<T, P> {
@@ -248,7 +248,11 @@ impl SpatialMatcher<Par, Par> for SpatialMatcherContext {
                     match_connective_with_bounds(
                         self,
                         acc,
-                        ((*connective).clone(), (*bounds1).clone(), (*bounds2).clone()),
+                        (
+                            (*connective).clone(),
+                            (*bounds1).clone(),
+                            (*bounds2).clone(),
+                        ),
                     )
                 },
             )?;

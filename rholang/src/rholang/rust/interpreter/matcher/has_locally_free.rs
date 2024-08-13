@@ -1,6 +1,8 @@
-use crate::rspace::matcher::exports::*;
-use crate::rspace::matcher::spatial_matcher::SpatialMatcherContext;
-use crate::rspace::matcher::utils::union;
+use crate::rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
+
+use models::rust::utils::union;
+
+use super::exports::*;
 
 // See models/src/main/scala/coop/rchain/models/HasLocallyFree.scala - HasLocallyFree
 // Also see models/src/main/scala/coop/rchain/models/rholang/implicits.scala - line 357 and beyond
@@ -305,7 +307,10 @@ impl HasLocallyFree<MatchCase> for SpatialMatcherContext {
     }
 
     fn locally_free(&self, mc: MatchCase, depth: i32) -> Vec<u8> {
-        union(mc.source.unwrap().locally_free, self.locally_free(mc.pattern.unwrap(), depth + 1))
+        union(
+            mc.source.unwrap().locally_free,
+            self.locally_free(mc.pattern.unwrap(), depth + 1),
+        )
     }
 }
 

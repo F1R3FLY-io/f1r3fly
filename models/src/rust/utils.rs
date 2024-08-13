@@ -1,8 +1,10 @@
-use crate::rspace::matcher::exports::*;
-use crate::rspace::matcher::has_locally_free::HasLocallyFree;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::HashSet;
+
+use crate::rhoapi::rhoapi::*;
+use crate::rust::utils::expr::ExprInstance::EVarBody;
+use crate::rust::utils::var::VarInstance::{FreeVar, Wildcard};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionResult<A, K> {
@@ -68,31 +70,31 @@ impl Par {
         }
     }
 
-    // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
-    pub fn prepend_connective(&mut self, c: Connective, depth: i32) -> Par {
-        let mut new_connectives = vec![c.clone()];
-        new_connectives.append(&mut self.connectives);
+    // // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
+    // pub fn prepend_connective(&mut self, c: Connective, depth: i32) -> Par {
+    //     let mut new_connectives = vec![c.clone()];
+    //     new_connectives.append(&mut self.connectives);
 
-        Par {
-            connectives: new_connectives,
-            locally_free: c.locally_free(c.clone(), depth),
-            connective_used: self.connective_used || c.clone().connective_used(c),
-            ..self.clone()
-        }
-    }
+    //     Par {
+    //         connectives: new_connectives,
+    //         locally_free: c.locally_free(c.clone(), depth),
+    //         connective_used: self.connective_used || c.clone().connective_used(c),
+    //         ..self.clone()
+    //     }
+    // }
 
-    // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
-    pub fn prepend_expr(&mut self, e: Expr, depth: i32) -> Par {
-        let mut new_exprs = vec![e.clone()];
-        new_exprs.append(&mut self.exprs);
+    // // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
+    // pub fn prepend_expr(&mut self, e: Expr, depth: i32) -> Par {
+    //     let mut new_exprs = vec![e.clone()];
+    //     new_exprs.append(&mut self.exprs);
 
-        Par {
-            exprs: new_exprs,
-            locally_free: union(self.locally_free.clone(), e.locally_free(e.clone(), depth)),
-            connective_used: self.connective_used || e.clone().connective_used(e),
-            ..self.clone()
-        }
-    }
+    //     Par {
+    //         exprs: new_exprs,
+    //         locally_free: union(self.locally_free.clone(), e.locally_free(e.clone(), depth)),
+    //         connective_used: self.connective_used || e.clone().connective_used(e),
+    //         ..self.clone()
+    //     }
+    // }
 
     // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
     pub fn prepend_send(&mut self, s: Send) -> Par {
@@ -211,7 +213,7 @@ pub fn guard(condition: bool) -> Option<()> {
     }
 }
 
-// Rust test helper functions
+// Helper functions
 pub fn new_conn_and_body_par(
     _ps: Vec<Par>,
     _locally_free_par: Vec<u8>,

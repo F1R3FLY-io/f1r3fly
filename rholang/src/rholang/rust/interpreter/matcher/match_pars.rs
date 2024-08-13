@@ -1,4 +1,6 @@
-use crate::rspace::matcher::exports::*;
+use models::rhoapi::rhoapi::{
+    Bundle, Connective, Expr, GUnforgeable, Match, New, Par, Receive, ReceiveBind, Send,
+};
 
 /*
  * This file is doing a custom comparison with two 'Pars'

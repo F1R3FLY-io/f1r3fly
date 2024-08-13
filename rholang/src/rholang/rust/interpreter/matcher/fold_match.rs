@@ -1,6 +1,8 @@
-use crate::rspace::matcher::exports::*;
-use crate::rspace::matcher::has_locally_free::HasLocallyFree;
-use crate::rspace::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
+use models::rhoapi::rhoapi::var::VarInstance::{FreeVar, Wildcard};
+use models::rhoapi::rhoapi::{MatchCase, Par, Var};
+
+use super::has_locally_free::HasLocallyFree;
+use super::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - foldMatch
 pub trait FoldMatch<T, P> {

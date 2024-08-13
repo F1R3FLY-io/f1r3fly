@@ -1,6 +1,7 @@
-use crate::rhoapi::rhoapi::Par;
-use crate::rspace::matcher::par_count::ParCount;
 use itertools::Itertools;
+use models::rhoapi::rhoapi::Par;
+
+use super::par_count::ParCount;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParSpatialMatcherUtils.scala - subPars
 pub fn sub_pars(
@@ -10,16 +11,22 @@ pub fn sub_pars(
     min_prune: &ParCount,
     max_prune: &ParCount,
 ) -> impl Iterator<Item = (Par, Par)> {
-    let send_max =
-        std::cmp::min(max.sends as isize, par.sends.len() as isize - min_prune.sends as isize);
+    let send_max = std::cmp::min(
+        max.sends as isize,
+        par.sends.len() as isize - min_prune.sends as isize,
+    );
     let receive_max = std::cmp::min(
         max.receives as isize,
         par.receives.len() as isize - min_prune.receives as isize,
     );
-    let new_max =
-        std::cmp::min(max.news as isize, par.news.len() as isize - min_prune.news as isize);
-    let expr_max =
-        std::cmp::min(max.exprs as isize, par.exprs.len() as isize - min_prune.exprs as isize);
+    let new_max = std::cmp::min(
+        max.news as isize,
+        par.news.len() as isize - min_prune.news as isize,
+    );
+    let expr_max = std::cmp::min(
+        max.exprs as isize,
+        par.exprs.len() as isize - min_prune.exprs as isize,
+    );
     let match_max = std::cmp::min(
         max.matches as isize,
         par.matches.len() as isize - min_prune.matches as isize,
@@ -33,16 +40,22 @@ pub fn sub_pars(
         par.bundles.len() as isize - min_prune.bundles as isize,
     );
 
-    let send_min =
-        std::cmp::max(min.sends as isize, par.sends.len() as isize - max_prune.sends as isize);
+    let send_min = std::cmp::max(
+        min.sends as isize,
+        par.sends.len() as isize - max_prune.sends as isize,
+    );
     let receive_min = std::cmp::max(
         min.receives as isize,
         par.receives.len() as isize - max_prune.receives as isize,
     );
-    let new_min =
-        std::cmp::max(min.news as isize, par.news.len() as isize - max_prune.news as isize);
-    let expr_min =
-        std::cmp::max(min.exprs as isize, par.exprs.len() as isize - max_prune.exprs as isize);
+    let new_min = std::cmp::max(
+        min.news as isize,
+        par.news.len() as isize - max_prune.news as isize,
+    );
+    let expr_min = std::cmp::max(
+        min.exprs as isize,
+        par.exprs.len() as isize - max_prune.exprs as isize,
+    );
     let match_min = std::cmp::max(
         min.matches as isize,
         par.matches.len() as isize - max_prune.matches as isize,

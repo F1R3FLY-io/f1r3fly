@@ -722,6 +722,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "models"
+version = "0.1.0"
+dependencies = [
+ "prost",
+ "prost-build",
+ "serde",
+]
+
+[[package]]
 name = "monadic"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1100,6 +1109,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
+name = "rholang"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.5",
+ "models",
+ "serde",
+]
+
+[[package]]
 name = "rspace_plus_plus"
 version = "0.1.0"
 dependencies = [
@@ -1118,6 +1136,7 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "log",
+ "models",
  "monadic",
  "multiset",
  "once_cell",
@@ -1128,6 +1147,7 @@ dependencies = [
  "prost-types",
  "rand",
  "rayon",
+ "rholang",
  "rstest",
  "serde",
  "serde_json",

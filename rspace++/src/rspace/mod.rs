@@ -2,7 +2,6 @@ pub mod hashing;
 pub mod history;
 pub mod hot_store;
 pub mod internal;
-pub mod matcher;
 pub mod rspace;
 mod space_matcher;
 pub mod checkpoint;
