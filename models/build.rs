@@ -21,11 +21,11 @@ fn main() {
     prost_build
         .compile_protos(
             &[
-                "src/scalapb/scalapb.proto",
-                "src/main/protobuf/RhoTypes.proto",
-                "src/main/protobuf/RSpacePlusPlusTypes.proto",
+                "scalapb/scalapb.proto",
+                "RhoTypes.proto",
+                "RSpacePlusPlusTypes.proto",
             ],
-            &["src/"],
+            &["src/main/protobuf/", "src/"],
         )
         .unwrap();
 }
