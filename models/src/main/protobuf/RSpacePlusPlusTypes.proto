@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package rspace_plus_plus_types;
 
-import "main/protobuf/RhoTypes.proto";
+import "RhoTypes.proto";
 import "scalapb/scalapb.proto";
 
 option (scalapb.options) = {
