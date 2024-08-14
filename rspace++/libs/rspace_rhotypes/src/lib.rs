@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use models::rhoapi::rhoapi::*;
+use models::rhoapi::*;
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
@@ -19,7 +19,7 @@ use rspace_plus_plus::rspace::ByteVector;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
-use models::rspace_plus_plus_types::rspace_plus_plus_types::*;
+use models::rspace_plus_plus_types::*;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes

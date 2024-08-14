@@ -7,7 +7,6 @@ use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::{
     history::history_repository::HistoryRepositoryInstances,
     hot_store::HotStoreState,
-    matcher::r#match::Match,
     rspace::RSpace,
     shared::{
         in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
@@ -18,6 +17,7 @@ use rspace_plus_plus::rspace::{Byte, ByteVector};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
+use rholang::rust::interpreter::matcher::r#match::Match;
 
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

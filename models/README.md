@@ -34,3 +34,6 @@ The HTML version of the generated report is located at:
 
  `./target/scala-<version>/scoverage-report/index.html`
  
+ ## Rust
+
+- Within models directory, `cargo build --profile dev -p models` to build `models` library. Outputs to `models/target/debug/`. Scala code pulls from here.

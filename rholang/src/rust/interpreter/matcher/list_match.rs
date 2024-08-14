@@ -1,4 +1,4 @@
-use models::{rhoapi::rhoapi::Par, rust::utils::FreeMap};
+use models::{rhoapi::Par, rust::utils::FreeMap};
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use models::rhoapi::rhoapi::Par;
+use models::rhoapi::Par;
 
 use super::par_count::ParCount;
 

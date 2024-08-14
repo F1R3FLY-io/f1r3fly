@@ -1,10 +1,10 @@
 use std::fs::remove_dir_all;
 
-use rspace_plus_plus::rhoapi::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
-use rspace_plus_plus::rhoapi::rhoapi::{
+use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
+use models::rhoapi::{
     BindPattern, GPrivate, GUnforgeable, ListParWithRandom, Par, TaggedContinuation,
 };
-use rspace_plus_plus::rspace::matcher::r#match::Matcher;
+use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;

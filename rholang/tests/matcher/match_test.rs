@@ -13,9 +13,16 @@
  *
  * Might be able to use '::default()' at certain points
 */
-use rspace_plus_plus::rspace::matcher::exports::*;
-use rspace_plus_plus::rspace::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
 use std::collections::BTreeMap;
+
+use connective::ConnectiveInstance::*;
+use expr::ExprInstance::*;
+use g_unforgeable::UnfInstance::GPrivateBody;
+use models::rhoapi::*;
+use models::rust::utils::*;
+use rholang::rust::interpreter::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
+
+use crate::matcher::utils::{prepend_connective, prepend_expr};
 
 fn assert_spatial_match(
     target: Par,
@@ -100,17 +107,23 @@ fn matching_lists_of_grounds_with_lists_of_vars_should_work() {
 
 #[test]
 fn matching_two_lists_in_parallel_should_work() {
-    let target: Par = new_elist_par(
-        vec![new_gint_par(7, Vec::new(), false), new_gint_par(9, Vec::new(), false)],
-        Vec::new(),
-        false,
-        None,
-        Vec::new(),
-        false,
-    )
-    .prepend_expr(
+    let target: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_gint_par(7, Vec::new(), false),
+                new_gint_par(9, Vec::new(), false),
+            ],
+            Vec::new(),
+            false,
+            None,
+            Vec::new(),
+            false,
+        ),
         new_elist_expr(
-            vec![new_gint_par(7, Vec::new(), false), new_gint_par(8, Vec::new(), false)],
+            vec![
+                new_gint_par(7, Vec::new(), false),
+                new_gint_par(8, Vec::new(), false),
+            ],
             Vec::new(),
             false,
             None,
@@ -118,17 +131,23 @@ fn matching_two_lists_in_parallel_should_work() {
         0,
     );
 
-    let pattern: Par = new_elist_par(
-        vec![new_freevar_par(0, Vec::new()), new_gint_par(9, Vec::new(), false)],
-        Vec::new(),
-        true,
-        None,
-        Vec::new(),
-        false,
-    )
-    .prepend_expr(
+    let pattern: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_freevar_par(0, Vec::new()),
+                new_gint_par(9, Vec::new(), false),
+            ],
+            Vec::new(),
+            true,
+            None,
+            Vec::new(),
+            false,
+        ),
         new_elist_expr(
-            vec![new_gint_par(7, Vec::new(), false), new_freevar_par(1, Vec::new())],
+            vec![
+                new_gint_par(7, Vec::new(), false),
+                new_freevar_par(1, Vec::new()),
+            ],
             Vec::new(),
             true,
             None,
@@ -161,7 +180,10 @@ fn matching_a_sends_channel_should_work() {
                 id: "unforgeable".into(),
             })),
         }]),
-        vec![new_gint_par(7, Vec::new(), false), new_gint_par(8, Vec::new(), false)],
+        vec![
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(8, Vec::new(), false),
+        ],
         false,
         Vec::new(),
         false,
@@ -171,7 +193,10 @@ fn matching_a_sends_channel_should_work() {
 
     let pattern = new_send_par(
         new_freevar_par(0, Vec::new()),
-        vec![new_wildcard_par(Vec::new(), true), new_gint_par(8, Vec::new(), false)],
+        vec![
+            new_wildcard_par(Vec::new(), true),
+            new_gint_par(8, Vec::new(), false),
+        ],
         false,
         Vec::new(),
         true,
@@ -198,7 +223,10 @@ fn matching_a_sends_body_should_work() {
                 id: "unforgeable".into(),
             })),
         }]),
-        vec![new_gint_par(7, Vec::new(), false), new_gint_par(8, Vec::new(), false)],
+        vec![
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(8, Vec::new(), false),
+        ],
         false,
         Vec::new(),
         false,
@@ -208,7 +236,10 @@ fn matching_a_sends_body_should_work() {
 
     let pattern = new_send_par(
         new_wildcard_par(Vec::new(), true),
-        vec![new_freevar_par(0, Vec::new()), new_gint_par(8, Vec::new(), false)],
+        vec![
+            new_freevar_par(0, Vec::new()),
+            new_gint_par(8, Vec::new(), false),
+        ],
         false,
         Vec::new(),
         true,
@@ -242,7 +273,10 @@ fn matching_a_send_should_require_arity_matching() {
 
     let pattern = new_send_par(
         new_wildcard_par(Vec::new(), true),
-        vec![new_freevar_par(0, Vec::new()), new_wildcard_par(Vec::new(), true)],
+        vec![
+            new_freevar_par(0, Vec::new()),
+            new_wildcard_par(Vec::new(), true),
+        ],
         false,
         Vec::new(),
         true,
@@ -255,14 +289,18 @@ fn matching_a_send_should_require_arity_matching() {
 
 #[test]
 fn matching_extras_with_free_variable_should_work() {
-    let target: Par = new_gint_par(9, Vec::new(), false)
-        .prepend_expr(new_gint_expr(8), 0)
-        .prepend_expr(new_gint_expr(7), 0);
+    let target: Par = prepend_expr(
+        prepend_expr(new_gint_par(9, Vec::new(), false), new_gint_expr(8), 0),
+        new_gint_expr(7),
+        0,
+    );
 
-    let pattern: Par = new_freevar_par(0, Vec::new()).prepend_expr(new_gint_expr(8), 1);
+    let pattern: Par = prepend_expr(new_freevar_par(0, Vec::new()), new_gint_expr(8), 1);
 
-    let expected_captures =
-        BTreeMap::from([(0, new_gint_par(9, Vec::new(), false).prepend_expr(new_gint_expr(7), 0))]);
+    let expected_captures = BTreeMap::from([(
+        0,
+        prepend_expr(new_gint_par(9, Vec::new(), false), new_gint_expr(7), 0),
+    )]);
     assert!(assert_spatial_match(target, pattern, Some(expected_captures)).is_ok());
 }
 
@@ -292,8 +330,8 @@ fn matching_a_singleton_list_should_work() {
 
 #[test]
 fn matching_patterns_to_equal_targets_should_work() {
-    let target: Par = new_gint_par(1, Vec::new(), false).prepend_expr(new_gint_expr(1), 0);
-    let pattern: Par = new_freevar_par(1, Vec::new()).prepend_expr(new_freevar_expr(0), 0);
+    let target: Par = prepend_expr(new_gint_par(1, Vec::new(), false), new_gint_expr(1), 0);
+    let pattern: Par = prepend_expr(new_freevar_par(1, Vec::new()), new_freevar_expr(0), 0);
 
     let expected_captures = BTreeMap::from([(0, target.clone())]);
     assert!(assert_spatial_match(target, pattern, Some(expected_captures)).is_ok());
@@ -301,13 +339,17 @@ fn matching_patterns_to_equal_targets_should_work() {
 
 #[test]
 fn matching_multiple_reminders_should_assign_captures_to_remainders_greedily() {
-    let target: Par = new_gint_par(3, Vec::new(), false)
-        .prepend_expr(new_gint_expr(2), 0)
-        .prepend_expr(new_gint_expr(1), 0);
+    let target: Par = prepend_expr(
+        prepend_expr(new_gint_par(3, Vec::new(), false), new_gint_expr(2), 0),
+        new_gint_expr(1),
+        0,
+    );
 
-    let pattern: Par = new_wildcard_par(Vec::new(), false)
-        .prepend_expr(new_freevar_expr(1), 0)
-        .prepend_expr(new_freevar_expr(0), 0);
+    let pattern: Par = prepend_expr(
+        prepend_expr(new_wildcard_par(Vec::new(), false), new_freevar_expr(1), 0),
+        new_freevar_expr(0),
+        0,
+    );
 
     let expected_captures = BTreeMap::from([(0, target.clone())]);
     assert!(assert_spatial_match(target, pattern, Some(expected_captures)).is_ok());
@@ -315,25 +357,25 @@ fn matching_multiple_reminders_should_assign_captures_to_remainders_greedily() {
 
 #[test]
 fn matching_that_requires_revision_of_prior_matches_should_work() {
-    let pattern = new_elist_par(
-        vec![
-            new_freevar_par(1, Vec::new()),
-            new_elist_par(
-                vec![new_gint_par(2, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        true,
-        None,
-        Vec::new(),
-        true,
-    )
-    .prepend_expr(
+    let pattern = prepend_expr(
+        new_elist_par(
+            vec![
+                new_freevar_par(1, Vec::new()),
+                new_elist_par(
+                    vec![new_gint_par(2, Vec::new(), false)],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            true,
+            None,
+            Vec::new(),
+            true,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
@@ -353,25 +395,25 @@ fn matching_that_requires_revision_of_prior_matches_should_work() {
         0,
     );
 
-    let target: Par = new_elist_par(
-        vec![
-            new_gint_par(1, Vec::new(), false),
-            new_elist_par(
-                vec![new_gint_par(3, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        false,
-        None,
-        Vec::new(),
-        false,
-    )
-    .prepend_expr(
+    let target: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_gint_par(1, Vec::new(), false),
+                new_elist_par(
+                    vec![new_gint_par(3, Vec::new(), false)],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            false,
+            None,
+            Vec::new(),
+            false,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
@@ -400,25 +442,25 @@ fn matching_that_requires_revision_of_prior_matches_should_work() {
 
 #[test]
 fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders() {
-    let pattern: Par = new_elist_par(
-        vec![
-            new_freevar_par(1, Vec::new()),
-            new_elist_par(
-                vec![new_gint_par(2, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        true,
-        None,
-        Vec::new(),
-        true,
-    )
-    .prepend_expr(
+    let pattern: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_freevar_par(1, Vec::new()),
+                new_elist_par(
+                    vec![new_gint_par(2, Vec::new(), false)],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            true,
+            None,
+            Vec::new(),
+            true,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
@@ -438,25 +480,25 @@ fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders(
         0,
     );
 
-    let target: Par = new_elist_par(
-        vec![
-            new_gint_par(1, Vec::new(), false),
-            new_elist_par(
-                vec![new_gint_par(3, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        false,
-        None,
-        Vec::new(),
-        false,
-    )
-    .prepend_expr(
+    let target: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_gint_par(1, Vec::new(), false),
+                new_elist_par(
+                    vec![new_gint_par(3, Vec::new(), false)],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            false,
+            None,
+            Vec::new(),
+            false,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
@@ -496,30 +538,36 @@ fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders(
 #[test]
 fn matching_that_requires_revision_of_prior_matches_should_work_despite_having_other_terms_in_the_same_list(
 ) {
-    let pattern: Par = new_elist_par(
-        vec![
-            new_freevar_par(1, Vec::new()),
-            new_elist_par(
-                vec![new_gint_par(2, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        true,
-        None,
-        Vec::new(),
-        true,
-    )
-    .prepend_expr(
+    let pattern: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_freevar_par(1, Vec::new()),
+                new_elist_par(
+                    vec![
+                        new_gint_par(2, Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            true,
+            None,
+            Vec::new(),
+            true,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
                 new_elist_par(
-                    vec![new_freevar_par(0, Vec::new()), new_gint_par(2, Vec::new(), false)],
+                    vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_gint_par(2, Vec::new(), false),
+                    ],
                     Vec::new(),
                     true,
                     None,
@@ -534,30 +582,36 @@ fn matching_that_requires_revision_of_prior_matches_should_work_despite_having_o
         0,
     );
 
-    let target: Par = new_elist_par(
-        vec![
-            new_gint_par(1, Vec::new(), false),
-            new_elist_par(
-                vec![new_gint_par(3, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
-                Vec::new(),
-                false,
-                None,
-                Vec::new(),
-                false,
-            ),
-        ],
-        Vec::new(),
-        false,
-        None,
-        Vec::new(),
-        false,
-    )
-    .prepend_expr(
+    let target: Par = prepend_expr(
+        new_elist_par(
+            vec![
+                new_gint_par(1, Vec::new(), false),
+                new_elist_par(
+                    vec![
+                        new_gint_par(3, Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                ),
+            ],
+            Vec::new(),
+            false,
+            None,
+            Vec::new(),
+            false,
+        ),
         new_elist_expr(
             vec![
                 new_gint_par(1, Vec::new(), false),
                 new_elist_par(
-                    vec![new_gint_par(2, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
+                    vec![
+                        new_gint_par(2, Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ],
                     Vec::new(),
                     false,
                     None,
@@ -581,24 +635,32 @@ fn matching_that_requires_revision_of_prior_matches_should_work_despite_having_o
 
 #[test]
 fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders_and_wildcards() {
-    let pattern: Par = vector_par(Vec::new(), true)
-        .with_exprs(vec![new_freevar_expr(0)])
-        .prepend_expr(
-            new_elist_expr(vec![new_wildcard_par(Vec::new(), true)], Vec::new(), true, None),
-            0,
-        );
+    let pattern: Par = prepend_expr(
+        vector_par(Vec::new(), true).with_exprs(vec![new_freevar_expr(0)]),
+        new_elist_expr(
+            vec![new_wildcard_par(Vec::new(), true)],
+            Vec::new(),
+            true,
+            None,
+        ),
+        0,
+    );
 
-    let target: Par = vector_par(vec![0], false)
-        .with_exprs(vec![new_elist_expr(
+    let target: Par = prepend_expr(
+        vector_par(vec![0], false).with_exprs(vec![new_elist_expr(
             vec![new_boundvar_par(0, vec![0], false)],
             vec![0],
             false,
             None,
-        )])
-        .prepend_expr(
-            new_elist_expr(vec![new_gint_par(1, Vec::new(), false)], Vec::new(), false, None),
-            0,
-        );
+        )]),
+        new_elist_expr(
+            vec![new_gint_par(1, Vec::new(), false)],
+            Vec::new(),
+            false,
+            None,
+        ),
+        0,
+    );
 
     let expected_captures = BTreeMap::from([(
         0,
@@ -616,32 +678,51 @@ fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders_
 
 #[test]
 fn matching_extras_with_wildcard_should_work() {
-    let target: Par = vector_par(Vec::new(), false)
-        .with_exprs(vec![new_gint_expr(9)])
-        .prepend_expr(new_gint_expr(8), 0)
-        .prepend_expr(new_gint_expr(7), 0);
+    let target: Par = prepend_expr(
+        prepend_expr(
+            vector_par(Vec::new(), false).with_exprs(vec![new_gint_expr(9)]),
+            new_gint_expr(8),
+            0,
+        ),
+        new_gint_expr(7),
+        0,
+    );
 
-    let pattern: Par = vector_par(Vec::new(), true)
-        .with_exprs(vec![new_wildcard_expr()])
-        .prepend_expr(new_gint_expr(8), 1);
+    let pattern: Par = prepend_expr(
+        vector_par(Vec::new(), true).with_exprs(vec![new_wildcard_expr()]),
+        new_gint_expr(8),
+        1,
+    );
 
     assert!(assert_spatial_match(target, pattern, Some(BTreeMap::new())).is_ok());
 }
 
 #[test]
 fn matching_extras_with_wildcard_and_free_variable_should_capture_in_the_free_variable() {
-    let target: Par = vector_par(Vec::new(), false)
-        .with_exprs(vec![new_gint_expr(9)])
-        .prepend_expr(new_gint_expr(8), 0)
-        .prepend_expr(new_gint_expr(7), 0);
+    let target: Par = prepend_expr(
+        prepend_expr(
+            vector_par(Vec::new(), false).with_exprs(vec![new_gint_expr(9)]),
+            new_gint_expr(8),
+            0,
+        ),
+        new_gint_expr(7),
+        0,
+    );
 
-    let pattern: Par = vector_par(Vec::new(), true)
-        .with_exprs(vec![new_wildcard_expr()])
-        .prepend_expr(new_freevar_expr(0), 1)
-        .prepend_expr(new_gint_expr(8), 1);
+    let pattern: Par = prepend_expr(
+        prepend_expr(
+            vector_par(Vec::new(), true).with_exprs(vec![new_wildcard_expr()]),
+            new_freevar_expr(0),
+            1,
+        ),
+        new_gint_expr(8),
+        1,
+    );
 
-    let expected_captures =
-        BTreeMap::from([(0, new_gint_par(9, Vec::new(), false).prepend_expr(new_gint_expr(7), 0))]);
+    let expected_captures = BTreeMap::from([(
+        0,
+        prepend_expr(new_gint_par(9, Vec::new(), false), new_gint_expr(7), 0),
+    )]);
     assert!(assert_spatial_match(target, pattern, Some(expected_captures)).is_ok());
 }
 
@@ -666,7 +747,10 @@ fn matching_send_with_free_variable_in_channel_and_variable_position_should_capt
 
     let pattern: Par = new_send_par(
         vector_par(Vec::new(), true).with_exprs(vec![new_freevar_expr(0)]),
-        vec![new_gint_par(7, Vec::new(), false), new_freevar_par(1, Vec::new())],
+        vec![
+            new_gint_par(7, Vec::new(), false),
+            new_freevar_par(1, Vec::new()),
+        ],
         false,
         Vec::new(),
         true,
@@ -697,13 +781,19 @@ fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in
     let target: Par = new_receive_par(
         vec![
             ReceiveBind {
-                patterns: vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
                 source: Some(new_gint_par(7, Vec::new(), false)),
                 remainder: None,
                 free_count: 0,
             },
             ReceiveBind {
-                patterns: vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
                 source: Some(new_gint_par(8, Vec::new(), false)),
                 remainder: None,
                 free_count: 0,
@@ -715,7 +805,10 @@ fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in
                     id: "unforgeable".into(),
                 })),
             }]),
-            vec![new_gint_par(9, Vec::new(), false), new_gint_par(10, Vec::new(), false)],
+            vec![
+                new_gint_par(9, Vec::new(), false),
+                new_gint_par(10, Vec::new(), false),
+            ],
             false,
             Vec::new(),
             false,
@@ -734,13 +827,19 @@ fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in
     let pattern: Par = new_receive_par(
         vec![
             ReceiveBind {
-                patterns: vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
                 source: Some(new_gint_par(7, Vec::new(), false)),
                 remainder: None,
                 free_count: 0,
             },
             ReceiveBind {
-                patterns: vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
                 source: Some(new_freevar_par(0, Vec::new())),
                 remainder: None,
                 free_count: 0,
@@ -766,7 +865,10 @@ fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in
                         id: "unforgeable".into(),
                     })),
                 }]),
-                vec![new_gint_par(9, Vec::new(), false), new_gint_par(10, Vec::new(), false)],
+                vec![
+                    new_gint_par(9, Vec::new(), false),
+                    new_gint_par(10, Vec::new(), false),
+                ],
                 false,
                 Vec::new(),
                 false,
@@ -814,15 +916,17 @@ fn matching_between_news_should_match_the_bodies_if_the_new_count_is_the_same() 
 
     let pattern: Par = new_new_par(
         2,
-        vector_par(Vec::new(), false)
-            .prepend_send(new_send(
+        prepend_expr(
+            vector_par(Vec::new(), false).prepend_send(new_send(
                 new_gint_par(7, Vec::new(), false),
                 vec![new_freevar_par(0, Vec::new())],
                 false,
                 Vec::new(),
                 true,
-            ))
-            .prepend_expr(new_wildcard_expr(), 1),
+            )),
+            new_wildcard_expr(),
+            1,
+        ),
         Vec::new(),
         BTreeMap::new(),
         Vec::new(),
@@ -838,7 +942,10 @@ fn matching_between_news_should_match_the_bodies_if_the_new_count_is_the_same() 
 fn matching_between_matches_should_require_equality_of_cases_but_match_targets_and_inside_bodies() {
     let target: Par = new_match_par(
         new_elist_par(
-            vec![new_gint_par(4, Vec::new(), false), new_gint_par(20, Vec::new(), false)],
+            vec![
+                new_gint_par(4, Vec::new(), false),
+                new_gint_par(20, Vec::new(), false),
+            ],
             Vec::new(),
             false,
             None,
@@ -848,7 +955,10 @@ fn matching_between_matches_should_require_equality_of_cases_but_match_targets_a
         vec![
             MatchCase {
                 pattern: Some(new_elist_par(
-                    vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                    vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_freevar_par(1, Vec::new()),
+                    ],
                     Vec::new(),
                     false,
                     None,
@@ -883,7 +993,10 @@ fn matching_between_matches_should_require_equality_of_cases_but_match_targets_a
         vec![
             MatchCase {
                 pattern: Some(new_elist_par(
-                    vec![new_freevar_par(0, Vec::new()), new_freevar_par(1, Vec::new())],
+                    vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_freevar_par(1, Vec::new()),
+                    ],
                     Vec::new(),
                     false,
                     None,
@@ -909,7 +1022,10 @@ fn matching_between_matches_should_require_equality_of_cases_but_match_targets_a
         (
             0,
             new_elist_par(
-                vec![new_gint_par(4, Vec::new(), false), new_gint_par(20, Vec::new(), false)],
+                vec![
+                    new_gint_par(4, Vec::new(), false),
+                    new_gint_par(20, Vec::new(), false),
+                ],
                 Vec::new(),
                 false,
                 None,
@@ -925,7 +1041,10 @@ fn matching_between_matches_should_require_equality_of_cases_but_match_targets_a
 #[test]
 fn matching_a_list_with_a_remainder_should_capture_the_remainder() {
     let target: Par = new_elist_par(
-        vec![new_gint_par(1, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
+        vec![
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+        ],
         Vec::new(),
         false,
         None,
@@ -1041,10 +1160,19 @@ fn matching_sets_should_work_with_wildcard_remainders() {
         new_gint_par(5, Vec::new(), false),
     ];
 
-    let target: Par =
-        new_eset_par(target_elements.clone(), Vec::new(), false, None, Vec::new(), false);
+    let target: Par = new_eset_par(
+        target_elements.clone(),
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
     let pattern: Par = new_eset_par(
-        vec![new_gint_par(1, Vec::new(), false), new_gint_par(4, Vec::new(), false)],
+        vec![
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+        ],
         Vec::new(),
         true,
         Some(new_wildcard_var()),
@@ -1054,14 +1182,30 @@ fn matching_sets_should_work_with_wildcard_remainders() {
 
     assert!(assert_spatial_match(target.clone(), pattern.clone(), Some(BTreeMap::new())).is_ok());
 
-    let all_elements_and_wildcard: Par =
-        new_eset_par(target_elements, Vec::new(), true, Some(new_wildcard_var()), Vec::new(), true);
+    let all_elements_and_wildcard: Par = new_eset_par(
+        target_elements,
+        Vec::new(),
+        true,
+        Some(new_wildcard_var()),
+        Vec::new(),
+        true,
+    );
 
-    assert!(assert_spatial_match(target.clone(), all_elements_and_wildcard, Some(BTreeMap::new()))
-        .is_ok());
+    assert!(assert_spatial_match(
+        target.clone(),
+        all_elements_and_wildcard,
+        Some(BTreeMap::new())
+    )
+    .is_ok());
 
-    let just_wildcard =
-        new_eset_par(Vec::new(), Vec::new(), true, Some(new_wildcard_var()), Vec::new(), true);
+    let just_wildcard = new_eset_par(
+        Vec::new(),
+        Vec::new(),
+        true,
+        Some(new_wildcard_var()),
+        Vec::new(),
+        true,
+    );
 
     assert!(assert_spatial_match(target, just_wildcard, Some(BTreeMap::new())).is_ok());
 }
@@ -1076,8 +1220,14 @@ fn matching_sets_should_work_with_var_remainders() {
         new_gint_par(5, Vec::new(), false),
     ];
 
-    let target: Par =
-        new_eset_par(target_elements.clone(), Vec::new(), false, None, Vec::new(), false);
+    let target: Par = new_eset_par(
+        target_elements.clone(),
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
     let pattern: Par = new_eset_par(
         vec![
             new_gint_par(1, Vec::new(), false),
@@ -1096,7 +1246,10 @@ fn matching_sets_should_work_with_var_remainders() {
         (
             1,
             new_eset_par(
-                vec![new_gint_par(3, Vec::new(), false), new_gint_par(5, Vec::new(), false)],
+                vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(5, Vec::new(), false),
+                ],
                 Vec::new(),
                 false,
                 None,
@@ -1126,8 +1279,14 @@ fn matching_sets_should_work_with_var_remainders() {
     )
     .is_ok());
 
-    let just_remainder =
-        new_eset_par(Vec::new(), Vec::new(), true, Some(new_freevar_var(0)), Vec::new(), true);
+    let just_remainder = new_eset_par(
+        Vec::new(),
+        Vec::new(),
+        true,
+        Some(new_freevar_var(0)),
+        Vec::new(),
+        true,
+    );
 
     assert!(assert_spatial_match(
         target,
@@ -1190,12 +1349,18 @@ fn matching_maps_should_work_with_free_variables_and_wildcards() {
 
     let pattern: Par = new_emap_par(
         vec![
-            new_key_value_pair(new_gint_par(1, Vec::new(), false), new_freevar_par(1, Vec::new())),
+            new_key_value_pair(
+                new_gint_par(1, Vec::new(), false),
+                new_freevar_par(1, Vec::new()),
+            ),
             new_key_value_pair(
                 new_gint_par(3, Vec::new(), false),
                 new_gint_par(4, Vec::new(), false),
             ),
-            new_key_value_pair(new_freevar_par(0, Vec::new()), new_wildcard_par(Vec::new(), true)),
+            new_key_value_pair(
+                new_freevar_par(0, Vec::new()),
+                new_wildcard_par(Vec::new(), true),
+            ),
         ],
         vec![0, 1],
         true,
@@ -1212,8 +1377,14 @@ fn matching_maps_should_work_with_free_variables_and_wildcards() {
 
     let non_matching_pattern = new_emap_par(
         vec![
-            new_key_value_pair(new_gint_par(3, Vec::new(), false), new_freevar_par(1, Vec::new())),
-            new_key_value_pair(new_freevar_par(0, Vec::new()), new_wildcard_par(Vec::new(), true)),
+            new_key_value_pair(
+                new_gint_par(3, Vec::new(), false),
+                new_freevar_par(1, Vec::new()),
+            ),
+            new_key_value_pair(
+                new_freevar_par(0, Vec::new()),
+                new_wildcard_par(Vec::new(), true),
+            ),
             new_key_value_pair(
                 new_wildcard_par(Vec::new(), true),
                 new_gint_par(4, Vec::new(), false),
@@ -1289,8 +1460,12 @@ fn matching_maps_should_work_with_wildcard_remainders() {
         true,
     );
 
-    assert!(assert_spatial_match(target.clone(), all_elements_and_wildcard, Some(BTreeMap::new()))
-        .is_ok());
+    assert!(assert_spatial_match(
+        target.clone(),
+        all_elements_and_wildcard,
+        Some(BTreeMap::new())
+    )
+    .is_ok());
 
     let just_wildcard = new_emap_par(vec![], vec![], true, Some(new_wildcard_var()), vec![], true);
 
@@ -1300,12 +1475,27 @@ fn matching_maps_should_work_with_wildcard_remainders() {
 #[test]
 fn matching_maps_should_work_with_var_remainders() {
     let target_elements = vec![
-        new_key_value_pair(new_gint_par(1, Vec::new(), false), new_gint_par(2, Vec::new(), false)),
-        new_key_value_pair(new_gint_par(3, Vec::new(), false), new_gint_par(4, Vec::new(), false)),
-        new_key_value_pair(new_gint_par(5, Vec::new(), false), new_gint_par(6, Vec::new(), false)),
+        new_key_value_pair(
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+        ),
+        new_key_value_pair(
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+        ),
+        new_key_value_pair(
+            new_gint_par(5, Vec::new(), false),
+            new_gint_par(6, Vec::new(), false),
+        ),
     ];
-    let target: Par =
-        new_emap_par(target_elements.clone(), Vec::new(), false, None, Vec::new(), false);
+    let target: Par = new_emap_par(
+        target_elements.clone(),
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
 
     let pattern: Par = new_emap_par(
         vec![new_key_value_pair(
@@ -1345,11 +1535,19 @@ fn matching_maps_should_work_with_var_remainders() {
 
     assert!(assert_spatial_match(target.clone(), pattern.clone(), Some(expected_captures)).is_ok());
 
-    let all_elements_and_remainder =
-        new_emap_par(target_elements.clone(), vec![], true, Some(new_freevar_var(0)), vec![], true);
+    let all_elements_and_remainder = new_emap_par(
+        target_elements.clone(),
+        vec![],
+        true,
+        Some(new_freevar_var(0)),
+        vec![],
+        true,
+    );
 
-    let expected_captures =
-        BTreeMap::from([(0, new_emap_par(vec![], Vec::new(), false, None, Vec::new(), false))]);
+    let expected_captures = BTreeMap::from([(
+        0,
+        new_emap_par(vec![], Vec::new(), false, None, Vec::new(), false),
+    )]);
     assert!(assert_spatial_match(
         target.clone(),
         all_elements_and_remainder,
@@ -1381,8 +1579,14 @@ fn matching_a_whole_list_with_a_remainder_should_capture_the_list() {
         false,
     );
 
-    let pattern =
-        new_elist_par(vec![], Vec::new(), true, Some(new_freevar_var(0)), Vec::new(), true);
+    let pattern = new_elist_par(
+        vec![],
+        Vec::new(),
+        true,
+        Some(new_freevar_var(0)),
+        Vec::new(),
+        true,
+    );
 
     let expected_captures = BTreeMap::from([(0, target.clone())]);
     assert!(assert_spatial_match(target, pattern.clone(), Some(expected_captures)).is_ok());
@@ -1415,17 +1619,17 @@ fn matching_inside_bundles_should_not_be_possible() {
     }]);
 
     let pattern: Par = vector_par(Vec::new(), false).with_bundles(vec![Bundle {
-        body: Some(
-            vector_par(Vec::new(), false)
-                .prepend_send(new_send(
-                    new_gint_par(7, Vec::new(), false),
-                    vec![new_freevar_par(0, Vec::new())],
-                    false,
-                    Vec::new(),
-                    false,
-                ))
-                .prepend_expr(new_wildcard_expr(), 1),
-        ),
+        body: Some(prepend_expr(
+            vector_par(Vec::new(), false).prepend_send(new_send(
+                new_gint_par(7, Vec::new(), false),
+                vec![new_freevar_par(0, Vec::new())],
+                false,
+                Vec::new(),
+                false,
+            )),
+            new_wildcard_expr(),
+            1,
+        )),
         write_flag: false,
         read_flag: false,
     }]);
@@ -1776,7 +1980,8 @@ fn matching_a_target_with_var_ref_and_a_pattern_with_a_var_ref_should_ignore_loc
         1,
         new_receive_par(
             vec![ReceiveBind {
-                patterns: vec![vector_par(Vec::new(), false).prepend_connective(
+                patterns: vec![prepend_connective(
+                    vector_par(Vec::new(), false),
                     Connective {
                         connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
                     },
@@ -1806,7 +2011,8 @@ fn matching_a_target_with_var_ref_and_a_pattern_with_a_var_ref_should_ignore_loc
         1,
         new_receive_par(
             vec![ReceiveBind {
-                patterns: vec![vector_par(Vec::new(), false).prepend_connective(
+                patterns: vec![prepend_connective(
+                    vector_par(Vec::new(), false),
                     Connective {
                         connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
                     },
@@ -1930,14 +2136,20 @@ fn matching_minus_minus_should_work() {
     }]);
 
     let rhs_set = ESetBody(ESet {
-        ps: vec![new_gint_par(1, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
+        ps: vec![
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+        ],
         locally_free: Vec::new(),
         connective_used: false,
         remainder: None,
     });
     let rhs_set_par: Par = vector_par(Vec::new(), false).with_exprs(vec![Expr {
         expr_instance: Some(ESetBody(ESet {
-            ps: vec![new_gint_par(1, Vec::new(), false), new_gint_par(2, Vec::new(), false)],
+            ps: vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+            ],
             locally_free: Vec::new(),
             connective_used: false,
             remainder: None,

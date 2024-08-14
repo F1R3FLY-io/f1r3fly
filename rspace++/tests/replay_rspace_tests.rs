@@ -7,7 +7,7 @@ use rspace_plus_plus::rspace::hot_store_action::{
     HotStoreAction, InsertAction, InsertContinuations,
 };
 use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
-use rspace_plus_plus::rspace::matcher::r#match::Match;
+use rholang::rust::interpreter::matcher::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;

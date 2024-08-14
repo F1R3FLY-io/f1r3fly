@@ -1,4 +1,4 @@
-use models::rhoapi::rhoapi::{
+use models::rhoapi::{
     Bundle, Connective, Expr, GUnforgeable, Match, New, Par, Receive, ReceiveBind, Send,
 };
 

@@ -39,3 +39,15 @@ In general:
   * We don't pre-evaluate match cases. So matching 7 + 8 as a pattern currently doesn't work. Instead, you must match against 15.
 ### The good
 Several working examples have been included in the examples directory, and the examples in the [Rholang tutorial](https://github.com/rchain/rchain/blob/dev/docs/rholang/rholangtut.md) also work. If you run into something that doesn't work, check the bugtracker to see if it's a known issue, and if not, feel free to [file a bug](https://rchain.atlassian.net/secure/CreateIssueDetails!init.jspa?pid=10105&issuetype=10103&versions=10012&components=10004&assignee=medha&summary=issue+created%20via+link). We want Rholang to be a useful programming environment.
+
+## Rust
+
+- Within rholang directory, `cargo build --profile dev -p rholang` to build `rholang` library. Outputs to `rholang/target/debug/`. Scala code pulls from here.
+
+### Testing Rust (within rholang directory)
+
+- Run Spatial Matcher Tests: `cargo test matcher::match_test`
+
+(Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>
+(`--test-threads=1` runs them sequentially)<br>
+(`--nocapture` prints output during tests)
