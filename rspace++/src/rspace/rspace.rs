@@ -22,7 +22,7 @@ use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use rholang::matcher::r#match::Match;
+use rholang::rholang::rust::interpreter::matcher::r#match::Match;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::HashSet;

@@ -1,3 +1,5 @@
+use models::rust::utils::{new_elist_expr, to_vec, vector_par};
+
 use super::{exports::*, fold_match::FoldMatch, spatial_matcher::SpatialMatcherContext};
 
 /**

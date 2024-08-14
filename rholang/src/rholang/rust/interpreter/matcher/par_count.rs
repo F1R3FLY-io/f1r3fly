@@ -1,3 +1,5 @@
+use models::rust::utils::no_frees;
+
 use super::exports::*;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParCount.scala

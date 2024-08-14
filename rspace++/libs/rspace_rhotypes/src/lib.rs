@@ -1,13 +1,13 @@
 use dashmap::DashMap;
+use models::rhoapi::rhoapi::*;
 use prost::Message;
+use rholang::rholang::rust::interpreter::matcher::r#match::Matcher;
+use rholang::rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
-use rspace_plus_plus::rspace::matcher::exports::*;
-use rspace_plus_plus::rspace::matcher::r#match::Matcher;
-use rspace_plus_plus::rspace::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
@@ -16,17 +16,10 @@ use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExp
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
 use rspace_plus_plus::rspace::ByteVector;
-use rspace_plus_plus::rspace_plus_plus_types::rspace_plus_plus_types::{
-    event_proto, io_event_proto, ByteVectorProto, ChannelsProto, CheckpointProto, CommProto,
-    DatumsProto, EventProto, ExporterParams, HashProto, HistoryAndDataItems, HotStoreStateProto,
-    IoEventProto, ItemProto, ItemsProto, JoinProto, JoinsProto, KeysProto, LogProto, PathElement,
-    ProduceCounterMapEntry, SoftCheckpointProto, StoreItemsProto, StoreStateContMapEntry,
-    StoreStateDataMapEntry, StoreStateInstalledContMapEntry, StoreStateInstalledJoinsMapEntry,
-    StoreStateJoinsMapEntry, StoreToMapValue, ValidateStateParams, WaitingContinuationsProto,
-};
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
+use models::rspace_plus_plus_types::rspace_plus_plus_types::*;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes

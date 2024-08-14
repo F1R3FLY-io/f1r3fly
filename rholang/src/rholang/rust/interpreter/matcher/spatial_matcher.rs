@@ -1,3 +1,5 @@
+use models::rust::utils::*;
+
 use super::exports::*;
 use super::fold_match::FoldMatch;
 use super::has_locally_free::HasLocallyFree;

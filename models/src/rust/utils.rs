@@ -2,9 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
+// use super::has_locally_free::HasLocallyFree;
 use crate::rhoapi::rhoapi::*;
+use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
-use crate::rust::utils::var::VarInstance::{FreeVar, Wildcard};
+use crate::rust::utils::expr::ExprInstance::*;
+use crate::rust::utils::var::VarInstance::{BoundVar, FreeVar, Wildcard};
+use crate::rust::utils::var::WildcardMsg;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionResult<A, K> {
