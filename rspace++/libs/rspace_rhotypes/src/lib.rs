@@ -1,8 +1,8 @@
 use dashmap::DashMap;
 use models::rhoapi::rhoapi::*;
 use prost::Message;
-use rholang::rholang::rust::interpreter::matcher::r#match::Matcher;
-use rholang::rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
+use rholang::rust::interpreter::matcher::r#match::Matcher;
+use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};

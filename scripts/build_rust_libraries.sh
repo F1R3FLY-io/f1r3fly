@@ -3,6 +3,12 @@
 cd rspace++/
 cargo build --profile dev -p rspace_plus_plus_rhotypes
 
+cd ../models
+cargo build --profile dev -p models
+
+cd ../rholang
+cargo build --profile dev -p rholang
+
 # This is needed for debugging through VS Code 'Metals' extension on M2
 # ARCH_TYPE=$(uname -m)
 # if [ "$ARCH_TYPE" == "arm64" ]; then

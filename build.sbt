@@ -564,7 +564,7 @@ lazy val rholang = (project in file("rholang"))
     ),
     runCargoBuild := {
       import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rspace++.sh").!
+      val exitCode = Seq("./scripts/build_rust_libraries.sh").!
       if (exitCode != 0) {
         throw new Exception("Rust build script failed with exit code " + exitCode)
       }
@@ -638,7 +638,7 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
     ),
     runCargoBuild := {
       import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rspace++.sh").!
+      val exitCode = Seq("./scripts/build_rust_libraries.sh").!
       if (exitCode != 0) {
         throw new Exception("Rust build script failed with exit code " + exitCode)
       }
@@ -729,7 +729,7 @@ lazy val rchain = (project in file("."))
 lazy val runCargoBuild = taskKey[Unit]("Builds Rust library for RSpace++")
 runCargoBuild := {
   import scala.sys.process._
-  val exitCode = Seq("./scripts/build_rspace++.sh").!
+  val exitCode = Seq("./scripts/build_rust_libraries.sh").!
   if (exitCode != 0) {
     throw new Exception("Rust build script failed with exit code " + exitCode)
   }

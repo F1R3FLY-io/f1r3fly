@@ -1,4 +1,4 @@
-use crate::rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
+use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
 use models::rust::utils::union;
 

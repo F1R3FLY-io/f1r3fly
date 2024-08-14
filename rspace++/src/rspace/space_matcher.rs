@@ -1,7 +1,7 @@
 use crate::rspace::internal::WaitingContinuation;
 use crate::rspace::internal::{ConsumeCandidate, Datum, ProduceCandidate};
 use dashmap::DashMap;
-use rholang::rholang::rust::interpreter::matcher::r#match::Match;
+use rholang::rust::interpreter::matcher::r#match::Match;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
