@@ -12,3 +12,6 @@ debug = true
 models = { path = "../models" }
 itertools = "0.10.2"
 serde = "1.0"
+
+tree-sitter = "0.22"
+tree-sitter-rust = "0.21"
