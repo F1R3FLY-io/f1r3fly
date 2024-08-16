@@ -103,7 +103,7 @@ where
 
         let wk = WaitingContinuation {
             patterns,
-            continuation: Arc::new(Mutex::new(continuation)),
+            continuation: continuation,
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),
@@ -569,7 +569,7 @@ where
                         channels.clone(),
                         WaitingContinuation {
                             patterns,
-                            continuation: Arc::new(Mutex::new(continuation)),
+                            continuation,
                             persist: true,
                             peeks: BTreeSet::default(),
                             source: consume_ref,
@@ -827,7 +827,7 @@ where
 
         let wk = WaitingContinuation {
             patterns: patterns.clone(),
-            continuation: Arc::new(Mutex::new(continuation)),
+            continuation: continuation,
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),

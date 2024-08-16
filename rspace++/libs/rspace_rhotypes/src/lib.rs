@@ -1,4 +1,5 @@
 use dashmap::DashMap;
+use models::rspace_plus_plus_types::*;
 use models::{rhoapi::*, ByteVector};
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
@@ -18,7 +19,6 @@ use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, C
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
-use models::rspace_plus_plus_types::*;
 
 /*
  * This library contains predefined types for Channel, Pattern, Data, and Continuation - RhoTypes
@@ -26,7 +26,7 @@ use models::rspace_plus_plus_types::*;
  */
 #[repr(C)]
 pub struct Space {
-    rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation, Matcher>>,
+    rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
 }
 
 #[no_mangle]
@@ -58,7 +58,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
             // let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
             //     .expect("Error getting RSpaceStore: ");
 
-            RSpaceInstances::create(store, Matcher)
+            RSpaceInstances::create(store, Arc::new(Box::new(Matcher)))
         })
         .unwrap();
 
@@ -145,15 +145,13 @@ pub extern "C" fn produce(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
-            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
-            drop(cont_lock);
 
             let protobuf_results = rspace_results
                 .into_iter()
@@ -213,15 +211,13 @@ pub extern "C" fn consume(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
-            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
-            drop(cont_lock);
 
             let protobuf_results = rspace_results
                 .into_iter()
@@ -482,10 +478,9 @@ pub extern "C" fn get_waiting_continuations(
     let wks_protos: Vec<WaitingContinuationProto> = wks
         .into_iter()
         .map(|wk| {
-            let cont_lock = wk.continuation.lock().unwrap();
             let res = WaitingContinuationProto {
                 patterns: wk.patterns,
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(wk.continuation.clone()),
                 persist: wk.persist,
                 peeks: wk
                     .peeks
@@ -503,7 +498,7 @@ pub extern "C" fn get_waiting_continuations(
                     persistent: wk.source.persistent,
                 }),
             };
-            drop(cont_lock);
+
             res
         })
         .collect();
@@ -565,10 +560,9 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
             .wks
             .into_iter()
             .map(|wk| {
-                let cont_lock = wk.continuation.lock().unwrap();
                 let res = WaitingContinuationProto {
                     patterns: wk.patterns,
-                    continuation: Some(cont_lock.clone()),
+                    continuation: Some(wk.continuation.clone()),
                     persist: wk.persist,
                     peeks: wk
                         .peeks
@@ -586,7 +580,7 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                         persistent: wk.source.persistent,
                     }),
                 };
-                drop(cont_lock);
+
                 res
             })
             .collect();
@@ -640,10 +634,9 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
         let wks: Vec<WaitingContinuationProto> = value
             .into_iter()
             .map(|wk| {
-                let cont_lock = wk.continuation.lock().unwrap();
                 let res = WaitingContinuationProto {
                     patterns: wk.patterns,
-                    continuation: Some(cont_lock.clone()),
+                    continuation: Some(wk.continuation.clone()),
                     persist: wk.persist,
                     peeks: wk
                         .peeks
@@ -661,7 +654,7 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
                         persistent: wk.source.persistent,
                     }),
                 };
-                drop(cont_lock);
+
                 res
             })
             .collect();
@@ -670,10 +663,9 @@ pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
     }
 
     for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
-        let cont_lock = value.continuation.lock().unwrap();
         let wk = WaitingContinuationProto {
             patterns: value.patterns,
-            continuation: Some(cont_lock.clone()),
+            continuation: Some(value.continuation.clone()),
             persist: value.persist,
             peeks: value
                 .peeks
@@ -889,7 +881,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
                     .into_iter()
                     .map(|cont_proto| WaitingContinuation {
                         patterns: cont_proto.patterns,
-                        continuation: Arc::new(Mutex::new(cont_proto.continuation.unwrap())),
+                        continuation: cont_proto.continuation.unwrap(),
                         persist: cont_proto.persist,
                         peeks: cont_proto
                             .peeks
@@ -928,7 +920,7 @@ pub extern "C" fn revert_to_soft_checkpoint(
             let wk_proto = map_entry.value.unwrap();
             let value = WaitingContinuation {
                 patterns: wk_proto.patterns,
-                continuation: Arc::new(Mutex::new(wk_proto.continuation.unwrap())),
+                continuation: wk_proto.continuation.unwrap(),
                 persist: wk_proto.persist,
                 peeks: wk_proto.peeks.iter().map(|element| element.value).collect(),
                 source: {
@@ -1807,10 +1799,9 @@ pub extern "C" fn get_history_waiting_continuations(
     let wks_protos: Vec<WaitingContinuationProto> = wks
         .into_iter()
         .map(|wk| {
-            let cont_lock = wk.continuation.lock().unwrap();
             let res = WaitingContinuationProto {
                 patterns: wk.patterns,
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(wk.continuation.clone()),
                 persist: wk.persist,
                 peeks: wk
                     .peeks
@@ -1828,7 +1819,7 @@ pub extern "C" fn get_history_waiting_continuations(
                     persistent: wk.source.persistent,
                 }),
             };
-            drop(cont_lock);
+
             res
         })
         .collect();
@@ -1908,15 +1899,13 @@ pub extern "C" fn replay_produce(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
-            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
-            drop(cont_lock);
 
             let protobuf_results = rspace_results
                 .into_iter()
@@ -1978,15 +1967,13 @@ pub extern "C" fn replay_consume(
 
     match result_option {
         Some((cont_result, rspace_results)) => {
-            let cont_lock = cont_result.continuation.lock().unwrap();
             let protobuf_cont_result = ContResultProto {
-                continuation: Some(cont_lock.clone()),
+                continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
                 channels: cont_result.channels,
                 patterns: cont_result.patterns,
                 peek: cont_result.peek,
             };
-            drop(cont_lock);
 
             let protobuf_results = rspace_results
                 .into_iter()

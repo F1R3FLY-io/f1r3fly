@@ -10,10 +10,11 @@ use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::trace::event::Consume;
+use rspace_plus_plus::rspace::util::unpack_tuple;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 // See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
@@ -73,28 +74,13 @@ fn check_same_elements<T: Hash + Eq>(vec1: Vec<T>, vec2: Vec<T>) -> bool {
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/util/package.scala
-fn unpack_tuple<C, P, K: Clone, R: Clone>(
-    tuple: &(ContResult<C, P, K>, Vec<RSpaceResult<C, R>>),
-) -> (&Arc<Mutex<K>>, Vec<R>) {
-    match tuple {
-        (ContResult { continuation, .. }, data) => (
-            continuation,
-            data.into_iter()
-                .map(|result| result.matched_datum.clone())
-                .collect(),
-        ),
-    }
-}
-
-// See rspace/src/main/scala/coop/rchain/rspace/util/package.scala
 fn run_k<C, P>(
     cont: Option<(ContResult<C, P, StringsCaptor>, Vec<RSpaceResult<C, String>>)>,
 ) -> Vec<Vec<String>> {
-    let cont_unwrapped = cont.unwrap();
+    let mut cont_unwrapped = cont.unwrap();
     let unpacked_tuple = unpack_tuple(&cont_unwrapped);
-    let mut cont_lock = cont_unwrapped.0.continuation.lock().unwrap();
-    cont_lock.run_k(unpacked_tuple.1);
-    let cont_results = cont_lock.results();
+    cont_unwrapped.0.continuation.run_k(unpacked_tuple.1);
+    let cont_results = cont_unwrapped.0.continuation.results();
     let cloned_results: Vec<Vec<String>> = cont_results
         .iter()
         .map(|res| res.iter().map(|s| s.to_string()).collect())
@@ -1141,6 +1127,8 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
     assert!(check_same_elements(run_k(r4), vec![vec!["datum2".to_string()]]))
 }
 
+// TODO: Fix this test to not use the in-place modifcation as used on the scala side.
+// This would require the continuation to be wrapped in a Arc<Mutex<>> which is not needed
 #[tokio::test]
 async fn doing_persistent_consume_and_producing_multiple_times_should_work() {
     let mut rspace = create_rspace().await;
@@ -1612,7 +1600,7 @@ async fn create_soft_checkpoint_should_capture_the_current_state_of_the_store() 
 
     let expected_continuation = vec![WaitingContinuation {
         patterns: patterns.clone(),
-        continuation: Arc::new(Mutex::new(continuation.clone())),
+        continuation: continuation.clone(),
         persist: false,
         peeks: BTreeSet::default(),
         source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),
@@ -1663,7 +1651,7 @@ async fn create_soft_checkpoint_should_create_checkpoints_which_have_separate_st
 
     let expected_continuation = vec![WaitingContinuation {
         patterns: patterns.clone(),
-        continuation: Arc::new(Mutex::new(continuation.clone())),
+        continuation: continuation.clone(),
         persist: false,
         peeks: BTreeSet::default(),
         source: Consume::create(channels.clone(), patterns.clone(), continuation.clone(), false),

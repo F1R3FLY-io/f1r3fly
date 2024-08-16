@@ -15,7 +15,7 @@ use rspace_plus_plus::rspace::trace::event::{Consume, IOEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet};
 use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 // See rspace/src/test/scala/coop/rchain/rspace/ReplayRSpaceTests.scala
 
@@ -94,7 +94,7 @@ async fn creating_a_comm_event_should_replay_correctly() {
     assert_eq!(
         result_produce.clone().unwrap().0,
         ContResult {
-            continuation: Arc::new(Mutex::new(continuation.clone())),
+            continuation: continuation.clone(),
             persistent: false,
             channels: channels.clone(),
             patterns: patterns.clone(),
@@ -156,7 +156,7 @@ async fn creating_a_comm_event_with_peek_consume_first_should_replay_correctly()
     assert_eq!(
         result_produce.clone().unwrap().0,
         ContResult {
-            continuation: Arc::new(Mutex::new(continuation.clone())),
+            continuation: continuation.clone(),
             persistent: false,
             channels: channels.clone(),
             patterns: patterns.clone(),
@@ -401,7 +401,7 @@ async fn creating_multiple_comm_events_with_peeking_a_produce_should_replay_corr
 
     let expected_result = Some((
         ContResult {
-            continuation: Arc::new(Mutex::new(continuation.clone())),
+            continuation: continuation.clone(),
             persistent: false,
             channels: channels.clone(),
             patterns: patterns.clone(),

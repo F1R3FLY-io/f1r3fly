@@ -13,9 +13,7 @@ use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuples
 pub trait Reduce {
     fn eval(&self, par: Par, env: Env<Par>, rand: Blake2b256Hash) -> ();
 
-    fn inj(&self, par: Par, rand: Blake2b256Hash) -> () {
-        self.eval(par, Env::new(), rand)
-    }
+    fn inj(&self, par: Par, rand: Blake2b256Hash) -> ();
 }
 
 pub struct DebruijnInterpreter {
@@ -24,4 +22,14 @@ pub struct DebruijnInterpreter {
     urn_map: HashMap<String, Par>,
     merg_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
+}
+
+impl Reduce for DebruijnInterpreter {
+    fn eval(&self, par: Par, env: Env<Par>, rand: Blake2b256Hash) -> () {
+        todo!()
+    }
+
+    fn inj(&self, par: Par, rand: Blake2b256Hash) -> () {
+        self.eval(par, Env::new(), rand)
+    }
 }

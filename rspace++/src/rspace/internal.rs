@@ -1,10 +1,9 @@
 use counter::Counter;
 use dashmap::DashMap;
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::hash::Hash;
 
 use super::trace::event::{Consume, Produce};
 
@@ -19,79 +18,22 @@ pub struct RSpaceResult<C, A> {
 
 // See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
 // NOTE: On Scala side, they are defaulting "peek" to false
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq)]
 pub struct ContResult<C, P, K> {
-    pub continuation: Arc<Mutex<K>>,
+    pub continuation: K,
     pub persistent: bool,
     pub channels: Vec<C>,
     pub patterns: Vec<P>,
     pub peek: bool,
 }
 
-impl<C: Eq, P: Eq, K: Eq + Clone> PartialEq for ContResult<C, P, K> {
+impl<C: Eq, P: Eq, K: Eq> PartialEq for ContResult<C, P, K> {
     fn eq(&self, other: &ContResult<C, P, K>) -> bool {
-        let self_cont = self.continuation.lock().unwrap();
-        let self_cont_cloned = self_cont.clone();
-        drop(self_cont);
-
-        let other_cont = other.continuation.lock().unwrap();
-        let other_cont_cloned = other_cont.clone();
-        drop(other_cont);
-
         self.persistent == other.persistent
             && self.channels == other.channels
             && self.patterns == other.patterns
             && self.peek == other.peek
-            && self_cont_cloned == other_cont_cloned
-    }
-}
-
-impl<C: Eq, P: Eq, K: Eq + Clone> Eq for ContResult<C, P, K> {}
-
-impl<C: Serialize, P: Serialize, K: Serialize> Serialize for ContResult<C, P, K> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let guard = self.continuation.lock().unwrap();
-        let inner_data = &*guard; // Obtain the inner data from the mutex
-        (self.persistent, &self.channels, &self.patterns, self.peek, inner_data)
-            .serialize(serializer)
-    }
-}
-
-impl<'de, C, P, K> Deserialize<'de> for ContResult<C, P, K>
-where
-    C: Deserialize<'de>,
-    P: Deserialize<'de>,
-    K: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (persistent, channels, patterns, peek, inner_data) =
-            Deserialize::deserialize(deserializer)?;
-        let continuation = Arc::new(Mutex::new(inner_data));
-        Ok(ContResult {
-            continuation,
-            persistent,
-            channels,
-            patterns,
-            peek,
-        })
-    }
-}
-
-impl<C: Hash, P: Hash, K: Hash> Hash for ContResult<C, P, K> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        if let Ok(continuation) = self.continuation.lock() {
-            continuation.hash(state);
-        }
-        self.persistent.hash(state);
-        self.patterns.hash(state);
-        self.channels.hash(state);
-        self.peek.hash(state);
+            && self.continuation == other.continuation
     }
 }
 
@@ -121,10 +63,10 @@ where
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
 // The 'Default' macro is needed here for hot_store_spec.rs
-#[derive(Clone, Debug, Arbitrary, Default)]
+#[derive(Clone, Debug, Arbitrary, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct WaitingContinuation<P: Clone, K: Clone> {
     pub patterns: Vec<P>,
-    pub continuation: Arc<Mutex<K>>,
+    pub continuation: K,
     pub persist: bool,
     pub peeks: BTreeSet<i32>,
     pub source: Consume,
@@ -144,83 +86,11 @@ where
     ) -> WaitingContinuation<P, K> {
         WaitingContinuation {
             patterns: patterns.clone(),
-            continuation: Arc::new(Mutex::new(continuation.clone())),
+            continuation: continuation.clone(),
             persist,
             peeks,
             source: Consume::create(channels, patterns, continuation, persist),
         }
-    }
-}
-
-impl<P: Clone + PartialEq, K: Clone + PartialEq> PartialEq for WaitingContinuation<P, K> {
-    fn eq(&self, other: &Self) -> bool {
-        let self_cont = self.continuation.lock().unwrap();
-        let self_cont_cloned = self_cont.clone();
-        drop(self_cont);
-
-        let other_cont = other.continuation.lock().unwrap();
-        let other_cont_cloned = other_cont.clone();
-        drop(other_cont);
-
-        let result = self.patterns == other.patterns
-            && self_cont_cloned == other_cont_cloned
-            && self.persist == other.persist
-            && self.peeks == other.peeks
-            && self.source == other.source;
-
-        result
-    }
-}
-
-impl<P: Clone + Eq, K: Clone + Eq> Eq for WaitingContinuation<P, K> {}
-
-impl<P, K> Serialize for WaitingContinuation<P, K>
-where
-    P: Serialize + Clone,
-    K: Serialize + Clone,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let guard = self.continuation.lock().unwrap();
-        let inner_data = &*guard; // Obtain the inner data from the mutex
-        (self.patterns.clone(), inner_data, self.persist, self.peeks.clone(), self.source.clone())
-            .serialize(serializer)
-    }
-}
-
-impl<'de, P, K> Deserialize<'de> for WaitingContinuation<P, K>
-where
-    P: Deserialize<'de> + Clone,
-    K: Deserialize<'de> + Clone,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (patterns, inner_data, persist, peeks, source) =
-            Deserialize::deserialize(deserializer)?;
-        let continuation = Arc::new(Mutex::new(inner_data));
-        Ok(WaitingContinuation {
-            patterns,
-            continuation,
-            persist,
-            peeks,
-            source,
-        })
-    }
-}
-
-impl<P: Clone + Hash, K: Clone + Hash> Hash for WaitingContinuation<P, K> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.patterns.hash(state);
-        if let Ok(continuation) = self.continuation.lock() {
-            continuation.hash(state);
-        }
-        self.persist.hash(state);
-        self.peeks.hash(state);
-        self.source.hash(state);
     }
 }
 

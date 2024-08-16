@@ -12,6 +12,7 @@ pub struct Cost {
     value: i64,
 }
 
+#[derive(Clone)]
 pub struct CostState {
     cost: Arc<Mutex<Cost>>,
 
