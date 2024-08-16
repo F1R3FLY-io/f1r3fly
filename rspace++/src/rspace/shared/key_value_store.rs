@@ -1,6 +1,7 @@
-use crate::rspace::ByteBuffer;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+
+use models::ByteBuffer;
 
 // See shared/src/main/scala/coop/rchain/store/KeyValueStore.scala
 pub trait KeyValueStore: Send + Sync {

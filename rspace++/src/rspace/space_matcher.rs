@@ -1,10 +1,11 @@
 use crate::rspace::internal::WaitingContinuation;
 use crate::rspace::internal::{ConsumeCandidate, Datum, ProduceCandidate};
 use dashmap::DashMap;
-use rholang::rust::interpreter::matcher::r#match::Match;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
+
+use super::r#match::Match;
 
 // See rspace/src/main/scala/coop/rchain/rspace/SpaceMatcher.scala
 pub struct SpaceMatcher<C, P, A, K, M: Match<P, A>> {

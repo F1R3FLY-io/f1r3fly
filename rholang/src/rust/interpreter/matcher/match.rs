@@ -1,18 +1,7 @@
 use models::rust::utils::{new_elist_expr, to_vec, vector_par};
+use rspace_plus_plus::rspace::r#match::Match;
 
 use super::{exports::*, fold_match::FoldMatch, spatial_matcher::SpatialMatcherContext};
-
-/**
- * See rspace/src/main/scala/coop/rchain/rspace/Match.scala
- *
- * Type trait for matching patterns with data.
- *
- * @tparam P A type representing patterns
- * @tparam A A type representing data and match result
- */
-pub trait Match<P, A> {
-    fn get(&self, p: P, a: A) -> Option<A>;
-}
 
 #[derive(Clone, Default)]
 pub struct Matcher;

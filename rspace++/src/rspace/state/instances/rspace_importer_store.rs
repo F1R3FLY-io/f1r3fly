@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use models::ByteVector;
+
 use crate::rspace::{
     history::roots_store::{RootsStore, RootsStoreInstances},
     shared::{
@@ -8,7 +10,6 @@ use crate::rspace::{
         trie_importer::TrieImporter,
     },
     state::rspace_importer::RSpaceImporter,
-    ByteVector,
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/state/instances/RSpaceImporterStore.scala

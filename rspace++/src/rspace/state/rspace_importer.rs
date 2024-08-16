@@ -1,3 +1,4 @@
+use models::ByteVector;
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPoolBuilder,
@@ -12,7 +13,6 @@ use crate::rspace::{
     history::cold_store::PersistedData,
     shared::{trie_exporter::KeyHash, trie_importer::TrieImporter},
     state::rspace_exporter::RSpaceExporterInstance,
-    ByteVector,
 };
 use std::hash::Hash;
 

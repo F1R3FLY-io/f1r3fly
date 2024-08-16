@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
+use models::{Byte, ByteVector};
+
 use crate::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash, state::rspace_exporter::RSpaceExporter, Byte,
-    ByteVector,
+    hashing::blake2b256_hash::Blake2b256Hash, state::rspace_exporter::RSpaceExporter,
 };
 
 //See rspace/src/main/scala/coop/rchain/rspace/state/exporters/RSpaceExporterItems.scala

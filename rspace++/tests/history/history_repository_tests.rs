@@ -1,3 +1,4 @@
+use models::ByteVector;
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 use rand::prelude::SliceRandom;
 use rspace_plus_plus::rspace::{
@@ -23,7 +24,6 @@ use rspace_plus_plus::rspace::{
     },
     state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
     trace::event::{Consume, Produce},
-    ByteVector,
 };
 use std::{
     collections::{BTreeSet, HashSet},
@@ -456,12 +456,7 @@ impl RSpaceExporter for EmptyExporter {
 }
 
 impl TrieExporter for EmptyExporter {
-    fn get_nodes(
-        &self,
-        _start_path: NodePath,
-        _skip: i32,
-        _take: i32,
-    ) -> Vec<TrieNode<KeyHash>> {
+    fn get_nodes(&self, _start_path: NodePath, _skip: i32, _take: i32) -> Vec<TrieNode<KeyHash>> {
         todo!()
     }
 

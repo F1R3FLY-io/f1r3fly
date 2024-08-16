@@ -1,6 +1,8 @@
+use models::{Byte, ByteVector};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store::HotStoreInstances;
+use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::rspace::RSpaceInstances;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
@@ -13,11 +15,9 @@ use rspace_plus_plus::rspace::{
     },
     state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
 };
-use rspace_plus_plus::rspace::{Byte, ByteVector};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
-use rholang::rust::interpreter::matcher::r#match::Match;
 
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

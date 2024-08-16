@@ -1,4 +1,6 @@
-use crate::rspace::{hashing::blake2b256_hash::Blake2b256Hash, Byte};
+use models::Byte;
+
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 
 use super::key_value_store::KvStoreError;
 

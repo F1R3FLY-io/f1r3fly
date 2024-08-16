@@ -1,3 +1,4 @@
+use models::{Byte, ByteVector};
 use rand::distributions::{Alphanumeric, DistString};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 
@@ -18,7 +19,6 @@ use rspace_plus_plus::rspace::{
         instances::radix_history::RadixHistory,
     },
     shared::in_mem_key_value_store::InMemoryKeyValueStore,
-    Byte, ByteVector,
 };
 
 #[test]

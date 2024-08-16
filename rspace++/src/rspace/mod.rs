@@ -11,7 +11,4 @@ mod hot_store_trie_action;
 pub mod state;
 mod serializers;
 pub mod trace;
-
-pub type ByteVector = Vec<u8>;
-pub type ByteBuffer = Vec<u8>;
-pub type Byte = u8;
+pub mod r#match;

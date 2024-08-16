@@ -1,3 +1,5 @@
+use models::ByteVector;
+
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history::HistoryError;
@@ -6,7 +8,6 @@ use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::radix_tree::empty_node;
 use crate::rspace::history::radix_tree::{hash_node, Node, RadixTreeImpl};
 use crate::rspace::shared::key_value_store::KeyValueStore;
-use crate::rspace::ByteVector;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;

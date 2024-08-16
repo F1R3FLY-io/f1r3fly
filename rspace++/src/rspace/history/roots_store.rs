@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
 
+use models::ByteBuffer;
+
 use crate::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
     shared::key_value_store::{KeyValueStore, KvStoreError},
-    ByteBuffer,
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootsStore.scala

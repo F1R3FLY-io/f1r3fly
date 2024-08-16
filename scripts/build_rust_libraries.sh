@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 cd rspace++/
 cargo build --profile dev -p rspace_plus_plus_rhotypes
 
@@ -8,6 +10,9 @@ cargo build --profile dev -p models
 
 cd ../rholang
 cargo build --profile dev -p rholang
+
+cd ../crypto
+cargo build --profile dev -p crypto
 
 # This is needed for debugging through VS Code 'Metals' extension on M2
 # ARCH_TYPE=$(uname -m)
