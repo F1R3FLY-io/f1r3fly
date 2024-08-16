@@ -109,12 +109,12 @@ pub fn filter_enum_variants<C: Clone, P: Clone, A: Clone, K: Clone, V>(
     vec.into_iter().filter_map(variant).collect()
 }
 
-async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor, StringMatch> {
+async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor> {
     let mut kvm = InMemoryStoreManager::new();
     // let mut kvm = mk_rspace_store_manager((&format!("{}/rspace++/", "./tests/storage_actions_test_lmdb")).into(), 1 * GB);
     let store = kvm.r_space_stores().await.unwrap();
 
-    RSpaceInstances::create(store, StringMatch).unwrap()
+    RSpaceInstances::create(store, Arc::new(Box::new(StringMatch))).unwrap()
 }
 
 // NOTE: not implementing test checks for Log

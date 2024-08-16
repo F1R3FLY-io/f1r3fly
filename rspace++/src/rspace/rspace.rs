@@ -35,14 +35,13 @@ use std::sync::{Arc, Mutex};
 // NOTE: 'space_matcher' field is added on Rust side to behave like Scala's 'extend'
 // NOTE: 'store' field and methods are public for testing purposes. Production should be private?
 #[repr(C)]
-pub struct RSpace<C, P, A, K, M>
+pub struct RSpace<C, P, A, K>
 where
     C: Clone + Ord,
-    M: Match<P, A>,
 {
     pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
     pub store: Box<dyn HotStore<C, P, A, K>>,
-    space_matcher: SpaceMatcher<C, P, A, K, M>,
+    space_matcher: SpaceMatcher<C, P, A, K>,
     installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
     produce_counter: BTreeMap<Produce, i32>,
@@ -56,13 +55,12 @@ const CONSUME_COMM_LABEL: &str = "comm.consume";
 const PRODUCE_COMM_LABEL: &str = "comm.produce";
 
 // NOTE: Implementing 'RSpaceOps' functions in this file
-impl<C, P, A, K, M> RSpace<C, P, A, K, M>
+impl<C, P, A, K> RSpace<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
     P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    M: Clone + Match<P, A>,
 {
     fn produce_counters(&self, produce_refs: Vec<Produce>) -> BTreeMap<Produce, i32> {
         produce_refs
@@ -1408,17 +1406,16 @@ impl RSpaceInstances {
     /**
      * Creates [[RSpace]] from [[HistoryRepository]] and [[HotStore]].
      */
-    pub fn apply<C, P, A, K, M>(
+    pub fn apply<C, P, A, K>(
         history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
         store: Box<dyn HotStore<C, P, A, K>>,
-        matcher: M,
-    ) -> RSpace<C, P, A, K, M>
+        matcher: Arc<Box<dyn Match<P, A>>>,
+    ) -> RSpace<C, P, A, K>
     where
         C: Clone + Debug + Ord + Hash,
         P: Clone + Debug,
         A: Clone + Debug,
         K: Clone + Debug,
-        M: Match<P, A>,
     {
         RSpace {
             history_repository,
@@ -1431,10 +1428,10 @@ impl RSpaceInstances {
         }
     }
 
-    pub fn create<C, P, A, K, M>(
+    pub fn create<C, P, A, K>(
         store: RSpaceStore,
-        matcher: M,
-    ) -> Result<RSpace<C, P, A, K, M>, HistoryRepositoryError>
+        matcher: Arc<Box<dyn Match<P, A>>>,
+    ) -> Result<RSpace<C, P, A, K>, HistoryRepositoryError>
     where
         C: Clone
             + Debug
@@ -1449,7 +1446,6 @@ impl RSpaceInstances {
         P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
         A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
         K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-        M: Match<P, A>,
     {
         let setup = RSpaceInstances::create_history_repo(store).unwrap();
         let (history_reader, store) = setup;

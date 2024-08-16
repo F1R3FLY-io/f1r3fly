@@ -4,14 +4,17 @@ use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
+use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::trace::Log;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
 
 use super::accounting::costs::Cost;
-use super::accounting::has_cost::HasCost;
+use super::accounting::has_cost::{CostState, HasCost};
 use super::env::Env;
 use super::interpreter::EvaluateResult;
-use super::system_processes::BlockData;
+use super::reduce::DebruijnInterpreter;
+use super::system_processes::{BlockData, InvalidBlocks};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 pub trait RhoRuntime: HasCost {
@@ -133,3 +136,16 @@ pub trait ReplayRhoRuntime: RhoRuntime {
 
     fn check_replay_data(&self) -> ();
 }
+
+pub struct RhoRuntimeImpl {
+    reducer: DebruijnInterpreter,
+    space: RhoISpace,
+    cost: CostState,
+    block_data_ref: Arc<RwLock<BlockData>>,
+    invalid_blocks_param: InvalidBlocks,
+    merg_chs: Arc<RwLock<HashSet<Par>>>,
+}
+
+pub type RhoTuplespace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
+pub type RhoISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
+pub type RhoReplayISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;

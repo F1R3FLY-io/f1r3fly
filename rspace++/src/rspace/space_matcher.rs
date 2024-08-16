@@ -4,26 +4,26 @@ use dashmap::DashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use super::r#match::Match;
 
 // See rspace/src/main/scala/coop/rchain/rspace/SpaceMatcher.scala
-pub struct SpaceMatcher<C, P, A, K, M: Match<P, A>> {
-    pub matcher: M,
+pub struct SpaceMatcher<C, P, A, K> {
+    pub matcher: Arc<Box<dyn Match<P, A>>>,
     phantom: PhantomData<(C, P, A, K)>,
 }
 
 type MatchingDataCandidate<C, A> = (ConsumeCandidate<C, A>, Vec<(Datum<A>, i32)>);
 
-impl<C, P, A, K, M> SpaceMatcher<C, P, A, K, M>
+impl<C, P, A, K> SpaceMatcher<C, P, A, K>
 where
     C: Clone + Debug + Hash + Eq,
     P: Clone + Debug,
     A: Clone + Debug,
     K: Clone,
-    M: Match<P, A>,
 {
-    pub fn create(matcher: M) -> SpaceMatcher<C, P, A, K, M> {
+    pub fn create(matcher: Arc<Box<dyn Match<P, A>>>) -> SpaceMatcher<C, P, A, K> {
         SpaceMatcher {
             matcher,
             phantom: PhantomData,

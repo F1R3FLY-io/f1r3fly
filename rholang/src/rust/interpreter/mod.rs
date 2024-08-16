@@ -1,7 +1,9 @@
 pub mod accounting;
+pub mod dispatch;
 pub mod env;
 pub mod errors;
 pub mod interpreter;
 pub mod matcher;
+pub mod reduce;
 pub mod rho_runtime;
 pub mod system_processes;

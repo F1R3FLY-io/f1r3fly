@@ -8,4 +8,3 @@ pub mod maximum_bipartite_match;
 pub mod par_count;
 pub mod spatial_matcher;
 pub mod sub_pars;
-// pub mod utils;

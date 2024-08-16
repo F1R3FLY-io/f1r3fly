@@ -498,7 +498,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     let range: Vec<i32> = (n..m).collect();
 
     fn consume_many<F, G>(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channels_creator: F,
         patterns: &Vec<Pattern>,
@@ -530,7 +530,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn produce_many<F, A>(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channel_creator: F,
         datum_creator: A,
@@ -554,7 +554,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn replay_consume_many<F, G>(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channels_creator: F,
         patterns: &Vec<Pattern>,
@@ -586,7 +586,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn replay_produce_many<F, A>(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channel_creator: F,
         datum_creator: A,
@@ -680,7 +680,7 @@ async fn a_matched_continuation_defined_for_multiple_channels_some_peeked_should
     produces.shuffle(&mut rng);
 
     fn consume_and_produce(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         channels: &Vec<String>,
         patterns: &Vec<Pattern>,
         continuation: &String,
@@ -704,7 +704,7 @@ async fn a_matched_continuation_defined_for_multiple_channels_some_peeked_should
     }
 
     fn replay_consume_and_produce(
-        space: &mut RSpace<String, Pattern, String, String, StringMatch>,
+        space: &mut RSpace<String, Pattern, String, String>,
         channels: &Vec<String>,
         patterns: &Vec<Pattern>,
         continuation: &String,
@@ -1509,10 +1509,8 @@ async fn check_replay_data_should_panic_if_replay_data_contains_elements() {
     let _res = replay_space.check_replay_data();
 }
 
-type StateSetup = (
-    RSpace<String, Pattern, String, String, StringMatch>,
-    RSpace<String, Pattern, String, String, StringMatch>,
-);
+type StateSetup =
+    (RSpace<String, Pattern, String, String>, RSpace<String, Pattern, String, String>);
 
 async fn fixture() -> StateSetup {
     let mut kvm = InMemoryStoreManager::new();
@@ -1537,7 +1535,8 @@ async fn fixture() -> StateSetup {
         HotStoreInstances::create_from_hs_and_hr(cache, hr)
     };
 
-    let rspace = RSpaceInstances::apply(history_repo.clone(), hot_store, StringMatch);
+    let rspace =
+        RSpaceInstances::apply(history_repo.clone(), hot_store, Arc::new(Box::new(StringMatch)));
 
     let history_cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let replay_store = {
@@ -1545,8 +1544,8 @@ async fn fixture() -> StateSetup {
         HotStoreInstances::create_from_hs_and_hr(history_cache, hr)
     };
 
-    let replay_rspace: RSpace<String, Pattern, String, String, StringMatch> =
-        RSpaceInstances::apply(history_repo, replay_store, StringMatch);
+    let replay_rspace: RSpace<String, Pattern, String, String> =
+        RSpaceInstances::apply(history_repo, replay_store, Arc::new(Box::new(StringMatch)));
 
     (rspace, replay_rspace)
 }

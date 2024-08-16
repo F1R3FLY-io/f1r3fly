@@ -8,7 +8,7 @@ pub trait HasCost {
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/package.scala
-struct Cost {
+pub struct Cost {
     value: i64,
 }
 
