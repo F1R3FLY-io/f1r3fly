@@ -1113,6 +1113,7 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 name = "rholang"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "crypto",
  "itertools 0.10.5",
  "models",
