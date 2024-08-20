@@ -1,28 +1,29 @@
-use crate::rhoapi::{Par, Var};
+use crate::rhoapi::{EMap, KeyValuePair, Par, Var};
 use crate::BitSet;
 
-use super::sorted_par_map::SortedParMap;
+use super::utils::union;
 
 // See models/src/main/scala/coop/rchain/models/ParMap.scala
-#[derive(Debug, Clone)]
-pub struct ParMap {
-    ps: SortedParMap,
-    connective_used: bool,
-    locally_free: BitSet,
-    remainder: Option<Var>,
-}
-
-impl ParMap {
+// See models/src/main/scala/coop/rchain/models/SortedParMap.scala
+// In Rust, because we can't ovveride field types, we are going to add methods to EMap
+// to behave similarly to ParMap
+impl EMap {
     pub fn new(
         seq: Vec<(Par, Par)>,
         connective_used: bool,
         locally_free: BitSet,
         remainder: Option<Var>,
     ) -> Self {
-        let ps = SortedParMap::from_iter(seq);
+        let kvs: Vec<KeyValuePair> = seq
+            .into_iter()
+            .map(|kv| KeyValuePair {
+                key: Some(kv.0),
+                value: Some(kv.1),
+            })
+            .collect();
 
-        ParMap {
-            ps,
+        EMap {
+            kvs,
             connective_used,
             locally_free,
             remainder,
@@ -36,27 +37,17 @@ impl ParMap {
         Self::new(seq, connective_used, locally_free, None)
     }
 
-    pub fn from_sorted_map(map: SortedParMap) -> Self {
-        Self::from_seq(
-            map.keys()
-                .into_iter()
-                .map(|k| (k.clone(), map.get(k).unwrap().clone()))
-                .collect(),
-        )
-    }
-
     fn connective_used(map: &[(Par, Par)]) -> bool {
         map.iter()
             .any(|(k, v)| k.connective_used || v.connective_used)
     }
 
     fn update_locally_free(ps: &[(Par, Par)]) -> BitSet {
-        let mut locally_free_set = Vec::new();
-
-        for (key, value) in ps {
-            locally_free_set.extend_from_slice(&key.locally_free);
-            locally_free_set.extend_from_slice(&value.locally_free);
-        }
-        locally_free_set
+        ps.iter().fold(Vec::new(), |acc, (key, value)| {
+            union(
+                acc,
+                union(key.locally_free.clone(), value.locally_free.clone()),
+            )
+        })
     }
 }

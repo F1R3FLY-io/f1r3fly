@@ -1,6 +1,6 @@
 use models::rhoapi::expr::ExprInstance::EMapBody;
-use models::rhoapi::EMap;
 use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
+use models::rhoapi::{EMap, KeyValuePair};
 use models::rust::block_hash::BlockHash;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
@@ -18,6 +18,7 @@ use super::env::Env;
 use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
 use super::reduce::{DebruijnInterpreter, Reduce};
 use super::system_processes::{BlockData, InvalidBlocks};
+use models::rhoapi::expr::ExprInstance::GByteArray;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 pub trait RhoRuntime: HasCost {
@@ -227,10 +228,28 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 
     fn set_invalid_blocks(&self, invalid_blocks: HashMap<BlockHash, Validator>) -> () {
-        // let invalid_blocks: Par = Par::default().with_exprs(vec![Expr {
-        //     expr_instance: Some(EMapBody(EMap {})),
-        // }]);
-        todo!()
+        let invalid_blocks: Par = Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(EMapBody(EMap {
+                kvs: {
+                    invalid_blocks
+                        .into_iter()
+                        .map(|(validator, block_hash)| KeyValuePair {
+                            key: Some(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(GByteArray(validator)),
+                            }])),
+                            value: Some(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(GByteArray(block_hash)),
+                            }])),
+                        })
+                        .collect()
+                },
+                locally_free: Vec::new(),
+                connective_used: false,
+                remainder: None,
+            })),
+        }]);
+
+        self.invalid_blocks_param.set_params(invalid_blocks)
     }
 
     fn get_hot_changes(
