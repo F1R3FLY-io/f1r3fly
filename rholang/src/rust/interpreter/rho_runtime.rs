@@ -5,6 +5,7 @@ use models::rust::block_hash::BlockHash;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::trace::Log;
@@ -151,6 +152,26 @@ pub struct RhoRuntimeImpl {
     merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
+impl RhoRuntimeImpl {
+    fn new(
+        reducer: DebruijnInterpreter,
+        space: RhoISpace,
+        cost: CostState,
+        block_data_ref: Arc<RwLock<BlockData>>,
+        invalid_blocks_param: InvalidBlocks,
+        merge_chs: Arc<RwLock<HashSet<Par>>>,
+    ) -> RhoRuntimeImpl {
+        RhoRuntimeImpl {
+            reducer,
+            space,
+            cost,
+            block_data_ref,
+            invalid_blocks_param,
+            merge_chs,
+        }
+    }
+}
+
 impl RhoRuntime for RhoRuntimeImpl {
     fn evaluate(
         &self,
@@ -259,7 +280,126 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 }
 
+// TODO: Where is this implementation for the scala code?
 impl HasCost for RhoRuntimeImpl {
+    fn cost(&self) -> &CostState {
+        todo!()
+    }
+}
+
+pub struct ReplayRhoRuntimeImpl {
+    runtime: RhoRuntimeImpl,
+}
+
+impl ReplayRhoRuntimeImpl {
+    pub fn new(
+        reducer: DebruijnInterpreter,
+        space: RhoISpace,
+        cost: CostState,
+        block_data_ref: Arc<RwLock<BlockData>>,
+        invalid_blocks_param: InvalidBlocks,
+        merge_chs: Arc<RwLock<HashSet<Par>>>,
+    ) -> Self {
+        ReplayRhoRuntimeImpl {
+            runtime: RhoRuntimeImpl {
+                reducer,
+                space,
+                cost,
+                block_data_ref,
+                invalid_blocks_param,
+                merge_chs,
+            },
+        }
+    }
+}
+
+impl ReplayRhoRuntime for ReplayRhoRuntimeImpl {
+    fn rig(&self, log: Log) -> () {
+        self.runtime.space.rig(log)
+    }
+
+    fn check_replay_data(&self) -> () {
+        self.runtime.space.check_replay_data()
+    }
+}
+
+impl RhoRuntime for ReplayRhoRuntimeImpl {
+    fn evaluate(
+        &self,
+        term: String,
+        initial_phlo: Cost,
+        normalizer_env: HashMap<String, Par>,
+        rand: Blake2b256Hash,
+    ) -> EvaluateResult {
+        self.runtime
+            .evaluate(term, initial_phlo, normalizer_env, rand)
+    }
+
+    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b256Hash) -> () {
+        self.runtime.inj(par, env, rand)
+    }
+
+    fn create_soft_checkpoint(
+        &mut self,
+    ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation> {
+        self.runtime.create_soft_checkpoint()
+    }
+
+    fn revert_to_soft_checkpoint(
+        &mut self,
+        soft_checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    ) -> () {
+        self.runtime.revert_to_soft_checkpoint(soft_checkpoint)
+    }
+
+    fn create_checkpoint(&mut self) -> Checkpoint {
+        self.runtime.create_checkpoint()
+    }
+
+    fn reset(&mut self, root: Blake2b256Hash) -> () {
+        self.runtime.reset(root)
+    }
+
+    fn consume_result(
+        &mut self,
+        channel: Vec<Par>,
+        pattern: Vec<BindPattern>,
+    ) -> Option<(TaggedContinuation, Vec<ListParWithRandom>)> {
+        self.runtime.consume_result(channel, pattern)
+    }
+
+    fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
+        self.runtime.get_data(channel)
+    }
+
+    fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
+        self.runtime.get_joins(channel)
+    }
+
+    fn get_continuation(
+        &self,
+        channels: Vec<Par>,
+    ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
+        self.runtime.get_continuation(channels)
+    }
+
+    fn set_block_data(&self, block_data: BlockData) -> () {
+        self.runtime.set_block_data(block_data)
+    }
+
+    fn set_invalid_blocks(&self, invalid_blocks: HashMap<BlockHash, Validator>) -> () {
+        self.runtime.set_invalid_blocks(invalid_blocks)
+    }
+
+    fn get_hot_changes(
+        &self,
+    ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
+        self.runtime.get_hot_changes()
+    }
+}
+
+// TODO: Where is this implementation for the scala code?
+impl HasCost for ReplayRhoRuntimeImpl {
     fn cost(&self) -> &CostState {
         todo!()
     }
@@ -268,21 +408,8 @@ impl HasCost for RhoRuntimeImpl {
 pub type RhoTuplespace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 pub type RhoISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 pub type RhoReplayISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
+pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
+pub type RhoHistoryRepository =
+    HistoryRepositoryImpl<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 
-// fn create(
-//   reducer: DebruijnInterpreter,
-//   space: RhoISpace,
-//   cost: CostState,
-//   block_data_ref: Arc<RwLock<BlockData>>,
-//   invalid_blocks_param: InvalidBlocks,
-//   merg_chs: Arc<RwLock<HashSet<Par>>>,
-// ) -> RhoRuntimeImpl {
-//   RhoRuntimeImpl {
-//       reducer,
-//       space,
-//       cost,
-//       block_data_ref,
-//       invalid_blocks_param,
-//       merg_chs,
-//   }
-// }
+    
