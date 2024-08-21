@@ -1,3 +1,5 @@
+use models::rust::rholang::implicits::single_expr;
+use models::rust::rholang::implicits::vector_par;
 use models::rust::utils::*;
 
 use super::exports::*;

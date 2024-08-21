@@ -1,4 +1,4 @@
-use models::rust::utils::{new_elist_expr, to_vec, vector_par};
+use models::rust::{rholang::implicits::vector_par, utils::{new_elist_expr, to_vec}};
 use rspace_plus_plus::rspace::r#match::Match;
 
 use super::{exports::*, fold_match::FoldMatch, spatial_matcher::SpatialMatcherContext};
