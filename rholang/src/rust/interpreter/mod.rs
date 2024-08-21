@@ -7,6 +7,8 @@ pub mod interpreter;
 pub mod matcher;
 pub mod pretty_printer;
 pub mod reduce;
+pub mod registry;
 pub mod rho_runtime;
 pub mod rho_type;
 pub mod system_processes;
+pub mod util;

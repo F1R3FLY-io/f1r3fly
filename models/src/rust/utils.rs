@@ -139,6 +139,25 @@ pub fn single_expr(p: &Par) -> Option<Expr> {
     }
 }
 
+// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - singleUnforgeable
+pub fn single_unforgeable(p: &Par) -> Option<GUnforgeable> {
+    if p.sends.is_empty()
+        && p.receives.is_empty()
+        && p.news.is_empty()
+        && p.exprs.is_empty()
+        && p.matches.is_empty()
+        && p.bundles.is_empty()
+        && p.connectives.is_empty()
+    {
+        match &p.unforgeables {
+            vec if vec.len() == 1 => vec.get(0).cloned(),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/package.scala - toSeq
 pub fn to_vec(fm: FreeMap, max: i32) -> Vec<Par> {
     (0..max)

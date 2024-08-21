@@ -13,7 +13,7 @@ pub struct PrettyPrinter {
 }
 
 impl PrettyPrinter {
-    pub fn build_string_from_par(m: Par) -> String {
+    pub fn build_string_from_par(m: &Par) -> String {
         todo!()
     }
 }

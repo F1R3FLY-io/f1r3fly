@@ -28,7 +28,7 @@ pub struct ContractCall {
     pub dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
 }
 
-type Producer = Box<dyn Fn(Vec<Par>, Par) -> ()>;
+pub type Producer = Box<dyn Fn(Vec<Par>, Par) -> ()>;
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {

@@ -7,5 +7,5 @@ pub struct Signed<A> {
     pub data: A,
     pub pk: PublicKey,
     pub sig: Vec<u8>, // Type ByteString
-    pub sig_algorithm: SignaturesAlg,
+    pub sig_algorithm: Box<dyn SignaturesAlg>,
 }

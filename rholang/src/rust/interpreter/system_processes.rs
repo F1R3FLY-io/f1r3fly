@@ -1,6 +1,12 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
+use crypto::rust::hash::blake2b256::Blake2b256;
+use crypto::rust::hash::keccak256::Keccak256;
+use crypto::rust::hash::sha_256::Sha256Hasher;
 use crypto::rust::public_key::PublicKey;
+use crypto::rust::signatures::ed25519::Ed25519;
+use crypto::rust::signatures::secp256k1::Secp256k1;
+use crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
@@ -9,8 +15,13 @@ use models::Byte;
 use super::contract_call::ContractCall;
 use super::dispatch::{RhoDispatch, RholangAndRustDispatcher};
 use super::pretty_printer::PrettyPrinter;
+use super::registry::registry::Registry;
 use super::rho_runtime::RhoTuplespace;
-use super::rho_type::{Boolean, ByteArray};
+use super::rho_type::{
+    RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
+};
+use super::util::rev_address::RevAddress;
+use models::rhoapi::Expr;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
@@ -25,7 +36,7 @@ pub struct InvalidBlocks {
 }
 impl InvalidBlocks {
     pub fn set_params(&self, invalid_blocks: Par) -> () {
-        let mut lock = self.invalid_blocks.write().unwrap();
+        let mut lock: RwLockWriteGuard<Par> = self.invalid_blocks.write().unwrap();
 
         *lock = invalid_blocks;
     }
@@ -240,7 +251,6 @@ impl BlockData {
 pub struct SystemProcesses {
     dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
     space: RhoTuplespace,
-    pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
@@ -251,38 +261,60 @@ impl SystemProcesses {
         }
     }
 
-    fn illegal_argument_exception(&self, msg: &str) -> () {
-        panic!("{}", msg);
-    }
-
     fn verify_signature_contract(
         &self,
         contract_args: Vec<ListParWithRandom>,
         name: &str,
-        algorithm: Box<dyn Fn(Vec<u8>, Vec<u8>, Vec<u8>) -> bool>,
+        // algorithm: Box<dyn Fn(Vec<u8>, Vec<u8>, Vec<u8>) -> bool>,
+        algorithm: Box<dyn SignaturesAlg>,
     ) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [data, signature, pub_key, ack] = &vec[..] {
                 if let (Some(data_bytes), Some(signature_bytes), Some(pub_key_bytes)) = (
-                    ByteArray::unapply(&data),
-                    ByteArray::unapply(&signature),
-                    ByteArray::unapply(&pub_key),
+                    RhoByteArray::unapply(&data),
+                    RhoByteArray::unapply(&signature),
+                    RhoByteArray::unapply(&pub_key),
                 ) {
-                    let verified = algorithm(data_bytes, signature_bytes, pub_key_bytes);
+                    let verified = algorithm.verify(data_bytes, signature_bytes, pub_key_bytes);
+                    if !verified {
+                        panic!("SystemProcesses: Failed to verify contract")
+                    }
                     let _ = produce(
-                        vec![Par::default().with_exprs(vec![Boolean::create_expr(verified)])],
+                        vec![Par::default().with_exprs(vec![RhoBoolean::create_expr(verified)])],
                         ack.clone(),
                     );
-
-                    ()
                 } else {
                     panic!("{} expects data, signature, public key (all as byte arrays), and an acknowledgement channel", name)
                 }
             } else {
-                panic!("Invalid contract call")
+                panic!("{} expects data, signature, public key (all as byte arrays), and an acknowledgement channel", name)
             }
         } else {
-            panic!("Invalid contract call")
+            panic!("{} expects data, signature, public key (all as byte arrays), and an acknowledgement channel", name)
+        }
+    }
+
+    pub fn hash_contract(
+        &self,
+        contract_args: Vec<ListParWithRandom>,
+        name: &str,
+        algorithm: Box<dyn Fn(Vec<u8>) -> Vec<u8>>,
+    ) -> () {
+        if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
+            if vec.len() == 2 {
+                if let (Some(input), Some(ack)) =
+                    (vec.get(0).and_then(RhoByteArray::unapply), vec.get(1))
+                {
+                    let hash = algorithm(input);
+                    let _ = produce(vec![RhoByteArray::create_par(hash)], ack.clone());
+                } else {
+                    panic!("{} expects a byte array and return channel", name)
+                }
+            } else {
+                panic!("{} expects a byte array and return channel", name)
+            }
+        } else {
+            panic!("{} expects a byte array and return channel", name)
         }
     }
 
@@ -290,10 +322,14 @@ impl SystemProcesses {
         println!("{}", s);
     }
 
+    fn print_std_err(&self, s: &str) -> () {
+        println!("STD ERROR: {}", s);
+    }
+
     pub fn std_out(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
-                self.print_std_out(&PrettyPrinter::build_string_from_par(args[0].clone()));
+                self.print_std_out(&PrettyPrinter::build_string_from_par(&args[0]));
             } else {
                 panic!("Expected exactly one argument, but got {}", args.len());
             }
@@ -302,59 +338,338 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_out_ack() -> () {
-        todo!()
+    pub fn std_out_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
+            if let [arg, ack] = &vec[..] {
+                self.print_std_out(&PrettyPrinter::build_string_from_par(arg));
+                let _ = produce(vec![Par::default()], ack.clone());
+            } else {
+                panic!("Expected exactly two arguments, but got {}", vec.len());
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn std_err() -> () {
-        todo!()
+    pub fn std_err(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((_, vec)) = self.is_contract_call().unapply(contract_args) {
+            if let [arg] = &vec[..] {
+                self.print_std_err(&PrettyPrinter::build_string_from_par(arg));
+            } else {
+                panic!("Expected exactly one argument, but got {}", vec.len());
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn std_err_ack() -> () {
-        todo!()
+    pub fn std_err_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
+            if let [arg, ack] = &vec[..] {
+                self.print_std_err(&PrettyPrinter::build_string_from_par(arg));
+                let _ = produce(vec![Par::default()], ack.clone());
+            } else {
+                panic!("Expected exactly two arguments, but got {}", vec.len());
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn secp256k1_verify() -> () {
-        todo!()
+    pub fn rev_address(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            match args.as_slice() {
+                [first_par, second_par, ack] => {
+                    if let (Some(_), Some(address)) = (
+                        RhoString::unapply(first_par).and_then(|str| {
+                            if str == "validate".to_string() {
+                                Some(())
+                            } else {
+                                None
+                            }
+                        }),
+                        RhoString::unapply(second_par),
+                    ) {
+                        let error_message = match RevAddress::parse(&address) {
+                            Ok(_) => Par::default(),
+                            Err(str) => RhoString::create_par(str),
+                        };
+
+                        let _ = produce(vec![error_message], ack.clone());
+                    } else {
+                        // TODO: Invalid type for address should throw error!
+                        if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
+                            if str == "validate".to_string() {
+                                Some(())
+                            } else {
+                                None
+                            }
+                        }) {
+                            let _ = produce(vec![Par::default()], ack.clone());
+                        } else {
+                            if let (Some(_), Some(public_key)) = (
+                                RhoString::unapply(first_par).and_then(|str| {
+                                    if str == "fromPublicKey".to_string() {
+                                        Some(())
+                                    } else {
+                                        None
+                                    }
+                                }),
+                                RhoByteArray::unapply(second_par),
+                            ) {
+                                let response = match RevAddress::from_public_key(&PublicKey {
+                                    bytes: public_key,
+                                }) {
+                                    Some(ra) => RhoString::create_par(ra.to_base58()),
+                                    None => Par::default(),
+                                };
+
+                                let _ = produce(vec![response], ack.clone());
+                            } else {
+                                if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
+                                    if str == "fromPublicKey".to_string() {
+                                        Some(())
+                                    } else {
+                                        None
+                                    }
+                                }) {
+                                    let _ = produce(vec![Par::default()], ack.clone());
+                                } else {
+                                    if let (Some(_), Some(id)) = (
+                                        RhoString::unapply(first_par).and_then(|str| {
+                                            if str == "fromDeployerId".to_string() {
+                                                Some(())
+                                            } else {
+                                                None
+                                            }
+                                        }),
+                                        RhoDeployerId::unapply(second_par),
+                                    ) {
+                                        let response = match RevAddress::from_deployer_id(id) {
+                                            Some(ra) => RhoString::create_par(ra.to_base58()),
+                                            None => Par::default(),
+                                        };
+
+                                        let _ = produce(vec![response], ack.clone());
+                                    } else {
+                                        if let Some(_) =
+                                            RhoString::unapply(first_par).and_then(|str| {
+                                                if str == "fromDeployerId".to_string() {
+                                                    Some(())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        {
+                                            let _ = produce(vec![Par::default()], ack.clone());
+                                        } else {
+                                            if let Some(_) =
+                                                RhoString::unapply(first_par).and_then(|str| {
+                                                    if str == "fromUnforgeable".to_string() {
+                                                        Some(())
+                                                    } else {
+                                                        None
+                                                    }
+                                                })
+                                            {
+                                                let response = if let Some(gprivate) =
+                                                    RhoName::unapply(&second_par)
+                                                {
+                                                    RhoString::create_par(
+                                                        RevAddress::from_unforgeable(&gprivate)
+                                                            .to_base58(),
+                                                    )
+                                                } else {
+                                                    Par::default()
+                                                };
+
+                                                let _ = produce(vec![response], ack.clone());
+                                            } else {
+                                                if let Some(_) = RhoString::unapply(first_par)
+                                                    .and_then(|str| {
+                                                        if str == "fromUnforgeable".to_string() {
+                                                            Some(())
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                                {
+                                                    let _ =
+                                                        produce(vec![Par::default()], ack.clone());
+                                                } else {
+                                                    panic!("Expected args did not match any case");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => panic!("args does not have exactly 3 elements"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn ed25519_verify() -> () {
-        todo!()
+    pub fn deployer_id_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            match args.as_slice() {
+                [first_par, second_par, ack] => {
+                    if let (Some(_), Some(public_key)) = (
+                        RhoString::unapply(first_par).and_then(|str| {
+                            if str == "pubKeyBytes".to_string() {
+                                Some(())
+                            } else {
+                                None
+                            }
+                        }),
+                        RhoDeployerId::unapply(second_par),
+                    ) {
+                        let _ = produce(vec![RhoByteArray::create_par(public_key)], ack.clone());
+                    } else {
+                        if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
+                            if str == "pubKeyBytes".to_string() {
+                                Some(())
+                            } else {
+                                None
+                            }
+                        }) {
+                            let _ = produce(vec![Par::default()], ack.clone());
+                        } else {
+                            panic!("Expected args did not match any case");
+                        }
+                    }
+                }
+
+                _ => panic!("args does not have exactly 3 elements"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn sha256_hash() -> () {
-        todo!()
+    pub fn registry_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            match args.as_slice() {
+                [first_par, argument, ack] => {
+                    if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
+                        if str == "buildUri".to_string() {
+                            Some(())
+                        } else {
+                            None
+                        }
+                    }) {
+                        let response = if let Some(ba) = RhoByteArray::unapply(&argument) {
+                            let hash_key_bytes = Blake2b256::hash(ba);
+                            RhoUri::create_par(Registry::build_uri(&hash_key_bytes))
+                        } else {
+                            Par::default()
+                        };
+                        let _ = produce(vec![response], ack.clone());
+                    } else {
+                        panic!("Expected args did not match any case");
+                    }
+                }
+
+                _ => panic!("args does not have exactly 3 elements"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn keccak256_hash() -> () {
-        todo!()
+    pub fn sys_auth_token_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            match args.as_slice() {
+                [first_par, argument, ack] => {
+                    if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
+                        if str == "check".to_string() {
+                            Some(())
+                        } else {
+                            None
+                        }
+                    }) {
+                        let response: Expr = if let Some(_) = RhoByteArray::unapply(&argument) {
+                            RhoBoolean::create_expr(true)
+                        } else {
+                            RhoBoolean::create_expr(false)
+                        };
+                        let _ =
+                            produce(vec![Par::default().with_exprs(vec![response])], ack.clone());
+                    } else {
+                        panic!("Expected args did not match any case");
+                    }
+                }
+
+                _ => panic!("args does not have exactly 3 elements"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn blake2b256_hash() -> () {
-        todo!()
+    pub fn secp256k1_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        self.verify_signature_contract(contract_args, "secp256k1Verify", Box::new(Secp256k1))
     }
 
-    pub fn get_block_data(block_data: &BlockData) -> () {
-        todo!()
+    pub fn ed25519_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        self.verify_signature_contract(contract_args, "ed25519Verify", Box::new(Ed25519))
     }
 
-    pub fn invalid_blocks(invalid_blocks: &InvalidBlocks) -> () {
-        todo!()
+    pub fn sha256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        self.hash_contract(contract_args, "sha256Hash", Box::new(Sha256Hasher::hash))
     }
 
-    pub fn rev_address() -> () {
-        todo!()
+    pub fn keccak256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        self.hash_contract(contract_args, "keccak256Hash", Box::new(Keccak256::hash))
     }
 
-    pub fn deployer_id_ops() -> () {
-        todo!()
+    pub fn blake2b256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+        self.hash_contract(contract_args, "blake2b256Hash", Box::new(Blake2b256::hash))
     }
 
-    pub fn registry_ops() -> () {
-        todo!()
+    pub fn get_block_data(
+        &self,
+        contract_args: Vec<ListParWithRandom>,
+        block_data: Arc<RwLock<BlockData>>,
+    ) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            if args.len() == 1 {
+                let data = block_data.read().unwrap();
+                let _ = produce(
+                    vec![
+                        Par::default().with_exprs(vec![RhoNumber::create_expr(data.block_number)]),
+                        Par::default().with_exprs(vec![RhoNumber::create_expr(data.time_stamp)]),
+                        RhoByteArray::create_par(data.sender.bytes.clone()),
+                    ],
+                    args[0].clone(),
+                );
+            } else {
+                panic!("blockData expects only a return channel");
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 
-    pub fn sys_auth_token_ops() -> () {
-        todo!()
+    pub fn invalid_blocks(
+        &self,
+        contract_args: Vec<ListParWithRandom>,
+        invalid_blocks: &InvalidBlocks,
+    ) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
+            if args.len() == 1 {
+                let invalid_blocks: Par = invalid_blocks.invalid_blocks.read().unwrap().clone();
+
+                let _ = produce(vec![invalid_blocks], args[0].clone());
+            } else {
+                panic!("invalidBlocks expects only a return channel");
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
     }
 }
