@@ -6,7 +6,7 @@ use super::signatures_alg::SignaturesAlg;
 pub struct Secp256k1;
 
 impl SignaturesAlg for Secp256k1 {
-    fn verify(&self, data: Vec<u8>, signature: Vec<u8>, pub_key: Vec<u8>) -> bool {
+    fn verify(&self, data: &[u8], signature: &[u8], pub_key: Vec<u8>) -> bool {
         todo!()
     }
 
