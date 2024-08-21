@@ -733,6 +733,7 @@ dependencies = [
 name = "models"
 version = "0.1.0"
 dependencies = [
+ "crypto",
  "prost",
  "prost-build",
  "serde",
@@ -1115,6 +1116,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "crypto",
+ "hex",
  "itertools 0.10.5",
  "models",
  "rspace_plus_plus",

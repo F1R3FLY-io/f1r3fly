@@ -81,35 +81,35 @@ impl SpatialMatcher<Par, Connective> for SpatialMatcherContext {
 
             Some(VarRefBody(_)) => None,
 
-            Some(ConnBool(_)) => match single_expr(target) {
+            Some(ConnBool(_)) => match single_expr(&target) {
                 Some(Expr {
                     expr_instance: Some(GBool(_)),
                 }) => Some(()),
                 _ => None,
             },
 
-            Some(ConnInt(_)) => match single_expr(target) {
+            Some(ConnInt(_)) => match single_expr(&target) {
                 Some(Expr {
                     expr_instance: Some(GInt(_)),
                 }) => Some(()),
                 _ => None,
             },
 
-            Some(ConnString(_)) => match single_expr(target) {
+            Some(ConnString(_)) => match single_expr(&target) {
                 Some(Expr {
                     expr_instance: Some(GString(_)),
                 }) => Some(()),
                 _ => None,
             },
 
-            Some(ConnUri(_)) => match single_expr(target) {
+            Some(ConnUri(_)) => match single_expr(&target) {
                 Some(Expr {
                     expr_instance: Some(GUri(_)),
                 }) => Some(()),
                 _ => None,
             },
 
-            Some(ConnByteArray(_)) => match single_expr(target) {
+            Some(ConnByteArray(_)) => match single_expr(&target) {
                 Some(Expr {
                     expr_instance: Some(GByteArray(_)),
                 }) => {

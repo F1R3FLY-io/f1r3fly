@@ -1,7 +1,9 @@
 use models::rhoapi::expr::ExprInstance::EMapBody;
+use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
 use models::rhoapi::{EMap, KeyValuePair};
 use models::rust::block_hash::BlockHash;
+use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
@@ -11,14 +13,14 @@ use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::trace::Log;
 use rspace_plus_plus::rspace::util::unpack_option;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use super::accounting::costs::Cost;
 use super::accounting::has_cost::{CostState, HasCost};
 use super::env::Env;
 use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
 use super::reduce::{DebruijnInterpreter, Reduce};
-use super::system_processes::{BlockData, InvalidBlocks};
+use super::system_processes::{Arity, BlockData, BodyRef, InvalidBlocks, Name, Remainder};
 use models::rhoapi::expr::ExprInstance::GByteArray;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
@@ -405,11 +407,43 @@ impl HasCost for ReplayRhoRuntimeImpl {
     }
 }
 
-pub type RhoTuplespace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
+pub type RhoTuplespace =
+    Arc<Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
 pub type RhoISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 pub type RhoReplayISpace = RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
 pub type RhoHistoryRepository =
     HistoryRepositoryImpl<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 
-    
+fn introduce_system_process(
+    mut spaces: Vec<RhoTuplespace>,
+    processes: Vec<(Name, Arity, Remainder, BodyRef)>,
+) -> Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> {
+    let mut results = Vec::new();
+
+    for (name, arity, remainder, body_ref) in processes {
+        let channels = vec![name];
+        let patterns = vec![BindPattern {
+            patterns: (0..arity).map(|i| new_freevar_par(i, Vec::new())).collect(),
+            remainder,
+            free_count: arity,
+        }];
+
+        let continuation = TaggedContinuation {
+            tagged_cont: Some(TaggedCont::ScalaBodyRef(body_ref)),
+        };
+
+        for space in &mut spaces {
+            let result = space.lock().unwrap().install(
+                channels.clone(),
+                patterns.clone(),
+                continuation.clone(),
+            );
+            results.push(result);
+        }
+    }
+
+    results
+}
+
+// fn std_system_processes() -> Vec<De>

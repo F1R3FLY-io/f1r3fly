@@ -1,29 +1,29 @@
 use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
 
-// See crypto/src/main/scala/coop/rchain/crypto/PublicKey.scala
+// See crypto/src/main/scala/coop/rchain/crypto/PrivateKey.scala
 #[derive(Debug, Clone)]
-pub struct PublicKey {
+pub struct PrivateKey {
     pub bytes: Vec<u8>,
 }
 
-impl PublicKey {
+impl PrivateKey {
     pub fn new(bytes: Vec<u8>) -> Self {
-        PublicKey { bytes }
+        PrivateKey { bytes }
     }
 
     pub fn from_bytes(bs: &[u8]) -> Self {
-        PublicKey::new(bs.to_vec())
+        PrivateKey::new(bs.to_vec())
     }
 }
 
-impl PartialEq for PublicKey {
+impl PartialEq for PrivateKey {
     fn eq(&self, other: &Self) -> bool {
         self.bytes == other.bytes
     }
 }
 
-impl Hash for PublicKey {
+impl Hash for PrivateKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.bytes.hash(state);
     }

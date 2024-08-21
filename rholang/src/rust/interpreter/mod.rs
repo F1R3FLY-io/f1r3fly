@@ -1,9 +1,12 @@
 pub mod accounting;
+pub mod contract_call;
 pub mod dispatch;
 pub mod env;
 pub mod errors;
 pub mod interpreter;
 pub mod matcher;
+pub mod pretty_printer;
 pub mod reduce;
 pub mod rho_runtime;
+pub mod rho_type;
 pub mod system_processes;
