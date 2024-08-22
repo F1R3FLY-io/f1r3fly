@@ -17,11 +17,11 @@ pub trait Reduce {
 }
 
 pub struct DebruijnInterpreter {
-    space: RhoTuplespace,
-    dispatcher: Box<dyn Fn() -> RholangAndRustDispatcher>,
-    urn_map: HashMap<String, Par>,
-    merg_chs: Arc<RwLock<HashSet<Par>>>,
-    mergeable_tag_name: Par,
+    pub space: RhoTuplespace,
+    pub dispatcher: RholangAndRustDispatcher,
+    pub urn_map: HashMap<String, Par>,
+    pub merge_chs: Arc<RwLock<HashSet<Par>>>,
+    pub mergeable_tag_name: Par,
 }
 
 impl Reduce for DebruijnInterpreter {

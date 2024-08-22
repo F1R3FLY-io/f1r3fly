@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
-
 use crypto::rust::hash::blake2b256::Blake2b256;
 use crypto::rust::hash::keccak256::Keccak256;
 use crypto::rust::hash::sha_256::Sha256Hasher;
@@ -8,9 +6,12 @@ use crypto::rust::signatures::ed25519::Ed25519;
 use crypto::rust::signatures::secp256k1::Secp256k1;
 use crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
+use models::rhoapi::Expr;
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::{RhoDispatch, RholangAndRustDispatcher};
@@ -21,20 +22,28 @@ use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
 };
 use super::util::rev_address::RevAddress;
-use models::rhoapi::Expr;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
+pub type RhoSysFunction = Box<dyn Fn(Vec<ListParWithRandom>) -> ()>;
+pub type RhoDispatchMap = HashMap<i64, RhoSysFunction>;
 pub type Name = Par;
 pub type Arity = i32;
 pub type Remainder = Option<Var>;
 pub type BodyRef = i64;
 pub type Contract = dyn Fn(Vec<ListParWithRandom>) -> ();
 
+#[derive(Clone)]
 pub struct InvalidBlocks {
-    invalid_blocks: Arc<RwLock<Par>>,
+    pub invalid_blocks: Arc<RwLock<Par>>,
 }
 impl InvalidBlocks {
+    pub fn new() -> Self {
+        InvalidBlocks {
+            invalid_blocks: Arc::new(RwLock::new(Par::default())),
+        }
+    }
+
     pub fn set_params(&self, invalid_blocks: Par) -> () {
         let mut lock: RwLockWriteGuard<Par> = self.invalid_blocks.write().unwrap();
 
@@ -159,20 +168,20 @@ impl BodyRefs {
 }
 
 pub struct ProcessContext {
-    space: RhoTuplespace,
-    dispatcher: RhoDispatch,
-    block_data: Arc<RwLock<BlockData>>,
-    invalid_blocks: InvalidBlocks,
-    system_processes: SystemProcesses,
+    pub space: RhoTuplespace,
+    pub dispatcher: RhoDispatch,
+    pub block_data: Arc<RwLock<BlockData>>,
+    pub invalid_blocks: InvalidBlocks,
+    pub system_processes: SystemProcesses,
 }
 
 pub struct Definition {
-    urn: String,
-    fixed_channel: Name,
-    arity: Arity,
-    body_ref: BodyRef,
-    handler: fn(&ProcessContext) -> fn(Vec<ListParWithRandom>) -> (),
-    remainder: Remainder,
+    pub urn: String,
+    pub fixed_channel: Name,
+    pub arity: Arity,
+    pub body_ref: BodyRef,
+    pub handler: Box<dyn Fn(ProcessContext) -> Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>,
+    pub remainder: Remainder,
 }
 
 impl Definition {
@@ -181,7 +190,7 @@ impl Definition {
         fixed_channel: Name,
         arity: Arity,
         body_ref: BodyRef,
-        handler: fn(&ProcessContext) -> fn(Vec<ListParWithRandom>) -> (),
+        handler: Box<dyn Fn(ProcessContext) -> Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>,
         remainder: Remainder,
     ) -> Self {
         Definition {
@@ -196,8 +205,8 @@ impl Definition {
 
     pub fn to_dispatch_table(
         &self,
-        context: &ProcessContext,
-    ) -> (BodyRef, fn(Vec<ListParWithRandom>) -> ()) {
+        context: ProcessContext,
+    ) -> (BodyRef, Box<dyn Fn(Vec<ListParWithRandom>) -> ()>) {
         (self.body_ref, (self.handler)(context))
     }
 
@@ -249,8 +258,8 @@ impl BlockData {
 }
 
 pub struct SystemProcesses {
-    dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
-    space: RhoTuplespace,
+    pub dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
+    pub space: RhoTuplespace,
 }
 
 impl SystemProcesses {

@@ -1138,6 +1138,7 @@ dependencies = [
  "crypto",
  "hex",
  "itertools 0.10.5",
+ "lazy_static",
  "models",
  "prost",
  "rspace_plus_plus",
