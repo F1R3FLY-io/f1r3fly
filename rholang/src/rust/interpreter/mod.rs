@@ -10,5 +10,6 @@ pub mod reduce;
 pub mod registry;
 pub mod rho_runtime;
 pub mod rho_type;
+pub mod storage;
 pub mod system_processes;
 pub mod util;

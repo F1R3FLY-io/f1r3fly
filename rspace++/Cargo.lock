@@ -280,6 +280,7 @@ name = "crypto"
 version = "0.1.0"
 dependencies = [
  "blake2",
+ "rand",
  "sha2",
  "tiny-keccak",
 ]

@@ -1,22 +1,19 @@
-use std::sync::{Arc, Mutex};
-use tokio::sync::Semaphore;
-
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/HasCost.scala
+// See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/package.scala
+
+use std::sync::{Arc, Mutex};
+
+use super::costs::Cost;
+
 // _cost = CostState
 pub trait HasCost {
     fn cost(&self) -> &CostState;
 }
 
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/package.scala
-pub struct Cost {
-    value: i64,
-}
-
 #[derive(Clone)]
 pub struct CostState {
-    cost: Arc<Mutex<Cost>>,
-
-    semaphore: Arc<Semaphore>,
+    pub cost: Arc<Mutex<Cost>>,
+    pub permits: usize,
 }
 
 impl CostState {
@@ -24,36 +21,34 @@ impl CostState {
         CostState {
             cost: Arc::new(Mutex::new(Cost {
                 value: initial_value,
+                operation: "".to_string(),
             })),
 
-            semaphore: Arc::new(Semaphore::new(permits)),
+            permits,
         }
     }
 
-    pub async fn acquire(&self, _n: usize) {
-        let _permit = self.semaphore.acquire().await.unwrap();
-
-        // Permit acquired
+    pub fn acquire(&self, _n: usize) {
+        // In a non-async context, we can simply use the permits value directly
+        // Here you can implement your own logic for handling permits if needed
+        // For now, this function does nothing
     }
 
-    pub async fn get(&self) -> i64 {
+    pub fn get(&self) -> i64 {
         let cost = self.cost.lock().unwrap();
-
         cost.value
     }
 
-    pub async fn modify<F>(&self, f: F)
+    pub fn modify<F>(&self, f: F)
     where
         F: FnOnce(&mut Cost),
     {
         let mut cost = self.cost.lock().unwrap();
-
         f(&mut cost);
     }
 
-    pub async fn set(&self, new_cost: Cost) {
+    pub fn set(&self, new_cost: Cost) {
         let mut cost = self.cost.lock().unwrap();
-
         *cost = new_cost;
     }
 }
