@@ -6,7 +6,7 @@ use std::{
 use models::rhoapi::Par;
 use models::rhoapi::{ListParWithRandom, TaggedContinuation};
 
-use super::{reduce::DebruijnInterpreter, rho_runtime::RhoTuplespace};
+use super::{errors::InterpreterError, reduce::DebruijnInterpreter, rho_runtime::RhoTuplespace};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala
 pub trait Dispatch<A, K> {
@@ -47,7 +47,7 @@ impl RholangAndRustDispatcher {
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
-    ) -> () {
+    ) -> Result<(), InterpreterError> {
         todo!()
     }
 }

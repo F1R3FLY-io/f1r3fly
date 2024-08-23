@@ -22,6 +22,7 @@ hex = "0.4.3"
 prost = "0.12.4"
 zbase32 = "0.1.2"
 lazy_static = "1.5.0"
+futures = "0.3.30"
 
 [build-dependencies]
 cc = "1.0"

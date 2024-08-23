@@ -1134,6 +1134,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "crypto",
+ "futures",
  "hex",
  "itertools 0.10.5",
  "lazy_static",

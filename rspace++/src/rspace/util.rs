@@ -22,3 +22,24 @@ pub fn unpack_tuple<C, P, K: Clone, R: Clone>(
         ),
     }
 }
+
+pub fn unpack_option_with_peek<C, P, K, R>(
+    v: Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, R>>)>,
+) -> Option<(K, Vec<(C, R, R, bool)>, bool)> {
+    v.map(unpack_tuple_with_peek)
+}
+
+pub fn unpack_tuple_with_peek<C, P, K, R>(
+    v: (ContResult<C, P, K>, Vec<RSpaceResult<C, R>>),
+) -> (K, Vec<(C, R, R, bool)>, bool) {
+    let (cont_result, data) = v;
+
+    let ContResult { continuation, .. } = cont_result;
+
+    let mapped_data: Vec<(C, R, R, bool)> = data
+        .into_iter()
+        .map(|d| (d.channel, d.matched_datum, d.removed_datum, d.persistent))
+        .collect();
+
+    (continuation, mapped_data, cont_result.peek)
+}
