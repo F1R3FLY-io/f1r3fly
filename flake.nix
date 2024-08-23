@@ -98,6 +98,11 @@
               package = dhall-yaml;
               help = "Dhall-to-YAML utility";
             }
+            {
+              name = "tree-sitter";
+              package = tree-sitter;
+              help = "Parser generator tool and incremental parsing library";
+            }
           ];
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";
