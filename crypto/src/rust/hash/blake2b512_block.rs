@@ -24,6 +24,9 @@ inner hash length to 64.
 This class is an abbreviated version of Blake2bDigest.java from BouncyCastle
 https://github.com/bcgit/bc-java/blob/master/core/src/main/java/org/bouncycastle/crypto/digests/Blake2bDigest.java
   */
+
+// TODO: REVIEW
+#[derive(Clone)]
 pub struct Blake2b512Block {
     chain_value: [u64; 8],
     t0: u64,

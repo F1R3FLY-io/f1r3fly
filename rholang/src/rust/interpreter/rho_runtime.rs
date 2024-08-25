@@ -31,6 +31,7 @@ use super::accounting::costs::Cost;
 use super::accounting::has_cost::{CostState, HasCost};
 use super::dispatch::RholangAndRustDispatcher;
 use super::env::Env;
+use super::errors::InterpreterError;
 use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
 use super::reduce::{DebruijnInterpreter, Reduce};
 use super::registry::registry_bootstrap::ast;
@@ -74,7 +75,7 @@ pub trait RhoRuntime: HasCost {
      * @param rand random seed for rholang execution
      * @return
      */
-    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> ();
+    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> Result<(), InterpreterError>;
 
     /**
      * After some executions([[evaluate]]) on the runtime, you can create a soft checkpoint which is the changes
@@ -205,7 +206,12 @@ impl RhoRuntime for RhoRuntimeImpl {
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
     }
 
-    fn inj(&self, par: Par, _env: Env<Par>, rand: Blake2b512Random) -> () {
+    fn inj(
+        &self,
+        par: Par,
+        _env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
         self.reducer.inj(par, rand)
     }
 
@@ -364,7 +370,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
     }
 
-    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> () {
+    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> Result<(), InterpreterError> {
         self.reducer.inj(par, rand)
     }
 

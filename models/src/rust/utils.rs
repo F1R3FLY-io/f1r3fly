@@ -87,6 +87,15 @@ impl Par {
             ..self.clone()
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.sends.is_empty()
+            && self.receives.is_empty()
+            && self.news.is_empty()
+            && self.matches.is_empty()
+            && self.bundles.is_empty()
+            && self.exprs.is_empty()
+    }
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/package.scala - FreeMap
