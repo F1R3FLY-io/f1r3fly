@@ -3,8 +3,7 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::BindPattern;
-use models::rhoapi::ParWithRandom;
+use models::rhoapi::{BindPattern, Bundle, Expr, Match, New, ParWithRandom, Receive, Send, Var};
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::BTreeSet;
@@ -13,6 +12,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use super::errors::InterpreterError;
+use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
 
 /**
@@ -47,32 +47,49 @@ impl Reduce for DebruijnInterpreter {
         env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // Par = GeneratedMessage
-        let terms: Vec<Par> = vec![
-            Par::default().with_sends(par.sends),
-            Par::default().with_receives(par.receives),
-            Par::default().with_news(par.news),
-            Par::default().with_matches(par.matches),
-            Par::default().with_bundles(par.bundles),
-            Par::default().with_exprs(
-                par.exprs
-                    .into_iter()
-                    .filter(|expr| match &expr.expr_instance {
-                        Some(expr_instance) => match expr_instance {
-                            ExprInstance::EVarBody(_) => true,
-                            ExprInstance::EMethodBody(_) => true,
-                            _ => false,
-                        },
-                        None => false,
-                    })
-                    .collect(),
-            ),
+        let terms: Vec<GeneratedMessage> = vec![
+            par.sends
+                .into_iter()
+                .map(GeneratedMessage::Send)
+                .collect::<Vec<_>>(),
+            par.receives
+                .into_iter()
+                .map(GeneratedMessage::Receive)
+                .collect(),
+            par.news.into_iter().map(GeneratedMessage::New).collect(),
+            par.matches
+                .into_iter()
+                .map(GeneratedMessage::Match)
+                .collect(),
+            par.bundles
+                .into_iter()
+                .map(GeneratedMessage::Bundle)
+                .collect(),
+            par.exprs
+                .into_iter()
+                .filter(|expr| match &expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EVarBody(_) => true,
+                        ExprInstance::EMethodBody(_) => true,
+                        _ => false,
+                    },
+                    None => false,
+                })
+                .collect::<Vec<Expr>>()
+                .into_iter()
+                .map(GeneratedMessage::Expr)
+                .collect(),
         ]
         .into_iter()
         .filter(|vec| !vec.is_empty())
+        .flatten()
         .collect();
 
-        let split = |id: i32| {
+        fn split(
+            id: i32,
+            terms: &Vec<GeneratedMessage>,
+            rand: Blake2b512Random,
+        ) -> Blake2b512Random {
             if terms.len() == 1 {
                 rand
             } else if terms.len() > 256 {
@@ -80,7 +97,7 @@ impl Reduce for DebruijnInterpreter {
             } else {
                 rand.split_byte(id.try_into().unwrap())
             }
-        };
+        }
 
         let term_split_limit = i16::MAX;
         if terms.len() > term_split_limit.try_into().unwrap() {
@@ -96,9 +113,12 @@ impl Reduce for DebruijnInterpreter {
                 terms
                     .iter()
                     .enumerate()
-                    // .map(|(index, term)| self.eval(term.clone(), env, split(index.try_into().unwrap())))
                     .map(|(index, term)| {
-                        Box::pin(self.private_eval())
+                        Box::pin(self.generated_message_eval(
+                            term,
+                            env.clone(),
+                            split(index.try_into().unwrap(), &terms, rand.clone()),
+                        ))
                             as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
                     })
                     .collect();
@@ -374,7 +394,118 @@ impl DebruijnInterpreter {
         }
     }
 
-    async fn private_eval(&self) -> Result<(), InterpreterError> {
+    async fn generated_message_eval(
+        &self,
+        term: &GeneratedMessage,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        match term {
+            GeneratedMessage::Send(term) => self.send_eval(term, env, rand),
+            GeneratedMessage::Receive(term) => self.receive_eval(term, env, rand),
+            GeneratedMessage::New(term) => self.new_eval(term, env, rand),
+            GeneratedMessage::Match(term) => self.match_eval(term, env, rand),
+            GeneratedMessage::Bundle(term) => self.bundle_eval(term, env, rand),
+            GeneratedMessage::Expr(term) => match &term.expr_instance {
+                Some(expr_instance) => match expr_instance {
+                    ExprInstance::EVarBody(e) => {
+                        let res = self.var_eval(&e.clone().v.unwrap(), &env, &rand)?;
+                        self.eval(res, env, rand).await
+                    }
+                    ExprInstance::EMethodBody(e) => {
+                        let res = self.eval_expr_to_par(
+                            &Expr {
+                                expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
+                            },
+                            &env,
+                            &rand,
+                        )?;
+                        self.eval(res, env, rand).await
+                    }
+                    other => Err(InterpreterError::BugFoundError(format!(
+                        "Undefined term: {:?}",
+                        other
+                    ))),
+                },
+                None => Err(InterpreterError::BugFoundError(format!(
+                    "Undefined term, expr_instance was None"
+                ))),
+            },
+        }
+    }
+
+    /** Algorithm as follows:
+     *
+     * 1. Fully evaluate the channel in given environment.
+     * 2. Substitute any variable references in the channel so that it can be
+     *    correctly used as a key in the tuple space.
+     * 3. Evaluate any top level expressions in the data being sent.
+     * 4. Call produce
+     *
+     * @param send An output process
+     * @param env An execution context
+     *
+     */
+    fn send_eval(
+        &self,
+        send: &Send,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+
+    fn receive_eval(
+        &self,
+        send: &Receive,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+
+    fn new_eval(
+        &self,
+        send: &New,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+
+    fn match_eval(
+        &self,
+        send: &Match,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+
+    fn bundle_eval(
+        &self,
+        send: &Bundle,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+
+    fn var_eval(
+        &self,
+        send: &Var,
+        env: &Env<Par>,
+        rand: &Blake2b512Random,
+    ) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+
+    fn eval_expr_to_par(
+        &self,
+        send: &Expr,
+        env: &Env<Par>,
+        rand: &Blake2b512Random,
+    ) -> Result<Par, InterpreterError> {
         todo!()
     }
 }

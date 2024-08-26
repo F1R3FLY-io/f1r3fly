@@ -39,7 +39,6 @@ impl SpatialMatcherContext {
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - connectiveMatcher
-// PARTIALLY IMPLEMENTED
 impl SpatialMatcher<Par, Connective> for SpatialMatcherContext {
     fn spatial_match(&mut self, target: Par, pattern: Connective) -> Option<()> {
         // println!("\nHit Par, Connective");
