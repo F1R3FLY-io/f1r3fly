@@ -1,7 +1,6 @@
 // See See rholang/src/main/scala/coop/rchain/rholang/interpreter/Reduce.scala
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use futures::future;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::BindPattern;
@@ -20,11 +19,15 @@ use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuples
  * Reduce is the interface for evaluating Rholang expressions.
  */
 pub trait Reduce {
-    fn eval(&self, par: Par, env: Env<Par>, rand: Blake2b512Random)
-        -> Result<(), InterpreterError>;
+    async fn eval(
+        &self,
+        par: Par,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError>;
 
-    fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.eval(par, Env::new(), rand)
+    async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
+        self.eval(par, Env::new(), rand).await
     }
 }
 
@@ -38,7 +41,7 @@ pub struct DebruijnInterpreter {
 }
 
 impl Reduce for DebruijnInterpreter {
-    fn eval(
+    async fn eval(
         &self,
         par: Par,
         env: Env<Par>,
@@ -79,18 +82,36 @@ impl Reduce for DebruijnInterpreter {
             }
         };
 
-        // let term_split_limit = i16::MAX;
-        // if terms.len() > term_split_limit.try_into().unwrap() {
-        //     Err(InterpreterError::ReduceError(format!(
-        //         "The number of terms in the Par is {}, which exceeds the limit of {}",
-        //         terms.len(),
-        //         term_split_limit
-        //     )));
-        // } else {
-        //     // Collect errors from all parallel execution paths (pars)
-        //     self.par_traverse_safe(terms.iter().enumerate().collect(), self.eval(term, env, split(index))
-        // }
-        todo!()
+        let term_split_limit = i16::MAX;
+        if terms.len() > term_split_limit.try_into().unwrap() {
+            Err(InterpreterError::ReduceError(format!(
+                "The number of terms in the Par is {}, which exceeds the limit of {}",
+                terms.len(),
+                term_split_limit
+            )))
+        } else {
+            // Collect errors from all parallel execution paths (pars)
+            // parTraverseSafe
+            let futures: Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>> =
+                terms
+                    .iter()
+                    .enumerate()
+                    // .map(|(index, term)| self.eval(term.clone(), env, split(index.try_into().unwrap())))
+                    .map(|(index, term)| {
+                        Box::pin(self.private_eval())
+                            as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
+                    })
+                    .collect();
+
+            let results: Vec<Result<(), InterpreterError>> =
+                futures::future::join_all(futures).await;
+            let flattened_results: Vec<InterpreterError> = results
+                .into_iter()
+                .filter_map(|result| result.err())
+                .collect();
+
+            self.aggregate_evaluator_errors(flattened_results)
+        }
     }
 }
 
@@ -120,7 +141,7 @@ impl DebruijnInterpreter {
         chan: Par,
         data: ListParWithRandom,
         persistent: bool,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>> {
+    ) -> Result<(), InterpreterError> {
         self.update_mergeable_channels(&chan);
 
         let produce_result =
@@ -129,11 +150,13 @@ impl DebruijnInterpreter {
                 .unwrap()
                 .produce(chan.clone(), data.clone(), persistent);
 
-        Box::pin(self.proceed(
+        self.continue_produce_process(
             unpack_option_with_peek(produce_result),
-            self.produce(chan, data, persistent),
+            chan,
+            data,
             persistent,
-        ))
+        )
+        .await
     }
 
     async fn consume(
@@ -142,7 +165,7 @@ impl DebruijnInterpreter {
         body: ParWithRandom,
         persistent: bool,
         peek: bool,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>> {
+    ) -> Result<(), InterpreterError> {
         let (patterns, sources): (Vec<BindPattern>, Vec<Par>) = binds.clone().into_iter().unzip();
 
         // Update mergeable channels
@@ -164,35 +187,54 @@ impl DebruijnInterpreter {
             },
         );
 
-        Box::pin(self.proceed(
+        self.continue_consume_process(
             unpack_option_with_peek(consume_result),
-            self.consume(binds, body, persistent, peek),
+            binds,
+            body,
             persistent,
-        ))
+            peek,
+        )
+        .await
     }
 
-    // proceed is alias for 'continue'
-    // TODO: Try to remove cloning self here
-    async fn proceed(
+    async fn continue_produce_process(
         &self,
         res: Application,
-        repeat_op: Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+        chan: Par,
+        data: ListParWithRandom,
         persistent: bool,
     ) -> Result<(), InterpreterError> {
         match res {
             Some((continuation, data_list, peek)) => {
                 if persistent {
-                    self.clone()
-                        .dispatch_and_run(continuation, data_list, vec![repeat_op])
-                        .await
+                    // dispatchAndRun
+                    let mut futures: Vec<
+                        Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+                    > = vec![Box::pin(self.dispatch(continuation, data_list.clone()))];
+                    futures.push(Box::pin(self.produce(chan, data, persistent)));
+
+                    // parTraverseSafe
+                    let results: Vec<Result<(), InterpreterError>> =
+                        futures::future::join_all(futures).await;
+                    let flattened_results: Vec<InterpreterError> = results
+                        .into_iter()
+                        .filter_map(|result| result.err())
+                        .collect();
+
+                    self.aggregate_evaluator_errors(flattened_results)
                 } else if peek {
-                    self.clone()
-                        .dispatch_and_run(
-                            continuation,
-                            data_list.clone(),
-                            self.clone().produce_peeks(data_list).await,
-                        )
-                        .await
+                    // dispatchAndRun
+                    let futures = self.produce_peeks(data_list).await;
+
+                    // parTraverseSafe
+                    let results: Vec<Result<(), InterpreterError>> =
+                        futures::future::join_all(futures).await;
+                    let flattened_results: Vec<InterpreterError> = results
+                        .into_iter()
+                        .filter_map(|result| result.err())
+                        .collect();
+
+                    self.aggregate_evaluator_errors(flattened_results)
                 } else {
                     self.dispatch(continuation, data_list).await
                 }
@@ -201,44 +243,78 @@ impl DebruijnInterpreter {
         }
     }
 
-    // TODO: Review this method to make sure it follows Scala logic
-    async fn dispatch_and_run(
+    async fn continue_consume_process(
         &self,
-        continuation: TaggedContinuation,
-        data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
-        ops: Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>>,
+        res: Application,
+        binds: Vec<(BindPattern, Par)>,
+        body: ParWithRandom,
+        persistent: bool,
+        _peek: bool,
     ) -> Result<(), InterpreterError> {
-        let mut tasks: Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>> =
-            vec![self.dispatch(continuation.clone(), data_list.clone())];
+        match res {
+            Some((continuation, data_list, peek)) => {
+                if persistent {
+                    // dispatchAndRun
+                    let mut futures: Vec<
+                        Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+                    > = vec![Box::pin(self.dispatch(continuation, data_list.clone()))];
+                    futures.push(Box::pin(self.consume(binds, body, persistent, _peek)));
 
-        tasks.extend(ops);
+                    // parTraverseSafe
+                    let results: Vec<Result<(), InterpreterError>> =
+                        futures::future::join_all(futures).await;
+                    let flattened_results: Vec<InterpreterError> = results
+                        .into_iter()
+                        .filter_map(|result| result.err())
+                        .collect();
 
-        self.par_traverse_safe(tasks).await
+                    self.aggregate_evaluator_errors(flattened_results)
+                } else if peek {
+                    // dispatchAndRun
+                    let futures = self.produce_peeks(data_list).await;
+
+                    // parTraverseSafe
+                    let results: Vec<Result<(), InterpreterError>> =
+                        futures::future::join_all(futures).await;
+                    let flattened_results: Vec<InterpreterError> = results
+                        .into_iter()
+                        .filter_map(|result| result.err())
+                        .collect();
+
+                    self.aggregate_evaluator_errors(flattened_results)
+                } else {
+                    self.dispatch(continuation, data_list).await
+                }
+            }
+            None => Ok(()),
+        }
     }
 
-    // TODO: Review this method to make sure it follows Scala logic
-    fn dispatch(
+    async fn dispatch(
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>> {
-        self.dispatcher.dispatch(
-            continuation,
-            data_list.into_iter().map(|tuple| tuple.1).collect(),
-        )
+    ) -> Result<(), InterpreterError> {
+        self.dispatcher
+            .dispatch(
+                continuation,
+                data_list.into_iter().map(|tuple| tuple.1).collect(),
+            )
+            .await
     }
 
-    // TODO: Review this method to make sure it follows Scala logic
     async fn produce_peeks(
         &self,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>> + '_>>> {
-        let results: Vec<_> = data_list
+        data_list
             .into_iter()
             .filter(|(_, _, _, persist)| !persist)
-            .map(|(chan, _, removed_data, _)| self.produce(chan, removed_data, false))
-            .collect();
-        results
+            .map(|(chan, _, removed_data, _)| {
+                Box::pin(self.produce(chan, removed_data, false))
+                    as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
+            })
+            .collect()
     }
 
     /* Collect mergeable channels */
@@ -270,20 +346,6 @@ impl DebruijnInterpreter {
             .map_or(false, |head| head == &self.mergeable_tag_name)
     }
 
-    // TODO: Review this method to make sure it follows Scala logic
-    async fn par_traverse_safe(
-        &self,
-        xs: Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>>,
-    ) -> Result<(), InterpreterError> {
-        let results: Vec<Result<(), InterpreterError>> = futures::future::join_all(xs).await;
-        let flattened_results: Vec<InterpreterError> = results
-            .into_iter()
-            .filter_map(|result| result.err())
-            .collect();
-
-        self.aggregate_evaluator_errors(flattened_results)
-    }
-
     fn aggregate_evaluator_errors(
         &self,
         errors: Vec<InterpreterError>,
@@ -310,5 +372,9 @@ impl DebruijnInterpreter {
                 interpreter_errors: err_list.to_vec(),
             }),
         }
+    }
+
+    async fn private_eval(&self) -> Result<(), InterpreterError> {
+        todo!()
     }
 }

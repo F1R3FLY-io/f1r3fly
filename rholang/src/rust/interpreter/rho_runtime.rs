@@ -75,7 +75,12 @@ pub trait RhoRuntime: HasCost {
      * @param rand random seed for rholang execution
      * @return
      */
-    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> Result<(), InterpreterError>;
+    async fn inj(
+        &self,
+        par: Par,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError>;
 
     /**
      * After some executions([[evaluate]]) on the runtime, you can create a soft checkpoint which is the changes
@@ -206,13 +211,13 @@ impl RhoRuntime for RhoRuntimeImpl {
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
     }
 
-    fn inj(
+    async fn inj(
         &self,
         par: Par,
         _env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.reducer.inj(par, rand)
+        self.reducer.inj(par, rand).await
     }
 
     fn create_soft_checkpoint(
@@ -370,8 +375,13 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
     }
 
-    fn inj(&self, par: Par, env: Env<Par>, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.reducer.inj(par, rand)
+    async fn inj(
+        &self,
+        par: Par,
+        env: Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        self.reducer.inj(par, rand).await
     }
 
     fn create_soft_checkpoint(

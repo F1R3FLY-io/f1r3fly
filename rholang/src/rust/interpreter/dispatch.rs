@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    pin::Pin,
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -44,11 +43,11 @@ impl RholangAndRustDispatcher {
         (dispatcher, reducer)
     }
 
-    pub fn dispatch(
+    pub async fn dispatch(
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>> {
+    ) -> Result<(), InterpreterError> {
         todo!()
     }
 }
