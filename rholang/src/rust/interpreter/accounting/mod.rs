@@ -27,7 +27,7 @@ impl CostManager {
         }
     }
 
-    pub fn charge(&self, amount: i64) -> Result<(), InterpreterError> {
+    pub fn charge(&self, amount: Cost) -> Result<(), InterpreterError> {
         let permit = self
             .semaphore
             .try_acquire()
@@ -39,7 +39,7 @@ impl CostManager {
             return Err(InterpreterError::OutOfPhlogistonsError);
         }
 
-        current_cost.value -= amount;
+        current_cost.value -= amount.value;
 
         drop(permit);
 

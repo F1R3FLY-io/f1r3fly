@@ -5,6 +5,7 @@ use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{BindPattern, Bundle, Expr, Match, New, ParWithRandom, Receive, Send, Var};
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
+use models::rust::rholang::implicits::concatenate_pars;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
@@ -12,6 +13,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use super::accounting::_cost;
+use super::accounting::costs::{receive_eval_cost, send_eval_cost};
 use super::errors::InterpreterError;
 use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
@@ -39,7 +41,7 @@ pub struct DebruijnInterpreter {
     pub urn_map: HashMap<String, Par>,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
-    pub cost: _cost
+    pub cost: _cost,
 }
 
 impl Reduce for DebruijnInterpreter {
@@ -415,13 +417,9 @@ impl DebruijnInterpreter {
                         self.eval(res, env, rand).await
                     }
                     ExprInstance::EMethodBody(e) => {
-                        let res = self.eval_expr_to_par(
-                            &Expr {
-                                expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
-                            },
-                            &env,
-                            &rand,
-                        )?;
+                        let res = self.eval_expr_to_par(&Expr {
+                            expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
+                        })?;
                         self.eval(res, env, rand).await
                     }
                     other => Err(InterpreterError::BugFoundError(format!(
@@ -454,6 +452,9 @@ impl DebruijnInterpreter {
         env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        self.cost.charge(send_eval_cost());
+        let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap())?;
+        // let sub_chan =
         todo!()
     }
 
@@ -502,12 +503,30 @@ impl DebruijnInterpreter {
         todo!()
     }
 
-    fn eval_expr_to_par(
-        &self,
-        send: &Expr,
-        env: &Env<Par>,
-        rand: &Blake2b512Random,
-    ) -> Result<Par, InterpreterError> {
+    fn eval_expr_to_par(&self, send: &Expr) -> Result<Par, InterpreterError> {
         todo!()
+    }
+
+    /**
+     * Evaluate any top level expressions in @param Par .
+     */
+    fn eval_expr(&self, par: &Par) -> Result<Par, InterpreterError> {
+        let evaled_exprs = par
+            .exprs
+            .iter()
+            .map(|expr| self.eval_expr_to_par(expr))
+            .collect::<Result<Vec<_>, InterpreterError>>()?;
+        // Note: the locallyFree cache in par could now be invalid, but given
+        // that locallyFree is for use in the matcher, and the matcher uses
+        // substitution, it will resolve in that case. AlwaysEqual makes sure
+        // that this isn't an issue in the rest of cases.
+        let result = evaled_exprs
+            .into_iter()
+            .fold(par.with_exprs(Vec::new()), |acc, expr| {
+                // acc.exprs.iter().chain(expr.exprs.iter()).cloned().collect()
+                concatenate_pars(acc, expr)
+            });
+
+        Ok(result)
     }
 }

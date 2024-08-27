@@ -1,4 +1,7 @@
-use crate::rhoapi::{Expr, GUnforgeable, Par};
+use crate::{
+    rhoapi::{Expr, GUnforgeable, Par},
+    rust::utils::union,
+};
 
 // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - object VectorPar
 // Somehow they are not initializing 'locally_free' and 'connective_used' fields
@@ -50,5 +53,45 @@ pub fn single_unforgeable(p: &Par) -> Option<GUnforgeable> {
         }
     } else {
         None
+    }
+}
+
+pub fn concatenate_pars(p: Par, that: Par) -> Par {
+    Par {
+        sends: that.sends.iter().chain(p.sends.iter()).cloned().collect(),
+        receives: that
+            .receives
+            .iter()
+            .chain(p.receives.iter())
+            .cloned()
+            .collect(),
+        news: that.news.iter().chain(p.news.iter()).cloned().collect(),
+        exprs: that.exprs.iter().chain(p.exprs.iter()).cloned().collect(),
+        matches: that
+            .matches
+            .iter()
+            .chain(p.matches.iter())
+            .cloned()
+            .collect(),
+        unforgeables: that
+            .unforgeables
+            .iter()
+            .chain(p.unforgeables.iter())
+            .cloned()
+            .collect(),
+        bundles: that
+            .bundles
+            .iter()
+            .chain(p.bundles.iter())
+            .cloned()
+            .collect(),
+        connectives: that
+            .connectives
+            .iter()
+            .chain(p.connectives.iter())
+            .cloned()
+            .collect(),
+        locally_free: union(that.locally_free, p.locally_free),
+        connective_used: that.connective_used || p.connective_used,
     }
 }
