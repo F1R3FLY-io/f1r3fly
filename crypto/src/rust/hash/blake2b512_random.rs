@@ -1,5 +1,3 @@
-// See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Random.scala
-
 use super::blake2b512_block::Blake2b512Block;
 
 /** Blake2b512 based splittable and mergeable random number generator
@@ -11,6 +9,8 @@ use super::blake2b512_block::Blake2b512Block;
  *
  * TODO: REVIEW
  */
+
+// See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Random.scala
 
 #[derive(Clone)]
 pub struct Blake2b512Random {
@@ -81,5 +81,13 @@ impl Blake2b512Random {
             self.path_view.clear(); // Reset path_view
         }
         self.path_view.push(index);
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.digest.to_vec() // Assuming Blake2b512Block has a to_vec method
+    }
+
+    pub fn from_vec(data: Vec<u8>) -> Blake2b512Block {
+        Blake2b512Block::from_vec(data) // Assuming Blake2b512Block has a from_vec method
     }
 }

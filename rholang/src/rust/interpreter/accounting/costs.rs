@@ -26,6 +26,14 @@ impl Cost {
             operation: cost.operation,
         }
     }
+
+    // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Chargeable.scala
+    pub fn create_from_generic<A: prost::Message>(term: A, operation: String) -> Cost {
+        Cost {
+            value: term.encoded_len() as i64,
+            operation,
+        }
+    }
 }
 
 pub fn sum_cost() -> Cost {

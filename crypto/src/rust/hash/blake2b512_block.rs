@@ -163,4 +163,34 @@ impl Blake2b512Block {
         internal_state[pos_c] = internal_state[pos_c].wrapping_add(internal_state[pos_d]);
         internal_state[pos_b] = rotr64(internal_state[pos_b] ^ internal_state[pos_c], 63);
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut vec = Vec::with_capacity(8 * 3); // 8 u64 for chain_value, t0, t1
+
+        for &value in &self.chain_value {
+            vec.extend_from_slice(&value.to_le_bytes());
+        }
+
+        vec.extend_from_slice(&self.t0.to_le_bytes());
+        vec.extend_from_slice(&self.t1.to_le_bytes());
+
+        vec
+    }
+
+    pub fn from_vec(data: Vec<u8>) -> Blake2b512Block {
+        let mut chain_value = [0u64; 8];
+
+        for i in 0..8 {
+            chain_value[i] = u64::from_le_bytes(data[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
+
+        let t0 = u64::from_le_bytes(data[64..72].try_into().unwrap());
+        let t1 = u64::from_le_bytes(data[72..80].try_into().unwrap());
+
+        Blake2b512Block {
+            chain_value,
+            t0,
+            t1,
+        }
+    }
 }

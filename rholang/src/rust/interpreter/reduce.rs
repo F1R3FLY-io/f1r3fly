@@ -5,7 +5,7 @@ use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{BindPattern, Bundle, Expr, Match, New, ParWithRandom, Receive, Send, Var};
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
-use models::rust::rholang::implicits::concatenate_pars;
+use models::rust::rholang::implicits::{concatenate_pars, single_bundle};
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
@@ -13,8 +13,9 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use super::accounting::_cost;
-use super::accounting::costs::{receive_eval_cost, send_eval_cost};
+use super::accounting::costs::send_eval_cost;
 use super::errors::InterpreterError;
+use super::substitue::Substitute;
 use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
 
@@ -25,12 +26,12 @@ pub trait Reduce {
     async fn eval(
         &self,
         par: Par,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError>;
 
     async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.eval(par, Env::new(), rand).await
+        self.eval(par, &Env::new(), rand).await
     }
 }
 
@@ -42,13 +43,14 @@ pub struct DebruijnInterpreter {
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
     pub cost: _cost,
+    pub susbtitute: Substitute,
 }
 
 impl Reduce for DebruijnInterpreter {
     async fn eval(
         &self,
         par: Par,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         let terms: Vec<GeneratedMessage> = vec![
@@ -120,7 +122,7 @@ impl Reduce for DebruijnInterpreter {
                     .map(|(index, term)| {
                         Box::pin(self.generated_message_eval(
                             term,
-                            env.clone(),
+                            env,
                             split(index.try_into().unwrap(), &terms, rand.clone()),
                         ))
                             as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
@@ -401,11 +403,11 @@ impl DebruijnInterpreter {
     async fn generated_message_eval(
         &self,
         term: &GeneratedMessage,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         match term {
-            GeneratedMessage::Send(term) => self.send_eval(term, env, rand),
+            GeneratedMessage::Send(term) => self.send_eval(term, env, rand).await,
             GeneratedMessage::Receive(term) => self.receive_eval(term, env, rand),
             GeneratedMessage::New(term) => self.new_eval(term, env, rand),
             GeneratedMessage::Match(term) => self.match_eval(term, env, rand),
@@ -446,22 +448,54 @@ impl DebruijnInterpreter {
      * @param env An execution context
      *
      */
-    fn send_eval(
+    async fn send_eval(
         &self,
         send: &Send,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.cost.charge(send_eval_cost());
+        self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap())?;
-        // let sub_chan =
-        todo!()
+        let sub_chan = self.susbtitute.substitue_and_charge(eval_chan, 0, env)?;
+        let unbundled = match single_bundle(&sub_chan) {
+            Some(value) => {
+                if !value.write_flag {
+                    return Err(InterpreterError::ReduceError(
+                        "Trying to send on non-writeable channel.".to_string(),
+                    ));
+                } else {
+                    value.body.unwrap()
+                }
+            }
+            None => sub_chan,
+        };
+
+        let data = send
+            .data
+            .iter()
+            .map(|expr| self.eval_expr(expr))
+            .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+        let subst_data = data
+            .into_iter()
+            .map(|p| self.susbtitute.substitue_and_charge(p, 0, env))
+            .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+        self.produce(
+            unbundled,
+            ListParWithRandom {
+                pars: subst_data,
+                random_state: rand.to_vec(),
+            },
+            send.persistent,
+        )
+        .await
     }
 
     fn receive_eval(
         &self,
         send: &Receive,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         todo!()
@@ -470,7 +504,7 @@ impl DebruijnInterpreter {
     fn new_eval(
         &self,
         send: &New,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         todo!()
@@ -479,7 +513,7 @@ impl DebruijnInterpreter {
     fn match_eval(
         &self,
         send: &Match,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         todo!()
@@ -488,7 +522,7 @@ impl DebruijnInterpreter {
     fn bundle_eval(
         &self,
         send: &Bundle,
-        env: Env<Par>,
+        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         todo!()

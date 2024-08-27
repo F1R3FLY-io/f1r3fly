@@ -6,7 +6,10 @@ use std::{
 use models::rhoapi::Par;
 use models::rhoapi::{ListParWithRandom, TaggedContinuation};
 
-use super::{accounting::_cost, errors::InterpreterError, reduce::DebruijnInterpreter, rho_runtime::RhoTuplespace};
+use super::{
+    accounting::_cost, errors::InterpreterError, reduce::DebruijnInterpreter,
+    rho_runtime::RhoTuplespace, substitue::Substitute,
+};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala
 pub trait Dispatch<A, K> {
@@ -39,7 +42,8 @@ impl RholangAndRustDispatcher {
             urn_map,
             merge_chs,
             mergeable_tag_name,
-            cost,
+            cost: cost.clone(),
+            susbtitute: Substitute { cost },
         };
 
         (dispatcher, reducer)
