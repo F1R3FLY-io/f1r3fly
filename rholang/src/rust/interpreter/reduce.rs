@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
+use super::accounting::_cost;
 use super::errors::InterpreterError;
 use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
@@ -38,6 +39,7 @@ pub struct DebruijnInterpreter {
     pub urn_map: HashMap<String, Par>,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
+    pub cost: _cost
 }
 
 impl Reduce for DebruijnInterpreter {

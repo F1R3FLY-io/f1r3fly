@@ -26,9 +26,10 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crate::rust::interpreter::system_processes::{BodyRefs, FixedChannels};
 
+use super::accounting::_cost;
 use super::accounting::cost_accounting::CostAccounting;
 use super::accounting::costs::Cost;
-use super::accounting::has_cost::{CostState, HasCost};
+use super::accounting::has_cost::HasCost;
 use super::dispatch::RholangAndRustDispatcher;
 use super::env::Env;
 use super::errors::InterpreterError;
@@ -172,7 +173,7 @@ pub trait ReplayRhoRuntime: RhoRuntime {
 pub struct RhoRuntimeImpl {
     reducer: DebruijnInterpreter,
     space: RhoISpace,
-    cost: CostState,
+    cost: _cost,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks_param: InvalidBlocks,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -182,7 +183,7 @@ impl RhoRuntimeImpl {
     fn new(
         reducer: DebruijnInterpreter,
         space: RhoISpace,
-        cost: CostState,
+        cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -318,7 +319,7 @@ impl RhoRuntime for RhoRuntimeImpl {
 
 // TODO: Where is this implementation for the scala code?
 impl HasCost for RhoRuntimeImpl {
-    fn cost(&self) -> &CostState {
+    fn cost(&self) -> &_cost {
         todo!()
     }
 }
@@ -326,7 +327,7 @@ impl HasCost for RhoRuntimeImpl {
 pub struct ReplayRhoRuntimeImpl {
     reducer: DebruijnInterpreter,
     space: RhoISpace,
-    cost: CostState,
+    cost: _cost,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks_param: InvalidBlocks,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -336,7 +337,7 @@ impl ReplayRhoRuntimeImpl {
     pub fn new(
         reducer: DebruijnInterpreter,
         space: RhoReplayISpace,
-        cost: CostState,
+        cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -486,7 +487,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
 
 // TODO: Where is this implementation for the scala code?
 impl HasCost for ReplayRhoRuntimeImpl {
-    fn cost(&self) -> &CostState {
+    fn cost(&self) -> &_cost {
         todo!()
     }
 }
@@ -757,6 +758,7 @@ fn setup_reducer(
     urn_map: HashMap<String, Par>,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
+    cost: _cost,
 ) -> DebruijnInterpreter {
     let (replay_dispatcher, replay_reducer) = RholangAndRustDispatcher::create(
         charging_rspace.clone(),
@@ -764,6 +766,7 @@ fn setup_reducer(
         urn_map,
         merge_chs,
         mergeable_tag_name,
+        cost,
     );
 
     let replay_dispatch_table = dispatch_table_creator(
@@ -814,6 +817,7 @@ fn create_rho_env(
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
     extra_system_processes: &Vec<Definition>,
+    cost: _cost,
 ) -> (DebruijnInterpreter, Arc<RwLock<BlockData>>, InvalidBlocks) {
     let maps_and_refs = setup_maps_and_refs(&extra_system_processes);
     let (block_data_ref, invalid_blocks, urn_map, proc_defs) = maps_and_refs;
@@ -825,6 +829,7 @@ fn create_rho_env(
         urn_map,
         merge_chs,
         mergeable_tag_name,
+        cost,
     );
 
     let res = introduce_system_process(vec![rspace], proc_defs);
@@ -843,9 +848,11 @@ fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     let rand = bootstrap_rand();
     let runtime_lock = runtime.lock().unwrap();
     let cost = runtime_lock.cost().get();
-    let _ = runtime_lock.cost().set(Cost::unsafe_max());
+    let _ = runtime_lock
+        .cost()
+        .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
     let _ = runtime_lock.inj(ast(), Env::new(), rand);
-    let _ = runtime_lock.cost().set(Cost::create_from_i64(cost));
+    let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
 fn create_runtime(
@@ -866,6 +873,7 @@ fn create_runtime(
         merge_chs.clone(),
         mergeable_tag_name,
         extra_system_processes,
+        cost.clone(),
     );
 
     let (reducer, block_ref, invalid_blocks) = rho_env;
@@ -936,6 +944,7 @@ fn create_replay_rho_runtime(
         merge_chs.clone(),
         mergeable_tag_name,
         extra_system_processes,
+        cost.clone(),
     );
 
     let (reducer, block_ref, invalid_blocks) = rho_env;

@@ -12,6 +12,8 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Eq, Clone, Serialize, Deserialize, Hash, Arbitrary, Default)]
 pub struct Blake2b256Hash(pub Vec<u8>);
 
+pub const LENGTH: i64 = 32;
+
 impl Blake2b256Hash {
     pub fn new(data: &[u8]) -> Self {
         let mut hasher = Blake2b::<U32>::new();

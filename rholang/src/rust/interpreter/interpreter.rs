@@ -3,8 +3,8 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
+use super::accounting::_cost;
 use super::accounting::costs::Cost;
-use super::accounting::has_cost::CostState;
 use super::errors::InterpreterError;
 use super::reduce::DebruijnInterpreter;
 
@@ -27,7 +27,7 @@ pub trait Interpreter {
 }
 
 pub struct InterpreterImpl {
-    c: CostState,
+    c: _cost,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
@@ -45,7 +45,7 @@ impl Interpreter for InterpreterImpl {
 }
 
 impl InterpreterImpl {
-    pub fn new(cost: CostState, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
+    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
         InterpreterImpl { c: cost, merge_chs }
     }
 }
