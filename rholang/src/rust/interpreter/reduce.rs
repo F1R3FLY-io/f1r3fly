@@ -792,18 +792,120 @@ impl DebruijnInterpreter {
 
                 Ok(result_par)
             }
-            _ => Ok(Par::default().with_exprs(vec![self.eval_expr_to_expr(expr)?])),
+            _ => Ok(Par::default().with_exprs(vec![self.eval_expr_to_expr(expr, env)?])),
         }
     }
 
-    fn eval_expr_to_expr(&self, expr: &Expr) -> Result<Expr, InterpreterError> {
-        todo!()
+    fn eval_expr_to_expr(&self, expr: &Expr, env: &Env<Par>) -> Result<Expr, InterpreterError> {
+        let relop = |p1: &Par,
+                     p2: &Par,
+                     relopb: fn(bool, bool) -> bool,
+                     relopi: fn(i64, i64) -> bool,
+                     relops: fn(String, String) -> bool| {
+            let v1 = self.eval_single_expr(p1, env)?;
+            let v2 = self.eval_single_expr(p2, env)?;
+
+            match (
+                v1.expr_instance.clone().unwrap(),
+                v2.expr_instance.clone().unwrap(),
+            ) {
+                (ExprInstance::GBool(b1), ExprInstance::GBool(b2)) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBool(relopb(b1, b2))),
+                }),
+
+                (ExprInstance::GInt(i1), ExprInstance::GInt(i2)) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBool(relopi(i1, i2))),
+                }),
+
+                (ExprInstance::GString(s1), ExprInstance::GString(s2)) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBool(relops(s1, s2))),
+                }),
+
+                _ => Err(InterpreterError::ReduceError(format!(
+                    "Unexpected compare: {:?} vs. {:?}",
+                    v1, v2
+                ))),
+            }
+        };
+
+        match &expr.expr_instance {
+            Some(expr_instance) => match expr_instance {
+                ExprInstance::GBool(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBool(*x)),
+                }),
+                ExprInstance::GInt(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GInt(*x)),
+                }),
+                ExprInstance::GString(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GString(x.clone())),
+                }),
+                ExprInstance::GUri(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GUri(x.clone())),
+                }),
+                ExprInstance::GByteArray(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GByteArray(x.clone())),
+                }),
+
+                ExprInstance::ENotBody(enot) => {
+                    let b = self.eval_to_bool(&enot.p.as_ref().unwrap(), env)?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(!b)),
+                    })
+                }
+                ExprInstance::ENegBody(eneg) => {
+                    let v = self.eval_to_i64(&eneg.p.as_ref().unwrap(), env)?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GInt(-v)),
+                    })
+                }
+
+                ExprInstance::EMultBody(_) => todo!(),
+                ExprInstance::EDivBody(_) => todo!(),
+                ExprInstance::EPlusBody(_) => todo!(),
+                ExprInstance::EMinusBody(_) => todo!(),
+                ExprInstance::ELtBody(_) => todo!(),
+                ExprInstance::ELteBody(_) => todo!(),
+                ExprInstance::EGtBody(_) => todo!(),
+                ExprInstance::EGteBody(_) => todo!(),
+                ExprInstance::EEqBody(_) => todo!(),
+                ExprInstance::ENeqBody(_) => todo!(),
+                ExprInstance::EAndBody(_) => todo!(),
+                ExprInstance::EOrBody(_) => todo!(),
+                ExprInstance::EVarBody(_) => todo!(),
+                ExprInstance::EListBody(_) => todo!(),
+                ExprInstance::ETupleBody(_) => todo!(),
+                ExprInstance::ESetBody(_) => todo!(),
+                ExprInstance::EMapBody(_) => todo!(),
+                ExprInstance::EMethodBody(_) => todo!(),
+                ExprInstance::EMatchesBody(_) => todo!(),
+                ExprInstance::EPercentPercentBody(_) => todo!(),
+                ExprInstance::EPlusPlusBody(_) => todo!(),
+                ExprInstance::EMinusMinusBody(_) => todo!(),
+                ExprInstance::EModBody(_) => todo!(),
+            },
+            None => Err(InterpreterError::ReduceError(format!(
+                "Unimplemented expression: {:?}",
+                expr
+            ))),
+        }
     }
 
     fn method_table(&self) -> HashMap<String, impl Method> {
         let mut table = HashMap::new();
         table.insert("nth".to_string(), NthMethod);
         table
+    }
+
+    fn eval_single_expr(&self, p: &Par, env: &Env<Par>) -> Result<Expr, InterpreterError> {
+        todo!()
+    }
+
+    fn eval_to_i64(&self, p: &Par, env: &Env<Par>) -> Result<i64, InterpreterError> {
+        todo!()
+    }
+
+    fn eval_to_bool(&self, p: &Par, env: &Env<Par>) -> Result<bool, InterpreterError> {
+        todo!()
     }
 
     /**
