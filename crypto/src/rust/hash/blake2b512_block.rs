@@ -69,13 +69,34 @@ impl Blake2b512Block {
     }
 
     pub fn update(&mut self, block: &[u8], offset: usize) {
-        self.compress(block, offset, false, false, false);
+        let cv = &mut self.chain_value.clone();
+        self.compress(block, offset, cv, false, false, false);
     }
 
-    fn compress(
+    pub fn peek_final_root(
+        &mut self,
+        block: &[u8],
+        in_offset: usize,
+        output: &mut [u8],
+        out_offset: usize,
+    ) {
+        let mut temp_chain_value = [0u64; 8];
+        self.compress(block, in_offset, &mut temp_chain_value, true, true, true);
+        self.long_to_little_endian(&temp_chain_value, output, out_offset);
+    }
+
+    fn long_to_little_endian(&self, input: &[u64], output: &mut [u8], out_offset: usize) {
+        for (i, &value) in input.iter().enumerate() {
+            let start = out_offset + i * 8;
+            output[start..start + 8].copy_from_slice(&value.to_le_bytes());
+        }
+    }
+
+    pub fn compress(
         &mut self,
         msg: &[u8],
         offset: usize,
+        new_chain_value: &mut [u64; 8],
         peek: bool,
         finalize: bool,
         root_finalize: bool,
@@ -126,11 +147,13 @@ impl Blake2b512Block {
             self.t1 = new_t1;
 
             for i in 0..8 {
-                self.chain_value[i] ^= internal_state[i] ^ internal_state[i + 8];
+                new_chain_value[i] =
+                    self.chain_value[i] ^ internal_state[i] ^ internal_state[i + 8];
             }
         } else {
             for i in 0..8 {
-                self.chain_value[i] ^= internal_state[i] ^ internal_state[i + 8];
+                new_chain_value[i] =
+                    self.chain_value[i] ^ internal_state[i] ^ internal_state[i + 8];
             }
         }
     }

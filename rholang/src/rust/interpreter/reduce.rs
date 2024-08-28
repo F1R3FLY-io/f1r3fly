@@ -2,14 +2,17 @@
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::expr::ExprInstance;
+use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
-    BindPattern, Bundle, Expr, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
-    Var,
+    BindPattern, Bundle, Expr, GPrivate, GUnforgeable, Match, MatchCase, New, ParWithRandom,
+    Receive, ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle};
+use models::ByteString;
+use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
@@ -20,8 +23,11 @@ use crate::rust::interpreter::accounting::costs::match_eval_cost;
 use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
 use super::accounting::_cost;
-use super::accounting::costs::{receive_eval_cost, send_eval_cost, var_eval_cost};
+use super::accounting::costs::{
+    new_bindings_cost, receive_eval_cost, send_eval_cost, var_eval_cost,
+};
 use super::errors::InterpreterError;
+use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitue::Substitute;
 use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
@@ -416,9 +422,9 @@ impl DebruijnInterpreter {
         match term {
             GeneratedMessage::Send(term) => self.eval_send(term, env, rand).await,
             GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand).await,
-            GeneratedMessage::New(term) => self.eval_new(term, env, rand),
+            GeneratedMessage::New(term) => self.eval_new(term, env.clone(), rand).await,
             GeneratedMessage::Match(term) => self.eval_match(term, env, rand).await,
-            GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand),
+            GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand).await,
             GeneratedMessage::Expr(term) => match &term.expr_instance {
                 Some(expr_instance) => match expr_instance {
                     ExprInstance::EVarBody(e) => {
@@ -577,7 +583,7 @@ impl DebruijnInterpreter {
         }
     }
 
-    // TODO: review loop matches tailRecM
+    // TODO: review 'loop' matches 'tailRecM'
     async fn eval_match(
         &self,
         mat: &Match,
@@ -649,13 +655,82 @@ impl DebruijnInterpreter {
         first_match(subst_target, mat.cases.clone(), rand).await
     }
 
-    fn eval_new(
+    /**
+     * Adds neu.bindCount new GPrivate from UUID's to the environment and then
+     * proceeds to evaluate the body.
+     */
+    async fn eval_new(
         &self,
-        send: &New,
-        env: &Env<Par>,
-        rand: Blake2b512Random,
+        new: &New,
+        env: Env<Par>,
+        mut rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        todo!()
+        let mut alloc = |count: usize, urns: Vec<String>| {
+            let simple_news =
+                (0..(count - urns.len()))
+                    .into_iter()
+                    .fold(env.clone(), |mut _env: Env<Par>, _| {
+                        let addr: Par = Par::default().with_unforgeables(vec![GUnforgeable {
+                            unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
+                                id: ByteString::from(rand.next()),
+                            })),
+                        }]);
+                        _env.put(addr)
+                    });
+
+            let add_urn = |new_env: &mut Env<Par>, urn: String| {
+                if !self.urn_map.contains_key(&urn) {
+                    /** TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]]. */
+                    // If `urn` can't be found in `urnMap`, it must be referencing an injection
+                    match new.injections.get(&urn) {
+                      Some(p) => {
+                        if let Some(gunf) = RhoUnforgeable::unapply(p) {
+                          if let Some(instance) = gunf.unf_instance {
+                              Either::Right(new_env.put(Par::default().with_unforgeables(vec![GUnforgeable {unf_instance: Some(instance)}])))
+                          } else {
+                               Either::Left(InterpreterError::BugFoundError("unf_instance field is None".to_string()))
+                          }
+                      } else if let Some(expr) = RhoExpression::unapply(p) {
+                          if let Some(instance) = expr.expr_instance {
+                              Either::Right(new_env.put(Par::default().with_exprs(vec![Expr {expr_instance: Some(instance)}])))
+                          } else {
+                               Either::Left(InterpreterError::BugFoundError("expr_instance field is None".to_string()))
+                          }
+                      } else {
+                          Either::Left(InterpreterError::BugFoundError("invalid injection".to_string()))
+                      }
+                      },
+                      None => {
+                        Either::Left(InterpreterError::BugFoundError(format!("No value set for {}. This is a bug in the normalizer or on the path from it.", urn)))
+                      },
+                    }
+                } else {
+                    match self.urn_map.get(&urn) {
+                        Some(p) => Either::Right(new_env.put(p.clone())),
+                        None => Either::Left(InterpreterError::ReduceError(format!(
+                            "Unknown urn for new: {}",
+                            urn
+                        ))),
+                    }
+                }
+            };
+
+            urns.into_iter()
+                .fold(Ok(simple_news), |acc, urn| match acc {
+                    Ok(mut news) => match add_urn(&mut news, urn) {
+                        Either::Left(err) => Err(err),
+                        Either::Right(env) => Ok(env),
+                    },
+
+                    Err(e) => Err(e),
+                })
+        };
+
+        self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
+        match alloc(new.bind_count as usize, new.uri.clone()) {
+            Ok(env) => self.eval(new.p.clone().unwrap(), &env, rand).await,
+            Err(e) => Err(e),
+        }
     }
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
@@ -678,16 +753,16 @@ impl DebruijnInterpreter {
         Ok(unbndl)
     }
 
-    fn eval_bundle(
+    async fn eval_bundle(
         &self,
-        send: &Bundle,
+        bundle: &Bundle,
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        todo!()
+        self.eval(bundle.body.clone().unwrap(), env, rand).await
     }
 
-    fn eval_expr_to_par(&self, send: &Expr) -> Result<Par, InterpreterError> {
+    fn eval_expr_to_par(&self, expr: &Expr) -> Result<Par, InterpreterError> {
         todo!()
     }
 

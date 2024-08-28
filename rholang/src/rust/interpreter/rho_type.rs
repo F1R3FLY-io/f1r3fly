@@ -162,6 +162,30 @@ impl RhoName {
     }
 }
 
+pub struct RhoExpression;
+
+impl RhoExpression {
+    pub fn create_par(expr: Expr) -> Par {
+        Par::default().with_exprs(vec![expr])
+    }
+
+    pub fn unapply(p: &Par) -> Option<Expr> {
+        single_expr(p)
+    }
+}
+
+pub struct RhoUnforgeable;
+
+impl RhoUnforgeable {
+    pub fn create_par(unforgeable: GUnforgeable) -> Par {
+        Par::default().with_unforgeables(vec![unforgeable])
+    }
+
+    pub fn unapply(p: &Par) -> Option<GUnforgeable> {
+        single_unforgeable(p)
+    }
+}
+
 pub struct RhoSysAuthToken;
 
 impl RhoSysAuthToken {

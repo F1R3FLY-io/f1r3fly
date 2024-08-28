@@ -61,33 +61,58 @@ impl Blake2b512Random {
     }
 
     pub fn split_short(&self, index: u16) -> Blake2b512Random {
-        let mut split = self.clone(); // Assuming you have implemented Clone for Blake2b512Random
-        let packed = index.to_le_bytes(); // Convert the short to little-endian bytes
+        let mut split = self.clone();
+        let packed = index.to_le_bytes();
         split.add_byte(packed[0]);
         split.add_byte(packed[1]);
         split
     }
 
     pub fn split_byte(&self, index: u8) -> Blake2b512Random {
-        let mut split = self.clone(); // Create a copy of the current instance
-        split.add_byte(index); // Add the byte to the path_view
-        split // Return the new instance
+        let mut split = self.clone();
+        split.add_byte(index);
+        split
     }
 
     fn add_byte(&mut self, index: u8) {
         if self.path_view.len() == 112 {
             self.digest.update(&self.last_block, 0);
-            self.last_block.fill(0); // Reset last_block
-            self.path_view.clear(); // Reset path_view
+            self.last_block.fill(0);
+            self.path_view.clear();
         }
         self.path_view.push(index);
     }
 
+    pub fn next(&mut self) -> Vec<u8> {
+        if self.position == 0 {
+            self.hash();
+            self.position = 32;
+            self.hash_array[0..32].to_vec()
+        } else {
+            let result = self.hash_array[32..64].to_vec();
+            self.position = 0;
+            result
+        }
+    }
+
+    fn hash(&mut self) {
+        self.digest
+            .peek_final_root(self.last_block.as_slice(), 0, &mut self.hash_array, 0);
+        let low = self.count_view[0];
+        if low == u64::MAX {
+            let high = self.count_view[1];
+            self.count_view[0] = 0;
+            self.count_view[1] = high + 1;
+        } else {
+            self.count_view[0] = low + 1;
+        }
+    }
+
     pub fn to_vec(&self) -> Vec<u8> {
-        self.digest.to_vec() // Assuming Blake2b512Block has a to_vec method
+        self.digest.to_vec()
     }
 
     pub fn from_vec(data: Vec<u8>) -> Blake2b512Block {
-        Blake2b512Block::from_vec(data) // Assuming Blake2b512Block has a from_vec method
+        Blake2b512Block::from_vec(data)
     }
 }
