@@ -43,7 +43,7 @@ impl RholangAndRustDispatcher {
             merge_chs,
             mergeable_tag_name,
             cost: cost.clone(),
-            susbtitute: Substitute { cost },
+            substitute: Substitute { cost },
         };
 
         (dispatcher, reducer)

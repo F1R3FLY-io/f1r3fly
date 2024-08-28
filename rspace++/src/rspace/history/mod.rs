@@ -8,3 +8,8 @@ pub mod roots_store;
 pub mod root_repository;
 pub mod cold_store;
 pub mod history_repository_impl;
+
+pub enum Either<L, R> {
+  Left(L),
+  Right(R),
+}

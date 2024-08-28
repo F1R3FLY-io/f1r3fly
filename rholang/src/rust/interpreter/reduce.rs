@@ -3,17 +3,24 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::{BindPattern, Bundle, Expr, Match, New, ParWithRandom, Receive, Send, Var};
+use models::rhoapi::var::VarInstance;
+use models::rhoapi::{
+    BindPattern, Bundle, Expr, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
+    Var,
+};
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle};
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
+use crate::rust::interpreter::accounting::costs::match_eval_cost;
+use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
+
 use super::accounting::_cost;
-use super::accounting::costs::send_eval_cost;
+use super::accounting::costs::{receive_eval_cost, send_eval_cost, var_eval_cost};
 use super::errors::InterpreterError;
 use super::substitue::Substitute;
 use super::util::GeneratedMessage;
@@ -43,7 +50,7 @@ pub struct DebruijnInterpreter {
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
     pub cost: _cost,
-    pub susbtitute: Substitute,
+    pub substitute: Substitute,
 }
 
 impl Reduce for DebruijnInterpreter {
@@ -407,15 +414,15 @@ impl DebruijnInterpreter {
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         match term {
-            GeneratedMessage::Send(term) => self.send_eval(term, env, rand).await,
-            GeneratedMessage::Receive(term) => self.receive_eval(term, env, rand),
-            GeneratedMessage::New(term) => self.new_eval(term, env, rand),
-            GeneratedMessage::Match(term) => self.match_eval(term, env, rand),
-            GeneratedMessage::Bundle(term) => self.bundle_eval(term, env, rand),
+            GeneratedMessage::Send(term) => self.eval_send(term, env, rand).await,
+            GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand).await,
+            GeneratedMessage::New(term) => self.eval_new(term, env, rand),
+            GeneratedMessage::Match(term) => self.eval_match(term, env, rand).await,
+            GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand),
             GeneratedMessage::Expr(term) => match &term.expr_instance {
                 Some(expr_instance) => match expr_instance {
                     ExprInstance::EVarBody(e) => {
-                        let res = self.var_eval(&e.clone().v.unwrap(), &env, &rand)?;
+                        let res = self.eval_var(&e.clone().v.unwrap(), &env)?;
                         self.eval(res, env, rand).await
                     }
                     ExprInstance::EMethodBody(e) => {
@@ -448,7 +455,7 @@ impl DebruijnInterpreter {
      * @param env An execution context
      *
      */
-    async fn send_eval(
+    async fn eval_send(
         &self,
         send: &Send,
         env: &Env<Par>,
@@ -456,7 +463,7 @@ impl DebruijnInterpreter {
     ) -> Result<(), InterpreterError> {
         self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap())?;
-        let sub_chan = self.susbtitute.substitue_and_charge(eval_chan, 0, env)?;
+        let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
         let unbundled = match single_bundle(&sub_chan) {
             Some(value) => {
                 if !value.write_flag {
@@ -478,7 +485,7 @@ impl DebruijnInterpreter {
 
         let subst_data = data
             .into_iter()
-            .map(|p| self.susbtitute.substitue_and_charge(p, 0, env))
+            .map(|p| self.substitute.substitute_and_charge(&p, 0, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
         self.produce(
@@ -492,16 +499,157 @@ impl DebruijnInterpreter {
         .await
     }
 
-    fn receive_eval(
+    async fn eval_receive(
         &self,
-        send: &Receive,
+        receive: &Receive,
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        todo!()
+        self.cost.charge(receive_eval_cost())?;
+        let binds = receive
+            .binds
+            .clone()
+            .into_iter()
+            .map(|rb| {
+                let q = self.unbundle_receive(&rb, env)?;
+                let subst_patterns = rb
+                    .patterns
+                    .into_iter()
+                    .map(|pattern| self.substitute.substitute_and_charge(&pattern, 1, env))
+                    .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+                Ok((
+                    BindPattern {
+                        patterns: subst_patterns,
+                        remainder: rb.remainder,
+                        free_count: rb.free_count,
+                    },
+                    q,
+                ))
+            })
+            .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+        // TODO: Allow for the environment to be stored with the body in the Tuplespace
+        let subst_body = self.substitute.substitute_no_sort_and_charge(
+            receive.body.as_ref().unwrap(),
+            0,
+            &env.shift(receive.bind_count),
+        )?;
+
+        self.consume(
+            binds,
+            ParWithRandom {
+                body: Some(subst_body),
+                random_state: rand.to_vec(),
+            },
+            receive.persistent,
+            receive.peek,
+        )
+        .await
     }
 
-    fn new_eval(
+    /**
+     * Variable "evaluation" is an environment lookup, but
+     * lookup of an unbound variable should be an error.
+     *
+     * @param valproc The variable to be evaluated
+     * @param env  provides the environment (possibly) containing a binding for the given variable.
+     * @return If the variable has a binding (par), lift the
+     *                  binding into the monadic context, else signal
+     *                  an exception.
+     */
+    fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
+        self.cost.charge(var_eval_cost())?;
+        match valproc.var_instance {
+            Some(VarInstance::BoundVar(level)) => Err(InterpreterError::ReduceError(format!(
+                "Unbound variable: {} in {:#?}",
+                level, env.env_map
+            ))),
+            Some(VarInstance::Wildcard(_)) => Err(InterpreterError::ReduceError(
+                "Unbound variable: attempting to evaluate a pattern".to_string(),
+            )),
+            Some(VarInstance::FreeVar(_)) => Err(InterpreterError::ReduceError(
+                "Unbound variable: attempting to evaluate a pattern".to_string(),
+            )),
+            None => Err(InterpreterError::ReduceError(
+                "Impossible var instance EMPTY".to_string(),
+            )),
+        }
+    }
+
+    // TODO: review loop matches tailRecM
+    async fn eval_match(
+        &self,
+        mat: &Match,
+        env: &Env<Par>,
+        rand: Blake2b512Random,
+    ) -> Result<(), InterpreterError> {
+        fn add_to_env(env: &Env<Par>, free_map: BTreeMap<i32, Par>, free_count: i32) -> Env<Par> {
+            (0..free_count).fold(env.clone(), |mut acc, e| {
+                let value = free_map.get(&e).unwrap_or(&Par::default()).clone();
+                acc.put(value)
+            })
+        }
+
+        let first_match = Box::new(
+            |target: Par, cases: Vec<MatchCase>, rand: Blake2b512Random| async {
+                let mut state = (target, cases);
+
+                loop {
+                    let (_target, _cases) = state;
+
+                    match _cases.as_slice() {
+                        [] => return Ok(()),
+
+                        [single_case, case_rem @ ..] => {
+                            let pattern = self.substitute.substitute_and_charge(
+                                single_case.pattern.as_ref().unwrap(),
+                                1,
+                                env,
+                            )?;
+
+                            let mut spatial_matcher = SpatialMatcherContext::new();
+
+                            let match_result =
+                                spatial_matcher.spatial_match_result(_target.clone(), pattern);
+
+                            match match_result {
+                                None => {
+                                    state = (_target, case_rem.to_vec());
+                                }
+
+                                Some(free_map) => {
+                                    let eval_result = self
+                                        .eval(
+                                            single_case.source.clone().unwrap(),
+                                            &add_to_env(
+                                                env,
+                                                free_map.clone(),
+                                                single_case.free_count,
+                                            ),
+                                            rand,
+                                        )
+                                        .await?;
+
+                                    return Ok(eval_result);
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        );
+
+        self.cost.charge(match_eval_cost())?;
+        let evaled_target = self.eval_expr(&mat.target.as_ref().unwrap())?;
+        let subst_target = self
+            .substitute
+            .substitute_and_charge(&evaled_target, 0, env)?;
+
+        first_match(subst_target, mat.cases.clone(), rand).await
+    }
+
+    fn eval_new(
         &self,
         send: &New,
         env: &Env<Par>,
@@ -510,30 +658,32 @@ impl DebruijnInterpreter {
         todo!()
     }
 
-    fn match_eval(
-        &self,
-        send: &Match,
-        env: &Env<Par>,
-        rand: Blake2b512Random,
-    ) -> Result<(), InterpreterError> {
-        todo!()
+    fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
+        let eval_src = self.eval_expr(&rb.source.as_ref().unwrap())?;
+        let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
+        // Check if we try to read from bundled channel
+        let unbndl = match single_bundle(&subst) {
+            Some(value) => {
+                if !value.write_flag {
+                    return Err(InterpreterError::ReduceError(
+                        "Trying to read on non-readable channel.".to_string(),
+                    ));
+                } else {
+                    value.body.unwrap()
+                }
+            }
+            None => subst,
+        };
+
+        Ok(unbndl)
     }
 
-    fn bundle_eval(
+    fn eval_bundle(
         &self,
         send: &Bundle,
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        todo!()
-    }
-
-    fn var_eval(
-        &self,
-        send: &Var,
-        env: &Env<Par>,
-        rand: &Blake2b512Random,
-    ) -> Result<Par, InterpreterError> {
         todo!()
     }
 

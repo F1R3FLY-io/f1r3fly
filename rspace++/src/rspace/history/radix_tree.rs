@@ -1,5 +1,6 @@
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history_action::HistoryActionTrait;
+use crate::rspace::history::Either;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::shared::key_value_store::KvStoreError;
 use dashmap::DashMap;
@@ -37,11 +38,6 @@ const NUM_ITEMS: usize = 256;
 
 pub fn empty_node() -> Node {
     vec![Item::EmptyItem; NUM_ITEMS]
-}
-
-enum Either<L, R> {
-    Left(L),
-    Right(R),
 }
 
 /**
