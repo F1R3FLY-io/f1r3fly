@@ -24,7 +24,7 @@ use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
 use super::accounting::_cost;
 use super::accounting::costs::{
-    new_bindings_cost, receive_eval_cost, send_eval_cost, var_eval_cost,
+    method_call_cost, new_bindings_cost, receive_eval_cost, send_eval_cost, var_eval_cost,
 };
 use super::errors::InterpreterError;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
@@ -432,9 +432,12 @@ impl DebruijnInterpreter {
                         self.eval(res, env, rand).await
                     }
                     ExprInstance::EMethodBody(e) => {
-                        let res = self.eval_expr_to_par(&Expr {
-                            expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
-                        })?;
+                        let res = self.eval_expr_to_par(
+                            &Expr {
+                                expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
+                            },
+                            env,
+                        )?;
                         self.eval(res, env, rand).await
                     }
                     other => Err(InterpreterError::BugFoundError(format!(
@@ -468,7 +471,7 @@ impl DebruijnInterpreter {
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         self.cost.charge(send_eval_cost())?;
-        let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap())?;
+        let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap(), env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
         let unbundled = match single_bundle(&sub_chan) {
             Some(value) => {
@@ -486,7 +489,7 @@ impl DebruijnInterpreter {
         let data = send
             .data
             .iter()
-            .map(|expr| self.eval_expr(expr))
+            .map(|expr| self.eval_expr(expr, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
         let subst_data = data
@@ -535,7 +538,6 @@ impl DebruijnInterpreter {
             })
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
-        // TODO: Allow for the environment to be stored with the body in the Tuplespace
         let subst_body = self.substitute.substitute_no_sort_and_charge(
             receive.body.as_ref().unwrap(),
             0,
@@ -647,7 +649,7 @@ impl DebruijnInterpreter {
         );
 
         self.cost.charge(match_eval_cost())?;
-        let evaled_target = self.eval_expr(&mat.target.as_ref().unwrap())?;
+        let evaled_target = self.eval_expr(&mat.target.as_ref().unwrap(), env)?;
         let subst_target = self
             .substitute
             .substitute_and_charge(&evaled_target, 0, env)?;
@@ -734,7 +736,7 @@ impl DebruijnInterpreter {
     }
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
-        let eval_src = self.eval_expr(&rb.source.as_ref().unwrap())?;
+        let eval_src = self.eval_expr(&rb.source.as_ref().unwrap(), env)?;
         let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
         // Check if we try to read from bundled channel
         let unbndl = match single_bundle(&subst) {
@@ -762,18 +764,56 @@ impl DebruijnInterpreter {
         self.eval(bundle.body.clone().unwrap(), env, rand).await
     }
 
-    fn eval_expr_to_par(&self, expr: &Expr) -> Result<Par, InterpreterError> {
+    fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
+        match expr.expr_instance.clone().unwrap() {
+            ExprInstance::EVarBody(evar) => {
+                let p = self.eval_var(&evar.v.unwrap(), env)?;
+                let evaled_p = self.eval_expr(&p, env)?;
+                Ok(evaled_p)
+            }
+            ExprInstance::EMethodBody(emethod) => {
+                self.cost.charge(method_call_cost())?;
+                let evaled_target = self.eval_expr(&emethod.target.unwrap(), env)?;
+                let evaled_args: Vec<Par> = emethod
+                    .arguments
+                    .iter()
+                    .map(|arg| self.eval_expr(arg, env))
+                    .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+                let result_par = match self.method_table().get(&emethod.method_name) {
+                    Some(_method) => _method.apply(evaled_target, evaled_args)?,
+                    None => {
+                        return Err(InterpreterError::ReduceError(format!(
+                            "Unimplemented method: {}",
+                            emethod.method_name
+                        )))
+                    }
+                };
+
+                Ok(result_par)
+            }
+            _ => Ok(Par::default().with_exprs(vec![self.eval_expr_to_expr(expr)?])),
+        }
+    }
+
+    fn eval_expr_to_expr(&self, expr: &Expr) -> Result<Expr, InterpreterError> {
         todo!()
+    }
+
+    fn method_table(&self) -> HashMap<String, impl Method> {
+        let mut table = HashMap::new();
+        table.insert("nth".to_string(), NthMethod);
+        table
     }
 
     /**
      * Evaluate any top level expressions in @param Par .
      */
-    fn eval_expr(&self, par: &Par) -> Result<Par, InterpreterError> {
+    fn eval_expr(&self, par: &Par, env: &Env<Par>) -> Result<Par, InterpreterError> {
         let evaled_exprs = par
             .exprs
             .iter()
-            .map(|expr| self.eval_expr_to_par(expr))
+            .map(|expr| self.eval_expr_to_par(expr, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
         // Note: the locallyFree cache in par could now be invalid, but given
         // that locallyFree is for use in the matcher, and the matcher uses
@@ -787,5 +827,177 @@ impl DebruijnInterpreter {
             });
 
         Ok(result)
+    }
+}
+
+trait Method {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError>;
+}
+
+struct NthMethod;
+
+impl Method for NthMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ToByteArrayMethod;
+
+impl Method for ToByteArrayMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct HexToBytesMethod;
+
+impl Method for HexToBytesMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct BytesToHexMethod;
+
+impl Method for BytesToHexMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ToUtf8BytesMethod;
+
+impl Method for ToUtf8BytesMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct UnionMethod;
+
+impl Method for UnionMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct DiffMethod;
+
+impl Method for DiffMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct AddMethod;
+
+impl Method for AddMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct DeleteMethod;
+
+impl Method for DeleteMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ContainsMethod;
+
+impl Method for ContainsMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct GetMethod;
+
+impl Method for GetMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct GetOrElseMethod;
+
+impl Method for GetOrElseMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct SetMethod;
+
+impl Method for SetMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct KeysMethod;
+
+impl Method for KeysMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct SizeMethod;
+
+impl Method for SizeMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct LengthMethod;
+
+impl Method for LengthMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct SliceMethod;
+
+impl Method for SliceMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct TakeMethod;
+
+impl Method for TakeMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ToListMethod;
+
+impl Method for ToListMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ToSetMethod;
+
+impl Method for ToSetMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
+    }
+}
+
+struct ToMapMethod;
+
+impl Method for ToMapMethod {
+    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        todo!()
     }
 }
