@@ -7,13 +7,13 @@ use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMap, EMatches, EMethod,
-    EMinus, EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr,
-    GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
+    EMinus, EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, ESet, EVar,
+    Expr, GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
     ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
-use models::rust::rholang::implicits::{concatenate_pars, single_bundle};
-use models::rust::utils::union;
+use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
+use models::rust::utils::{new_gint_par, new_gstring_par, union};
 use models::ByteString;
 use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
@@ -23,7 +23,10 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
-use crate::rust::interpreter::accounting::costs::{interpolate_cost, match_eval_cost};
+use crate::rust::interpreter::accounting::costs::{
+    bytes_to_hex_cost, diff_cost, hex_to_bytes_cost, interpolate_cost, match_eval_cost,
+    nth_method_call_cost, to_byte_array_cost, union_cost,
+};
 use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
 use super::accounting::_cost;
@@ -36,7 +39,7 @@ use super::accounting::costs::{
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
-use super::substitue::Substitute;
+use super::substitute::Substitute;
 use super::util::GeneratedMessage;
 use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
 
@@ -790,7 +793,7 @@ impl DebruijnInterpreter {
                     .collect::<Result<Vec<_>, InterpreterError>>()?;
 
                 let result_par = match self.method_table().get(&emethod.method_name) {
-                    Some(_method) => _method.apply(evaled_target, evaled_args)?,
+                    Some(_method) => _method.apply(evaled_target, evaled_args, env)?,
                     None => {
                         return Err(InterpreterError::ReduceError(format!(
                             "Unimplemented method: {}",
@@ -921,6 +924,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(rhs),
                                 }])],
+                                env,
                             )?;
 
                             let result_expr = self.eval_single_expr(&result_par, env)?;
@@ -963,6 +967,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(rhs),
                                 }])],
+                                env,
                             )?;
 
                             let result_expr = self.eval_single_expr(&result_par, env)?;
@@ -978,6 +983,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(rhs),
                                 }])],
+                                env,
                             )?;
 
                             let result_expr = self.eval_single_expr(&result_par, env)?;
@@ -1267,6 +1273,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::EMapBody(rhs)),
                                 }])],
+                                env,
                             )?;
                             let result_expr = self.eval_single_expr(&result_par, env)?;
                             Ok(result_expr)
@@ -1280,6 +1287,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::ESetBody(rhs)),
                                 }])],
+                                env,
                             )?;
                             let result_expr = self.eval_single_expr(&result_par, env)?;
                             Ok(result_expr)
@@ -1338,6 +1346,7 @@ impl DebruijnInterpreter {
                                 vec![Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::ESetBody(rhs)),
                                 }])],
+                                env,
                             )?;
                             let result_expr = self.eval_single_expr(&result_par, env)?;
                             Ok(result_expr)
@@ -1467,7 +1476,9 @@ impl DebruijnInterpreter {
                         .collect::<Result<Vec<_>, InterpreterError>>()?;
 
                     let result_par = match self.method_table().get(method_name) {
-                        Some(mth) => mth.apply(evaled_target, evaled_args)?,
+                        Some(method_function) => {
+                            method_function.apply(evaled_target, evaled_args, env)?
+                        }
                         None => {
                             return Err(InterpreterError::ReduceError(format!(
                                 "Unimplemented method: {:?}",
@@ -1487,261 +1498,732 @@ impl DebruijnInterpreter {
         }
     }
 
-    fn nth_method(&self) -> impl Method {
-        struct NthMethod;
+    fn nth_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct NthMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for NthMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> NthMethod<'a> {
+            fn local_nth(&self, ps: &[Par], nth: usize) -> Result<Par, InterpreterError> {
+                if ps.len() > nth {
+                    Ok(ps[nth].clone())
+                } else {
+                    Err(InterpreterError::ReduceError(format!(
+                        "Error: index out of bound: {}",
+                        nth
+                    )))
+                }
+            }
+        }
+
+        impl<'a> Method for NthMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: "nth".to_string(),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                }
+
+                self.outer.cost.charge(nth_method_call_cost())?;
+                let nth_raw = self.outer.eval_to_i64(&args[0], env)?;
+                let nth = self.outer.restrict_to_usize(nth_raw)?;
+                let v = self.outer.eval_single_expr(&p, env)?;
+
+                match v.expr_instance.unwrap() {
+                    ExprInstance::EListBody(EList { ps, .. }) => self.local_nth(&ps, nth),
+                    ExprInstance::ETupleBody(ETuple { ps, .. }) => self.local_nth(&ps, nth),
+                    ExprInstance::GByteArray(bs) => {
+                        if nth < bs.len() {
+                            let b = bs[nth] & 0xff; // Convert to unsigned;
+                            let p = new_gint_par(b as i64, Vec::new(), false);
+                            Ok(p)
+                        } else {
+                            Err(InterpreterError::ReduceError(format!(
+                                "Error: index out of bound: {}",
+                                nth
+                            )))
+                        }
+                    }
+                    _ => Err(InterpreterError::ReduceError(String::from(
+                        "Error: nth applied to something that wasn't a list or tuple.",
+                    ))),
+                }
+            }
+        }
+
+        Box::new(NthMethod { outer: self })
+    }
+
+    fn to_byte_array_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToByteArrayMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> ToByteArrayMethod<'a> {
+            fn serialize(&self, p: &Par) -> Result<Vec<u8>, InterpreterError> {
+                match bincode::serialize(p) {
+                    Ok(serialized) => Ok(serialized),
+                    Err(err) => {
+                        return Err(InterpreterError::ReduceError(format!(
+                            "Error thrown when serializing: {}",
+                            err
+                        )))
+                    }
+                }
+            }
+        }
+
+        impl<'a> Method for ToByteArrayMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: "ToByteArray".to_string(),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                }
+
+                let expr_evaled = self.outer.eval_expr(&p, env)?;
+                let expr_subst =
+                    self.outer
+                        .substitute
+                        .substitute_and_charge(&expr_evaled, 0, env)?;
+
+                self.outer.cost.charge(to_byte_array_cost(&expr_subst))?;
+                let ba = self.serialize(&expr_subst)?;
+
+                Ok(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::GByteArray(ba)),
+                }]))
+            }
+        }
+
+        Box::new(ToByteArrayMethod { outer: self })
+    }
+
+    fn hex_to_bytes_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct HexToBytesMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> Method for HexToBytesMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                _env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("bytesToHex"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    match single_expr(&p) {
+                        Some(expr) => match expr.expr_instance.unwrap() {
+                            ExprInstance::GString(encoded) => {
+                                self.outer.cost.charge(hex_to_bytes_cost(&encoded))?;
+                                // unsafeHexToByteString
+                                match (0..encoded.len())
+                            .step_by(2)
+                            .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16))
+                            .collect::<Result<Vec<u8>, _>>()
+                        {
+                            Ok(ba) => Ok(Par::default().with_exprs(vec![Expr {
+                              expr_instance: Some(ExprInstance::GByteArray(ba)),
+                          }])),
+                            Err(err) => Err(InterpreterError::ReduceError(format!(
+                                "Error was thrown when decoding input string to hexadecimal: {}", err.to_string()
+                            ))),
+                        }
+                            }
+
+                            other => Err(InterpreterError::MethodNotDefined {
+                                method: String::from("hexToBytes"),
+                                other_type: format!("{:?}", other.type_id()),
+                            }),
+                        },
+
+                        None => Err(InterpreterError::ReduceError(String::from(
+                            "Error: Method can only be called on singular expressions.",
+                        ))),
+                    }
+                }
+            }
+        }
+
+        Box::new(HexToBytesMethod { outer: self })
+    }
+
+    fn bytes_to_hex_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct BytesToHexMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> Method for BytesToHexMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("bytesToHex"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    match single_expr(&p) {
+                        Some(expr) => match expr.expr_instance.unwrap() {
+                            ExprInstance::GByteArray(bytes) => {
+                                self.outer.cost.charge(bytes_to_hex_cost(&bytes))?;
+
+                                let str =
+                                    bytes.iter().map(|byte| format!("{:02x}", byte)).collect();
+
+                                Ok(new_gstring_par(str, Vec::new(), false))
+                            }
+
+                            other => Err(InterpreterError::MethodNotDefined {
+                                method: String::from("BytesToHex"),
+                                other_type: format!("{:?}", other.type_id()),
+                            }),
+                        },
+
+                        None => Err(InterpreterError::ReduceError(String::from(
+                            "Error: Method can only be called on singular expressions.",
+                        ))),
+                    }
+                }
+            }
+        }
+
+        Box::new(BytesToHexMethod { outer: self })
+    }
+
+    fn to_utf8_bytes_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToUtf8BytesMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> Method for ToUtf8BytesMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("toUtf8Bytes"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    match single_expr(&p) {
+                        Some(expr) => match expr.expr_instance.unwrap() {
+                            ExprInstance::GString(utf8_string) => {
+                                self.outer.cost.charge(hex_to_bytes_cost(&utf8_string))?;
+
+                                Ok(Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(ExprInstance::GByteArray(
+                                        utf8_string.as_str().as_bytes().to_vec(),
+                                    )),
+                                }]))
+                            }
+
+                            other => Err(InterpreterError::MethodNotDefined {
+                                method: String::from("toUtf8Bytes"),
+                                other_type: format!("{:?}", other.type_id()),
+                            }),
+                        },
+
+                        None => Err(InterpreterError::ReduceError(String::from(
+                            "Error: Method can only be called on singular expressions.",
+                        ))),
+                    }
+                }
+            }
+        }
+
+        Box::new(ToUtf8BytesMethod { outer: self })
+    }
+
+    fn union_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct UnionMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> UnionMethod<'a> {
+            fn union(&self, base_expr: &Expr, other_expr: &Expr) -> Result<Expr, InterpreterError> {
+                match (
+                    base_expr.expr_instance.clone().unwrap(),
+                    other_expr.expr_instance.clone().unwrap(),
+                ) {
+                    (ExprInstance::ESetBody(base_set), ExprInstance::ESetBody(other_set)) => {
+                        self.outer
+                            .cost
+                            .charge(union_cost(other_set.ps.len() as i64))?;
+
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::ESetBody(ESet {
+                                ps: union(base_set.ps, other_set.ps),
+                                locally_free: union(base_set.locally_free, other_set.locally_free),
+                                connective_used: base_set.connective_used
+                                    || other_set.connective_used,
+                                remainder: None,
+                            })),
+                        })
+                    }
+
+                    (ExprInstance::EMapBody(base_map), ExprInstance::EMapBody(other_map)) => {
+                        self.outer
+                            .cost
+                            .charge(union_cost(other_map.kvs.len() as i64))?;
+
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::EMapBody(EMap {
+                                kvs: base_map
+                                    .kvs
+                                    .into_iter()
+                                    .chain(other_map.kvs.into_iter())
+                                    .collect(),
+                                locally_free: union(base_map.locally_free, other_map.locally_free),
+                                connective_used: base_map.connective_used
+                                    || other_map.connective_used,
+                                remainder: None,
+                            })),
+                        })
+                    }
+
+                    (other, _) => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("union"),
+                        other_type: format!("{:?}", other.type_id()),
+                    }),
+                }
+            }
+        }
+
+        impl<'a> Method for UnionMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("union"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let other_expr = self.outer.eval_single_expr(&args[0], env)?;
+                    let result = self.union(&base_expr, &other_expr)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
+            }
+        }
+
+        Box::new(UnionMethod { outer: self })
+    }
+
+    fn diff_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct DiffMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> DiffMethod<'a> {
+            fn diff(&self, base_expr: &Expr, other_expr: &Expr) -> Result<Expr, InterpreterError> {
+                match (
+                    base_expr.expr_instance.clone().unwrap(),
+                    other_expr.expr_instance.clone().unwrap(),
+                ) {
+                    (ExprInstance::ESetBody(base_set), ExprInstance::ESetBody(other_set)) => {
+                        // diff is implemented in terms of foldLeft that at each step
+                        // removes one element from the collection.
+                        self.outer
+                            .cost
+                            .charge(diff_cost(other_set.ps.len() as i64))?;
+
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::ESetBody(ESet {
+                                ps: {
+                                    let base_set: HashSet<_> =
+                                        base_set.ps.iter().cloned().collect();
+                                    let other_set: HashSet<_> =
+                                        other_set.ps.iter().cloned().collect();
+
+                                    let diff: Vec<_> =
+                                        base_set.difference(&other_set).cloned().collect();
+                                    diff
+                                },
+                                locally_free: Vec::new(),
+                                connective_used: false,
+                                remainder: None,
+                            })),
+                        })
+                    }
+
+                    (ExprInstance::EMapBody(base_map), ExprInstance::EMapBody(other_map)) => {
+                        self.outer
+                            .cost
+                            .charge(diff_cost(other_map.kvs.len() as i64))?;
+
+                        // Ok(Expr {
+                        //     expr_instance: Some(ExprInstance::EMapBody(EMap {
+                        //         kvs: {
+                        //             let base_hash_map =
+                        //                 base_map.kvs.into_iter().map(|(k, v)| {}).collect();
+                        //         },
+                        //         locally_free: Vec::new(),
+                        //         connective_used: false,
+                        //         remainder: None,
+                        //     })),
+                        // })
+
+                        todo!()
+                    }
+
+                    (other, _) => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("union"),
+                        other_type: format!("{:?}", other.type_id()),
+                    }),
+                }
+            }
+        }
+
+        impl<'a> Method for DiffMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
+                // if !args.len() != 1 {
+                //     return Err(InterpreterError::MethodArgumentNumberMismatch {
+                //         method: String::from("union"),
+                //         expected: 1,
+                //         actual: args.len(),
+                //     });
+                // } else {
+                //     let base_expr = self.outer.eval_single_expr(&p, env)?;
+                //     let other_expr = self.outer.eval_single_expr(&args[0], env)?;
+                //     let result = self.union(&base_expr, &other_expr)?;
+                //     Ok(Par::default().with_exprs(vec![result]))
+                // }
+
                 todo!()
             }
         }
 
-        NthMethod
+        Box::new(DiffMethod { outer: self })
     }
 
-    fn to_byte_array_method(&self) -> impl Method {
-        struct ToByteArrayMethod;
+    fn add_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct AddMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for ToByteArrayMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for AddMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        ToByteArrayMethod
+        Box::new(AddMethod { outer: self })
     }
 
-    fn hex_to_bytes_method(&self) -> impl Method {
-        struct HexToBytesMethod;
+    fn delete_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct DeleteMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for HexToBytesMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for DeleteMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        HexToBytesMethod
+        Box::new(DeleteMethod { outer: self })
     }
 
-    fn bytes_to_hex_method(&self) -> impl Method {
-        struct BytesToHexMethod;
+    fn contains_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ContainsMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for BytesToHexMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for ContainsMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        BytesToHexMethod
+        Box::new(ContainsMethod { outer: self })
     }
 
-    fn to_utf8_bytes_method(&self) -> impl Method {
-        struct ToUtf8BytesMethod;
+    fn get_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct GetMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for ToUtf8BytesMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for GetMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        ToUtf8BytesMethod
+        Box::new(GetMethod { outer: self })
     }
 
-    fn union_method(&self) -> impl Method {
-        struct UnionMethod;
+    fn get_or_else_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct GetOrElseMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for UnionMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for GetOrElseMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        UnionMethod
+        Box::new(GetOrElseMethod { outer: self })
     }
 
-    fn diff_method(&self) -> impl Method {
-        struct DiffMethod;
+    fn set_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct SetMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for DiffMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for SetMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        DiffMethod
+        Box::new(SetMethod { outer: self })
     }
 
-    fn add_method(&self) -> impl Method {
-        struct AddMethod;
+    fn keys_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct KeysMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for AddMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for KeysMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        AddMethod
+        Box::new(KeysMethod { outer: self })
     }
 
-    fn delete_method(&self) -> impl Method {
-        struct NthMethod;
+    fn size_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct SizeMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for NthMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for SizeMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        NthMethod
+        Box::new(SizeMethod { outer: self })
     }
 
-    fn contains_method(&self) -> impl Method {
-        struct ContainsMethod;
+    fn length_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct LengthMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for ContainsMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for LengthMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        ContainsMethod
+        Box::new(LengthMethod { outer: self })
     }
 
-    fn get_method(&self) -> impl Method {
-        struct GetMethod;
+    fn slice_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct SliceMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for GetMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for SliceMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        GetMethod
+        Box::new(SliceMethod { outer: self })
     }
 
-    fn get_or_else_method(&self) -> impl Method {
-        struct GetOrElseMethod;
+    fn take_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct TakeMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for GetOrElseMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for TakeMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        GetOrElseMethod
+        Box::new(TakeMethod { outer: self })
     }
 
-    fn set_method(&self) -> impl Method {
-        struct SetMethod;
+    fn to_list_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToListMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for SetMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for ToListMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        SetMethod
+        Box::new(ToListMethod { outer: self })
     }
 
-    fn keys_method(&self) -> impl Method {
-        struct KeysMethod;
+    fn to_set_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToSetMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for KeysMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for ToSetMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        KeysMethod
+        Box::new(ToSetMethod { outer: self })
     }
 
-    fn size_method(&self) -> impl Method {
-        struct SizeMethod;
+    fn to_map_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToMapMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
 
-        impl Method for SizeMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
+        impl<'a> Method for ToMapMethod<'a> {
+            fn apply(
+                &self,
+                p: Par,
+                args: Vec<Par>,
+                env: &Env<Par>,
+            ) -> Result<Par, InterpreterError> {
                 todo!()
             }
         }
 
-        SizeMethod
+        Box::new(ToMapMethod { outer: self })
     }
 
-    fn length_method(&self) -> impl Method {
-        struct LengthMethod;
-
-        impl Method for LengthMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        LengthMethod
-    }
-
-    fn slice_method(&self) -> impl Method {
-        struct SliceMethod;
-
-        impl Method for SliceMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        SliceMethod
-    }
-
-    fn take_method(&self) -> impl Method {
-        struct TakeMethod;
-
-        impl Method for TakeMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        TakeMethod
-    }
-
-    fn to_list_method(&self) -> impl Method {
-        struct ToListMethod;
-
-        impl Method for ToListMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        ToListMethod
-    }
-
-    fn to_set_method(&self) -> impl Method {
-        struct ToSetMethod;
-
-        impl Method for ToSetMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        ToSetMethod
-    }
-
-    fn to_map_method(&self) -> impl Method {
-        struct ToMapMethod;
-
-        impl Method for ToMapMethod {
-            fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-                todo!()
-            }
-        }
-
-        ToMapMethod
-    }
-
-    fn method_table(&self) -> HashMap<String, impl Method> {
+    fn method_table<'a>(&'a self) -> HashMap<String, Box<dyn Method + 'a>> {
         let mut table = HashMap::new();
         table.insert("nth".to_string(), self.nth_method());
+        table.insert("toByteArray".to_string(), self.to_byte_array_method());
+        table.insert("hexToBytes".to_string(), self.hex_to_bytes_method());
+        table.insert("bytesToHex".to_string(), self.bytes_to_hex_method());
+        table.insert("toUtf8Bytes".to_string(), self.to_utf8_bytes_method());
+        table.insert("union".to_string(), self.union_method());
+        table.insert("diff".to_string(), self.diff_method());
+        table.insert("add".to_string(), self.add_method());
+        table.insert("delete".to_string(), self.delete_method());
+        table.insert("contains".to_string(), self.contains_method());
+        table.insert("get".to_string(), self.get_method());
+        table.insert("getOrElse".to_string(), self.get_or_else_method());
+        table.insert("set".to_string(), self.set_method());
+        table.insert("keys".to_string(), self.keys_method());
+        table.insert("size".to_string(), self.size_method());
+        table.insert("length".to_string(), self.length_method());
+        table.insert("slice".to_string(), self.slice_method());
+        table.insert("take".to_string(), self.take_method());
+        table.insert("toList".to_string(), self.to_list_method());
+        table.insert("toSet".to_string(), self.to_set_method());
+        table.insert("toMap".to_string(), self.to_map_method());
         table
     }
 
@@ -1754,6 +2236,10 @@ impl DebruijnInterpreter {
     }
 
     fn eval_to_bool(&self, p: &Par, env: &Env<Par>) -> Result<bool, InterpreterError> {
+        todo!()
+    }
+
+    fn restrict_to_usize(&self, i64: i64) -> Result<usize, InterpreterError> {
         todo!()
     }
 
@@ -1857,5 +2343,5 @@ impl DebruijnInterpreter {
 }
 
 trait Method {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError>;
+    fn apply(&self, p: Par, args: Vec<Par>, env: &Env<Par>) -> Result<Par, InterpreterError>;
 }

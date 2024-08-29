@@ -11,6 +11,6 @@ pub mod registry;
 pub mod rho_runtime;
 pub mod rho_type;
 pub mod storage;
-pub mod substitue;
+pub mod substitute;
 pub mod system_processes;
 pub mod util;

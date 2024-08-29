@@ -23,6 +23,7 @@ prost = "0.12.4"
 zbase32 = "0.1.2"
 lazy_static = "1.5.0"
 futures = "0.3.30"
+bincode = "1.3.3"
 
 [build-dependencies]
 cc = "1.0"

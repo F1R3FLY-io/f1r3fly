@@ -8,7 +8,7 @@ use models::rhoapi::{ListParWithRandom, TaggedContinuation};
 
 use super::{
     accounting::_cost, errors::InterpreterError, reduce::DebruijnInterpreter,
-    rho_runtime::RhoTuplespace, substitue::Substitute,
+    rho_runtime::RhoTuplespace, substitute::Substitute,
 };
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala

@@ -94,12 +94,12 @@ pub fn add_cost() -> Cost {
 }
 
 // decoding to bytes is linear with respect to the length of the string
-pub fn hex_to_bytes_cost(str: String) -> Cost {
+pub fn hex_to_bytes_cost(str: &String) -> Cost {
     Cost::create(str.len() as i64, "hex to bytes".to_string())
 }
 
 // encoding to hex is linear with respect to the length of the byte array
-pub fn bytes_to_hex_cost(bytes: Vec<u8>) -> Cost {
+pub fn bytes_to_hex_cost(bytes: &Vec<u8>) -> Cost {
     Cost::create(bytes.len() as i64, "bytes to hex".to_string())
 }
 
@@ -149,7 +149,7 @@ pub fn interpolate_cost(str_length: i64, map_size: i64) -> Cost {
 // serializing any Par into a Array[Byte]:
 // + allocates byte array of the same size as `serializedSize`
 // + then it copies all elements of the Par
-pub fn to_byte_array_cost(message: impl prost::Message) -> Cost {
+pub fn to_byte_array_cost(message: &impl prost::Message) -> Cost {
     Cost::create(message.encoded_len() as i64, "to byte array".to_string())
 }
 

@@ -130,7 +130,7 @@ pub fn to_vec(fm: FreeMap, max: i32) -> Vec<Par> {
     'This function takes two Vec<u8> as input, converts them to HashSet<u8>, performs the union operation, and then converts
   the result back to Vec<u8>.' - GPT-4
 */
-pub fn union(vec1: Vec<u8>, vec2: Vec<u8>) -> Vec<u8> {
+pub fn union<A: Eq + std::hash::Hash + Clone>(vec1: Vec<A>, vec2: Vec<A>) -> Vec<A> {
     let set1: HashSet<_> = vec1.into_iter().collect();
     let set2: HashSet<_> = vec2.into_iter().collect();
     set1.union(&set2).cloned().collect()
