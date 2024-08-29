@@ -44,6 +44,17 @@ pub fn subtraction_cost() -> Cost {
     Cost::create(3, "subtraction".to_string())
 }
 
+pub fn equality_check_cost<T: prost::Message, P: prost::Message>(x: &T, y: &P) -> Cost {
+    let size_x = x.encoded_len();
+    let size_y = y.encoded_len();
+    let min_size = std::cmp::min(size_x, size_y);
+
+    Cost {
+        value: min_size as i64,
+        operation: String::from("equality check"),
+    }
+}
+
 pub fn boolean_and_cost() -> Cost {
     Cost::create(2, "boolean and".to_string())
 }
