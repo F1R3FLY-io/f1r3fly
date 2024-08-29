@@ -6,9 +6,10 @@ use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
-    BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMap, EMatches, EMinus,
-    EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
-    GUnforgeable, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send, Var,
+    BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMap, EMatches, EMethod,
+    EMinus, EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr,
+    GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
+    ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle};
@@ -16,7 +17,7 @@ use models::rust::utils::union;
 use models::ByteString;
 use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
-use std::any::{type_name, Any};
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
@@ -545,6 +546,7 @@ impl DebruijnInterpreter {
             })
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
+        // TODO: Allow for the environment to be stored with the body in the Tuplespace - OLD
         let subst_body = self.substitute.substitute_no_sort_and_charge(
             receive.body.as_ref().unwrap(),
             0,
@@ -667,6 +669,7 @@ impl DebruijnInterpreter {
      * Adds neu.bindCount new GPrivate from UUID's to the environment and then
      * proceeds to evaluate the body.
      */
+    // TODO: Eliminate variable shadowing - OLD
     async fn eval_new(
         &self,
         new: &New,
@@ -689,7 +692,7 @@ impl DebruijnInterpreter {
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
                 if !self.urn_map.contains_key(&urn) {
                     /** TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]]. */
-                    // If `urn` can't be found in `urnMap`, it must be referencing an injection
+                    // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
                     match new.injections.get(&urn) {
                       Some(p) => {
                         if let Some(gunf) = RhoUnforgeable::unapply(p) {
@@ -1420,11 +1423,62 @@ impl DebruijnInterpreter {
                         .map(|p| self.update_locally_free_par(p.clone()))
                         .collect();
 
-                    todo!()
+                    let mut cloned_set = set.clone();
+                    // TODO: Update 'ps' here into type 'SortedParHashSet'. See Scala code
+                    cloned_set.ps = updated_ps;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::ESetBody(cloned_set)),
+                    })
                 }
 
-                ExprInstance::EMapBody(_) => todo!(),
-                ExprInstance::EMethodBody(_) => todo!(),
+                ExprInstance::EMapBody(map) => {
+                    let evaled_ps = map
+                        .kvs
+                        .iter()
+                        .map(|kv| {
+                            let e_key = self.eval_expr(&kv.key.as_ref().unwrap(), env)?;
+                            let e_value = self.eval_expr(&kv.value.as_ref().unwrap(), env)?;
+                            Ok(KeyValuePair {
+                                key: Some(e_key),
+                                value: Some(e_value),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+                    let mut cloned_map = map.clone();
+                    // TODO: Update 'kvs' here into type 'SortedParMap'. See Scala code
+                    cloned_map.kvs = evaled_ps;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::EMapBody(cloned_map)),
+                    })
+                }
+
+                ExprInstance::EMethodBody(EMethod {
+                    method_name,
+                    target,
+                    arguments,
+                    ..
+                }) => {
+                    self.cost.charge(method_call_cost())?;
+                    let evaled_target = self.eval_expr(&target.as_ref().unwrap(), env)?;
+                    let evaled_args = arguments
+                        .iter()
+                        .map(|arg| self.eval_expr(arg, env))
+                        .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+                    let result_par = match self.method_table().get(method_name) {
+                        Some(mth) => mth.apply(evaled_target, evaled_args)?,
+                        None => {
+                            return Err(InterpreterError::ReduceError(format!(
+                                "Unimplemented method: {:?}",
+                                method_name
+                            )))
+                        }
+                    };
+
+                    let result_expr = self.eval_single_expr(&result_par, env)?;
+                    Ok(result_expr)
+                }
             },
             None => Err(InterpreterError::ReduceError(format!(
                 "Unimplemented expression: {:?}",
@@ -1804,164 +1858,4 @@ impl DebruijnInterpreter {
 
 trait Method {
     fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError>;
-}
-
-struct ToByteArrayMethod;
-
-impl Method for ToByteArrayMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct HexToBytesMethod;
-
-impl Method for HexToBytesMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct BytesToHexMethod;
-
-impl Method for BytesToHexMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct ToUtf8BytesMethod;
-
-impl Method for ToUtf8BytesMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct UnionMethod;
-
-impl Method for UnionMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct DiffMethod;
-
-impl Method for DiffMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct AddMethod;
-
-impl Method for AddMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct DeleteMethod;
-
-impl Method for DeleteMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct ContainsMethod;
-
-impl Method for ContainsMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct GetMethod;
-
-impl Method for GetMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct GetOrElseMethod;
-
-impl Method for GetOrElseMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct SetMethod;
-
-impl Method for SetMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct KeysMethod;
-
-impl Method for KeysMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct SizeMethod;
-
-impl Method for SizeMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct LengthMethod;
-
-impl Method for LengthMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct SliceMethod;
-
-impl Method for SliceMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct TakeMethod;
-
-impl Method for TakeMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct ToListMethod;
-
-impl Method for ToListMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct ToSetMethod;
-
-impl Method for ToSetMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
-}
-
-struct ToMapMethod;
-
-impl Method for ToMapMethod {
-    fn apply(&self, p: Par, args: Vec<Par>) -> Result<Par, InterpreterError> {
-        todo!()
-    }
 }
