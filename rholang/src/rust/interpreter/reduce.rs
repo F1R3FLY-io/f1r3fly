@@ -12,6 +12,8 @@ use models::rhoapi::{
     ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
+use models::rust::par_map::ParMap;
+use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
 use models::rust::utils::{new_gint_par, new_gstring_par, union};
 use models::ByteString;
@@ -1880,24 +1882,26 @@ impl DebruijnInterpreter {
                         })
                     }
 
-                    (ExprInstance::EMapBody(base_map), ExprInstance::EMapBody(other_map)) => {
+                    (ExprInstance::EMapBody(base_emap), ExprInstance::EMapBody(other_emap)) => {
+                        let base_par_map = ParMapTypeMapper::emap_to_par_map(base_emap);
+                        let other_par_map = ParMapTypeMapper::emap_to_par_map(other_emap);
+
+                        let mut base_ps = base_par_map.ps;
+                        let other_ps = other_par_map.ps;
+
                         self.outer
                             .cost
-                            .charge(diff_cost(other_map.kvs.len() as i64))?;
+                            .charge(diff_cost(other_ps.length() as i64))?;
 
-                        // Ok(Expr {
-                        //     expr_instance: Some(ExprInstance::EMapBody(EMap {
-                        //         kvs: {
-                        //             let base_hash_map =
-                        //                 base_map.kvs.into_iter().map(|(k, v)| {}).collect();
-                        //         },
-                        //         locally_free: Vec::new(),
-                        //         connective_used: false,
-                        //         remainder: None,
-                        //     })),
-                        // })
+                        let new_par_map = ParMap::create_from_sorted_par_map(
+                            base_ps.remove_multiple(other_ps.keys()),
+                        );
 
-                        todo!()
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::EMapBody(
+                                ParMapTypeMapper::par_map_to_emap(new_par_map),
+                            )),
+                        })
                     }
 
                     (other, _) => Err(InterpreterError::MethodNotDefined {

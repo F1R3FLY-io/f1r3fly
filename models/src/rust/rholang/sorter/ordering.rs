@@ -1,0 +1,31 @@
+// See models/src/main/scala/coop/rchain/models/rholang/sorter/ordering.scala
+
+use std::collections::HashMap;
+
+use crate::rhoapi::Par;
+
+use super::{par_sort_matcher::ParSortMatcher, score_tree::ScoredTerm, sortable::Sortable};
+
+pub struct Ordering;
+
+impl Ordering {
+    pub fn sort_key_value_pair(key: &Par, value: &Par) -> ScoredTerm<(Par, Par)> {
+        let sorted_key = ParSortMatcher::sort_match(key);
+        let sorted_value = ParSortMatcher::sort_match(value);
+
+        ScoredTerm {
+            term: (sorted_key.term, sorted_value.term),
+            score: sorted_key.score,
+        }
+    }
+
+    pub fn sort_map(ps: &HashMap<Par, Par>) -> Vec<(Par, Par)> {
+        let mut pairs_sorted: Vec<ScoredTerm<(Par, Par)>> = ps
+            .iter()
+            .map(|kv| Ordering::sort_key_value_pair(kv.0, kv.1))
+            .collect();
+
+        pairs_sorted.sort();
+        pairs_sorted.into_iter().map(|st| st.term).collect()
+    }
+}
