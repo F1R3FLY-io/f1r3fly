@@ -1145,6 +1145,7 @@ dependencies = [
  "serde",
  "tokio",
  "tree-sitter",
+ "tree-sitter-rholang",
  "tree-sitter-rust",
  "zbase32",
 ]
@@ -1596,6 +1597,14 @@ checksum = "df7cc499ceadd4dcdf7ec6d4cbc34ece92c3fa07821e287aedecd4416c516dca"
 dependencies = [
  "cc",
  "regex",
+]
+
+[[package]]
+name = "tree-sitter-rholang"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "tree-sitter",
 ]
 
 [[package]]
