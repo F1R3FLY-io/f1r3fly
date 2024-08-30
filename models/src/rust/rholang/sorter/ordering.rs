@@ -9,6 +9,13 @@ use super::{par_sort_matcher::ParSortMatcher, score_tree::ScoredTerm, sortable::
 pub struct Ordering;
 
 impl Ordering {
+    pub fn sort_pars(ps: &Vec<Par>) -> Vec<Par> {
+        let mut ps_sorted: Vec<ScoredTerm<Par>> =
+            ps.iter().map(ParSortMatcher::sort_match).collect();
+        ps_sorted.sort();
+        ps_sorted.into_iter().map(|st| st.term).collect()
+    }
+
     pub fn sort_key_value_pair(key: &Par, value: &Par) -> ScoredTerm<(Par, Par)> {
         let sorted_key = ParSortMatcher::sort_match(key);
         let sorted_value = ParSortMatcher::sort_match(value);

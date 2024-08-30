@@ -14,6 +14,8 @@ use models::rhoapi::{
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
+use models::rust::par_set::ParSet;
+use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
 use models::rust::utils::{new_gint_par, new_gstring_par, union};
 use models::ByteString;
@@ -1857,28 +1859,34 @@ impl DebruijnInterpreter {
                     other_expr.expr_instance.clone().unwrap(),
                 ) {
                     (ExprInstance::ESetBody(base_set), ExprInstance::ESetBody(other_set)) => {
+                        let base_par_set = ParSetTypeMapper::eset_to_par_set(base_set);
+                        let other_par_set = ParSetTypeMapper::eset_to_par_set(other_set);
+
+                        let base_ps = base_par_set.ps;
+                        let other_ps = other_par_set.ps;
+
                         // diff is implemented in terms of foldLeft that at each step
                         // removes one element from the collection.
                         self.outer
                             .cost
-                            .charge(diff_cost(other_set.ps.len() as i64))?;
+                            .charge(diff_cost(other_ps.length() as i64))?;
+
+                        let base_sorted_pars_set: HashSet<Par> =
+                            base_ps.sorted_pars.into_iter().collect();
+                        let other_sorted_pars_set: HashSet<Par> =
+                            other_ps.sorted_pars.into_iter().collect();
+                        let new_par_set = ParSet::create_from_vec(
+                            base_sorted_pars_set
+                                .difference(&other_sorted_pars_set)
+                                .into_iter()
+                                .cloned()
+                                .collect(),
+                        );
 
                         Ok(Expr {
-                            expr_instance: Some(ExprInstance::ESetBody(ESet {
-                                ps: {
-                                    let base_set: HashSet<_> =
-                                        base_set.ps.iter().cloned().collect();
-                                    let other_set: HashSet<_> =
-                                        other_set.ps.iter().cloned().collect();
-
-                                    let diff: Vec<_> =
-                                        base_set.difference(&other_set).cloned().collect();
-                                    diff
-                                },
-                                locally_free: Vec::new(),
-                                connective_used: false,
-                                remainder: None,
-                            })),
+                            expr_instance: Some(ExprInstance::ESetBody(
+                                ParSetTypeMapper::par_set_to_eset(new_par_set),
+                            )),
                         })
                     }
 
