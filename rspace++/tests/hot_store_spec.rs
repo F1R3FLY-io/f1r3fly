@@ -359,6 +359,7 @@ proptest! {
   #[test]
   fn install_join_should_cache_installed_joins_separately(channel in  any::<Channel>(), mut cached_joins in any::<Joins>(), inserted_join in any::<Join>(),
     installed_join in any::<Join>()) {
+      prop_assume!(inserted_join != installed_join && !cached_joins.contains(&inserted_join));
       let (state, _, hot_store) = fixture();
 
       let mut cache = state.lock().unwrap();

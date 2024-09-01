@@ -1913,7 +1913,7 @@ impl DebruijnInterpreter {
                     }
 
                     (other, _) => Err(InterpreterError::MethodNotDefined {
-                        method: String::from("union"),
+                        method: String::from("diff"),
                         other_type: format!("{:?}", other.type_id()),
                     }),
                 }
