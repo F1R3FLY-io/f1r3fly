@@ -104,7 +104,20 @@ impl SortedParMap {
         self.sorted_list.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.ps.is_empty() && self.sorted_list.is_empty() && self.sorted_map.is_empty()
+    }
+
     fn sort(par: &Par) -> Par {
         ParSortMatcher::sort_match(&par).term.clone()
+    }
+}
+
+impl IntoIterator for SortedParMap {
+    type Item = (Par, Par);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.sorted_list.into_iter()
     }
 }

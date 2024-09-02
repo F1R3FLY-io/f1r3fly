@@ -7,8 +7,10 @@ use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::Bundle;
 use models::rhoapi::Var;
 use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
-use models::rhoapi::{EMap, KeyValuePair};
 use models::rust::block_hash::BlockHash;
+use models::rust::par_map::ParMap;
+use models::rust::par_map_type_mapper::ParMapTypeMapper;
+use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
@@ -287,24 +289,23 @@ impl RhoRuntime for RhoRuntimeImpl {
 
     fn set_invalid_blocks(&self, invalid_blocks: HashMap<BlockHash, Validator>) -> () {
         let invalid_blocks: Par = Par::default().with_exprs(vec![Expr {
-            expr_instance: Some(EMapBody(EMap {
-                kvs: {
+            expr_instance: Some(EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_sorted_par_map(SortedParMap::create_from_map(
                     invalid_blocks
                         .into_iter()
-                        .map(|(validator, block_hash)| KeyValuePair {
-                            key: Some(Par::default().with_exprs(vec![Expr {
-                                expr_instance: Some(GByteArray(validator)),
-                            }])),
-                            value: Some(Par::default().with_exprs(vec![Expr {
-                                expr_instance: Some(GByteArray(block_hash)),
-                            }])),
+                        .map(|(validator, block_hash)| {
+                            (
+                                Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(GByteArray(validator)),
+                                }]),
+                                Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(GByteArray(block_hash)),
+                                }]),
+                            )
                         })
-                        .collect()
-                },
-                locally_free: Vec::new(),
-                connective_used: false,
-                remainder: None,
-            })),
+                        .collect(),
+                )),
+            ))),
         }]);
 
         self.invalid_blocks_param.set_params(invalid_blocks)
@@ -455,24 +456,23 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
 
     fn set_invalid_blocks(&self, invalid_blocks: HashMap<BlockHash, Validator>) -> () {
         let invalid_blocks: Par = Par::default().with_exprs(vec![Expr {
-            expr_instance: Some(EMapBody(EMap {
-                kvs: {
+            expr_instance: Some(EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_sorted_par_map(SortedParMap::create_from_map(
                     invalid_blocks
                         .into_iter()
-                        .map(|(validator, block_hash)| KeyValuePair {
-                            key: Some(Par::default().with_exprs(vec![Expr {
-                                expr_instance: Some(GByteArray(validator)),
-                            }])),
-                            value: Some(Par::default().with_exprs(vec![Expr {
-                                expr_instance: Some(GByteArray(block_hash)),
-                            }])),
+                        .map(|(validator, block_hash)| {
+                            (
+                                Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(GByteArray(validator)),
+                                }]),
+                                Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(GByteArray(block_hash)),
+                                }]),
+                            )
                         })
-                        .collect()
-                },
-                locally_free: Vec::new(),
-                connective_used: false,
-                remainder: None,
-            })),
+                        .collect(),
+                )),
+            ))),
         }]);
 
         self.invalid_blocks_param.set_params(invalid_blocks)

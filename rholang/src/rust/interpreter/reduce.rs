@@ -6,10 +6,9 @@ use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
-    BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMap, EMatches, EMethod,
-    EMinus, EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, ESet, EVar,
-    Expr, GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
-    ReceiveBind, Send, Var,
+    BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
+    EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, ESet, EVar, Expr,
+    GPrivate, GUnforgeable, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::par_map::ParMap;
@@ -17,6 +16,7 @@ use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::par_set::ParSet;
 use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
+use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::{new_gint_par, new_gstring_par, union};
 use models::ByteString;
 use rspace_plus_plus::rspace::history::Either;
@@ -1189,23 +1189,25 @@ impl DebruijnInterpreter {
                     let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
 
                     match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
-                        (ExprInstance::GString(lhs), ExprInstance::EMapBody(EMap { kvs, .. })) => {
-                            if !lhs.is_empty() || !kvs.is_empty() {
-                                let key_value_pairs = kvs
+                        (ExprInstance::GString(lhs), ExprInstance::EMapBody(emap)) => {
+                            let rhs = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            if !lhs.is_empty() || !rhs.is_empty() {
+                                let key_value_pairs = rhs
                                     .clone()
                                     .into_iter()
-                                    .map(|kv| {
-                                        let key_expr =
-                                            self.eval_single_expr(&kv.key.unwrap(), env)?;
-                                        let value_expr =
-                                            self.eval_single_expr(&kv.value.unwrap(), env)?;
+                                    .map(|(k, v)| {
+                                        let key_expr = self.eval_single_expr(&k, env)?;
+                                        let value_expr = self.eval_single_expr(&v, env)?;
                                         let result = eval_to_string_pair(key_expr, value_expr)?;
                                         Ok(result)
                                     })
                                     .collect::<Result<Vec<_>, InterpreterError>>()?;
 
-                                self.cost
-                                    .charge(interpolate_cost(lhs.len() as i64, kvs.len() as i64))?;
+                                self.cost.charge(interpolate_cost(
+                                    lhs.len() as i64,
+                                    rhs.length() as i64,
+                                ))?;
+
                                 Ok(Expr {
                                     expr_instance: Some(ExprInstance::GString(interpolate(
                                         &lhs,
@@ -1444,25 +1446,25 @@ impl DebruijnInterpreter {
                     })
                 }
 
-                ExprInstance::EMapBody(map) => {
+                ExprInstance::EMapBody(emap) => {
+                    let map = ParMapTypeMapper::emap_to_par_map(emap.clone());
                     let evaled_ps = map
-                        .kvs
-                        .iter()
-                        .map(|kv| {
-                            let e_key = self.eval_expr(&kv.key.as_ref().unwrap(), env)?;
-                            let e_value = self.eval_expr(&kv.value.as_ref().unwrap(), env)?;
-                            Ok(KeyValuePair {
-                                key: Some(e_key),
-                                value: Some(e_value),
-                            })
+                        .ps
+                        .clone()
+                        .into_iter()
+                        .map(|(k, v)| {
+                            let e_key = self.eval_expr(&k, env)?;
+                            let e_value = self.eval_expr(&v, env)?;
+                            Ok((e_key, e_value))
                         })
                         .collect::<Result<Vec<_>, InterpreterError>>()?;
 
                     let mut cloned_map = map.clone();
-                    // TODO: Update 'kvs' here into type 'SortedParMap'. See Scala code
-                    cloned_map.kvs = evaled_ps;
+                    cloned_map.ps = SortedParMap::create_from_vec(evaled_ps);
                     Ok(Expr {
-                        expr_instance: Some(ExprInstance::EMapBody(cloned_map)),
+                        expr_instance: Some(ExprInstance::EMapBody(
+                            ParMapTypeMapper::par_map_to_emap(cloned_map),
+                        )),
                     })
                 }
 
@@ -1795,22 +1797,28 @@ impl DebruijnInterpreter {
                     }
 
                     (ExprInstance::EMapBody(base_map), ExprInstance::EMapBody(other_map)) => {
+                        let base_par_map = ParMapTypeMapper::emap_to_par_map(base_map.clone());
+                        let other_par_map = ParMapTypeMapper::emap_to_par_map(other_map.clone());
+
+                        let mut base_sorted_par_map = base_par_map.ps;
+                        let other_sorted_par_map = other_par_map.ps;
+
                         self.outer
                             .cost
                             .charge(union_cost(other_map.kvs.len() as i64))?;
 
                         Ok(Expr {
-                            expr_instance: Some(ExprInstance::EMapBody(EMap {
-                                kvs: base_map
-                                    .kvs
-                                    .into_iter()
-                                    .chain(other_map.kvs.into_iter())
-                                    .collect(),
-                                locally_free: union(base_map.locally_free, other_map.locally_free),
-                                connective_used: base_map.connective_used
-                                    || other_map.connective_used,
-                                remainder: None,
-                            })),
+                            expr_instance: Some(ExprInstance::EMapBody(
+                                ParMapTypeMapper::par_map_to_emap(ParMap::new(
+                                    base_sorted_par_map
+                                        .extend(other_sorted_par_map.into_iter().collect())
+                                        .into_iter()
+                                        .collect(),
+                                    base_map.connective_used || other_map.connective_used,
+                                    union(base_map.locally_free, other_map.locally_free),
+                                    None,
+                                )),
+                            )),
                         })
                     }
 
@@ -1927,20 +1935,18 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                // if !args.len() != 1 {
-                //     return Err(InterpreterError::MethodArgumentNumberMismatch {
-                //         method: String::from("union"),
-                //         expected: 1,
-                //         actual: args.len(),
-                //     });
-                // } else {
-                //     let base_expr = self.outer.eval_single_expr(&p, env)?;
-                //     let other_expr = self.outer.eval_single_expr(&args[0], env)?;
-                //     let result = self.union(&base_expr, &other_expr)?;
-                //     Ok(Par::default().with_exprs(vec![result]))
-                // }
-
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("diff"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let other_expr = self.outer.eval_single_expr(&args[0], env)?;
+                    let result = self.diff(&base_expr, &other_expr)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
             }
         }
 

@@ -18,8 +18,10 @@ use std::collections::BTreeMap;
 use connective::ConnectiveInstance::*;
 use expr::ExprInstance::*;
 use g_unforgeable::UnfInstance::GPrivateBody;
-use models::{rhoapi::*, rust::rholang::implicits::vector_par};
+use models::rust::par_map::ParMap;
+use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::utils::*;
+use models::{rhoapi::*, rust::rholang::implicits::vector_par};
 use rholang::rust::interpreter::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
 
 use crate::matcher::utils::{prepend_connective, prepend_expr};
@@ -2066,33 +2068,19 @@ fn matching_plus_plus_should_work() {
 
 #[test]
 fn matching_percent_percent_should_work() {
-    let map = EMapBody(EMap {
-        kvs: vec![KeyValuePair {
-            key: Some(new_gstring_par("name".to_string(), Vec::new(), false)),
-            value: Some(new_gstring_par("a".to_string(), Vec::new(), false)),
-        }],
-        locally_free: Vec::new(),
-        connective_used: false,
-        remainder: None,
-    });
-    let map_par: Par = vector_par(Vec::new(), false).with_exprs(vec![Expr {
-        expr_instance: Some(EMapBody(EMap {
-            kvs: vec![KeyValuePair {
-                key: Some(new_gstring_par("name".to_string(), Vec::new(), false)),
-                value: Some(new_gstring_par("a".to_string(), Vec::new(), false)),
-            }],
-            locally_free: Vec::new(),
-            connective_used: false,
-            remainder: None,
-        })),
+    let map: Par = vector_par(Vec::new(), false).with_exprs(vec![Expr {
+        expr_instance: Some(EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![(
+                new_gstring_par("name".to_string(), Vec::new(), false),
+                new_gstring_par("a".to_string(), Vec::new(), false),
+            )]),
+        ))),
     }]);
 
     let target = vector_par(Vec::new(), false).with_exprs(vec![Expr {
         expr_instance: Some(EPercentPercentBody(EPercentPercent {
             p1: Some(new_gstring_par("${name}".to_string(), Vec::new(), false)),
-            p2: Some(vector_par(Vec::new(), false).with_exprs(vec![Expr {
-                expr_instance: Some(map),
-            }])),
+            p2: Some(map.clone()),
         })),
     }]);
 
@@ -2105,7 +2093,7 @@ fn matching_percent_percent_should_work() {
 
     let expected_captures = BTreeMap::from([
         (0, new_gstring_par("${name}".to_string(), Vec::new(), false)),
-        (1, map_par),
+        (1, map),
     ]);
     assert!(assert_spatial_match(target, pattern, Some(expected_captures)).is_ok());
 }

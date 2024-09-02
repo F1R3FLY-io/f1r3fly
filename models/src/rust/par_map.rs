@@ -4,6 +4,7 @@ use crate::rhoapi::{Par, Var};
 
 use super::{sorted_par_map::SortedParMap, utils::union};
 
+#[derive(Clone)]
 pub struct ParMap {
     pub ps: SortedParMap,
     pub connective_used: bool,
