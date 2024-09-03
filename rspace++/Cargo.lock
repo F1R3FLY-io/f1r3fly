@@ -1144,7 +1144,7 @@ dependencies = [
  "rspace_plus_plus",
  "serde",
  "tokio",
- "tree-sitter",
+ "tree-sitter 0.22.6",
  "tree-sitter-rholang",
  "tree-sitter-rust",
  "zbase32",
@@ -1591,6 +1591,16 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter"
+version = "0.20.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e747b1f9b7b931ed39a548c1fae149101497de3c1fc8d9e18c62c1a66c683d3d"
+dependencies = [
+ "cc",
+ "regex",
+]
+
+[[package]]
+name = "tree-sitter"
 version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df7cc499ceadd4dcdf7ec6d4cbc34ece92c3fa07821e287aedecd4416c516dca"
@@ -1604,7 +1614,7 @@ name = "tree-sitter-rholang"
 version = "0.0.1"
 dependencies = [
  "cc",
- "tree-sitter",
+ "tree-sitter 0.20.10",
 ]
 
 [[package]]
@@ -1614,7 +1624,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "277690f420bf90741dea984f3da038ace46c4fe6047cba57a66822226cde1c93"
 dependencies = [
  "cc",
- "tree-sitter",
+ "tree-sitter 0.22.6",
 ]
 
 [[package]]

@@ -8,8 +8,6 @@
  * to 'assertSpatialMatch' even though 'assertSpatialMatch' takes type 'Par'
  * For example: passing an 'Expr', 'Expr' to function that takes type 'Par', 'Par'
  *
- * For type 'ParSet' on Scala side, I am using type 'ESet'
- * For type 'ParMap' on Scala side, I am using type 'EMap'
  *
  * Might be able to use '::default()' at certain points
 */
