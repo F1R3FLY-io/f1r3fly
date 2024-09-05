@@ -18,6 +18,8 @@ use expr::ExprInstance::*;
 use g_unforgeable::UnfInstance::GPrivateBody;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
+use models::rust::par_set::ParSet;
+use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::utils::*;
 use models::{rhoapi::*, rust::rholang::implicits::vector_par};
 use rholang::rust::interpreter::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
@@ -2098,48 +2100,48 @@ fn matching_percent_percent_should_work() {
 
 #[test]
 fn matching_minus_minus_should_work() {
-    let lhs_set = ESetBody(ESet {
-        ps: vec![
+    let lhs_set = ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
+        vec![
             new_gint_par(1, Vec::new(), false),
             new_gint_par(2, Vec::new(), false),
             new_gint_par(3, Vec::new(), false),
         ],
-        locally_free: Vec::new(),
-        connective_used: false,
-        remainder: None,
-    });
+        false,
+        Vec::new(),
+        None,
+    )));
     let lhs_set_par: Par = vector_par(Vec::new(), false).with_exprs(vec![Expr {
-        expr_instance: Some(ESetBody(ESet {
-            ps: vec![
+        expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
+            vec![
                 new_gint_par(1, Vec::new(), false),
                 new_gint_par(2, Vec::new(), false),
                 new_gint_par(3, Vec::new(), false),
             ],
-            locally_free: Vec::new(),
-            connective_used: false,
-            remainder: None,
-        })),
+            false,
+            Vec::new(),
+            None,
+        )))),
     }]);
 
-    let rhs_set = ESetBody(ESet {
-        ps: vec![
+    let rhs_set = ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
+        vec![
             new_gint_par(1, Vec::new(), false),
             new_gint_par(2, Vec::new(), false),
         ],
-        locally_free: Vec::new(),
-        connective_used: false,
-        remainder: None,
-    });
+        false,
+        Vec::new(),
+        None,
+    )));
     let rhs_set_par: Par = vector_par(Vec::new(), false).with_exprs(vec![Expr {
-        expr_instance: Some(ESetBody(ESet {
-            ps: vec![
+        expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
+            vec![
                 new_gint_par(1, Vec::new(), false),
                 new_gint_par(2, Vec::new(), false),
             ],
-            locally_free: Vec::new(),
-            connective_used: false,
-            remainder: None,
-        })),
+            false,
+            Vec::new(),
+            None,
+        )))),
     }]);
 
     let target = vector_par(Vec::new(), false).with_exprs(vec![Expr {

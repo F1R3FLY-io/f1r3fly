@@ -1,4 +1,5 @@
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
+use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::single_expr;
 use models::rust::rholang::implicits::vector_par;
 use models::rust::utils::*;
@@ -449,19 +450,26 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
             ) => self.fold_match(tlist, plist, None).map(|_| ()),
 
             (
-                Some(ESetBody(ESet {
-                    ps: tlist,
-                    locally_free: _,
-                    connective_used: _,
-                    remainder: _,
-                })),
-                Some(ESetBody(ESet {
-                    ps: plist,
-                    locally_free: _,
-                    connective_used: _,
-                    remainder: rem,
-                })),
+                Some(ESetBody(
+                    t_set @ ESet {
+                        ps: _,
+                        locally_free: _,
+                        connective_used: _,
+                        remainder: _,
+                    },
+                )),
+                Some(ESetBody(
+                    ref p_set @ ESet {
+                        ps: _,
+                        locally_free: _,
+                        connective_used: _,
+                        remainder: ref rem,
+                    },
+                )),
             ) => {
+                let tlist = ParSetTypeMapper::eset_to_par_set(t_set.clone()).ps;
+                let plist = ParSetTypeMapper::eset_to_par_set(p_set.clone()).ps;
+
                 let is_wildcard = match rem {
                     Some(Var {
                         var_instance: Some(Wildcard(_)),
@@ -482,12 +490,18 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
 
                 list_match!(Par);
                 // println!("\ncalling list_match_single_ in ESetBody");
-                self.list_match_single_(tlist, plist, &merger, remainder_var_opt, is_wildcard)
+                self.list_match_single_(
+                    tlist.sorted_pars,
+                    plist.sorted_pars,
+                    &merger,
+                    remainder_var_opt.copied(),
+                    is_wildcard,
+                )
             }
 
             (
                 Some(EMapBody(
-                    ref t_emap @ EMap {
+                    t_emap @ EMap {
                         kvs: _,
                         locally_free: _,
                         connective_used: _,

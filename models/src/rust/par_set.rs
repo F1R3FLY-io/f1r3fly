@@ -4,6 +4,7 @@ use crate::rhoapi::{Par, Var};
 
 use super::{sorted_par_hash_set::SortedParHashSet, utils::union};
 
+#[derive(Clone)]
 pub struct ParSet {
     pub ps: SortedParHashSet,
     pub connective_used: bool,

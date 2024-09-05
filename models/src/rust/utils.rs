@@ -11,6 +11,8 @@ use crate::rust::utils::var::WildcardMsg;
 
 use super::par_map::ParMap;
 use super::par_map_type_mapper::ParMapTypeMapper;
+use super::par_set::ParSet;
+use super::par_set_type_mapper::ParSetTypeMapper;
 use super::rholang::implicits::vector_par;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -313,12 +315,12 @@ pub fn new_eset_expr(
     _remainder: Option<Var>,
 ) -> Expr {
     Expr {
-        expr_instance: Some(ESetBody(ESet {
-            ps: _ps,
-            locally_free: _locally_free,
-            connective_used: _connective_used,
-            remainder: _remainder,
-        })),
+        expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
+            _ps,
+            _connective_used,
+            _locally_free,
+            _remainder,
+        )))),
     }
 }
 

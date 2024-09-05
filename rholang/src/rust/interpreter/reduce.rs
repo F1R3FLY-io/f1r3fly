@@ -16,6 +16,7 @@ use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::par_set::ParSet;
 use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
+use models::rust::sorted_par_hash_set::SortedParHashSet;
 use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::{new_gint_par, new_gstring_par, union};
 use models::ByteString;
@@ -1426,9 +1427,11 @@ impl DebruijnInterpreter {
                     })
                 }
 
-                ExprInstance::ESetBody(set) => {
+                ExprInstance::ESetBody(eset) => {
+                    let set = ParSetTypeMapper::eset_to_par_set(eset.clone());
                     let evaled_ps = set
                         .ps
+                        .sorted_pars
                         .iter()
                         .map(|p| self.eval_expr(p, env))
                         .collect::<Result<Vec<_>, InterpreterError>>()?;
@@ -1439,10 +1442,11 @@ impl DebruijnInterpreter {
                         .collect();
 
                     let mut cloned_set = set.clone();
-                    // TODO: Update 'ps' here into type 'SortedParHashSet'. See Scala code
-                    cloned_set.ps = updated_ps;
+                    cloned_set.ps = SortedParHashSet::create_from_vec(updated_ps);
                     Ok(Expr {
-                        expr_instance: Some(ExprInstance::ESetBody(cloned_set)),
+                        expr_instance: Some(ExprInstance::ESetBody(
+                            ParSetTypeMapper::par_set_to_eset(cloned_set),
+                        )),
                     })
                 }
 
@@ -1781,23 +1785,34 @@ impl DebruijnInterpreter {
                     other_expr.expr_instance.clone().unwrap(),
                 ) {
                     (ExprInstance::ESetBody(base_set), ExprInstance::ESetBody(other_set)) => {
+                        let base_par_set = ParSetTypeMapper::eset_to_par_set(base_set);
+                        let other_par_set = ParSetTypeMapper::eset_to_par_set(other_set);
+
+                        let base_ps = base_par_set.ps;
+                        let other_ps = other_par_set.ps;
+
                         self.outer
                             .cost
-                            .charge(union_cost(other_set.ps.len() as i64))?;
+                            .charge(union_cost(other_ps.length() as i64))?;
 
                         Ok(Expr {
-                            expr_instance: Some(ExprInstance::ESetBody(ESet {
-                                ps: union(base_set.ps, other_set.ps),
-                                locally_free: union(base_set.locally_free, other_set.locally_free),
-                                connective_used: base_set.connective_used
-                                    || other_set.connective_used,
-                                remainder: None,
-                            })),
+                            expr_instance: Some(ExprInstance::ESetBody(
+                                ParSetTypeMapper::par_set_to_eset(ParSet {
+                                    ps: base_ps.union(other_ps.ps),
+                                    connective_used: base_par_set.connective_used
+                                        || other_par_set.connective_used,
+                                    locally_free: union(
+                                        base_par_set.locally_free,
+                                        other_par_set.locally_free,
+                                    ),
+                                    remainder: None,
+                                }),
+                            )),
                         })
                     }
 
                     (ExprInstance::EMapBody(base_map), ExprInstance::EMapBody(other_map)) => {
-                        let base_par_map = ParMapTypeMapper::emap_to_par_map(base_map.clone());
+                        let base_par_map = ParMapTypeMapper::emap_to_par_map(base_map);
                         let other_par_map = ParMapTypeMapper::emap_to_par_map(other_map.clone());
 
                         let mut base_sorted_par_map = base_par_map.ps;
@@ -1814,8 +1829,8 @@ impl DebruijnInterpreter {
                                         .extend(other_sorted_par_map.into_iter().collect())
                                         .into_iter()
                                         .collect(),
-                                    base_map.connective_used || other_map.connective_used,
-                                    union(base_map.locally_free, other_map.locally_free),
+                                    base_par_map.connective_used || other_par_map.connective_used,
+                                    union(base_par_map.locally_free, other_par_map.locally_free),
                                     None,
                                 )),
                             )),
