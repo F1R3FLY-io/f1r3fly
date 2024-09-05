@@ -1,6 +1,13 @@
 pub mod bundle_sort_matcher;
 pub mod connective_sort_matcher;
+pub mod expr_sort_matcher;
+pub mod match_sort_matcher;
+pub mod new_sort_matcher;
 pub mod ordering;
 pub mod par_sort_matcher;
+pub mod receive_sort_matcher;
 pub mod score_tree;
+pub mod send_sort_matcher;
 pub mod sortable;
+pub mod unforgeable_sort_matcher;
+pub mod var_sort_matcher;

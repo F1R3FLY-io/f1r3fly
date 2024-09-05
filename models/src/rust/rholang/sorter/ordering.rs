@@ -12,7 +12,7 @@ impl Ordering {
     pub fn sort_pars(ps: &Vec<Par>) -> Vec<Par> {
         let mut ps_sorted: Vec<ScoredTerm<Par>> =
             ps.iter().map(ParSortMatcher::sort_match).collect();
-        ps_sorted.sort();
+        ScoredTerm::sort_vec(&mut ps_sorted);
         ps_sorted.into_iter().map(|st| st.term).collect()
     }
 
@@ -32,7 +32,7 @@ impl Ordering {
             .map(|kv| Ordering::sort_key_value_pair(kv.0, kv.1))
             .collect();
 
-        pairs_sorted.sort();
+        ScoredTerm::sort_vec(&mut pairs_sorted);
         pairs_sorted.into_iter().map(|st| st.term).collect()
     }
 }

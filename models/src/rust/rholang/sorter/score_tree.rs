@@ -18,25 +18,64 @@ use crate::ByteString;
  */
 pub struct ScoreTree;
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[derive(Clone)]
 pub enum Tree<T> {
     Leaf(T),
     Node(Vec<Tree<T>>),
 }
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[derive(Clone)]
 pub enum TaggedAtom {
     IntAtom(i64),
     StringAtom(String),
     BytesAtom(ByteString),
 }
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[derive(Clone)]
 pub struct ScoreAtom {
     value: TaggedAtom,
 }
 
 impl ScoreAtom {
+    fn bs_compare(&self, b1: &ByteString, b2: &ByteString) -> i32 {
+        let mut it1 = b1.iter();
+        let mut it2 = b2.iter();
+
+        loop {
+            match (it1.next(), it2.next()) {
+                (Some(&byte1), Some(&byte2)) => {
+                    let comp = byte1.cmp(&byte2);
+
+                    if comp != std::cmp::Ordering::Equal {
+                        return comp as i32;
+                    }
+                }
+
+                (Some(_), None) => return 1,
+                (None, Some(_)) => return -1,
+                (None, None) => return 0,
+            }
+        }
+    }
+
+    pub fn compare(&self, that: &ScoreAtom) -> i32 {
+        match (&self.value, &that.value) {
+            (TaggedAtom::IntAtom(i1), TaggedAtom::IntAtom(i2)) => i1.cmp(i2) as i32,
+
+            (TaggedAtom::IntAtom(_), _) => -1,
+
+            (_, TaggedAtom::IntAtom(_)) => 1,
+
+            (TaggedAtom::StringAtom(s1), TaggedAtom::StringAtom(s2)) => s1.cmp(s2) as i32,
+
+            (TaggedAtom::StringAtom(_), _) => -1,
+
+            (_, TaggedAtom::StringAtom(_)) => 1,
+
+            (TaggedAtom::BytesAtom(b1), TaggedAtom::BytesAtom(b2)) => self.bs_compare(b1, b2),
+        }
+    }
+
     pub fn create_from_i64(value: i64) -> ScoreAtom {
         ScoreAtom {
             value: TaggedAtom::IntAtom(value),
@@ -92,10 +131,56 @@ impl<T> Tree<T> {
 }
 
 // Effectively a tuple that groups the term to its score tree.
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[derive(Clone)]
 pub struct ScoredTerm<T> {
     pub term: T,
     pub score: Tree<ScoreAtom>,
+}
+
+impl<T: Clone> ScoredTerm<T> {
+    pub fn sort_vec(scored_terms: &mut Vec<ScoredTerm<T>>) {
+        fn compare_score(s1: &Tree<ScoreAtom>, s2: &Tree<ScoreAtom>) -> i32 {
+            match (s1, s2) {
+                (Tree::Leaf(a), Tree::Leaf(b)) => a.compare(&b),
+
+                (Tree::Leaf(_), Tree::Node(_)) => -1,
+
+                (Tree::Node(_), Tree::Leaf(_)) => 1,
+
+                (Tree::Node(a), Tree::Node(b)) => match (a.is_empty(), b.is_empty()) {
+                    (true, true) => 0,
+
+                    (true, false) => -1,
+
+                    (false, true) => 1,
+
+                    (false, false) => {
+                        let (h1, t1) = (a[0].clone(), &a[1..]);
+
+                        let (h2, t2) = (b[0].clone(), &b[1..]);
+
+                        match compare_score(&h1, &h2) {
+                            0 => compare_score(&Tree::Node(t1.to_vec()), &Tree::Node(t2.to_vec())),
+
+                            other => other,
+                        }
+                    }
+                },
+            }
+        }
+
+        scored_terms.sort_by(|s1, s2| {
+            let result = compare_score(&s1.score, &s2.score);
+
+            if result.is_negative() {
+                std::cmp::Ordering::Less
+            } else if result.is_positive() {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+    }
 }
 
 /**
@@ -103,12 +188,10 @@ pub struct ScoredTerm<T> {
 *
 * The general order is ground, vars, arithmetic, comparisons, logical, and then others
 */
-
 pub struct Score;
 
 impl Score {
     // For things that are truly optional
-
     pub const ABSENT: i32 = 0;
 
     // Ground types
