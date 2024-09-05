@@ -4,8 +4,7 @@ use models::rust::utils::union;
 
 use super::exports::*;
 
-// See models/src/main/scala/coop/rchain/models/HasLocallyFree.scala - HasLocallyFree
-// Also see models/src/main/scala/coop/rchain/models/rholang/implicits.scala - line 357 and beyond
+// See models/src/main/scala/coop/rchain/models/HasLocallyFree.scala
 pub trait HasLocallyFree<T> {
     /** Return true if a connective (including free variables and wildcards) is
      *  used anywhere in {@code source}.
@@ -32,6 +31,21 @@ pub trait HasLocallyFree<T> {
     fn locally_free(&self, source: T, depth: i32) -> Vec<u8>;
 }
 
+// forTuple
+impl HasLocallyFree<(Par, Par)> for SpatialMatcherContext {
+    fn connective_used(&self, source: (Par, Par)) -> bool {
+        self.connective_used(source.0) || self.connective_used(source.1)
+    }
+
+    fn locally_free(&self, source: (Par, Par), depth: i32) -> Vec<u8> {
+        union(
+            self.locally_free(source.0, depth),
+            self.locally_free(source.1, depth),
+        )
+    }
+}
+
+// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - line 357 and beyond
 impl HasLocallyFree<Par> for SpatialMatcherContext {
     fn connective_used(&self, p: Par) -> bool {
         p.connective_used
@@ -344,19 +358,6 @@ impl HasLocallyFree<Connective> for SpatialMatcherContext {
             }
             _ => Default::default(),
         }
-    }
-}
-
-// See models/src/main/scala/coop/rchain/models/HasLocallyFree.scala
-impl HasLocallyFree<KeyValuePair> for SpatialMatcherContext {
-    fn connective_used(&self, kv: KeyValuePair) -> bool {
-        self.connective_used(kv.key.unwrap()) || self.connective_used(kv.value.unwrap())
-    }
-
-    fn locally_free(&self, kv: KeyValuePair, depth: i32) -> Vec<u8> {
-        let mut result = self.locally_free(kv.key.unwrap(), depth);
-        result.append(&mut self.locally_free(kv.value.unwrap(), depth));
-        result
     }
 }
 

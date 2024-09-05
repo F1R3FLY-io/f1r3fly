@@ -1,3 +1,4 @@
+use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::rholang::implicits::single_expr;
 use models::rust::rholang::implicits::vector_par;
 use models::rust::utils::*;
@@ -35,6 +36,14 @@ impl SpatialMatcherContext {
             Some(_) => Some(&self.free_map),
             None => None,
         }
+    }
+}
+
+// See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - forTuple
+impl SpatialMatcher<(Par, Par), (Par, Par)> for SpatialMatcherContext {
+    fn spatial_match(&mut self, target: (Par, Par), pattern: (Par, Par)) -> Option<()> {
+        self.spatial_match(target.0, pattern.0)
+            .and_then(|_| self.spatial_match(target.1, pattern.1))
     }
 }
 
@@ -477,19 +486,26 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
             }
 
             (
-                Some(EMapBody(EMap {
-                    kvs: tlist,
-                    locally_free: _,
-                    connective_used: _,
-                    remainder: _,
-                })),
-                Some(EMapBody(EMap {
-                    kvs: plist,
-                    locally_free: _,
-                    connective_used: _,
-                    remainder: rem,
-                })),
+                Some(EMapBody(
+                    ref t_emap @ EMap {
+                        kvs: _,
+                        locally_free: _,
+                        connective_used: _,
+                        remainder: _,
+                    },
+                )),
+                Some(EMapBody(
+                    ref p_emap @ EMap {
+                        kvs: _,
+                        locally_free: _,
+                        connective_used: _,
+                        remainder: ref rem,
+                    },
+                )),
             ) => {
+                let tlist = ParMapTypeMapper::emap_to_par_map(t_emap.clone()).ps;
+                let plist = ParMapTypeMapper::emap_to_par_map(p_emap.clone()).ps;
+
                 let is_wildcard = match rem {
                     Some(Var {
                         var_instance: Some(Wildcard(_)),
@@ -504,13 +520,29 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
                     _ => None,
                 };
 
-                let merger = |p: Par, r: Vec<KeyValuePair>| {
-                    p.with_exprs(vec![new_emap_expr(r, Vec::new(), false, None)])
+                let merger = |p: Par, r: Vec<(Par, Par)>| {
+                    p.with_exprs(vec![new_emap_expr(
+                        r.into_iter()
+                            .map(|(k, v)| KeyValuePair {
+                                key: Some(k),
+                                value: Some(v),
+                            })
+                            .collect(),
+                        Vec::new(),
+                        false,
+                        None,
+                    )])
                 };
 
-                list_match!(KeyValuePair);
+                list_match!((Par, Par));
                 // println!("\ncalling list_match_single_ in EMapBody");
-                self.list_match_single_(tlist, plist, &merger, remainder_var_opt, is_wildcard)
+                self.list_match_single_(
+                    tlist.sorted_list,
+                    plist.sorted_list,
+                    &merger,
+                    remainder_var_opt.copied(),
+                    is_wildcard,
+                )
             }
 
             (Some(EVarBody(EVar { v: vp })), Some(EVarBody(EVar { v: vt }))) => guard(vp == vt),
@@ -613,9 +645,9 @@ impl SpatialMatcher<MatchCase, MatchCase> for SpatialMatcherContext {
 // This implementation for type 'KeyValuePair' is NOT on the Scala side
 // Somewhere, somehow, on Scala side they are are just calling this logic
 // Could be related to ParMap. See RhoTypes.proto and how they set custom types for fields
-impl SpatialMatcher<KeyValuePair, KeyValuePair> for SpatialMatcherContext {
-    fn spatial_match(&mut self, target: KeyValuePair, pattern: KeyValuePair) -> Option<()> {
-        self.spatial_match(target.key.unwrap(), pattern.key.unwrap())
-            .and_then(|_| self.spatial_match(target.value.unwrap(), pattern.value.unwrap()))
-    }
-}
+// impl SpatialMatcher<KeyValuePair, KeyValuePair> for SpatialMatcherContext {
+//     fn spatial_match(&mut self, target: KeyValuePair, pattern: KeyValuePair) -> Option<()> {
+//         self.spatial_match(target.key.unwrap(), pattern.key.unwrap())
+//             .and_then(|_| self.spatial_match(target.value.unwrap(), pattern.value.unwrap()))
+//     }
+// }

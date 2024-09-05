@@ -9,6 +9,8 @@ use crate::rust::utils::expr::ExprInstance::*;
 use crate::rust::utils::var::VarInstance::{BoundVar, FreeVar, Wildcard};
 use crate::rust::utils::var::WildcardMsg;
 
+use super::par_map::ParMap;
+use super::par_map_type_mapper::ParMapTypeMapper;
 use super::rholang::implicits::vector_par;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -343,12 +345,20 @@ pub fn new_emap_expr(
     _remainder: Option<Var>,
 ) -> Expr {
     Expr {
-        expr_instance: Some(EMapBody(EMap {
-            kvs: _kvs,
-            locally_free: _locally_free,
-            connective_used: _connective_used,
-            remainder: _remainder,
-        })),
+        expr_instance: Some(EMapBody(ParMapTypeMapper::par_map_to_emap(ParMap::new(
+            _kvs.into_iter()
+                .filter_map(|kv| {
+                    if let (Some(key), Some(value)) = (kv.key, kv.value) {
+                        Some((key, value))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            _connective_used,
+            _locally_free,
+            _remainder,
+        )))),
     }
 }
 
