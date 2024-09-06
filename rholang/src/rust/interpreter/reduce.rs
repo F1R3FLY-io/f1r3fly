@@ -7,9 +7,9 @@ use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
-    EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, ESet, EVar, Expr,
-    GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
-    ReceiveBind, Send, Var,
+    EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
+    GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
+    Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::par_map::ParMap;
@@ -180,6 +180,10 @@ type Application = Option<(
     Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     bool,
 )>;
+
+trait Method {
+    fn apply(&self, p: Par, args: Vec<Par>, env: &Env<Par>) -> Result<Par, InterpreterError>;
+}
 
 /**
  * Materialize a send in the store, optionally returning the matched continuation.
@@ -1692,7 +1696,7 @@ impl DebruijnInterpreter {
                 &self,
                 p: Par,
                 args: Vec<Par>,
-                env: &Env<Par>,
+                _env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
                 if !args.is_empty() {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
@@ -1739,7 +1743,7 @@ impl DebruijnInterpreter {
                 &self,
                 p: Par,
                 args: Vec<Par>,
-                env: &Env<Par>,
+                _env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
                 if !args.is_empty() {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
@@ -3006,15 +3010,125 @@ impl DebruijnInterpreter {
     }
 
     fn eval_single_expr(&self, p: &Par, env: &Env<Par>) -> Result<Expr, InterpreterError> {
-        todo!()
+        if !p.sends.is_empty()
+            && !p.receives.is_empty()
+            && !p.news.is_empty()
+            && !p.matches.is_empty()
+            && !p.unforgeables.is_empty()
+            && !p.bundles.is_empty()
+        {
+            Err(InterpreterError::ReduceError(String::from(
+                "Error: parallel or non expression found where expression expected.",
+            )))
+        } else {
+            match p.exprs.as_slice() {
+                [e] => Ok(self.eval_expr_to_expr(&e, env)?),
+
+                _ => Err(InterpreterError::ReduceError(
+                    "Error: Multiple expressions given.".to_string(),
+                )),
+            }
+        }
     }
 
     fn eval_to_i64(&self, p: &Par, env: &Env<Par>) -> Result<i64, InterpreterError> {
-        todo!()
+        if !p.sends.is_empty()
+            && !p.receives.is_empty()
+            && !p.news.is_empty()
+            && !p.matches.is_empty()
+            && !p.unforgeables.is_empty()
+            && !p.bundles.is_empty()
+        {
+            Err(InterpreterError::ReduceError(String::from(
+                "Error: parallel or non expression found where expression expected.",
+            )))
+        } else {
+            match p.exprs.as_slice() {
+                [Expr {
+                    expr_instance: Some(ExprInstance::GInt(v)),
+                }] => Ok(*v),
+
+                [Expr {
+                    expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
+                }] => {
+                    let p = self
+                        .eval_var(&v.clone().expect("Var field was none, should be some"), env)?;
+                    self.eval_to_i64(&p, env)
+                }
+
+                [e] => {
+                    let evaled = self.eval_expr_to_expr(&e, env)?;
+
+                    match evaled.expr_instance {
+                        Some(expr_instance) => match expr_instance {
+                            ExprInstance::GInt(v) => Ok(v),
+
+                            _ => Err(InterpreterError::ReduceError(
+                                "Error: expression didn't evaluate to integer.".to_string(),
+                            )),
+                        },
+                        None => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("expr_instance"),
+                            other_type: String::from("None"),
+                        }),
+                    }
+                }
+
+                _ => Err(InterpreterError::ReduceError(
+                    "Error: Integer expected, or unimplemented expression.".to_string(),
+                )),
+            }
+        }
     }
 
     fn eval_to_bool(&self, p: &Par, env: &Env<Par>) -> Result<bool, InterpreterError> {
-        todo!()
+        if !p.sends.is_empty()
+            && !p.receives.is_empty()
+            && !p.news.is_empty()
+            && !p.matches.is_empty()
+            && !p.unforgeables.is_empty()
+            && !p.bundles.is_empty()
+        {
+            Err(InterpreterError::ReduceError(String::from(
+                "Error: parallel or non expression found where expression expected.",
+            )))
+        } else {
+            match p.exprs.as_slice() {
+                [Expr {
+                    expr_instance: Some(ExprInstance::GBool(b)),
+                }] => Ok(*b),
+
+                [Expr {
+                    expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
+                }] => {
+                    let p = self
+                        .eval_var(&v.clone().expect("Var field was none, should be some"), env)?;
+                    self.eval_to_bool(&p, env)
+                }
+
+                [e] => {
+                    let evaled = self.eval_expr_to_expr(&e, env)?;
+
+                    match evaled.expr_instance {
+                        Some(expr_instance) => match expr_instance {
+                            ExprInstance::GBool(b) => Ok(b),
+
+                            _ => Err(InterpreterError::ReduceError(
+                                "Error: expression didn't evaluate to boolean.".to_string(),
+                            )),
+                        },
+                        None => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("expr_instance"),
+                            other_type: String::from("None"),
+                        }),
+                    }
+                }
+
+                _ => Err(InterpreterError::ReduceError(
+                    "Error: Multiple expressions given.".to_string(),
+                )),
+            }
+        }
     }
 
     fn update_locally_free_par(&self, mut par: Par) -> Par {
@@ -3114,8 +3228,4 @@ impl DebruijnInterpreter {
 
         Ok(result)
     }
-}
-
-trait Method {
-    fn apply(&self, p: Par, args: Vec<Par>, env: &Env<Par>) -> Result<Par, InterpreterError>;
 }
