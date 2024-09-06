@@ -1,4 +1,5 @@
 use models::rhoapi::g_unforgeable::UnfInstance;
+use models::rhoapi::ETuple;
 use models::rhoapi::GPrivate;
 use models::rhoapi::GSysAuthToken;
 use models::rhoapi::GUnforgeable;
@@ -88,6 +89,36 @@ impl RhoNumber {
             } = expr
             {
                 return Some(v);
+            }
+        }
+        None
+    }
+}
+
+pub struct RhoTuple2;
+
+impl RhoTuple2 {
+    pub fn create_par(tuple: (Par, Par)) -> Par {
+        Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::ETupleBody(ETuple {
+                ps: vec![tuple.0, tuple.1],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }])
+    }
+
+    pub fn unapply(p: Par) -> Option<(Par, Par)> {
+        if let Some(expr) = single_expr(&p) {
+            if let Expr {
+                expr_instance: Some(ExprInstance::ETupleBody(ETuple { ps, .. })),
+            } = expr
+            {
+                if ps.len() == 2 {
+                    return Some((ps[0].clone(), ps[1].clone()));
+                } else {
+                    return None;
+                }
             }
         }
         None

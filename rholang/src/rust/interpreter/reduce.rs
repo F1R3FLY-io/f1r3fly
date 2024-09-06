@@ -8,7 +8,8 @@ use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, ESet, EVar, Expr,
-    GPrivate, GUnforgeable, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send, Var,
+    GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive,
+    ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::par_map::ParMap;
@@ -18,7 +19,9 @@ use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
 use models::rust::sorted_par_hash_set::SortedParHashSet;
 use models::rust::sorted_par_map::SortedParMap;
-use models::rust::utils::{new_gint_par, new_gstring_par, union};
+use models::rust::utils::{
+    new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
+};
 use models::ByteString;
 use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
@@ -29,10 +32,12 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 use crate::rust::interpreter::accounting::costs::{
-    bytes_to_hex_cost, diff_cost, hex_to_bytes_cost, interpolate_cost, match_eval_cost,
-    nth_method_call_cost, to_byte_array_cost, union_cost,
+    add_cost, bytes_to_hex_cost, diff_cost, hex_to_bytes_cost, interpolate_cost, keys_method_cost,
+    length_method_cost, lookup_cost, match_eval_cost, nth_method_call_cost, remove_cost,
+    size_method_cost, slice_cost, take_cost, to_byte_array_cost, to_list_cost, union_cost,
 };
 use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
+use crate::rust::interpreter::rho_type::RhoTuple2;
 
 use super::accounting::_cost;
 use super::accounting::costs::{
@@ -1542,8 +1547,7 @@ impl DebruijnInterpreter {
                 }
 
                 self.outer.cost.charge(nth_method_call_cost())?;
-                let nth_raw = self.outer.eval_to_i64(&args[0], env)?;
-                let nth = self.outer.restrict_to_usize(nth_raw)?;
+                let nth = self.outer.eval_to_i64(&args[0], env)? as usize;
                 let v = self.outer.eval_single_expr(&p, env)?;
 
                 match v.expr_instance.unwrap() {
@@ -1973,6 +1977,41 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> AddMethod<'a> {
+            fn add(&self, base_expr: Expr, par: Par) -> Result<Expr, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::ESetBody(eset) => {
+                            let base = ParSetTypeMapper::eset_to_par_set(eset);
+                            let mut base_ps = base.ps;
+
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::ESetBody(
+                                    ParSetTypeMapper::par_set_to_eset(ParSet {
+                                        ps: base_ps.insert(par.clone()),
+                                        connective_used: base.connective_used
+                                            || par.connective_used,
+                                        locally_free: union(base.locally_free, par.locally_free),
+                                        remainder: None,
+                                    }),
+                                )),
+                            })
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("add"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("add"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for AddMethod<'a> {
             fn apply(
                 &self,
@@ -1980,7 +2019,19 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("add"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let element = self.outer.eval_expr(&args[0], env)?;
+                    self.outer.cost.charge(add_cost())?;
+                    let result = self.add(base_expr, element)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
             }
         }
 
@@ -1992,6 +2043,58 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> DeleteMethod<'a> {
+            fn delete(&self, base_expr: Expr, par: Par) -> Result<Expr, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::ESetBody(eset) => {
+                            let base = ParSetTypeMapper::eset_to_par_set(eset);
+                            let mut base_ps = base.ps;
+
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::ESetBody(
+                                    ParSetTypeMapper::par_set_to_eset(ParSet {
+                                        ps: base_ps.remove(par.clone()),
+                                        connective_used: base.connective_used
+                                            || par.connective_used,
+                                        locally_free: union(base.locally_free, par.locally_free),
+                                        remainder: None,
+                                    }),
+                                )),
+                            })
+                        }
+
+                        ExprInstance::EMapBody(emap) => {
+                            let base = ParMapTypeMapper::emap_to_par_map(emap);
+                            let mut base_ps = base.ps;
+
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::EMapBody(
+                                    ParMapTypeMapper::par_map_to_emap(ParMap {
+                                        ps: base_ps.remove(par.clone()),
+                                        connective_used: base.connective_used
+                                            || par.connective_used,
+                                        locally_free: union(base.locally_free, par.locally_free),
+                                        remainder: None,
+                                    }),
+                                )),
+                            })
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("delete"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("delete"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for DeleteMethod<'a> {
             fn apply(
                 &self,
@@ -1999,7 +2102,20 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("delete"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let element = self.outer.eval_expr(&args[0], env)?;
+                    //TODO(mateusz.gorski): think whether deletion of an element from the collection should dependent on the collection type/size - OLD
+                    self.outer.cost.charge(remove_cost())?;
+                    let result = self.delete(base_expr, element)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
             }
         }
 
@@ -2011,6 +2127,40 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> ContainsMethod<'a> {
+            fn contains(&self, base_expr: Expr, par: Par) -> Result<Expr, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::ESetBody(eset) => {
+                            let base_ps = ParSetTypeMapper::eset_to_par_set(eset).ps;
+
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GBool(base_ps.contains(par))),
+                            })
+                        }
+
+                        ExprInstance::EMapBody(emap) => {
+                            let base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GBool(base_ps.contains(par))),
+                            })
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("contains"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("contains"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for ContainsMethod<'a> {
             fn apply(
                 &self,
@@ -2018,7 +2168,19 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("contains"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let element = self.outer.eval_expr(&args[0], env)?;
+                    self.outer.cost.charge(lookup_cost())?;
+                    let result = self.contains(base_expr, element)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
             }
         }
 
@@ -2030,6 +2192,29 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> GetMethod<'a> {
+            fn get(&self, base_expr: Expr, key: Par) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => {
+                            let base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            Ok(base_ps.get_or_else(key, Par::default()))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("get"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("get"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for GetMethod<'a> {
             fn apply(
                 &self,
@@ -2037,7 +2222,19 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("get"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let key = self.outer.eval_expr(&args[0], env)?;
+                    self.outer.cost.charge(lookup_cost())?;
+                    let result = self.get(base_expr, key)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2049,6 +2246,34 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> GetOrElseMethod<'a> {
+            fn get_or_else(
+                &self,
+                base_expr: Expr,
+                key: Par,
+                default: Par,
+            ) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => {
+                            let base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            Ok(base_ps.get_or_else(key, default))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("get_or_else"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("get_or_else"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for GetOrElseMethod<'a> {
             fn apply(
                 &self,
@@ -2056,7 +2281,20 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 2 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("get_or_else"),
+                        expected: 2,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let key = self.outer.eval_expr(&args[0], env)?;
+                    let default = self.outer.eval_expr(&args[1], env)?;
+                    self.outer.cost.charge(lookup_cost())?;
+                    let result = self.get_or_else(base_expr, key, default)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2068,6 +2306,36 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> SetMethod<'a> {
+            fn set(&self, base_expr: Expr, key: Par, value: Par) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => {
+                            let mut base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            let par_map =
+                                ParMap::create_from_sorted_par_map(base_ps.insert((key, value)));
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::EMapBody(
+                                    ParMapTypeMapper::par_map_to_emap(par_map),
+                                )),
+                            }]))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("set"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("set"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for SetMethod<'a> {
             fn apply(
                 &self,
@@ -2075,7 +2343,20 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 2 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("set"),
+                        expected: 2,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let key = self.outer.eval_expr(&args[0], env)?;
+                    let value = self.outer.eval_expr(&args[1], env)?;
+                    self.outer.cost.charge(add_cost())?;
+                    let result = self.set(base_expr, key, value)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2087,6 +2368,35 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> KeysMethod<'a> {
+            fn keys(&self, base_expr: Expr) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => {
+                            let base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            let par_set = ParSet::create_from_vec(base_ps.keys());
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::ESetBody(
+                                    ParSetTypeMapper::par_set_to_eset(par_set),
+                                )),
+                            }]))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("keys"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("keys"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for KeysMethod<'a> {
             fn apply(
                 &self,
@@ -2094,7 +2404,18 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("keys"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    self.outer.cost.charge(keys_method_cost())?;
+                    let result = self.keys(base_expr)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2106,6 +2427,38 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> SizeMethod<'a> {
+            fn size(&self, base_expr: Expr) -> Result<(i64, Par), InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => {
+                            let base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            let size = base_ps.length() as i64;
+
+                            Ok((size, new_gint_par(size, Vec::new(), false)))
+                        }
+
+                        ExprInstance::ESetBody(eset) => {
+                            let base_ps = ParSetTypeMapper::eset_to_par_set(eset).ps;
+                            let size = base_ps.length() as i64;
+
+                            Ok((size, new_gint_par(size, Vec::new(), false)))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("size"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("size"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for SizeMethod<'a> {
             fn apply(
                 &self,
@@ -2113,7 +2466,18 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("size"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let result = self.size(base_expr)?;
+                    self.outer.cost.charge(size_method_cost(result.0))?;
+                    Ok(result.1)
+                }
             }
         }
 
@@ -2125,6 +2489,30 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> LengthMethod<'a> {
+            fn length(&self, base_expr: Expr) -> Result<Expr, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::GString(string) => Ok(new_gint_expr(string.len() as i64)),
+
+                        ExprInstance::GByteArray(bytes) => Ok(new_gint_expr(bytes.len() as i64)),
+
+                        ExprInstance::EListBody(elist) => Ok(new_gint_expr(elist.ps.len() as i64)),
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("length"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("length"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for LengthMethod<'a> {
             fn apply(
                 &self,
@@ -2132,7 +2520,18 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("length"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    self.outer.cost.charge(length_method_cost())?;
+                    let result = self.length(base_expr)?;
+                    Ok(Par::default().with_exprs(vec![result]))
+                }
             }
         }
 
@@ -2144,6 +2543,52 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> SliceMethod<'a> {
+            fn slice(
+                &self,
+                base_expr: Expr,
+                from: usize,
+                until: usize,
+            ) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::GString(string) => Ok(new_gstring_par(
+                            string[from..until].to_string(),
+                            Vec::new(),
+                            false,
+                        )),
+
+                        ExprInstance::EListBody(elist) => Ok(new_elist_par(
+                            elist.ps[from..until].to_vec(),
+                            elist.locally_free,
+                            elist.connective_used,
+                            elist.remainder,
+                            Vec::new(),
+                            false,
+                        )),
+
+                        ExprInstance::GByteArray(bytes) => {
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::GByteArray(
+                                    bytes[from..until].to_vec(),
+                                )),
+                            }]))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("slice"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("slice"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for SliceMethod<'a> {
             fn apply(
                 &self,
@@ -2151,7 +2596,20 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 2 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("slice"),
+                        expected: 2,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let from_arg = self.outer.eval_to_i64(&args[0], env)?;
+                    let to_arg = self.outer.eval_to_i64(&args[1], env)?;
+                    self.outer.cost.charge(slice_cost(to_arg))?;
+                    let result = self.slice(base_expr, from_arg as usize, to_arg as usize)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2163,6 +2621,33 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> TakeMethod<'a> {
+            fn take(&self, base_expr: Expr, n: usize) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EListBody(elist) => Ok(new_elist_par(
+                            elist.ps.into_iter().take(n).collect(),
+                            elist.locally_free,
+                            elist.connective_used,
+                            elist.remainder,
+                            Vec::new(),
+                            false,
+                        )),
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("take"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("take"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for TakeMethod<'a> {
             fn apply(
                 &self,
@@ -2170,7 +2655,19 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.len() != 1 {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("take"),
+                        expected: 1,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let n_arg = self.outer.eval_to_i64(&args[0], env)?;
+                    self.outer.cost.charge(take_cost(n_arg))?;
+                    let result = self.take(base_expr, n_arg as usize)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2182,6 +2679,86 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> ToListMethod<'a> {
+            fn to_list(&self, base_expr: Expr) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EListBody(elist) => {
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::EListBody(elist)),
+                            }]))
+                        }
+
+                        ExprInstance::ESetBody(eset) => {
+                            let ps = ParSetTypeMapper::eset_to_par_set(eset).ps;
+                            self.outer.cost.charge(to_list_cost(ps.length() as i64))?;
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::EListBody(EList {
+                                    ps: ps.sorted_pars,
+                                    locally_free: Vec::new(),
+                                    connective_used: false,
+                                    remainder: None,
+                                })),
+                            }]))
+                        }
+
+                        ExprInstance::EMapBody(emap) => {
+                            let ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            self.outer.cost.charge(to_list_cost(ps.length() as i64))?;
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::EListBody(EList {
+                                    ps: ps
+                                        .sorted_list
+                                        .into_iter()
+                                        .map(|(k, v)| {
+                                            Par::default().with_exprs(vec![Expr {
+                                                expr_instance: Some(ExprInstance::ETupleBody(
+                                                    ETuple {
+                                                        ps: vec![k, v],
+                                                        locally_free: Vec::new(),
+                                                        connective_used: false,
+                                                    },
+                                                )),
+                                            }])
+                                        })
+                                        .collect(),
+                                    locally_free: Vec::new(),
+                                    connective_used: false,
+                                    remainder: None,
+                                })),
+                            }]))
+                        }
+
+                        ExprInstance::ETupleBody(etuple) => {
+                            let ps = etuple.ps;
+                            self.outer.cost.charge(to_list_cost(ps.len() as i64))?;
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::EListBody(EList {
+                                    ps: ps,
+                                    locally_free: Vec::new(),
+                                    connective_used: false,
+                                    remainder: None,
+                                })),
+                            }]))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("to_list"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("to_list"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for ToListMethod<'a> {
             fn apply(
                 &self,
@@ -2189,7 +2766,17 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("to_list"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let result = self.to_list(base_expr)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2201,6 +2788,69 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> ToSetMethod<'a> {
+            fn to_set(&self, base_expr: Expr) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::ESetBody(eset) => Ok(Par::default().with_exprs(vec![Expr {
+                            expr_instance: Some(ExprInstance::ESetBody(eset)),
+                        }])),
+
+                        ExprInstance::EMapBody(emap) => {
+                            let map = ParMapTypeMapper::emap_to_par_map(emap);
+
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::ESetBody(
+                                    ParSetTypeMapper::par_set_to_eset(ParSet::new(
+                                        map.ps
+                                            .into_iter()
+                                            .map(|t| {
+                                                Par::default().with_exprs(vec![Expr {
+                                                    expr_instance: Some(ExprInstance::ETupleBody(
+                                                        ETuple {
+                                                            ps: vec![t.0, t.1],
+                                                            locally_free: Vec::new(),
+                                                            connective_used: false,
+                                                        },
+                                                    )),
+                                                }])
+                                            })
+                                            .collect(),
+                                        map.connective_used,
+                                        map.locally_free,
+                                        map.remainder,
+                                    )),
+                                )),
+                            }]))
+                        }
+
+                        ExprInstance::EListBody(elist) => {
+                            Ok(Par::default().with_exprs(vec![Expr {
+                                expr_instance: Some(ExprInstance::ESetBody(
+                                    ParSetTypeMapper::par_set_to_eset(ParSet::new(
+                                        elist.ps,
+                                        elist.connective_used,
+                                        elist.locally_free,
+                                        elist.remainder,
+                                    )),
+                                )),
+                            }]))
+                        }
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("to_set"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("to_set"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for ToSetMethod<'a> {
             fn apply(
                 &self,
@@ -2208,7 +2858,17 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("to_set"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let result = self.to_set(base_expr)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2220,6 +2880,81 @@ impl DebruijnInterpreter {
             outer: &'a DebruijnInterpreter,
         }
 
+        impl<'a> ToMapMethod<'a> {
+            fn make_map(
+                &self,
+                ps: Vec<Par>,
+                connective_used: bool,
+                locally_free: Vec<u8>,
+                remainder: Option<Var>,
+            ) -> Result<Par, InterpreterError> {
+                let key_pairs: Vec<Option<(Par, Par)>> =
+                    ps.into_iter().map(|p| RhoTuple2::unapply(p)).collect();
+
+                if key_pairs.iter().any(|pair| !pair.is_some()) {
+                    Err(InterpreterError::MethodNotDefined {
+                        method: String::from("to_map"),
+                        other_type: String::from("types except List[(K,V)]"),
+                    })
+                } else {
+                    Ok(new_emap_par(
+                        key_pairs
+                            .into_iter()
+                            .map(|pair| {
+                                let (key, value) = pair.unwrap();
+                                KeyValuePair {
+                                    key: Some(key),
+                                    value: Some(value),
+                                }
+                            })
+                            .collect(),
+                        locally_free,
+                        connective_used,
+                        remainder,
+                        Vec::new(),
+                        false,
+                    ))
+                }
+            }
+
+            fn to_map(&self, base_expr: Expr) -> Result<Par, InterpreterError> {
+                match base_expr.expr_instance {
+                    Some(expr_instance) => match expr_instance {
+                        ExprInstance::EMapBody(emap) => Ok(Par::default().with_exprs(vec![Expr {
+                            expr_instance: Some(ExprInstance::EMapBody(emap)),
+                        }])),
+
+                        ExprInstance::ESetBody(eset) => {
+                            let base = ParSetTypeMapper::eset_to_par_set(eset);
+                            self.make_map(
+                                base.ps.sorted_pars,
+                                base.connective_used,
+                                base.locally_free,
+                                base.remainder,
+                            )
+                        }
+
+                        ExprInstance::EListBody(elist) => self.make_map(
+                            elist.ps,
+                            elist.connective_used,
+                            elist.locally_free,
+                            elist.remainder,
+                        ),
+
+                        other => Err(InterpreterError::MethodNotDefined {
+                            method: String::from("to_map"),
+                            other_type: format!("{:?}", other.type_id()),
+                        }),
+                    },
+
+                    None => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("to_map"),
+                        other_type: String::from("None"),
+                    }),
+                }
+            }
+        }
+
         impl<'a> Method for ToMapMethod<'a> {
             fn apply(
                 &self,
@@ -2227,7 +2962,17 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                todo!()
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("to_map"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let base_expr = self.outer.eval_single_expr(&p, env)?;
+                    let result = self.to_map(base_expr)?;
+                    Ok(result)
+                }
             }
         }
 
@@ -2269,10 +3014,6 @@ impl DebruijnInterpreter {
     }
 
     fn eval_to_bool(&self, p: &Par, env: &Env<Par>) -> Result<bool, InterpreterError> {
-        todo!()
-    }
-
-    fn restrict_to_usize(&self, i64: i64) -> Result<usize, InterpreterError> {
         todo!()
     }
 
