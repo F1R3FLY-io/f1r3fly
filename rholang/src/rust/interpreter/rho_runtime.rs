@@ -698,16 +698,12 @@ fn dispatch_table_creator(
             .iter()
             .chain(extra_system_processes.iter()),
     ) {
-        let tuple = def.to_dispatch_table(ProcessContext {
-            space: space.clone(),
-            dispatcher: dispatcher.clone(),
-            block_data: block_data.clone(),
-            invalid_blocks: invalid_blocks.clone(),
-            system_processes: SystemProcesses {
-                dispatcher: dispatcher.clone(),
-                space: space.clone(),
-            },
-        });
+        let tuple = def.to_dispatch_table(ProcessContext::create(
+            space.clone(),
+            dispatcher.clone(),
+            block_data.clone(),
+            invalid_blocks.clone(),
+        ));
 
         dispatch_table.insert(tuple.0, tuple.1);
     }

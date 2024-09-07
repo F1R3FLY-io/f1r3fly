@@ -113,7 +113,8 @@ pub struct ProduceCandidate<C, P: Clone, A: Clone, K: Clone> {
 }
 
 // See rspace/src/main/scala/coop/rchain/rspace/internal.scala
-#[derive(Debug)]
+// Eq and PartialEq is needed here for reduce_spec tests
+#[derive(Debug, Eq, PartialEq)]
 pub struct Row<P: Clone, A: Clone, K: Clone> {
     pub data: Vec<Datum<A>>,
     pub wks: Vec<WaitingContinuation<P, K>>,

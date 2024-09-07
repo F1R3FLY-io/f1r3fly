@@ -175,6 +175,23 @@ pub struct ProcessContext {
     pub system_processes: SystemProcesses,
 }
 
+impl ProcessContext {
+    pub fn create(
+        space: RhoTuplespace,
+        dispatcher: RhoDispatch,
+        block_data: Arc<RwLock<BlockData>>,
+        invalid_blocks: InvalidBlocks,
+    ) -> Self {
+        ProcessContext {
+            space: space.clone(),
+            dispatcher: dispatcher.clone(),
+            block_data,
+            invalid_blocks,
+            system_processes: SystemProcesses::create(dispatcher, space),
+        }
+    }
+}
+
 pub struct Definition {
     pub urn: String,
     pub fixed_channel: Name,
@@ -260,9 +277,18 @@ impl BlockData {
 pub struct SystemProcesses {
     pub dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
     pub space: RhoTuplespace,
+    pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
+    fn create(dispatcher: Arc<Mutex<RholangAndRustDispatcher>>, space: RhoTuplespace) -> Self {
+        SystemProcesses {
+            dispatcher,
+            space,
+            pretty_printer: PrettyPrinter::new(),
+        }
+    }
+
     fn is_contract_call(&self) -> ContractCall {
         ContractCall {
             space: self.space.clone(),
@@ -338,7 +364,7 @@ impl SystemProcesses {
     pub fn std_out(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
-                self.print_std_out(&PrettyPrinter::build_string_from_par(&args[0]));
+                self.print_std_out(&self.pretty_printer.build_string_from_par(&args[0]));
             } else {
                 panic!("Expected exactly one argument, but got {}", args.len());
             }
@@ -350,7 +376,7 @@ impl SystemProcesses {
     pub fn std_out_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
-                self.print_std_out(&PrettyPrinter::build_string_from_par(arg));
+                self.print_std_out(&self.pretty_printer.build_string_from_par(arg));
                 let _ = produce(vec![Par::default()], ack.clone());
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());
@@ -363,7 +389,7 @@ impl SystemProcesses {
     pub fn std_err(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg] = &vec[..] {
-                self.print_std_err(&PrettyPrinter::build_string_from_par(arg));
+                self.print_std_err(&self.pretty_printer.build_string_from_par(arg));
             } else {
                 panic!("Expected exactly one argument, but got {}", vec.len());
             }
@@ -375,7 +401,7 @@ impl SystemProcesses {
     pub fn std_err_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
-                self.print_std_err(&PrettyPrinter::build_string_from_par(arg));
+                self.print_std_err(&self.pretty_printer.build_string_from_par(arg));
                 let _ = produce(vec![Par::default()], ack.clone());
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());

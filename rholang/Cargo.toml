@@ -11,6 +11,7 @@ debug = true
 [dependencies]
 crypto = { path = "../crypto" }
 models = { path = "../models" }
+shared = { path = "../shared" }
 rspace_plus_plus = { path = "../rspace++" }
 tree-sitter-rholang = { path = "src/main/tree_sitter/" }
 itertools = "0.10.2"
