@@ -98,11 +98,12 @@
               package = dhall-yaml;
               help = "Dhall-to-YAML utility";
             }
-            {
-              name = "tree-sitter";
-              package = tree-sitter;
-              help = "Parser generator tool and incremental parsing library";
-            }
+             #need 0.22.6 version, by default nix provide 0.20.9
+#            {
+#              name = "tree-sitter";
+#              package = tree-sitter;
+#              help = "Parser generator tool and incremental parsing library";
+#            }
           ];
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";
