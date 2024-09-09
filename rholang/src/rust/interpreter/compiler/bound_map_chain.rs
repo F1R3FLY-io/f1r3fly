@@ -1,7 +1,7 @@
 use super::exports::*;
 
 #[derive(Debug, Clone)]
-struct BoundMapChain<T> {
+pub struct BoundMapChain<T> {
   chain: Vec<BoundMap<T>>,
 }
 
@@ -54,7 +54,7 @@ impl<T> BoundMapChain<T> {
     self.chain.first().map_or(0, |map| map.count())
   }
 
-  fn depth(&self) -> usize {
+  pub(crate) fn depth(&self) -> usize {
     self.chain.len() - 1
   }
 }
