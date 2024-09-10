@@ -112,3 +112,5 @@ docker/data/**/*.mdb
 
 rholang/**/*.mdb
 rspace++/tests/*.proptest-regressions
+
+rholang/src/main/tree_sitter/*

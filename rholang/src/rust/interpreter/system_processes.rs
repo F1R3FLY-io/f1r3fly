@@ -25,7 +25,7 @@ use super::util::rev_address::RevAddress;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
-pub type RhoSysFunction = Box<dyn Fn(Vec<ListParWithRandom>) -> ()>;
+pub type RhoSysFunction = Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>;
 pub type RhoDispatchMap = HashMap<i64, RhoSysFunction>;
 pub type Name = Par;
 pub type Arity = i32;
@@ -197,7 +197,7 @@ pub struct Definition {
     pub fixed_channel: Name,
     pub arity: Arity,
     pub body_ref: BodyRef,
-    pub handler: Box<dyn Fn(ProcessContext) -> Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>,
+    pub handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
     pub remainder: Remainder,
 }
 
@@ -207,7 +207,7 @@ impl Definition {
         fixed_channel: Name,
         arity: Arity,
         body_ref: BodyRef,
-        handler: Box<dyn Fn(ProcessContext) -> Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>,
+        handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
         remainder: Remainder,
     ) -> Self {
         Definition {
@@ -221,9 +221,9 @@ impl Definition {
     }
 
     pub fn to_dispatch_table(
-        &self,
+        &mut self,
         context: ProcessContext,
-    ) -> (BodyRef, Box<dyn Fn(Vec<ListParWithRandom>) -> ()>) {
+    ) -> (BodyRef, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>) {
         (self.body_ref, (self.handler)(context))
     }
 
@@ -361,10 +361,11 @@ impl SystemProcesses {
         println!("STD ERROR: {}", s);
     }
 
-    pub fn std_out(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub fn std_out(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
-                self.print_std_out(&self.pretty_printer.build_string_from_par(&args[0]));
+                let str = self.pretty_printer.build_string_from_message(&args[0]);
+                self.print_std_out(&str);
             } else {
                 panic!("Expected exactly one argument, but got {}", args.len());
             }
@@ -373,10 +374,11 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_out_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub fn std_out_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
-                self.print_std_out(&self.pretty_printer.build_string_from_par(arg));
+                let str = self.pretty_printer.build_string_from_message(arg);
+                self.print_std_out(&str);
                 let _ = produce(vec![Par::default()], ack.clone());
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());
@@ -386,10 +388,11 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_err(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub fn std_err(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg] = &vec[..] {
-                self.print_std_err(&self.pretty_printer.build_string_from_par(arg));
+                let str = self.pretty_printer.build_string_from_message(arg);
+                self.print_std_err(&str);
             } else {
                 panic!("Expected exactly one argument, but got {}", vec.len());
             }
@@ -398,10 +401,11 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_err_ack(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub fn std_err_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
-                self.print_std_err(&self.pretty_printer.build_string_from_par(arg));
+                let str = self.pretty_printer.build_string_from_message(arg);
+                self.print_std_err(&str);
                 let _ = produce(vec![Par::default()], ack.clone());
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());

@@ -539,7 +539,7 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stdout(),
             arity: 1,
             body_ref: BodyRefs::STDOUT,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.std_out(args))),
+            handler: Box::new(|mut ctx| Box::new(move |args| ctx.system_processes.std_out(args))),
             remainder: None,
         },
         Definition {
@@ -547,7 +547,9 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stdout_ack(),
             arity: 2,
             body_ref: BodyRefs::STDOUT_ACK,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.std_out_ack(args))),
+            handler: Box::new(|mut ctx| {
+                Box::new(move |args| ctx.system_processes.std_out_ack(args))
+            }),
             remainder: None,
         },
         Definition {
@@ -555,7 +557,7 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stderr(),
             arity: 1,
             body_ref: BodyRefs::STDERR,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.std_err(args))),
+            handler: Box::new(|mut ctx| Box::new(move |args| ctx.system_processes.std_err(args))),
             remainder: None,
         },
         Definition {
@@ -563,7 +565,9 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stderr_ack(),
             arity: 2,
             body_ref: BodyRefs::STDERR_ACK,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.std_err_ack(args))),
+            handler: Box::new(|mut ctx| {
+                Box::new(move |args| ctx.system_processes.std_err_ack(args))
+            }),
             remainder: None,
         },
         Definition {
@@ -689,14 +693,14 @@ fn dispatch_table_creator(
     dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
 ) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
-    for def in std_system_processes().iter().chain(
+    for def in std_system_processes().iter_mut().chain(
         std_rho_crypto_processes()
-            .iter()
-            .chain(extra_system_processes.iter()),
+            .iter_mut()
+            .chain(extra_system_processes.iter_mut()),
     ) {
         let tuple = def.to_dispatch_table(ProcessContext::create(
             space.clone(),
@@ -750,7 +754,7 @@ fn setup_reducer(
     charging_rspace: RhoTuplespace,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
     urn_map: HashMap<String, Par>,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
@@ -812,7 +816,7 @@ fn create_rho_env(
     rspace: RhoISpace,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
     cost: _cost,
 ) -> (DebruijnInterpreter, Arc<RwLock<BlockData>>, InvalidBlocks) {
     let maps_and_refs = setup_maps_and_refs(&extra_system_processes);
@@ -853,7 +857,7 @@ fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
 
 fn create_runtime(
     rspace: RhoISpace,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
     init_registry: bool,
     mergeable_tag_name: Par,
 ) -> Arc<Mutex<RhoRuntimeImpl>> {
@@ -904,7 +908,7 @@ fn create_rho_runtime(
     rspace: RhoISpace,
     mergeable_tag_name: Par,
     init_registry: bool,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
 ) -> Arc<Mutex<RhoRuntimeImpl>> {
     create_runtime(
         rspace,
@@ -926,7 +930,7 @@ fn create_replay_rho_runtime(
     rspace: RhoReplayISpace,
     mergeable_tag_name: Par,
     init_registry: bool,
-    extra_system_processes: &Vec<Definition>,
+    extra_system_processes: &mut Vec<Definition>,
 ) -> Arc<Mutex<ReplayRhoRuntimeImpl>> {
     let cost = CostAccounting::empty_cost();
     let merge_chs = Arc::new(RwLock::new({
@@ -959,7 +963,7 @@ fn create_runtimes(
     space: RhoISpace,
     replay_space: RhoReplayISpace,
     init_registry: bool,
-    additional_system_processes: &Vec<Definition>,
+    additional_system_processes: &mut Vec<Definition>,
     mergeable_tag_name: Par,
 ) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<ReplayRhoRuntimeImpl>>) {
     let rho_runtime = create_rho_runtime(
@@ -983,7 +987,7 @@ fn create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,
-    additional_system_processes: &Vec<Definition>,
+    additional_system_processes: &mut Vec<Definition>,
     matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
 ) -> Arc<Mutex<RhoRuntimeImpl>> {
     let space = RSpaceInstances::create::<Par, BindPattern, ListParWithRandom, TaggedContinuation>(
