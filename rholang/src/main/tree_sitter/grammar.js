@@ -152,7 +152,13 @@ module.exports = grammar({
         ),
 
         // Bundle
-        bundle: $ => choice("bundle+", "bundle-", "bundle0", "bundle"),
+        //bundle: $ => choice("bundle+", "bundle-", "bundle0", "bundle"),
+        bundle: $ => choice(
+            seq("bundle+", "{", $._proc, "}"),
+            seq("bundle-", "{", $._proc, "}"),
+            seq("bundle0", "{", $._proc, "}"),
+            seq("bundle", "{", $._proc, "}")
+        ),
 
         // Send types
         send: $ => choice("!", "!!"),
