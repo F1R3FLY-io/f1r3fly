@@ -8,7 +8,6 @@ use models::{
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
-// TODO: Update to match Rust operations?
 #[derive(Clone)]
 pub struct Cost {
     pub value: i64,

@@ -275,13 +275,13 @@ impl BlockData {
 }
 
 pub struct SystemProcesses {
-    pub dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
+    pub dispatcher: RhoDispatch,
     pub space: RhoTuplespace,
     pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
-    fn create(dispatcher: Arc<Mutex<RholangAndRustDispatcher>>, space: RhoTuplespace) -> Self {
+    fn create(dispatcher: RhoDispatch, space: RhoTuplespace) -> Self {
         SystemProcesses {
             dispatcher,
             space,

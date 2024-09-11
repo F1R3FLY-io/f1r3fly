@@ -46,6 +46,7 @@ Several working examples have been included in the examples directory, and the e
 
 ### Testing Rust (within rholang directory)
 
+- Run Reduce Tests: `cargo test --test reduce_spec`
 - Run Spatial Matcher Tests: `cargo test matcher::match_test`
 
 (Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>

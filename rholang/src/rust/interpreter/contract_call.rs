@@ -1,7 +1,6 @@
 use models::rhoapi::{ListParWithRandom, Par};
-use std::sync::{Arc, Mutex};
 
-use super::{dispatch::RholangAndRustDispatcher, rho_runtime::RhoTuplespace};
+use super::{dispatch::RhoDispatch, rho_runtime::RhoTuplespace};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -25,7 +24,7 @@ use super::{dispatch::RholangAndRustDispatcher, rho_runtime::RhoTuplespace};
  */
 pub struct ContractCall {
     pub space: RhoTuplespace,
-    pub dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
+    pub dispatcher: RhoDispatch,
 }
 
 pub type Producer = Box<dyn Fn(Vec<Par>, Par) -> ()>;
@@ -52,10 +51,15 @@ impl ContractCall {
 
                 match produce_result {
                     Some((cont, channels)) => {
-                        dispatcher.lock().unwrap().dispatch(
-                            cont.continuation,
-                            channels.iter().map(|c| c.matched_datum.clone()).collect(),
-                        );
+                        dispatcher
+                            .lock()
+                            .unwrap()
+                            .dispatch(
+                                cont.continuation,
+                                channels.iter().map(|c| c.matched_datum.clone()).collect(),
+                            )
+                            .map_err(|err| panic!("{}", err))
+                            .unwrap();
                     }
 
                     None => {}

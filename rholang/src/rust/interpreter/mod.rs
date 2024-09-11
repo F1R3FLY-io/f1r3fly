@@ -15,3 +15,4 @@ pub mod substitute;
 pub mod system_processes;
 pub mod util;
 pub mod compiler;
+pub mod test_utils;

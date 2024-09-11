@@ -1,7 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-// use lazy_static::lazy_static;
 use models::rhoapi::expr::ExprInstance::EMapBody;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::Bundle;
@@ -32,6 +31,7 @@ use super::accounting::_cost;
 use super::accounting::cost_accounting::CostAccounting;
 use super::accounting::costs::Cost;
 use super::accounting::has_cost::HasCost;
+use super::dispatch::RhoDispatch;
 use super::dispatch::RholangAndRustDispatcher;
 use super::env::Env;
 use super::errors::InterpreterError;
@@ -41,7 +41,7 @@ use super::registry::registry_bootstrap::ast;
 use super::storage::charging_rspace::ChargingRSpace;
 use super::system_processes::{
     Arity, BlockData, BodyRef, Definition, InvalidBlocks, Name, ProcessContext, Remainder,
-    RhoDispatchMap, SystemProcesses,
+    RhoDispatchMap,
 };
 use models::rhoapi::expr::ExprInstance::GByteArray;
 
@@ -690,7 +690,7 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
 
 fn dispatch_table_creator(
     space: RhoTuplespace,
-    dispatcher: Arc<Mutex<RholangAndRustDispatcher>>,
+    dispatcher: RhoDispatch,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
@@ -748,8 +748,6 @@ fn basic_processes() -> HashMap<String, Par> {
     map
 }
 
-// TODO: Review this code and make sure it follows the same logic as Scala function.
-//       "lazy val" and circular dependency
 fn setup_reducer(
     charging_rspace: RhoTuplespace,
     block_data_ref: Arc<RwLock<BlockData>>,
@@ -760,21 +758,23 @@ fn setup_reducer(
     mergeable_tag_name: Par,
     cost: _cost,
 ) -> DebruijnInterpreter {
-    let (replay_dispatcher, replay_reducer) = RholangAndRustDispatcher::create(
+    let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
-        HashMap::new(), // this should be replay_dispatch_table
+        Arc::new(Mutex::new(Box::new(RholangAndRustDispatcher {
+            _dispatch_table: Arc::new(Mutex::new(HashMap::new())),
+        }))),
+        block_data_ref,
+        invalid_blocks,
+        extra_system_processes,
+    );
+
+    let (_, replay_reducer) = RholangAndRustDispatcher::create(
+        charging_rspace.clone(),
+        replay_dispatch_table,
         urn_map,
         merge_chs,
         mergeable_tag_name,
         cost,
-    );
-
-    let replay_dispatch_table = dispatch_table_creator(
-        charging_rspace,
-        Arc::new(Mutex::new(replay_dispatcher)),
-        block_data_ref,
-        invalid_blocks,
-        extra_system_processes,
     );
 
     replay_reducer

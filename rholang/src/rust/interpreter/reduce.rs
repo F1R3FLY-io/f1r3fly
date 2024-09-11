@@ -46,12 +46,13 @@ use super::accounting::costs::{
     new_bindings_cost, op_call_cost, receive_eval_cost, send_eval_cost, string_append_cost,
     subtraction_cost, sum_cost, var_eval_cost,
 };
+use super::dispatch::RhoDispatch;
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::util::GeneratedMessage;
-use super::{dispatch::RholangAndRustDispatcher, env::Env, rho_runtime::RhoTuplespace};
+use super::{env::Env, rho_runtime::RhoTuplespace};
 
 /**
  * Reduce is the interface for evaluating Rholang expressions.
@@ -72,7 +73,7 @@ pub trait Reduce {
 #[derive(Clone)]
 pub struct DebruijnInterpreter {
     pub space: RhoTuplespace,
-    pub dispatcher: RholangAndRustDispatcher,
+    pub dispatcher: RhoDispatch,
     pub urn_map: HashMap<String, Par>,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
@@ -354,17 +355,16 @@ impl DebruijnInterpreter {
         }
     }
 
+    // TODO: Remove async
     async fn dispatch(
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Result<(), InterpreterError> {
-        self.dispatcher
-            .dispatch(
-                continuation,
-                data_list.into_iter().map(|tuple| tuple.1).collect(),
-            )
-            .await
+        self.dispatcher.lock().unwrap().dispatch(
+            continuation,
+            data_list.into_iter().map(|tuple| tuple.1).collect(),
+        )
     }
 
     async fn produce_peeks(
@@ -3208,8 +3208,10 @@ impl DebruijnInterpreter {
 
     /**
      * Evaluate any top level expressions in @param Par .
+     *
+     * Public here to be used in tests / Scala code has it as private but still able to use in tests?
      */
-    fn eval_expr(&self, par: &Par, env: &Env<Par>) -> Result<Par, InterpreterError> {
+    pub fn eval_expr(&self, par: &Par, env: &Env<Par>) -> Result<Par, InterpreterError> {
         let evaled_exprs = par
             .exprs
             .iter()

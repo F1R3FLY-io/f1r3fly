@@ -1,3 +1,4 @@
+use expr::ExprInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::HashSet;
@@ -486,4 +487,26 @@ pub fn new_elist_expr(
             remainder: _remainder,
         })),
     }
+}
+
+pub fn new_eplus_par(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Par {
+    Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }])
 }

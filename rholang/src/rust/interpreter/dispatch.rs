@@ -13,20 +13,30 @@ use super::{
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala
 pub trait Dispatch<A, K> {
-    fn dispatch(continuation: K, data_list: Vec<A>) -> ();
+    fn dispatch(&self, continuation: K, data_list: Vec<A>) -> Result<(), InterpreterError>;
 }
-
-pub type RhoDispatch = Arc<Mutex<RholangAndRustDispatcher>>;
 
 #[derive(Clone)]
 pub struct RholangAndRustDispatcher {
-    _dispatch_table: Arc<Mutex<HashMap<i64, Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>>>,
+    pub _dispatch_table: Arc<Mutex<HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>>>,
 }
+
+impl Dispatch<ListParWithRandom, TaggedContinuation> for RholangAndRustDispatcher {
+    fn dispatch(
+        &self,
+        continuation: TaggedContinuation,
+        data_list: Vec<ListParWithRandom>,
+    ) -> Result<(), InterpreterError> {
+        todo!()
+    }
+}
+
+pub type RhoDispatch = Arc<Mutex<Box<dyn Dispatch<ListParWithRandom, TaggedContinuation>>>>;
 
 impl RholangAndRustDispatcher {
     pub fn create(
         tuplespace: RhoTuplespace,
-        dispatch_table: HashMap<i64, Box<dyn Fn(Vec<ListParWithRandom>) -> ()>>,
+        dispatch_table: HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
         urn_map: HashMap<String, Par>,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
         mergeable_tag_name: Par,
@@ -38,7 +48,7 @@ impl RholangAndRustDispatcher {
 
         let reducer = DebruijnInterpreter {
             space: tuplespace,
-            dispatcher: dispatcher.clone(),
+            dispatcher: Arc::new(Mutex::new(Box::new(dispatcher.clone()))),
             urn_map,
             merge_chs,
             mergeable_tag_name,
@@ -47,13 +57,5 @@ impl RholangAndRustDispatcher {
         };
 
         (dispatcher, reducer)
-    }
-
-    pub async fn dispatch(
-        &self,
-        continuation: TaggedContinuation,
-        data_list: Vec<ListParWithRandom>,
-    ) -> Result<(), InterpreterError> {
-        todo!()
     }
 }
