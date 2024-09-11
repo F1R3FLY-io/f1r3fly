@@ -1,13 +1,20 @@
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/ReduceSpec.scala
 
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    i64,
+};
 
 use models::{
+    rhoapi::{expr::ExprInstance, EEq},
+    rust::{rholang::implicits::GPrivateBuilder, utils::new_gbool_expr},
+};
+use models::{
     rhoapi::{
-        tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
+        tagged_continuation::TaggedCont, BindPattern, Expr, ListParWithRandom, Par, ParWithRandom,
         TaggedContinuation,
     },
-    rust::utils::{new_eplus_par, new_gint_expr},
+    rust::utils::{new_eplus_par, new_gint_expr, new_gint_par},
 };
 use rholang::rust::interpreter::{
     env::Env, test_utils::persistent_store_tester::create_test_space,
@@ -60,8 +67,48 @@ async fn eval_expr_should_handle_simple_addition() {
     let add_expr = new_eplus_par(7, 8, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&add_expr, &env);
-    println!("{:?}", result);
     let expected = vec![new_gint_expr(15)];
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().exprs, expected);
+}
+
+#[tokio::test]
+async fn eval_expr_should_handle_long_addition() {
+    let (_, reducer) = create_test_space().await;
+    let add_expr = new_eplus_par(i64::MAX, i64::MAX, Vec::new(), false);
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval_expr(&add_expr, &env);
+    let expected = vec![new_gint_expr(i64::MAX.wrapping_mul(2))];
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().exprs, expected);
+}
+
+#[tokio::test]
+async fn eval_expr_should_leave_ground_values_alone() {
+    let (_, reducer) = create_test_space().await;
+    let ground_expr = new_gint_par(7, Vec::new(), false);
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval_expr(&ground_expr, &env);
+    let expected = vec![new_gint_expr(7)];
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().exprs, expected);
+}
+
+#[tokio::test]
+async fn eval_expr_should_handle_equality_between_arbitary_processes() {
+    let (_, reducer) = create_test_space().await;
+    let eq_expr = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EEqBody(EEq {
+            p1: Some(GPrivateBuilder::new_par(String::from("private_name"))),
+            p2: Some(GPrivateBuilder::new_par(String::from("private_name"))),
+        })),
+    }]);
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval_expr(&eq_expr, &env);
+    let expected = vec![new_gbool_expr(true)];
 
     assert!(result.is_ok());
     assert_eq!(result.unwrap().exprs, expected);

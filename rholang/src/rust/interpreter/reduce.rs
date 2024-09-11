@@ -925,7 +925,7 @@ impl DebruijnInterpreter {
                         (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
                             self.cost.charge(sum_cost())?;
                             Ok(Expr {
-                                expr_instance: Some(ExprInstance::GInt(lhs + rhs)),
+                                expr_instance: Some(ExprInstance::GInt(lhs.wrapping_add(rhs))),
                             })
                         }
 

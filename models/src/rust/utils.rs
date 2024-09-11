@@ -382,6 +382,16 @@ pub fn new_gint_expr(value: i64) -> Expr {
     }
 }
 
+pub fn new_gbool_par(value: bool, _locally_free_par: Vec<u8>, _connective_used_par: bool) -> Par {
+    vector_par(_locally_free_par, _connective_used_par).with_exprs(vec![new_gbool_expr(value)])
+}
+
+pub fn new_gbool_expr(value: bool) -> Expr {
+    Expr {
+        expr_instance: Some(GBool(value)),
+    }
+}
+
 pub fn new_gstring_par(
     value: String,
     _locally_free_par: Vec<u8>,

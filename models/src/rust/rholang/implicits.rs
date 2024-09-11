@@ -1,9 +1,11 @@
+// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala
+
+use prost::Message;
+
 use crate::{
-    rhoapi::{Bundle, Expr, GUnforgeable, Par},
+    rhoapi::{g_unforgeable::UnfInstance, Bundle, Expr, GPrivate, GUnforgeable, Par},
     rust::utils::union,
 };
-
-// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala
 
 // Somehow they are not initializing 'locally_free' and 'connective_used' fields
 pub fn vector_par(_locally_free: Vec<u8>, _connective_used: bool) -> Par {
@@ -18,6 +20,18 @@ pub fn vector_par(_locally_free: Vec<u8>, _connective_used: bool) -> Par {
         connectives: Vec::new(),
         locally_free: _locally_free,
         connective_used: _connective_used,
+    }
+}
+
+pub struct GPrivateBuilder;
+
+impl GPrivateBuilder {
+    pub fn new_par(s: String) -> Par {
+        Par::default().with_unforgeables(vec![GUnforgeable {
+            unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
+                id: s.encode_to_vec(),
+            })),
+        }])
     }
 }
 
