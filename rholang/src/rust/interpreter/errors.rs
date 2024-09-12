@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum InterpreterError {
     BugFoundError(String),
+    UndefinedRequiredProtobufFieldError,
     NormalizerError(String),
     SyntaxError(String),
     LexerError(String),
@@ -76,6 +77,10 @@ impl fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InterpreterError::BugFoundError(msg) => write!(f, "Bug found: {}", msg),
+
+            InterpreterError::UndefinedRequiredProtobufFieldError => {
+                write!(f, "A parsed Protobuf field was None, should be Some",)
+            }
 
             InterpreterError::NormalizerError(msg) => write!(f, "Normalizer error: {}", msg),
 

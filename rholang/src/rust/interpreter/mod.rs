@@ -1,4 +1,7 @@
+use errors::InterpreterError;
+
 pub mod accounting;
+pub mod compiler;
 pub mod contract_call;
 pub mod dispatch;
 pub mod env;
@@ -13,6 +16,10 @@ pub mod rho_type;
 pub mod storage;
 pub mod substitute;
 pub mod system_processes;
-pub mod util;
-pub mod compiler;
 pub mod test_utils;
+pub mod util;
+
+pub fn unwrap_option_safe<A: Clone>(opt: Option<A>) -> Result<A, InterpreterError> {
+    opt.map(|x| x.clone())
+        .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)
+}

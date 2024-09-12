@@ -22,9 +22,8 @@ use models::rust::par_set::ParSet;
 use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::utils::*;
 use models::{rhoapi::*, rust::rholang::implicits::vector_par};
+use rholang::rust::interpreter::matcher::{prepend_connective, prepend_expr};
 use rholang::rust::interpreter::matcher::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};
-
-use crate::matcher::utils::{prepend_connective, prepend_expr};
 
 fn assert_spatial_match(
     target: Par,
