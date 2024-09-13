@@ -520,3 +520,11 @@ pub fn new_eplus_par(
         })),
     }])
 }
+
+pub fn new_bundle_par(body: Par, write_flag: bool, read_flag: bool) -> Par {
+    Par::default().with_bundles(vec![Bundle {
+        body: Some(body),
+        write_flag,
+        read_flag,
+    }])
+}

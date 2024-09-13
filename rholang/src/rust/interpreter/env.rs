@@ -28,6 +28,12 @@ impl<A: Clone> Env<A> {
         }
     }
 
+    pub fn get(&self, k: &i32) -> Option<A> {
+        self.env_map
+            .get(&((self.level + self.shift) - k - 1))
+            .cloned()
+    }
+
     pub fn shift(&self, j: i32) -> Env<A> {
         Env {
             shift: self.shift + j,

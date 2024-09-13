@@ -118,8 +118,8 @@ impl Substitute {
                 .clone()
                 .expect("var_instance was None, should be Some")
             {
-                VarInstance::BoundVar(index) => match env.env_map.get(&index) {
-                    Some(p) => Ok(Either::Right(p.clone())),
+                VarInstance::BoundVar(index) => match env.get(&index) {
+                    Some(p) => Ok(Either::Right(p)),
                     None => Ok(Either::Left(term)),
                 },
                 _ => Err(InterpreterError::SubstituteError(format!(
@@ -155,8 +155,8 @@ impl Substitute {
         if term.depth != depth {
             Ok(Either::Left(term))
         } else {
-            match env.env_map.get(&term.index) {
-                Some(p) => Ok(Either::Right(p.clone())),
+            match env.get(&term.index) {
+                Some(p) => Ok(Either::Right(p)),
                 None => Ok(Either::Left(term)),
             }
         }

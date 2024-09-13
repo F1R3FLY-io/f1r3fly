@@ -1,7 +1,8 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/errors.scala
 use std::fmt;
 
-#[derive(Debug, Clone)]
+// PartialEq here is needed for testing purposes
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterpreterError {
     BugFoundError(String),
     UndefinedRequiredProtobufFieldError,

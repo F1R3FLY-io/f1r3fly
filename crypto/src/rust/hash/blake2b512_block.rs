@@ -1,4 +1,4 @@
-// See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Block.scala
+/* See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Block.scala */
 
 /**
 Block oriented Blake2b512 class.
@@ -26,7 +26,7 @@ https://github.com/bcgit/bc-java/blob/master/core/src/main/java/org/bouncycastle
   */
 
 // TODO: REVIEW
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Blake2b512Block {
     chain_value: [u64; 8],
     t0: u64,
@@ -107,7 +107,7 @@ impl Blake2b512Block {
 
         // Initialize internal state
         internal_state[..8].copy_from_slice(&self.chain_value);
-        internal_state[8..12].copy_from_slice(&IV);
+        internal_state[8..16].copy_from_slice(&IV); // Adjusted to copy the full IV
 
         let f0 = if finalize { 0xFFFFFFFFFFFFFFFF } else { 0 };
         let f1 = if root_finalize { 0xFFFFFFFFFFFFFFFF } else { 0 };
@@ -120,11 +120,15 @@ impl Blake2b512Block {
         let mut m = [0u64; 16];
 
         for i in 0..16 {
-            m[i] = u64::from_le_bytes(
-                msg[offset + i * 8..offset + (i + 1) * 8]
-                    .try_into()
-                    .unwrap(),
-            );
+            if offset + i * 8 + 8 <= msg.len() {
+                m[i] = u64::from_le_bytes(
+                    msg[offset + i * 8..offset + (i + 1) * 8]
+                        .try_into()
+                        .unwrap(),
+                );
+            } else {
+                m[i] = 0; // Handle the case where there is not enough data
+            }
         }
 
         for _ in 0..12 {

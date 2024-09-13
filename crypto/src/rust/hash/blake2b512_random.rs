@@ -12,7 +12,7 @@ use super::blake2b512_block::Blake2b512Block;
 
 // See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Random.scala
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Blake2b512Random {
     digest: Blake2b512Block,
     last_block: Vec<u8>,
@@ -33,24 +33,25 @@ impl Blake2b512Random {
             position: 0,
         };
 
-        let range: Vec<usize> = (offset..(offset + length - 127)).step_by(128).collect();
+        if length > 127 {
+            let range: Vec<usize> = (offset..(offset + length - 127)).step_by(128).collect();
 
-        for &base in &range {
-            result.digest.update(&init, base);
-        }
+            for &base in &range {
+                result.digest.update(&init, base);
+            }
 
-        let partial_base = if range.is_empty() {
-            offset
+            let partial_base = range.last().unwrap() + 128;
+
+            // If there is any remainder:
+            if offset + length != partial_base {
+                let mut padded = vec![0; 128];
+                let remainder_length = (offset + length) - partial_base;
+                padded.copy_from_slice(&init[partial_base..(partial_base + remainder_length)]);
+                result.digest.update(&padded, 0);
+            }
         } else {
-            range.last().unwrap() + 128
-        };
-
-        // If there is any remainder:
-        if offset + length != partial_base {
-            let mut padded = vec![0; 128];
-
-            padded.copy_from_slice(&init[partial_base..(offset + length)]);
-            result.digest.update(&padded, 0);
+            // Handle the case where length is less than or equal to 127
+            result.digest.update(&init[offset..(offset + length)], 0);
         }
 
         result

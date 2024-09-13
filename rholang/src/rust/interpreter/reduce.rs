@@ -595,10 +595,13 @@ impl DebruijnInterpreter {
     fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
         self.cost.charge(var_eval_cost())?;
         match valproc.var_instance {
-            Some(VarInstance::BoundVar(level)) => Err(InterpreterError::ReduceError(format!(
-                "Unbound variable: {} in {:#?}",
-                level, env.env_map
-            ))),
+            Some(VarInstance::BoundVar(level)) => match env.get(&level) {
+                Some(p) => Ok(p),
+                None => Err(InterpreterError::ReduceError(format!(
+                    "Unbound variable: {} in {:?}",
+                    level, env.env_map
+                ))),
+            },
             Some(VarInstance::Wildcard(_)) => Err(InterpreterError::ReduceError(
                 "Unbound variable: attempting to evaluate a pattern".to_string(),
             )),
@@ -767,9 +770,9 @@ impl DebruijnInterpreter {
         // Check if we try to read from bundled channel
         let unbndl = match single_bundle(&subst) {
             Some(value) => {
-                if !value.write_flag {
+                if !value.read_flag {
                     return Err(InterpreterError::ReduceError(
-                        "Trying to read on non-readable channel.".to_string(),
+                        "Trying to read from non-readable channel.".to_string(),
                     ));
                 } else {
                     value.body.unwrap()
