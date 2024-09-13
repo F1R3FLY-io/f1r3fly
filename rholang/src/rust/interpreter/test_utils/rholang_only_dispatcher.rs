@@ -1,4 +1,5 @@
-use models::rhoapi::{ListParWithRandom, Par, TaggedContinuation};
+use crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use models::rhoapi::{tagged_continuation::TaggedCont, ListParWithRandom, Par, TaggedContinuation};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex, RwLock},
@@ -6,7 +7,7 @@ use std::{
 
 use crate::rust::interpreter::{
     accounting::_cost,
-    dispatch::{Dispatch, RhoDispatch},
+    dispatch::{build_env, Dispatch, RhoDispatch},
     errors::InterpreterError,
     reduce::DebruijnInterpreter,
     rho_runtime::RhoTuplespace,
@@ -62,6 +63,17 @@ impl Dispatch<ListParWithRandom, TaggedContinuation> for RholangOnlyDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
+        // match continuation.tagged_cont {
+        //     Some(cont) => match cont {
+        //         TaggedCont::ParBody(par_with_rand) => {
+        //             let env = build_env(data_list);
+        //             let randoms = vec![Blake2b512Random::new(par_with_rand.random_state)];
+        //         }
+        //         TaggedCont::ScalaBodyRef(_) => Ok(()),
+        //     },
+        //     None => Ok(()),
+        // }
+
         todo!()
     }
 }

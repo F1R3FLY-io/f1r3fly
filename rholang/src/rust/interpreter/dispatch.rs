@@ -7,13 +7,24 @@ use models::rhoapi::Par;
 use models::rhoapi::{ListParWithRandom, TaggedContinuation};
 
 use super::{
-    accounting::_cost, errors::InterpreterError, reduce::DebruijnInterpreter,
+    accounting::_cost, env::Env, errors::InterpreterError, reduce::DebruijnInterpreter,
     rho_runtime::RhoTuplespace, substitute::Substitute,
 };
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala
 pub trait Dispatch<A, K> {
     fn dispatch(&self, continuation: K, data_list: Vec<A>) -> Result<(), InterpreterError>;
+}
+
+pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
+    let pars: Vec<Par> = data_list.into_iter().flat_map(|list| list.pars).collect();
+    let mut env = Env::new();
+
+    for par in pars {
+        env = env.put(par);
+    }
+
+    env
 }
 
 #[derive(Clone)]

@@ -109,6 +109,52 @@ impl Blake2b512Random {
         }
     }
 
+    pub fn merge(mut children: Vec<Blake2b512Random>) -> Blake2b512Random {
+        assert!(
+            children.len() >= 2,
+            "Blake2b512Random should have at least 2 inputs to merge."
+        );
+
+        let mut squashed_builder = Vec::new();
+        let mut chain_block = vec![0; 128];
+
+        while children.len() > 1 {
+            let mut result = Blake2b512Random::new(&[0; 0]);
+            let chunks = children.chunks_mut(255).collect::<Vec<_>>();
+
+            for slice in chunks {
+                for quad in slice.chunks_mut(4) {
+                    for (i, child) in quad.iter_mut().enumerate() {
+                        child.digest.finalize_internal(
+                            child.last_block.as_slice(),
+                            0,
+                            &mut chain_block,
+                            i * 32,
+                        );
+                    }
+                    if quad.len() != 4 {
+                        let blank_length = (4 - quad.len()) * 32;
+                        if blank_length > 0 {
+                            let mut blank = Blake2b512Random::BLANK_BLOCK;
+                            blank
+                                .get_mut(..blank_length)
+                                .unwrap()
+                                .copy_from_slice(&chain_block[quad.len() * 32..]);
+                        }
+                    }
+                    result.digest.update(&chain_block, 0);
+                }
+                squashed_builder.push(result.clone());
+            }
+            children = squashed_builder;
+            squashed_builder = Vec::new();
+        }
+
+        children.remove(0)
+    }
+
+    const BLANK_BLOCK: [u8; 128] = [0; 128];
+
     pub fn to_vec(&self) -> Vec<u8> {
         self.digest.to_vec()
     }

@@ -85,6 +85,21 @@ impl Blake2b512Block {
         self.long_to_little_endian(&temp_chain_value, output, out_offset);
     }
 
+    pub fn finalize_internal(
+        &mut self,
+        block: &[u8],
+        in_offset: usize,
+        output: &mut [u8],
+        out_offset: usize,
+    ) {
+        let mut temp_chain_value = [0u64; 8];
+        self.compress(block, in_offset, &mut temp_chain_value, true, true, false);
+        for i in 0..4 {
+            let start = out_offset + i * 8;
+            output[start..start + 8].copy_from_slice(&temp_chain_value[i].to_le_bytes());
+        }
+    }
+
     fn long_to_little_endian(&self, input: &[u64], output: &mut [u8], out_offset: usize) {
         for (i, &value) in input.iter().enumerate() {
             let start = out_offset + i * 8;
