@@ -23,8 +23,7 @@ use models::{
     rust::utils::{new_eplus_par, new_gint_expr, new_gint_par},
 };
 use rholang::rust::interpreter::{
-    env::Env, errors::InterpreterError, reduce::Reduce,
-    test_utils::persistent_store_tester::create_test_space,
+    env::Env, errors::InterpreterError, test_utils::persistent_store_tester::create_test_space,
 };
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 
@@ -504,9 +503,12 @@ async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() 
     }]);
 
     let env: Env<Par> = Env::new();
-    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
     assert!(reducer
-        .eval(receive, &env, split_rand1.clone())
+        .eval(send.clone(), &env, split_rand0.clone())
+        .await
+        .is_ok());
+    assert!(reducer
+        .eval(receive.clone(), &env, split_rand1.clone())
         .await
         .is_ok());
 
@@ -519,8 +521,15 @@ async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() 
             merge_rand,
         ),
     );
+    assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    assert_eq!(send_result, map_data(expected_elements));
+    let (space, reducer) = create_test_space().await;
+    assert!(reducer
+        .eval(receive, &env, split_rand1.clone())
+        .await
+        .is_ok());
+    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    // TODO: finish this test case 
+    let receive_result = space.lock().unwrap().to_map();
+    assert_eq!(receive_result, map_data(expected_elements));
 }

@@ -32,11 +32,11 @@ use super::accounting::cost_accounting::CostAccounting;
 use super::accounting::costs::Cost;
 use super::accounting::has_cost::HasCost;
 use super::dispatch::RhoDispatch;
-use super::dispatch::RholangAndRustDispatcher;
+use super::dispatch::RholangAndScalaDispatcher;
 use super::env::Env;
 use super::errors::InterpreterError;
 use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
-use super::reduce::{DebruijnInterpreter, Reduce};
+use super::reduce::DebruijnInterpreter;
 use super::registry::registry_bootstrap::ast;
 use super::storage::charging_rspace::ChargingRSpace;
 use super::system_processes::{
@@ -760,15 +760,16 @@ fn setup_reducer(
 ) -> DebruijnInterpreter {
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
-        Arc::new(Mutex::new(Box::new(RholangAndRustDispatcher {
+        Arc::new(Mutex::new(RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(Mutex::new(HashMap::new())),
-        }))),
+            reducer: None,
+        })),
         block_data_ref,
         invalid_blocks,
         extra_system_processes,
     );
 
-    let (_, replay_reducer) = RholangAndRustDispatcher::create(
+    let (_, replay_reducer) = RholangAndScalaDispatcher::create(
         charging_rspace.clone(),
         replay_dispatch_table,
         urn_map,

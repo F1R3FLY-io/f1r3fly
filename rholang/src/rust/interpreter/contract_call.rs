@@ -27,7 +27,7 @@ pub struct ContractCall {
     pub dispatcher: RhoDispatch,
 }
 
-pub type Producer = Box<dyn Fn(Vec<Par>, Par) -> ()>;
+pub type Producer = Box<dyn FnOnce(Vec<Par>, Par) -> Box<dyn futures::Future<Output = ()>>>;
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
@@ -40,30 +40,35 @@ impl ContractCall {
             let space = self.space.clone();
             let dispatcher = self.dispatcher.clone();
             let produce = Box::new(move |values: Vec<Par>, ch: Par| {
-                let produce_result = space.lock().unwrap().produce(
-                    ch,
-                    ListParWithRandom {
-                        pars: values,
-                        random_state: rand.clone(),
-                    },
-                    false,
-                );
+                let space = space.clone();
+                let rand = rand.clone();
+                Box::new(async move {
+                    let produce_result = space.lock().unwrap().produce(
+                        ch,
+                        ListParWithRandom {
+                            pars: values,
+                            random_state: rand,
+                        },
+                        false,
+                    );
 
-                match produce_result {
-                    Some((cont, channels)) => {
-                        dispatcher
-                            .lock()
-                            .unwrap()
-                            .dispatch(
-                                cont.continuation,
-                                channels.iter().map(|c| c.matched_datum.clone()).collect(),
-                            )
-                            .map_err(|err| panic!("{}", err))
-                            .unwrap();
+                    match produce_result {
+                        Some((cont, channels)) => {
+                            dispatcher
+                                .lock()
+                                .unwrap()
+                                .dispatch(
+                                    cont.continuation,
+                                    channels.iter().map(|c| c.matched_datum.clone()).collect(),
+                                )
+                                .await
+                                .map_err(|err| panic!("{}", err))
+                                .unwrap();
+                        }
+
+                        None => {}
                     }
-
-                    None => {}
-                }
+                }) as Box<dyn futures::Future<Output = ()>>
             });
 
             Some((produce, args.clone()))

@@ -11,10 +11,10 @@ use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
-use super::dispatch::{RhoDispatch, RholangAndRustDispatcher};
+use super::dispatch::RhoDispatch;
 use super::pretty_printer::PrettyPrinter;
 use super::registry::registry::Registry;
 use super::rho_runtime::RhoTuplespace;

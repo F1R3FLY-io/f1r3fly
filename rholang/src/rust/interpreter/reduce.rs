@@ -57,18 +57,6 @@ use super::{env::Env, rho_runtime::RhoTuplespace};
 /**
  * Reduce is the interface for evaluating Rholang expressions.
  */
-pub trait Reduce {
-    async fn eval(
-        &self,
-        par: Par,
-        env: &Env<Par>,
-        rand: Blake2b512Random,
-    ) -> Result<(), InterpreterError>;
-
-    async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.eval(par, &Env::new(), rand).await
-    }
-}
 
 #[derive(Clone)]
 pub struct DebruijnInterpreter {
@@ -81,8 +69,25 @@ pub struct DebruijnInterpreter {
     pub substitute: Substitute,
 }
 
-impl Reduce for DebruijnInterpreter {
-    async fn eval(
+type Application = Option<(
+    TaggedContinuation,
+    Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
+    bool,
+)>;
+
+trait Method {
+    fn apply(&self, p: Par, args: Vec<Par>, env: &Env<Par>) -> Result<Par, InterpreterError>;
+}
+
+/**
+ * Materialize a send in the store, optionally returning the matched continuation.
+ *
+ * @param chan  The channel on which data is being sent.
+ * @param data  The par objects holding the processes being sent.
+ * @param persistent  True if the write should remain in the tuplespace indefinitely.
+ */
+impl DebruijnInterpreter {
+    pub async fn eval(
         &self,
         par: Par,
         env: &Env<Par>,
@@ -174,26 +179,11 @@ impl Reduce for DebruijnInterpreter {
             self.aggregate_evaluator_errors(flattened_results)
         }
     }
-}
 
-type Application = Option<(
-    TaggedContinuation,
-    Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
-    bool,
-)>;
+    pub async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
+        self.eval(par, &Env::new(), rand).await
+    }
 
-trait Method {
-    fn apply(&self, p: Par, args: Vec<Par>, env: &Env<Par>) -> Result<Par, InterpreterError>;
-}
-
-/**
- * Materialize a send in the store, optionally returning the matched continuation.
- *
- * @param chan  The channel on which data is being sent.
- * @param data  The par objects holding the processes being sent.
- * @param persistent  True if the write should remain in the tuplespace indefinitely.
- */
-impl DebruijnInterpreter {
     /**
      * Materialize a send in the store, optionally returning the matched continuation.
      *
@@ -355,16 +345,19 @@ impl DebruijnInterpreter {
         }
     }
 
-    // TODO: Remove async
     async fn dispatch(
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Result<(), InterpreterError> {
-        self.dispatcher.lock().unwrap().dispatch(
-            continuation,
-            data_list.into_iter().map(|tuple| tuple.1).collect(),
-        )
+        self.dispatcher
+            .lock()
+            .unwrap()
+            .dispatch(
+                continuation,
+                data_list.into_iter().map(|tuple| tuple.1).collect(),
+            )
+            .await
     }
 
     async fn produce_peeks(
@@ -711,7 +704,7 @@ impl DebruijnInterpreter {
 
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
                 if !self.urn_map.contains_key(&urn) {
-                    /** TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]]. */
+                    // TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]].
                     // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
                     match new.injections.get(&urn) {
                       Some(p) => {
