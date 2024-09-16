@@ -31,16 +31,20 @@ module.exports = grammar({
         ),
 
         // Process definitions
-        proc1: $ => prec.right(0, choice(
+        proc1: $ => prec.right(10, choice(
             seq("new", repeat($.name_decl), "in", $._proc),
             seq("match", $._proc, "{", repeat($.case_impl), "}"),
             seq($.name, "!", "[", repeat($._proc), "]"),
             seq("for", "(", repeat($.receipt), ")", "{", $._proc, "}")
         )),
 
-        proc2: $ => prec.left(1, choice(
-            seq("if", $._proc, "then", $._proc, "else", $._proc),
-            seq($._proc, "||", $._proc)
+        proc2: $ => prec.left(5, choice(
+            $.bundle_proc,
+            seq("contract", $.name, "(", repeat($.name), optional($.name_remainder), ")", "=", "{", $._proc, "}"),
+            seq("for", "(", repeat($.receipt), ")", "{", $._proc, "}"),
+            seq("select", "{", repeat($.branch), "}"),
+            seq("match", $._proc, "{", repeat($.case_impl), "}"),
+            seq("let", $.decl, repeat($.decls), "in", "{", $._proc, "}")
         )),
 
         proc3: $ => prec.left(1, choice(
@@ -88,16 +92,25 @@ module.exports = grammar({
         proc14: $ => prec.right(2, seq("~", $._proc)),
         proc15: $ => choice(
             $.ground,
-            $.collection,
+            // $.collection,
             $.proc_var,
             "Nil",
             $.simple_type
         ),
 
+        // proc16: $ => prec.right(3, choice(
+        //     seq("{", $._proc, "}"),
+        //     $.ground,
+        //     // $.collection,
+        //     $.proc_var,
+        //     "Nil",
+        //     $.simple_type
+        // )),
+
         proc16: $ => prec.right(3, choice(
             seq("{", $._proc, "}"),
             $.ground,
-            $.collection,
+            //$.collection,
             $.proc_var,
             "Nil",
             $.simple_type
@@ -109,6 +122,10 @@ module.exports = grammar({
         receipt: $ => prec.left(seq(
             repeat1($.linear_bind), optional($._proc)
         )),
+
+        receipt_linear_impl: $ => seq(
+            repeat1($.linear_bind)
+        ),
 
         linear_bind: $ => seq(
             repeat($.name), optional($.name_remainder), "<-", $.name_source
@@ -152,13 +169,31 @@ module.exports = grammar({
         ),
 
         // Bundle
-        //bundle: $ => choice("bundle+", "bundle-", "bundle0", "bundle"),
-        bundle: $ => choice(
-            seq("bundle+", "{", $._proc, "}"),
-            seq("bundle-", "{", $._proc, "}"),
-            seq("bundle0", "{", $._proc, "}"),
-            seq("bundle", "{", $._proc, "}")
+      bundle_proc: $ => choice(
+        prec(10, seq("bundle+", "{", $._proc, "}")),
+        prec(10, seq("bundle-", "{", $._proc, "}")),
+        prec(10, seq("bundle0", "{", $._proc, "}")),
+        prec(10, seq("bundle", "{", $._proc, "}"))
+      ),
+      // branch
+        branch: $ => seq(
+            $.receipt_linear_impl,
+            "=>",
+            $._proc
         ),
+
+        // Define 'decls' as a sequence of linear or concurrent declarations
+        decls: $ => choice(
+            seq(";", repeat($.linear_decl)),
+            seq("&", repeat($.conc_decl))
+        ),
+
+        linear_decl: $ => $.decl,
+        conc_decl: $ => $.decl,
+
+        decl: $ => prec.left(seq(
+            repeat($.name), optional($.name_remainder), "<-", repeat($._proc)
+        )),
 
         // Send types
         send: $ => choice("!", "!!"),
@@ -173,7 +208,7 @@ module.exports = grammar({
         bool_literal: $ => choice("true", "false"),
         long_literal: $ => token(/\d+/),
         string_literal: $ => token(/"[^"\\]*(\\.[^"\\]*)*"/),
-        uri_literal: $ => token(/[^\\]*(\\.[^\\]*)*/),
+        uri_literal: $ => token(/`([^\\`]|\\.)*`/),
 
         // Variables
         var: $ => token(/((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\')+))/),
@@ -185,12 +220,12 @@ module.exports = grammar({
         )),
 
         // Collections
-        collection: $ => choice(
-            seq("[", repeat($._proc), $.proc_remainder, "]"),
-            $.tuple,
-            seq("Set", "(", repeat($._proc), $.proc_remainder, ")"),
-            seq("{", repeat($.key_value_pair), $.proc_remainder, "}")
-        ),
+        // collection: $ => choice(
+        //     seq("[", repeat($._proc), $.proc_remainder, "]"),
+        //     $.tuple,
+        //     seq("Set", "(", repeat($._proc), $.proc_remainder, ")"),
+        //     seq("{", repeat($.key_value_pair), $.proc_remainder, "}")
+        // ),
 
         // Key-Value Pair
         key_value_pair: $ => seq($._proc, ":", $._proc),

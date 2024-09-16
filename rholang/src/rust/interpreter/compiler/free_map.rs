@@ -83,3 +83,9 @@ impl<T> FreeMap<T> {
     self.next_level
   }
 }
+
+impl<T> Default for FreeMap<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}

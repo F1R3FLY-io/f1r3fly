@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct SourcePosition {
-  row: usize,
-  column: usize,
+  pub row: usize,
+  pub column: usize,
 }
 
 impl std::fmt::Display for SourcePosition {

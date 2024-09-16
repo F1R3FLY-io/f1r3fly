@@ -28,7 +28,7 @@ impl<T> BoundMapChain<T> {
     })
   }
 
-  fn put(&mut self, binding: IdContext<T>) {
+  pub fn put(&mut self, binding: IdContext<T>) {
     if let Some(map) = self.chain.first_mut() {
       map.put(binding);
     }
@@ -56,5 +56,11 @@ impl<T> BoundMapChain<T> {
 
   pub(crate) fn depth(&self) -> usize {
     self.chain.len() - 1
+  }
+}
+
+impl<T> Default for BoundMapChain<T> {
+  fn default() -> Self {
+    Self::new()
   }
 }

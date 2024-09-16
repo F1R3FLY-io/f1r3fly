@@ -7,4 +7,4 @@ pub mod free_context;
 pub mod id_context;
 pub mod source_position;
 pub mod normalizer;
-// pub mod normalize;
+pub mod normalize;
