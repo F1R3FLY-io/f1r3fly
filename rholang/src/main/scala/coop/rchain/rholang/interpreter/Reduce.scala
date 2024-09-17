@@ -384,8 +384,10 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
           case singleCase +: caseRem =>
             for {
               pattern <- substituteAndCharge[Par, M](singleCase.pattern, depth = 1, env)
+              // _       = println("\npattern in evalMatch: " + pattern)
               // matchResult <- spatialMatchResult[M](target, pattern)
               matchResult <- RSpacePlusPlus_RhoTypes.spatialMatchResult(target, pattern)
+              // _           = println("\nmatchResult in evalMatch: " + matchResult)
               res <- matchResult match {
                       case None =>
                         (target, caseRem).asLeft[Unit].pure[M]
@@ -406,6 +408,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       evaledTarget <- evalExpr(mat.target)
       // TODO(kyle): Make the matcher accept an environment, instead of substituting it.
       substTarget <- substituteAndCharge[Par, M](evaledTarget, depth = 0, env)
+      _           = println("\nsubstTarget in evalMatch: " + substTarget)
       _           <- firstMatch(substTarget, mat.cases)
     } yield ()
   }

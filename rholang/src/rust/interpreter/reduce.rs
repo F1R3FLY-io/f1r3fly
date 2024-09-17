@@ -522,7 +522,6 @@ impl DebruijnInterpreter {
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
         let subst_data = data
-            .clone()
             .into_iter()
             .map(|p| self.substitute.substitute_and_charge(&p, 0, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
@@ -651,14 +650,19 @@ impl DebruijnInterpreter {
 
                         [single_case, case_rem @ ..] => {
                             let pattern = self.substitute.substitute_and_charge(
-                                single_case.pattern.as_ref().unwrap(),
+                                &unwrap_option_safe(single_case.pattern.clone())?,
                                 1,
                                 env,
                             )?;
 
+                            // println!("\ntarget in eval_matcher: {:?}", target);
+                            // println!("\npattern in eval_matcher: {:?}", pattern);
+
                             let mut spatial_matcher = SpatialMatcherContext::new();
                             let match_result =
                                 spatial_matcher.spatial_match_result(_target.clone(), pattern);
+
+                            // println!("\nmatch_result in eval_matcher: {:?}", match_result);
 
                             match match_result {
                                 None => {
@@ -692,6 +696,8 @@ impl DebruijnInterpreter {
         let subst_target = self
             .substitute
             .substitute_and_charge(&evaled_target, 0, env)?;
+
+        // println!("\nsubst_target in eval_match: {:?}", subst_target);
 
         first_match(subst_target, mat.cases.clone(), rand).await
     }
