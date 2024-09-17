@@ -533,3 +533,95 @@ async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() 
     let receive_result = space.lock().unwrap().to_map();
     assert_eq!(receive_result, map_data(expected_elements));
 }
+
+#[tokio::test]
+async fn eval_of_send_pipe_receive_with_peek_should_meet_in_the_tuple_space_and_proceed() {
+    let (space, reducer) = create_test_space().await;
+
+    let channel = new_gstring_par("channel".to_string(), Vec::new(), false);
+    let result_channel = new_gstring_par("result".to_string(), Vec::new(), false);
+
+    let split_rand0 = rand().split_byte(0);
+    let split_rand1 = rand().split_byte(1);
+    let merge_rand = Blake2b512Random::merge(vec![split_rand1.clone(), split_rand0.clone()]);
+
+    let send = Par::default().with_sends(vec![Send {
+        chan: Some(channel.clone()),
+        data: vec![
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(8, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+        ],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let receive = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![
+                new_freevar_par(0, Vec::new()),
+                new_freevar_par(1, Vec::new()),
+                new_freevar_par(2, Vec::new()),
+            ],
+            source: Some(channel.clone()),
+            remainder: None,
+            free_count: 3,
+        }],
+        body: Some(Par::default().with_sends(vec![Send {
+            chan: Some(result_channel.clone()),
+            data: vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            persistent: false,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }])),
+        persistent: false,
+        peek: true,
+        bind_count: 3,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        channel,
+        (
+            vec![
+                new_gint_par(7, Vec::new(), false),
+                new_gint_par(8, Vec::new(), false),
+                new_gint_par(9, Vec::new(), false),
+            ],
+            split_rand0.clone(),
+        ),
+    );
+    expected_elements.insert(
+        result_channel,
+        (
+            vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            merge_rand,
+        ),
+    );
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(send.clone(), &env, split_rand0.clone())
+        .await
+        .is_ok());
+    assert!(reducer
+        .eval(receive.clone(), &env, split_rand1.clone())
+        .await
+        .is_ok());
+
+    let send_result = space.lock().unwrap().to_map();
+    assert_eq!(send_result, map_data(expected_elements.clone()));
+
+    let (space, reducer) = create_test_space().await;
+    assert!(reducer
+        .eval(receive, &env, split_rand1.clone())
+        .await
+        .is_ok());
+    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
+
+    let receive_result = space.lock().unwrap().to_map();
+    assert_eq!(receive_result, map_data(expected_elements));
+}

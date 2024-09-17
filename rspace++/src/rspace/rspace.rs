@@ -103,7 +103,7 @@ where
 
         let wk = WaitingContinuation {
             patterns,
-            continuation: continuation,
+            continuation,
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),

@@ -114,6 +114,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
         //   "consumeResult in Reduce consume: " + consumeResult + "\npeek in Reduce consume: " + peek
         // ) *>
         // Sync[M].delay(println("consumeResult in Reduce consume: " + consumeResult)) *>
+        // Sync[M].delay(println("space toMap in Reduce consume: " )) *>
         continue(
           unpackOptionWithPeek(consumeResult),
           consume(binds, body, persistent, peek),
@@ -124,6 +125,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
   }
 
   private[this] def continue(res: Application, repeatOp: M[Unit], persistent: Boolean): M[Unit] =
+    // println("\napplication in continue: " + res)
     res match {
       case Some((continuation, dataList, _)) if persistent => {
         // Log[M].debug("Calling dispatchAndRun with repeatOp in Reduce") *>
@@ -309,7 +311,9 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
                   }
       data      <- send.data.toList.traverse(evalExpr)
       substData <- data.traverse(substituteAndCharge[Par, M](_, depth = 0, env))
-      _         <- produce(unbundled, ListParWithRandom(substData, rand), send.persistent)
+      // _         = println("\ndata in evalSend: " + data)
+      // _         = println("\nsubstData in evalSend: " + substData)
+      _ <- produce(unbundled, ListParWithRandom(substData, rand), send.persistent)
     } yield ()
 
   private def eval(receive: Receive)(
@@ -331,6 +335,8 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
                     depth = 0,
                     env.shift(receive.bindCount)
                   )
+      // _ = println("\nbinds in evalReceive: " + binds)
+      // _ = println("\nsubstBody in evalReceive: " + substBody)
       _ <- consume(binds, ParWithRandom(substBody, rand), receive.persistent, receive.peek)
     } yield ()
 
@@ -454,7 +460,9 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
   private[this] def unbundleReceive(rb: ReceiveBind)(implicit env: Env[Par]): M[Par] =
     for {
       evalSrc <- evalExpr(rb.source)
-      subst   <- substituteAndCharge[Par, M](evalSrc, depth = 0, env)
+      // _       = println("evalSrc in unbundleReceive: " + evalSrc)
+      subst <- substituteAndCharge[Par, M](evalSrc, depth = 0, env)
+      // _       = println("subst in unbundleReceive: " + subst)
       // Check if we try to read from bundled channel
       unbndl <- subst.singleBundle() match {
                  case Some(value) =>
@@ -463,6 +471,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
                    else value.body.pure[M]
                  case None => subst.pure[M]
                }
+      // _ = println("unbndl in unbundleReceive: " + unbndl)
     } yield unbndl
 
   private def eval(

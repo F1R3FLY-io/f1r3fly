@@ -242,6 +242,9 @@ impl DebruijnInterpreter {
             },
         );
 
+        // println!("space map in reduce consume: {:?}", self.space.lock().unwrap().to_map());
+        // println!("\nconsume_result in reduce consume: {:?}", consume_result);
+
         self.continue_consume_process(
             unpack_option_with_peek(consume_result),
             binds,
@@ -279,7 +282,10 @@ impl DebruijnInterpreter {
                     self.aggregate_evaluator_errors(flattened_results)
                 } else if peek {
                     // dispatchAndRun
-                    let futures = self.produce_peeks(data_list).await;
+                    let mut futures: Vec<
+                        Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+                    > = vec![Box::pin(self.dispatch(continuation, data_list.clone()))];
+                    futures.extend(self.produce_peeks(data_list).await);
 
                     // parTraverseSafe
                     let results: Vec<Result<(), InterpreterError>> =
@@ -304,16 +310,17 @@ impl DebruijnInterpreter {
         binds: Vec<(BindPattern, Par)>,
         body: ParWithRandom,
         persistent: bool,
-        _peek: bool,
+        peek: bool,
     ) -> Result<(), InterpreterError> {
+        // println!("\napplication in continue_consume_process: {:?}", res);
         match res {
-            Some((continuation, data_list, peek)) => {
+            Some((continuation, data_list, _peek)) => {
                 if persistent {
                     // dispatchAndRun
                     let mut futures: Vec<
                         Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
                     > = vec![Box::pin(self.dispatch(continuation, data_list.clone()))];
-                    futures.push(Box::pin(self.consume(binds, body, persistent, _peek)));
+                    futures.push(Box::pin(self.consume(binds, body, persistent, peek)));
 
                     // parTraverseSafe
                     let results: Vec<Result<(), InterpreterError>> =
@@ -324,9 +331,12 @@ impl DebruijnInterpreter {
                         .collect();
 
                     self.aggregate_evaluator_errors(flattened_results)
-                } else if peek {
+                } else if _peek {
                     // dispatchAndRun
-                    let futures = self.produce_peeks(data_list).await;
+                    let mut futures: Vec<
+                        Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+                    > = vec![Box::pin(self.dispatch(continuation, data_list.clone()))];
+                    futures.extend(self.produce_peeks(data_list).await);
 
                     // parTraverseSafe
                     let results: Vec<Result<(), InterpreterError>> =
@@ -511,9 +521,13 @@ impl DebruijnInterpreter {
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
         let subst_data = data
+            .clone()
             .into_iter()
             .map(|p| self.substitute.substitute_and_charge(&p, 0, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+        // println!("\ndata in eval_send: {:?}", data);
+        // println!("\nsubst_data in eval_send: {:?}", subst_data);
 
         self.produce(
             unbundled,
@@ -562,6 +576,9 @@ impl DebruijnInterpreter {
             0,
             &env.shift(receive.bind_count),
         )?;
+
+        // println!("\nbinds in eval_receive: {:?}", binds);
+        // println!("\nsubst_body in eval_receive: {:?}", subst_body);
 
         self.consume(
             binds,
@@ -759,7 +776,9 @@ impl DebruijnInterpreter {
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
         let eval_src = self.eval_expr(&rb.source.as_ref().unwrap(), env)?;
+        // println!("\neval_src in unbundle_receive: {:?}", eval_src);
         let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
+        // println!("\nsubst in unbundle_receive: {:?}", eval_src);
         // Check if we try to read from bundled channel
         let unbndl = match single_bundle(&subst) {
             Some(value) => {
@@ -774,6 +793,7 @@ impl DebruijnInterpreter {
             None => subst,
         };
 
+        // println!("\nunbndl in unbundle_receive: {:?}", unbndl);
         Ok(unbndl)
     }
 
