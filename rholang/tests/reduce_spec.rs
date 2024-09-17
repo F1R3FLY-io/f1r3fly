@@ -11,7 +11,8 @@ use models::{
     rust::{
         rholang::implicits::GPrivateBuilder,
         utils::{
-            new_boundvar_par, new_bundle_par, new_freevar_par, new_gbool_expr, new_gstring_par,
+            new_boundvar_par, new_bundle_par, new_elist_par, new_freevar_par, new_freevar_var,
+            new_gbool_expr, new_gstring_par,
         },
     },
 };
@@ -624,4 +625,311 @@ async fn eval_of_send_pipe_receive_with_peek_should_meet_in_the_tuple_space_and_
 
     let receive_result = space.lock().unwrap().to_map();
     assert_eq!(receive_result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn eval_of_send_pipe_receive_when_whole_list_is_bound_to_list_remainder_should_meet_in_the_tuple_space_and_proceed(
+) {
+    let (space, reducer) = create_test_space().await;
+
+    // for(@[...a] <- @"channel") { … } | @"channel"!([7,8,9])
+    let channel = new_gstring_par("channel".to_string(), Vec::new(), false);
+    let result_channel = new_gstring_par("result".to_string(), Vec::new(), false);
+    let split_rand0 = rand().split_byte(0);
+    let split_rand1 = rand().split_byte(1);
+    let merge_rand = Blake2b512Random::merge(vec![split_rand1.clone(), split_rand0.clone()]);
+
+    let send = Par::default().with_sends(vec![Send {
+        chan: Some(channel.clone()),
+        data: vec![new_elist_par(
+            vec![
+                new_gint_par(7, Vec::new(), false),
+                new_gint_par(8, Vec::new(), false),
+                new_gint_par(9, Vec::new(), false),
+            ],
+            Vec::new(),
+            false,
+            None,
+            Vec::new(),
+            false,
+        )],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let receive = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![new_elist_par(
+                vec![new_freevar_par(0, Vec::new())],
+                Vec::new(),
+                true,
+                Some(new_freevar_var(0)),
+                Vec::new(),
+                false,
+            )],
+            source: Some(channel.clone()),
+            remainder: None,
+            free_count: 1,
+        }],
+        body: Some(Par::default().with_sends(vec![Send {
+            chan: Some(result_channel.clone()),
+            data: vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            persistent: false,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }])),
+        persistent: false,
+        peek: false,
+        bind_count: 1,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(send.clone(), &env, split_rand0.clone())
+        .await
+        .is_ok());
+    assert!(reducer
+        .eval(receive.clone(), &env, split_rand1.clone())
+        .await
+        .is_ok());
+
+    let send_result = space.lock().unwrap().to_map();
+
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        result_channel,
+        (
+            vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            merge_rand,
+        ),
+    );
+    assert_eq!(send_result, map_data(expected_elements.clone()));
+
+    let (space, reducer) = create_test_space().await;
+    assert!(reducer
+        .eval(receive, &env, split_rand1.clone())
+        .await
+        .is_ok());
+    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
+
+    let receive_result = space.lock().unwrap().to_map();
+    assert_eq!(receive_result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn eval_of_send_on_seven_plus_eight_pipe_receive_on_fifteen_should_meet_in_the_tuple_space_and_proceed(
+) {
+    let (space, reducer) = create_test_space().await;
+
+    let split_rand0 = rand().split_byte(0);
+    let split_rand1 = rand().split_byte(1);
+    let merge_rand = Blake2b512Random::merge(vec![split_rand1.clone(), split_rand0.clone()]);
+
+    let send = Par::default().with_sends(vec![Send {
+        chan: Some(new_eplus_par(7, 8, Vec::new(), false)),
+        data: vec![
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(8, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+        ],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let receive = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![
+                new_freevar_par(0, Vec::new()),
+                new_freevar_par(1, Vec::new()),
+                new_freevar_par(2, Vec::new()),
+            ],
+            source: Some(new_gint_par(15, Vec::new(), false)),
+            remainder: None,
+            free_count: 3,
+        }],
+        body: Some(Par::default().with_sends(vec![Send {
+            chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+            data: vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            persistent: false,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }])),
+        persistent: false,
+        peek: false,
+        bind_count: 3,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(send.clone(), &env, split_rand0.clone())
+        .await
+        .is_ok());
+    assert!(reducer
+        .eval(receive.clone(), &env, split_rand1.clone())
+        .await
+        .is_ok());
+
+    let send_result = space.lock().unwrap().to_map();
+
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![new_gstring_par("Success".to_string(), Vec::new(), false)],
+            merge_rand,
+        ),
+    );
+    assert_eq!(send_result, map_data(expected_elements.clone()));
+
+    let (space, reducer) = create_test_space().await;
+    assert!(reducer
+        .eval(receive, &env, split_rand1.clone())
+        .await
+        .is_ok());
+    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
+
+    let receive_result = space.lock().unwrap().to_map();
+    assert_eq!(receive_result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and_proceed() {
+    let (space, reducer) = create_test_space().await;
+
+    let base_rand = rand().split_byte(2);
+    let split_rand0 = rand().split_byte(0);
+    let split_rand1 = rand().split_byte(1);
+    let merge_rand = Blake2b512Random::merge(vec![split_rand1.clone(), split_rand0.clone()]);
+
+    let simple_receive = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![new_gint_par(2, Vec::new(), false)],
+            source: Some(new_gint_par(2, Vec::new(), false)),
+            remainder: None,
+            free_count: 3,
+        }],
+        body: Some(Par::default()),
+        persistent: false,
+        peek: false,
+        bind_count: 0,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let send = Par::default().with_sends(vec![Send {
+        chan: Some(new_gint_par(1, Vec::new(), false)),
+        data: vec![simple_receive.clone()],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let receive = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![new_freevar_par(0, Vec::new())],
+            source: Some(new_gint_par(1, Vec::new(), false)),
+            remainder: None,
+            free_count: 1,
+        }],
+        body: Some(new_boundvar_par(0, Vec::new(), false)),
+        persistent: false,
+        peek: false,
+        bind_count: 1,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(send.clone(), &env, split_rand0.clone())
+        .await
+        .is_ok());
+    assert!(reducer
+        .eval(receive.clone(), &env, split_rand1.clone())
+        .await
+        .is_ok());
+
+    let send_result = space.lock().unwrap().to_map();
+    let channels = vec![new_gint_par(2, Vec::new(), false)];
+    // Because they are evaluated separately, nothing is split.
+    assert!(check_continuation(
+        send_result,
+        channels.clone(),
+        vec![BindPattern {
+            patterns: vec![new_gint_par(2, Vec::new(), false)],
+            remainder: None,
+            free_count: 0,
+        }],
+        ParWithRandom {
+            body: Some(Par::default()),
+            random_state: merge_rand.to_vec(),
+        },
+    ));
+
+    let (space, reducer) = create_test_space().await;
+    assert!(reducer
+        .eval(receive, &env, split_rand1.clone())
+        .await
+        .is_ok());
+    assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
+
+    let receive_result = space.lock().unwrap().to_map();
+    assert!(check_continuation(
+        receive_result,
+        channels.clone(),
+        vec![BindPattern {
+            patterns: vec![new_gint_par(2, Vec::new(), false)],
+            remainder: None,
+            free_count: 0,
+        }],
+        ParWithRandom {
+            body: Some(Par::default()),
+            random_state: merge_rand.to_vec(),
+        },
+    ));
+
+    let (space, reducer) = create_test_space().await;
+    let mut par_param = Par::default().with_receives(vec![Receive {
+        binds: vec![ReceiveBind {
+            patterns: vec![new_freevar_par(0, Vec::new())],
+            source: Some(new_gint_par(1, Vec::new(), false)),
+            remainder: None,
+            free_count: 1,
+        }],
+        body: Some(new_boundvar_par(0, Vec::new(), false)),
+        persistent: false,
+        peek: false,
+        bind_count: 1,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+    par_param = par_param.with_sends(vec![Send {
+        chan: Some(new_gint_par(1, Vec::new(), false)),
+        data: vec![simple_receive],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+    assert!(reducer.eval(par_param, &env, base_rand).await.is_ok());
+
+    let both_result = space.lock().unwrap().to_map();
+    assert!(check_continuation(
+        both_result,
+        channels,
+        vec![BindPattern {
+            patterns: vec![new_gint_par(2, Vec::new(), false)],
+            remainder: None,
+            free_count: 0,
+        }],
+        ParWithRandom {
+            body: Some(Par::default()),
+            random_state: merge_rand.to_vec(),
+        },
+    ));
 }

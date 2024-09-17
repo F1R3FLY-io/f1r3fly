@@ -51,6 +51,7 @@ use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
+use super::unwrap_option_safe;
 use super::util::GeneratedMessage;
 use super::{env::Env, rho_runtime::RhoTuplespace};
 
@@ -775,7 +776,7 @@ impl DebruijnInterpreter {
     }
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
-        let eval_src = self.eval_expr(&rb.source.as_ref().unwrap(), env)?;
+        let eval_src = self.eval_expr(&unwrap_option_safe(rb.source.clone())?, env)?;
         // println!("\neval_src in unbundle_receive: {:?}", eval_src);
         let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
         // println!("\nsubst in unbundle_receive: {:?}", eval_src);
