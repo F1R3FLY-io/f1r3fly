@@ -500,9 +500,9 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        println!("\nsend in eval_send: {:?}", send);
+        // println!("\nsend in eval_send: {:?}", send);
         self.cost.charge(send_eval_cost())?;
-        let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap(), env)?;
+        let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
         let unbundled = match single_bundle(&sub_chan) {
             Some(value) => {
@@ -511,7 +511,7 @@ impl DebruijnInterpreter {
                         "Trying to send on non-writeable channel.".to_string(),
                     ));
                 } else {
-                    value.body.unwrap()
+                    unwrap_option_safe(value.body)?
                 }
             }
             None => sub_chan,
@@ -826,7 +826,7 @@ impl DebruijnInterpreter {
             }
             ExprInstance::EMethodBody(emethod) => {
                 self.cost.charge(method_call_cost())?;
-                let evaled_target = self.eval_expr(&emethod.target.unwrap(), env)?;
+                let evaled_target = self.eval_expr(&unwrap_option_safe(emethod.target)?, env)?;
                 let evaled_args: Vec<Par> = emethod
                     .arguments
                     .iter()
@@ -1641,13 +1641,13 @@ impl DebruijnInterpreter {
                 }
 
                 let expr_evaled = self.outer.eval_expr(&p, env)?;
-                println!("\nexpr_evaled in to_byte_array_method: {:?}", expr_evaled);
+                // println!("\nexpr_evaled in to_byte_array_method: {:?}", expr_evaled);
                 let expr_subst =
                     self.outer
                         .substitute
                         .substitute_and_charge(&expr_evaled, 0, env)?;
 
-                println!("\nexpr_subst in to_byte_array_method: {:?}", expr_subst);
+                // println!("\nexpr_subst in to_byte_array_method: {:?}", expr_subst);
 
                 self.outer.cost.charge(to_byte_array_cost(&expr_subst))?;
                 let ba = self.serialize(&expr_subst)?;

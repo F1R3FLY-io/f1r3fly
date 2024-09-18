@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Env.scala
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Env<A: Clone> {
     pub env_map: HashMap<i32, A>,
     pub level: i32,

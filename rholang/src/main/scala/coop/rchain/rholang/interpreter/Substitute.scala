@@ -66,7 +66,10 @@ object Substitute {
     else
       term.varInstance match {
         case BoundVar(index) =>
-          Sync[M].delay(env.get(index).toRight(left = term))
+          Sync[M].delay {
+            // println("\nenv in maybeSubstitute for Var: " + env)
+            env.get(index).toRight(left = term)
+          }
         case _ =>
           Sync[M].raiseError(SubstituteError(s"Illegal Substitution [$term]"))
       }

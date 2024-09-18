@@ -1622,9 +1622,6 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
     env = env.put(GPrivateBuilder::new_par("one".to_string()));
     env = env.put(GPrivateBuilder::new_par("zero".to_string()));
 
-    println!("{:?}", GPrivateBuilder::new_par("one".to_string()));
-    println!("{:?}", GPrivateBuilder::new_par("zero".to_string()));
-
     assert!(reducer
         .eval(to_byte_array_call, &env, split_rand.clone())
         .await
@@ -1641,4 +1638,218 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
         ),
     );
     assert_eq!(result, map_data(expected_result));
+}
+
+#[tokio::test]
+async fn eval_of_to_byte_array_method_on_any_process_should_return_an_error_when_to_byte_array_is_called_with_arguments(
+) {
+    let (_, reducer) = create_test_space().await;
+
+    let to_byte_array_call = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+            method_name: "toByteArray".to_string(),
+            target: Some(new_gint_par(1, Vec::new(), false)),
+            arguments: vec![new_gint_par(1, Vec::new(), false)],
+            locally_free: vec![],
+            connective_used: false,
+        })),
+    }]);
+
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval(to_byte_array_call, &env, rand()).await;
+    assert!(result.is_err());
+    assert_eq!(
+        result,
+        Err(InterpreterError::MethodArgumentNumberMismatch {
+            method: String::from("toByteArray"),
+            expected: 0,
+            actual: 1
+        })
+    );
+}
+
+#[tokio::test]
+async fn eval_of_hex_to_bytes_should_transform_encoded_string_to_byte_array_not_the_rholang_term() {
+    let (space, reducer) = create_test_space().await;
+
+    let split_rand = rand().split_byte(0);
+    let test_string = String::from("testing testing");
+    let base16_repr = hex::encode(test_string.clone());
+    let proc = new_gstring_par(base16_repr, Vec::new(), false);
+
+    let to_byte_array_call = Par::default().with_sends(vec![Send {
+        chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+        data: vec![Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "hexToBytes".to_string(),
+                target: Some(proc),
+                arguments: Vec::new(),
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }])],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(to_byte_array_call, &env, split_rand.clone())
+        .await
+        .is_ok());
+    let result = space.lock().unwrap().to_map();
+    let mut expected_result = HashMap::new();
+    expected_result.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![Par::default().with_exprs(vec![Expr {
+                expr_instance: Some(ExprInstance::GByteArray(test_string.as_bytes().to_vec())),
+            }])],
+            split_rand,
+        ),
+    );
+    assert_eq!(result, map_data(expected_result));
+}
+
+#[tokio::test]
+async fn eval_of_bytes_to_hex_should_transform_byte_array_to_hex_string_not_the_rholang_term() {
+    let (space, reducer) = create_test_space().await;
+
+    let split_rand = rand().split_byte(0);
+    let base16_repr = String::from("0123456789abcdef");
+    let test_bytes = StringOps::unsafe_decode_hex(base16_repr.clone());
+    let proc = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::GByteArray(test_bytes)),
+    }]);
+
+    let to_string_call = Par::default().with_sends(vec![Send {
+        chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+        data: vec![Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "bytesToHex".to_string(),
+                target: Some(proc),
+                arguments: Vec::new(),
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }])],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(to_string_call, &env, split_rand.clone())
+        .await
+        .is_ok());
+    let result = space.lock().unwrap().to_map();
+    let mut expected_result = HashMap::new();
+    expected_result.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![new_gstring_par(base16_repr, Vec::new(), false)],
+            split_rand,
+        ),
+    );
+    assert_eq!(result, map_data(expected_result));
+}
+
+#[tokio::test]
+async fn eval_of_to_utf8_bytes_should_transform_string_to_utf8_byte_array_not_the_rholang_term() {
+    let (space, reducer) = create_test_space().await;
+
+    let split_rand = rand().split_byte(0);
+    let test_string = String::from("testing testing");
+    let proc = new_gstring_par(test_string.clone(), Vec::new(), false);
+
+    let to_utf8_bytes_call = Par::default().with_sends(vec![Send {
+        chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+        data: vec![Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toUtf8Bytes".to_string(),
+                target: Some(proc),
+                arguments: Vec::new(),
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }])],
+        persistent: false,
+        locally_free: Vec::new(),
+        connective_used: false,
+    }]);
+
+    let env: Env<Par> = Env::new();
+    assert!(reducer
+        .eval(to_utf8_bytes_call, &env, split_rand.clone())
+        .await
+        .is_ok());
+    let result = space.lock().unwrap().to_map();
+    let mut expected_result = HashMap::new();
+    expected_result.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![Par::default().with_exprs(vec![Expr {
+                expr_instance: Some(ExprInstance::GByteArray(test_string.as_bytes().to_vec())),
+            }])],
+            split_rand,
+        ),
+    );
+    assert_eq!(result, map_data(expected_result));
+}
+
+#[tokio::test]
+async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_called_with_arguments()
+{
+    let (_, reducer) = create_test_space().await;
+
+    let to_utf8_bytes_call = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+            method_name: "toUtf8Bytes".to_string(),
+            target: Some(new_gint_par(1, Vec::new(), false)),
+            arguments: vec![new_gint_par(1, Vec::new(), false)],
+            locally_free: vec![],
+            connective_used: false,
+        })),
+    }]);
+
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval(to_utf8_bytes_call, &env, rand()).await;
+    assert!(result.is_err());
+    assert_eq!(
+        result,
+        Err(InterpreterError::MethodArgumentNumberMismatch {
+            method: String::from("toUtf8Bytes"),
+            expected: 0,
+            actual: 1
+        })
+    );
+}
+
+#[tokio::test]
+async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_evaluated_on_a_non_string(
+) {
+    let (_, reducer) = create_test_space().await;
+
+    let to_utf8_bytes_call = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+            method_name: "toUtf8Bytes".to_string(),
+            target: Some(new_gint_par(44, Vec::new(), false)),
+            arguments: vec![],
+            locally_free: vec![],
+            connective_used: false,
+        })),
+    }]);
+
+    let env: Env<Par> = Env::new();
+    let result = reducer.eval(to_utf8_bytes_call, &env, rand()).await;
+    assert!(result.is_err());
+    assert_eq!(
+        result,
+        Err(InterpreterError::MethodNotDefined {
+            method: "toUtf8Bytes".to_string(),
+            other_type: String::from("TypeId { t: (8494243739510146576, 4366098958496239024) }")
+        })
+    );
 }

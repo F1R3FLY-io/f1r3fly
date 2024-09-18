@@ -110,6 +110,7 @@ impl Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Either<Var, Par>, InterpreterError> {
+        // println!("\nenv in maybe_substitute_var: {:?}", env);
         if depth != 0 {
             Ok(Either::Left(term))
         } else {
@@ -118,10 +119,16 @@ impl Substitute {
                 .clone()
                 .expect("var_instance was None, should be Some")
             {
-                VarInstance::BoundVar(index) => match env.get(&index) {
-                    Some(p) => Ok(Either::Right(p)),
-                    None => Ok(Either::Left(term)),
-                },
+                VarInstance::BoundVar(index) => {
+                    // println!("\nindex in maybe_substitute_var: {:?}", index);
+                    match env.get(&index) {
+                        Some(p) => {
+                            // println!("\np in maybe_substitute_var: {:?}", p);
+                            Ok(Either::Right(p))
+                        }
+                        None => Ok(Either::Left(term)),
+                    }
+                }
                 _ => Err(InterpreterError::SubstituteError(format!(
                     "Illegal Substitution [{:?}]",
                     term
@@ -355,6 +362,7 @@ impl SubstituteTrait<Par> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Par, InterpreterError> {
+        // println!("\nterm in substitute_no_sort for par: {:?}", term);
         let exprs = self.sub_exp(term.exprs, depth, env)?;
         let connectives = self.sub_conn(term.connectives, depth, env)?;
 
@@ -477,11 +485,8 @@ impl SubstituteTrait<Receive> for Substitute {
                      remainder,
                      free_count,
                  }| {
-                    let sub_channel = self.substitute_no_sort(
-                        source.expect("source field on ReceiveBind was None, should be Some"),
-                        depth,
-                        env,
-                    )?;
+                    let sub_channel =
+                        self.substitute_no_sort(unwrap_option_safe(source)?, depth, env)?;
                     let sub_patterns = patterns
                         .iter()
                         .map(|p| self.substitute_no_sort(p.clone(), depth + 1, env))
@@ -498,10 +503,9 @@ impl SubstituteTrait<Receive> for Substitute {
             .collect::<Result<Vec<ReceiveBind>, InterpreterError>>()?;
 
         let body_sub = self.substitute_no_sort(
-            term.body
-                .expect("body field on Send was None, should be Some"),
+            unwrap_option_safe(term.body)?,
             depth,
-            env,
+            &env.shift(term.bind_count),
         )?;
 
         Ok(Receive {
@@ -539,19 +543,23 @@ impl SubstituteTrait<New> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<New, InterpreterError> {
-        self.substitute_no_sort(unwrap_option_safe(term.p)?, depth, env)
-            .map(|new_sub| New {
-                bind_count: term.bind_count,
-                p: Some(new_sub),
-                uri: term.uri,
-                injections: term.injections,
-                locally_free: term
-                    .locally_free
-                    .iter()
-                    .cloned()
-                    .take_while(|&x| i32::from(x) < env.shift)
-                    .collect(),
-            })
+        self.substitute_no_sort(
+            unwrap_option_safe(term.p)?,
+            depth,
+            &env.shift(term.bind_count),
+        )
+        .map(|new_sub| New {
+            bind_count: term.bind_count,
+            p: Some(new_sub),
+            uri: term.uri,
+            injections: term.injections,
+            locally_free: term
+                .locally_free
+                .iter()
+                .cloned()
+                .take_while(|&x| i32::from(x) < env.shift)
+                .collect(),
+        })
     }
 
     fn substitute(&self, term: New, depth: i32, env: &Env<Par>) -> Result<New, InterpreterError> {

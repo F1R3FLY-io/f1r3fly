@@ -1288,7 +1288,8 @@ class ReduceSpec extends FlatSpec with Matchers with AppendedClues with Persiste
 
     val result = withTestSpace {
       case TestFixture(space, reducer) =>
-        val env         = Env.makeEnv[Par](GPrivateBuilder("one"), GPrivateBuilder("zero"))
+        val env = Env.makeEnv[Par](GPrivateBuilder("one"), GPrivateBuilder("zero"))
+        // println("\nenv: " + env)
         val task        = reducer.eval(wrapWithSend(toByteArrayCall))(env, splitRand)
         val inspectTask = task >> space.toMap
         Await.result(inspectTask.runToFuture, 3.seconds)
