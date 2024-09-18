@@ -499,7 +499,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\nsend in eval_send: {:?}", send);
+        // println!("\nenv in eval_send: {:?}", env);
         self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
@@ -606,6 +606,7 @@ impl DebruijnInterpreter {
      */
     fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
         self.cost.charge(var_eval_cost())?;
+        // println!("\nenv in eval_var: {:?}", env);
         match valproc.var_instance {
             Some(VarInstance::BoundVar(level)) => match env.get(&level) {
                 Some(p) => Ok(p),
@@ -728,6 +729,8 @@ impl DebruijnInterpreter {
                         _env.put(addr)
                     });
 
+            // println!("\nsimple_news in eval_new: {:?}", simple_news);
+
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
                 if !self.urn_map.contains_key(&urn) {
                     // TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]].
@@ -765,6 +768,7 @@ impl DebruijnInterpreter {
                 }
             };
 
+            // println!("\nurns in eval_new: {:?}", urns);
             urns.into_iter()
                 .fold(Ok(simple_news), |acc, urn| match acc {
                     Ok(mut news) => match add_urn(&mut news, urn) {
@@ -776,9 +780,14 @@ impl DebruijnInterpreter {
                 })
         };
 
+        // println!("\nhit eval_new");
         self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
         match alloc(new.bind_count as usize, new.uri.clone()) {
-            Ok(env) => self.eval(new.p.clone().unwrap(), &env, rand).await,
+            Ok(env) => {
+                // println!("\nenv in eval_new: {:?}", env);
+                self.eval(unwrap_option_safe(new.p.clone())?, &env, rand)
+                    .await
+            }
             Err(e) => Err(e),
         }
     }
@@ -812,14 +821,16 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.eval(bundle.body.clone().unwrap(), env, rand).await
+        self.eval(unwrap_option_safe(bundle.body.clone())?, env, rand)
+            .await
     }
 
     // Public here for testing purposes
     pub fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
-        match expr.expr_instance.clone().unwrap() {
+        match unwrap_option_safe(expr.expr_instance.clone())? {
             ExprInstance::EVarBody(evar) => {
-                let p = self.eval_var(&evar.v.unwrap(), env)?;
+                // println!("\nenv in eval_expr_to_par: {:?}", env);
+                let p = self.eval_var(&unwrap_option_safe(evar.v)?, env)?;
                 let evaled_p = self.eval_expr(&p, env)?;
                 Ok(evaled_p)
             }
@@ -1881,7 +1892,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("union"),
                         expected: 1,
@@ -1979,7 +1990,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("diff"),
                         expected: 1,
@@ -2044,7 +2055,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("add"),
                         expected: 1,
@@ -2127,7 +2138,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("delete"),
                         expected: 1,
@@ -2193,7 +2204,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("contains"),
                         expected: 1,
@@ -2247,7 +2258,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("get"),
                         expected: 1,
@@ -2306,7 +2317,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 2 {
+                if args.len() != 2 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("get_or_else"),
                         expected: 2,
@@ -2368,7 +2379,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 2 {
+                if args.len() != 2 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("set"),
                         expected: 2,
@@ -2578,13 +2589,21 @@ impl DebruijnInterpreter {
                 match base_expr.expr_instance {
                     Some(expr_instance) => match expr_instance {
                         ExprInstance::GString(string) => Ok(new_gstring_par(
-                            string[from..until].to_string(),
+                            if from <= until && until <= string.len() {
+                                string[from..until].to_string()
+                            } else {
+                                "".to_string()
+                            },
                             Vec::new(),
                             false,
                         )),
 
                         ExprInstance::EListBody(elist) => Ok(new_elist_par(
-                            elist.ps[from..until].to_vec(),
+                            if from <= until && until <= elist.ps.len() {
+                                elist.ps[from..until].to_vec()
+                            } else {
+                                vec![]
+                            },
                             elist.locally_free,
                             elist.connective_used,
                             elist.remainder,
@@ -2595,7 +2614,11 @@ impl DebruijnInterpreter {
                         ExprInstance::GByteArray(bytes) => {
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::GByteArray(
-                                    bytes[from..until].to_vec(),
+                                    if from <= until && until <= bytes.len() {
+                                        bytes[from..until].to_vec()
+                                    } else {
+                                        vec![]
+                                    },
                                 )),
                             }]))
                         }
@@ -2621,7 +2644,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 2 {
+                if args.len() != 2 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("slice"),
                         expected: 2,
@@ -2632,7 +2655,11 @@ impl DebruijnInterpreter {
                     let from_arg = self.outer.eval_to_i64(&args[0], env)?;
                     let to_arg = self.outer.eval_to_i64(&args[1], env)?;
                     self.outer.cost.charge(slice_cost(to_arg))?;
-                    let result = self.slice(base_expr, from_arg as usize, to_arg as usize)?;
+                    let result = self.slice(
+                        base_expr,
+                        if from_arg > 0 { from_arg as usize } else { 0 },
+                        if to_arg > 0 { to_arg as usize } else { 0 },
+                    )?;
                     Ok(result)
                 }
             }
@@ -2680,7 +2707,7 @@ impl DebruijnInterpreter {
                 args: Vec<Par>,
                 env: &Env<Par>,
             ) -> Result<Par, InterpreterError> {
-                if !args.len() != 1 {
+                if args.len() != 1 {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
                         method: String::from("take"),
                         expected: 1,

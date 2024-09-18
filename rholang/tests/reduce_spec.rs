@@ -10,15 +10,15 @@ use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::{
     rhoapi::{
         connective::ConnectiveInstance::VarRefBody, expr::ExprInstance, g_unforgeable::UnfInstance,
-        Bundle, Connective, EEq, EMethod, GPrivate, GUnforgeable, Match, MatchCase, New, Receive,
-        ReceiveBind, VarRef,
+        Bundle, Connective, EEq, EMatches, EMethod, GPrivate, GUnforgeable, Match, MatchCase, New,
+        Receive, ReceiveBind, VarRef,
     },
     rust::{
         rholang::implicits::GPrivateBuilder,
         string_ops::StringOps,
         utils::{
             new_boundvar_par, new_bundle_par, new_elist_par, new_freevar_par, new_freevar_var,
-            new_gbool_expr, new_gstring_par,
+            new_gbool_expr, new_gstring_expr, new_gstring_par, new_wildcard_par,
         },
     },
 };
@@ -180,7 +180,6 @@ async fn eval_expr_should_substitute_before_comparison() {
     env = env.put(Par::default());
 
     let result = reducer.eval_expr(&eq_expr, &env);
-    println!("{:?}", result);
     let expected = vec![new_gbool_expr(true)];
 
     assert!(result.is_ok());
@@ -1867,52 +1866,50 @@ async fn variable_references_should_be_substituted_before_being_used() {
         split_rand_result.split_byte(0),
     ]);
 
-    let proc = Par::default()
-        .with_news(vec![New {
-            bind_count: 1,
-            p: Some(Par::default().with_sends(vec![Send {
-                chan: Some(new_boundvar_par(0, Vec::new(), false)),
-                data: vec![new_boundvar_par(0, Vec::new(), false)],
-                persistent: false,
-                locally_free: Vec::new(),
-                connective_used: false,
-            }])),
-            uri: vec![],
-            injections: BTreeMap::new(),
-            locally_free: vec![],
-        }])
-        .with_receives(vec![Receive {
-            binds: vec![ReceiveBind {
-                patterns: vec![Par::default().with_connectives(vec![Connective {
-                    connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
-                }])],
-                source: Some(new_boundvar_par(0, Vec::new(), false)),
-                remainder: None,
-                free_count: 0,
-            }],
-            body: Some(Par::default().with_sends(vec![Send {
-                chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
-                data: vec![new_gstring_par("true".to_string(), Vec::new(), false)],
-                persistent: false,
-                locally_free: Vec::new(),
-                connective_used: false,
-            }])),
-            persistent: false,
-            peek: false,
-            bind_count: 0,
-            locally_free: Vec::new(),
-            connective_used: false,
-        }]);
+    let proc = Par::default().with_news(vec![New {
+        bind_count: 1,
+        p: Some(
+            Par::default()
+                .with_sends(vec![Send {
+                    chan: Some(new_boundvar_par(0, Vec::new(), false)),
+                    data: vec![new_boundvar_par(0, Vec::new(), false)],
+                    persistent: false,
+                    locally_free: Vec::new(),
+                    connective_used: false,
+                }])
+                .with_receives(vec![Receive {
+                    binds: vec![ReceiveBind {
+                        patterns: vec![Par::default().with_connectives(vec![Connective {
+                            connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
+                        }])],
+                        source: Some(new_boundvar_par(0, Vec::new(), false)),
+                        remainder: None,
+                        free_count: 0,
+                    }],
+                    body: Some(Par::default().with_sends(vec![Send {
+                        chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+                        data: vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+                        persistent: false,
+                        locally_free: Vec::new(),
+                        connective_used: false,
+                    }])),
+                    persistent: false,
+                    peek: false,
+                    bind_count: 0,
+                    locally_free: Vec::new(),
+                    connective_used: false,
+                }]),
+        ),
+        uri: Vec::new(),
+        injections: BTreeMap::new(),
+        locally_free: vec![],
+    }]);
 
     let env = Env::new();
     let res = reducer
         .eval(proc.clone(), &env, split_rand_src.clone())
         .await;
-    println!("\n{:?}", res);
-    assert!(reducer
-        .eval(proc.clone(), &env, split_rand_src.clone())
-        .await
-        .is_ok());
+    assert!(res.is_ok());
 
     let result = space.lock().unwrap().to_map();
     let mut expected_elements = HashMap::new();
@@ -1924,4 +1921,340 @@ async fn variable_references_should_be_substituted_before_being_used() {
         ),
     );
     assert_eq!(result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn variable_references_should_be_substituted_before_being_used_in_a_match() {
+    let (space, reducer) = create_test_space().await;
+
+    let mut split_rand_result = rand().split_byte(4);
+    let split_rand_src = rand().split_byte(4);
+    let _ = split_rand_result.next();
+
+    let proc = Par::default().with_news(vec![New {
+        bind_count: 1,
+        p: Some(Par::default().with_matches(vec![Match {
+            target: Some(new_boundvar_par(0, Vec::new(), false)),
+            cases: vec![MatchCase {
+                pattern: Some(Par::default().with_connectives(vec![Connective {
+                    connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
+                }])),
+                source: Some(Par::default().with_sends(vec![Send {
+                    chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+                    data: vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+                    persistent: false,
+                    locally_free: Vec::new(),
+                    connective_used: false,
+                }])),
+                free_count: 0,
+            }],
+            locally_free: Vec::new(),
+            connective_used: false,
+        }])),
+        uri: Vec::new(),
+        injections: BTreeMap::new(),
+        locally_free: vec![],
+    }]);
+
+    let env = Env::new();
+    let res = reducer
+        .eval(proc.clone(), &env, split_rand_src.clone())
+        .await;
+    assert!(res.is_ok());
+
+    let result = space.lock().unwrap().to_map();
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+            split_rand_result,
+        ),
+    );
+    assert_eq!(result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn variable_references_should_reference_a_variable_that_comes_from_a_match_in_tuplespace() {
+    let (space, reducer) = create_test_space().await;
+
+    let base_rand = rand().split_byte(7);
+    let split_rand0 = base_rand.split_byte(0);
+    let split_rand1 = base_rand.split_byte(1);
+    let merge_rand = Blake2b512Random::merge(vec![split_rand1, split_rand0]);
+
+    let proc = Par::default()
+        .with_sends(vec![Send {
+            chan: Some(new_gint_par(7, Vec::new(), false)),
+            data: vec![new_gint_par(10, Vec::new(), false)],
+            persistent: false,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }])
+        .with_receives(vec![Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![new_freevar_par(0, Vec::new())],
+                source: Some(new_gint_par(7, Vec::new(), false)),
+                remainder: None,
+                free_count: 1,
+            }],
+            body: Some(Par::default().with_matches(vec![Match {
+                target: Some(new_gint_par(10, Vec::new(), false)),
+                cases: vec![MatchCase {
+                    pattern: Some(Par::default().with_connectives(vec![Connective {
+                        connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
+                    }])),
+                    source: Some(Par::default().with_sends(vec![Send {
+                        chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+                        data: vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+                        persistent: false,
+                        locally_free: Vec::new(),
+                        connective_used: false,
+                    }])),
+                    free_count: 0,
+                }],
+                locally_free: Vec::new(),
+                connective_used: false,
+            }])),
+            persistent: false,
+            peek: false,
+            bind_count: 0,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }]);
+
+    let env = Env::new();
+    let res = reducer.eval(proc.clone(), &env, base_rand.clone()).await;
+    assert!(res.is_ok());
+
+    let result = space.lock().unwrap().to_map();
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+            merge_rand,
+        ),
+    );
+    assert_eq!(result, map_data(expected_elements));
+}
+
+#[tokio::test]
+async fn one_matches_one_should_return_true() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                target: Some(new_gint_par(1, Vec::new(), false)),
+                pattern: Some(new_gint_par(1, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gbool_expr(true)])
+}
+
+#[tokio::test]
+async fn one_matches_zero_should_return_false() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                target: Some(new_gint_par(1, Vec::new(), false)),
+                pattern: Some(new_gint_par(0, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gbool_expr(false)])
+}
+
+// "1 matches _"
+#[tokio::test]
+async fn one_matches_wildcard_should_return_true() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                target: Some(new_gint_par(1, Vec::new(), false)),
+                pattern: Some(new_wildcard_par(Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gbool_expr(true)])
+}
+
+#[tokio::test]
+async fn x_matches_one_should_return_true_when_x_is_bound_to_one() {
+    let (_, reducer) = create_test_space().await;
+
+    let mut env = Env::new();
+    env = env.put(new_gint_par(1, Vec::new(), false));
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                target: Some(new_boundvar_par(0, Vec::new(), false)),
+                pattern: Some(new_gint_par(1, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gbool_expr(true)])
+}
+
+// "1 matches =x"
+#[tokio::test]
+async fn one_matches_equal_sign_x_should_return_true_when_x_is_bound_to_one() {
+    let (_, reducer) = create_test_space().await;
+
+    let mut env = Env::new();
+    env = env.put(new_gint_par(1, Vec::new(), false));
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                target: Some(new_gint_par(1, Vec::new(), false)),
+                pattern: Some(Par::default().with_connectives(vec![Connective {
+                    connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
+                }])),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gbool_expr(true)])
+}
+
+#[tokio::test]
+async fn length_should_return_the_length_of_the_string() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "length".to_string(),
+                target: Some(new_gstring_par("abc".to_string(), Vec::new(), false)),
+                arguments: Vec::new(),
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gint_expr(3)])
+}
+
+// "'abcabac'.slice(3, 6)" should "return 'aba'"
+#[tokio::test]
+async fn slice_should_work_correctly_1() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(new_gstring_par("abcabac".to_string(), Vec::new(), false)),
+                arguments: vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(6, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("aba".to_string())]
+    )
+}
+
+// "'abcabcac'.slice(2,1)" should "return empty string"
+#[tokio::test]
+async fn slice_should_work_correctly_2() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(new_gstring_par("abcabac".to_string(), Vec::new(), false)),
+                arguments: vec![
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(1, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("".to_string())])
+}
+
+// "'abcabcac'.slice(8,9)" should "return empty string"
+#[tokio::test]
+async fn slice_should_work_correctly_3() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(new_gstring_par("abcabac".to_string(), Vec::new(), false)),
+                arguments: vec![
+                    new_gint_par(8, Vec::new(), false),
+                    new_gint_par(9, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("".to_string())])
+}
+
+//"'abcabcac'.slice(-2,2)" should "return 'ab'"
+#[tokio::test]
+async fn slice_should_work_correctly_4() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(new_gstring_par("abcabac".to_string(), Vec::new(), false)),
+                arguments: vec![
+                    new_gint_par(-2, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("ab".to_string())])
 }

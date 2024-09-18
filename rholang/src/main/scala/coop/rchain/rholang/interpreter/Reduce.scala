@@ -300,7 +300,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
   ): M[Unit] =
     for {
       _        <- charge[M](SEND_EVAL_COST)
-      _        = println("\nsend in evalSend: " + send)
+      // _        = println("\nenv in evalSend: " + env)
       evalChan <- evalExpr(send.chan)
       subChan  <- substituteAndCharge[Par, M](evalChan, depth = 0, env)
       unbundled <- subChan.singleBundle() match {
@@ -355,6 +355,8 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       valproc: Var
   )(implicit env: Env[Par]): M[Par] =
     charge[M](VAR_EVAL_COST) >> {
+      // println("\nhit evalVar")
+      // println("\nenv in evalVar: " + env)
       valproc.varInstance match {
         case BoundVar(level) =>
           env.get(level).liftTo[M](ReduceError("Unbound variable: " + level + " in " + env.envMap))
@@ -429,6 +431,8 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
         _env.put(addr)
       }
 
+      // println("\nsimpleNews in evalNew: " + simpleNews)
+
       def normalizerBugFound(urn: String) =
         BugFoundError(
           s"No value set for `$urn`. This is a bug in the normalizer or on the path from it."
@@ -454,11 +458,15 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
         else
           urnMap.get(urn).map(newEnv.put).toRight(left = ReduceError(s"Unknown urn for new: $urn"))
 
+      // println("\nurns in evalNew: " + urns)
       urns.toList.foldM(simpleNews)(addUrn).fold(_.raiseError[M, Env[Par]], _.pure[M])
     }
 
     charge[M](newBindingsCost(neu.bindCount)) >>
-      alloc(neu.bindCount, neu.uri).flatMap(eval(neu.p)(_, rand))
+      alloc(neu.bindCount, neu.uri).flatMap { env =>
+        // println("\nenv in evalNew: " + env)
+        eval(neu.p)(env, rand)
+      }
   }
 
   private[this] def unbundleReceive(rb: ReceiveBind)(implicit env: Env[Par]): M[Par] =
