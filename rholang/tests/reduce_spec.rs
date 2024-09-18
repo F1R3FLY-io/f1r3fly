@@ -9,8 +9,9 @@ use std::{
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::{
     rhoapi::{
-        expr::ExprInstance, g_unforgeable::UnfInstance, Bundle, EEq, EMethod, GPrivate,
-        GUnforgeable, Match, MatchCase, New, Receive, ReceiveBind,
+        connective::ConnectiveInstance::VarRefBody, expr::ExprInstance, g_unforgeable::UnfInstance,
+        Bundle, Connective, EEq, EMethod, GPrivate, GUnforgeable, Match, MatchCase, New, Receive,
+        ReceiveBind, VarRef,
     },
     rust::{
         rholang::implicits::GPrivateBuilder,
@@ -1849,7 +1850,78 @@ async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_eval
         result,
         Err(InterpreterError::MethodNotDefined {
             method: "toUtf8Bytes".to_string(),
-            other_type: String::from("TypeId { t: (8494243739510146576, 4366098958496239024) }")
+            other_type: String::from("int")
         })
     );
+}
+
+#[tokio::test]
+async fn variable_references_should_be_substituted_before_being_used() {
+    let (space, reducer) = create_test_space().await;
+
+    let mut split_rand_result = rand().split_byte(3);
+    let split_rand_src = rand().split_byte(3);
+    let _ = split_rand_result.next();
+    let merge_rand = Blake2b512Random::merge(vec![
+        split_rand_result.split_byte(1),
+        split_rand_result.split_byte(0),
+    ]);
+
+    let proc = Par::default()
+        .with_news(vec![New {
+            bind_count: 1,
+            p: Some(Par::default().with_sends(vec![Send {
+                chan: Some(new_boundvar_par(0, Vec::new(), false)),
+                data: vec![new_boundvar_par(0, Vec::new(), false)],
+                persistent: false,
+                locally_free: Vec::new(),
+                connective_used: false,
+            }])),
+            uri: vec![],
+            injections: BTreeMap::new(),
+            locally_free: vec![],
+        }])
+        .with_receives(vec![Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![Par::default().with_connectives(vec![Connective {
+                    connective_instance: Some(VarRefBody(VarRef { index: 0, depth: 1 })),
+                }])],
+                source: Some(new_boundvar_par(0, Vec::new(), false)),
+                remainder: None,
+                free_count: 0,
+            }],
+            body: Some(Par::default().with_sends(vec![Send {
+                chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
+                data: vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+                persistent: false,
+                locally_free: Vec::new(),
+                connective_used: false,
+            }])),
+            persistent: false,
+            peek: false,
+            bind_count: 0,
+            locally_free: Vec::new(),
+            connective_used: false,
+        }]);
+
+    let env = Env::new();
+    let res = reducer
+        .eval(proc.clone(), &env, split_rand_src.clone())
+        .await;
+    println!("\n{:?}", res);
+    assert!(reducer
+        .eval(proc.clone(), &env, split_rand_src.clone())
+        .await
+        .is_ok());
+
+    let result = space.lock().unwrap().to_map();
+    let mut expected_elements = HashMap::new();
+    expected_elements.insert(
+        new_gstring_par("result".to_string(), Vec::new(), false),
+        (
+            vec![new_gstring_par("true".to_string(), Vec::new(), false)],
+            merge_rand,
+        ),
+    );
+    assert_eq!(result, map_data(expected_elements));
 }

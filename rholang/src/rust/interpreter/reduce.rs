@@ -26,7 +26,6 @@ use models::rust::utils::{
 use models::ByteString;
 use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
-use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
@@ -976,13 +975,13 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "+".to_string(),
                                 expected: "Int".to_string(),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
                         (other, _) => Err(InterpreterError::OperatorNotDefined {
                             op: "+".to_string(),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     }
                 }
@@ -1035,13 +1034,13 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "-".to_string(),
                                 expected: "Int".to_string(),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
                         (other, _) => Err(InterpreterError::OperatorNotDefined {
                             op: "-".to_string(),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     }
                 }
@@ -1185,7 +1184,7 @@ impl DebruijnInterpreter {
                             (ExprInstance::GString(_), value) => {
                                 Err(InterpreterError::ReduceError(format!(
                                     "Error: interpolation doesn't support {:?}",
-                                    value.type_id()
+                                    get_type(value),
                                 )))
                             }
 
@@ -1262,13 +1261,13 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "%%".to_string(),
                                 expected: String::from("Map"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
                         (other, _) => Err(InterpreterError::OperatorNotDefined {
                             op: String::from("%%"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     }
                 }
@@ -1340,7 +1339,7 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "++".to_string(),
                                 expected: String::from("String"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
@@ -1348,7 +1347,7 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "++".to_string(),
                                 expected: String::from("List"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
@@ -1356,7 +1355,7 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "++".to_string(),
                                 expected: String::from("Map"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
@@ -1364,13 +1363,13 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "++".to_string(),
                                 expected: String::from("Set"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
                         (other, _) => Err(InterpreterError::OperatorNotDefined {
                             op: String::from("++"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     }
                 }
@@ -1399,13 +1398,13 @@ impl DebruijnInterpreter {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "--".to_string(),
                                 expected: String::from("Set"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             })
                         }
 
                         (other, _) => Err(InterpreterError::OperatorNotDefined {
                             op: String::from("--"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     }
                 }
@@ -1693,7 +1692,7 @@ impl DebruijnInterpreter {
 
                             other => Err(InterpreterError::MethodNotDefined {
                                 method: String::from("hexToBytes"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             }),
                         },
 
@@ -1740,7 +1739,7 @@ impl DebruijnInterpreter {
 
                             other => Err(InterpreterError::MethodNotDefined {
                                 method: String::from("BytesToHex"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             }),
                         },
 
@@ -1788,7 +1787,7 @@ impl DebruijnInterpreter {
 
                             other => Err(InterpreterError::MethodNotDefined {
                                 method: String::from("toUtf8Bytes"),
-                                other_type: format!("{:?}", other.type_id()),
+                                other_type: get_type(other),
                             }),
                         },
 
@@ -1869,7 +1868,7 @@ impl DebruijnInterpreter {
 
                     (other, _) => Err(InterpreterError::MethodNotDefined {
                         method: String::from("union"),
-                        other_type: format!("{:?}", other.type_id()),
+                        other_type: get_type(other),
                     }),
                 }
             }
@@ -1967,7 +1966,7 @@ impl DebruijnInterpreter {
 
                     (other, _) => Err(InterpreterError::MethodNotDefined {
                         method: String::from("diff"),
-                        other_type: format!("{:?}", other.type_id()),
+                        other_type: get_type(other),
                     }),
                 }
             }
@@ -2026,7 +2025,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("add"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2109,7 +2108,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("delete"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2175,7 +2174,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("contains"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2229,7 +2228,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("get"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2288,7 +2287,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("get_or_else"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2350,7 +2349,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("set"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2411,7 +2410,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("keys"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2473,7 +2472,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("size"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2527,7 +2526,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("length"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2603,7 +2602,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("slice"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2662,7 +2661,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("take"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2773,7 +2772,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("to_list"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2865,7 +2864,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("to_set"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -2969,7 +2968,7 @@ impl DebruijnInterpreter {
 
                         other => Err(InterpreterError::MethodNotDefined {
                             method: String::from("to_map"),
-                            other_type: format!("{:?}", other.type_id()),
+                            other_type: get_type(other),
                         }),
                     },
 
@@ -3073,8 +3072,7 @@ impl DebruijnInterpreter {
                 [Expr {
                     expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
                 }] => {
-                    let p = self
-                        .eval_var(&v.clone().expect("Var field was none, should be some"), env)?;
+                    let p = self.eval_var(&unwrap_option_safe(v.clone())?, env)?;
                     self.eval_to_i64(&p, env)
                 }
 
@@ -3123,8 +3121,7 @@ impl DebruijnInterpreter {
                 [Expr {
                     expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
                 }] => {
-                    let p = self
-                        .eval_var(&v.clone().expect("Var field was none, should be some"), env)?;
+                    let p = self.eval_var(&unwrap_option_safe(v.clone())?, env)?;
                     self.eval_to_bool(&p, env)
                 }
 
@@ -3251,5 +3248,40 @@ impl DebruijnInterpreter {
             });
 
         Ok(result)
+    }
+}
+
+fn get_type(expr_instance: ExprInstance) -> String {
+    match expr_instance {
+        ExprInstance::GBool(_) => String::from("bool"),
+        ExprInstance::GInt(_) => String::from("int"),
+        ExprInstance::GString(_) => String::from("string"),
+        ExprInstance::GUri(_) => String::from("uri"),
+        ExprInstance::GByteArray(_) => String::from("byte array"),
+        ExprInstance::ENotBody(_) => String::from("enot"),
+        ExprInstance::ENegBody(_) => String::from("eneg"),
+        ExprInstance::EMultBody(_) => String::from("mult"),
+        ExprInstance::EDivBody(_) => String::from("div"),
+        ExprInstance::EPlusBody(_) => String::from("plus"),
+        ExprInstance::EMinusBody(_) => String::from("minus"),
+        ExprInstance::ELtBody(_) => String::from("elt"),
+        ExprInstance::ELteBody(_) => String::from("elte"),
+        ExprInstance::EGtBody(_) => String::from("egt"),
+        ExprInstance::EGteBody(_) => String::from("egte"),
+        ExprInstance::EEqBody(_) => String::from("eeq"),
+        ExprInstance::ENeqBody(_) => String::from("eneq"),
+        ExprInstance::EAndBody(_) => String::from("eand"),
+        ExprInstance::EOrBody(_) => String::from("eor"),
+        ExprInstance::EVarBody(_) => String::from("evar"),
+        ExprInstance::EListBody(_) => String::from("list"),
+        ExprInstance::ETupleBody(_) => String::from("tuple"),
+        ExprInstance::ESetBody(_) => String::from("set"),
+        ExprInstance::EMapBody(_) => String::from("map"),
+        ExprInstance::EMethodBody(_) => String::from("emethod"),
+        ExprInstance::EMatchesBody(_) => String::from("ematches"),
+        ExprInstance::EPercentPercentBody(_) => String::from("epercent percent"),
+        ExprInstance::EPlusPlusBody(_) => String::from("plus plus"),
+        ExprInstance::EMinusMinusBody(_) => String::from("minus minus"),
+        ExprInstance::EModBody(_) => String::from("mod"),
     }
 }
