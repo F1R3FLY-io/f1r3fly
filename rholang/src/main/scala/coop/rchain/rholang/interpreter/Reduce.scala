@@ -300,6 +300,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
   ): M[Unit] =
     for {
       _        <- charge[M](SEND_EVAL_COST)
+      _        = println("\nsend in evalSend: " + send)
       evalChan <- evalExpr(send.chan)
       subChan  <- substituteAndCharge[Par, M](evalChan, depth = 0, env)
       unbundled <- subChan.singleBundle() match {
@@ -889,7 +890,9 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       else {
         for {
           exprEvaled <- evalExpr(p)
+          _          = println("\nexprEvaled in toByteArrayMethod: " + exprEvaled)
           exprSubst  <- substituteAndCharge[Par, M](exprEvaled, depth = 0, env)
+          _          = println("\nexprSubst in toByteArrayMethod: " + exprSubst)
           _          <- charge[M](toByteArrayCost(exprSubst))
           ba         <- Sync[M].fromEither(serialize(exprSubst))
         } yield Expr(GByteArray(ByteString.copyFrom(ba)))

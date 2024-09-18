@@ -19,6 +19,7 @@ use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
 use models::rust::sorted_par_hash_set::SortedParHashSet;
 use models::rust::sorted_par_map::SortedParMap;
+use models::rust::string_ops::StringOps;
 use models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
@@ -499,6 +500,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        println!("\nsend in eval_send: {:?}", send);
         self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&send.chan.as_ref().unwrap(), env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
@@ -522,6 +524,7 @@ impl DebruijnInterpreter {
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
         let subst_data = data
+            .clone()
             .into_iter()
             .map(|p| self.substitute.substitute_and_charge(&p, 0, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
@@ -813,7 +816,8 @@ impl DebruijnInterpreter {
         self.eval(bundle.body.clone().unwrap(), env, rand).await
     }
 
-    fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
+    // Public here for testing purposes
+    pub fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
         match expr.expr_instance.clone().unwrap() {
             ExprInstance::EVarBody(evar) => {
                 let p = self.eval_var(&evar.v.unwrap(), env)?;
@@ -1630,17 +1634,20 @@ impl DebruijnInterpreter {
             ) -> Result<Par, InterpreterError> {
                 if !args.is_empty() {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
-                        method: "ToByteArray".to_string(),
+                        method: "toByteArray".to_string(),
                         expected: 0,
                         actual: args.len(),
                     });
                 }
 
                 let expr_evaled = self.outer.eval_expr(&p, env)?;
+                println!("\nexpr_evaled in to_byte_array_method: {:?}", expr_evaled);
                 let expr_subst =
                     self.outer
                         .substitute
                         .substitute_and_charge(&expr_evaled, 0, env)?;
+
+                println!("\nexpr_subst in to_byte_array_method: {:?}", expr_subst);
 
                 self.outer.cost.charge(to_byte_array_cost(&expr_subst))?;
                 let ba = self.serialize(&expr_subst)?;
@@ -1668,28 +1675,20 @@ impl DebruijnInterpreter {
             ) -> Result<Par, InterpreterError> {
                 if !args.is_empty() {
                     return Err(InterpreterError::MethodArgumentNumberMismatch {
-                        method: String::from("bytesToHex"),
+                        method: String::from("hexToBytes"),
                         expected: 0,
                         actual: args.len(),
                     });
                 } else {
                     match single_expr(&p) {
-                        Some(expr) => match expr.expr_instance.unwrap() {
+                        Some(expr) => match unwrap_option_safe(expr.expr_instance)? {
                             ExprInstance::GString(encoded) => {
                                 self.outer.cost.charge(hex_to_bytes_cost(&encoded))?;
-                                // unsafeHexToByteString
-                                match (0..encoded.len())
-                            .step_by(2)
-                            .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16))
-                            .collect::<Result<Vec<u8>, _>>()
-                        {
-                            Ok(ba) => Ok(Par::default().with_exprs(vec![Expr {
-                              expr_instance: Some(ExprInstance::GByteArray(ba)),
-                          }])),
-                            Err(err) => Err(InterpreterError::ReduceError(format!(
-                                "Error was thrown when decoding input string to hexadecimal: {}", err.to_string()
-                            ))),
-                        }
+                                Ok(Par::default().with_exprs(vec![Expr {
+                                    expr_instance: Some(ExprInstance::GByteArray(
+                                        StringOps::unsafe_decode_hex(encoded),
+                                    )),
+                                }]))
                             }
 
                             other => Err(InterpreterError::MethodNotDefined {

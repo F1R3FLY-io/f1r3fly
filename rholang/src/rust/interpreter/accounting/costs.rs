@@ -33,6 +33,10 @@ impl Cost {
             operation,
         }
     }
+
+    pub fn unsafe_max() -> Self {
+        Cost::create(i64::MAX, "persistent_store_tester setup".to_string())
+    }
 }
 
 pub fn sum_cost() -> Cost {
