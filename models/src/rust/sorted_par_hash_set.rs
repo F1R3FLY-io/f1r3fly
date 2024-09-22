@@ -20,13 +20,14 @@ pub struct SortedParHashSet {
 
 impl SortedParHashSet {
     pub fn create_from_vec(vec: Vec<Par>) -> Self {
-        let sorted_pars = Ordering::sort_pars(&vec);
-        let sorted_ps = sorted_pars.clone().into_iter().collect();
+        let set: HashSet<Par> = vec.clone().into_iter().collect();
+        let sorted_pars = Ordering::sort_pars(&set.clone().into_iter().collect());
+        let sorted_ps: HashSet<Par> = sorted_pars.clone().into_iter().collect();
 
         // println!("\nsorted_ps in SortedParHashSet: {:?}", sorted_ps);
 
         SortedParHashSet {
-            ps: vec.into_iter().collect(),
+            ps: set,
             sorted_pars,
             sorted_ps,
         }

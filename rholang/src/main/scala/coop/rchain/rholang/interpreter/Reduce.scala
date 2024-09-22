@@ -299,7 +299,7 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       rand: Blake2b512Random
   ): M[Unit] =
     for {
-      _        <- charge[M](SEND_EVAL_COST)
+      _ <- charge[M](SEND_EVAL_COST)
       // _        = println("\nenv in evalSend: " + env)
       evalChan <- evalExpr(send.chan)
       subChan  <- substituteAndCharge[Par, M](evalChan, depth = 0, env)

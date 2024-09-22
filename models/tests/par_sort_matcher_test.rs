@@ -8,6 +8,8 @@ use models::{
     },
 };
 
+// TODO: Finish these tests
+
 #[test]
 fn par_should_sort_so_that_smaller_integers_come_first() {
     let par_ground = Par::default().with_exprs(vec![

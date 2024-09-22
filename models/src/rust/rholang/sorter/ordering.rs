@@ -12,8 +12,9 @@ impl Ordering {
     pub fn sort_pars(ps: &Vec<Par>) -> Vec<Par> {
         let mut ps_sorted: Vec<ScoredTerm<Par>> =
             ps.iter().map(ParSortMatcher::sort_match).collect();
-        println!("\nps_sorted in sort_pars: {:?}", ps_sorted);
+        // println!("\nps_sorted in sort_pars before sort: {:?}", ps_sorted);
         ScoredTerm::sort_vec(&mut ps_sorted);
+        // println!("\nps_sorted in sort_pars after sort: {:?}", ps_sorted);
         ps_sorted.into_iter().map(|st| st.term).collect()
     }
 

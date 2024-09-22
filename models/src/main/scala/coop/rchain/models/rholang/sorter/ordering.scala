@@ -19,8 +19,10 @@ object ordering {
 
       val coeval: Coeval[List[Par]] = for {
         parsSorted <- psSorted.sequence
-        _          = println("\npsSorted in sortPars: " + parsSorted)
-      } yield parsSorted.sorted.map(_.term)
+        // _          = println("\npsSorted in sortPars before sort: " + parsSorted)
+        sorted     = parsSorted.sorted
+        // _          = println("\npsSorted in sortPars after sort: " + sorted)
+      } yield sorted.map(_.term)
 
       coeval.value
     }
