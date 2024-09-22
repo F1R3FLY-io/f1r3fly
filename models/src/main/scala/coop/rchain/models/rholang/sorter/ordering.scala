@@ -20,7 +20,7 @@ object ordering {
       val coeval: Coeval[List[Par]] = for {
         parsSorted <- psSorted.sequence
         // _          = println("\npsSorted in sortPars before sort: " + parsSorted)
-        sorted     = parsSorted.sorted
+        sorted = parsSorted.sorted
         // _          = println("\npsSorted in sortPars after sort: " + sorted)
       } yield sorted.map(_.term)
 

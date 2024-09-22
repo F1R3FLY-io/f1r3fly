@@ -3709,3 +3709,600 @@ async fn to_set_method_should_turn_list_with_duplicate_into_set_without_duplicat
         }]
     )
 }
+
+#[tokio::test]
+async fn to_set_method_should_turn_empty_list_into_empty_set() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(new_elist_par(
+                    vec![],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_transform_list_of_tuples_into_map() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(Par::default().with_exprs(vec![new_elist_expr(
+                    vec![
+                        new_etuple_par(vec![
+                            new_gstring_par("a".to_string(), Vec::new(), false),
+                            new_gint_par(1, Vec::new(), false),
+                        ]),
+                        new_etuple_par(vec![
+                            new_gstring_par("b".to_string(), Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                        ]),
+                        new_etuple_par(vec![
+                            new_gstring_par("c".to_string(), Vec::new(), false),
+                            new_gint_par(3, Vec::new(), false),
+                        ]),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                )])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                        new_gint_par(1, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                        new_gint_par(3, Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_transform_set_of_tuples_into_map() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                        ParSet::create_from_vec(vec![
+                            new_etuple_par(vec![
+                                new_gstring_par("a".to_string(), Vec::new(), false),
+                                new_gint_par(1, Vec::new(), false),
+                            ]),
+                            new_etuple_par(vec![
+                                new_gstring_par("b".to_string(), Vec::new(), false),
+                                new_gint_par(2, Vec::new(), false),
+                            ]),
+                            new_etuple_par(vec![
+                                new_gstring_par("c".to_string(), Vec::new(), false),
+                                new_gint_par(3, Vec::new(), false),
+                            ]),
+                        ]),
+                    ))),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                        new_gint_par(1, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                        new_gint_par(3, Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_turn_map_into_set() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                        ParMap::create_from_vec(vec![
+                            (
+                                new_gstring_par("a".to_string(), Vec::new(), false),
+                                new_gint_par(1, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("b".to_string(), Vec::new(), false),
+                                new_gint_par(2, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("c".to_string(), Vec::new(), false),
+                                new_gint_par(3, Vec::new(), false),
+                            ),
+                        ]),
+                    ))),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_etuple_par(vec![
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                        new_gint_par(1, Vec::new(), false),
+                    ]),
+                    new_etuple_par(vec![
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ]),
+                    new_etuple_par(vec![
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                        new_gint_par(3, Vec::new(), false),
+                    ]),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_correctly_do_put_operations() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(Par::default().with_exprs(vec![new_elist_expr(
+                    vec![
+                        new_etuple_par(vec![
+                            new_gstring_par("a".to_string(), Vec::new(), false),
+                            new_gint_par(1, Vec::new(), false),
+                        ]),
+                        new_etuple_par(vec![
+                            new_gstring_par("a".to_string(), Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                        ]),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                )])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![(
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                ),]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_turn_empty_list_into_empty_map() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(Par::default().with_exprs(vec![new_elist_expr(
+                    vec![],
+                    Vec::new(),
+                    false,
+                    None,
+                )])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_not_change_the_object_it_is_applied_on() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ]),
+            ))),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_not_change_the_object_it_is_applied_on() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                        ParMap::create_from_vec(vec![
+                            (
+                                new_gstring_par("a".to_string(), Vec::new(), false),
+                                new_gint_par(1, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("b".to_string(), Vec::new(), false),
+                                new_gint_par(2, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("c".to_string(), Vec::new(), false),
+                                new_gint_par(3, Vec::new(), false),
+                            ),
+                        ]),
+                    ))),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                        new_gint_par(1, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ),
+                    (
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                        new_gint_par(3, Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_throw_error_if_not_called_with_correct_types() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(new_elist_par(
+                    vec![
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                        new_etuple_par(vec![
+                            new_gstring_par("b".to_string(), Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                        ]),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodNotDefined {
+            method: "to_map".to_string(),
+            other_type: "types except List[(K,V)]".to_string()
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_throw_error_when_called_with_arguments() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(new_elist_par(
+                    vec![new_etuple_par(vec![
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                    ])],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![new_gint_par(2, Vec::new(), false)],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodArgumentNumberMismatch {
+            method: "to_map".to_string(),
+            expected: 0,
+            actual: 1
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_map_method_should_throw_error_when_called_on_an_int() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toMap".to_string(),
+                target: Some(new_gint_par(2, Vec::new(), false)),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodNotDefined {
+            method: "to_map".to_string(),
+            other_type: "int".to_string()
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_throw_error_when_called_with_arguments() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                        ParSet::create_from_vec(vec![]),
+                    ))),
+                }])),
+                arguments: vec![new_gint_par(2, Vec::new(), false)],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodArgumentNumberMismatch {
+            method: "to_set".to_string(),
+            expected: 0,
+            actual: 1
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_throw_error_when_called_on_an_int() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(new_gint_par(2, Vec::new(), false)),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodNotDefined {
+            method: "to_set".to_string(),
+            other_type: "int".to_string()
+        })
+    )
+}
+
+#[tokio::test]
+async fn term_split_size_max_should_be_evaluated_for_max_size() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let p = New {
+        bind_count: 1,
+        p: Some(Par::default()),
+        uri: vec![],
+        injections: BTreeMap::new(),
+        locally_free: vec![],
+    };
+    let news = vec![p; std::i16::MAX as usize];
+    let proc = Par::default().with_news(news);
+
+    let res = reducer.eval(proc, &env, rand()).await;
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
+async fn term_split_size_max_should_limited_to_max_value() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let p = New {
+        bind_count: 1,
+        p: Some(Par::default()),
+        uri: vec![],
+        injections: BTreeMap::new(),
+        locally_free: vec![],
+    };
+    let news = vec![p; std::i16::MAX as usize + 1];
+    let proc = Par::default().with_news(news);
+
+    let res = reducer.eval(proc, &env, rand()).await;
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::ReduceError(
+            "The number of terms in the Par is 32768, which exceeds the limit of 32767".to_string()
+        ))
+    )
+}
