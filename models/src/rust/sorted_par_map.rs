@@ -8,7 +8,7 @@ use super::rholang::sorter::{
     ordering::Ordering, par_sort_matcher::ParSortMatcher, sortable::Sortable,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SortedParMap {
     pub ps: HashMap<Par, Par>,
     // TODO: Merge `sortedList` and `sortedMap` into one VectorMap once available - OLD
@@ -40,7 +40,7 @@ impl SortedParMap {
     // alias for '+'
     pub fn insert(&mut self, kv: (Par, Par)) -> SortedParMap {
         self.sorted_map.insert(kv.0, kv.1);
-        self.clone()
+        Self::create_from_map(self.sorted_map.clone())
     }
 
     // alias for '++'
@@ -48,13 +48,13 @@ impl SortedParMap {
         for kv in kvs {
             self.insert(kv);
         }
-        self.clone()
+        Self::create_from_map(self.sorted_map.clone())
     }
 
     // alias for '-'
     pub fn remove(&mut self, key: Par) -> SortedParMap {
         self.sorted_map.remove(&Self::sort(&key));
-        self.clone()
+        Self::create_from_map(self.sorted_map.clone())
     }
 
     // alias for '--'
@@ -62,7 +62,7 @@ impl SortedParMap {
         for key in keys {
             self.sorted_map.remove(&Self::sort(&key));
         }
-        self.clone()
+        Self::create_from_map(self.sorted_map.clone())
     }
 
     pub fn contains(&self, par: Par) -> bool {

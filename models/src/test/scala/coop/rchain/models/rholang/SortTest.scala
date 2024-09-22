@@ -31,16 +31,19 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     val sortedTerms = Seq(ScoredTerm("bar", Leaves(1, 2, 2)), ScoredTerm("foo", Leaves(1, 2, 2, 3)))
     unsortedTerms.sorted should be(sortedTerms)
   }
+
   it should "sort so that smaller leafs stay first" in {
     val unsortedTerms = Seq(ScoredTerm("foo", Leaf(1)), ScoredTerm("bar", Leaf(2)))
     val sortedTerms   = Seq(ScoredTerm("foo", Leaf(1)), ScoredTerm("bar", Leaf(2)))
     unsortedTerms.sorted should be(sortedTerms)
   }
+
   it should "sort so that smaller leafs are put first" in {
     val unsortedTerms = Seq(ScoredTerm("foo", Leaf(2)), ScoredTerm("bar", Leaf(1)))
     val sortedTerms   = Seq(ScoredTerm("bar", Leaf(1)), ScoredTerm("foo", Leaf(2)))
     unsortedTerms.sorted should be(sortedTerms)
   }
+
   it should "sort so that smaller nodes are put first" in {
     val unsortedTerms = Seq(
       ScoredTerm("foo", Node(Seq(Leaves(1, 2), Leaves(2, 2)))),
@@ -52,6 +55,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     )
     unsortedTerms.sorted should be(sortedTerms)
   }
+
   it should "sort so that whenever scores differ then result terms have to differ and the other way around" in {
     def check[A: Sortable: Arbitrary]: Unit =
       forAllSimilarA[A] { (x, y) =>
@@ -73,6 +77,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
   }
   // Specific Match terms created from previous test failed on CI (freeCount was not part of sorting)
   // https://github.com/rchain/rchain/pull/3616
+
   it should "sort different Match terms (MatchCase.freeCount)" in {
     val nil = Par(locallyFree = AlwaysEqual(BitSet()))
 
@@ -104,6 +109,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     check[Send]
     check[Var]
   }
+
   it should "sort so that unequal terms have unequal scores and the other way around" in {
     def checkScoreEquality[A: Sortable: Arbitrary]: Unit =
       forAllSimilarA[A](
@@ -126,6 +132,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     checkScoreEquality[Send]
     checkScoreEquality[Var]
   }
+
   it should "score in different ByteString should be unequal" in {
     // ci failing case https://github.com/rchain/rchain/runs/2268175723
     // a is Expr(GByteArray(<ByteString@65e14bdc size=1 contents="\200">))
@@ -134,6 +141,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     val b = Expr(GByteArray(ByteString.copyFrom(Base16.unsafeDecode("d9"))))
     assert(sort(a).score != sort(b).score)
   }
+
   it should "sort so that unequal New have unequal scores" in {
     val new1 = New(
       bindCount = 1,
@@ -152,11 +160,13 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     assert(new1 != new2)
     assert(sort(new1).score != sort(new2).score)
   }
+
   it should "sort so that unequal EMethod have unequal scores" in {
     val method1 = Expr(EMethodBody(EMethod(connectiveUsed = true)))
     val method2 = Expr(EMethodBody(EMethod(connectiveUsed = false)))
     assert(sort(method1).score != sort(method2).score)
   }
+
   it should "sort so that unequal ParMap have unequal scores" in {
     val map1 = Expr(EMapBody(ParMap(Seq.empty, connectiveUsed = true, BitSet(), None)))
     val map2 = Expr(EMapBody(ParMap(Seq.empty, connectiveUsed = false, BitSet(), None)))
@@ -165,6 +175,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
     val map4 = Expr(EMapBody(ParMap(Seq.empty, connectiveUsed = true, BitSet(), Some(Var()))))
     assert(sort(map3).score != sort(map4).score)
   }
+
   it should "sort so that unequal ParSet have unequal scores" in {
     val set1 =
       Expr(ESetBody(ParSet(Seq.empty, connectiveUsed = true, Coeval.delay(BitSet()), None)))
@@ -177,6 +188,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
       Expr(ESetBody(ParSet(Seq.empty, connectiveUsed = true, Coeval.delay(BitSet()), Some(Var()))))
     assert(sort(set3).score != sort(set4).score)
   }
+
   it should "sort so that unequal List have unequal scores" in {
     val list1 =
       Expr(EListBody(EList(Seq.empty, AlwaysEqual(BitSet()), connectiveUsed = true, None)))

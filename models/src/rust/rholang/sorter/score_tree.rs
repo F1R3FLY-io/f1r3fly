@@ -15,23 +15,25 @@ use crate::ByteString;
  *
  * In order to sort an term, call [Type]SortMatcher.sortMatch(term)
  * and extract the .term  of the returned ScoredTerm.
+ *
+ * NOTE: PartialEq is needed for testing purposes
  */
 pub struct ScoreTree;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Tree<T> {
     Leaf(T),
     Node(Vec<Tree<T>>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TaggedAtom {
     IntAtom(i64),
     StringAtom(String),
     BytesAtom(ByteString),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScoreAtom {
     value: TaggedAtom,
 }
@@ -131,7 +133,7 @@ impl<T> Tree<T> {
 }
 
 // Effectively a tuple that groups the term to its score tree.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScoredTerm<T> {
     pub term: T,
     pub score: Tree<ScoreAtom>,

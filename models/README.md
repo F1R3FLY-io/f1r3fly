@@ -36,4 +36,8 @@ The HTML version of the generated report is located at:
  
  ## Rust
 
-- Within models directory, `cargo build --profile dev -p models` to build `models` library. Outputs to `models/target/debug/`. Scala code pulls from here.
+Within models directory, `cargo build --profile dev -p models` to build `models` library. Outputs to `models/target/debug/`.
+
+### Test
+
+To run ScoredTermSortTest: `cargo test --test scored_term_sort_test`

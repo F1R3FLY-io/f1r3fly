@@ -16,8 +16,10 @@ object ordering {
     def sort: List[Par] = {
       val psSorted: List[Coeval[ScoredTerm[Par]]] =
         ps.map(par => Sortable[Par].sortMatch[Coeval](par))
+
       val coeval: Coeval[List[Par]] = for {
         parsSorted <- psSorted.sequence
+        _          = println("\npsSorted in sortPars: " + parsSorted)
       } yield parsSorted.sorted.map(_.term)
 
       coeval.value

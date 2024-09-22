@@ -18,7 +18,7 @@ impl ParSetTypeMapper {
 
     pub fn par_set_to_eset(par_set: ParSet) -> ESet {
         ESet {
-            ps: par_set.ps.sorted_pars,
+            ps: par_set.ps.sorted_ps.into_iter().collect(),
             locally_free: par_set.locally_free,
             connective_used: par_set.connective_used,
             remainder: par_set.remainder,

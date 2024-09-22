@@ -2348,8 +2348,12 @@ impl DebruijnInterpreter {
                     Some(expr_instance) => match expr_instance {
                         ExprInstance::EMapBody(emap) => {
                             let mut base_ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
+                            // let sorted_par_map = base_ps.insert((key, value));
                             let par_map =
                                 ParMap::create_from_sorted_par_map(base_ps.insert((key, value)));
+
+                            // println!("\nsorted_par_map in set_method: {:?}", sorted_par_map);
+                            // println!("\npar_map in set_method: {:?}", par_map);
 
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::EMapBody(

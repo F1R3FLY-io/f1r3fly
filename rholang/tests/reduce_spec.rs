@@ -10,15 +10,21 @@ use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::{
     rhoapi::{
         connective::ConnectiveInstance::VarRefBody, expr::ExprInstance, g_unforgeable::UnfInstance,
-        Bundle, Connective, EEq, EMatches, EMethod, GPrivate, GUnforgeable, Match, MatchCase, New,
-        Receive, ReceiveBind, VarRef,
+        Bundle, Connective, EEq, EList, EMatches, EMethod, EMinus, EMinusMinus, EPercentPercent,
+        EPlus, EPlusPlus, ETuple, GPrivate, GUnforgeable, Match, MatchCase, New, Receive,
+        ReceiveBind, VarRef,
     },
     rust::{
+        par_map::ParMap,
+        par_map_type_mapper::ParMapTypeMapper,
+        par_set::ParSet,
+        par_set_type_mapper::ParSetTypeMapper,
         rholang::implicits::GPrivateBuilder,
         string_ops::StringOps,
         utils::{
-            new_boundvar_par, new_bundle_par, new_elist_par, new_freevar_par, new_freevar_var,
-            new_gbool_expr, new_gstring_expr, new_gstring_par, new_wildcard_par,
+            new_boundvar_par, new_bundle_par, new_elist_expr, new_elist_par, new_etuple_par,
+            new_freevar_par, new_freevar_var, new_gbool_expr, new_gbool_par, new_gstring_expr,
+            new_gstring_par, new_wildcard_par,
         },
     },
 };
@@ -2234,7 +2240,7 @@ async fn slice_should_work_correctly_3() {
     assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("".to_string())])
 }
 
-//"'abcabcac'.slice(-2,2)" should "return 'ab'"
+// "'abcabcac'.slice(-2,2)" should "return 'ab'"
 #[tokio::test]
 async fn slice_should_work_correctly_4() {
     let (_, reducer) = create_test_space().await;
@@ -2257,4 +2263,1449 @@ async fn slice_should_work_correctly_4() {
     );
     assert!(res.is_ok());
     assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("ab".to_string())])
+}
+
+// "'Hello, ${name}!' % {'name': 'Alice'}" should "return 'Hello, Alice!"
+#[tokio::test]
+async fn percent_percent_should_work_correctly() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
+                p1: Some(new_gstring_par(
+                    "Hello, ${name}!".to_string(),
+                    Vec::new(),
+                    false,
+                )),
+                p2: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                        ParMap::create_from_vec(vec![(
+                            new_gstring_par("name".to_string(), Vec::new(), false),
+                            new_gstring_par("Alice".to_string(), Vec::new(), false),
+                        )]),
+                    ))),
+                }])),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("Hello, Alice!".to_string())]
+    )
+}
+
+// "'abc' ++ 'def'" should "return 'abcdef"
+#[tokio::test]
+async fn plus_plus_should_work_correctly_with_string() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                p1: Some(new_gstring_par("abc".to_string(), Vec::new(), false)),
+                p2: Some(new_gstring_par("def".to_string(), Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("abcdef".to_string())]
+    )
+}
+
+// "ByteArray('dead') ++ ByteArray('beef)'" should "return ByteArray('deadbeef')"
+#[tokio::test]
+async fn plus_plus_should_work_correctly_with_byte_array() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                p1: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::GByteArray(StringOps::unsafe_decode_hex(
+                        "dead".to_string(),
+                    ))),
+                }])),
+                p2: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::GByteArray(StringOps::unsafe_decode_hex(
+                        "beef".to_string(),
+                    ))),
+                }])),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::GByteArray(StringOps::unsafe_decode_hex(
+                "deadbeef".to_string(),
+            ))),
+        }]
+    )
+}
+
+fn interpolate(base: String, substitutes: Vec<(Par, Par)>) -> Par {
+    Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
+            p1: Some(new_gstring_par(base, Vec::new(), false)),
+            p2: Some(Par::default().with_exprs(vec![Expr {
+                expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                    ParMap::create_from_vec(substitutes),
+                ))),
+            }])),
+        })),
+    }])
+}
+// "'${a} ${b}' % {'a': '1 ${b}', 'b': '2 ${a}'" should "return '1 ${b} 2 ${a}"
+#[tokio::test]
+async fn interpolate_should_work_correctly() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &interpolate(
+            "${a} ${b}".to_string(),
+            vec![
+                (
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                    new_gstring_par("1 ${b}".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                    new_gstring_par("2 ${a}".to_string(), Vec::new(), false),
+                ),
+            ],
+        ),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("1 ${b} 2 ${a}".to_string())]
+    )
+}
+
+#[tokio::test]
+async fn interpolate_should_interpolate_boolean_values() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &interpolate(
+            "${a} ${b}".to_string(),
+            vec![
+                (
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                    new_gbool_par(false, Vec::new(), false),
+                ),
+                (
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                    new_gbool_par(true, Vec::new(), false),
+                ),
+            ],
+        ),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("false true".to_string())]
+    )
+}
+
+#[tokio::test]
+async fn interpolate_should_interpolate_uris() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &interpolate(
+            "${a} ${b}".to_string(),
+            vec![
+                (
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                    Par::default().with_exprs(vec![Expr {
+                        expr_instance: Some(ExprInstance::GUri("testUriA".to_string())),
+                    }]),
+                ),
+                (
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                    Par::default().with_exprs(vec![Expr {
+                        expr_instance: Some(ExprInstance::GUri("testUriB".to_string())),
+                    }]),
+                ),
+            ],
+        ),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_gstring_expr("testUriA testUriB".to_string())]
+    )
+}
+
+#[tokio::test]
+async fn length_should_return_the_length_of_the_list() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let list = new_elist_par(
+        vec![
+            new_gint_par(0, Vec::new(), false),
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(3, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "length".to_string(),
+                target: Some(list),
+                arguments: vec![],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gint_expr(4)])
+}
+
+// "[3, 7, 2, 9, 4, 3, 7].slice(3, 5)" should "return [9, 4]"
+#[tokio::test]
+async fn slice_should_work_correctly_with_list_1() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let list = new_elist_par(
+        vec![
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(list),
+                arguments: vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(5, Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EListBody(EList {
+                ps: vec![
+                    new_gint_par(9, Vec::new(), false),
+                    new_gint_par(4, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+                remainder: None
+            }))
+        }]
+    )
+}
+
+// "[3, 7, 2, 9, 4, 3, 7].slice(5, 4)" should "return []"
+#[tokio::test]
+async fn slice_should_work_correctly_with_list_2() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let list = new_elist_par(
+        vec![
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(list),
+                arguments: vec![
+                    new_gint_par(5, Vec::new(), false),
+                    new_gint_par(4, Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EListBody(EList {
+                ps: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+                remainder: None
+            }))
+        }]
+    )
+}
+
+// "[3, 7, 2, 9, 4, 3, 7].slice(7, 8)" should "return []"
+#[tokio::test]
+async fn slice_should_work_correctly_with_list_3() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let list = new_elist_par(
+        vec![
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(list),
+                arguments: vec![
+                    new_gint_par(7, Vec::new(), false),
+                    new_gint_par(8, Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EListBody(EList {
+                ps: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+                remainder: None
+            }))
+        }]
+    )
+}
+
+// "[3, 7, 2, 9, 4, 3, 7].slice(-2, 2)" should "return [3, 7]"
+#[tokio::test]
+async fn slice_should_work_correctly_with_list_4() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let list = new_elist_par(
+        vec![
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+            new_gint_par(4, Vec::new(), false),
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "slice".to_string(),
+                target: Some(list),
+                arguments: vec![
+                    new_gint_par(-2, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EListBody(EList {
+                ps: vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(7, Vec::new(), false),
+                ],
+                locally_free: Vec::new(),
+                connective_used: false,
+                remainder: None
+            }))
+        }]
+    )
+}
+
+// "[3, 2, 9] ++ [6, 1, 7]" should "return [3, 2, 9, 6, 1, 7]"
+#[tokio::test]
+async fn plus_plus_should_work_correctly_with_list() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let lhs_list = new_elist_par(
+        vec![
+            new_gint_par(3, Vec::new(), false),
+            new_gint_par(2, Vec::new(), false),
+            new_gint_par(9, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+    let rhs_list = new_elist_par(
+        vec![
+            new_gint_par(6, Vec::new(), false),
+            new_gint_par(1, Vec::new(), false),
+            new_gint_par(7, Vec::new(), false),
+        ],
+        Vec::new(),
+        false,
+        None,
+        Vec::new(),
+        false,
+    );
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                p1: Some(lhs_list),
+                p2: Some(rhs_list),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_elist_expr(
+            vec![
+                new_gint_par(3, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(9, Vec::new(), false),
+                new_gint_par(6, Vec::new(), false),
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(7, Vec::new(), false),
+            ],
+            Vec::new(),
+            false,
+            None
+        )]
+    )
+}
+
+// "{1: 'a', 2: 'b'}.getOrElse(1, 'c')" should "return 'a'"
+#[tokio::test]
+async fn get_or_else_method_should_work_correctly_1() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "getOrElse".to_string(),
+                target: Some(map),
+                arguments: vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("a".to_string())])
+}
+
+// "{1: 'a', 2: 'b'}.getOrElse(3, 'c')" should "return 'c'"
+#[tokio::test]
+async fn get_or_else_method_should_work_correctly_2() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "getOrElse".to_string(),
+                target: Some(map),
+                arguments: vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gstring_expr("c".to_string())])
+}
+
+// "{1: 'a', 2: 'b'}.set(3, 'c')" should "return {1: 'a', 2: 'b', 3: 'c'}"
+#[tokio::test]
+async fn set_method_should_work_correctly_1() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "set".to_string(),
+                target: Some(map),
+                arguments: vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gint_par(1, Vec::new(), false),
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(2, Vec::new(), false),
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(3, Vec::new(), false),
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+// "{1: 'a', 2: 'b'}.set(2, 'c')" should "return {1: 'a', 2: 'c'}"
+#[tokio::test]
+async fn set_method_should_work_correctly_2() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "set".to_string(),
+                target: Some(map),
+                arguments: vec![
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gint_par(1, Vec::new(), false),
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(2, Vec::new(), false),
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+// "{1: 'a', 2: 'b', 3: 'c'}.keys()" should "return Set(1, 2, 3)"
+#[tokio::test]
+async fn keys_method_should_work_correctly() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "keys".to_string(),
+                target: Some(map),
+                arguments: vec![],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ])
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn size_method_should_work_correctly_emap() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "size".to_string(),
+                target: Some(map),
+                arguments: vec![],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gint_expr(3)])
+}
+
+#[tokio::test]
+async fn size_method_should_work_correctly_with_eset() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "size".to_string(),
+                target: Some(set),
+                arguments: vec![],
+                locally_free: vec![],
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap().exprs, vec![new_gint_expr(3)])
+}
+
+#[tokio::test]
+async fn plus_method_should_work_correctly_with_eset() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+                p1: Some(set),
+                p2: Some(new_gint_par(3, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+// "{1: 'a', 2: 'b', 3: 'c'} - 3" should "return {1: 'a', 2: 'b'}"
+#[tokio::test]
+async fn minus_method_should_work_correctly_with_emap() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMinusBody(EMinus {
+                p1: Some(map),
+                p2: Some(new_gint_par(3, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gint_par(1, Vec::new(), false),
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(2, Vec::new(), false),
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn minus_method_should_work_correctly_with_eset() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMinusBody(EMinus {
+                p1: Some(set),
+                p2: Some(new_gint_par(3, Vec::new(), false)),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn plus_plus_method_should_work_correctly_with_eset() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let lhs_set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+    let rhs_set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(3, Vec::new(), false),
+                new_gint_par(4, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                p1: Some(lhs_set),
+                p2: Some(rhs_set),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(4, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn plus_plus_method_with_map_should_return_union() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let lhs_map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+    let rhs_map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(3, Vec::new(), false),
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(4, Vec::new(), false),
+                    new_gstring_par("d".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                p1: Some(lhs_map),
+                p2: Some(rhs_map),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                ParMap::create_from_vec(vec![
+                    (
+                        new_gint_par(1, Vec::new(), false),
+                        new_gstring_par("a".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(2, Vec::new(), false),
+                        new_gstring_par("b".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(3, Vec::new(), false),
+                        new_gstring_par("c".to_string(), Vec::new(), false),
+                    ),
+                    (
+                        new_gint_par(4, Vec::new(), false),
+                        new_gstring_par("d".to_string(), Vec::new(), false),
+                    ),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn minus_minus_method_should_work_correctly_with_eset() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let lhs_set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+                new_gint_par(4, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+    let rhs_set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
+                p1: Some(lhs_set),
+                p2: Some(rhs_set),
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(3, Vec::new(), false),
+                    new_gint_par(4, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn get_method_on_set_should_not_be_defined() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let set = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+            ParSet::create_from_vec(vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "get".to_string(),
+                target: Some(set),
+                arguments: vec![new_gint_par(1, Vec::new(), false)],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodNotDefined {
+            method: "get".to_string(),
+            other_type: "set".to_string()
+        })
+    )
+}
+
+#[tokio::test]
+async fn add_method_on_map_should_not_be_defined() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let map = Par::default().with_exprs(vec![Expr {
+        expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+            ParMap::create_from_vec(vec![
+                (
+                    new_gint_par(1, Vec::new(), false),
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                ),
+                (
+                    new_gint_par(2, Vec::new(), false),
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                ),
+            ]),
+        ))),
+    }]);
+
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "add".to_string(),
+                target: Some(map),
+                arguments: vec![new_gint_par(1, Vec::new(), false)],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodNotDefined {
+            method: "add".to_string(),
+            other_type: "map".to_string()
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_list_method_should_error_when_called_with_arguments() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toList".to_string(),
+                target: Some(new_elist_par(
+                    vec![],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![new_gint_par(1, Vec::new(), false)],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_err());
+    assert_eq!(
+        res,
+        Err(InterpreterError::MethodArgumentNumberMismatch {
+            method: "to_list".to_string(),
+            expected: 0,
+            actual: 1
+        })
+    )
+}
+
+#[tokio::test]
+async fn to_list_method_should_transform_set_into_list() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toList".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                        ParSet::create_from_vec(vec![
+                            new_gint_par(1, Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                            new_gint_par(3, Vec::new(), false),
+                        ]),
+                    ))),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_elist_expr(
+            vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+            ],
+            Vec::new(),
+            false,
+            None
+        )]
+    )
+}
+
+#[tokio::test]
+async fn to_list_method_should_transform_map_into_list_of_tuples() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toList".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
+                        ParMap::create_from_vec(vec![
+                            (
+                                new_gstring_par("a".to_string(), Vec::new(), false),
+                                new_gint_par(1, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("b".to_string(), Vec::new(), false),
+                                new_gint_par(2, Vec::new(), false),
+                            ),
+                            (
+                                new_gstring_par("c".to_string(), Vec::new(), false),
+                                new_gint_par(3, Vec::new(), false),
+                            ),
+                        ]),
+                    ))),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_elist_expr(
+            vec![
+                new_etuple_par(vec![
+                    new_gstring_par("a".to_string(), Vec::new(), false),
+                    new_gint_par(1, Vec::new(), false),
+                ]),
+                new_etuple_par(vec![
+                    new_gstring_par("b".to_string(), Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                ]),
+                new_etuple_par(vec![
+                    new_gstring_par("c".to_string(), Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ])
+            ],
+            Vec::new(),
+            false,
+            None
+        )]
+    )
+}
+
+#[tokio::test]
+async fn to_list_method_should_transform_tuple_into_list() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toList".to_string(),
+                target: Some(Par::default().with_exprs(vec![Expr {
+                    expr_instance: Some(ExprInstance::ETupleBody(ETuple {
+                        ps: vec![
+                            new_gint_par(1, Vec::new(), false),
+                            new_gint_par(2, Vec::new(), false),
+                            new_gint_par(3, Vec::new(), false),
+                        ],
+                        locally_free: Vec::new(),
+                        connective_used: false,
+                    })),
+                }])),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![new_elist_expr(
+            vec![
+                new_gint_par(1, Vec::new(), false),
+                new_gint_par(2, Vec::new(), false),
+                new_gint_par(3, Vec::new(), false),
+            ],
+            Vec::new(),
+            false,
+            None
+        )]
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_turn_list_into_set() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(new_elist_par(
+                    vec![
+                        new_gint_par(1, Vec::new(), false),
+                        new_gint_par(2, Vec::new(), false),
+                        new_gint_par(3, Vec::new(), false),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![
+                    new_gint_par(1, Vec::new(), false),
+                    new_gint_par(2, Vec::new(), false),
+                    new_gint_par(3, Vec::new(), false),
+                ]),
+            ))),
+        }]
+    )
+}
+
+#[tokio::test]
+async fn to_set_method_should_turn_list_with_duplicate_into_set_without_duplicate() {
+    let (_, reducer) = create_test_space().await;
+
+    let env = Env::new();
+    let res = reducer.eval_expr(
+        &Par::default().with_exprs(vec![Expr {
+            expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                method_name: "toSet".to_string(),
+                target: Some(new_elist_par(
+                    vec![
+                        new_gint_par(1, Vec::new(), false),
+                        new_gint_par(1, Vec::new(), false),
+                    ],
+                    Vec::new(),
+                    false,
+                    None,
+                    Vec::new(),
+                    false,
+                )),
+                arguments: vec![],
+                locally_free: Vec::new(),
+                connective_used: false,
+            })),
+        }]),
+        &env,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap().exprs,
+        vec![Expr {
+            expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
+                ParSet::create_from_vec(vec![new_gint_par(1, Vec::new(), false)]),
+            ))),
+        }]
+    )
 }

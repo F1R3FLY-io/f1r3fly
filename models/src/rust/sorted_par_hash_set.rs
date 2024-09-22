@@ -15,13 +15,15 @@ use super::rholang::sorter::{
 pub struct SortedParHashSet {
     pub ps: HashSet<Par>,
     pub sorted_pars: Vec<Par>,
-    sorted_ps: HashSet<Par>,
+    pub sorted_ps: HashSet<Par>,
 }
 
 impl SortedParHashSet {
     pub fn create_from_vec(vec: Vec<Par>) -> Self {
         let sorted_pars = Ordering::sort_pars(&vec);
         let sorted_ps = sorted_pars.clone().into_iter().collect();
+
+        // println!("\nsorted_ps in SortedParHashSet: {:?}", sorted_ps);
 
         SortedParHashSet {
             ps: vec.into_iter().collect(),
@@ -42,13 +44,13 @@ impl SortedParHashSet {
     // alias for '+'
     pub fn insert(&mut self, elem: Par) -> SortedParHashSet {
         self.ps.insert(Self::sort(&elem));
-        self.clone()
+        Self::create_from_set(self.ps.clone())
     }
 
     // alias for '-'
     pub fn remove(&mut self, elem: Par) -> SortedParHashSet {
         self.ps.remove(&Self::sort(&elem));
-        self.clone()
+        Self::create_from_set(self.ps.clone())
     }
 
     pub fn contains(&self, elem: Par) -> bool {

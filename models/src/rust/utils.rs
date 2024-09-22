@@ -499,6 +499,20 @@ pub fn new_elist_expr(
     }
 }
 
+pub fn new_etuple_par(_ps: Vec<Par>) -> Par {
+    vector_par(Vec::new(), false).with_exprs(vec![new_etuple_expr(_ps, Vec::new(), false)])
+}
+
+pub fn new_etuple_expr(_ps: Vec<Par>, _locally_free: Vec<u8>, _connective_used: bool) -> Expr {
+    Expr {
+        expr_instance: Some(ETupleBody(ETuple {
+            ps: _ps,
+            locally_free: _locally_free,
+            connective_used: _connective_used,
+        })),
+    }
+}
+
 pub fn new_eplus_par(
     lhs_value: i64,
     rhs_value: i64,
