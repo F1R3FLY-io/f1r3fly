@@ -41,3 +41,4 @@ Within models directory, `cargo build --profile dev -p models` to build `models`
 ### Test
 
 To run ScoredTermSortTest: `cargo test --test scored_term_sort_test`
+To run ParSortMatcherTest: `cargo test --test par_sort_matcher_test`
