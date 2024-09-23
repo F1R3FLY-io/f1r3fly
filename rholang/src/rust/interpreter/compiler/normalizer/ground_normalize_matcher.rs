@@ -7,14 +7,14 @@ use super::exports::normalize_bool;
  */
 
 #[derive(Debug, PartialEq)]
-enum Ground {
+pub enum Ground {
   Bool(bool),
   Int(i64),
   String(String),
   Uri(String),
 }
 
-fn normalize_ground(node: Node, source_code: &[u8]) -> Option<Ground> {
+pub fn normalize_ground(node: Node, source_code: &[u8]) -> Option<Ground> {
   match node.kind() {
     "bool_literal" => {
       if let Some(value) = normalize_bool(node, source_code) {

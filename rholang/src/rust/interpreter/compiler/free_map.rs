@@ -11,7 +11,7 @@ pub struct FreeMap<T> {
 }
 
 impl<T> FreeMap<T> {
-  fn new() -> Self {
+  pub(crate) fn new() -> Self {
     FreeMap {
       next_level: 0,
       level_bindings: HashMap::new(),

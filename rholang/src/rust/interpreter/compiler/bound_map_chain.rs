@@ -46,7 +46,7 @@ impl<T> BoundMapChain<T> {
     }
   }
 
-  fn push(&mut self) {
+  pub(crate) fn push(&mut self) {
     self.chain.insert(0, BoundMap::new());
   }
 
