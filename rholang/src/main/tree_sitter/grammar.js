@@ -212,7 +212,7 @@ module.exports = grammar({
         name_decl: $ => seq($.var, field('uri', optional(seq('(', $.uri_literal, ')')))),
 
         //match cases
-        case: $ => seq(field('pattern', $.quotable), '=>', field('proc', $._proc)),
+        case: $ => seq(field('pattern', $._proc), '=>', field('proc', $._proc)),
 
         // ground terms
         nil: $ => 'Nil',
