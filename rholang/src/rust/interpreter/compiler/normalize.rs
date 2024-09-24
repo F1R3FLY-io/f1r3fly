@@ -2,7 +2,7 @@ use super::exports::*;
 use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::Ground;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::{expr, EEq, EGt, ELt, EMinus, ENeg, ENot, Expr, Par};
+use models::rhoapi::{expr, EEq, EGt, ELt, EMinus, ENeg, ENot, Expr, Par, EMult, EDiv, EMod, EPercentPercent, EPlus, EPlusPlus, EMinusMinus, ELte, EGte, ENeq, EAnd, EOr};
 use models::rust::utils::union;
 use std::error::Error;
 use tree_sitter::Node;
@@ -128,6 +128,92 @@ pub fn normalize_match(
     ),
 
     //binary
+    "PMult" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EMult::default()),
+    ),
+    "PDiv" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EDiv::default()),
+    ),
+    "PMod" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EMod::default()),
+    ),
+    "PPercentPercent" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EPercentPercent::default()),
+    ),
+    "PAdd" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EPlus::default()),
+    ),
+    "PMinus" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EMinus::default()),
+    ),
+    "PPlusPlus" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EPlusPlus::default()),
+    ),
+    "PMinusMinus" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EMinusMinus::default()),
+    ),
+
+    "PLt" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(ELt::default()),
+    ),
+    "PLte" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(ELte::default()),
+    ),
+    "PGt" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EGt::default()),
+    ),
+    "PGte" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EGte::default()),
+    ),
+
     "PEq" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
@@ -135,21 +221,30 @@ pub fn normalize_match(
       source_code,
       Box::new(EEq::default()),
     ),
-    // "PLt" => binary_exp(
-    //     p_node.child(0).unwrap(),
-    //     p_node.child(1).unwrap(),
-    //     input,
-    //     source_code,
-    //     Box::new(ELt::default()),
-    // ),
-    // "PGt" => binary_exp(
-    //   p_node.child(0).unwrap(),
-    //   p_node.child(1).unwrap(),
-    //   input,
-    //   source_code,
-    //   EGt::new,
-    // ),
-    _ => Err(format!("Unknown process type: {}", p_node.kind()).into()),
+    "PNeq" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(ENeq::default()),
+    ),
+
+    "PAnd" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EAnd::default()),
+    ),
+    "POr" => binary_exp(
+      p_node.child(0).unwrap(),
+      p_node.child(1).unwrap(),
+      input,
+      source_code,
+      Box::new(EOr::default()),
+    ),
+
+    _ => Err(format!("Compilation of construct not yet supported.: {}", p_node.kind()).into()),
   }
 }
 
@@ -212,11 +307,175 @@ impl UnaryExpr for ENeg {
   }
 }
 
+impl BinaryExpr for EMult {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EMultBody(EMult {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EDiv {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EDivBody(EDiv {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EMod {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EModBody(EMod {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EPercentPercent {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EPlus {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EMinus {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EMinusBody(EMinus {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EPlusPlus {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EMinusMinus {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for ELt {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::ELtBody(ELt {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for ELte {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::ELteBody(ELte {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EGt {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EGtBody(EGt {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EGte {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EGteBody(EGte {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
 
 impl BinaryExpr for EEq {
   fn from_pars(&self, p1: Par, p2: Par) -> Expr {
     Expr {
       expr_instance: Some(ExprInstance::EEqBody(EEq {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for ENeq {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::ENeqBody(ENeq {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EAnd {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EAndBody(EAnd {
+        p1: Some(p1),
+        p2: Some(p2),
+      })),
+    }
+  }
+}
+
+impl BinaryExpr for EOr {
+  fn from_pars(&self, p1: Par, p2: Par) -> Expr {
+    Expr {
+      expr_instance: Some(ExprInstance::EOrBody(EOr {
         p1: Some(p1),
         p2: Some(p2),
       })),
