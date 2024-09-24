@@ -50,7 +50,8 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
               body: (send
                 name: (proc_var
                   (var))
-                input: (input
+                send_type: (send_single)
+                inputs: (inputs
                   (proc_var
                     (var)))))))
         input: (simple_source
@@ -100,7 +101,8 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
         pattern: (send
           name: (proc_var
             (var))
-          input: (input
+          send_type: (send_single)
+          inputs: (inputs
             (proc_var
               (var))))
         proc: (proc_var
@@ -140,7 +142,8 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
               body: (send
                 name: (proc_var
                   (var))
-                input: (input
+                send_type: (send_single)
+                inputs: (inputs
                   (proc_var
                     (var)))))))
         input: (simple_source
@@ -247,7 +250,8 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
             body: (send
               name: (proc_var
                 (var))
-              input: (input
+              send_type: (send_single)
+              inputs: (inputs
                 (add
                   left: (proc_var
                     (var))

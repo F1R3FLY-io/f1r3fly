@@ -2,7 +2,12 @@ module.exports = grammar({
     name: 'rholang',
     word: $ => $.var,
 
-    supertypes: $ => [$._decls, $._bundle, $._source, $._ground],
+    supertypes: $ => [
+        $._decls,
+        $._bundle,
+        $._send_type,
+        $._source,
+        $._ground],
 
     inline: $ => [$.name, $.quotable],
 
@@ -76,9 +81,12 @@ module.exports = grammar({
 
         send: $ => prec(3, seq(
             field('name', $.name),
-            field('send_type', choice('!', '!!')),
-            '(', field('input', alias(commaSep($._proc), $.input)), ')'
+            field('send_type', $._send_type),
+            '(', field('inputs', alias(commaSep($._proc), $.inputs)), ')'
         )),
+        send_single: $ => '!',
+        send_multiple: $ => '!!',
+        _send_type: $ => choice($.send_single, $.send_multiple),
 
         _proc_expression: $ => choice(
             $.or,
