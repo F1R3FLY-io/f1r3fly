@@ -229,30 +229,30 @@ module.exports = grammar({
         simple_type: $ => choice('Bool', 'Int', 'String', 'Uri', 'ByteArray'),
 
         // Collections
-        collection: $ => choice($.collection_list, $.tuple, $.collection_set, $.collection_map),
+        collection: $ => choice($.list, $.tuple, $.set, $.map),
 
-        collection_list: $ => seq(
+        list: $ => seq(
             '[',
-            field('body', commaSep($._proc)),
+            commaSep($._proc),
             field('cont', optional($._proc_remainder)),
             ']'
         ),
 
-        collection_set: $ => seq(
+        set: $ => seq(
             'Set', '(',
-            field('body', commaSep($._proc)),
+            commaSep($._proc),
             field('cont', optional($._proc_remainder)),
             ')'
         ),
 
-        collection_map: $ => seq(
+        map: $ => seq(
             '{',
-            field('body', commaSep($.key_value_pair)),
+            commaSep($.key_value_pair),
             field('cont', optional($._proc_remainder)),
             '}'
         ),
 
-        _proc_remainder: $ => seq('...', $.proc_var),
+        _proc_remainder: $ => seq(',', '...', $.proc_var),
 
         key_value_pair: $ => seq(
             field('key', $._proc),
