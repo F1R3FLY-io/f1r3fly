@@ -1,0 +1,47 @@
+=====================
+Sending and receiving
+=====================
+
+new HelloWorld, stdout(`rho:io:stdout`) in {
+  HelloWorld!("Hello, world!") |
+  for (@text <- HelloWorld) {
+    stdout!(text)
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      body: (par
+        left: (send
+          name: (proc_var
+            (var))
+          send_type: (send_single)
+          inputs: (inputs
+            (string_literal)))
+        right: (input
+          formals: (receipts
+            (linear_bind
+              names: (names
+                (quote
+                  (proc_var
+                    (var))))
+              input: (simple_source
+                (proc_var
+                  (var)))))
+          proc: (block
+            body: (send
+              name: (proc_var
+                (var))
+              send_type: (send_single)
+              inputs: (inputs
+                (proc_var
+                  (var))))))))))

@@ -23,8 +23,9 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
 
 (source_file
   (new
-    decls: (name_decl
-      (var))
+    decls: (decls
+      (name_decl
+        (var)))
     proc: (proc_var
       (var)))
   (input
