@@ -1,0 +1,47 @@
+=====
+Names
+=====
+
+@{10 + 2}
+@{5 + 7}
+
+@{ P | Q }
+@{ Q | P }
+@{ Q | P | Nil }
+
+---
+
+(source_file
+  (quote
+    (block
+      body: (add
+        left: (long_literal)
+        right: (long_literal))))
+  (quote
+    (block
+      body: (add
+        left: (long_literal)
+        right: (long_literal))))
+  (quote
+    (block
+      body: (par
+        left: (proc_var
+          (var))
+        right: (proc_var
+          (var)))))
+  (quote
+    (block
+      body: (par
+        left: (proc_var
+          (var))
+        right: (proc_var
+          (var)))))
+  (quote
+    (block
+      body: (par
+        left: (par
+          left: (proc_var
+            (var))
+          right: (proc_var
+            (var)))
+        right: (nil)))))
