@@ -35,7 +35,7 @@ module.exports = grammar({
         send_sync: $ => prec(1, seq(
             field('name', $.name),
             '!?',
-            '(', field('messages', alias(commaSep($._proc), $.messages)), ')',
+            field('messages', alias($._proc_list, $.messages)),
             field('cont', $.sync_send_cont))
         ),
         empty_cont: $ => '.',
@@ -86,7 +86,7 @@ module.exports = grammar({
         send: $ => prec(3, seq(
             field('name', $.name),
             field('send_type', $._send_type),
-            '(', field('inputs', alias(commaSep($._proc), $.inputs)), ')'
+            field('inputs', alias($._proc_list, $.inputs))
         )),
         send_single: $ => '!',
         send_multiple: $ => '!!',
@@ -146,7 +146,7 @@ module.exports = grammar({
             field('receiver', $._proc),
             '.',
             field('name', $.var),
-            '(', field('args', alias(commaSep($._proc), $.args)), ')')
+            field('args', alias($._proc_list, $.args)))
         ),
 
         eval: $ => prec(12, seq('*', field('name', $.name))),
@@ -214,7 +214,7 @@ module.exports = grammar({
 
         simple_source: $ => $.name,
         receive_send_source: $ => seq($.name, '?!'),
-        send_receive_source: $ => seq($.name, '!?', '(', field('inputs', alias(commaSep($._proc), $.inputs)), ')'),
+        send_receive_source: $ => seq($.name, '!?', field('inputs', alias($._proc_list, $.inputs))),
         _source: $ => choice($.simple_source, $.receive_send_source, $.send_receive_source),
 
         // select branches
@@ -276,6 +276,7 @@ module.exports = grammar({
             seq('(', commaSep1($._proc), ')')
         ),
 
+        _proc_list: $ => seq('(', commaSep($._proc), ')'),
         var: $ => token(/((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\')+))/),
     }
 });
