@@ -1,0 +1,72 @@
+================
+Replicated send
+================
+
+new HelloWorld, stdout(`rho:io:stdout`), stderr(`rho:io:stderr`) in {
+  HelloWorld!!("Hello, world!") |
+  for (@text <- HelloWorld) {
+    stdout!(text)
+  } |
+  for (@text <- HelloWorld) {
+    stderr!(text)
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      body: (par
+        left: (par
+          left: (send
+            name: (proc_var
+              (var))
+            send_type: (send_multiple)
+            inputs: (inputs
+              (string_literal)))
+          right: (input
+            formals: (receipts
+              (linear_bind
+                names: (names
+                  (quote
+                    (proc_var
+                      (var))))
+                input: (simple_source
+                  (proc_var
+                    (var)))))
+            proc: (block
+              body: (send
+                name: (proc_var
+                  (var))
+                send_type: (send_single)
+                inputs: (inputs
+                  (proc_var
+                    (var)))))))
+        right: (input
+          formals: (receipts
+            (linear_bind
+              names: (names
+                (quote
+                  (proc_var
+                    (var))))
+              input: (simple_source
+                (proc_var
+                  (var)))))
+          proc: (block
+            body: (send
+              name: (proc_var
+                (var))
+              send_type: (send_single)
+              inputs: (inputs
+                (proc_var
+                  (var))))))))))
