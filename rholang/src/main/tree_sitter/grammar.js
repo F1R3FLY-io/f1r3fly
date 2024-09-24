@@ -42,7 +42,11 @@ module.exports = grammar({
         non_empty_cont: $ => prec(1, seq(';', $._proc)),
         sync_send_cont: $ => choice($.empty_cont, $.non_empty_cont),
 
-        new: $ => prec(1, seq('new', field('decls', commaSep1($.name_decl)), 'in', field('proc', $._proc))),
+        new: $ => prec(1, seq(
+            'new', field('decls', $.decls),
+            'in',
+            field('proc', $._proc))),
+        decls: $ => commaSep1($.name_decl),
 
         ifElse: $ => prec.right(1, seq('if', '(', field('condition', $._proc), ')',
             field('ifTrue', $._proc),
