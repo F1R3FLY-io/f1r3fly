@@ -40,9 +40,7 @@ fn test_normalize_pground_int() {
   };
 
   let literal_node = root
-    .child(0)  // proc16
-    .and_then(|n| n.child(0))  // ground
-    .and_then(|n| n.child(0))  // long_literal
+    .child(0)
     .expect("Expected a long_literal node");
 
   let output = normalize_p_ground(literal_node, input.clone(), rholang_code.as_bytes());
@@ -72,9 +70,7 @@ fn test_normalize_pground_string() {
   };
 
   let literal_node = root
-    .child(0)  // proc16
-    .and_then(|n| n.child(0))  // ground
-    .and_then(|n| n.child(0))  // string_literal
+    .child(0)
     .expect("Expected a string_literal node");
 
   let output = normalize_p_ground(literal_node, input.clone(), rholang_code.as_bytes());
@@ -104,9 +100,7 @@ fn test_normalize_pground_bool() {
   };
 
   let literal_node = root
-    .child(0)  // proc16
-    .and_then(|n| n.child(0))  // ground
-    .and_then(|n| n.child(0))  // bool_literal
+    .child(0)
     .expect("Expected a bool_literal node");
 
   let output = normalize_p_ground(literal_node, input.clone(), rholang_code.as_bytes());
@@ -135,9 +129,7 @@ fn test_normalize_pground_uri() {
   };
 
   let literal_node = root
-    .child(0)  // proc16
-    .and_then(|n| n.child(0))  // ground
-    .and_then(|n| n.child(0))  // uri_literal
+    .child(0)
     .expect("Expected a uri_literal node");
 
   let output = normalize_p_ground(literal_node, input.clone(), rholang_code.as_bytes());
