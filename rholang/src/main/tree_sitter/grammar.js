@@ -50,9 +50,10 @@ module.exports = grammar({
 
         match: $ => prec(2, seq(
             'match',
-            field('pattern', $._proc_expression),
-            '{', field('cases', repeat1($.case)), '}'
+            field('expression', $._proc_expression),
+            '{', field('cases', $.cases), '}'
         )),
+        cases: $ => repeat1($.case),
 
         choice: $ => prec(2, seq(
             'select',
