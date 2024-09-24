@@ -46,7 +46,7 @@ module.exports = grammar({
 
         let: $ => prec(2, seq('let', field('decls', $._decls), 'in', field('proc', $.block))),
 
-        bundle: $ => prec(2, seq(field('bundle', $._bundle), field('proc', $.block))),
+        bundle: $ => prec(2, seq(field('bundle_type', $._bundle), field('proc', $.block))),
 
         match: $ => prec(2, seq(
             'match',
