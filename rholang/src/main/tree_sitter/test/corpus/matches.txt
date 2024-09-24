@@ -1,0 +1,31 @@
+===================
+Matches expression
+===================
+
+p matches q
+
+match p {
+    q => true
+    _ => false
+}
+
+---
+
+(source_file
+  (matches
+    left: (proc_var
+      (var))
+    right: (proc_var
+      (var)))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (proc_var
+          (var))
+        proc: (bool_literal))
+      (case
+        pattern: (proc_var
+          (wildcard))
+        proc: (bool_literal)))))
