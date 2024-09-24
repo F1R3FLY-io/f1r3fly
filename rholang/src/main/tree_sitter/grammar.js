@@ -156,7 +156,7 @@ module.exports = grammar({
             $.conjunction,
             $.negation,
             $._ground_expression),
-        quote: $ => prec(12, seq('@', field('proc', $.quotable))),
+        quote: $ => prec(12, seq('@', $.quotable)),
 
         name: $ => choice($.proc_var, $.quote),
         _name_remainder: $ => seq('...', '@', $.proc_var),
