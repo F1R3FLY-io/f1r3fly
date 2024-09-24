@@ -1,0 +1,257 @@
+=================
+Pattern matching
+=================
+
+new x in P
+for (w, x <- y) { P }
+for (@{x!(Q)} <- y) { P }
+for (@{for(z <- x) { Q }} <- y) { P }
+contract foo(x) = { P }
+match R { x!(Q) => P }
+match R { contract x(y) = { Q } => P }
+
+contract foo(@P) = { Q }
+for (@{x!(P)} <- y) { Q }
+for (@{for (@P <- z) { R }} <- y) { Q }
+for (@{ P | R } <- y) { Q }
+match R { P => Q }
+match R { [P, S, ...T] => Q }
+match R { contract foo(x) = { P } => Q }
+match R { contract foo(@S) = { x!(P + S) } => Q }
+
+---
+
+(source_file
+  (new
+    decls: (name_decl
+      (var))
+    proc: (proc_var
+      (var)))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (proc_var
+            (var))
+          (proc_var
+            (var)))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (block
+              body: (send
+                name: (proc_var
+                  (var))
+                input: (input
+                  (proc_var
+                    (var)))))))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (block
+              body: (input
+                formals: (receipts
+                  (linear_bind
+                    names: (names
+                      (proc_var
+                        (var)))
+                    input: (simple_source
+                      (proc_var
+                        (var)))))
+                proc: (block
+                  body: (proc_var
+                    (var)))))))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (contract
+    name: (proc_var
+      (var))
+    formals: (names
+      (proc_var
+        (var)))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (send
+          name: (proc_var
+            (var))
+          input: (input
+            (proc_var
+              (var))))
+        proc: (proc_var
+          (var)))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (contract
+          name: (proc_var
+            (var))
+          formals: (names
+            (proc_var
+              (var)))
+          proc: (block
+            body: (proc_var
+              (var))))
+        proc: (proc_var
+          (var)))))
+  (contract
+    name: (proc_var
+      (var))
+    formals: (names
+      (quote
+        (proc_var
+          (var))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (block
+              body: (send
+                name: (proc_var
+                  (var))
+                input: (input
+                  (proc_var
+                    (var)))))))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (block
+              body: (input
+                formals: (receipts
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (proc_var
+                          (var))))
+                    input: (simple_source
+                      (proc_var
+                        (var)))))
+                proc: (block
+                  body: (proc_var
+                    (var)))))))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (block
+              body: (par
+                left: (proc_var
+                  (var))
+                right: (proc_var
+                  (var))))))
+        input: (simple_source
+          (proc_var
+            (var)))))
+    proc: (block
+      body: (proc_var
+        (var))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (proc_var
+          (var))
+        proc: (proc_var
+          (var)))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (collection
+          (list
+            (proc_var
+              (var))
+            (proc_var
+              (var))
+            cont: (proc_var
+              (var))))
+        proc: (proc_var
+          (var)))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (contract
+          name: (proc_var
+            (var))
+          formals: (names
+            (proc_var
+              (var)))
+          proc: (block
+            body: (proc_var
+              (var))))
+        proc: (proc_var
+          (var)))))
+  (match
+    expression: (proc_var
+      (var))
+    cases: (cases
+      (case
+        pattern: (contract
+          name: (proc_var
+            (var))
+          formals: (names
+            (quote
+              (proc_var
+                (var))))
+          proc: (block
+            body: (send
+              name: (proc_var
+                (var))
+              input: (input
+                (add
+                  left: (proc_var
+                    (var))
+                  right: (proc_var
+                    (var)))))))
+        proc: (proc_var
+          (var))))))
