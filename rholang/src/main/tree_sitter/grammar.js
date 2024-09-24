@@ -2,9 +2,9 @@ module.exports = grammar({
     name: 'rholang',
     word: $ => $.var,
 
-    supertypes: $ => [$._decls, $._bundle, $._receipt, $._source, $._ground],
+    supertypes: $ => [$._decls, $._bundle, $._source, $._ground],
 
-    inline: $ => [$.name, $.names, $.quotable],
+    inline: $ => [$.name, $.quotable],
 
     rules: {
         // Starting point of the grammar
@@ -63,7 +63,7 @@ module.exports = grammar({
         contract: $ => prec(2, seq(
             'contract',
             field('name', $.name),
-            '(', field('formals', commaSep($.name)), field('cont', optional($._name_remainder)), ')',
+            '(', field('formals', $.names), ')',
             '=',
             field('proc', $.block)
         )),
@@ -77,7 +77,7 @@ module.exports = grammar({
         send: $ => prec(3, seq(
             field('name', $.name),
             field('send_type', choice('!', '!!')),
-            '(', field('messages', commaSep($._proc)), ')'
+            '(', field('input', commaSep($._proc)), ')'
         )),
 
         _proc_expression: $ => choice(
@@ -160,10 +160,10 @@ module.exports = grammar({
 
         name: $ => choice($.proc_var, $.quote),
         _name_remainder: $ => seq('...', '@', $.proc_var),
-        names: $ => seq(field('names', commaSep1($.name)), field('cont', optional($._name_remainder))),
+        names: $ => seq(commaSep1($.name), field('cont', optional($._name_remainder))),
 
         // let declarations
-        decl: $ => seq($.names, '<-', commaSep1($._proc)),
+        decl: $ => seq(field('names', $.names), '<-', commaSep1($._proc)),
         linear_decls: $ => semiSep1($.decl),
         conc_decls: $ => prec(-1, conc1($.decl)),
         _decls: $ => choice($.linear_decls, $.conc_decls),
@@ -176,37 +176,37 @@ module.exports = grammar({
         _bundle: $ => choice($.bundle_write, $.bundle_read, $.bundle_equiv, $.bundle_read_write),
 
         // receipts
-        linear_receipt: $ => conc1($.linear_bind),
         linear_bind: $ => seq(
-            $.names,
+            field('names', $.names),
             '<-',
             field('input', $._source)
         ),
 
-        repeated_receit: $ => conc1($.repeated_bind),
         repeated_bind: $ => seq(
-            $.names,
+            field('names', $.names),
             '<=',
             field('input', $.name)
         ),
 
 
-        peek_receipt: $ => conc1($.peek_bind),
         peek_bind: $ => seq(
-            $.names,
+            field('names', $.names),
             '<<-',
             field('input', $.name)
         ),
 
-        _receipt: $ => choice($.linear_receipt, $.repeated_receit, $.peek_receipt),
+        _receipt: $ => choice(
+            conc1($.linear_bind),
+            conc1($.repeated_bind),
+            conc1($.peek_bind)),
 
-        simple_source: $ => field('name', $.name),
-        receive_send_source: $ => seq(field('name', $.name), '?!'),
-        send_receive_source: $ => seq(field('name', $.name), '!?', '(', field('inputs', commaSep($._proc)), ')'),
+        simple_source: $ => $.name,
+        receive_send_source: $ => seq($.name, '?!'),
+        send_receive_source: $ => seq($.name, '!?', '(', field('inputs', commaSep($._proc)), ')'),
         _source: $ => choice($.simple_source, $.receive_send_source, $.send_receive_source),
 
         // select branches
-        branch: $ => seq(field('pattern', $.linear_receipt), '=>', field('proc', choice($.send, $._proc_expression))),
+        branch: $ => seq(field('pattern', conc1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
 
         // name declarations
         name_decl: $ => seq($.var, field('uri', optional(seq('(', $.uri_literal, ')')))),
