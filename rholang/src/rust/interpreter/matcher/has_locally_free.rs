@@ -1,6 +1,6 @@
 use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
-use models::rust::utils::union;
+use models::{create_bit_vector, rust::utils::union};
 
 use super::exports::*;
 
@@ -259,7 +259,7 @@ impl HasLocallyFree<VarInstance> for SpatialMatcherContext {
         match v {
             BoundVar(index) => {
                 if depth == 0 {
-                    vec![index.try_into().unwrap(); 1]
+                    create_bit_vector(&vec![index as usize])
                 } else {
                     Default::default()
                 }
@@ -351,7 +351,7 @@ impl HasLocallyFree<Connective> for SpatialMatcherContext {
                 depth: var_depth,
             })) => {
                 if depth == var_depth {
-                    vec![idx.try_into().unwrap(); 1]
+                    create_bit_vector(&vec![idx as usize])
                 } else {
                     Default::default()
                 }
@@ -374,7 +374,7 @@ impl HasLocallyFree<VarInstance> for VarInstance {
         match v {
             BoundVar(index) => {
                 if depth == 0 {
-                    vec![index.try_into().unwrap(); 1]
+                    create_bit_vector(&vec![index as usize])
                 } else {
                     Default::default()
                 }
@@ -574,7 +574,7 @@ impl HasLocallyFree<Connective> for Connective {
                 depth: var_depth,
             })) => {
                 if depth == var_depth {
-                    vec![idx.try_into().unwrap(); 1]
+                    create_bit_vector(&vec![idx as usize])
                 } else {
                     Default::default()
                 }

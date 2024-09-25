@@ -48,6 +48,7 @@ Several working examples have been included in the examples directory, and the e
 
 - Run Reduce Tests: `cargo test --test reduce_spec`
 - Run Spatial Matcher Tests: `cargo test matcher::match_test`
+- Run Substitute Tests: `cargo test --test substitute_test`
 
 (Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>
 (`--test-threads=1` runs them sequentially)<br>

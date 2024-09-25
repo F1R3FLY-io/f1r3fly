@@ -102,9 +102,8 @@ impl Substitute {
         }
     }
 
-    // fn substitute_2(&self, term_a: A, term_b)
-
-    fn maybe_substitute_var(
+    // pub here for testing purposes
+    pub fn maybe_substitute_var(
         &self,
         term: Var,
         depth: i32,
@@ -114,11 +113,7 @@ impl Substitute {
         if depth != 0 {
             Ok(Either::Left(term))
         } else {
-            match term
-                .var_instance
-                .clone()
-                .expect("var_instance was None, should be Some")
-            {
+            match unwrap_option_safe(term.clone().var_instance)? {
                 VarInstance::BoundVar(index) => {
                     // println!("\nindex in maybe_substitute_var: {:?}", index);
                     match env.get(&index) {
@@ -143,11 +138,7 @@ impl Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Either<EVar, Par>, InterpreterError> {
-        match self.maybe_substitute_var(
-            term.v.expect("var field on EVar was None, should be Some"),
-            depth,
-            env,
-        )? {
+        match self.maybe_substitute_var(unwrap_option_safe(term.v)?, depth, env)? {
             Either::Left(v) => Ok(Either::Left(EVar { v: Some(v) })),
             Either::Right(p) => Ok(Either::Right(p)),
         }
@@ -177,13 +168,7 @@ impl SubstituteTrait<Bundle> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Bundle, InterpreterError> {
-        let sub_bundle = self.substitute(
-            term.body
-                .clone()
-                .expect("body field on term was None, should be Some"),
-            depth,
-            env,
-        )?;
+        let sub_bundle = self.substitute(unwrap_option_safe(term.clone().body)?, depth, env)?;
 
         match single_bundle(&sub_bundle) {
             Some(b) => Ok(BundleOps::merge(&term, &b)),
@@ -201,13 +186,8 @@ impl SubstituteTrait<Bundle> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Bundle, InterpreterError> {
-        let sub_bundle = self.substitute_no_sort(
-            term.body
-                .clone()
-                .expect("body field on term was None, should be Some"),
-            depth,
-            env,
-        )?;
+        let sub_bundle =
+            self.substitute_no_sort(unwrap_option_safe(term.clone().body)?, depth, env)?;
 
         match single_bundle(&sub_bundle) {
             Some(b) => Ok(BundleOps::merge(&term, &b)),
@@ -228,19 +208,18 @@ impl Substitute {
         env: &Env<Par>,
     ) -> Result<Par, InterpreterError> {
         exprs.into_iter().try_fold(Par::default(), |par, expr| {
-            match expr
-                .expr_instance
-                .clone()
-                .expect("expr_instance was None, should be Some")
-            {
+            match unwrap_option_safe(expr.clone().expr_instance)? {
                 ExprInstance::EVarBody(e) => match self.maybe_substitute_evar(e, depth, env)? {
-                    Either::Left(_e) => Ok(prepend_expr(
-                        par,
-                        Expr {
-                            expr_instance: Some(ExprInstance::EVarBody(_e)),
-                        },
-                        depth,
-                    )),
+                    Either::Left(_e) => {
+                        // println!("\npar in sub_expr: {:?}", par);
+                        Ok(prepend_expr(
+                            par,
+                            Expr {
+                                expr_instance: Some(ExprInstance::EVarBody(_e)),
+                            },
+                            depth,
+                        ))
+                    }
                     Either::Right(_par) => Ok(concatenate_pars(_par, par)),
                 },
                 _ => match self.substitute_no_sort(expr, depth, env) {
@@ -364,6 +343,7 @@ impl SubstituteTrait<Par> for Substitute {
     ) -> Result<Par, InterpreterError> {
         // println!("\nterm in substitute_no_sort for par: {:?}", term);
         let exprs = self.sub_exp(term.exprs, depth, env)?;
+        // println!("\nexprs in substitute_no_sort for par: {:?}", exprs);
         let connectives = self.sub_conn(term.connectives, depth, env)?;
 
         let sends = term
@@ -413,7 +393,7 @@ impl SubstituteTrait<Par> for Substitute {
                         .locally_free
                         .iter()
                         .cloned()
-                        .take_while(|&x| i32::from(x) < env.shift)
+                        .take(env.shift as usize)
                         .collect(),
                     connective_used: term.connective_used,
                 },
@@ -435,11 +415,7 @@ impl SubstituteTrait<Send> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Send, InterpreterError> {
-        let channels_sub = self.substitute_no_sort(
-            term.chan.expect("chan field was None, should be Some"),
-            depth,
-            env,
-        )?;
+        let channels_sub = self.substitute_no_sort(unwrap_option_safe(term.chan)?, depth, env)?;
 
         let pars_sub = term
             .data
@@ -455,7 +431,7 @@ impl SubstituteTrait<Send> for Substitute {
                 .locally_free
                 .iter()
                 .cloned()
-                .take_while(|&x| i32::from(x) < env.shift)
+                .take(env.shift as usize)
                 .collect(),
             connective_used: term.connective_used,
         })
@@ -518,7 +494,7 @@ impl SubstituteTrait<Receive> for Substitute {
                 .locally_free
                 .iter()
                 .cloned()
-                .take_while(|&x| i32::from(x) < env.shift)
+                .take(env.shift as usize)
                 .collect(),
             connective_used: term.connective_used,
         })
@@ -557,7 +533,7 @@ impl SubstituteTrait<New> for Substitute {
                 .locally_free
                 .iter()
                 .cloned()
-                .take_while(|&x| i32::from(x) < env.shift)
+                .take(env.shift as usize)
                 .collect(),
         })
     }
@@ -615,7 +591,7 @@ impl SubstituteTrait<Match> for Substitute {
                 .locally_free
                 .iter()
                 .cloned()
-                .take_while(|&x| i32::from(x) < env.shift)
+                .take(env.shift as usize)
                 .collect(),
             connective_used: term.connective_used,
         })
@@ -870,7 +846,7 @@ impl SubstituteTrait<Expr> for Substitute {
                 let new_locally_free = locally_free
                     .iter()
                     .cloned()
-                    .take_while(|&x| i32::from(x) < env.shift)
+                    .take(env.shift as usize)
                     .collect();
 
                 Ok(Expr {
@@ -896,7 +872,7 @@ impl SubstituteTrait<Expr> for Substitute {
                 let new_locally_free = locally_free
                     .iter()
                     .cloned()
-                    .take_while(|&x| i32::from(x) < env.shift)
+                    .take(env.shift as usize)
                     .collect();
 
                 Ok(Expr {
@@ -926,7 +902,7 @@ impl SubstituteTrait<Expr> for Substitute {
                                 .locally_free
                                 .iter()
                                 .cloned()
-                                .take_while(|&x| i32::from(x) < env.shift)
+                                .take(env.shift as usize)
                                 .collect(),
                             remainder: par_set.remainder,
                         },
@@ -956,7 +932,7 @@ impl SubstituteTrait<Expr> for Substitute {
                                 .locally_free
                                 .iter()
                                 .cloned()
-                                .take_while(|&x| i32::from(x) < env.shift)
+                                .take(env.shift as usize)
                                 .collect(),
                             remainder: par_map.remainder,
                         },
@@ -985,7 +961,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         locally_free: locally_free
                             .iter()
                             .cloned()
-                            .take_while(|&x| i32::from(x) < env.shift)
+                            .take(env.shift as usize)
                             .collect(),
                         connective_used,
                     })),
@@ -1237,7 +1213,7 @@ impl SubstituteTrait<Expr> for Substitute {
                 let new_locally_free = locally_free
                     .iter()
                     .cloned()
-                    .take_while(|&x| i32::from(x) < env.shift)
+                    .take(env.shift as usize)
                     .collect();
 
                 Ok(Expr {
@@ -1263,7 +1239,7 @@ impl SubstituteTrait<Expr> for Substitute {
                 let new_locally_free = locally_free
                     .iter()
                     .cloned()
-                    .take_while(|&x| i32::from(x) < env.shift)
+                    .take(env.shift as usize)
                     .collect();
 
                 Ok(Expr {
@@ -1293,7 +1269,7 @@ impl SubstituteTrait<Expr> for Substitute {
                                 .locally_free
                                 .iter()
                                 .cloned()
-                                .take_while(|&x| i32::from(x) < env.shift)
+                                .take(env.shift as usize)
                                 .collect(),
                             remainder: par_set.remainder,
                         },
@@ -1323,7 +1299,7 @@ impl SubstituteTrait<Expr> for Substitute {
                                 .locally_free
                                 .iter()
                                 .cloned()
-                                .take_while(|&x| i32::from(x) < env.shift)
+                                .take(env.shift as usize)
                                 .collect(),
                             remainder: par_map.remainder,
                         },
@@ -1353,7 +1329,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         locally_free: locally_free
                             .iter()
                             .cloned()
-                            .take_while(|&x| i32::from(x) < env.shift)
+                            .take(env.shift as usize)
                             .collect(),
                         connective_used,
                     })),

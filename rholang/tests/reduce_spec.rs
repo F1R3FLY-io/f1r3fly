@@ -158,8 +158,8 @@ async fn eval_expr_should_handle_equality_between_arbitary_processes() {
     let (_, reducer) = create_test_space().await;
     let eq_expr = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EEqBody(EEq {
-            p1: Some(GPrivateBuilder::new_par(String::from("private_name"))),
-            p2: Some(GPrivateBuilder::new_par(String::from("private_name"))),
+            p1: Some(GPrivateBuilder::new_par_from_string(String::from("private_name"))),
+            p2: Some(GPrivateBuilder::new_par_from_string(String::from("private_name"))),
         })),
     }]);
     let env: Env<Par> = Env::new();
@@ -998,8 +998,8 @@ async fn simple_match_should_capture_and_add_to_the_environment() {
     }]);
 
     let mut env: Env<Par> = Env::new();
-    env = env.put(GPrivateBuilder::new_par("one".to_string()));
-    env = env.put(GPrivateBuilder::new_par("zero".to_string()));
+    env = env.put(GPrivateBuilder::new_par_from_string("one".to_string()));
+    env = env.put(GPrivateBuilder::new_par_from_string("zero".to_string()));
     assert!(reducer
         .eval(match_term.clone(), &env, split_rand.clone())
         .await
@@ -1011,8 +1011,8 @@ async fn simple_match_should_capture_and_add_to_the_environment() {
         new_gstring_par("result".to_string(), Vec::new(), false),
         (
             vec![
-                GPrivateBuilder::new_par("one".to_string()),
-                GPrivateBuilder::new_par("zero".to_string()),
+                GPrivateBuilder::new_par_from_string("one".to_string()),
+                GPrivateBuilder::new_par_from_string("zero".to_string()),
             ],
             split_rand,
         ),
@@ -1601,7 +1601,7 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
     }]);
     let sub_proc = Par::default().with_news(vec![New {
         bind_count: 1,
-        p: Some(GPrivateBuilder::new_par("zero".to_string())),
+        p: Some(GPrivateBuilder::new_par_from_string("zero".to_string())),
         uri: Vec::new(),
         injections: BTreeMap::new(),
         locally_free: vec![],
@@ -1625,8 +1625,8 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
     }]);
 
     let mut env: Env<Par> = Env::new();
-    env = env.put(GPrivateBuilder::new_par("one".to_string()));
-    env = env.put(GPrivateBuilder::new_par("zero".to_string()));
+    env = env.put(GPrivateBuilder::new_par_from_string("one".to_string()));
+    env = env.put(GPrivateBuilder::new_par_from_string("zero".to_string()));
 
     assert!(reducer
         .eval(to_byte_array_call, &env, split_rand.clone())

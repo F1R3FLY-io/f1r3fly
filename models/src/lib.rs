@@ -13,3 +13,13 @@ pub type ByteBuffer = Vec<u8>;
 pub type Byte = u8;
 pub type ByteString = Vec<u8>;
 pub type BitSet = Vec<u8>;
+
+pub fn create_bit_vector(indices: &[usize]) -> BitSet {
+    let max_index = *indices.iter().max().unwrap_or(&0);
+    let mut bit_vector = vec![0; max_index + 1];
+    for &index in indices {
+        bit_vector[index] = 1;
+    }
+    // println!("\nbitvector: {:?}", bit_vector);
+    bit_vector
+}

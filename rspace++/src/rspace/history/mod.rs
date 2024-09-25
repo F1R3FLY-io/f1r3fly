@@ -9,7 +9,9 @@ pub mod root_repository;
 pub mod cold_store;
 pub mod history_repository_impl;
 
+// PartialEq needed here for testing purposes
+#[derive(Debug, PartialEq)]
 pub enum Either<L, R> {
-  Left(L),
-  Right(R),
+    Left(L),
+    Right(R),
 }

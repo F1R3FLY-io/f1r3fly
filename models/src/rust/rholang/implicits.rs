@@ -1,6 +1,7 @@
 // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala
 
 use prost::Message;
+use uuid::Uuid;
 
 use crate::{
     rhoapi::{g_unforgeable::UnfInstance, Bundle, Expr, GPrivate, GUnforgeable, Par},
@@ -26,7 +27,15 @@ pub fn vector_par(_locally_free: Vec<u8>, _connective_used: bool) -> Par {
 pub struct GPrivateBuilder;
 
 impl GPrivateBuilder {
-    pub fn new_par(s: String) -> Par {
+    pub fn new_par() -> Par {
+        Par::default().with_unforgeables(vec![GUnforgeable {
+            unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
+                id: Uuid::new_v4().to_string().encode_to_vec(),
+            })),
+        }])
+    }
+
+    pub fn new_par_from_string(s: String) -> Par {
         Par::default().with_unforgeables(vec![GUnforgeable {
             unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
                 id: s.encode_to_vec(),
