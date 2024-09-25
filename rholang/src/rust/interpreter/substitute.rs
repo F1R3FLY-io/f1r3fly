@@ -389,12 +389,10 @@ impl SubstituteTrait<Par> for Substitute {
                     unforgeables: term.unforgeables,
                     bundles,
                     connectives: Vec::new(),
-                    locally_free: term
-                        .locally_free
-                        .iter()
-                        .cloned()
-                        .take(env.shift as usize)
-                        .collect(),
+                    locally_free: {
+                        // println!("\nenv.shift in substitute_no_sort for par: {}", env.shift);
+                        set_bits_until(term.locally_free, env.shift)
+                    },
                     connective_used: term.connective_used,
                 },
             ),
@@ -415,7 +413,8 @@ impl SubstituteTrait<Send> for Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Send, InterpreterError> {
-        let channels_sub = self.substitute_no_sort(unwrap_option_safe(term.chan)?, depth, env)?;
+        let channels_sub =
+            self.substitute_no_sort(unwrap_option_safe(term.clone().chan)?, depth, env)?;
 
         let pars_sub = term
             .data
@@ -423,16 +422,13 @@ impl SubstituteTrait<Send> for Substitute {
             .map(|p| self.substitute_no_sort(p.clone(), depth, env))
             .collect::<Result<Vec<Par>, InterpreterError>>()?;
 
+        // println!("\nterm in substitute_no_sort for Send {:?}", term);
+
         Ok(Send {
             chan: Some(channels_sub),
             data: pars_sub,
             persistent: term.persistent,
-            locally_free: term
-                .locally_free
-                .iter()
-                .cloned()
-                .take(env.shift as usize)
-                .collect(),
+            locally_free: set_bits_until(term.locally_free, env.shift),
             connective_used: term.connective_used,
         })
     }
@@ -490,12 +486,7 @@ impl SubstituteTrait<Receive> for Substitute {
             persistent: term.persistent,
             peek: term.peek,
             bind_count: term.bind_count,
-            locally_free: term
-                .locally_free
-                .iter()
-                .cloned()
-                .take(env.shift as usize)
-                .collect(),
+            locally_free: set_bits_until(term.locally_free, env.shift),
             connective_used: term.connective_used,
         })
     }
@@ -529,12 +520,7 @@ impl SubstituteTrait<New> for Substitute {
             p: Some(new_sub),
             uri: term.uri,
             injections: term.injections,
-            locally_free: term
-                .locally_free
-                .iter()
-                .cloned()
-                .take(env.shift as usize)
-                .collect(),
+            locally_free: set_bits_until(term.locally_free, env.shift),
         })
     }
 
@@ -587,12 +573,7 @@ impl SubstituteTrait<Match> for Substitute {
         Ok(Match {
             target: Some(target_sub),
             cases: cases_sub,
-            locally_free: term
-                .locally_free
-                .iter()
-                .cloned()
-                .take(env.shift as usize)
-                .collect(),
+            locally_free: set_bits_until(term.locally_free, env.shift),
             connective_used: term.connective_used,
         })
     }
@@ -843,11 +824,7 @@ impl SubstituteTrait<Expr> for Substitute {
                     .map(|p| self.substitute(p.clone(), depth, env))
                     .collect::<Result<Vec<Par>, InterpreterError>>()?;
 
-                let new_locally_free = locally_free
-                    .iter()
-                    .cloned()
-                    .take(env.shift as usize)
-                    .collect();
+                let new_locally_free = set_bits_until(locally_free, env.shift);
 
                 Ok(Expr {
                     expr_instance: Some(ExprInstance::EListBody(EList {
@@ -869,11 +846,7 @@ impl SubstituteTrait<Expr> for Substitute {
                     .map(|p| self.substitute(p.clone(), depth, env))
                     .collect::<Result<Vec<Par>, InterpreterError>>()?;
 
-                let new_locally_free = locally_free
-                    .iter()
-                    .cloned()
-                    .take(env.shift as usize)
-                    .collect();
+                let new_locally_free = set_bits_until(locally_free, env.shift);
 
                 Ok(Expr {
                     expr_instance: Some(ExprInstance::ETupleBody(ETuple {
@@ -898,12 +871,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         ParSet {
                             ps: SortedParHashSet::create_from_vec(_ps),
                             connective_used: par_set.connective_used,
-                            locally_free: par_set
-                                .locally_free
-                                .iter()
-                                .cloned()
-                                .take(env.shift as usize)
-                                .collect(),
+                            locally_free: set_bits_until(par_set.locally_free, env.shift),
                             remainder: par_set.remainder,
                         },
                     ))),
@@ -928,12 +896,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         ParMap {
                             ps: SortedParMap::create_from_vec(_ps),
                             connective_used: par_map.connective_used,
-                            locally_free: par_map
-                                .locally_free
-                                .iter()
-                                .cloned()
-                                .take(env.shift as usize)
-                                .collect(),
+                            locally_free: set_bits_until(par_map.locally_free, env.shift),
                             remainder: par_map.remainder,
                         },
                     ))),
@@ -958,11 +921,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         method_name,
                         target: Some(sub_target),
                         arguments: sub_arguments,
-                        locally_free: locally_free
-                            .iter()
-                            .cloned()
-                            .take(env.shift as usize)
-                            .collect(),
+                        locally_free: set_bits_until(locally_free, env.shift),
                         connective_used,
                     })),
                 })
@@ -1210,11 +1169,7 @@ impl SubstituteTrait<Expr> for Substitute {
                     .map(|p| self.substitute_no_sort(p.clone(), depth, env))
                     .collect::<Result<Vec<Par>, InterpreterError>>()?;
 
-                let new_locally_free = locally_free
-                    .iter()
-                    .cloned()
-                    .take(env.shift as usize)
-                    .collect();
+                let new_locally_free = set_bits_until(locally_free, env.shift);
 
                 Ok(Expr {
                     expr_instance: Some(ExprInstance::EListBody(EList {
@@ -1236,11 +1191,7 @@ impl SubstituteTrait<Expr> for Substitute {
                     .map(|p| self.substitute_no_sort(p.clone(), depth, env))
                     .collect::<Result<Vec<Par>, InterpreterError>>()?;
 
-                let new_locally_free = locally_free
-                    .iter()
-                    .cloned()
-                    .take(env.shift as usize)
-                    .collect();
+                let new_locally_free = set_bits_until(locally_free, env.shift);
 
                 Ok(Expr {
                     expr_instance: Some(ExprInstance::ETupleBody(ETuple {
@@ -1265,12 +1216,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         ParSet {
                             ps: SortedParHashSet::create_from_vec(_ps),
                             connective_used: par_set.connective_used,
-                            locally_free: par_set
-                                .locally_free
-                                .iter()
-                                .cloned()
-                                .take(env.shift as usize)
-                                .collect(),
+                            locally_free: set_bits_until(par_set.locally_free, env.shift),
                             remainder: par_set.remainder,
                         },
                     ))),
@@ -1295,12 +1241,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         ParMap {
                             ps: SortedParMap::create_from_vec(_ps),
                             connective_used: par_map.connective_used,
-                            locally_free: par_map
-                                .locally_free
-                                .iter()
-                                .cloned()
-                                .take(env.shift as usize)
-                                .collect(),
+                            locally_free: set_bits_until(par_map.locally_free, env.shift),
                             remainder: par_map.remainder,
                         },
                     ))),
@@ -1326,11 +1267,7 @@ impl SubstituteTrait<Expr> for Substitute {
                         method_name,
                         target: Some(sub_target),
                         arguments: sub_arguments,
-                        locally_free: locally_free
-                            .iter()
-                            .cloned()
-                            .take(env.shift as usize)
-                            .collect(),
+                        locally_free: set_bits_until(locally_free, env.shift),
                         connective_used,
                     })),
                 })
@@ -1339,4 +1276,17 @@ impl SubstituteTrait<Expr> for Substitute {
             _ => Ok(term),
         }
     }
+}
+
+fn set_bits_until(bits: Vec<u8>, until: i32) -> Vec<u8> {
+    if until <= 0 {
+        return Vec::new();
+    }
+    let until_usize = until as usize;
+
+    bits.iter()
+        .enumerate()
+        .filter(|&(i, &bit)| i < until_usize && bit == 1)
+        .map(|(_, &bit)| bit)
+        .collect()
 }
