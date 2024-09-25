@@ -149,7 +149,7 @@ module.exports = grammar({
             field('args', alias($._proc_list, $.args)))
         ),
 
-        eval: $ => prec(12, seq('*', field('name', $.name))),
+        eval: $ => prec(12, seq('*', $.name)),
 
         disjunction: $ => prec.left(13, seq(field('left', $._proc), '\\/', field('right', $._proc))),
         conjunction: $ => prec.left(14, seq(field('left', $._proc), '/\\', field('right', $._proc))),
