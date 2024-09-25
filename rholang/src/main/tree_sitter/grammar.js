@@ -79,9 +79,10 @@ module.exports = grammar({
 
         input: $ => prec(2, seq(
             'for',
-            '(', field('formals', alias(semiSep1($._receipt), $.receipts)), ')',
+            '(', field('formals', $.receipts), ')',
             field('proc', $.block)
         )),
+        receipts: $ => semiSep1($._receipt),
 
         send: $ => prec(3, seq(
             field('name', $.name),
