@@ -15,7 +15,7 @@ for (@{x!(P)} <- y) { Q }
 for (@{for (@P <- z) { R }} <- y) { Q }
 for (@{ P | R } <- y) { Q }
 match R { P => Q }
-match R { [P, S, ...T] => Q }
+match R { [P, S ...T] => Q }
 match R { contract foo(x) = { P } => Q }
 match R { contract foo(@S) = { x!(P + S) } => Q }
 

@@ -263,7 +263,7 @@ module.exports = grammar({
             '}'
         ),
 
-        _proc_remainder: $ => seq(',', '...', $.proc_var),
+        _proc_remainder: $ => seq('...', $.proc_var),
 
         key_value_pair: $ => seq(
             field('key', $._proc),
