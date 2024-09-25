@@ -1,0 +1,160 @@
+==========
+Iteration
+==========
+
+new iterate in {
+    contract iterate(@list, process, done) = {
+      match list {
+        [hd ...tl] => {
+          new ack in {
+            process!(hd, *ack) |
+            for (_ <- ack) { iterate!(tl, *process, *done) }
+          }
+        }
+        _ => done!(Nil)
+      }
+    } |
+    new process, done in {
+      iterate!([4,5,6], *process, *done) |
+      contract process(@item, ack) = {
+        ack!(Nil)
+      } |
+      for (_ <- done) {
+        Nil
+      }
+    }
+  }
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var)))
+    proc: (block
+      body: (par
+        left: (contract
+          name: (proc_var
+            (var))
+          formals: (names
+            (quote
+              (proc_var
+                (var)))
+            (proc_var
+              (var))
+            (proc_var
+              (var)))
+          proc: (block
+            body: (match
+              expression: (proc_var
+                (var))
+              cases: (cases
+                (case
+                  pattern: (collection
+                    (list
+                      (proc_var
+                        (var))
+                      cont: (proc_var
+                        (var))))
+                  proc: (block
+                    body: (new
+                      decls: (decls
+                        (name_decl
+                          (var)))
+                      proc: (block
+                        body: (par
+                          left: (send
+                            name: (proc_var
+                              (var))
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (proc_var
+                                (var))
+                              (eval
+                                (proc_var
+                                  (var)))))
+                          right: (input
+                            formals: (receipts
+                              (linear_bind
+                                names: (names
+                                  (proc_var
+                                    (wildcard)))
+                                input: (simple_source
+                                  (proc_var
+                                    (var)))))
+                            proc: (block
+                              body: (send
+                                name: (proc_var
+                                  (var))
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (proc_var
+                                    (var))
+                                  (eval
+                                    (proc_var
+                                      (var)))
+                                  (eval
+                                    (proc_var
+                                      (var))))))))))))
+                (case
+                  pattern: (proc_var
+                    (wildcard))
+                  proc: (send
+                    name: (proc_var
+                      (var))
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (nil))))))))
+        right: (new
+          decls: (decls
+            (name_decl
+              (var))
+            (name_decl
+              (var)))
+          proc: (block
+            body: (par
+              left: (par
+                left: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (collection
+                      (list
+                        (long_literal)
+                        (long_literal)
+                        (long_literal)))
+                    (eval
+                      (proc_var
+                        (var)))
+                    (eval
+                      (proc_var
+                        (var)))))
+                right: (contract
+                  name: (proc_var
+                    (var))
+                  formals: (names
+                    (quote
+                      (proc_var
+                        (var)))
+                    (proc_var
+                      (var)))
+                  proc: (block
+                    body: (send
+                      name: (proc_var
+                        (var))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (nil))))))
+              right: (input
+                formals: (receipts
+                  (linear_bind
+                    names: (names
+                      (proc_var
+                        (wildcard)))
+                    input: (simple_source
+                      (proc_var
+                        (var)))))
+                proc: (block
+                  body: (nil))))))))))

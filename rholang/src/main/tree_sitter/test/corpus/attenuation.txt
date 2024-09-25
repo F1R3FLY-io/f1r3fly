@@ -1,0 +1,78 @@
+===========
+Attenuation
+===========
+
+new MakeGetForwarder in {
+  contract MakeGetForwarder(target, ret) = {
+    new port in {
+      ret!(*port) |
+      contract port(@method, @arg, ack) = {
+        match method == "get" { true => target!("get", arg, *ack) }
+      }
+    }
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var)))
+    proc: (block
+      body: (contract
+        name: (proc_var
+          (var))
+        formals: (names
+          (proc_var
+            (var))
+          (proc_var
+            (var)))
+        proc: (block
+          body: (new
+            decls: (decls
+              (name_decl
+                (var)))
+            proc: (block
+              body: (par
+                left: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (eval
+                      (proc_var
+                        (var)))))
+                right: (contract
+                  name: (proc_var
+                    (var))
+                  formals: (names
+                    (quote
+                      (proc_var
+                        (var)))
+                    (quote
+                      (proc_var
+                        (var)))
+                    (proc_var
+                      (var)))
+                  proc: (block
+                    body: (match
+                      expression: (eq
+                        left: (proc_var
+                          (var))
+                        right: (string_literal))
+                      cases: (cases
+                        (case
+                          pattern: (bool_literal)
+                          proc: (send
+                            name: (proc_var
+                              (var))
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (string_literal)
+                              (proc_var
+                                (var))
+                              (eval
+                                (proc_var
+                                  (var))))))))))))))))))

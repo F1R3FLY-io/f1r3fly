@@ -1,0 +1,229 @@
+=============
+Mutable state
+=============
+
+new MakeCell in {
+
+    contract MakeCell(@init, get, set) = {
+      new valueStore in {
+        valueStore!(init) |
+        contract get(ack) = {
+          for(@value <- valueStore) {
+            valueStore!(value) | ack!(value)
+          }
+        } |
+        contract set(@newValue, ack) = {
+          for(_ <- valueStore) {
+            valueStore!(newValue) | ack!(true)
+          }
+        }
+      }
+    } |
+
+    new myGet, mySet in {
+      MakeCell!(123, *myGet, *mySet) |
+      new ack in {
+        myGet!(*ack) |
+        for (@result <- ack) {
+
+          mySet!(456, *ack) |
+          for (_ <- ack) {
+            myGet!(*ack) |
+            for (@result <- ack) {
+
+              Nil
+            }
+          }
+        }
+      }
+    }
+  }
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var)))
+    proc: (block
+      body: (par
+        left: (contract
+          name: (proc_var
+            (var))
+          formals: (names
+            (quote
+              (proc_var
+                (var)))
+            (proc_var
+              (var))
+            (proc_var
+              (var)))
+          proc: (block
+            body: (new
+              decls: (decls
+                (name_decl
+                  (var)))
+              proc: (block
+                body: (par
+                  left: (par
+                    left: (send
+                      name: (proc_var
+                        (var))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (proc_var
+                          (var))))
+                    right: (contract
+                      name: (proc_var
+                        (var))
+                      formals: (names
+                        (proc_var
+                          (var)))
+                      proc: (block
+                        body: (input
+                          formals: (receipts
+                            (linear_bind
+                              names: (names
+                                (quote
+                                  (proc_var
+                                    (var))))
+                              input: (simple_source
+                                (proc_var
+                                  (var)))))
+                          proc: (block
+                            body: (par
+                              left: (send
+                                name: (proc_var
+                                  (var))
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (proc_var
+                                    (var))))
+                              right: (send
+                                name: (proc_var
+                                  (var))
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (proc_var
+                                    (var))))))))))
+                  right: (contract
+                    name: (proc_var
+                      (var))
+                    formals: (names
+                      (quote
+                        (proc_var
+                          (var)))
+                      (proc_var
+                        (var)))
+                    proc: (block
+                      body: (input
+                        formals: (receipts
+                          (linear_bind
+                            names: (names
+                              (proc_var
+                                (wildcard)))
+                            input: (simple_source
+                              (proc_var
+                                (var)))))
+                        proc: (block
+                          body: (par
+                            left: (send
+                              name: (proc_var
+                                (var))
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (proc_var
+                                  (var))))
+                            right: (send
+                              name: (proc_var
+                                (var))
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (bool_literal)))))))))))))
+        right: (new
+          decls: (decls
+            (name_decl
+              (var))
+            (name_decl
+              (var)))
+          proc: (block
+            body: (par
+              left: (send
+                name: (proc_var
+                  (var))
+                send_type: (send_single)
+                inputs: (inputs
+                  (long_literal)
+                  (eval
+                    (proc_var
+                      (var)))
+                  (eval
+                    (proc_var
+                      (var)))))
+              right: (new
+                decls: (decls
+                  (name_decl
+                    (var)))
+                proc: (block
+                  body: (par
+                    left: (send
+                      name: (proc_var
+                        (var))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (eval
+                          (proc_var
+                            (var)))))
+                    right: (input
+                      formals: (receipts
+                        (linear_bind
+                          names: (names
+                            (quote
+                              (proc_var
+                                (var))))
+                          input: (simple_source
+                            (proc_var
+                              (var)))))
+                      proc: (block
+                        body: (par
+                          left: (send
+                            name: (proc_var
+                              (var))
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (long_literal)
+                              (eval
+                                (proc_var
+                                  (var)))))
+                          right: (input
+                            formals: (receipts
+                              (linear_bind
+                                names: (names
+                                  (proc_var
+                                    (wildcard)))
+                                input: (simple_source
+                                  (proc_var
+                                    (var)))))
+                            proc: (block
+                              body: (par
+                                left: (send
+                                  name: (proc_var
+                                    (var))
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (eval
+                                      (proc_var
+                                        (var)))))
+                                right: (input
+                                  formals: (receipts
+                                    (linear_bind
+                                      names: (names
+                                        (quote
+                                          (proc_var
+                                            (var))))
+                                      input: (simple_source
+                                        (proc_var
+                                          (var)))))
+                                  proc: (block
+                                    body: (nil)))))))))))))))))))

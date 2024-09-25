@@ -1,0 +1,85 @@
+========
+Hashing
+========
+
+new x, y, stdout(`rho:io:stdout`) in {
+    x!(@"name"!("Joe") | @"age"!(40)) |
+    for (@r <- x) { @"keccak256Hash"!(r.toByteArray(), *y) } |
+    for (@h <- y) { stdout!(h) }
+}
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      body: (par
+        left: (par
+          left: (send
+            name: (proc_var
+              (var))
+            send_type: (send_single)
+            inputs: (inputs
+              (par
+                left: (send
+                  name: (quote
+                    (string_literal))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (string_literal)))
+                right: (send
+                  name: (quote
+                    (string_literal))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (long_literal))))))
+          right: (input
+            formals: (receipts
+              (linear_bind
+                names: (names
+                  (quote
+                    (proc_var
+                      (var))))
+                input: (simple_source
+                  (proc_var
+                    (var)))))
+            proc: (block
+              body: (send
+                name: (quote
+                  (string_literal))
+                send_type: (send_single)
+                inputs: (inputs
+                  (method
+                    receiver: (proc_var
+                      (var))
+                    name: (var)
+                    args: (args))
+                  (eval
+                    (proc_var
+                      (var))))))))
+        right: (input
+          formals: (receipts
+            (linear_bind
+              names: (names
+                (quote
+                  (proc_var
+                    (var))))
+              input: (simple_source
+                (proc_var
+                  (var)))))
+          proc: (block
+            body: (send
+              name: (proc_var
+                (var))
+              send_type: (send_single)
+              inputs: (inputs
+                (proc_var
+                  (var))))))))))

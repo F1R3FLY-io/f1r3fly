@@ -1,0 +1,138 @@
+===================
+Dining philosophers
+===================
+
+new philosopher1, philosopher2, north, south, knife, spoon in {
+    north!(*knife) |
+    south!(*spoon) |
+    for (@knf <- north; @spn <- south) {
+      philosopher1!("Complete!") |
+      north!(knf) |
+      south!(spn)
+    } |
+    for (@spn <- south; @knf <- north) {
+      philosopher2!("Complete!") |
+      north!(knf) |
+      south!(spn)
+    }
+}
+
+---
+
+(source_file
+  (new
+    decls: (decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      body: (par
+        left: (par
+          left: (par
+            left: (send
+              name: (proc_var
+                (var))
+              send_type: (send_single)
+              inputs: (inputs
+                (eval
+                  (proc_var
+                    (var)))))
+            right: (send
+              name: (proc_var
+                (var))
+              send_type: (send_single)
+              inputs: (inputs
+                (eval
+                  (proc_var
+                    (var))))))
+          right: (input
+            formals: (receipts
+              (linear_bind
+                names: (names
+                  (quote
+                    (proc_var
+                      (var))))
+                input: (simple_source
+                  (proc_var
+                    (var))))
+              (linear_bind
+                names: (names
+                  (quote
+                    (proc_var
+                      (var))))
+                input: (simple_source
+                  (proc_var
+                    (var)))))
+            proc: (block
+              body: (par
+                left: (par
+                  left: (send
+                    name: (proc_var
+                      (var))
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (string_literal)))
+                  right: (send
+                    name: (proc_var
+                      (var))
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (proc_var
+                        (var)))))
+                right: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (proc_var
+                      (var))))))))
+        right: (input
+          formals: (receipts
+            (linear_bind
+              names: (names
+                (quote
+                  (proc_var
+                    (var))))
+              input: (simple_source
+                (proc_var
+                  (var))))
+            (linear_bind
+              names: (names
+                (quote
+                  (proc_var
+                    (var))))
+              input: (simple_source
+                (proc_var
+                  (var)))))
+          proc: (block
+            body: (par
+              left: (par
+                left: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (string_literal)))
+                right: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (proc_var
+                      (var)))))
+              right: (send
+                name: (proc_var
+                  (var))
+                send_type: (send_single)
+                inputs: (inputs
+                  (proc_var
+                    (var)))))))))))
