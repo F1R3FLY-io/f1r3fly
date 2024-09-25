@@ -42,7 +42,8 @@ Several working examples have been included in the examples directory, and the e
 
 ## Rust
 
-- Within rholang directory, `cargo build --profile dev -p rholang` to build `rholang` library. Outputs to `rholang/target/debug/`. Scala code pulls from here.
+- To install the tree-sitter-cli, run: `cargo install tree-sitter-cli`. This is needed to generate necessary files for compiler.
+- Within rholang directory, `cargo build --profile dev -p rholang` to build `rholang` library. Outputs to `rholang/target/debug/`.
 
 ### Testing Rust (within rholang directory)
 
