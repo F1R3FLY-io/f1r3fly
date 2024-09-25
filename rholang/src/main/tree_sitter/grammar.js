@@ -66,7 +66,7 @@ module.exports = grammar({
 
         choice: $ => prec(2, seq(
             'select',
-            '{', field('branches', repeat1($.branch)), '}'
+            '{', field('branches', alias(repeat1($.branch), $.branches)), '}'
         )),
 
         contract: $ => prec(2, seq(

@@ -1,0 +1,109 @@
+======
+Select
+======
+
+contract Cell( get, set, state ) = {
+  select {
+    rtn <- get & v <- state => {
+     rtn!( v ) | state!( v ) | Cell!( get, set, state )
+    }
+    newValue <- set & v <- state => {
+      state!( newValue ) | Cell!( get, set, state )
+    }
+  }
+}
+
+---
+
+(source_file
+  (contract
+    name: (proc_var
+      (var))
+    formals: (names
+      (proc_var
+        (var))
+      (proc_var
+        (var))
+      (proc_var
+        (var)))
+    proc: (block
+      body: (choice
+        branches: (branches
+          (branch
+            pattern: (linear_bind
+              names: (names
+                (proc_var
+                  (var)))
+              input: (simple_source
+                (proc_var
+                  (var))))
+            pattern: (linear_bind
+              names: (names
+                (proc_var
+                  (var)))
+              input: (simple_source
+                (proc_var
+                  (var))))
+            proc: (block
+              body: (par
+                left: (par
+                  left: (send
+                    name: (proc_var
+                      (var))
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (proc_var
+                        (var))))
+                  right: (send
+                    name: (proc_var
+                      (var))
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (proc_var
+                        (var)))))
+                right: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (proc_var
+                      (var))
+                    (proc_var
+                      (var))
+                    (proc_var
+                      (var)))))))
+          (branch
+            pattern: (linear_bind
+              names: (names
+                (proc_var
+                  (var)))
+              input: (simple_source
+                (proc_var
+                  (var))))
+            pattern: (linear_bind
+              names: (names
+                (proc_var
+                  (var)))
+              input: (simple_source
+                (proc_var
+                  (var))))
+            proc: (block
+              body: (par
+                left: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (proc_var
+                      (var))))
+                right: (send
+                  name: (proc_var
+                    (var))
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (proc_var
+                      (var))
+                    (proc_var
+                      (var))
+                    (proc_var
+                      (var))))))))))))
