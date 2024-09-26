@@ -17,9 +17,11 @@ new iterate in {
     new process, done in {
       iterate!([4,5,6], *process, *done) |
       contract process(@item, ack) = {
+        /* handle processing of item */
         ack!(Nil)
       } |
       for (_ <- done) {
+         /* done! */
         Nil
       }
     }

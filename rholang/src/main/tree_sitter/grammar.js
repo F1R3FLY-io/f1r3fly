@@ -1,5 +1,11 @@
 module.exports = grammar({
     name: 'rholang',
+
+    extras: $ => [
+        $._line_comment,
+        $._block_comment,
+        /\s/,
+    ],
     word: $ => $.var,
 
     supertypes: $ => [
@@ -279,6 +285,14 @@ module.exports = grammar({
 
         _proc_list: $ => seq('(', commaSep($._proc), ')'),
         var: $ => token(/((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\')+))/),
+
+        _line_comment: $ => token(seq('//', /[^\n]*/)),
+        _block_comment: $ => token(seq(
+            '/*',
+            /[^*]*\*+([^/*][^*]*\*+)*/,
+            '/',
+        )),
+        // http://stackoverflow.com/questions/13014947/regex-to-match-a-c-style-multiline-comment/36328890#36328890
     }
 });
 

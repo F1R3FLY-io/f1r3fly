@@ -27,7 +27,7 @@ new MakeCoatCheck in {
       }
     } |
 
-
+  // Usage
   new ret, get, set in {
     MakeCoatCheck!(*ret) |
     for (cc <- ret) {
@@ -38,9 +38,10 @@ new MakeCoatCheck in {
         contract set(@value, return) = { cc!("set", *ticket, value, *return) } |
 
         get!(*ret) | for(@r <- ret) {
-
+          //r is equal to 1
           set!(1, *ret) | for(_ <- ret) {
             get!(*ret) | for(@r <- ret) {
+              //r is equal to 1
               Nil
             }
           }
