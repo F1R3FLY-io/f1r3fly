@@ -9,7 +9,7 @@
 # Cleaning up the src/main/tree_sitter directory, leaving only grammar.js, GPT-BNFC-to-Tree-Sitter.md, and the tests folder.
 DIR="src/main/tree_sitter"
 
-find "$DIR" -mindepth 1 ! -name "grammar.js" ! -name "GPT-BNFC-to-Tree-Sitter.md" ! -name "tests" ! -path "$DIR/tests/*" -exec rm -rf {} +
+find "$DIR" -mindepth 1 ! -name "grammar.js" ! -name "GPT-BNFC-to-Tree-Sitter.md" ! -name "tests" ! -path "$DIR/tests/*" ! -name "test" ! -path "$DIR/test/*" -exec rm -rf {} +
 
 # Removing the target folder in the root directory if it exists.
 TARGET_DIR="target"
