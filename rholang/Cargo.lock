@@ -759,6 +759,7 @@ dependencies = [
  "prost",
  "prost-build",
  "serde",
+ "uuid",
 ]
 
 [[package]]
@@ -1145,6 +1146,7 @@ dependencies = [
  "lazy_static",
  "models",
  "prost",
+ "rand",
  "regex",
  "rspace_plus_plus",
  "serde",
