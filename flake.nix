@@ -98,12 +98,23 @@
               package = dhall-yaml;
               help = "Dhall-to-YAML utility";
             }
-             #need 0.22.6 version, by default nix provide 0.20.9
-#            {
-#              name = "tree-sitter";
-#              package = tree-sitter;
-#              help = "Parser generator tool and incremental parsing library";
-#            }
+            {
+              name = "tree-sitter";
+              package = pkgs.stdenv.mkDerivation {
+                pname = "tree-sitter-cli";
+                version = "0.23.0";
+                src = pkgs.fetchurl {
+                  url = "https://registry.npmjs.org/tree-sitter-cli/-/tree-sitter-cli-0.23.0.tgz";
+                  sha256 = "18m7ih9dk45kkbxxci2qx5kf30ysrz2039mbdzhcwfsyxj6p2iqr"; # nix-prefetch-url https://registry.npmjs.org/tree-sitter-cli/-/tree-sitter-cli-0.23.0.tgz
+                };
+                buildInputs = [ pkgs.nodejs-18_x ];
+                installPhase = ''
+                  mkdir -p $out/bin
+                  cp -r ./* $out/bin/
+                '';
+              };
+              help = "Parser generator tool and incremental parsing library";
+            }
           ];
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";
