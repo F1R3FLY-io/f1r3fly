@@ -1,7 +1,6 @@
 use expr::ExprInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::collections::HashSet;
 
 use crate::rhoapi::*;
 use crate::rust::utils::connective::ConnectiveInstance::*;
@@ -131,14 +130,17 @@ pub fn to_vec(fm: FreeMap, max: i32) -> Vec<Par> {
         .collect()
 }
 
-/*
-    'This function takes two Vec<u8> as input, converts them to HashSet<u8>, performs the union operation, and then converts
-  the result back to Vec<u8>.' - GPT-4
-*/
-pub fn union<A: Eq + std::hash::Hash + Clone>(vec1: Vec<A>, vec2: Vec<A>) -> Vec<A> {
-    let set1: HashSet<_> = vec1.into_iter().collect();
-    let set2: HashSet<_> = vec2.into_iter().collect();
-    set1.union(&set2).cloned().collect()
+pub fn union(bitset1: Vec<u8>, bitset2: Vec<u8>) -> Vec<u8> {
+    let max_len = bitset1.len().max(bitset2.len());
+    let mut result = vec![0; max_len];
+
+    for i in 0..max_len {
+        let bit1 = if i < bitset1.len() { bitset1[i] } else { 0 };
+        let bit2 = if i < bitset2.len() { bitset2[i] } else { 0 };
+        result[i] = bit1 | bit2;
+    }
+
+    result
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParSpatialMatcherUtils.scala - noFrees[Par]
