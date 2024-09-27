@@ -1,12 +1,14 @@
+// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
+
 use proptest::prelude::*;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store_action::{
     HotStoreAction, InsertAction, InsertContinuations, InsertData,
 };
-use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::rspace_interface::{ContResult, RSpaceResult};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::trace::event::Consume;
@@ -16,8 +18,6 @@ use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-
-// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
 
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]

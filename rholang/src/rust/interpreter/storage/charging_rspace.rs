@@ -32,6 +32,6 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
 
 impl ChargingRSpace {
     pub fn charging_rspace(space: RhoTuplespace) -> RhoTuplespace {
-        
+        todo!()
     }
 }

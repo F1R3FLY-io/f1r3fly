@@ -6,6 +6,8 @@ use super::history::history_repository::HistoryRepositoryError;
 use super::history::instances::radix_history::RadixHistory;
 use super::history::radix_tree::RadixTreeError;
 use super::r#match::Match;
+use super::rspace_interface::ContResult;
+use super::rspace_interface::RSpaceResult;
 use super::shared::key_value_store::KvStoreError;
 use super::trace::event::Consume;
 use super::trace::event::Event;

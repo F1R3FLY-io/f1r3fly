@@ -1,6 +1,7 @@
-use super::internal::{ContResult, RSpaceResult};
-
 // See rspace/src/main/scala/coop/rchain/rspace/util/package.scala
+
+use super::rspace_interface::{ContResult, RSpaceResult};
+
 pub fn unpack_option<C, P, K: Clone, R: Clone>(
     v: &Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, R>>)>,
 ) -> Option<(K, Vec<R>)> {
