@@ -1,5 +1,5 @@
+use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::Par;
-use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
@@ -9,10 +9,11 @@ use super::errors::InterpreterError;
 use super::reduce::DebruijnInterpreter;
 
 //See rholang/src/main/scala/coop/rchain/rholang/interpreter/Interpreter.scala
+#[derive(Clone)]
 pub struct EvaluateResult {
-    cost: Cost,
-    errors: Vec<InterpreterError>,
-    mergeable: HashSet<Par>,
+    pub cost: Cost,
+    pub errors: Vec<InterpreterError>,
+    pub mergeable: HashSet<Par>,
 }
 
 pub trait Interpreter {
@@ -22,8 +23,8 @@ pub trait Interpreter {
         term: String,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
-        rand: Blake2b256Hash,
-    ) -> EvaluateResult;
+        rand: Blake2b512Random,
+    ) -> Result<EvaluateResult, InterpreterError>;
 }
 
 pub struct InterpreterImpl {
@@ -38,8 +39,8 @@ impl Interpreter for InterpreterImpl {
         term: String,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
-        rand: Blake2b256Hash,
-    ) -> EvaluateResult {
+        rand: Blake2b512Random,
+    ) -> Result<EvaluateResult, InterpreterError> {
         todo!()
     }
 }

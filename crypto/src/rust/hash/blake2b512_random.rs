@@ -1,4 +1,5 @@
 use super::blake2b512_block::Blake2b512Block;
+use rand::Rng;
 
 /** Blake2b512 based splittable and mergeable random number generator
  * specialized for generating 256-bit unforgeable names.
@@ -55,6 +56,12 @@ impl Blake2b512Random {
         }
 
         result
+    }
+
+    pub fn new_from_length(length: i32) -> Blake2b512Random {
+        let mut bytes = vec![0u8; length as usize];
+        rand::thread_rng().fill(&mut bytes[..]);
+        Self::new(&bytes)
     }
 
     pub fn new(init: &[u8]) -> Blake2b512Random {

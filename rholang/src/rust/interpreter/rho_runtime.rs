@@ -58,12 +58,57 @@ pub trait RhoRuntime: HasCost {
      * @return
      */
     fn evaluate(
-        &self,
+        &mut self,
         term: String,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
-        rand: Blake2b256Hash,
-    ) -> EvaluateResult;
+        rand: Blake2b512Random,
+    ) -> Result<EvaluateResult, InterpreterError>;
+
+    // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntimeSyntax.scala
+    fn evaluate_with_env(
+        &mut self,
+        term: String,
+        normalizer_env: HashMap<String, Par>,
+    ) -> Result<EvaluateResult, InterpreterError> {
+        self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), normalizer_env)
+    }
+
+    fn evaluate_with_term(&mut self, term: String) -> Result<EvaluateResult, InterpreterError> {
+        self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), HashMap::new())
+    }
+
+    fn evaluate_with_phlo(
+        &mut self,
+        term: String,
+        initial_phlo: Cost,
+    ) -> Result<EvaluateResult, InterpreterError> {
+        self.evaluate_with_env_and_phlo(term, initial_phlo, HashMap::new())
+    }
+
+    fn evaluate_with_env_and_phlo(
+        &mut self,
+        term: String,
+        initial_phlo: Cost,
+        normalizer_env: HashMap<String, Par>,
+    ) -> Result<EvaluateResult, InterpreterError> {
+        let rand = Blake2b512Random::new_from_length(128);
+        let checkpoint = self.create_soft_checkpoint();
+        match self.evaluate(term, initial_phlo, normalizer_env, rand) {
+            Ok(eval_result) => {
+                if !eval_result.errors.is_empty() {
+                    self.revert_to_soft_checkpoint(checkpoint);
+                    Ok(eval_result)
+                } else {
+                    Ok(eval_result)
+                }
+            }
+            Err(err) => {
+                self.revert_to_soft_checkpoint(checkpoint);
+                Err(err)
+            }
+        }
+    }
 
     /**
      * The function would execute the par regardless setting cost which would possibly cause
@@ -203,12 +248,12 @@ impl RhoRuntimeImpl {
 
 impl RhoRuntime for RhoRuntimeImpl {
     fn evaluate(
-        &self,
+        &mut self,
         term: String,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
-        rand: Blake2b256Hash,
-    ) -> EvaluateResult {
+        rand: Blake2b512Random,
+    ) -> Result<EvaluateResult, InterpreterError> {
         let i = InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone());
         let reducer = &self.reducer;
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
@@ -366,12 +411,12 @@ impl ReplayRhoRuntime for ReplayRhoRuntimeImpl {
 
 impl RhoRuntime for ReplayRhoRuntimeImpl {
     fn evaluate(
-        &self,
+        &mut self,
         term: String,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
-        rand: Blake2b256Hash,
-    ) -> EvaluateResult {
+        rand: Blake2b512Random,
+    ) -> Result<EvaluateResult, InterpreterError> {
         let i = InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone());
         let reducer = &self.reducer;
         i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
@@ -380,7 +425,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     async fn inj(
         &self,
         par: Par,
-        env: Env<Par>,
+        _env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         self.reducer.inj(par, rand).await
@@ -905,7 +950,7 @@ fn create_runtime(
  *                use [[coop.rchain.rholang.interpreter.accounting.noOpCostLog]]
  * @return
  */
-fn create_rho_runtime(
+pub fn create_rho_runtime(
     rspace: RhoISpace,
     mergeable_tag_name: Par,
     init_registry: bool,
@@ -927,7 +972,7 @@ fn create_rho_runtime(
  * @param costLog same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
  * @return
  */
-fn create_replay_rho_runtime(
+pub fn create_replay_rho_runtime(
     rspace: RhoReplayISpace,
     mergeable_tag_name: Par,
     init_registry: bool,

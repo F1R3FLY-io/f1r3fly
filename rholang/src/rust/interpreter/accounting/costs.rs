@@ -8,7 +8,7 @@ use models::{
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Cost {
     pub value: i64,
     pub operation: String,
