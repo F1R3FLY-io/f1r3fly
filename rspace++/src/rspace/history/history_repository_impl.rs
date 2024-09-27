@@ -1,9 +1,9 @@
 use super::cold_store::{ContinuationsLeaf, DataLeaf, JoinsLeaf};
-use super::history::HistoryError;
 use super::history_action::{DeleteAction, HistoryAction, InsertAction};
 use super::history_reader::HistoryReader;
 use super::history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT};
 use super::instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl;
+use crate::rspace::errors::HistoryError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use crate::rspace::history::cold_store::PersistedData;

@@ -1,14 +1,12 @@
 use super::checkpoint::SoftCheckpoint;
+use super::errors::HistoryRepositoryError;
+use super::errors::RSpaceError;
 use super::hashing::blake2b256_hash::Blake2b256Hash;
-use super::history::history::HistoryError;
 use super::history::history_reader::HistoryReader;
-use super::history::history_repository::HistoryRepositoryError;
 use super::history::instances::radix_history::RadixHistory;
-use super::history::radix_tree::RadixTreeError;
 use super::r#match::Match;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::RSpaceResult;
-use super::shared::key_value_store::KvStoreError;
 use super::trace::event::Consume;
 use super::trace::event::Event;
 use super::trace::event::IOEvent;
@@ -1485,42 +1483,5 @@ impl RSpaceInstances {
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
         Ok((history_repo, hot_store))
-    }
-}
-
-#[derive(Debug)]
-pub enum RSpaceError {
-    HistoryError(HistoryError),
-    RadixTreeError(RadixTreeError),
-    KvStoreError(KvStoreError),
-    BugFoundError(String),
-}
-
-impl std::fmt::Display for RSpaceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            RSpaceError::HistoryError(err) => write!(f, "History Error: {}", err),
-            RSpaceError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
-            RSpaceError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
-            RSpaceError::BugFoundError(err) => write!(f, "RSpace Bug Found Error: {}", err),
-        }
-    }
-}
-
-impl From<RadixTreeError> for RSpaceError {
-    fn from(error: RadixTreeError) -> Self {
-        RSpaceError::RadixTreeError(error)
-    }
-}
-
-impl From<KvStoreError> for RSpaceError {
-    fn from(error: KvStoreError) -> Self {
-        RSpaceError::KvStoreError(error)
-    }
-}
-
-impl From<HistoryError> for RSpaceError {
-    fn from(error: HistoryError) -> Self {
-        RSpaceError::HistoryError(error)
     }
 }

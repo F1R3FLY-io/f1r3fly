@@ -1,3 +1,4 @@
+use crate::rspace::errors::{HistoryError, HistoryRepositoryError};
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history::{History, HistoryInstances};
 use crate::rspace::history::history_reader::HistoryReader;
@@ -14,9 +15,6 @@ use crate::rspace::state::rspace_importer::RSpaceImporter;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-
-use super::history::HistoryError;
-use super::roots_store::RootError;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync {
@@ -102,32 +100,5 @@ where
             rspace_importer: Arc::new(Mutex::new(Box::new(importer))),
             _marker: PhantomData,
         }))
-    }
-}
-
-#[derive(Debug)]
-pub enum HistoryRepositoryError {
-    RootError(RootError),
-    HistoryError(HistoryError),
-}
-
-impl std::fmt::Display for HistoryRepositoryError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            HistoryRepositoryError::RootError(err) => write!(f, "Root Error: {}", err),
-            HistoryRepositoryError::HistoryError(err) => write!(f, "History Error: {}", err),
-        }
-    }
-}
-
-impl From<RootError> for HistoryRepositoryError {
-    fn from(error: RootError) -> Self {
-        HistoryRepositoryError::RootError(error)
-    }
-}
-
-impl From<HistoryError> for HistoryRepositoryError {
-    fn from(error: HistoryError) -> Self {
-        HistoryRepositoryError::HistoryError(error)
     }
 }

@@ -1,12 +1,7 @@
 use models::{Byte, ByteVector};
 
 use crate::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash,
-    history::{
-        radix_tree::{sequential_export, ExportData, ExportDataSettings},
-        roots_store::RootError,
-    },
-    shared::trie_exporter::{KeyHash, TrieExporter, TrieNode},
+    errors::RootError, hashing::blake2b256_hash::Blake2b256Hash, history::radix_tree::{sequential_export, ExportData, ExportDataSettings}, shared::trie_exporter::{KeyHash, TrieExporter, TrieNode}
 };
 use std::sync::Arc;
 

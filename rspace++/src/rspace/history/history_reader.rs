@@ -1,6 +1,4 @@
-use crate::rspace::internal::{Datum, WaitingContinuation};
-
-use super::history::HistoryError;
+use crate::rspace::{errors::HistoryError, internal::{Datum, WaitingContinuation}};
 
 /**
 * Reader for particular history (state verified on blockchain)

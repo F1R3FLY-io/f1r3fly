@@ -16,3 +16,4 @@ pub mod util;
 pub mod rspace_interface;
 pub mod tuplespace_interface;
 pub mod replay_rspace_interface;
+pub mod errors;

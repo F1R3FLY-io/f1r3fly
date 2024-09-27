@@ -1,8 +1,8 @@
+use crate::rspace::errors::RadixTreeError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::Either;
 use crate::rspace::shared::key_value_store::KeyValueStore;
-use crate::rspace::shared::key_value_store::KvStoreError;
 use dashmap::DashMap;
 use itertools::Itertools;
 use models::Byte;
@@ -1748,30 +1748,5 @@ where
             Either::Left(new_state) => state = new_state,
             Either::Right(final_state) => return Ok(final_state),
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum RadixTreeError {
-    KeyNotFound(String),
-    KvStoreError(KvStoreError),
-    PrefixError(String),
-    CollisionError(String),
-}
-
-impl std::fmt::Display for RadixTreeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            RadixTreeError::KeyNotFound(err) => write!(f, "Key Not Found Error: {}", err),
-            RadixTreeError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
-            RadixTreeError::PrefixError(err) => write!(f, "Prefix Error: {}", err),
-            RadixTreeError::CollisionError(err) => write!(f, "Collision Error: {}", err),
-        }
-    }
-}
-
-impl From<KvStoreError> for RadixTreeError {
-    fn from(error: KvStoreError) -> Self {
-        RadixTreeError::KvStoreError(error)
     }
 }

@@ -3,14 +3,10 @@
 use std::collections::HashSet;
 
 use super::{
-    hashing::blake2b256_hash::Blake2b256Hash,
-    internal::MultisetMultiMap,
-    rspace::RSpaceError,
-    rspace_interface::ISpace,
-    trace::{
+    errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::MultisetMultiMap, rspace_interface::ISpace, trace::{
         event::{Event, IOEvent, COMM},
         Log,
-    },
+    }
 };
 
 pub trait IReplayRSpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone>:

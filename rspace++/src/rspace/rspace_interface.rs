@@ -6,11 +6,7 @@ use std::collections::HashMap;
 use crate::rspace::checkpoint::SoftCheckpoint;
 
 use super::{
-    checkpoint::Checkpoint,
-    hashing::blake2b256_hash::Blake2b256Hash,
-    internal::{Datum, Row, WaitingContinuation},
-    rspace::RSpaceError,
-    tuplespace_interface::Tuplespace,
+    checkpoint::Checkpoint, errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::{Datum, Row, WaitingContinuation}, tuplespace_interface::Tuplespace
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
