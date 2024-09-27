@@ -513,7 +513,6 @@ where
 
     pub fn install(
         &mut self,
-        // &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -523,7 +522,6 @@ where
 
     fn locked_install(
         &mut self,
-        // &self,
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
@@ -829,7 +827,7 @@ where
 
         let wk = WaitingContinuation {
             patterns: patterns.clone(),
-            continuation: continuation,
+            continuation,
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),
@@ -1495,6 +1493,7 @@ pub enum RSpaceError {
     HistoryError(HistoryError),
     RadixTreeError(RadixTreeError),
     KvStoreError(KvStoreError),
+    BugFoundError(String),
 }
 
 impl std::fmt::Display for RSpaceError {
@@ -1503,6 +1502,7 @@ impl std::fmt::Display for RSpaceError {
             RSpaceError::HistoryError(err) => write!(f, "History Error: {}", err),
             RSpaceError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
             RSpaceError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
+            RSpaceError::BugFoundError(err) => write!(f, "RSpace Bug Found Error: {}", err),
         }
     }
 }

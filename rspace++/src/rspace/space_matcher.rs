@@ -1,3 +1,5 @@
+// See rspace/src/main/scala/coop/rchain/rspace/SpaceMatcher.scala
+
 use crate::rspace::internal::WaitingContinuation;
 use crate::rspace::internal::{ConsumeCandidate, Datum, ProduceCandidate};
 use dashmap::DashMap;
@@ -8,7 +10,7 @@ use std::sync::Arc;
 
 use super::r#match::Match;
 
-// See rspace/src/main/scala/coop/rchain/rspace/SpaceMatcher.scala
+
 pub struct SpaceMatcher<C, P, A, K> {
     pub matcher: Arc<Box<dyn Match<P, A>>>,
     phantom: PhantomData<(C, P, A, K)>,
