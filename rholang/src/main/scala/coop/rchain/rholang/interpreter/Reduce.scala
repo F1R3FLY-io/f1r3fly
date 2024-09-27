@@ -411,8 +411,8 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       evaledTarget <- evalExpr(mat.target)
       // TODO(kyle): Make the matcher accept an environment, instead of substituting it.
       substTarget <- substituteAndCharge[Par, M](evaledTarget, depth = 0, env)
-      _           = println("\nsubstTarget in evalMatch: " + substTarget)
-      _           <- firstMatch(substTarget, mat.cases)
+      // _           = println("\nsubstTarget in evalMatch: " + substTarget)
+      _ <- firstMatch(substTarget, mat.cases)
     } yield ()
   }
 
@@ -898,11 +898,11 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
       else {
         for {
           exprEvaled <- evalExpr(p)
-          _          = println("\nexprEvaled in toByteArrayMethod: " + exprEvaled)
-          exprSubst  <- substituteAndCharge[Par, M](exprEvaled, depth = 0, env)
-          _          = println("\nexprSubst in toByteArrayMethod: " + exprSubst)
-          _          <- charge[M](toByteArrayCost(exprSubst))
-          ba         <- Sync[M].fromEither(serialize(exprSubst))
+          // _          = println("\nexprEvaled in toByteArrayMethod: " + exprEvaled)
+          exprSubst <- substituteAndCharge[Par, M](exprEvaled, depth = 0, env)
+          // _          = println("\nexprSubst in toByteArrayMethod: " + exprSubst)
+          _  <- charge[M](toByteArrayCost(exprSubst))
+          ba <- Sync[M].fromEither(serialize(exprSubst))
         } yield Expr(GByteArray(ByteString.copyFrom(ba)))
       }
   }
