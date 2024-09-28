@@ -3,9 +3,10 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store::HotStoreInstances;
 use rspace_plus_plus::rspace::r#match::Match;
-use rspace_plus_plus::rspace::rspace::RSpaceInstances;
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use rspace_plus_plus::rspace::{
     history::history_repository::HistoryRepositoryInstances,
     hot_store::HotStoreState,
@@ -93,7 +94,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     let _ = importer2_lock.set_history_items(history_items);
     let _ = importer2_lock.set_data_items(data_items);
     let _ = importer2_lock.set_root(&init_point.root);
-    let _ = space2.reset(init_point.root);
+    let _ = space2.ops.reset(init_point.root);
 
     // space2.store.print();
 
@@ -375,8 +376,7 @@ async fn test_setup() -> (
     let exporter1 = history_repository1.exporter();
     let importer1 = history_repository1.importer();
 
-    let space1 =
-        RSpaceInstances::apply(history_repository1, store1, Arc::new(Box::new(StringMatch)));
+    let space1 = RSpace::apply(history_repository1, store1, Arc::new(Box::new(StringMatch)));
 
     let roots2 = kvm.store("roots2".to_string()).await.unwrap();
     let cold2 = kvm.store("cold2".to_string()).await.unwrap();
@@ -404,8 +404,7 @@ async fn test_setup() -> (
     let exporter2 = history_repository2.exporter();
     let importer2 = history_repository2.importer();
 
-    let space2 =
-        RSpaceInstances::apply(history_repository2, store2, Arc::new(Box::new(StringMatch)));
+    let space2 = RSpace::apply(history_repository2, store2, Arc::new(Box::new(StringMatch)));
 
     (space1, exporter1, importer1, space2, exporter2, importer2)
 }

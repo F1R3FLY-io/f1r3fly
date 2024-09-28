@@ -42,9 +42,7 @@ pub struct ContResult<C, P, K> {
  * @tparam A a type representing an arbitrary piece of data and match result
  * @tparam K a type representing a continuation
  */
-pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone>:
-    Tuplespace<C, P, A, K>
-{
+pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
     fn get_data(&self, channel: C) -> Vec<Datum<A>>;
 
     fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;

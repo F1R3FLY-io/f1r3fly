@@ -12,6 +12,8 @@ use rand::thread_rng;
 use serde::Serialize;
 
 use super::r#match::Match;
+use super::replay_rspace_interface::IReplayRSpace;
+use super::rspace_interface::ISpace;
 use super::{
     checkpoint::SoftCheckpoint,
     errors::RSpaceError,
@@ -30,28 +32,126 @@ use super::{
     },
 };
 
-pub type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
-pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
+pub struct RSpaceOps<C, P, A, K> {
+    pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+    pub store: Box<dyn HotStore<C, P, A, K>>,
+    pub installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
+    pub event_log: Log,
+    pub produce_counter: BTreeMap<Produce, i32>,
+    pub matcher: Arc<Box<dyn Match<P, A>>>,
+}
 
-pub const CONSUME_COMM_LABEL: &str = "comm.consume";
-pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
-
-pub trait RSpaceOps<C, P, A, K>: SpaceMatcher<C, P, A, K>
+impl<C, P, A, K> SpaceMatcher<C, P, A, K> for RSpaceOps<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
     P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
-    fn produce_counter(&self) -> BTreeMap<Produce, i32>;
+}
 
-    fn store(&self) -> Box<dyn HotStore<C, P, A, K>>;
+pub type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
+pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
 
-    fn installs(&self) -> Mutex<HashMap<Vec<C>, Install<P, K>>>;
+pub const CONSUME_COMM_LABEL: &str = "comm.consume";
+pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
 
-    fn matcher(&self) -> Box<dyn Match<P, A>>;
+impl<C, P, A, K> ISpace<C, P, A, K> for RSpaceOps<C, P, A, K>
+where
+    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+{
+    fn get_data(&self, channel: C) -> Vec<Datum<A>> {
+        self.store.get_data(&channel)
+    }
 
-    fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
+    fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+        self.store.get_continuations(channels)
+    }
+
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+        self.store.get_joins(channel)
+    }
+
+    fn clear(&mut self) -> Result<(), RSpaceError> {
+        self.reset(RadixHistory::empty_root_node_hash())
+    }
+
+    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+        // println!("\nhit rspace++ reset");
+        let next_history = self.history_repository.reset(&root)?;
+        self.history_repository = Arc::new(next_history);
+
+        self.event_log = Vec::new();
+        self.produce_counter = BTreeMap::new();
+
+        let history_reader = self.history_repository.get_history_reader(root)?;
+        self.create_new_hot_store(history_reader);
+        self.restore_installs();
+
+        Ok(())
+    }
+
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+        self.store.to_map()
+    }
+
+    fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
+        // println!("\nhit rspace++ create_soft_checkpoint");
+        // println!("current hot_store state: {:?}", self.store.snapshot());
+
+        let cache_snapshot = self.store.snapshot();
+        let curr_event_log = self.event_log.clone();
+        let curr_produce_counter = self.produce_counter.clone();
+
+        self.event_log = Vec::new();
+        self.produce_counter = BTreeMap::new();
+
+        SoftCheckpoint {
+            cache_snapshot,
+            log: curr_event_log,
+            produce_counter: curr_produce_counter,
+        }
+    }
+
+    fn revert_to_soft_checkpoint(
+        &mut self,
+        checkpoint: SoftCheckpoint<C, P, A, K>,
+    ) -> Result<(), RSpaceError> {
+        let history = &self.history_repository;
+        let history_reader = history.get_history_reader(history.root())?;
+        let hot_store = HotStoreInstances::create_from_mhs_and_hr(
+            Arc::new(Mutex::new(checkpoint.cache_snapshot)),
+            history_reader.base(),
+        );
+
+        self.store = hot_store;
+        self.event_log = checkpoint.log;
+        self.produce_counter = checkpoint.produce_counter;
+
+        Ok(())
+    }
+}
+
+impl<C, P, A, K> IReplayRSpace<C, P, A, K> for RSpaceOps<C, P, A, K>
+where
+    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+{
+}
+
+impl<C, P, A, K> RSpaceOps<C, P, A, K>
+where
+    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+{
+    pub fn shuffle_with_index<D>(&self, t: Vec<D>) -> Vec<(D, i32)> {
         let mut rng = thread_rng();
         let mut indexed_vec = t
             .into_iter()
@@ -62,40 +162,28 @@ where
         indexed_vec
     }
 
-    fn produce_counters(&self, produce_refs: Vec<Produce>) -> BTreeMap<Produce, i32> {
+    pub fn produce_counters(&self, produce_refs: Vec<Produce>) -> BTreeMap<Produce, i32> {
         produce_refs
             .into_iter()
-            .map(|p| (p.clone(), self.produce_counter().get(&p).unwrap_or(&0).clone()))
+            .map(|p| (p.clone(), self.produce_counter.get(&p).unwrap_or(&0).clone()))
             .collect()
     }
 
-    fn get_data(&self, channel: C) -> Vec<Datum<A>> {
-        self.store().get_data(&channel)
-    }
-
-    fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
-        self.store().get_continuations(channels)
-    }
-
-    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
-        self.store().get_joins(channel)
-    }
-
-    fn store_waiting_continuation(
+    pub fn store_waiting_continuation(
         &self,
         channels: Vec<C>,
         wc: WaitingContinuation<P, K>,
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_waiting_continuation");
-        self.store().put_continuation(channels.clone(), wc);
+        self.store.put_continuation(channels.clone(), wc);
         for channel in channels.iter() {
-            self.store().put_join(channel.clone(), channels.clone());
+            self.store.put_join(channel.clone(), channels.clone());
             // println!("consume: no data found, storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>", wc.patterns, wc.continuation, channels)
         }
         None
     }
 
-    fn store_data(
+    pub fn store_data(
         &self,
         channel: C,
         data: A,
@@ -104,7 +192,7 @@ where
     ) -> MaybeActionResult<C, P, A, K> {
         // println!("\nHit store_data");
         // println!("\nHit store_data, data: {:?}", data);
-        self.store().put_datum(
+        self.store.put_datum(
             channel,
             Datum {
                 a: data,
@@ -120,7 +208,7 @@ where
         None
     }
 
-    fn store_persistent_data(
+    pub fn store_persistent_data(
         &self,
         mut data_candidates: Vec<ConsumeCandidate<C, A>>,
         _peeks: &BTreeSet<i32>,
@@ -138,7 +226,7 @@ where
                 } = consume_candidate;
 
                 if !persist {
-                    self.store().remove_datum(channel, datum_index)
+                    self.store.remove_datum(channel, datum_index)
                 } else {
                     Some(())
                 }
@@ -152,15 +240,15 @@ where
         }
     }
 
-    fn restore_installs(&mut self) -> () {
-        let installs = self.installs().lock().unwrap().clone();
+    pub fn restore_installs(&mut self) -> () {
+        let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self._install(channels, install.patterns, install.continuation);
+            self.install(channels, install.patterns, install.continuation);
         }
     }
 
-    fn _install(
+    pub fn install(
         &mut self,
         channels: Vec<C>,
         patterns: Vec<P>,
@@ -177,10 +265,13 @@ where
      * Put another way, this allows us to speculatively remove matching data without
      * affecting the actual store contents.
      */
-    fn fetch_channel_to_index_data(&self, channels: &Vec<C>) -> DashMap<C, Vec<(Datum<A>, i32)>> {
+    pub fn fetch_channel_to_index_data(
+        &self,
+        channels: &Vec<C>,
+    ) -> DashMap<C, Vec<(Datum<A>, i32)>> {
         let map = DashMap::new();
         for c in channels {
-            let data = self.store().get_data(c);
+            let data = self.store.get_data(c);
             let shuffled_data = self.shuffle_with_index(data);
             map.insert(c.clone(), shuffled_data);
         }
@@ -215,12 +306,7 @@ where
                 .zip(patterns.iter().cloned())
                 .collect();
             let options: Option<Vec<ConsumeCandidate<C, A>>> = self
-                .extract_data_candidates(
-                    &self.matcher(),
-                    zipped,
-                    channel_to_indexed_data,
-                    Vec::new(),
-                )
+                .extract_data_candidates(&self.matcher, zipped, channel_to_indexed_data, Vec::new())
                 .into_iter()
                 .collect();
 
@@ -228,7 +314,7 @@ where
 
             let result = match options {
                 None => {
-                    self.installs().lock().unwrap().insert(
+                    self.installs.lock().unwrap().insert(
                         channels.clone(),
                         Install {
                             patterns: patterns.clone(),
@@ -236,7 +322,7 @@ where
                         },
                     );
 
-                    self.store().install_continuation(
+                    self.store.install_continuation(
                         channels.clone(),
                         WaitingContinuation {
                             patterns,
@@ -248,7 +334,7 @@ where
                     );
 
                     for channel in channels.iter() {
-                        self.store().install_join(channel.clone(), channels.clone());
+                        self.store.install_join(channel.clone(), channels.clone());
                     }
                     // println!(
                     //     "storing <(patterns, continuation): ({:?}, {:?})> at <channels: {:?}>",
@@ -265,80 +351,15 @@ where
         }
     }
 
-    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
-        self.store().to_map()
-    }
-
-    fn _reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-        // // println!("\nhit rspace++ reset");
-        // let next_history = self.history_repository.reset(&root)?;
-        // self.history_repository = Arc::new(next_history);
-
-        // self.event_log = Vec::new();
-        // self.produce_counter() = BTreeMap::new();
-
-        // let history_reader = self.history_repository.get_history_reader(root)?;
-        // self.create_new_hot_store(history_reader);
-        // self.restore_installs();
-
-        // Ok(())
-        todo!()
-    }
-
-    fn clear(&mut self) -> Result<(), RSpaceError> {
-        self._reset(RadixHistory::empty_root_node_hash())
-    }
-
-    fn create_new_hot_store(
+    pub fn create_new_hot_store(
         &mut self,
         history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
-        // let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        // self.store() = next_hot_store;
-        todo!()
+        let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
+        self.store = next_hot_store;
     }
 
-    fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
-        // println!("\nhit rspace++ create_soft_checkpoint");
-        // println!("current hot_store state: {:?}", self.store.snapshot());
-
-        // let cache_snapshot = self.store().snapshot();
-        // let curr_event_log = self.event_log.clone();
-        // let curr_produce_counter = self.produce_counter().clone();
-
-        // self.event_log = Vec::new();
-        // self.produce_counter = BTreeMap::new();
-
-        // SoftCheckpoint {
-        //     cache_snapshot,
-        //     log: curr_event_log,
-        //     produce_counter: curr_produce_counter,
-        // }
-
-        todo!()
-    }
-
-    fn revert_to_soft_checkpoint(
-        &mut self,
-        checkpoint: SoftCheckpoint<C, P, A, K>,
-    ) -> Result<(), RSpaceError> {
-        // let history = &self.history_repository;
-        // let history_reader = history.get_history_reader(history.root())?;
-        // let hot_store = HotStoreInstances::create_from_mhs_and_hr(
-        //     Arc::new(Mutex::new(checkpoint.cache_snapshot)),
-        //     history_reader.base(),
-        // );
-
-        // self.store = hot_store;
-        // self.event_log = checkpoint.log;
-        // self.produce_counter = checkpoint.produce_counter;
-
-        // Ok(())
-
-        todo!()
-    }
-
-    fn wrap_result(
+    pub fn wrap_result(
         &self,
         channels: Vec<C>,
         wk: WaitingContinuation<P, K>,
@@ -368,7 +389,7 @@ where
         Some((cont_result, rspace_results))
     }
 
-    fn remove_matched_datum_and_join(
+    pub fn remove_matched_datum_and_join(
         &self,
         channels: Vec<C>,
         mut data_candidates: Vec<ConsumeCandidate<C, A>>,
@@ -387,9 +408,9 @@ where
 
                 let channels_clone = channels.clone();
                 if datum_index >= 0 && !persist {
-                    self.store().remove_datum(channel.clone(), datum_index);
+                    self.store.remove_datum(channel.clone(), datum_index);
                 }
-                self.store().remove_join(channel, channels_clone);
+                self.store.remove_join(channel, channels_clone);
 
                 Some(())
             })
@@ -402,7 +423,7 @@ where
         }
     }
 
-    fn run_matcher_for_channels(
+    pub fn run_matcher_for_channels(
         &self,
         grouped_channels: Vec<Vec<C>>,
         fetch_matching_continuations: impl Fn(Vec<C>) -> Vec<(WaitingContinuation<P, K>, i32)>,
@@ -425,7 +446,7 @@ where
                     // println!("channel_to_indexed_data_list: {:?}", channel_to_indexed_data_list);
 
                     let first_match = self.extract_first_match(
-                        &self.matcher(),
+                        &self.matcher,
                         channels.to_vec(),
                         match_candidates,
                         channel_to_indexed_data_list.into_iter().collect(),

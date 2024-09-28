@@ -9,6 +9,7 @@ use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
 use super::replay_rspace_interface::IReplayRSpace;
 use super::rspace_interface::ContResult;
+use super::rspace_interface::ISpace;
 use super::rspace_interface::RSpaceResult;
 use super::rspace_ops::MaybeActionResult;
 use super::rspace_ops::MaybeProduceCandidate;
@@ -21,6 +22,7 @@ use super::trace::event::IOEvent;
 use super::trace::event::Produce;
 use super::trace::event::COMM;
 use super::trace::Log;
+use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
@@ -41,22 +43,85 @@ use std::sync::{Arc, Mutex};
 
 #[repr(C)]
 pub struct ReplayRSpace<C, P, A, K> {
-    pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
-    pub store: Box<dyn HotStore<C, P, A, K>>,
-    matcher: Arc<Box<dyn Match<P, A>>>,
-    installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
-    event_log: Log,
-    produce_counter: BTreeMap<Produce, i32>,
+    ops: RSpaceOps<C, P, A, K>,
     replay_data: MultisetMultiMap<IOEvent, COMM>,
 }
 
-impl<C, P, A, K> IReplayRSpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
+impl<C, P, A, K> Tuplespace<C, P, A, K> for ReplayRSpace<C, P, A, K>
 where
-    C: Eq + std::hash::Hash,
-    P: Clone,
-    A: Clone,
-    K: Clone,
+    C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
+    fn consume(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> MaybeActionResult<C, P, A, K> {
+        // println!("\nHit consume");
+
+        if channels.is_empty() {
+            panic!("RUST ERROR: channels can't be empty");
+        } else if channels.len() != patterns.len() {
+            panic!("RUST ERROR: channels.length must equal patterns.length");
+        } else {
+            let consume_ref =
+                Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
+
+            let result =
+                self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
+            // println!("\nlocked_consume result: {:?}", result);
+            result
+        }
+    }
+
+    fn produce(&mut self, channel: C, data: A, persist: bool) -> MaybeActionResult<C, P, A, K> {
+        // println!("\nHit produce");
+        // println!("\nto_map: {:?}", self.store.to_map());
+        // println!("\nHit produce, data: {:?}", data);
+        // println!("\n\nHit produce, channel: {:?}", channel);
+
+        let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
+        let result = self.locked_produce(channel, data, persist, produce_ref);
+        // println!("\nlocked_produce result: {:?}", result);
+        result
+    }
+
+    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        // println!("\nhit rspace++ create_checkpoint");
+
+        self.ops.check_replay_data(self.replay_data.clone());
+
+        let changes = self.ops.store.changes();
+        let next_history = self.ops.history_repository.checkpoint(&changes);
+        self.ops.history_repository = Arc::new(next_history);
+
+        let history_reader = self
+            .ops
+            .history_repository
+            .get_history_reader(self.ops.history_repository.root())?;
+
+        self.ops.create_new_hot_store(history_reader);
+        self.ops.restore_installs();
+
+        Ok(Checkpoint {
+            root: self.ops.history_repository.root(),
+            log: Vec::new(),
+        })
+    }
+
+    fn install(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+    ) -> Option<(K, Vec<A>)> {
+        self.ops.install(channels, patterns, continuation)
+    }
 }
 
 impl<C, P, A, K> ReplayRSpace<C, P, A, K>
@@ -66,6 +131,33 @@ where
     A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
+    /**
+     * Creates [[ReplayRSpace]] from [[HistoryRepository]] and [[HotStore]].
+     */
+    pub fn apply(
+        history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+        store: Box<dyn HotStore<C, P, A, K>>,
+        matcher: Arc<Box<dyn Match<P, A>>>,
+    ) -> ReplayRSpace<C, P, A, K>
+    where
+        C: Clone + Debug + Ord + Hash,
+        P: Clone + Debug,
+        A: Clone + Debug,
+        K: Clone + Debug,
+    {
+        ReplayRSpace {
+            ops: RSpaceOps {
+                history_repository,
+                store,
+                installs: Mutex::new(HashMap::new()),
+                event_log: Vec::new(),
+                produce_counter: BTreeMap::new(),
+                matcher,
+            },
+            replay_data: MultisetMultiMap::empty(),
+        }
+    }
+
     pub fn consume(
         &mut self,
         channels: Vec<C>,
@@ -480,29 +572,6 @@ where
         self.replay_data = updated_replays;
     }
 
-    pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        // println!("\nhit rspace++ create_checkpoint");
-
-        self.check_replay_data();
-
-        let changes = self.ops.store.changes();
-        let next_history = self.ops.history_repository.checkpoint(&changes);
-        self.ops.history_repository = Arc::new(next_history);
-
-        let history_reader = self
-            .ops
-            .history_repository
-            .get_history_reader(self.ops.history_repository.root())?;
-
-        self.ops.create_new_hot_store(history_reader);
-        self.ops.restore_installs();
-
-        Ok(Checkpoint {
-            root: self.ops.history_repository.root(),
-            log: Vec::new(),
-        })
-    }
-
     pub fn clear(&mut self) -> Result<(), RSpaceError> {
         self.replay_data.clear();
         self.ops.clear()
@@ -586,14 +655,13 @@ where
     }
 
     // This function may need to clear 'replay_data'
-    pub fn replay_spawn(&self) -> Result<Self, RSpaceError> {
+    pub fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.ops.history_repository;
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace =
-            RSpaceInstances::apply(Arc::new(next_history), hot_store, self.ops.matcher.clone());
-        rspace.restore_installs();
+        let mut rspace = Self::apply(Arc::new(next_history), hot_store, self.ops.matcher.clone());
+        rspace.ops.restore_installs();
 
         Ok(rspace)
     }
