@@ -3,14 +3,22 @@
 use std::collections::HashSet;
 
 use super::{
-    errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::MultisetMultiMap, rspace_interface::ISpace, trace::{
+    errors::RSpaceError,
+    hashing::blake2b256_hash::Blake2b256Hash,
+    internal::MultisetMultiMap,
+    rspace_interface::ISpace,
+    trace::{
         event::{Event, IOEvent, COMM},
         Log,
-    }
+    },
 };
 
-pub trait IReplayRSpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone>:
-    ISpace<C, P, A, K>
+pub trait IReplayRSpace<C, P, A, K>: ISpace<C, P, A, K>
+where
+    C: Eq + std::hash::Hash,
+    P: Clone,
+    A: Clone,
+    K: Clone,
 {
     fn rig_and_reset(
         &mut self,

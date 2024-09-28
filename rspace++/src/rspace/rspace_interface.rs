@@ -6,7 +6,11 @@ use std::collections::HashMap;
 use crate::rspace::checkpoint::SoftCheckpoint;
 
 use super::{
-    checkpoint::Checkpoint, errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::{Datum, Row, WaitingContinuation}, tuplespace_interface::Tuplespace
+    checkpoint::Checkpoint,
+    errors::RSpaceError,
+    hashing::blake2b256_hash::Blake2b256Hash,
+    internal::{Datum, Row, WaitingContinuation},
+    tuplespace_interface::Tuplespace,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -17,7 +21,6 @@ pub struct RSpaceResult<C, A> {
     pub persistent: bool,
 }
 
-// See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
 // NOTE: On Scala side, they are defaulting "peek" to false
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ContResult<C, P, K> {
@@ -27,6 +30,10 @@ pub struct ContResult<C, P, K> {
     pub patterns: Vec<P>,
     pub peek: bool,
 }
+
+// pub trait CreateCheckpoint {
+//     fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError>;
+// }
 
 /** The interface for RSpace
  *
@@ -38,12 +45,6 @@ pub struct ContResult<C, P, K> {
 pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone>:
     Tuplespace<C, P, A, K>
 {
-    /** Creates a checkpoint.
-     *
-     * @return A [[Checkpoint]]
-     */
-    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError>;
-
     fn get_data(&self, channel: C) -> Vec<Datum<A>>;
 
     fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;
