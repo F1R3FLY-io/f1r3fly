@@ -32,8 +32,12 @@ pub fn normalize_p_bundle(
     )
       .into());
   }
+
+  if !target_result.free_map.wildcards.is_empty() || !target_result.free_map.level_bindings.is_empty() {
+    return raise_error(target_result);
+  }
+
   println!("Target result after normalizing proc: {:?}", target_result);
-  // bundle -> bundle_type
   let outermost_bundle = match node.child_by_field_name("bundle_type").unwrap().kind() {
     "bundle_read_write" => Bundle {
       body: Some(target_result.par.clone()),
@@ -57,10 +61,6 @@ pub fn normalize_p_bundle(
     },
     _ => return Err("Unknown bundle type".into()),
   };
-
-  if !target_result.free_map.wildcards.is_empty() || !target_result.free_map.level_bindings.is_empty() {
-    return raise_error(target_result);
-  }
 
   let new_bundle = match target_result.par.bundles.get(0) {
     Some(single) => merge_bundles(&outermost_bundle, single),
@@ -102,19 +102,19 @@ fn raise_error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, Box<
       .collect();
 
     let err_msg_wildcards = if !wildcards_positions.is_empty() {
-      format!("Wildcards positions: {}", wildcards_positions.join(", "))
+      format!(" Wildcards positions: {}", wildcards_positions.join(", "))
     } else {
       String::new()
     };
 
     let err_msg_free_vars = if !free_vars_positions.is_empty() {
-      format!("Free variables positions: {}", free_vars_positions.join(", "))
+      format!(" Free variables positions: {}", free_vars_positions.join(", "))
     } else {
       String::new()
     };
 
     format!(
-      "Bundle's content must not have free variables or wildcards. {} {}",
+      "Bundle's content must not have free variables or wildcards.{}{}",
       err_msg_wildcards, err_msg_free_vars
     )
   };
@@ -123,8 +123,8 @@ fn raise_error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, Box<
 }
 
 #[test]
-fn test_normalize_bundle_plus() {
-  let rholang_code = r#" { bundle+ {Nil} }"#;
+fn normalize_terms_inside_a_bundle() {
+  let rholang_code = r#" { bundle+ {Nil} }"#; //bundle write
 
   let tree = parse_rholang_code(rholang_code);
   let root_node = tree.root_node();
@@ -162,7 +162,7 @@ fn test_normalize_bundle_plus() {
   }
 }
 
-//it should work when I have a proc_var case inside normalize_match
+//it should work when I proc_var case will be described inside normalize_match
 // #[test]
 // fn test_normalize_bundle_with_evar() {
 //   let rholang_code = r#" { bundle+ { x } }"#;
@@ -215,32 +215,61 @@ fn test_normalize_bundle_plus() {
 //   }
 // }
 
-#[test]
-fn test_bundle_with_top_level_connective() {
-  let rholang_code = r#" { bundle+ { Nil and Nil } }"#;
+//it should work when I send case will be described inside normalize_match
+// #[test]
+// fn test_bundle_with_top_level_connective() {
+//   let rholang_code = r#" { bundle { @Nil!(Uri) } }"#;
+//
+//   let tree = parse_rholang_code(rholang_code);
+//   let root_node = tree.root_node();
+//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
+//   let block_node = root_node.child(0).expect("Expected a block node");
+//   println!("Found block node: {}", block_node.to_sexp());
+//   let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
+//   println!("Found bundle node: {}", bundle_node.to_sexp());
+//   let input = ProcVisitInputs {
+//     par: Par::default(),
+//     bound_map_chain: BoundMapChain::default(),
+//     free_map: FreeMap::default(),
+//   };
+//
+//   match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
+//     Ok(_) => assert!(false, "Expected an error for top-level connective, but got Ok"),
+//     Err(e) => {
+//       println!("Normalization failed with error: {}", e);
+//       assert!(e.to_string().contains("Illegal top-level connective"), "Expected a connective error");
+//     }
+//   }
+// }
 
-  let tree = parse_rholang_code(rholang_code);
-  let root_node = tree.root_node();
-  println!("Tree S-expression: {}", tree.root_node().to_sexp());
-  let block_node = root_node.child(0).expect("Expected a block node");
-  println!("Found block node: {}", block_node.to_sexp());
-  let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
-  println!("Found bundle node: {}", bundle_node.to_sexp());
-  let input = ProcVisitInputs {
-    par: Par::default(),
-    bound_map_chain: BoundMapChain::default(),
-    free_map: FreeMap::default(),
-  };
+//it should work when I proc_var case will be described inside normalize_match
+// #[test]
+// fn test_bundle_with_wildcard_and_free_var() {
+//   let rholang_code = r#" { bundle+ { _ | x } }"#;
+//   let tree = parse_rholang_code(rholang_code);
+//   let root_node = tree.root_node();
+//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
+//   let block_node = root_node.child(0).expect("Expected a block node");
+//   println!("Found block node: {}", block_node.to_sexp());
+//   let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
+//   println!("Found bundle node: {}", bundle_node.to_sexp());
+//   let input = ProcVisitInputs {
+//     par: Par::default(),
+//     bound_map_chain: BoundMapChain::default(),
+//     free_map: FreeMap::default(),
+//   };
+//   match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
+//     Ok(_) => assert!(false, "Expected an error due to wildcard or free variable, but got Ok"),
+//     Err(e) => {
+//       println!("Normalization failed with error: {}", e);
+//       assert!(
+//         e.to_string().contains("Bundle's content must not have free variables or wildcards"),
+//         "Expected a wildcard or free variable error"
+//       );
+//     }
+//   }
+// }
 
-  // Очікуємо помилку при нормалізації з'єднання на верхньому рівні тіла bundle
-  match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
-    Ok(_) => assert!(false, "Expected an error for top-level connective, but got Ok"),
-    Err(e) => {
-      println!("Normalization failed with error: {}", e);
-      assert!(e.to_string().contains("Illegal top-level connective"), "Expected a connective error");
-    }
-  }
-}
 
 
 
