@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod test {
     use tree_sitter::{Parser, Tree};
     use tree_sitter_rholang::language; // Import the language function from the generated bindings
 

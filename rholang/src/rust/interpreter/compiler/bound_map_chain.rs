@@ -12,7 +12,7 @@ impl<T> BoundMapChain<T> {
     }
   }
 
-  fn get(&self, name: &str) -> Option<BoundContext<T>>
+  pub(crate) fn get(&self, name: &str) -> Option<BoundContext<T>>
   where
     T: Clone,
   {

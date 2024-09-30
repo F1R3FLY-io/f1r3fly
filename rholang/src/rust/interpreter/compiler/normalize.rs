@@ -36,14 +36,14 @@ pub struct ProcVisitOutputs {
 
 #[derive(Clone, Debug)]
 pub struct NameVisitInputs {
-  bound_map_chain: BoundMapChain<VarSort>,
-  free_map: FreeMap<VarSort>,
+  pub(crate) bound_map_chain: BoundMapChain<VarSort>,
+  pub(crate) free_map: FreeMap<VarSort>,
 }
 
 #[derive(Clone, Debug)]
 pub struct NameVisitOutputs {
-  par: Par,
-  free_map: FreeMap<VarSort>,
+  pub(crate) par: Par,
+  pub(crate) free_map: FreeMap<VarSort>,
 }
 
 #[derive(Clone, Debug)]
@@ -103,15 +103,19 @@ pub fn normalize_match(
       free_map: right_result.free_map,
     })
   }
-
+  println!("Normalizing node kind: {}", p_node.kind());
   match p_node.kind() {
-    "PBundle" => normalize_p_bundle(p_node, input, source_code),
+    "bundle" => {
+      println!("Found a bundle node, calling normalize_p_bundle");
+      normalize_p_bundle(p_node, input, source_code)
+    },
     "PGround" => normalize_p_ground(p_node, input, source_code),
     "PMatches" => normalize_p_ground(p_node, input, source_code),
-    "PNil" => Ok(ProcVisitOutputs {
+    "nil" => Ok(ProcVisitOutputs {
       par: input.par.clone(),
       free_map: input.free_map.clone(),
     }),
+    "block" => normalize_match(p_node.child_by_field_name("body").unwrap(), input, source_code),
 
     //unary
     "PNot" => unary_exp(
@@ -243,7 +247,6 @@ pub fn normalize_match(
       source_code,
       Box::new(EOr::default()),
     ),
-
     _ => Err(format!("Compilation of construct not yet supported.: {}", p_node.kind()).into()),
   }
 }
