@@ -215,32 +215,32 @@ fn test_normalize_bundle_plus() {
 //   }
 // }
 
-// #[test]
-// fn test_bundle_with_top_level_connective() {
-//   let rholang_code = r#" { bundle+ { Nil and Nil } }"#;
-//
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//   let block_node = root_node.child(0).expect("Expected a block node");
-//   println!("Found block node: {}", block_node.to_sexp());
-//   let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
-//   println!("Found bundle node: {}", bundle_node.to_sexp());
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: BoundMapChain::default(),
-//     free_map: FreeMap::default(),
-//   };
-//
-//   // Очікуємо помилку при нормалізації з'єднання на верхньому рівні тіла bundle
-//   match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
-//     Ok(_) => assert!(false, "Expected an error for top-level connective, but got Ok"),
-//     Err(e) => {
-//       println!("Normalization failed with error: {}", e);
-//       assert!(e.to_string().contains("Illegal top-level connective"), "Expected a connective error");
-//     }
-//   }
-// }
+#[test]
+fn test_bundle_with_top_level_connective() {
+  let rholang_code = r#" { bundle+ { Nil and Nil } }"#;
+
+  let tree = parse_rholang_code(rholang_code);
+  let root_node = tree.root_node();
+  println!("Tree S-expression: {}", tree.root_node().to_sexp());
+  let block_node = root_node.child(0).expect("Expected a block node");
+  println!("Found block node: {}", block_node.to_sexp());
+  let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
+  println!("Found bundle node: {}", bundle_node.to_sexp());
+  let input = ProcVisitInputs {
+    par: Par::default(),
+    bound_map_chain: BoundMapChain::default(),
+    free_map: FreeMap::default(),
+  };
+
+  // Очікуємо помилку при нормалізації з'єднання на верхньому рівні тіла bundle
+  match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
+    Ok(_) => assert!(false, "Expected an error for top-level connective, but got Ok"),
+    Err(e) => {
+      println!("Normalization failed with error: {}", e);
+      assert!(e.to_string().contains("Illegal top-level connective"), "Expected a connective error");
+    }
+  }
+}
 
 
 

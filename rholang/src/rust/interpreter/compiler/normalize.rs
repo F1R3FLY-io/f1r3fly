@@ -118,13 +118,13 @@ pub fn normalize_match(
     "block" => normalize_match(p_node.child_by_field_name("body").unwrap(), input, source_code),
 
     //unary
-    "PNot" => unary_exp(
+    "not" => unary_exp(
       p_node.child(0).unwrap(),
       input,
       source_code,
       Box::new(ENot::default()),
     ),
-    "PNeg" => unary_exp(
+    "neg" => unary_exp(
       p_node.child(0).unwrap(),
       input,
       source_code,
@@ -132,56 +132,56 @@ pub fn normalize_match(
     ),
 
     //binary
-    "PMult" => binary_exp(
+    "mult" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EMult::default()),
     ),
-    "PDiv" => binary_exp(
+    "div" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EDiv::default()),
     ),
-    "PMod" => binary_exp(
+    "mod" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EMod::default()),
     ),
-    "PPercentPercent" => binary_exp(
+    "percent_percent" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EPercentPercent::default()),
     ),
-    "PAdd" => binary_exp(
+    "add" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EPlus::default()),
     ),
-    "PMinus" => binary_exp(
+    "minus" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EMinus::default()),
     ),
-    "PPlusPlus" => binary_exp(
+    "plus_plus" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EPlusPlus::default()),
     ),
-    "PMinusMinus" => binary_exp(
+    "minus_minus" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
@@ -189,28 +189,28 @@ pub fn normalize_match(
       Box::new(EMinusMinus::default()),
     ),
 
-    "PLt" => binary_exp(
+    "lt" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(ELt::default()),
     ),
-    "PLte" => binary_exp(
+    "lte" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(ELte::default()),
     ),
-    "PGt" => binary_exp(
+    "gt" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EGt::default()),
     ),
-    "PGte" => binary_exp(
+    "gte" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
@@ -218,14 +218,14 @@ pub fn normalize_match(
       Box::new(EGte::default()),
     ),
 
-    "PEq" => binary_exp(
+    "eq" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EEq::default()),
     ),
-    "PNeq" => binary_exp(
+    "neq" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
@@ -233,14 +233,14 @@ pub fn normalize_match(
       Box::new(ENeq::default()),
     ),
 
-    "PAnd" => binary_exp(
+    "and" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
       source_code,
       Box::new(EAnd::default()),
     ),
-    "POr" => binary_exp(
+    "or" => binary_exp(
       p_node.child(0).unwrap(),
       p_node.child(1).unwrap(),
       input,
