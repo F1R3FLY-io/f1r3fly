@@ -9,8 +9,7 @@ use super::{
     checkpoint::Checkpoint,
     errors::RSpaceError,
     hashing::blake2b256_hash::Blake2b256Hash,
-    internal::{Datum, Row, WaitingContinuation},
-    tuplespace_interface::Tuplespace,
+    internal::{Datum, ProduceCandidate, Row, WaitingContinuation},
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -31,9 +30,11 @@ pub struct ContResult<C, P, K> {
     pub peek: bool,
 }
 
-// pub trait CreateCheckpoint {
-//     fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError>;
-// }
+pub type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
+pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
+
+pub const CONSUME_COMM_LABEL: &str = "comm.consume";
+pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
 
 /** The interface for RSpace
  *
@@ -43,6 +44,12 @@ pub struct ContResult<C, P, K> {
  * @tparam K a type representing a continuation
  */
 pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
+    /** Creates a checkpoint.
+     *
+     * @return A [[Checkpoint]]
+     */
+    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError>;
+
     fn get_data(&self, channel: C) -> Vec<Datum<A>>;
 
     fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>>;

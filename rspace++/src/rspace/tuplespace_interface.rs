@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use super::{checkpoint::Checkpoint, errors::RSpaceError, rspace_ops::MaybeActionResult};
+use super::{checkpoint::Checkpoint, errors::RSpaceError, rspace_interface::MaybeActionResult};
 
 pub trait Tuplespace<C, P, A, K> {
     /** Searches the store for data matching all the given patterns at the given channels.
@@ -68,10 +68,4 @@ pub trait Tuplespace<C, P, A, K> {
         patterns: Vec<P>,
         continuation: K,
     ) -> Option<(K, Vec<A>)>;
-
-    /** Creates a checkpoint.
-     *
-     * @return A [[Checkpoint]]
-     */
-    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError>;
 }

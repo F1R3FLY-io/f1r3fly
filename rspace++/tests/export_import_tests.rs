@@ -94,7 +94,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     let _ = importer2_lock.set_history_items(history_items);
     let _ = importer2_lock.set_data_items(data_items);
     let _ = importer2_lock.set_root(&init_point.root);
-    let _ = space2.ops.reset(init_point.root);
+    let _ = space2.reset(init_point.root);
 
     // space2.store.print();
 
