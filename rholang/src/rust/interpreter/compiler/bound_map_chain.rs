@@ -12,7 +12,7 @@ impl<T> BoundMapChain<T> {
     }
   }
 
-  fn get(&self, name: &str) -> Option<BoundContext<T>>
+  pub(crate) fn get(&self, name: &str) -> Option<BoundContext<T>>
   where
     T: Clone,
   {
@@ -46,8 +46,9 @@ impl<T> BoundMapChain<T> {
     }
   }
 
-  pub(crate) fn push(&mut self) {
+  pub(crate) fn push(mut self) -> BoundMapChain<T> {
     self.chain.insert(0, BoundMap::new());
+    self
   }
 
   fn count(&self) -> usize {

@@ -20,14 +20,14 @@ impl<T> FreeMap<T> {
     }
   }
 
-  fn get(&self, name: &str) -> Option<FreeContext<T>>
+  pub(crate) fn get(&self, name: &str) -> Option<FreeContext<T>>
   where
     T: Clone,
   {
     self.level_bindings.get(name).cloned()
   }
 
-  fn put(&mut self, binding: IdContext<T>) {
+  pub(crate) fn put(&mut self, binding: IdContext<T>) {
     let (name, typ, source_position) = binding;
     self.level_bindings.insert(
       name,
@@ -67,7 +67,7 @@ impl<T> FreeMap<T> {
     shadowed
   }
 
-  fn add_wildcard(&mut self, source_position: SourcePosition) {
+  pub(crate) fn add_wildcard(&mut self, source_position: SourcePosition) {
     self.wildcards.push(source_position);
   }
 

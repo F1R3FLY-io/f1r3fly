@@ -9,3 +9,4 @@ pub use models::rhoapi::connective::ConnectiveInstance;
 
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_bundle_normalizer::normalize_p_bundle;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_ground_normalizer::normalize_p_ground;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_matches_normalizer::normalize_p_matches;
