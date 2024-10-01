@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use super::{checkpoint::Checkpoint, errors::RSpaceError, rspace_interface::MaybeActionResult};
+use super::rspace_interface::MaybeActionResult;
 
 pub trait Tuplespace<C, P, A, K> {
     /** Searches the store for data matching all the given patterns at the given channels.

@@ -80,11 +80,11 @@ impl Clone for Box<dyn KeyValueStore> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KvStoreError {
     KeyNotFound(String),
-    IoError(heed::Error),
-    SerializationError(Box<bincode::ErrorKind>),
+    IoError(String),
+    SerializationError(String),
 }
 
 impl std::fmt::Display for KvStoreError {
@@ -99,12 +99,12 @@ impl std::fmt::Display for KvStoreError {
 
 impl From<heed::Error> for KvStoreError {
     fn from(error: heed::Error) -> Self {
-        KvStoreError::IoError(error)
+        KvStoreError::IoError(error.to_string())
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for KvStoreError {
     fn from(error: Box<bincode::ErrorKind>) -> Self {
-        KvStoreError::SerializationError(error)
+        KvStoreError::SerializationError(error.to_string())
     }
 }

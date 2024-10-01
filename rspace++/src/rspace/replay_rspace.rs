@@ -1,14 +1,12 @@
 // See /home/spreston/src/firefly/f1r3fly/rspace/src/main/scala/coop/rchain/rspace/ReplayRSpace.scala
 
 use super::checkpoint::SoftCheckpoint;
-use super::errors::HistoryRepositoryError;
 use super::errors::RSpaceError;
 use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
 use super::replay_rspace_interface::IReplayRSpace;
-// use super::replay_rspace_interface::IReplayRSpace;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
 use super::rspace_interface::MaybeActionResult;
@@ -25,15 +23,13 @@ use super::trace::Log;
 use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
-use crate::rspace::history::history_repository::HistoryRepositoryInstances;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
-use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::collections::{BTreeSet, HashMap};
@@ -123,6 +119,75 @@ where
     A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
+    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
+        self.rig(log)?;
+        self.reset(start_root)
+    }
+
+    fn rig(&self, log: Log) -> Result<(), RSpaceError> {
+        // println!("\nlog len in rust rig: {:?}", log.len());
+        let (io_events, comm_events): (Vec<_>, Vec<_>) =
+            log.iter().partition(|event| match event {
+                Event::IoEvent(IOEvent::Produce(_)) => true,
+                Event::IoEvent(IOEvent::Consume(_)) => true,
+                Event::Comm(_) => false,
+            });
+
+        // Create a set of the "new" IOEvents
+        let new_stuff: HashSet<_> = io_events.into_iter().collect();
+
+        // Create and prepare the ReplayData table
+        self.replay_data.clear();
+
+        for event in comm_events {
+            match event {
+                Event::Comm(comm) => {
+                    let comm_cloned = comm.clone();
+                    let (consume, produces) = (comm_cloned.consume, comm_cloned.produces);
+                    let produce_io_events: Vec<IOEvent> = produces
+                        .into_iter()
+                        .map(|produce| IOEvent::Produce(produce))
+                        .collect();
+
+                    let mut io_events = produce_io_events.clone();
+                    io_events.insert(0, IOEvent::Consume(consume));
+
+                    for io_event in io_events {
+                        let io_event_converted: Event = match io_event {
+                            IOEvent::Produce(ref p) => Event::IoEvent(IOEvent::Produce(p.clone())),
+                            IOEvent::Consume(ref c) => Event::IoEvent(IOEvent::Consume(c.clone())),
+                        };
+
+                        if new_stuff.contains(&io_event_converted) {
+                            // println!("\nadd_binding in rig");
+                            self.replay_data.add_binding(io_event, comm.clone());
+                        }
+                    }
+                    Ok(())
+                }
+                _ => Err(RSpaceError::BugFoundError(
+                    "BUG FOUND: only COMM events are expected here".to_string(),
+                )),
+            }?
+        }
+
+        Ok(())
+    }
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError> {
+        if self.replay_data.is_empty() {
+            Ok(())
+        } else {
+            Err(RSpaceError::BugFoundError(format!(
+                "Unused COMM event: replayData multimap has {} elements left",
+                self.replay_data.map.len()
+            )))
+        }
+    }
+
+    fn as_ispace(&self) -> &impl ISpace<C, P, A, K> {
+        self
+    }
 }
 
 impl<C, P, A, K> ISpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
@@ -135,7 +200,7 @@ where
     fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
         // println!("\nhit rspace++ create_checkpoint");
 
-        self.check_replay_data(self.replay_data.clone())?;
+        self.check_replay_data()?;
 
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
@@ -453,7 +518,8 @@ where
                     .collect::<Vec<_>>()
             });
 
-        // println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
+        println!("\nreplay_data in replay_produce: {:?}", self.replay_data);
+        println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
 
         match comms_option {
             None => self.store_data(channel, data, persist, produce_ref),

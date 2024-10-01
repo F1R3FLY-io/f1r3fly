@@ -2,7 +2,7 @@ use super::shared::key_value_store::KvStoreError;
 
 /* RSpace Error */
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RSpaceError {
     HistoryError(HistoryError),
     RadixTreeError(RadixTreeError),
@@ -41,7 +41,7 @@ impl From<HistoryError> for RSpaceError {
 
 /* History Error */
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum HistoryError {
     ActionError(String),
     RadixTreeError(RadixTreeError),
@@ -109,7 +109,7 @@ impl From<HistoryError> for HistoryRepositoryError {
 
 /* Radix Tree Error */
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RadixTreeError {
     KeyNotFound(String),
     KvStoreError(KvStoreError),
@@ -136,7 +136,7 @@ impl From<KvStoreError> for RadixTreeError {
 
 /* Root Error */
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RootError {
     KvStoreError(String),
     UnknownRootError(String),

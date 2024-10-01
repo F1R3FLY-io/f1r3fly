@@ -114,11 +114,7 @@ async fn creating_a_comm_event_should_replay_correctly() {
         }]
     );
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let replay_result_consume = replay_space.consume(
         channels.clone(),
         patterns.clone(),
@@ -179,11 +175,7 @@ async fn creating_a_comm_event_with_peek_consume_first_should_replay_correctly()
         }]
     );
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let replay_result_consume = replay_space.consume(
         channels.clone(),
         patterns.clone(),
@@ -225,11 +217,7 @@ async fn creating_a_comm_event_with_peek_produce_first_should_replay_correctly()
     assert!(result_produce.is_none());
     assert!(result_consume.is_some());
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let replay_result_produce = replay_space.produce(channels[0].clone(), datum.clone(), false);
 
     let replay_result_consume = replay_space.consume(
@@ -302,11 +290,7 @@ async fn creating_comm_events_on_many_channels_with_peek_should_replay_correctly
     assert!(result_consume3.is_none());
     assert!(result_produce4.is_some());
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let replay_result_consume1 = replay_space.consume(
         channels.clone(),
@@ -436,11 +420,7 @@ async fn creating_multiple_comm_events_with_peeking_a_produce_should_replay_corr
     assert!(result_produce4.is_none());
     assert!(result_produce5.is_none());
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let replay_result_consume1 = replay_space.consume(
         channels.clone(),
@@ -648,11 +628,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     );
 
     let rig_point = space.create_checkpoint().unwrap();
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let _ = replay_produce_many(
         &mut replay_space,
@@ -735,11 +711,8 @@ async fn a_matched_continuation_defined_for_multiple_channels_some_peeked_should
     }
 
     let rig_point = space.create_checkpoint().unwrap();
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    // println!("\nrig_point: {:?}", rig_point.log);
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     let rrs = consume_and_produce(
         &mut replay_space,
@@ -781,11 +754,7 @@ async fn picking_n_datums_from_m_persistent_waiting_datums_should_replay_correct
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), true);
@@ -834,11 +803,7 @@ async fn picking_n_continuations_from_m_waiting_continuations_should_replay_corr
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.consume(
@@ -888,11 +853,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_should_
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.consume(
@@ -947,11 +908,7 @@ async fn pick_n_continuations_from_m_waiting_continuations_stored_at_two_channel
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.consume(
@@ -1020,11 +977,7 @@ async fn picking_n_datums_from_m_waiting_datums_while_doing_a_bunch_of_other_jun
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
@@ -1103,11 +1056,7 @@ async fn picking_n_continuations_from_m_persistent_waiting_continuations_while_d
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range {
         let _ = replay_space.consume(
@@ -1178,11 +1127,7 @@ async fn peeking_data_stored_at_two_channels_in_100_continuations_should_replay_
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     for i in &range2 {
         let _ = replay_space.produce("ch1".to_string(), format!("datum{}", i), false);
@@ -1240,11 +1185,7 @@ async fn replay_rspace_should_correctly_remove_things_from_replay_data() {
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
 
     assert_eq!(
         replay_space
@@ -1323,11 +1264,7 @@ async fn an_install_should_be_available_after_resetting_to_a_checkpoint() {
 
     let after_produce = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        after_produce.root,
-        after_produce.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(after_produce.root, after_produce.log);
 
     let produce2 = replay_space.produce(channel, datum, false);
     assert!(produce2.is_some());
@@ -1355,11 +1292,7 @@ async fn reset_should_empty_the_replay_store_and_reset_the_replay_trie_updates_l
 
     let rig_point = space.create_checkpoint().unwrap();
 
-    let _ = replay_space.rig_and_reset(
-        empty_point.root.clone(),
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root.clone(), rig_point.log);
 
     let consume2 = replay_space.consume(
         channels.clone(),
@@ -1415,11 +1348,7 @@ async fn clear_should_empty_the_replay_store_reset_the_replay_event_log_reset_th
     assert!(consume1.is_none());
 
     let rig_point = space.create_checkpoint().unwrap();
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        rig_point.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let consume2 = replay_space.consume(
         channels.clone(),
         patterns.clone(),
@@ -1498,11 +1427,7 @@ async fn replay_should_not_allow_for_ambiguous_executions() {
     let after_play = space.create_checkpoint().unwrap();
 
     //rig
-    let _ = replay_space.rig_and_reset(
-        empty_point.root,
-        after_play.log,
-        replay_space.replay_data.clone(),
-    );
+    let _ = replay_space.rig_and_reset(empty_point.root, after_play.log);
 
     assert!(replay_space
         .produce(channel1.clone(), data3.clone(), false)
@@ -1532,13 +1457,12 @@ async fn replay_should_not_allow_for_ambiguous_executions() {
 #[tokio::test]
 async fn check_replay_data_should_proceed_if_replay_data_is_empty() {
     let (_space, replay_space) = fixture().await;
-    let res = replay_space.check_replay_data(replay_space.replay_data.clone());
+    let res = replay_space.check_replay_data();
     assert!(res.is_ok())
 }
 
 #[tokio::test]
-#[should_panic(expected = "Unused COMM event: replayData multimap has 2 elements left")]
-async fn check_replay_data_should_panic_if_replay_data_contains_elements() {
+async fn check_replay_data_should_throw_error_if_replay_data_contains_elements() {
     let (mut space, mut replay_space) = fixture().await;
     let channels = vec!["ch1".to_string()];
     let patterns = vec![Pattern::Wildcard];
@@ -1548,8 +1472,9 @@ async fn check_replay_data_should_panic_if_replay_data_contains_elements() {
     let _ = space.consume(channels.clone(), patterns, continuation, false, BTreeSet::new());
     let _ = space.produce(channels[0].clone(), datum, false);
     let c = space.create_checkpoint().unwrap();
-    let _ = replay_space.rig_and_reset(c.root, c.log, replay_space.replay_data.clone());
-    let _res = replay_space.check_replay_data(replay_space.replay_data.clone());
+    let _ = replay_space.rig_and_reset(c.root, c.log);
+    let res = replay_space.check_replay_data();
+    assert!(res.is_err());
 }
 
 type StateSetup =
