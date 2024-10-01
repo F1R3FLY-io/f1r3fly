@@ -14,8 +14,6 @@ where
     A: Clone,
     K: Clone,
 {
-    fn as_ispace(&self) -> &impl ISpace<C, P, A, K>;
-
     fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError>;
 
     fn rig(&self, log: Log) -> Result<(), RSpaceError>;

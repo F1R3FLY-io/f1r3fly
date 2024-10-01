@@ -4,7 +4,10 @@ use crate::rust::interpreter::{
     errors::InterpreterError, rho_runtime::RhoTuplespace, unwrap_option_safe,
 };
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::{tagged_continuation::TaggedCont, TaggedContinuation};
+use models::rhoapi::{
+    tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, TaggedContinuation,
+};
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 
 pub struct ChargingRSpace;
 
@@ -31,7 +34,11 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
 }
 
 impl ChargingRSpace {
-    pub fn charging_rspace(space: RhoTuplespace) -> RhoTuplespace {
+    pub fn charging_rspace<
+        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    >(
+        space: T,
+    ) -> RhoTuplespace {
         todo!()
     }
 }

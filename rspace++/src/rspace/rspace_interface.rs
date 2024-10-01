@@ -47,6 +47,13 @@ pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
 pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone>:
     Tuplespace<C, P, A, K>
 {
+    // fn ispace_to_tuplespace(
+    //     &self,
+    //     ispace: Box<dyn ISpace<C, P, A, K>>,
+    // ) -> Box<dyn Tuplespace<C, P, A, K>> {
+    //     ispace
+    // }
+
     /** Creates a checkpoint.
      *
      * @return A [[Checkpoint]]

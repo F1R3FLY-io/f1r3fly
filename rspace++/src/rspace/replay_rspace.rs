@@ -184,10 +184,6 @@ where
             )))
         }
     }
-
-    fn as_ispace(&self) -> &impl ISpace<C, P, A, K> {
-        self
-    }
 }
 
 impl<C, P, A, K> ISpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
