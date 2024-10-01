@@ -17,10 +17,13 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 use rspace_plus_plus::rspace::r#match::Match;
+use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
+use rspace_plus_plus::rspace::replay_rspace_interface::IReplayRSpace;
 use rspace_plus_plus::rspace::rspace::RSpace;
-use rspace_plus_plus::rspace::rspace::RSpaceInstances;
 use rspace_plus_plus::rspace::rspace::RSpaceStore;
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::trace::Log;
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use rspace_plus_plus::rspace::util::unpack_option;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
@@ -211,9 +214,9 @@ pub trait RhoRuntime: HasCost {
 }
 
 pub trait ReplayRhoRuntime: RhoRuntime {
-    fn rig(&self, log: Log) -> ();
+    fn rig(&self, log: Log) -> Result<(), InterpreterError>;
 
-    fn check_replay_data(&self) -> ();
+    fn check_replay_data(&self) -> Result<(), InterpreterError>;
 }
 
 #[derive(Clone)]
@@ -372,7 +375,7 @@ impl HasCost for RhoRuntimeImpl {
 
 pub struct ReplayRhoRuntimeImpl {
     reducer: DebruijnInterpreter,
-    space: RhoISpace,
+    space: RhoReplayISpace,
     cost: _cost,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks_param: InvalidBlocks,
@@ -400,12 +403,14 @@ impl ReplayRhoRuntimeImpl {
 }
 
 impl ReplayRhoRuntime for ReplayRhoRuntimeImpl {
-    fn rig(&self, log: Log) -> () {
-        self.space.lock().unwrap().rig(log)
+    fn rig(&self, log: Log) -> Result<(), InterpreterError> {
+        self.space.lock().unwrap().rig(log)?;
+        Ok(())
     }
 
-    fn check_replay_data(&self) -> () {
-        self.space.lock().unwrap().check_replay_data()
+    fn check_replay_data(&self) -> Result<(), InterpreterError> {
+        self.space.lock().unwrap().check_replay_data()?;
+        Ok(())
     }
 }
 
@@ -449,11 +454,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     }
 
     fn create_checkpoint(&mut self) -> Checkpoint {
-        self.space
-            .lock()
-            .unwrap()
-            .replay_create_checkpoint()
-            .unwrap()
+        self.space.lock().unwrap().create_checkpoint().unwrap()
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {
@@ -465,7 +466,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
     ) -> Option<(TaggedContinuation, Vec<ListParWithRandom>)> {
-        let v = self.space.lock().unwrap().replay_consume(
+        let v = self.space.lock().unwrap().consume(
             channel,
             pattern,
             TaggedContinuation::default(),
@@ -537,20 +538,33 @@ impl HasCost for ReplayRhoRuntimeImpl {
     }
 }
 
+// pub type RhoTuplespace =
+//     Arc<Mutex<Box<dyn Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
+
+// pub type RhoISpace =
+//     Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
+
+// pub type RhoReplayISpace =
+//     Arc<Mutex<Box<dyn IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
+
 pub type RhoTuplespace =
     Arc<Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
+
 pub type RhoISpace = Arc<Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
+
 pub type RhoReplayISpace =
-    Arc<Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
-pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
+    Arc<Mutex<ReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
+
 pub type RhoHistoryRepository =
     HistoryRepositoryImpl<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
 
+pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
+
 fn introduce_system_process(
-    mut spaces: Vec<RhoTuplespace>,
+    mut spaces: Vec<RhoISpace>,
     processes: Vec<(Name, Arity, Remainder, BodyRef)>,
 ) -> Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> {
-    let mut results = Vec::new();
+    let mut results: Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> = Vec::new();
 
     for (name, arity, remainder, body_ref) in processes {
         let channels = vec![name];
@@ -964,6 +978,24 @@ pub fn create_rho_runtime(
     )
 }
 
+// fn downcast_replay_space(
+//     arc: Arc<
+//         Mutex<Box<dyn IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
+//     >,
+// ) -> Option<Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>> {
+//     let guard = arc.lock().unwrap();
+//     if let Some(space) = guard
+//         .as_any()
+//         .downcast_ref::<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>()
+//     {
+//         // Clone the Arc and return it
+//         Some(arc.clone()
+//             as Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>)
+//     } else {
+//         None
+//     }
+// }
+
 /**
  *
  * @param rspace the replay rspace which the runtime operate on it
@@ -1036,10 +1068,7 @@ fn create_runtime_from_kv_store(
     additional_system_processes: &mut Vec<Definition>,
     matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
 ) -> Arc<Mutex<RhoRuntimeImpl>> {
-    let space = RSpaceInstances::create::<Par, BindPattern, ListParWithRandom, TaggedContinuation>(
-        stores, matcher,
-    )
-    .unwrap();
+    let space = RSpace::create(stores, matcher).unwrap();
 
     let runtime = create_rho_runtime(
         Arc::new(Mutex::new(space)),

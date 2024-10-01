@@ -1,9 +1,12 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/errors.scala
 use std::fmt;
 
+use rspace_plus_plus::rspace::errors::RSpaceError;
+
 // PartialEq here is needed for testing purposes
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpreterError {
+    RSpaceError(RSpaceError),
     BugFoundError(String),
     UndefinedRequiredProtobufFieldError,
     NormalizerError(String),
@@ -78,6 +81,8 @@ impl fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InterpreterError::BugFoundError(msg) => write!(f, "Bug found: {}", msg),
+
+            InterpreterError::RSpaceError(msg) => write!(f, "RSpace Error: {}", msg),
 
             InterpreterError::UndefinedRequiredProtobufFieldError => {
                 write!(f, "A parsed Protobuf field was None, should be Some",)
@@ -246,5 +251,11 @@ impl fmt::Display for InterpreterError {
                 )
             }
         }
+    }
+}
+
+impl From<RSpaceError> for InterpreterError {
+    fn from(err: RSpaceError) -> InterpreterError {
+        InterpreterError::RSpaceError(err)
     }
 }
