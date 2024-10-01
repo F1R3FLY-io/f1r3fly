@@ -40,9 +40,17 @@ use rholang::rust::interpreter::{
     dispatch::RholangAndScalaDispatcher,
     env::Env,
     errors::InterpreterError,
+    matcher::r#match::Matcher,
     test_utils::persistent_store_tester::create_test_space,
 };
-use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
+use rspace_plus_plus::rspace::{
+    internal::{Datum, Row, WaitingContinuation},
+    rspace::RSpace,
+    rspace_interface::ISpace,
+    shared::{
+        in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
+    },
+};
 
 fn rand() -> Blake2b512Random {
     Blake2b512Random::create(&Vec::new(), 0, 0)
@@ -119,7 +127,9 @@ fn check_continuation(
 
 #[tokio::test]
 async fn eval_expr_should_handle_simple_addition() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     let add_expr = new_eplus_par(7, 8, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&add_expr, &env);
@@ -131,7 +141,9 @@ async fn eval_expr_should_handle_simple_addition() {
 
 #[tokio::test]
 async fn eval_expr_should_handle_long_addition() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     let add_expr = new_eplus_par(i64::MAX, i64::MAX, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&add_expr, &env);
@@ -143,7 +155,9 @@ async fn eval_expr_should_handle_long_addition() {
 
 #[tokio::test]
 async fn eval_expr_should_leave_ground_values_alone() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     let ground_expr = new_gint_par(7, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&ground_expr, &env);
@@ -155,11 +169,17 @@ async fn eval_expr_should_leave_ground_values_alone() {
 
 #[tokio::test]
 async fn eval_expr_should_handle_equality_between_arbitary_processes() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     let eq_expr = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EEqBody(EEq {
-            p1: Some(GPrivateBuilder::new_par_from_string(String::from("private_name"))),
-            p2: Some(GPrivateBuilder::new_par_from_string(String::from("private_name"))),
+            p1: Some(GPrivateBuilder::new_par_from_string(String::from(
+                "private_name",
+            ))),
+            p2: Some(GPrivateBuilder::new_par_from_string(String::from(
+                "private_name",
+            ))),
         })),
     }]);
     let env: Env<Par> = Env::new();
@@ -172,7 +192,9 @@ async fn eval_expr_should_handle_equality_between_arbitary_processes() {
 
 #[tokio::test]
 async fn eval_expr_should_substitute_before_comparison() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let eq_expr = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EEqBody(EEq {
@@ -194,7 +216,9 @@ async fn eval_expr_should_substitute_before_comparison() {
 
 #[tokio::test]
 async fn eval_of_bundle_should_evaluate_contents_of_bundle() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let channel = new_gstring_par(String::from("channel"), Vec::new(), false);
@@ -230,12 +254,14 @@ async fn eval_of_bundle_should_evaluate_contents_of_bundle() {
         ),
     );
     let expected_result = map_data(expected_elements);
-    assert_eq!(space.lock().unwrap().to_map(), expected_result);
+    assert_eq!(space.to_map(), expected_result);
 }
 
 #[tokio::test]
 async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_polarity_1() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     /* for (n <- @bundle+ { y } ) { }  -> for (n <- y) { }
      */
@@ -259,7 +285,7 @@ async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_po
     let result = reducer
         .eval(receive, &env, rand())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
     assert!(result.is_err());
     if let Err(e) = result {
         assert_eq!(
@@ -273,7 +299,9 @@ async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_po
 
 #[tokio::test]
 async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_polarity_2() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     /* @bundle- { x } !(7) -> x!(7)
      */
@@ -290,7 +318,7 @@ async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_po
     let result = reducer
         .eval(send, &env, rand())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
     assert!(result.is_err());
     if let Err(e) = result {
         assert_eq!(
@@ -302,7 +330,9 @@ async fn eval_of_bundle_should_throw_an_error_if_names_are_used_against_their_po
 
 #[tokio::test]
 async fn eval_of_send_should_place_something_in_the_tuplespace() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let channel = new_gstring_par(String::from("channel"), Vec::new(), false);
     let split_rand = rand().split_byte(0);
@@ -322,7 +352,7 @@ async fn eval_of_send_should_place_something_in_the_tuplespace() {
     let result = reducer
         .eval(send, &env, split_rand.clone())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
 
     assert!(result.is_ok());
     let mut expected_elements = HashMap::new();
@@ -343,7 +373,9 @@ async fn eval_of_send_should_place_something_in_the_tuplespace() {
 
 #[tokio::test]
 async fn eval_of_send_should_verify_that_bundle_is_writeable_before_sending_on_bundle() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
 
@@ -362,7 +394,7 @@ async fn eval_of_send_should_verify_that_bundle_is_writeable_before_sending_on_b
     let result = reducer
         .eval(send, &env, split_rand.clone())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
 
     assert!(result.is_ok());
     let mut expected_elements = HashMap::new();
@@ -376,7 +408,9 @@ async fn eval_of_send_should_verify_that_bundle_is_writeable_before_sending_on_b
 
 #[tokio::test]
 async fn eval_of_single_channel_receive_should_place_something_in_the_tuplespace() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let channel = new_gstring_par(String::from("channel"), Vec::new(), false);
@@ -403,7 +437,7 @@ async fn eval_of_single_channel_receive_should_place_something_in_the_tuplespace
     let result = reducer
         .eval(receive, &env, split_rand.clone())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
 
     assert!(result.is_ok());
     let bind_pattern = BindPattern {
@@ -430,7 +464,9 @@ async fn eval_of_single_channel_receive_should_place_something_in_the_tuplespace
 #[tokio::test]
 async fn eval_of_single_channel_receive_should_verify_that_bundle_is_readable_if_receiving_on_bundle(
 ) {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(1);
 
@@ -456,7 +492,7 @@ async fn eval_of_single_channel_receive_should_verify_that_bundle_is_readable_if
     let result = reducer
         .eval(receive, &env, split_rand.clone())
         .await
-        .map(|_| space.lock().unwrap().to_map());
+        .map(|_| space.to_map());
 
     assert!(result.is_ok());
     assert!(check_continuation(
@@ -476,7 +512,9 @@ async fn eval_of_single_channel_receive_should_verify_that_bundle_is_readable_if
 
 #[tokio::test]
 async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand0 = rand().split_byte(0);
     let split_rand1 = rand().split_byte(1);
@@ -528,7 +566,7 @@ async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() 
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par(String::from("result"), Vec::new(), false),
@@ -539,20 +577,24 @@ async fn eval_of_send_pipe_receive_should_meet_in_the_tuple_space_and_proceed() 
     );
     assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(receive, &env, split_rand1.clone())
         .await
         .is_ok());
     assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert_eq!(receive_result, map_data(expected_elements));
 }
 
 #[tokio::test]
 async fn eval_of_send_pipe_receive_with_peek_should_meet_in_the_tuple_space_and_proceed() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let channel = new_gstring_par("channel".to_string(), Vec::new(), false);
     let result_channel = new_gstring_par("result".to_string(), Vec::new(), false);
@@ -628,24 +670,28 @@ async fn eval_of_send_pipe_receive_with_peek_should_meet_in_the_tuple_space_and_
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
     assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(receive, &env, split_rand1.clone())
         .await
         .is_ok());
     assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert_eq!(receive_result, map_data(expected_elements));
 }
 
 #[tokio::test]
 async fn eval_of_send_pipe_receive_when_whole_list_is_bound_to_list_remainder_should_meet_in_the_tuple_space_and_proceed(
 ) {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     // for(@[...a] <- @"channel") { … } | @"channel"!([7,8,9])
     let channel = new_gstring_par("channel".to_string(), Vec::new(), false);
@@ -711,7 +757,7 @@ async fn eval_of_send_pipe_receive_when_whole_list_is_bound_to_list_remainder_sh
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
 
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
@@ -723,21 +769,25 @@ async fn eval_of_send_pipe_receive_when_whole_list_is_bound_to_list_remainder_sh
     );
     assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(receive, &env, split_rand1.clone())
         .await
         .is_ok());
     assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert_eq!(receive_result, map_data(expected_elements));
 }
 
 #[tokio::test]
 async fn eval_of_send_on_seven_plus_eight_pipe_receive_on_fifteen_should_meet_in_the_tuple_space_and_proceed(
 ) {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand0 = rand().split_byte(0);
     let split_rand1 = rand().split_byte(1);
@@ -790,7 +840,7 @@ async fn eval_of_send_on_seven_plus_eight_pipe_receive_on_fifteen_should_meet_in
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
 
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
@@ -802,20 +852,24 @@ async fn eval_of_send_on_seven_plus_eight_pipe_receive_on_fifteen_should_meet_in
     );
     assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(receive, &env, split_rand1.clone())
         .await
         .is_ok());
     assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert_eq!(receive_result, map_data(expected_elements));
 }
 
 #[tokio::test]
 async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and_proceed() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let base_rand = rand().split_byte(2);
     let split_rand0 = base_rand.split_byte(0);
@@ -870,7 +924,7 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
     let channels = vec![new_gint_par(2, Vec::new(), false)];
     // Because they are evaluated separately, nothing is split.
     assert!(check_continuation(
@@ -887,14 +941,16 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         },
     ));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(receive, &env, split_rand1.clone())
         .await
         .is_ok());
     assert!(reducer.eval(send, &env, split_rand0.clone()).await.is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert!(check_continuation(
         receive_result,
         channels.clone(),
@@ -909,7 +965,9 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         },
     ));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     let mut par_param = Par::default().with_receives(vec![Receive {
         binds: vec![ReceiveBind {
             patterns: vec![new_freevar_par(0, Vec::new())],
@@ -933,7 +991,7 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
     }]);
     assert!(reducer.eval(par_param, &env, base_rand).await.is_ok());
 
-    let both_result = space.lock().unwrap().to_map();
+    let both_result = space.to_map();
     assert!(check_continuation(
         both_result,
         channels,
@@ -951,7 +1009,9 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
 
 #[tokio::test]
 async fn simple_match_should_capture_and_add_to_the_environment() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let mut pattern = Par::default().with_sends(vec![Send {
@@ -1005,7 +1065,7 @@ async fn simple_match_should_capture_and_add_to_the_environment() {
         .await
         .is_ok());
 
-    let match_result = space.lock().unwrap().to_map();
+    let match_result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1022,7 +1082,9 @@ async fn simple_match_should_capture_and_add_to_the_environment() {
 
 #[tokio::test]
 async fn eval_of_send_pipe_send_pipe_receive_join_should_meet_in_tuplespace_and_proceed() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand0 = rand().split_byte(0);
     let split_rand1 = rand().split_byte(1);
@@ -1107,7 +1169,7 @@ async fn eval_of_send_pipe_send_pipe_receive_join_should_meet_in_tuplespace_and_
         .await
         .is_ok());
 
-    let send_result = space.lock().unwrap().to_map();
+    let send_result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1118,7 +1180,9 @@ async fn eval_of_send_pipe_send_pipe_receive_join_should_meet_in_tuplespace_and_
     );
     assert_eq!(send_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .inj(receive.clone(), split_rand2.clone())
         .await
@@ -1132,10 +1196,12 @@ async fn eval_of_send_pipe_send_pipe_receive_join_should_meet_in_tuplespace_and_
         .await
         .is_ok());
 
-    let receive_result = space.lock().unwrap().to_map();
+    let receive_result = space.to_map();
     assert_eq!(receive_result, map_data(expected_elements.clone()));
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .inj(send1.clone(), split_rand0.clone())
         .await
@@ -1149,13 +1215,15 @@ async fn eval_of_send_pipe_send_pipe_receive_join_should_meet_in_tuplespace_and_
         .await
         .is_ok());
 
-    let inter_leaved_result = space.lock().unwrap().to_map();
+    let inter_leaved_result = space.to_map();
     assert_eq!(inter_leaved_result, map_data(expected_elements));
 }
 
 #[tokio::test]
 async fn eval_of_send_with_remainder_receive_should_capture_the_remainder() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand0 = rand().split_byte(0);
     let split_rand1 = rand().split_byte(1);
@@ -1204,7 +1272,7 @@ async fn eval_of_send_with_remainder_receive_should_capture_the_remainder() {
         .await
         .is_ok());
 
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1229,7 +1297,9 @@ async fn eval_of_send_with_remainder_receive_should_capture_the_remainder() {
 
 #[tokio::test]
 async fn eval_of_nth_method_should_pick_out_the_nth_item_from_a_list() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let nth_call = Expr {
@@ -1285,13 +1355,15 @@ async fn eval_of_nth_method_should_pick_out_the_nth_item_from_a_list() {
         })),
     }]);
 
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
     assert!(reducer
         .eval(nth_call_eval_to_send, &env, split_rand.clone())
         .await
         .is_ok());
 
-    let indirect_result = space.lock().unwrap().to_map();
+    let indirect_result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1305,7 +1377,9 @@ async fn eval_of_nth_method_should_pick_out_the_nth_item_from_a_list() {
 
 #[tokio::test]
 async fn eval_of_nth_method_should_pick_out_the_nth_item_from_a_byte_array() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let nth_call = Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1326,7 +1400,9 @@ async fn eval_of_nth_method_should_pick_out_the_nth_item_from_a_byte_array() {
 
 #[tokio::test]
 async fn eval_of_length_method_should_get_length_of_byte_array() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let nth_call = Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1347,8 +1423,6 @@ async fn eval_of_length_method_should_get_length_of_byte_array() {
 
 #[tokio::test]
 async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resources() {
-    let (space, _) = create_test_space().await;
-
     let split_rand = rand().split_byte(42);
     let mut result_rand = rand().split_byte(42);
     let chosen_name = result_rand.next();
@@ -1386,6 +1460,10 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
             unf_instance: Some(UnfInstance::GPrivateBody(GPrivate { id: vec![42] })),
         }]),
     );
+
+    let mut kvm = InMemoryStoreManager::new();
+    let store = kvm.r_space_stores().await.unwrap();
+    let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let reducer = RholangAndScalaDispatcher::create(
         space.clone(),
         HashMap::new(),
@@ -1398,7 +1476,7 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
     cost.set(Cost::unsafe_max());
     let env = Env::new();
     assert!(reducer.eval(new, &env, split_rand).await.is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
 
     let channel0 = new_gstring_par("result0".to_string(), Vec::new(), false);
     let channel1 = new_gstring_par("result1".to_string(), Vec::new(), false);
@@ -1443,7 +1521,9 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
 
 #[tokio::test]
 async fn eval_of_nth_method_in_send_position_should_change_what_is_sent() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let nth_call_eval_to_send = Par::default().with_exprs(vec![Expr {
@@ -1484,7 +1564,7 @@ async fn eval_of_nth_method_in_send_position_should_change_what_is_sent() {
 
     let env = Env::new();
     assert!(reducer.eval(send, &env, split_rand.clone()).await.is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
 
     let channel = new_gstring_par("result".to_string(), Vec::new(), false);
     let mut expected_result = HashMap::new();
@@ -1506,7 +1586,9 @@ async fn eval_of_nth_method_in_send_position_should_change_what_is_sent() {
 
 #[tokio::test]
 async fn eval_of_a_method_should_substitute_target_before_evaluating() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let hex_to_bytes_call = Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1533,7 +1615,9 @@ async fn eval_of_a_method_should_substitute_target_before_evaluating() {
 
 #[tokio::test]
 async fn eval_of_to_byte_array_method_on_any_process_should_return_that_process_serialized() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let proc = Par::default().with_receives(vec![Receive {
@@ -1573,7 +1657,7 @@ async fn eval_of_to_byte_array_method_on_any_process_should_return_that_process_
         .eval(to_byte_array_call, &env, split_rand.clone())
         .await
         .is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_result = HashMap::new();
     expected_result.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1589,7 +1673,9 @@ async fn eval_of_to_byte_array_method_on_any_process_should_return_that_process_
 
 #[tokio::test]
 async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_serialization() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let unsub_proc = Par::default().with_news(vec![New {
@@ -1632,7 +1718,7 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
         .eval(to_byte_array_call, &env, split_rand.clone())
         .await
         .is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_result = HashMap::new();
     expected_result.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1649,7 +1735,9 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
 #[tokio::test]
 async fn eval_of_to_byte_array_method_on_any_process_should_return_an_error_when_to_byte_array_is_called_with_arguments(
 ) {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let to_byte_array_call = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1676,7 +1764,9 @@ async fn eval_of_to_byte_array_method_on_any_process_should_return_an_error_when
 
 #[tokio::test]
 async fn eval_of_hex_to_bytes_should_transform_encoded_string_to_byte_array_not_the_rholang_term() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let test_string = String::from("testing testing");
@@ -1704,7 +1794,7 @@ async fn eval_of_hex_to_bytes_should_transform_encoded_string_to_byte_array_not_
         .eval(to_byte_array_call, &env, split_rand.clone())
         .await
         .is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_result = HashMap::new();
     expected_result.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1720,7 +1810,9 @@ async fn eval_of_hex_to_bytes_should_transform_encoded_string_to_byte_array_not_
 
 #[tokio::test]
 async fn eval_of_bytes_to_hex_should_transform_byte_array_to_hex_string_not_the_rholang_term() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let base16_repr = String::from("0123456789abcdef");
@@ -1750,7 +1842,7 @@ async fn eval_of_bytes_to_hex_should_transform_byte_array_to_hex_string_not_the_
         .eval(to_string_call, &env, split_rand.clone())
         .await
         .is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_result = HashMap::new();
     expected_result.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1764,7 +1856,9 @@ async fn eval_of_bytes_to_hex_should_transform_byte_array_to_hex_string_not_the_
 
 #[tokio::test]
 async fn eval_of_to_utf8_bytes_should_transform_string_to_utf8_byte_array_not_the_rholang_term() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let split_rand = rand().split_byte(0);
     let test_string = String::from("testing testing");
@@ -1791,7 +1885,7 @@ async fn eval_of_to_utf8_bytes_should_transform_string_to_utf8_byte_array_not_th
         .eval(to_utf8_bytes_call, &env, split_rand.clone())
         .await
         .is_ok());
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_result = HashMap::new();
     expected_result.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1808,7 +1902,9 @@ async fn eval_of_to_utf8_bytes_should_transform_string_to_utf8_byte_array_not_th
 #[tokio::test]
 async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_called_with_arguments()
 {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let to_utf8_bytes_call = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1836,7 +1932,9 @@ async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_call
 #[tokio::test]
 async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_evaluated_on_a_non_string(
 ) {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let to_utf8_bytes_call = Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EMethodBody(EMethod {
@@ -1862,7 +1960,9 @@ async fn eval_of_to_utf8_bytes_should_return_an_error_when_to_utf8_bytes_is_eval
 
 #[tokio::test]
 async fn variable_references_should_be_substituted_before_being_used() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let mut split_rand_result = rand().split_byte(3);
     let split_rand_src = rand().split_byte(3);
@@ -1917,7 +2017,7 @@ async fn variable_references_should_be_substituted_before_being_used() {
         .await;
     assert!(res.is_ok());
 
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1931,7 +2031,9 @@ async fn variable_references_should_be_substituted_before_being_used() {
 
 #[tokio::test]
 async fn variable_references_should_be_substituted_before_being_used_in_a_match() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let mut split_rand_result = rand().split_byte(4);
     let split_rand_src = rand().split_byte(4);
@@ -1968,7 +2070,7 @@ async fn variable_references_should_be_substituted_before_being_used_in_a_match(
         .await;
     assert!(res.is_ok());
 
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -1982,7 +2084,9 @@ async fn variable_references_should_be_substituted_before_being_used_in_a_match(
 
 #[tokio::test]
 async fn variable_references_should_reference_a_variable_that_comes_from_a_match_in_tuplespace() {
-    let (space, reducer) = create_test_space().await;
+    let (space, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let base_rand = rand().split_byte(7);
     let split_rand0 = base_rand.split_byte(0);
@@ -2033,7 +2137,7 @@ async fn variable_references_should_reference_a_variable_that_comes_from_a_match
     let res = reducer.eval(proc.clone(), &env, base_rand.clone()).await;
     assert!(res.is_ok());
 
-    let result = space.lock().unwrap().to_map();
+    let result = space.to_map();
     let mut expected_elements = HashMap::new();
     expected_elements.insert(
         new_gstring_par("result".to_string(), Vec::new(), false),
@@ -2047,7 +2151,9 @@ async fn variable_references_should_reference_a_variable_that_comes_from_a_match
 
 #[tokio::test]
 async fn one_matches_one_should_return_true() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2065,7 +2171,9 @@ async fn one_matches_one_should_return_true() {
 
 #[tokio::test]
 async fn one_matches_zero_should_return_false() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2084,7 +2192,9 @@ async fn one_matches_zero_should_return_false() {
 // "1 matches _"
 #[tokio::test]
 async fn one_matches_wildcard_should_return_true() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2102,7 +2212,9 @@ async fn one_matches_wildcard_should_return_true() {
 
 #[tokio::test]
 async fn x_matches_one_should_return_true_when_x_is_bound_to_one() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let mut env = Env::new();
     env = env.put(new_gint_par(1, Vec::new(), false));
@@ -2122,7 +2234,9 @@ async fn x_matches_one_should_return_true_when_x_is_bound_to_one() {
 // "1 matches =x"
 #[tokio::test]
 async fn one_matches_equal_sign_x_should_return_true_when_x_is_bound_to_one() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let mut env = Env::new();
     env = env.put(new_gint_par(1, Vec::new(), false));
@@ -2143,7 +2257,9 @@ async fn one_matches_equal_sign_x_should_return_true_when_x_is_bound_to_one() {
 
 #[tokio::test]
 async fn length_should_return_the_length_of_the_string() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2165,7 +2281,9 @@ async fn length_should_return_the_length_of_the_string() {
 // "'abcabac'.slice(3, 6)" should "return 'aba'"
 #[tokio::test]
 async fn slice_should_work_correctly_1() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2193,7 +2311,9 @@ async fn slice_should_work_correctly_1() {
 // "'abcabcac'.slice(2,1)" should "return empty string"
 #[tokio::test]
 async fn slice_should_work_correctly_2() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2218,7 +2338,9 @@ async fn slice_should_work_correctly_2() {
 // "'abcabcac'.slice(8,9)" should "return empty string"
 #[tokio::test]
 async fn slice_should_work_correctly_3() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2243,7 +2365,9 @@ async fn slice_should_work_correctly_3() {
 // "'abcabcac'.slice(-2,2)" should "return 'ab'"
 #[tokio::test]
 async fn slice_should_work_correctly_4() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2268,7 +2392,9 @@ async fn slice_should_work_correctly_4() {
 // "'Hello, ${name}!' % {'name': 'Alice'}" should "return 'Hello, Alice!"
 #[tokio::test]
 async fn percent_percent_should_work_correctly() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2301,7 +2427,9 @@ async fn percent_percent_should_work_correctly() {
 // "'abc' ++ 'def'" should "return 'abcdef"
 #[tokio::test]
 async fn plus_plus_should_work_correctly_with_string() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2323,7 +2451,9 @@ async fn plus_plus_should_work_correctly_with_string() {
 // "ByteArray('dead') ++ ByteArray('beef)'" should "return ByteArray('deadbeef')"
 #[tokio::test]
 async fn plus_plus_should_work_correctly_with_byte_array() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2369,7 +2499,9 @@ fn interpolate(base: String, substitutes: Vec<(Par, Par)>) -> Par {
 // "'${a} ${b}' % {'a': '1 ${b}', 'b': '2 ${a}'" should "return '1 ${b} 2 ${a}"
 #[tokio::test]
 async fn interpolate_should_work_correctly() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2397,7 +2529,9 @@ async fn interpolate_should_work_correctly() {
 
 #[tokio::test]
 async fn interpolate_should_interpolate_boolean_values() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2425,7 +2559,9 @@ async fn interpolate_should_interpolate_boolean_values() {
 
 #[tokio::test]
 async fn interpolate_should_interpolate_uris() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -2457,7 +2593,9 @@ async fn interpolate_should_interpolate_uris() {
 
 #[tokio::test]
 async fn length_should_return_the_length_of_the_list() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let list = new_elist_par(
@@ -2492,7 +2630,9 @@ async fn length_should_return_the_length_of_the_list() {
 // "[3, 7, 2, 9, 4, 3, 7].slice(3, 5)" should "return [9, 4]"
 #[tokio::test]
 async fn slice_should_work_correctly_with_list_1() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let list = new_elist_par(
@@ -2546,7 +2686,9 @@ async fn slice_should_work_correctly_with_list_1() {
 // "[3, 7, 2, 9, 4, 3, 7].slice(5, 4)" should "return []"
 #[tokio::test]
 async fn slice_should_work_correctly_with_list_2() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let list = new_elist_par(
@@ -2597,7 +2739,9 @@ async fn slice_should_work_correctly_with_list_2() {
 // "[3, 7, 2, 9, 4, 3, 7].slice(7, 8)" should "return []"
 #[tokio::test]
 async fn slice_should_work_correctly_with_list_3() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let list = new_elist_par(
@@ -2648,7 +2792,9 @@ async fn slice_should_work_correctly_with_list_3() {
 // "[3, 7, 2, 9, 4, 3, 7].slice(-2, 2)" should "return [3, 7]"
 #[tokio::test]
 async fn slice_should_work_correctly_with_list_4() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let list = new_elist_par(
@@ -2702,7 +2848,9 @@ async fn slice_should_work_correctly_with_list_4() {
 // "[3, 2, 9] ++ [6, 1, 7]" should "return [3, 2, 9, 6, 1, 7]"
 #[tokio::test]
 async fn plus_plus_should_work_correctly_with_list() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let lhs_list = new_elist_par(
@@ -2761,7 +2909,9 @@ async fn plus_plus_should_work_correctly_with_list() {
 // "{1: 'a', 2: 'b'}.getOrElse(1, 'c')" should "return 'a'"
 #[tokio::test]
 async fn get_or_else_method_should_work_correctly_1() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -2801,7 +2951,9 @@ async fn get_or_else_method_should_work_correctly_1() {
 // "{1: 'a', 2: 'b'}.getOrElse(3, 'c')" should "return 'c'"
 #[tokio::test]
 async fn get_or_else_method_should_work_correctly_2() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -2841,7 +2993,9 @@ async fn get_or_else_method_should_work_correctly_2() {
 // "{1: 'a', 2: 'b'}.set(3, 'c')" should "return {1: 'a', 2: 'b', 3: 'c'}"
 #[tokio::test]
 async fn set_method_should_work_correctly_1() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -2901,7 +3055,9 @@ async fn set_method_should_work_correctly_1() {
 // "{1: 'a', 2: 'b'}.set(2, 'c')" should "return {1: 'a', 2: 'c'}"
 #[tokio::test]
 async fn set_method_should_work_correctly_2() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -2957,7 +3113,9 @@ async fn set_method_should_work_correctly_2() {
 // "{1: 'a', 2: 'b', 3: 'c'}.keys()" should "return Set(1, 2, 3)"
 #[tokio::test]
 async fn keys_method_should_work_correctly() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -3008,7 +3166,9 @@ async fn keys_method_should_work_correctly() {
 
 #[tokio::test]
 async fn size_method_should_work_correctly_emap() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -3048,7 +3208,9 @@ async fn size_method_should_work_correctly_emap() {
 
 #[tokio::test]
 async fn size_method_should_work_correctly_with_eset() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let set = Par::default().with_exprs(vec![Expr {
@@ -3079,7 +3241,9 @@ async fn size_method_should_work_correctly_with_eset() {
 
 #[tokio::test]
 async fn plus_method_should_work_correctly_with_eset() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let set = Par::default().with_exprs(vec![Expr {
@@ -3118,7 +3282,9 @@ async fn plus_method_should_work_correctly_with_eset() {
 // "{1: 'a', 2: 'b', 3: 'c'} - 3" should "return {1: 'a', 2: 'b'}"
 #[tokio::test]
 async fn minus_method_should_work_correctly_with_emap() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -3171,7 +3337,9 @@ async fn minus_method_should_work_correctly_with_emap() {
 
 #[tokio::test]
 async fn minus_method_should_work_correctly_with_eset() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let set = Par::default().with_exprs(vec![Expr {
@@ -3209,7 +3377,9 @@ async fn minus_method_should_work_correctly_with_eset() {
 
 #[tokio::test]
 async fn plus_plus_method_should_work_correctly_with_eset() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let lhs_set = Par::default().with_exprs(vec![Expr {
@@ -3256,7 +3426,9 @@ async fn plus_plus_method_should_work_correctly_with_eset() {
 
 #[tokio::test]
 async fn plus_plus_method_with_map_should_return_union() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let lhs_map = Par::default().with_exprs(vec![Expr {
@@ -3327,7 +3499,9 @@ async fn plus_plus_method_with_map_should_return_union() {
 
 #[tokio::test]
 async fn minus_minus_method_should_work_correctly_with_eset() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let lhs_set = Par::default().with_exprs(vec![Expr {
@@ -3374,7 +3548,9 @@ async fn minus_minus_method_should_work_correctly_with_eset() {
 
 #[tokio::test]
 async fn get_method_on_set_should_not_be_defined() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let set = Par::default().with_exprs(vec![Expr {
@@ -3411,7 +3587,9 @@ async fn get_method_on_set_should_not_be_defined() {
 
 #[tokio::test]
 async fn add_method_on_map_should_not_be_defined() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let map = Par::default().with_exprs(vec![Expr {
@@ -3453,7 +3631,9 @@ async fn add_method_on_map_should_not_be_defined() {
 
 #[tokio::test]
 async fn to_list_method_should_error_when_called_with_arguments() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3488,7 +3668,9 @@ async fn to_list_method_should_error_when_called_with_arguments() {
 
 #[tokio::test]
 async fn to_list_method_should_transform_set_into_list() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3529,7 +3711,9 @@ async fn to_list_method_should_transform_set_into_list() {
 
 #[tokio::test]
 async fn to_list_method_should_transform_map_into_list_of_tuples() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3588,7 +3772,9 @@ async fn to_list_method_should_transform_map_into_list_of_tuples() {
 
 #[tokio::test]
 async fn to_list_method_should_transform_tuple_into_list() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3631,7 +3817,9 @@ async fn to_list_method_should_transform_tuple_into_list() {
 
 #[tokio::test]
 async fn to_set_method_should_turn_list_into_set() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3674,7 +3862,9 @@ async fn to_set_method_should_turn_list_into_set() {
 
 #[tokio::test]
 async fn to_set_method_should_turn_list_with_duplicate_into_set_without_duplicate() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3712,7 +3902,9 @@ async fn to_set_method_should_turn_list_with_duplicate_into_set_without_duplicat
 
 #[tokio::test]
 async fn to_set_method_should_turn_empty_list_into_empty_set() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3747,7 +3939,9 @@ async fn to_set_method_should_turn_empty_list_into_empty_set() {
 
 #[tokio::test]
 async fn to_map_method_should_transform_list_of_tuples_into_map() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3806,7 +4000,9 @@ async fn to_map_method_should_transform_list_of_tuples_into_map() {
 
 #[tokio::test]
 async fn to_map_method_should_transform_set_of_tuples_into_map() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3865,7 +4061,9 @@ async fn to_map_method_should_transform_set_of_tuples_into_map() {
 
 #[tokio::test]
 async fn to_set_method_should_turn_map_into_set() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3924,7 +4122,9 @@ async fn to_set_method_should_turn_map_into_set() {
 
 #[tokio::test]
 async fn to_map_method_should_correctly_do_put_operations() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -3970,7 +4170,9 @@ async fn to_map_method_should_correctly_do_put_operations() {
 
 #[tokio::test]
 async fn to_map_method_should_turn_empty_list_into_empty_map() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4004,7 +4206,9 @@ async fn to_map_method_should_turn_empty_list_into_empty_map() {
 
 #[tokio::test]
 async fn to_set_method_should_not_change_the_object_it_is_applied_on() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4037,7 +4241,9 @@ async fn to_set_method_should_not_change_the_object_it_is_applied_on() {
 
 #[tokio::test]
 async fn to_map_method_should_not_change_the_object_it_is_applied_on() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4096,7 +4302,9 @@ async fn to_map_method_should_not_change_the_object_it_is_applied_on() {
 
 #[tokio::test]
 async fn to_map_method_should_throw_error_if_not_called_with_correct_types() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4137,7 +4345,9 @@ async fn to_map_method_should_throw_error_if_not_called_with_correct_types() {
 
 #[tokio::test]
 async fn to_map_method_should_throw_error_when_called_with_arguments() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4176,7 +4386,9 @@ async fn to_map_method_should_throw_error_when_called_with_arguments() {
 
 #[tokio::test]
 async fn to_map_method_should_throw_error_when_called_on_an_int() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4204,7 +4416,9 @@ async fn to_map_method_should_throw_error_when_called_on_an_int() {
 
 #[tokio::test]
 async fn to_set_method_should_throw_error_when_called_with_arguments() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4237,7 +4451,9 @@ async fn to_set_method_should_throw_error_when_called_with_arguments() {
 
 #[tokio::test]
 async fn to_set_method_should_throw_error_when_called_on_an_int() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let res = reducer.eval_expr(
@@ -4265,7 +4481,9 @@ async fn to_set_method_should_throw_error_when_called_on_an_int() {
 
 #[tokio::test]
 async fn term_split_size_max_should_be_evaluated_for_max_size() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let p = New {
@@ -4284,7 +4502,9 @@ async fn term_split_size_max_should_be_evaluated_for_max_size() {
 
 #[tokio::test]
 async fn term_split_size_max_should_limited_to_max_value() {
-    let (_, reducer) = create_test_space().await;
+    let (_, reducer) =
+        create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
+            .await;
 
     let env = Env::new();
     let p = New {

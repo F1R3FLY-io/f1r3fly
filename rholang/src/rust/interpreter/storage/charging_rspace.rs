@@ -1,8 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/ChargingRSpace.scala
 
-use crate::rust::interpreter::{
-    errors::InterpreterError, rho_runtime::RhoTuplespace, unwrap_option_safe,
-};
+use crate::rust::interpreter::{errors::InterpreterError, unwrap_option_safe};
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{
     tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, TaggedContinuation,
@@ -34,11 +32,10 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
 }
 
 impl ChargingRSpace {
-    pub fn charging_rspace<
+    pub fn charging_rspace<T>(space: T) -> T
+    where
         T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-    >(
-        space: T,
-    ) -> RhoTuplespace {
+    {
         todo!()
     }
 }

@@ -46,14 +46,14 @@ pub struct RSpaceStore {
 }
 
 #[repr(C)]
+#[derive(Clone)]
 pub struct RSpace<C, P, A, K> {
     pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
-    pub store: Box<dyn HotStore<C, P, A, K>>,
-    installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
+    pub store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+    installs: Arc<Mutex<HashMap<Vec<C>, Install<P, K>>>>,
     event_log: Log,
     produce_counter: BTreeMap<Produce, i32>,
     matcher: Arc<Box<dyn Match<P, A>>>,
-    // pub ops: RSpaceOps<C, P, A, K>,
 }
 
 impl<C, P, A, K> SpaceMatcher<C, P, A, K> for RSpace<C, P, A, K>
@@ -159,7 +159,7 @@ where
             history_reader.base(),
         );
 
-        self.store = hot_store;
+        self.store = Arc::new(hot_store);
         self.event_log = checkpoint.log;
         self.produce_counter = checkpoint.produce_counter;
 
@@ -244,9 +244,9 @@ where
     {
         RSpace {
             history_repository,
-            store,
+            store: Arc::new(store),
             matcher,
-            installs: Mutex::new(HashMap::new()),
+            installs: Arc::new(Mutex::new(HashMap::new())),
             event_log: Vec::new(),
             produce_counter: BTreeMap::new(),
         }
@@ -760,7 +760,7 @@ where
         history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
         let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        self.store = next_hot_store;
+        self.store = Arc::new(next_hot_store);
     }
 
     fn wrap_result(
