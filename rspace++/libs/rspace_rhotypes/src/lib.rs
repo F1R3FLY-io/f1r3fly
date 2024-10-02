@@ -9,13 +9,15 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::rspace::RSpace;
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
@@ -58,7 +60,7 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
             // let store = get_or_create_rspace_store(&format!("{}/rspace++/", data_dir), 1 * GB)
             //     .expect("Error getting RSpaceStore: ");
 
-            RSpaceInstances::create(store, Arc::new(Box::new(Matcher)))
+            RSpace::create(store, Arc::new(Box::new(Matcher)))
         })
         .unwrap();
 
@@ -141,7 +143,7 @@ pub extern "C" fn produce(
             .lock()
             .unwrap()
             .produce(channel, data, persist)
-    };
+    }.unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -207,7 +209,7 @@ pub extern "C" fn consume(
             .lock()
             .unwrap()
             .consume(channels, patterns, continuation, persist, peeks)
-    };
+    }.unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -271,7 +273,7 @@ pub extern "C" fn install(
             .lock()
             .unwrap()
             .install(channels, patterns, continuation)
-    };
+    }.unwrap();
 
     match result_option {
         None => std::ptr::null(),
@@ -1894,8 +1896,8 @@ pub extern "C" fn replay_produce(
             .rspace
             .lock()
             .unwrap()
-            .replay_produce(channel, data, persist)
-    };
+            .produce(channel, data, persist)
+    }.unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -1956,14 +1958,14 @@ pub extern "C" fn replay_consume(
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
     let result_option = unsafe {
-        (*rspace).rspace.lock().unwrap().replay_consume(
+        (*rspace).rspace.lock().unwrap().consume(
             channels,
             patterns,
             continuation,
             persist,
             peeks,
         )
-    };
+    }.unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -2013,7 +2015,7 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
             .rspace
             .lock()
             .unwrap()
-            .replay_create_checkpoint()
+            .create_checkpoint()
             .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
     };
 
@@ -2131,7 +2133,7 @@ pub extern "C" fn replay_clear(rspace: *mut Space) -> () {
             .rspace
             .lock()
             .unwrap()
-            .replay_clear()
+            .clear()
             .expect("Rust RSpacePlusPlus Library: Failed to clear");
     }
 }
@@ -2143,7 +2145,7 @@ pub extern "C" fn replay_spawn(rspace: *mut Space) -> *mut Space {
             .rspace
             .lock()
             .unwrap()
-            .replay_spawn()
+            .spawn()
             .expect("Rust RSpacePlusPlus Library: Failed to spawn")
     };
 
@@ -2249,16 +2251,16 @@ pub extern "C" fn rig(rspace: *mut Space, log_pointer: *const u8, log_bytes_len:
         })
         .collect();
 
-    unsafe {
-        (*rspace).rspace.lock().unwrap().rig(log);
-    }
+    // unsafe {
+    //     (*rspace).rspace.lock().unwrap().rig(log);
+    // }
 }
 
 #[no_mangle]
 pub extern "C" fn check_replay_data(rspace: *mut Space) -> () {
-    unsafe {
-        (*rspace).rspace.lock().unwrap().check_replay_data();
-    }
+    // unsafe {
+    //     (*rspace).rspace.lock().unwrap().check_replay_data();
+    // }
 }
 
 /* Helper Functions */
