@@ -3,14 +3,14 @@ use std::fmt;
 use super::exports::*;
 
 #[derive(Debug, Clone)]
-pub struct FreeMap<T> {
+pub struct FreeMap<T: Clone> {
   pub next_level: usize,
   pub level_bindings: HashMap<String, FreeContext<T>>,
   pub wildcards: Vec<SourcePosition>,
   pub connectives: Vec<(ConnectiveInstance, SourcePosition)>,
 }
 
-impl<T> FreeMap<T> {
+impl<T: Clone> FreeMap<T> {
   pub(crate) fn new() -> Self {
     FreeMap {
       next_level: 0,
@@ -104,7 +104,7 @@ impl<T> FreeMap<T> {
   }
 }
 
-impl<T> Default for FreeMap<T> {
+impl<T: Clone> Default for FreeMap<T> {
   fn default() -> Self {
     Self::new()
   }

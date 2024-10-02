@@ -7,7 +7,7 @@ pub struct BoundMap<T> {
   index_bindings: HashMap<String, BoundContext<T>>,
 }
 
-impl<T> BoundMap<T> {
+impl<T: Clone> BoundMap<T> {
   pub fn new() -> Self {
     BoundMap {
       next_index: 0,

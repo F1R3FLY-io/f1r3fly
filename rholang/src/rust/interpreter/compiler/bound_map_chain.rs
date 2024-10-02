@@ -5,7 +5,7 @@ pub struct BoundMapChain<T> {
   chain: Vec<BoundMap<T>>,
 }
 
-impl<T> BoundMapChain<T> {
+impl<T: Clone> BoundMapChain<T> {
   fn new() -> Self {
     BoundMapChain {
       chain: vec![BoundMap::new()],
@@ -60,7 +60,7 @@ impl<T> BoundMapChain<T> {
   }
 }
 
-impl<T> Default for BoundMapChain<T> {
+impl<T: Clone> Default for BoundMapChain<T> {
   fn default() -> Self {
     Self::new()
   }
