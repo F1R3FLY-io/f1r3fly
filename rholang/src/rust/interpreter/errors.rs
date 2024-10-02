@@ -265,3 +265,5 @@ impl From<InterpreterError> for RSpaceError {
         RSpaceError::InterpreterError(error.to_string())
     }
 }
+
+impl std::error::Error for InterpreterError {}
