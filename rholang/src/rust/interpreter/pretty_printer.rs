@@ -567,7 +567,10 @@ impl PrettyPrinter {
                         string.push_str("  & ");
                     }
 
-                    Ok((bind.free_count + previous_free, string))
+                    Ok::<(i32, std::string::String), InterpreterError>((
+                        bind.free_count + previous_free,
+                        string,
+                    ))
                 },
             )?;
 
@@ -639,10 +642,9 @@ impl PrettyPrinter {
                 "match {} {{\n{}{}",
                 self.build_string_from_message(&m.target),
                 self.indent_string().repeat(indent + 1),
-                m.cases
-                    .iter()
-                    .enumerate()
-                    .fold(Ok(String::new()), |acc, (i, match_case)| {
+                m.cases.iter().enumerate().fold(
+                    Ok(String::new()),
+                    |acc: Result<String, InterpreterError>, (i, match_case)| {
                         let string = acc?;
 
                         let case_string = format!(
@@ -653,7 +655,8 @@ impl PrettyPrinter {
                         );
 
                         Ok(string + &case_string)
-                    })?
+                    }
+                )?
             );
 
             Ok(format!(

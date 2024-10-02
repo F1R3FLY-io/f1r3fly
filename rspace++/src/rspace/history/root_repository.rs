@@ -1,5 +1,5 @@
-use super::{instances::radix_history::RadixHistory, roots_store::RootError};
-use crate::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::roots_store::RootsStore};
+use super::instances::radix_history::RadixHistory;
+use crate::rspace::{errors::RootError, hashing::blake2b256_hash::Blake2b256Hash, history::roots_store::RootsStore};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootRepository.scala
 pub struct RootRepository {

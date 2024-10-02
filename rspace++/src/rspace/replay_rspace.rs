@@ -1,12 +1,12 @@
-// See rspace/src/main/scala/coop/rchain/rspace/RSpace.scala
+// See /home/spreston/src/firefly/f1r3fly/rspace/src/main/scala/coop/rchain/rspace/ReplayRSpace.scala
 
 use super::checkpoint::SoftCheckpoint;
-use super::errors::HistoryRepositoryError;
 use super::errors::RSpaceError;
 use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
+use super::replay_rspace_interface::IReplayRSpace;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
 use super::rspace_interface::MaybeActionResult;
@@ -23,40 +23,33 @@ use super::trace::Log;
 use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
-use crate::rspace::history::history_repository::HistoryRepositoryInstances;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
 use crate::rspace::internal::*;
-use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::space_matcher::SpaceMatcher;
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone)]
-pub struct RSpaceStore {
-    pub history: Arc<Mutex<Box<dyn KeyValueStore>>>,
-    pub roots: Arc<Mutex<Box<dyn KeyValueStore>>>,
-    pub cold: Arc<Mutex<Box<dyn KeyValueStore>>>,
-}
-
 #[repr(C)]
-#[derive(Clone)]
-pub struct RSpace<C, P, A, K> {
+pub struct ReplayRSpace<C, P, A, K> {
     pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
-    pub store: Arc<Box<dyn HotStore<C, P, A, K>>>,
-    installs: Arc<Mutex<HashMap<Vec<C>, Install<P, K>>>>,
+    pub store: Box<dyn HotStore<C, P, A, K>>,
+    installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
     event_log: Log,
     produce_counter: BTreeMap<Produce, i32>,
     matcher: Arc<Box<dyn Match<P, A>>>,
+    // pub ops: RSpaceOps<C, P, A, K>,
+    pub replay_data: MultisetMultiMap<IOEvent, COMM>,
 }
 
-impl<C, P, A, K> SpaceMatcher<C, P, A, K> for RSpace<C, P, A, K>
+impl<C, P, A, K> SpaceMatcher<C, P, A, K> for ReplayRSpace<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
     P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
@@ -65,109 +58,7 @@ where
 {
 }
 
-impl<C, P, A, K> ISpace<C, P, A, K> for RSpace<C, P, A, K>
-where
-    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
-    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-{
-    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        // println!("\nhit rspace++ create_checkpoint");
-        let changes = self.store.changes();
-        let next_history = self.history_repository.checkpoint(&changes);
-        self.history_repository = Arc::new(next_history);
-
-        let log = self.event_log.clone();
-        self.event_log = Vec::new();
-        self.produce_counter = BTreeMap::new();
-
-        let history_reader = self
-            .history_repository
-            .get_history_reader(self.history_repository.root())?;
-
-        self.create_new_hot_store(history_reader);
-        self.restore_installs();
-
-        Ok(Checkpoint {
-            root: self.history_repository.root(),
-            log,
-        })
-    }
-
-    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-        // println!("\nhit rspace++ reset");
-        let next_history = self.history_repository.reset(&root)?;
-        self.history_repository = Arc::new(next_history);
-
-        self.event_log = Vec::new();
-        self.produce_counter = BTreeMap::new();
-
-        let history_reader = self.history_repository.get_history_reader(root)?;
-        self.create_new_hot_store(history_reader);
-        self.restore_installs();
-
-        Ok(())
-    }
-
-    fn get_data(&self, channel: C) -> Vec<Datum<A>> {
-        self.store.get_data(&channel)
-    }
-
-    fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
-        self.store.get_continuations(channels)
-    }
-
-    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
-        self.store.get_joins(channel)
-    }
-
-    fn clear(&mut self) -> Result<(), RSpaceError> {
-        self.reset(RadixHistory::empty_root_node_hash())
-    }
-
-    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
-        self.store.to_map()
-    }
-
-    fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
-        // println!("\nhit rspace++ create_soft_checkpoint");
-        // println!("current hot_store state: {:?}", self.store.snapshot());
-
-        let cache_snapshot = self.store.snapshot();
-        let curr_event_log = self.event_log.clone();
-        let curr_produce_counter = self.produce_counter.clone();
-
-        self.event_log = Vec::new();
-        self.produce_counter = BTreeMap::new();
-
-        SoftCheckpoint {
-            cache_snapshot,
-            log: curr_event_log,
-            produce_counter: curr_produce_counter,
-        }
-    }
-
-    fn revert_to_soft_checkpoint(
-        &mut self,
-        checkpoint: SoftCheckpoint<C, P, A, K>,
-    ) -> Result<(), RSpaceError> {
-        let history = &self.history_repository;
-        let history_reader = history.get_history_reader(history.root())?;
-        let hot_store = HotStoreInstances::create_from_mhs_and_hr(
-            Arc::new(Mutex::new(checkpoint.cache_snapshot)),
-            history_reader.base(),
-        );
-
-        self.store = Arc::new(hot_store);
-        self.event_log = checkpoint.log;
-        self.produce_counter = checkpoint.produce_counter;
-
-        Ok(())
-    }
-}
-
-impl<C, P, A, K> Tuplespace<C, P, A, K> for RSpace<C, P, A, K>
+impl<C, P, A, K> Tuplespace<C, P, A, K> for ReplayRSpace<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
     P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
@@ -226,7 +117,183 @@ where
     }
 }
 
-impl<C, P, A, K> RSpace<C, P, A, K>
+impl<C, P, A, K> IReplayRSpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
+where
+    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+{
+    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
+        self.rig(log)?;
+        self.reset(start_root)
+    }
+
+    fn rig(&self, log: Log) -> Result<(), RSpaceError> {
+        // println!("\nlog len in rust rig: {:?}", log.len());
+        let (io_events, comm_events): (Vec<_>, Vec<_>) =
+            log.iter().partition(|event| match event {
+                Event::IoEvent(IOEvent::Produce(_)) => true,
+                Event::IoEvent(IOEvent::Consume(_)) => true,
+                Event::Comm(_) => false,
+            });
+
+        // Create a set of the "new" IOEvents
+        let new_stuff: HashSet<_> = io_events.into_iter().collect();
+
+        // Create and prepare the ReplayData table
+        self.replay_data.clear();
+
+        for event in comm_events {
+            match event {
+                Event::Comm(comm) => {
+                    let comm_cloned = comm.clone();
+                    let (consume, produces) = (comm_cloned.consume, comm_cloned.produces);
+                    let produce_io_events: Vec<IOEvent> = produces
+                        .into_iter()
+                        .map(|produce| IOEvent::Produce(produce))
+                        .collect();
+
+                    let mut io_events = produce_io_events.clone();
+                    io_events.insert(0, IOEvent::Consume(consume));
+
+                    for io_event in io_events {
+                        let io_event_converted: Event = match io_event {
+                            IOEvent::Produce(ref p) => Event::IoEvent(IOEvent::Produce(p.clone())),
+                            IOEvent::Consume(ref c) => Event::IoEvent(IOEvent::Consume(c.clone())),
+                        };
+
+                        if new_stuff.contains(&io_event_converted) {
+                            // println!("\nadd_binding in rig");
+                            self.replay_data.add_binding(io_event, comm.clone());
+                        }
+                    }
+                    Ok(())
+                }
+                _ => Err(RSpaceError::BugFoundError(
+                    "BUG FOUND: only COMM events are expected here".to_string(),
+                )),
+            }?
+        }
+
+        Ok(())
+    }
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError> {
+        if self.replay_data.is_empty() {
+            Ok(())
+        } else {
+            Err(RSpaceError::BugFoundError(format!(
+                "Unused COMM event: replayData multimap has {} elements left",
+                self.replay_data.map.len()
+            )))
+        }
+    }
+}
+
+impl<C, P, A, K> ISpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
+where
+    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
+    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
+{
+    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        // println!("\nhit rspace++ create_checkpoint");
+
+        self.check_replay_data()?;
+
+        let changes = self.store.changes();
+        let next_history = self.history_repository.checkpoint(&changes);
+        self.history_repository = Arc::new(next_history);
+
+        let history_reader = self
+            .history_repository
+            .get_history_reader(self.history_repository.root())?;
+
+        self.create_new_hot_store(history_reader);
+        self.restore_installs();
+
+        Ok(Checkpoint {
+            root: self.history_repository.root(),
+            log: Vec::new(),
+        })
+    }
+
+    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+        // println!("\nhit rspace++ reset");
+        let next_history = self.history_repository.reset(&root)?;
+        self.history_repository = Arc::new(next_history);
+
+        self.event_log = Vec::new();
+        self.produce_counter = BTreeMap::new();
+
+        let history_reader = self.history_repository.get_history_reader(root)?;
+        self.create_new_hot_store(history_reader);
+        self.restore_installs();
+
+        Ok(())
+    }
+
+    fn get_data(&self, channel: C) -> Vec<Datum<A>> {
+        self.store.get_data(&channel)
+    }
+
+    fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+        self.store.get_continuations(channels)
+    }
+
+    fn get_joins(&self, channel: C) -> Vec<Vec<C>> {
+        self.store.get_joins(channel)
+    }
+
+    fn clear(&mut self) -> Result<(), RSpaceError> {
+        self.replay_data.clear();
+        self.reset(RadixHistory::empty_root_node_hash())
+    }
+
+    fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
+        self.store.to_map()
+    }
+
+    fn create_soft_checkpoint(&mut self) -> SoftCheckpoint<C, P, A, K> {
+        // println!("\nhit rspace++ create_soft_checkpoint");
+        // println!("current hot_store state: {:?}", self.store.snapshot());
+
+        let cache_snapshot = self.store.snapshot();
+        let curr_event_log = self.event_log.clone();
+        let curr_produce_counter = self.produce_counter.clone();
+
+        self.event_log = Vec::new();
+        self.produce_counter = BTreeMap::new();
+
+        SoftCheckpoint {
+            cache_snapshot,
+            log: curr_event_log,
+            produce_counter: curr_produce_counter,
+        }
+    }
+
+    fn revert_to_soft_checkpoint(
+        &mut self,
+        checkpoint: SoftCheckpoint<C, P, A, K>,
+    ) -> Result<(), RSpaceError> {
+        let history = &self.history_repository;
+        let history_reader = history.get_history_reader(history.root())?;
+        let hot_store = HotStoreInstances::create_from_mhs_and_hr(
+            Arc::new(Mutex::new(checkpoint.cache_snapshot)),
+            history_reader.base(),
+        );
+
+        self.store = hot_store;
+        self.event_log = checkpoint.log;
+        self.produce_counter = checkpoint.produce_counter;
+
+        Ok(())
+    }
+}
+
+impl<C, P, A, K> ReplayRSpace<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
     P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
@@ -234,86 +301,28 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
     /**
-     * Creates [[RSpace]] from [[HistoryRepository]] and [[HotStore]].
+     * Creates [[ReplayRSpace]] from [[HistoryRepository]] and [[HotStore]].
      */
     pub fn apply(
         history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
         store: Box<dyn HotStore<C, P, A, K>>,
         matcher: Arc<Box<dyn Match<P, A>>>,
-    ) -> RSpace<C, P, A, K>
+    ) -> ReplayRSpace<C, P, A, K>
     where
         C: Clone + Debug + Ord + Hash,
         P: Clone + Debug,
         A: Clone + Debug,
         K: Clone + Debug,
     {
-        RSpace {
+        ReplayRSpace {
             history_repository,
-            store: Arc::new(store),
+            store,
             matcher,
-            installs: Arc::new(Mutex::new(HashMap::new())),
+            installs: Mutex::new(HashMap::new()),
             event_log: Vec::new(),
             produce_counter: BTreeMap::new(),
+            replay_data: MultisetMultiMap::empty(),
         }
-    }
-
-    pub fn create(
-        store: RSpaceStore,
-        matcher: Arc<Box<dyn Match<P, A>>>,
-    ) -> Result<RSpace<C, P, A, K>, HistoryRepositoryError>
-    where
-        C: Clone
-            + Debug
-            + Default
-            + Send
-            + Sync
-            + Serialize
-            + Ord
-            + Hash
-            + for<'a> Deserialize<'a>
-            + 'static,
-        P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-        A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-        K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-    {
-        let setup = Self::create_history_repo(store).unwrap();
-        let (history_reader, store) = setup;
-        let space = Self::apply(Arc::new(history_reader), store, matcher);
-        Ok(space)
-    }
-
-    /**
-     * Creates [[HistoryRepository]] and [[HotStore]].
-     */
-    pub fn create_history_repo(
-        store: RSpaceStore,
-    ) -> Result<
-        (Box<dyn HistoryRepository<C, P, A, K>>, Box<dyn HotStore<C, P, A, K>>),
-        HistoryRepositoryError,
-    >
-    where
-        C: Clone
-            + Debug
-            + Default
-            + Send
-            + Sync
-            + Serialize
-            + for<'a> Deserialize<'a>
-            + Eq
-            + Hash
-            + 'static,
-        P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-        A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-        K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
-    {
-        let history_repo =
-            HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)?;
-
-        let history_reader = history_repo.get_history_reader(history_repo.root())?;
-
-        let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-
-        Ok((history_repo, hot_store))
     }
 
     fn produce_counters(&self, produce_refs: Vec<Produce>) -> BTreeMap<Produce, i32> {
@@ -332,7 +341,6 @@ where
         peeks: BTreeSet<i32>,
         consume_ref: Consume,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit locked_consume");
         // println!(
         //     "consume: searching for data matching <patterns: {:?}> at <channels: {:?}>",
         //     patterns, channels
@@ -340,55 +348,78 @@ where
 
         self.log_consume(consume_ref.clone(), &channels, &patterns, &continuation, persist, &peeks);
 
-        let channel_to_indexed_data = self.fetch_channel_to_index_data(&channels);
-        // println!("\nchannel_to_indexed_data: {:?}", channel_to_indexed_data);
-        let zipped: Vec<(C, P)> = channels
-            .iter()
-            .cloned()
-            .zip(patterns.iter().cloned())
-            .collect();
-        let options: Option<Vec<ConsumeCandidate<C, A>>> = self
-            .extract_data_candidates(&self.matcher, zipped, channel_to_indexed_data, Vec::new())
-            .into_iter()
-            .collect();
-
-        // println!("\noptions: {:?}", options);
-
         let wk = WaitingContinuation {
-            patterns,
+            patterns: patterns.clone(),
             continuation,
             persist,
             peeks: peeks.clone(),
             source: consume_ref.clone(),
         };
 
-        match options {
-            Some(data_candidates) => {
-                let produce_counters_closure =
-                    |produces: Vec<Produce>| self.produce_counters(produces);
+        // println!("\nreplay_data len in replay_consume: {:?}", self.replay_data.map.len());
 
-                self.log_comm(
-                    &data_candidates,
-                    &channels,
-                    wk.clone(),
-                    COMM::new(
-                        data_candidates.clone(),
-                        consume_ref.clone(),
-                        peeks.clone(),
-                        produce_counters_closure,
-                    ),
-                    CONSUME_COMM_LABEL,
-                );
-                self.store_persistent_data(data_candidates.clone(), &peeks);
-                // println!(
-                //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
-                //     patterns, channels
-                // );
-                Ok(self.wrap_result(channels, wk, consume_ref, data_candidates))
-            }
-            None => {
-                self.store_waiting_continuation(channels, wk);
-                Ok(None)
+        let comms_option = self
+            .replay_data
+            .map
+            .get(&IOEvent::Consume(consume_ref.clone()))
+            .map(|comms| {
+                comms
+                    .iter()
+                    .map(|tuple| tuple.0.clone())
+                    .collect::<Vec<_>>()
+            });
+
+        // println!("\ncomms_options in replay_consume Some?: {:?}", comms_option.is_some());
+
+        match comms_option {
+            None => Ok(self.store_waiting_continuation(channels, wk)),
+            Some(comms_list) => {
+                match self.get_comm_and_consume_candidates(
+                    channels.clone(),
+                    patterns,
+                    comms_list.clone(),
+                ) {
+                    None => {
+                        // println!("\nwas none");
+                        Ok(self.store_waiting_continuation(channels, wk))
+                    }
+                    Some((_, data_candidates)) => {
+                        let comm_ref = {
+                            let produce_counters_closure =
+                                |produces: Vec<Produce>| self.produce_counters(produces);
+
+                            self.log_comm(
+                                &data_candidates,
+                                &channels,
+                                wk.clone(),
+                                COMM::new(
+                                    data_candidates.clone(),
+                                    consume_ref.clone(),
+                                    peeks.clone(),
+                                    produce_counters_closure,
+                                ),
+                                CONSUME_COMM_LABEL,
+                            )
+                        };
+
+                        assert!(
+                            comms_list.contains(&comm_ref),
+                            "{}",
+                            format!(
+                                "COMM Event {:?} was not contained in the trace {:?}",
+                                comm_ref, comms_list
+                            )
+                        );
+
+                        let _ = self.store_persistent_data(data_candidates.clone(), &peeks);
+                        // println!(
+                        //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
+                        //     patterns, channels
+                        // );
+                        let _ = self.remove_bindings_for(comm_ref);
+                        Ok(self.wrap_result(channels, wk, consume_ref, data_candidates))
+                    }
+                }
             }
         }
     }
@@ -411,6 +442,56 @@ where
         map
     }
 
+    fn get_comm_and_consume_candidates(
+        &self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        comms: Vec<COMM>,
+    ) -> Option<(COMM, Vec<ConsumeCandidate<C, A>>)> {
+        let run_matcher = |comm: COMM| -> Option<Vec<ConsumeCandidate<C, A>>> {
+            self.run_matcher_consume(channels.clone(), patterns.clone(), comm)
+        };
+
+        self.get_comm_or_candidate(comms, run_matcher)
+    }
+
+    fn run_matcher_consume(
+        &self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        comm: COMM,
+    ) -> Option<Vec<ConsumeCandidate<C, A>>> {
+        let mut channel_to_indexed_data_list: Vec<(C, Vec<(Datum<A>, i32)>)> = Vec::new();
+
+        for c in &channels {
+            let data = self.store.get_data(c);
+            // println!("\ndata len: {}", data.len());
+            let filtered_data: Vec<(Datum<A>, i32)> = data
+                .into_iter()
+                .zip(0..)
+                .filter(|(d, i)| self.matches(comm.clone(), (d.clone(), *i)))
+                .collect();
+            channel_to_indexed_data_list.push((c.clone(), filtered_data));
+        }
+
+        // println!("\nchannelToIndexedDataList: {:#?}", channel_to_indexed_data_list);
+
+        let channel_to_indexed_data_map: DashMap<C, Vec<(Datum<A>, i32)>> =
+            channel_to_indexed_data_list.into_iter().collect();
+
+        let result = self
+            .extract_data_candidates(
+                &self.matcher,
+                channels.into_iter().zip(patterns.into_iter()).collect(),
+                channel_to_indexed_data_map,
+                vec![],
+            )
+            .into_iter()
+            .collect::<Option<Vec<_>>>();
+
+        result
+    }
+
     fn locked_produce(
         &mut self,
         channel: C,
@@ -418,82 +499,158 @@ where
         persist: bool,
         produce_ref: Produce,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit locked_produce");
+        // println!("\nHit replay_locked_produce");
+
         let grouped_channels = self.store.get_joins(channel.clone());
-        // println!("\ngrouped_channels: {:?}", grouped_channels);
         // println!(
         //     "produce: searching for matching continuations at <grouped_channels: {:?}>",
         //     grouped_channels
         // );
         let _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
-        let extracted = self.extract_produce_candidate(
-            grouped_channels,
-            channel.clone(),
-            Datum {
-                a: data.clone(),
-                persist,
-                source: produce_ref.clone(),
-            },
-        );
 
-        // println!("extracted in lockedProduce: {:?}", extracted);
+        let comms_option = self
+            .replay_data
+            .map
+            .get(&IOEvent::Produce(produce_ref.clone()))
+            .map(|comms| {
+                comms
+                    .iter()
+                    .map(|tuple| tuple.0.clone())
+                    .collect::<Vec<_>>()
+            });
 
-        match extracted {
-            Some(produce_candidate) => Ok(self.process_match_found(produce_candidate)),
+        println!("\nreplay_data in replay_produce: {:?}", self.replay_data);
+        println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
+
+        match comms_option {
             None => Ok(self.store_data(channel, data, persist, produce_ref)),
+            Some(comms_list) => {
+                match self.get_comm_or_produce_candidate(
+                    channel.clone(),
+                    data.clone(),
+                    persist,
+                    comms_list.clone(),
+                    produce_ref.clone(),
+                    grouped_channels,
+                ) {
+                    Some((_, pc)) => Ok(self.handle_match(pc, comms_list)),
+                    None => {
+                        // println!("\nwas none");
+                        Ok(self.store_data(channel, data, persist, produce_ref))
+                    }
+                }
+            }
         }
     }
 
-    /*
-     * Find produce candidate
-     *
-     * NOTE: On Rust side, we are NOT passing functions through. Instead just the data.
-     * And then in 'run_matcher_for_channels' we call the functions defined below
-     */
-    fn extract_produce_candidate(
+    fn get_comm_or_produce_candidate(
         &self,
+        channel: C,
+        data: A,
+        persist: bool,
+        comms: Vec<COMM>,
+        produce_ref: Produce,
         grouped_channels: Vec<Vec<C>>,
-        bat_channel: C,
-        data: Datum<A>,
-    ) -> MaybeProduceCandidate<C, P, A, K> {
-        // println!("\nHit extract_produce_candidate");
-
-        let fetch_matching_continuations =
-            |channels: Vec<C>| -> Vec<(WaitingContinuation<P, K>, i32)> {
-                let continuations = self.store.get_continuations(channels);
-                self.shuffle_with_index(continuations)
-            };
-
-        /*
-         * Here, we create a cache of the data at each channel as `channelToIndexedData`
-         * which is used for finding matches.  When a speculative match is found, we can
-         * remove the matching datum from the remaining data candidates in the cache.
-         *
-         * Put another way, this allows us to speculatively remove matching data without
-         * affecting the actual store contents.
-         *
-         * In this version, we also add the produced data directly to this cache.
-         */
-        let fetch_matching_data = |channel| -> (C, Vec<(Datum<A>, i32)>) {
-            let data_vec = self.store.get_data(&channel);
-            let mut shuffled_data = self.shuffle_with_index(data_vec);
-            if channel == bat_channel {
-                shuffled_data.insert(0, (data.clone(), -1));
-            }
-            (channel, shuffled_data)
+    ) -> Option<(COMM, ProduceCandidate<C, P, A, K>)> {
+        let run_matcher = |comm: COMM| -> Option<ProduceCandidate<C, P, A, K>> {
+            self.run_matcher_produce(
+                channel.clone(),
+                data.clone(),
+                persist,
+                comm,
+                produce_ref.clone(),
+                grouped_channels.clone(),
+            )
         };
 
+        self.get_comm_or_candidate(comms, run_matcher)
+    }
+
+    fn run_matcher_produce(
+        &self,
+        channel: C,
+        data: A,
+        persist: bool,
+        comm: COMM,
+        produce_ref: Produce,
+        grouped_channels: Vec<Vec<C>>,
+    ) -> Option<ProduceCandidate<C, P, A, K>> {
         self.run_matcher_for_channels(
             grouped_channels,
-            fetch_matching_continuations,
-            fetch_matching_data,
+            |channels| {
+                let continuations = self.store.get_continuations(channels);
+                continuations
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, wc)| comm.consume == wc.source)
+                    .map(|(i, wc)| (wc, i as i32))
+                    .collect::<Vec<_>>()
+            },
+            |c| {
+                let store_data = self.store.get_data(&c);
+                let datum_tuples = store_data
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, d)| (d, i as i32))
+                    .collect::<Vec<_>>();
+
+                let mut result = datum_tuples;
+                if c == channel {
+                    result.insert(
+                        0,
+                        (
+                            Datum {
+                                a: data.clone(),
+                                persist,
+                                source: produce_ref.clone(),
+                            },
+                            -1,
+                        ),
+                    );
+                }
+
+                (
+                    c.clone(),
+                    result
+                        .into_iter()
+                        .filter(|(datum, i)| self.matches(comm.clone(), (datum.clone(), *i)))
+                        .collect(),
+                )
+            },
         )
     }
 
-    fn process_match_found(
+    fn matches(&self, comm: COMM, datum_with_index: (Datum<A>, i32)) -> bool {
+        // println!("\ncomm in matches: {:?}", comm);
+        let datum = datum_with_index.0;
+        let x = comm.produces.contains(&datum.source);
+        let res = x && self.was_repeated_enough_times(comm, datum);
+        // println!("\ncomm.produce.contains: {:?}", x);
+        // println!("\nmatches result: {:?}", res);
+        res
+    }
+
+    fn was_repeated_enough_times(&self, comm: COMM, datum: Datum<A>) -> bool {
+        // println!("\ncomm in was_repeated_enough_times: {:?}", comm);
+        // println!("\n\ndatum in was_repeated_enough_times: {:?}", datum);
+        // println!("\nproduce_counter: {:?}", self.produce_counter);
+        if !datum.persist {
+            let x = comm.times_repeated.get(&datum.source).unwrap_or(&0)
+                == self.produce_counter.get(&datum.source).unwrap_or(&0);
+            // println!("\nwas_repeated_enough_times result: {:?}", x);
+            x
+        } else {
+            true
+        }
+    }
+
+    fn handle_match(
         &mut self,
         pc: ProduceCandidate<C, P, A, K>,
+        comms: Vec<COMM>,
     ) -> MaybeActionResult<C, P, A, K> {
+        // println!("\nhit handle_match");
+
         let ProduceCandidate {
             channels,
             continuation,
@@ -510,7 +667,7 @@ where
         } = &continuation;
 
         let produce_counters_closure = |produces: Vec<Produce>| self.produce_counters(produces);
-        self.log_comm(
+        let comm_ref = self.log_comm(
             &data_candidates,
             &channels,
             continuation.clone(),
@@ -523,19 +680,43 @@ where
             PRODUCE_COMM_LABEL,
         );
 
+        assert!(
+            comms.contains(&comm_ref),
+            "COMM Event {:?} was not contained in the trace {:?}",
+            comm_ref,
+            comms
+        );
+
         if !persist {
-            self.store
+            let _ = self
+                .store
                 .remove_continuation(channels.clone(), continuation_index);
+        };
+
+        let _ = self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
+        // println!("produce: matching continuation found at <channels: {:?}>", channels);
+        let _ = self.remove_bindings_for(comm_ref);
+        self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
+    }
+
+    fn remove_bindings_for(&mut self, comm_ref: COMM) -> () {
+        // println!("\nhit remove_bindings_for");
+
+        let mut updated_replays = remove_binding(
+            self.replay_data.clone(),
+            IOEvent::Consume(comm_ref.clone().consume),
+            comm_ref.clone(),
+        );
+
+        for produce_ref in comm_ref.produces.iter() {
+            updated_replays = remove_binding(
+                updated_replays,
+                IOEvent::Produce(produce_ref.clone()),
+                comm_ref.clone(),
+            );
         }
 
-        self.remove_matched_datum_and_join(channels.clone(), data_candidates.clone());
-
-        // println!(
-        //     "produce: matching continuation found at <channels: {:?}>",
-        //     channels
-        // );
-
-        self.wrap_result(channels, continuation.clone(), consume_ref.clone(), data_candidates)
+        self.replay_data = updated_replays;
     }
 
     fn log_comm(
@@ -546,7 +727,8 @@ where
         comm: COMM,
         _label: &str,
     ) -> COMM {
-        self.event_log.insert(0, Event::Comm(comm.clone()));
+        // TODO: Metrics?
+        // self.event_log.insert(0, Event::Comm(comm.clone()));
         comm
     }
 
@@ -559,9 +741,6 @@ where
         _persist: bool,
         _peeks: &BTreeSet<i32>,
     ) -> Consume {
-        self.event_log
-            .insert(0, Event::IoEvent(IOEvent::Consume(consume_ref.clone())));
-
         consume_ref
     }
 
@@ -572,8 +751,6 @@ where
         _data: &A,
         persist: bool,
     ) -> Produce {
-        self.event_log
-            .insert(0, Event::IoEvent(IOEvent::Produce(produce_ref.clone())));
         if !persist {
             // let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
             // *entry += 1;
@@ -588,19 +765,44 @@ where
         produce_ref
     }
 
+    fn get_comm_or_candidate<Candidate>(
+        &self,
+        comms: Vec<COMM>,
+        run_matcher: impl Fn(COMM) -> Option<Candidate>,
+    ) -> Option<(COMM, Candidate)> {
+        let go = |cs: Vec<COMM>| match cs.as_slice() {
+            [] => {
+                let msg = "List comms must not be empty";
+                panic!("{}", msg);
+            }
+            [comm_ref] => match run_matcher(comm_ref.clone()) {
+                Some(data_candidates) => Ok(Ok((comm_ref.clone(), data_candidates))),
+                None => Ok(Err(comm_ref.clone())),
+            },
+            [comm_ref, rem @ ..] => match run_matcher(comm_ref.clone()) {
+                Some(data_candidates) => Ok(Ok((comm_ref.clone(), data_candidates))),
+                None => Err(rem.to_vec()),
+            },
+        };
+
+        let mut cs = comms;
+        loop {
+            match go(cs.clone()) {
+                Ok(Ok(comm_or_candidate)) => return Some(comm_or_candidate),
+                Ok(Err(_)) => return None,
+                Err(new_cs) => cs = new_cs,
+            }
+        }
+    }
+
+    // This function may need to clear 'replay_data'
     pub fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.history_repository;
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace = RSpace::apply(Arc::new(next_history), hot_store, self.matcher.clone());
+        let mut rspace = Self::apply(Arc::new(next_history), hot_store, self.matcher.clone());
         rspace.restore_installs();
-
-        // println!("\nRSpace Store in spawn: ");
-        // rspace.store.print().await;
-
-        // println!("\nRSpace History Store in spawn: ");
-        // rspace.history_repository.
 
         Ok(rspace)
     }
@@ -698,7 +900,9 @@ where
         // println!("patterns: {:?}", patterns);
         // println!("continuation: {:?}", continuation);
         if channels.len() != patterns.len() {
-            panic!("RUST ERROR: channels.length must equal patterns.length");
+            Err(RSpaceError::BugFoundError(
+                "RUST ERROR: channels.length must equal patterns.length".to_string(),
+            ))
         } else {
             // println!(
             //     "install: searching for data matching <patterns: {:?}> at <channels: {:?}>",
@@ -764,7 +968,7 @@ where
         history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
         let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        self.store = Arc::new(next_hot_store);
+        self.store = next_hot_store;
     }
 
     fn wrap_result(

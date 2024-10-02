@@ -2,7 +2,8 @@
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
-use models::rhoapi::{ListParWithRandom, TaggedContinuation};
+use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex, RwLock},
@@ -10,12 +11,8 @@ use std::{
 
 use super::{
     accounting::_cost, env::Env, errors::InterpreterError, reduce::DebruijnInterpreter,
-    rho_runtime::RhoTuplespace, substitute::Substitute, unwrap_option_safe,
+    substitute::Substitute, unwrap_option_safe,
 };
-
-// pub trait Dispatch<A, K> {
-//     async fn dispatch(&self, continuation: K, data_list: Vec<A>) -> Result<(), InterpreterError>;
-// }
 
 pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
     let pars: Vec<Par> = data_list.into_iter().flat_map(|list| list.pars).collect();
@@ -79,21 +76,24 @@ impl RholangAndScalaDispatcher {
 pub type RhoDispatch = Arc<Mutex<RholangAndScalaDispatcher>>;
 
 impl RholangAndScalaDispatcher {
-    pub fn create(
-        tuplespace: RhoTuplespace,
+    pub fn create<T>(
+        tuplespace: T,
         dispatch_table: HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
         urn_map: HashMap<String, Par>,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
         mergeable_tag_name: Par,
         cost: _cost,
-    ) -> (RholangAndScalaDispatcher, DebruijnInterpreter) {
+    ) -> (RholangAndScalaDispatcher, DebruijnInterpreter)
+    where
+        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+    {
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(Mutex::new(dispatch_table)),
             reducer: None,
         };
 
         let mut reducer = DebruijnInterpreter {
-            space: tuplespace,
+            space: Arc::new(Mutex::new(Box::new(tuplespace))),
             dispatcher: Arc::new(Mutex::new(dispatcher.clone())),
             urn_map,
             merge_chs,

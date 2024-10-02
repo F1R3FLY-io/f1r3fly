@@ -6,12 +6,13 @@ use crypto::rust::signatures::ed25519::Ed25519;
 use crypto::rust::signatures::secp256k1::Secp256k1;
 use crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
-use models::rhoapi::Expr;
+use models::rhoapi::{BindPattern, Expr, TaggedContinuation};
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
@@ -176,14 +177,17 @@ pub struct ProcessContext {
 }
 
 impl ProcessContext {
-    pub fn create(
-        space: RhoTuplespace,
+    pub fn create<T>(
+        space: T,
         dispatcher: RhoDispatch,
         block_data: Arc<RwLock<BlockData>>,
         invalid_blocks: InvalidBlocks,
-    ) -> Self {
+    ) -> Self
+    where
+        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    {
         ProcessContext {
-            space: space.clone(),
+            space: Arc::new(Mutex::new(Box::new(space.clone()))),
             dispatcher: dispatcher.clone(),
             block_data,
             invalid_blocks,
@@ -281,10 +285,13 @@ pub struct SystemProcesses {
 }
 
 impl SystemProcesses {
-    fn create(dispatcher: RhoDispatch, space: RhoTuplespace) -> Self {
+    fn create<T>(dispatcher: RhoDispatch, space: T) -> Self
+    where
+        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+    {
         SystemProcesses {
             dispatcher,
-            space,
+            space: Arc::new(Mutex::new(Box::new(space))),
             pretty_printer: PrettyPrinter::new(),
         }
     }
@@ -436,7 +443,7 @@ impl SystemProcesses {
 
                         let _ = produce(vec![error_message], ack.clone());
                     } else {
-                        // TODO: Invalid type for address should throw error!
+                        // TODO: Invalid type for address should throw error! - OLD
                         if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
                             if str == "validate".to_string() {
                                 Some(())

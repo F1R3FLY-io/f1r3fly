@@ -1,3 +1,5 @@
+// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
+
 use counter::Counter;
 use dashmap::DashMap;
 use proptest_derive::Arbitrary;
@@ -7,37 +9,6 @@ use std::hash::Hash;
 
 use super::trace::event::{Consume, Produce};
 
-// See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct RSpaceResult<C, A> {
-    pub channel: C,
-    pub matched_datum: A,
-    pub removed_datum: A,
-    pub persistent: bool,
-}
-
-// See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
-// NOTE: On Scala side, they are defaulting "peek" to false
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq)]
-pub struct ContResult<C, P, K> {
-    pub continuation: K,
-    pub persistent: bool,
-    pub channels: Vec<C>,
-    pub patterns: Vec<P>,
-    pub peek: bool,
-}
-
-impl<C: Eq, P: Eq, K: Eq> PartialEq for ContResult<C, P, K> {
-    fn eq(&self, other: &ContResult<C, P, K>) -> bool {
-        self.persistent == other.persistent
-            && self.channels == other.channels
-            && self.patterns == other.patterns
-            && self.peek == other.peek
-            && self.continuation == other.continuation
-    }
-}
-
-// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
 // The 'Default' macro is needed here for hot_store_spec.rs
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Arbitrary, Default)]
@@ -60,7 +31,6 @@ where
     }
 }
 
-// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // The 'Arbitrary' macro is needed here for proptest in hot_store_spec.rs
 // The 'Default' macro is needed here for hot_store_spec.rs
 #[derive(Clone, Debug, Arbitrary, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -94,7 +64,6 @@ where
     }
 }
 
-// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Clone, Debug)]
 pub struct ConsumeCandidate<C, A: Clone> {
     pub channel: C,
@@ -103,7 +72,6 @@ pub struct ConsumeCandidate<C, A: Clone> {
     pub datum_index: i32,
 }
 
-// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 #[derive(Debug)]
 pub struct ProduceCandidate<C, P: Clone, A: Clone, K: Clone> {
     pub channels: Vec<C>,
@@ -112,7 +80,6 @@ pub struct ProduceCandidate<C, P: Clone, A: Clone, K: Clone> {
     pub data_candidates: Vec<ConsumeCandidate<C, A>>,
 }
 
-// See rspace/src/main/scala/coop/rchain/rspace/internal.scala
 // Eq and PartialEq is needed here for reduce_spec tests
 #[derive(Debug, Eq, PartialEq)]
 pub struct Row<P: Clone, A: Clone, K: Clone> {

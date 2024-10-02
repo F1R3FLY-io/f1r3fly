@@ -1279,8 +1279,8 @@ impl SubstituteTrait<Expr> for Substitute {
 }
 
 fn set_bits_until(bits: Vec<u8>, until: i32) -> Vec<u8> {
-    println!("\nbits in set_bits_until: {:?}", bits);
-    println!("\nuntil in set_bits_until: {:?}", until);
+    // println!("\nbits in set_bits_until: {:?}", bits);
+    // println!("\nuntil in set_bits_until: {:?}", until);
     if until <= 0 {
         return Vec::new();
     }
@@ -1293,6 +1293,6 @@ fn set_bits_until(bits: Vec<u8>, until: i32) -> Vec<u8> {
         .map(|(_, &bit)| bit)
         .collect();
 
-    println!("\nresult bits in set_bits_until: {:?}", result);
+    // println!("\nresult bits in set_bits_until: {:?}", result);
     result
 }

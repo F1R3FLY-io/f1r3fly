@@ -253,13 +253,13 @@ pub fn storage_cost_consume(
         + storage_cost(&patterns).value
         + body_cost.unwrap_or(Cost::create(0, "".to_string())).value;
 
-    Cost::create(total_cost, "".to_string())
+    Cost::create(total_cost, "consume storage".to_string())
 }
 
 pub fn storage_cost_produce(channel: Par, data: ListParWithRandom) -> Cost {
     Cost::create(
         storage_cost(&vec![channel]).value + storage_cost(&data.pars).value,
-        "".to_string(),
+        "produces storage".to_string(),
     )
 }
 

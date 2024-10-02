@@ -1,6 +1,6 @@
 use models::rhoapi::{ListParWithRandom, Par};
 
-use super::{dispatch::RhoDispatch, rho_runtime::RhoTuplespace};
+use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::RhoTuplespace};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -27,7 +27,9 @@ pub struct ContractCall {
     pub dispatcher: RhoDispatch,
 }
 
-pub type Producer = Box<dyn FnOnce(Vec<Par>, Par) -> Box<dyn futures::Future<Output = ()>>>;
+pub type Producer = Box<
+    dyn FnOnce(Vec<Par>, Par) -> Box<dyn futures::Future<Output = Result<(), InterpreterError>>>,
+>;
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
@@ -50,7 +52,7 @@ impl ContractCall {
                             random_state: rand,
                         },
                         false,
-                    );
+                    )?;
 
                     match produce_result {
                         Some((cont, channels)) => {
@@ -62,13 +64,12 @@ impl ContractCall {
                                     channels.iter().map(|c| c.matched_datum.clone()).collect(),
                                 )
                                 .await
-                                .map_err(|err| panic!("{}", err))
-                                .unwrap();
                         }
 
-                        None => {}
+                        None => Ok(()),
                     }
-                }) as Box<dyn futures::Future<Output = ()>>
+                })
+                    as Box<dyn futures::Future<Output = Result<(), InterpreterError>>>
             });
 
             Some((produce, args.clone()))

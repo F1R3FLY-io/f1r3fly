@@ -1,8 +1,8 @@
 use models::ByteVector;
 
+use crate::rspace::errors::HistoryError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history::History;
-use crate::rspace::history::history::HistoryError;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::radix_tree::empty_node;

@@ -1,23 +1,24 @@
+// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
+
 use proptest::prelude::*;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store_action::{
     HotStoreAction, InsertAction, InsertContinuations, InsertData,
 };
-use rspace_plus_plus::rspace::internal::{ContResult, RSpaceResult};
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::r#match::Match;
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceInstances};
+use rspace_plus_plus::rspace::rspace::RSpace;
+use rspace_plus_plus::rspace::rspace_interface::{ContResult, ISpace, RSpaceResult};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use rspace_plus_plus::rspace::trace::event::Consume;
+use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use rspace_plus_plus::rspace::util::unpack_tuple;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashSet, LinkedList};
 use std::hash::Hash;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-
-// See rspace/src/test/scala/coop/rchain/rspace/StorageActionsTests.scala
 
 // See rspace/src/main/scala/coop/rchain/rspace/examples/StringExamples.scala
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
@@ -100,7 +101,7 @@ async fn create_rspace() -> RSpace<String, Pattern, String, StringsCaptor> {
     // let mut kvm = mk_rspace_store_manager((&format!("{}/rspace++/", "./tests/storage_actions_test_lmdb")).into(), 1 * GB);
     let store = kvm.r_space_stores().await.unwrap();
 
-    RSpaceInstances::create(store, Arc::new(Box::new(StringMatch))).unwrap()
+    RSpace::create(store, Arc::new(Box::new(StringMatch))).unwrap()
 }
 
 // NOTE: not implementing test checks for Log
@@ -117,7 +118,7 @@ async fn produce_should_persist_data_in_store() {
 
     let cont = rspace.store.get_continuations(key);
     assert_eq!(cont.len(), 0);
-    assert!(r.is_none());
+    assert!(r.unwrap().is_none());
 
     let insert_data: Vec<InsertData<_, _>> = filter_enum_variants(rspace.store.changes(), |e| {
         if let HotStoreAction::Insert(InsertAction::InsertData(d)) = e {
@@ -148,7 +149,7 @@ async fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_st
 
     let wc1 = rspace.store.get_continuations(key.clone());
     assert_eq!(wc1.len(), 0);
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
     let d2 = rspace.store.get_data(&channel);
@@ -162,7 +163,7 @@ async fn producing_twice_on_same_channel_should_persist_two_pieces_of_data_in_st
 
     let wc2 = rspace.store.get_continuations(key.clone());
     assert_eq!(wc2.len(), 0);
-    assert!(r2.is_none());
+    assert!(r2.unwrap().is_none());
 
     let insert_data: Vec<InsertData<_, _>> = filter_enum_variants(rspace.store.changes(), |e| {
         if let HotStoreAction::Insert(InsertAction::InsertData(d)) = e {
@@ -194,7 +195,7 @@ async fn consuming_on_one_channel_should_persist_continuation_in_store() {
 
     let c1 = rspace.store.get_continuations(key.clone());
     assert_ne!(c1.len(), 0);
-    assert!(r.is_none());
+    assert!(r.unwrap().is_none());
 
     let insert_continuations: Vec<InsertContinuations<_, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -229,7 +230,7 @@ async fn consuming_on_three_channels_should_persist_continuation_in_store() {
 
     let c1 = rspace.store.get_continuations(key);
     assert_ne!(c1.len(), 0);
-    assert!(r.is_none());
+    assert!(r.unwrap().is_none());
 
     let insert_continuations: Vec<InsertContinuations<_, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -254,7 +255,7 @@ async fn producing_then_consuming_on_same_channel_should_return_continuation_and
 
     let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 0);
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         key.clone(),
@@ -268,9 +269,9 @@ async fn producing_then_consuming_on_same_channel_should_return_continuation_and
 
     let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
-    assert!(r2.is_some());
+    assert!(r2.clone().unwrap().is_some());
 
-    let cont_results = run_k(r2);
+    let cont_results = run_k(r2.unwrap());
     assert!(check_same_elements(cont_results, vec![vec!["datum".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
@@ -297,7 +298,7 @@ async fn producing_then_consuming_on_same_channel_with_peek_should_return_contin
 
     let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 0);
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         key.clone(),
@@ -311,9 +312,9 @@ async fn producing_then_consuming_on_same_channel_with_peek_should_return_contin
 
     let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
-    assert!(r2.is_some());
+    assert!(r2.clone().unwrap().is_some());
 
-    let cont_results = run_k(r2);
+    let cont_results = run_k(r2.unwrap());
     assert!(check_same_elements(cont_results, vec![vec!["datum".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
@@ -341,7 +342,7 @@ async fn consuming_then_producing_on_same_channel_with_peek_should_return_contin
         false,
         std::iter::once(0).collect(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
     let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 1);
 
@@ -351,9 +352,9 @@ async fn consuming_then_producing_on_same_channel_with_peek_should_return_contin
 
     let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
-    assert!(r2.is_some());
+    assert!(r2.clone().unwrap().is_some());
 
-    let cont_results = run_k(r2);
+    let cont_results = run_k(r2.unwrap());
     assert!(check_same_elements(cont_results, vec![vec!["datum".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
@@ -381,7 +382,7 @@ async fn consuming_then_producing_on_same_channel_with_persistent_flag_should_re
         false,
         BTreeSet::default(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
     let c1 = rspace.store.get_continuations(key.clone());
     assert_eq!(c1.len(), 1);
 
@@ -391,9 +392,9 @@ async fn consuming_then_producing_on_same_channel_with_persistent_flag_should_re
 
     let c2 = rspace.store.get_continuations(key);
     assert_eq!(c2.len(), 0);
-    assert!(r2.is_some());
+    assert!(r2.clone().unwrap().is_some());
 
-    let cont_results = run_k(r2);
+    let cont_results = run_k(r2.unwrap());
     assert!(check_same_elements(cont_results, vec![vec!["datum".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
@@ -416,9 +417,9 @@ async fn producing_three_times_then_consuming_three_times_should_work() {
     let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
     let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_none());
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.unwrap().is_none());
 
     let r4 = rspace.consume(
         vec!["ch1".to_string()],
@@ -427,7 +428,7 @@ async fn producing_three_times_then_consuming_three_times_should_work() {
         false,
         BTreeSet::default(),
     );
-    let cont_results_r4 = run_k(r4);
+    let cont_results_r4 = run_k(r4.unwrap());
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r4.contains(v)));
@@ -439,7 +440,7 @@ async fn producing_three_times_then_consuming_three_times_should_work() {
         false,
         BTreeSet::default(),
     );
-    let cont_results_r5 = run_k(r5);
+    let cont_results_r5 = run_k(r5.unwrap());
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r5.contains(v)));
@@ -451,7 +452,7 @@ async fn producing_three_times_then_consuming_three_times_should_work() {
         false,
         BTreeSet::default(),
     );
-    let cont_results_r6 = run_k(r6);
+    let cont_results_r6 = run_k(r6.unwrap());
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r6.contains(v)));
@@ -484,7 +485,7 @@ async fn producing_on_channel_then_consuming_on_that_channel_and_another_then_pr
 
     let c1 = rspace.store.get_continuations(produce_key_1.clone());
     assert!(c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         consume_key.clone(),
@@ -502,7 +503,7 @@ async fn producing_on_channel_then_consuming_on_that_channel_and_another_then_pr
     assert!(c2.is_empty());
     assert!(d3.is_empty());
     assert_ne!(c3.len(), 0);
-    assert!(r2.is_none());
+    assert!(r2.unwrap().is_none());
 
     let r3 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
     let c4 = rspace.store.get_continuations(consume_key);
@@ -511,9 +512,9 @@ async fn producing_on_channel_then_consuming_on_that_channel_and_another_then_pr
     assert!(c4.is_empty());
     assert!(d4.is_empty());
     assert!(d5.is_empty());
-    assert!(r3.is_some());
+    assert!(r3.clone().unwrap().is_some());
 
-    let cont_results = run_k(r3);
+    let cont_results = run_k(r3.unwrap());
     assert!(check_same_elements(
         cont_results,
         vec![vec!["datum1".to_string(), "datum2".to_string()]]
@@ -545,7 +546,7 @@ async fn producing_on_three_channels_then_consuming_once_should_return_cont_and_
 
     let c1 = rspace.store.get_continuations(produce_key_1);
     assert!(c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce(produce_key_2[0].clone(), "datum2".to_string(), false);
     let d2 = rspace.store.get_data(&produce_key_2[0]);
@@ -553,7 +554,7 @@ async fn producing_on_three_channels_then_consuming_once_should_return_cont_and_
 
     let c2 = rspace.store.get_continuations(produce_key_2);
     assert!(c2.is_empty());
-    assert!(r2.is_none());
+    assert!(r2.unwrap().is_none());
 
     let r3 = rspace.produce(produce_key_3[0].clone(), "datum3".to_string(), false);
     let d3 = rspace.store.get_data(&produce_key_3[0]);
@@ -561,7 +562,7 @@ async fn producing_on_three_channels_then_consuming_once_should_return_cont_and_
 
     let c3 = rspace.store.get_continuations(produce_key_3);
     assert!(c3.is_empty());
-    assert!(r3.is_none());
+    assert!(r3.unwrap().is_none());
 
     let r4 = rspace.consume(
         consume_key.clone(),
@@ -581,9 +582,9 @@ async fn producing_on_three_channels_then_consuming_once_should_return_cont_and_
 
     let c4 = rspace.store.get_continuations(consume_key);
     assert!(c4.is_empty());
-    assert!(r4.is_some());
+    assert!(r4.clone().unwrap().is_some());
 
-    let cont_results = run_k(r4);
+    let cont_results = run_k(r4.unwrap());
     assert!(check_same_elements(
         cont_results,
         vec![vec!["datum1".to_string(), "datum2".to_string(), "datum3".to_string()]]
@@ -610,9 +611,9 @@ async fn producing_then_consuming_three_times_on_same_channel_should_return_thre
     let r1 = rspace.produce(key[0].clone(), "datum1".to_string(), false);
     let r2 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
     let r3 = rspace.produce(key[0].clone(), "datum3".to_string(), false);
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_none());
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.unwrap().is_none());
 
     let r4 = rspace.consume(
         key.clone(),
@@ -633,11 +634,12 @@ async fn producing_then_consuming_three_times_on_same_channel_should_return_thre
     let c1 = rspace.store.get_continuations(key);
     assert!(c1.is_empty());
 
-    let continuations = vec![r4.clone(), r5.clone(), r6.clone()];
+    let continuations =
+        vec![r4.clone().unwrap().clone(), r5.clone().unwrap().clone(), r6.clone().unwrap().clone()];
     assert!(continuations.iter().all(Option::is_some));
-    let cont_results_r4 = run_k(r4);
-    let cont_results_r5 = run_k(r5);
-    let cont_results_r6 = run_k(r6);
+    let cont_results_r4 = run_k(r4.unwrap());
+    let cont_results_r5 = run_k(r5.unwrap());
+    let cont_results_r6 = run_k(r6.unwrap());
     let cont_results = [cont_results_r4, cont_results_r5, cont_results_r6].concat();
     assert!(check_same_elements(
         cont_results,
@@ -684,15 +686,15 @@ async fn consuming_then_producing_three_times_on_same_channel_should_return_cont
     let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
     let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
-    assert!(r1.is_some());
-    assert!(r2.is_some());
-    assert!(r3.is_some());
+    assert!(r1.clone().unwrap().is_some());
+    assert!(r2.clone().unwrap().is_some());
+    assert!(r3.clone().unwrap().is_some());
 
     let possible_cont_results =
         vec![vec!["datum1".to_string()], vec!["datum2".to_string()], vec!["datum3".to_string()]];
-    let cont_results_r1 = run_k(r1);
-    let cont_results_r2 = run_k(r2);
-    let cont_results_r3 = run_k(r3);
+    let cont_results_r1 = run_k(r1.unwrap());
+    let cont_results_r2 = run_k(r2.unwrap());
+    let cont_results_r3 = run_k(r3.unwrap());
     assert!(possible_cont_results
         .iter()
         .any(|v| cont_results_r1.contains(v)));
@@ -747,13 +749,13 @@ async fn consuming_then_producing_three_times_on_same_channel_with_non_trivial_m
     let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
     let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
-    assert!(r1.is_some());
-    assert!(r2.is_some());
-    assert!(r3.is_some());
+    assert!(r1.clone().unwrap().is_some());
+    assert!(r2.clone().unwrap().is_some());
+    assert!(r3.clone().unwrap().is_some());
 
-    assert_eq!(run_k(r1), vec![vec!["datum1"]]);
-    assert_eq!(run_k(r2), vec![vec!["datum2"]]);
-    assert_eq!(run_k(r3), vec![vec!["datum3"]]);
+    assert_eq!(run_k(r1.unwrap()), vec![vec!["datum1"]]);
+    assert_eq!(run_k(r2.unwrap()), vec![vec!["datum2"]]);
+    assert_eq!(run_k(r3.unwrap()), vec![vec!["datum3"]]);
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -780,10 +782,13 @@ async fn consuming_on_two_channels_then_producing_on_each_should_return_cont_wit
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r3 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_some());
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string(), "datum2".to_string()]]));
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.clone().unwrap().is_some());
+    assert!(check_same_elements(
+        run_k(r3.unwrap()),
+        vec![vec!["datum1".to_string(), "datum2".to_string()]]
+    ));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -814,10 +819,13 @@ async fn joined_consume_with_same_channel_given_twice_followed_by_produce_should
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_some());
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string(), "datum1".to_string()]]));
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.clone().unwrap().is_some());
+    assert!(check_same_elements(
+        run_k(r3.unwrap()),
+        vec![vec!["datum1".to_string(), "datum1".to_string()]]
+    ));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -862,15 +870,21 @@ async fn consuming_then_producing_twice_on_same_channel_with_different_patterns_
     let r5 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r6 = rspace.produce("ch2".to_string(), "datum2".to_string(), false);
 
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_none());
-    assert!(r4.is_some());
-    assert!(r5.is_none());
-    assert!(r6.is_some());
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.unwrap().is_none());
+    assert!(r4.clone().unwrap().is_some());
+    assert!(r5.unwrap().is_none());
+    assert!(r6.clone().unwrap().is_some());
 
-    assert!(check_same_elements(run_k(r4), vec![vec!["datum3".to_string(), "datum4".to_string()]]));
-    assert!(check_same_elements(run_k(r6), vec![vec!["datum1".to_string(), "datum2".to_string()]]));
+    assert!(check_same_elements(
+        run_k(r4.unwrap()),
+        vec![vec!["datum3".to_string(), "datum4".to_string()]]
+    ));
+    assert!(check_same_elements(
+        run_k(r6.unwrap()),
+        vec![vec!["datum1".to_string(), "datum2".to_string()]]
+    ));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -896,8 +910,8 @@ async fn consuming_and_producing_with_non_trivial_matches_should_work() {
     );
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
 
-    assert!(r1.is_none());
-    assert!(r2.is_none());
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
 
     let d1 = rspace.store.get_data(&"ch2".to_string());
     assert!(d1.is_empty());
@@ -951,8 +965,8 @@ async fn consuming_and_producing_twice_with_non_trivial_matches_should_work() {
     let d2 = rspace.store.get_data(&"ch2".to_string());
     assert!(d2.is_empty());
 
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
-    assert!(check_same_elements(run_k(r4), vec![vec!["datum2".to_string()]]));
+    assert!(check_same_elements(run_k(r3.unwrap()), vec![vec!["datum1".to_string()]]));
+    assert!(check_same_elements(run_k(r4.unwrap()), vec![vec!["datum2".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1002,9 +1016,9 @@ async fn consuming_on_two_channels_then_consuming_on_one_then_producing_on_both_
     let d2 = rspace.store.get_data(&"ch2".to_string());
     assert_eq!(d2, vec![Datum::create("ch2".to_string(), "datum2".to_string(), false)]);
 
-    assert!(r3.is_some());
-    assert!(r4.is_none());
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
+    assert!(r3.clone().unwrap().is_some());
+    assert!(r4.unwrap().is_none());
+    assert!(check_same_elements(run_k(r3.unwrap()), vec![vec!["datum1".to_string()]]));
 
     let j1 = rspace.store.get_joins("ch1".to_string());
     assert_eq!(j1, vec![vec!["ch1".to_string(), "ch2".to_string()]]);
@@ -1034,7 +1048,7 @@ async fn producing_then_persistent_consume_on_same_channel_should_return_cont_an
     assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum".to_string(), false)]);
     let c1 = rspace.store.get_continuations(key.clone());
     assert!(c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     // Data exists so the write will not "stick"
     let r2 = rspace.consume(
@@ -1044,8 +1058,8 @@ async fn producing_then_persistent_consume_on_same_channel_should_return_cont_an
         true,
         BTreeSet::default(),
     );
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap()), vec![vec!["datum".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1068,7 +1082,7 @@ async fn producing_then_persistent_consume_on_same_channel_should_return_cont_an
     assert!(d2.is_empty());
     let c2 = rspace.store.get_continuations(key);
     assert!(!c2.is_empty());
-    assert!(r3.is_none());
+    assert!(r3.unwrap().is_none());
 }
 
 #[tokio::test]
@@ -1082,7 +1096,7 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
     assert_eq!(d1, vec![Datum::create(key[0].clone(), "datum1".to_string(), false)]);
     let c1 = rspace.store.get_continuations(key.clone());
     assert!(c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         key.clone(),
@@ -1091,8 +1105,8 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
         true,
         BTreeSet::default(),
     );
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap()), vec![vec!["datum1".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1111,7 +1125,7 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
         true,
         BTreeSet::default(),
     );
-    assert!(r3.is_none());
+    assert!(r3.unwrap().is_none());
 
     let d2 = rspace.store.get_data(&key[0]);
     assert!(d2.is_empty());
@@ -1119,12 +1133,12 @@ async fn producing_then_persistent_consume_then_producing_again_on_same_channel_
     assert!(!c2.is_empty());
 
     let r4 = rspace.produce(key[0].clone(), "datum2".to_string(), false);
-    assert!(r4.is_some());
+    assert!(r4.clone().unwrap().is_some());
     let d3 = rspace.store.get_data(&key[0]);
     assert!(d3.is_empty());
     let c3 = rspace.store.get_continuations(key);
     assert!(!c3.is_empty());
-    assert!(check_same_elements(run_k(r4), vec![vec!["datum2".to_string()]]))
+    assert!(check_same_elements(run_k(r4.clone().unwrap()), vec![vec!["datum2".to_string()]]))
 }
 
 #[tokio::test]
@@ -1142,24 +1156,24 @@ async fn doing_persistent_consume_and_producing_multiple_times_should_work() {
     assert!(d1.is_empty());
     let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let d2 = rspace.store.get_data(&"ch1".to_string());
     assert!(d2.is_empty());
     let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c2.is_empty());
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2.clone()), vec![vec!["datum1".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap().clone()), vec![vec!["datum1".to_string()]]));
 
     let r3 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
     let d3 = rspace.store.get_data(&"ch1".to_string());
     assert!(d3.is_empty());
     let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c3.is_empty());
-    assert!(r3.is_some());
+    assert!(r3.clone().unwrap().is_some());
 
-    let r3_results = run_k(r3.clone());
+    let r3_results = run_k(r3.clone().unwrap());
 
     // The below is commented out and replaced because the rust side does not allow
     // for modification of continuation in the history_store and have it reflect the the hot_store.
@@ -1186,11 +1200,11 @@ async fn consuming_and_doing_persistent_produce_should_work() {
         false,
         BTreeSet::default(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap()), vec![vec!["datum1".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1203,7 +1217,7 @@ async fn consuming_and_doing_persistent_produce_should_work() {
     assert!(insert_actions.is_empty());
 
     let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
-    assert!(r3.is_none());
+    assert!(r3.unwrap().is_none());
     let d1 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
@@ -1221,11 +1235,11 @@ async fn consuming_then_persistent_produce_then_consuming_should_work() {
         false,
         BTreeSet::default(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap()), vec![vec!["datum1".to_string()]]));
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1238,7 +1252,7 @@ async fn consuming_then_persistent_produce_then_consuming_should_work() {
     assert!(insert_actions.is_empty());
 
     let r3 = rspace.produce("ch1".to_string(), "datum1".to_string(), true);
-    assert!(r3.is_none());
+    assert!(r3.unwrap().is_none());
     let d1 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
@@ -1251,12 +1265,12 @@ async fn consuming_then_persistent_produce_then_consuming_should_work() {
         false,
         BTreeSet::default(),
     );
-    assert!(r4.is_some());
+    assert!(r4.clone().unwrap().is_some());
     let d2 = rspace.store.get_data(&"ch1".to_string());
     assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
-    assert!(check_same_elements(run_k(r4), vec![vec!["datum1".to_string()]]))
+    assert!(check_same_elements(run_k(r4.unwrap()), vec![vec!["datum1".to_string()]]))
 }
 
 #[tokio::test]
@@ -1268,7 +1282,7 @@ async fn doing_persistent_produce_and_consuming_twice_should_work() {
     assert_eq!(d1, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         vec!["ch1".to_string()],
@@ -1281,8 +1295,8 @@ async fn doing_persistent_produce_and_consuming_twice_should_work() {
     assert_eq!(d2, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum1".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r2.unwrap()), vec![vec!["datum1".to_string()]]));
 
     let r3 = rspace.consume(
         vec!["ch1".to_string()],
@@ -1295,8 +1309,8 @@ async fn doing_persistent_produce_and_consuming_twice_should_work() {
     assert_eq!(d3, vec![Datum::create("ch1".to_string(), "datum1".to_string(), true)]);
     let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c3.is_empty());
-    assert!(r3.is_some());
-    assert!(check_same_elements(run_k(r3), vec![vec!["datum1".to_string()]]));
+    assert!(r3.clone().unwrap().is_some());
+    assert!(check_same_elements(run_k(r3.unwrap()), vec![vec!["datum1".to_string()]]));
 }
 
 #[tokio::test]
@@ -1313,9 +1327,9 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
     let r1 = rspace.produce("ch1".to_string(), "datum1".to_string(), false);
     let r2 = rspace.produce("ch1".to_string(), "datum2".to_string(), false);
     let r3 = rspace.produce("ch1".to_string(), "datum3".to_string(), false);
-    assert!(r1.is_none());
-    assert!(r2.is_none());
-    assert!(r3.is_none());
+    assert!(r1.unwrap().is_none());
+    assert!(r2.unwrap().is_none());
+    assert!(r3.unwrap().is_none());
 
     let r4 = rspace.consume(
         vec!["ch1".to_string()],
@@ -1328,8 +1342,8 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
     assert!(expected_data.iter().any(|datum| d1.contains(datum)));
     let c1 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c1.is_empty());
-    assert!(r4.is_some());
-    let cont_results_r4 = run_k(r4);
+    assert!(r4.clone().unwrap().is_some());
+    let cont_results_r4 = run_k(r4.unwrap());
     assert!(expected_conts
         .iter()
         .any(|cont| cont_results_r4.contains(cont)));
@@ -1345,8 +1359,8 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
     assert!(expected_data.iter().any(|datum| d2.contains(datum)));
     let c2 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(c2.is_empty());
-    assert!(r5.is_some());
-    let cont_results_r5 = run_k(r5);
+    assert!(r5.clone().unwrap().is_some());
+    let cont_results_r5 = run_k(r5.unwrap());
     assert!(expected_conts
         .iter()
         .any(|cont| cont_results_r5.contains(cont)));
@@ -1358,7 +1372,7 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
         true,
         BTreeSet::default(),
     );
-    assert!(r6.is_some());
+    assert!(r6.clone().unwrap().is_some());
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {
@@ -1370,7 +1384,7 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
         });
     assert!(insert_actions.is_empty());
 
-    let cont_results_r6 = run_k(r6);
+    let cont_results_r6 = run_k(r6.unwrap());
     assert!(expected_conts
         .iter()
         .any(|cont| cont_results_r6.contains(cont)));
@@ -1386,7 +1400,7 @@ async fn producing_three_times_then_doing_persistent_consume_should_work() {
     assert!(d3.is_empty());
     let c3 = rspace.store.get_continuations(vec!["ch1".to_string()]);
     assert!(!c3.is_empty());
-    assert!(r7.is_none());
+    assert!(r7.unwrap().is_none());
 }
 
 #[tokio::test]
@@ -1395,7 +1409,7 @@ async fn persistent_produce_should_be_available_for_multiple_matches() {
     let channel = "chan".to_string();
 
     let r1 = rspace.produce(channel.clone(), "datum".to_string(), true);
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.consume(
         vec![channel.clone(), channel.clone()],
@@ -1404,8 +1418,11 @@ async fn persistent_produce_should_be_available_for_multiple_matches() {
         false,
         BTreeSet::default(),
     );
-    assert!(r2.is_some());
-    assert!(check_same_elements(run_k(r2), vec![vec!["datum".to_string(), "datum".to_string()]]));
+    assert!(r2.clone().unwrap().is_some());
+    assert!(check_same_elements(
+        run_k(r2.unwrap()),
+        vec![vec!["datum".to_string(), "datum".to_string()]]
+    ));
 }
 
 #[tokio::test]
@@ -1460,7 +1477,7 @@ async fn reset_should_change_the_state_of_the_store_and_reset_the_trie_updates_l
 
     let checkpint0 = rspace.create_checkpoint().unwrap();
     let r = rspace.consume(key, patterns, StringsCaptor::new(), false, BTreeSet::default());
-    assert!(r.is_none());
+    assert!(r.unwrap().is_none());
 
     let checkpoint0_changes: Vec<InsertContinuations<String, Pattern, StringsCaptor>> = rspace
         .store
@@ -1501,10 +1518,10 @@ async fn consume_and_produce_a_match_and_then_checkpoint_should_result_in_an_emp
         false,
         BTreeSet::default(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let r2 = rspace.produce("ch1".to_string(), "datum".to_string(), false);
-    assert!(r2.is_some());
+    assert!(r2.unwrap().is_some());
 
     let checkpoint = rspace.create_checkpoint().unwrap();
     assert_eq!(checkpoint.root, RadixHistory::empty_root_node_hash());
@@ -1534,14 +1551,14 @@ proptest! {
 
       for channel in data.iter() {
         let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
-        assert!(result.is_some());
+        assert!(result.unwrap().is_some());
       }
 
       let checkpoint2 = rspace.create_checkpoint().unwrap();
 
       for channel in data.iter() {
         let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
-        assert!(result.is_none());
+        assert!(result.unwrap().is_none());
       }
 
       assert_eq!(checkpoint2.root, RadixHistory::empty_root_node_hash());
@@ -1549,7 +1566,7 @@ proptest! {
 
       for channel in data.iter() {
         let result = rspace.consume(vec![channel.to_string()], vec![Pattern::Wildcard], StringsCaptor::new(), false, BTreeSet::default());
-        assert!(result.is_some());
+        assert!(result.unwrap().is_some());
       }
 
       let checkpoint3 = rspace.create_checkpoint().unwrap();
@@ -1560,7 +1577,6 @@ proptest! {
 }
 
 #[tokio::test]
-#[should_panic(expected = "RUST ERROR: Installing can be done only on startup")]
 async fn an_install_should_not_allow_installing_after_a_produce_operation() {
     let mut rspace = create_rspace().await;
     let channel = "ch1".to_string();
@@ -1569,7 +1585,8 @@ async fn an_install_should_not_allow_installing_after_a_produce_operation() {
     let patterns = vec![Pattern::Wildcard];
 
     let _ = rspace.produce(channel, datum, false);
-    let _install_attempt = rspace.install(key, patterns, StringsCaptor::new());
+    let install_attempt = rspace.install(key, patterns, StringsCaptor::new());
+    assert!(install_attempt.is_err())
 }
 
 #[tokio::test]
@@ -1583,7 +1600,7 @@ async fn consuming_with_different_pattern_and_channel_lengths_should_error() {
         false,
         BTreeSet::default(),
     );
-    assert!(r1.is_none());
+    assert!(r1.unwrap().is_none());
 
     let insert_actions: Vec<InsertAction<_, _, _, _>> =
         filter_enum_variants(rspace.store.changes(), |e| {

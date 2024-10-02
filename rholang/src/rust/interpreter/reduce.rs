@@ -204,7 +204,7 @@ impl DebruijnInterpreter {
             self.space
                 .lock()
                 .unwrap()
-                .produce(chan.clone(), data.clone(), persistent);
+                .produce(chan.clone(), data.clone(), persistent)?;
 
         self.continue_produce_process(
             unpack_option_with_peek(produce_result),
@@ -241,7 +241,7 @@ impl DebruijnInterpreter {
             } else {
                 BTreeSet::new()
             },
-        );
+        )?;
 
         // println!("space map in reduce consume: {:?}", self.space.lock().unwrap().to_map());
         // println!("\nconsume_result in reduce consume: {:?}", consume_result);

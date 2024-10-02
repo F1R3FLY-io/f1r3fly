@@ -13,3 +13,8 @@ mod serializers;
 pub mod trace;
 pub mod r#match;
 pub mod util;
+pub mod rspace_interface;
+pub mod tuplespace_interface;
+pub mod replay_rspace_interface;
+pub mod errors;
+pub mod replay_rspace;

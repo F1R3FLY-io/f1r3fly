@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use models::ByteBuffer;
 
 use crate::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash,
-    shared::key_value_store::{KeyValueStore, KvStoreError},
+    errors::RootError, hashing::blake2b256_hash::Blake2b256Hash,
+    shared::key_value_store::KeyValueStore,
 };
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/RootsStore.scala
@@ -98,26 +98,5 @@ impl RootsStoreInstances {
         }
 
         RootsStoreInstance { store }
-    }
-}
-
-#[derive(Debug)]
-pub enum RootError {
-    KvStoreError(String),
-    UnknownRootError(String),
-}
-
-impl std::fmt::Display for RootError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            RootError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
-            RootError::UnknownRootError(err) => write!(f, "Unknown root: {}", err),
-        }
-    }
-}
-
-impl From<KvStoreError> for RootError {
-    fn from(error: KvStoreError) -> Self {
-        RootError::KvStoreError(error.to_string())
     }
 }

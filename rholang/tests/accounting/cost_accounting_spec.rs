@@ -8,25 +8,20 @@ use rholang::rust::interpreter::{
     rho_runtime::{create_rho_runtime, RhoRuntime},
 };
 use rspace_plus_plus::rspace::{
-    rspace::{RSpace, RSpaceInstances},
+    rspace::RSpace,
     shared::{
         in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
     },
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> EvaluateResult {
     // let cost_log: Vec<Cost> = Vec::new();
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-        RSpaceInstances::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(
-        Arc::new(Mutex::new(space)),
-        Par::default(),
-        false,
-        &mut Vec::new(),
-    );
+        RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new());
 
     let eval_result = runtime.lock().unwrap().evaluate_with_phlo(
         contract,

@@ -1,13 +1,14 @@
-use models::rhoapi::Par;
+use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rspace_plus_plus::rspace::{
-    rspace::RSpaceInstances,
+    rspace::RSpace,
+    rspace_interface::ISpace,
     shared::{
         in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
     },
 };
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use crate::rust::interpreter::{
@@ -15,16 +16,20 @@ use crate::rust::interpreter::{
     dispatch::RholangAndScalaDispatcher,
     matcher::r#match::Matcher,
     reduce::DebruijnInterpreter,
-    rho_runtime::RhoTuplespace,
 };
 
-pub async fn create_test_space() -> (RhoTuplespace, DebruijnInterpreter) {
+pub async fn create_test_space<T>() -> (
+    impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    DebruijnInterpreter,
+)
+where
+    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+{
     let cost = CostAccounting::empty_cost();
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
-    let space = Arc::new(Mutex::new(
-        RSpaceInstances::create(store, Arc::new(Box::new(Matcher))).unwrap(),
-    ));
+    let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+
     let reducer = RholangAndScalaDispatcher::create(
         space.clone(),
         HashMap::new(),
