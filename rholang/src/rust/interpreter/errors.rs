@@ -259,3 +259,9 @@ impl From<RSpaceError> for InterpreterError {
         InterpreterError::RSpaceError(err)
     }
 }
+
+impl From<InterpreterError> for RSpaceError {
+    fn from(error: InterpreterError) -> Self {
+        RSpaceError::InterpreterError(error.to_string())
+    }
+}

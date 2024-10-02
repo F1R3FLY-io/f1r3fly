@@ -4,6 +4,7 @@ use super::shared::key_value_store::KvStoreError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RSpaceError {
+    InterpreterError(String),
     HistoryError(HistoryError),
     RadixTreeError(RadixTreeError),
     KvStoreError(KvStoreError),
@@ -13,6 +14,7 @@ pub enum RSpaceError {
 impl std::fmt::Display for RSpaceError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            RSpaceError::InterpreterError(err) => write!(f, "Interpreter Error: {}", err),
             RSpaceError::HistoryError(err) => write!(f, "History Error: {}", err),
             RSpaceError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
             RSpaceError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),

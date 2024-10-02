@@ -72,7 +72,7 @@ where
         continuation: K,
         persist: bool,
         peeks: BTreeSet<i32>,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit consume");
 
         if channels.is_empty() {
@@ -90,7 +90,12 @@ where
         }
     }
 
-    fn produce(&mut self, channel: C, data: A, persist: bool) -> MaybeActionResult<C, P, A, K> {
+    fn produce(
+        &mut self,
+        channel: C,
+        data: A,
+        persist: bool,
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
@@ -107,7 +112,7 @@ where
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
-    ) -> Option<(K, Vec<A>)> {
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         self.locked_install(channels, patterns, continuation)
     }
 }
@@ -335,7 +340,7 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
         consume_ref: Consume,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!(
         //     "consume: searching for data matching <patterns: {:?}> at <channels: {:?}>",
         //     patterns, channels
@@ -367,7 +372,7 @@ where
         // println!("\ncomms_options in replay_consume Some?: {:?}", comms_option.is_some());
 
         match comms_option {
-            None => self.store_waiting_continuation(channels, wk),
+            None => Ok(self.store_waiting_continuation(channels, wk)),
             Some(comms_list) => {
                 match self.get_comm_and_consume_candidates(
                     channels.clone(),
@@ -376,7 +381,7 @@ where
                 ) {
                     None => {
                         // println!("\nwas none");
-                        self.store_waiting_continuation(channels, wk)
+                        Ok(self.store_waiting_continuation(channels, wk))
                     }
                     Some((_, data_candidates)) => {
                         let comm_ref = {
@@ -412,7 +417,7 @@ where
                         //     patterns, channels
                         // );
                         let _ = self.remove_bindings_for(comm_ref);
-                        self.wrap_result(channels, wk, consume_ref, data_candidates)
+                        Ok(self.wrap_result(channels, wk, consume_ref, data_candidates))
                     }
                 }
             }
@@ -493,7 +498,7 @@ where
         data: A,
         persist: bool,
         produce_ref: Produce,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit replay_locked_produce");
 
         let grouped_channels = self.store.get_joins(channel.clone());
@@ -518,7 +523,7 @@ where
         println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
 
         match comms_option {
-            None => self.store_data(channel, data, persist, produce_ref),
+            None => Ok(self.store_data(channel, data, persist, produce_ref)),
             Some(comms_list) => {
                 match self.get_comm_or_produce_candidate(
                     channel.clone(),
@@ -528,10 +533,10 @@ where
                     produce_ref.clone(),
                     grouped_channels,
                 ) {
-                    Some((_, pc)) => self.handle_match(pc, comms_list),
+                    Some((_, pc)) => Ok(self.handle_match(pc, comms_list)),
                     None => {
                         // println!("\nwas none");
-                        self.store_data(channel, data, persist, produce_ref)
+                        Ok(self.store_data(channel, data, persist, produce_ref))
                     }
                 }
             }
@@ -889,13 +894,15 @@ where
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
-    ) -> Option<(K, Vec<A>)> {
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         // println!("\nhit locked_install");
         // println!("channels: {:?}", channels);
         // println!("patterns: {:?}", patterns);
         // println!("continuation: {:?}", continuation);
         if channels.len() != patterns.len() {
-            panic!("RUST ERROR: channels.length must equal patterns.length");
+            Err(RSpaceError::BugFoundError(
+                "RUST ERROR: channels.length must equal patterns.length".to_string(),
+            ))
         } else {
             // println!(
             //     "install: searching for data matching <patterns: {:?}> at <channels: {:?}>",
@@ -918,7 +925,7 @@ where
 
             // println!("options in locked_install: {:?}", options);
 
-            let result = match options {
+            match options {
                 None => {
                     self.installs.lock().unwrap().insert(
                         channels.clone(),
@@ -947,13 +954,12 @@ where
                     //     patterns, continuation, channels
                     // );
                     // println!("store length after install: {:?}\n", self.store.to_map().len());
-                    None
+                    Ok(None)
                 }
-                Some(_) => {
-                    panic!("RUST ERROR: Installing can be done only on startup")
-                }
-            };
-            result
+                Some(_) => Err(RSpaceError::BugFoundError(
+                    "RUST ERROR: Installing can be done only on startup".to_string(),
+                )),
+            }
         }
     }
 

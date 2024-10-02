@@ -172,7 +172,7 @@ pub trait RhoRuntime: HasCost {
         &mut self,
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
-    ) -> Option<(TaggedContinuation, Vec<ListParWithRandom>)>;
+    ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError>;
 
     /**
      * get data directly from history repository
@@ -299,16 +299,16 @@ impl RhoRuntime for RhoRuntimeImpl {
         &mut self,
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
-    ) -> Option<(TaggedContinuation, Vec<ListParWithRandom>)> {
+    ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError> {
         let v = self.space.lock().unwrap().consume(
             channel,
             pattern,
             TaggedContinuation::default(),
             false,
             BTreeSet::new(),
-        );
+        )?;
 
-        unpack_option(&v)
+        Ok(unpack_option(&v))
     }
 
     fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
@@ -464,16 +464,16 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         &mut self,
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
-    ) -> Option<(TaggedContinuation, Vec<ListParWithRandom>)> {
+    ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError> {
         let v = self.space.lock().unwrap().consume(
             channel,
             pattern,
             TaggedContinuation::default(),
             false,
             BTreeSet::new(),
-        );
+        )?;
 
-        unpack_option(&v)
+        Ok(unpack_option(&v))
     }
 
     fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
@@ -574,7 +574,7 @@ where
 
         for space in &mut spaces {
             let result = space.install(channels.clone(), patterns.clone(), continuation.clone());
-            results.push(result);
+            results.push(result.map_err(|err| panic!("{}", err)).unwrap());
         }
     }
 
@@ -884,7 +884,7 @@ where
     assert!(res.iter().all(|s| s.is_none()));
 
     let reducer = setup_reducer(
-        ChargingRSpace::charging_rspace(rspace),
+        ChargingRSpace::charging_rspace(rspace, cost.clone()),
         block_data_ref.clone(),
         invalid_blocks.clone(),
         extra_system_processes,

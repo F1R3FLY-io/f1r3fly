@@ -181,7 +181,7 @@ where
         continuation: K,
         persist: bool,
         peeks: BTreeSet<i32>,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit consume");
 
         if channels.is_empty() {
@@ -199,7 +199,12 @@ where
         }
     }
 
-    fn produce(&mut self, channel: C, data: A, persist: bool) -> MaybeActionResult<C, P, A, K> {
+    fn produce(
+        &mut self,
+        channel: C,
+        data: A,
+        persist: bool,
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
@@ -216,7 +221,7 @@ where
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
-    ) -> Option<(K, Vec<A>)> {
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         self.locked_install(channels, patterns, continuation)
     }
 }
@@ -326,7 +331,7 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
         consume_ref: Consume,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit locked_consume");
         // println!(
         //     "consume: searching for data matching <patterns: {:?}> at <channels: {:?}>",
@@ -379,11 +384,11 @@ where
                 //     "consume: data found for <patterns: {:?}> at <channels: {:?}>",
                 //     patterns, channels
                 // );
-                self.wrap_result(channels, wk, consume_ref, data_candidates)
+                Ok(self.wrap_result(channels, wk, consume_ref, data_candidates))
             }
             None => {
                 self.store_waiting_continuation(channels, wk);
-                None
+                Ok(None)
             }
         }
     }
@@ -412,7 +417,7 @@ where
         data: A,
         persist: bool,
         produce_ref: Produce,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit locked_produce");
         let grouped_channels = self.store.get_joins(channel.clone());
         // println!("\ngrouped_channels: {:?}", grouped_channels);
@@ -434,8 +439,8 @@ where
         // println!("extracted in lockedProduce: {:?}", extracted);
 
         match extracted {
-            Some(produce_candidate) => self.process_match_found(produce_candidate),
-            None => self.store_data(channel, data, persist, produce_ref),
+            Some(produce_candidate) => Ok(self.process_match_found(produce_candidate)),
+            None => Ok(self.store_data(channel, data, persist, produce_ref)),
         }
     }
 
@@ -687,7 +692,7 @@ where
         channels: Vec<C>,
         patterns: Vec<P>,
         continuation: K,
-    ) -> Option<(K, Vec<A>)> {
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         // println!("\nhit locked_install");
         // println!("channels: {:?}", channels);
         // println!("patterns: {:?}", patterns);
@@ -716,7 +721,7 @@ where
 
             // println!("options in locked_install: {:?}", options);
 
-            let result = match options {
+            match options {
                 None => {
                     self.installs.lock().unwrap().insert(
                         channels.clone(),
@@ -745,13 +750,12 @@ where
                     //     patterns, continuation, channels
                     // );
                     // println!("store length after install: {:?}\n", self.store.to_map().len());
-                    None
+                    Ok(None)
                 }
-                Some(_) => {
-                    panic!("RUST ERROR: Installing can be done only on startup")
-                }
-            };
-            result
+                Some(_) => Err(RSpaceError::BugFoundError(
+                    "RUST ERROR: Installing can be done only on startup".to_string(),
+                )),
+            }
         }
     }
 

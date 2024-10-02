@@ -443,7 +443,7 @@ impl SystemProcesses {
 
                         let _ = produce(vec![error_message], ack.clone());
                     } else {
-                        // TODO: Invalid type for address should throw error!
+                        // TODO: Invalid type for address should throw error! - OLD
                         if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
                             if str == "validate".to_string() {
                                 Some(())
