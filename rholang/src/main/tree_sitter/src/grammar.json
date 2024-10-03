@@ -1419,7 +1419,7 @@
           },
           {
             "type": "SYMBOL",
-            "name": "proc_var"
+            "name": "_proc_var"
           },
           {
             "type": "SYMBOL",
@@ -1453,7 +1453,7 @@
       "type": "STRING",
       "value": "_"
     },
-    "proc_var": {
+    "_proc_var": {
       "type": "CHOICE",
       "members": [
         {
@@ -1513,7 +1513,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "proc_var"
+          "name": "_proc_var"
         },
         {
           "type": "SYMBOL",
@@ -1534,7 +1534,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "proc_var"
+          "name": "_proc_var"
         }
       ]
     },
@@ -2371,7 +2371,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "proc_var"
+          "name": "_proc_var"
         }
       ]
     },
@@ -2576,6 +2576,7 @@
     "_bundle",
     "_send_type",
     "_source",
+    "_proc_var",
     "_ground"
   ]
 }

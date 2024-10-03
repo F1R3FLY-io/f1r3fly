@@ -62,6 +62,20 @@
     ]
   },
   {
+    "type": "_proc_var",
+    "named": true,
+    "subtypes": [
+      {
+        "type": "var",
+        "named": true
+      },
+      {
+        "type": "wildcard",
+        "named": true
+      }
+    ]
+  },
+  {
     "type": "_send_type",
     "named": true,
     "subtypes": [
@@ -114,6 +128,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -247,10 +265,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -288,6 +302,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -421,10 +439,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -468,6 +482,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -601,10 +619,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -642,6 +656,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -778,10 +796,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -811,6 +825,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -950,10 +968,6 @@
           "named": true
         },
         {
-          "type": "proc_var",
-          "named": true
-        },
-        {
           "type": "quote",
           "named": true
         },
@@ -990,6 +1004,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -1129,10 +1147,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -1189,6 +1203,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -1289,10 +1307,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -1373,6 +1387,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -1506,10 +1524,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -1547,6 +1561,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -1680,10 +1698,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -1800,6 +1814,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -1933,10 +1951,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -1974,6 +1988,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -2107,10 +2125,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -2152,7 +2166,7 @@
         "required": true,
         "types": [
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -2194,6 +2208,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -2333,10 +2351,6 @@
           "named": true
         },
         {
-          "type": "proc_var",
-          "named": true
-        },
-        {
           "type": "quote",
           "named": true
         },
@@ -2391,6 +2405,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -2524,10 +2542,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -2565,6 +2579,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -2698,10 +2716,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -2745,6 +2759,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -2878,10 +2896,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -2919,6 +2933,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -3052,10 +3070,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -3104,6 +3118,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -3237,10 +3255,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -3278,6 +3292,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -3411,10 +3429,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -3446,7 +3460,7 @@
       "required": true,
       "types": [
         {
-          "type": "proc_var",
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -3474,6 +3488,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -3610,10 +3628,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -3651,6 +3665,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -3784,10 +3802,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -3831,6 +3845,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -3964,10 +3982,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -4005,6 +4019,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -4138,10 +4156,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -4182,6 +4196,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -4325,10 +4343,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -4360,6 +4374,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -4496,10 +4514,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -4537,6 +4551,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -4670,10 +4688,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -4732,6 +4746,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -4871,10 +4889,6 @@
           "named": true
         },
         {
-          "type": "proc_var",
-          "named": true
-        },
-        {
           "type": "quote",
           "named": true
         },
@@ -4914,6 +4928,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -5047,10 +5065,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -5088,6 +5102,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -5221,10 +5239,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -5327,7 +5341,7 @@
             "named": false
           },
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           }
         ]
@@ -5339,6 +5353,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -5478,10 +5496,6 @@
           "named": true
         },
         {
-          "type": "proc_var",
-          "named": true
-        },
-        {
           "type": "quote",
           "named": true
         },
@@ -5521,6 +5535,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -5654,10 +5672,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -5695,6 +5709,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -5828,10 +5846,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -5875,6 +5889,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -6008,10 +6026,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -6049,6 +6063,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -6185,10 +6203,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -6221,7 +6235,7 @@
             "named": false
           },
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           }
         ]
@@ -6269,6 +6283,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -6369,10 +6387,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -6402,6 +6416,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -6538,10 +6556,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -6579,6 +6593,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -6715,10 +6733,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -6748,6 +6762,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -6884,10 +6902,6 @@
         },
         {
           "type": "plus_plus",
-          "named": true
-        },
-        {
-          "type": "proc_var",
           "named": true
         },
         {
@@ -6950,6 +6964,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7083,10 +7101,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -7130,6 +7144,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7263,10 +7281,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -7304,6 +7318,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7437,10 +7455,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -7484,6 +7498,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7617,10 +7635,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -7658,6 +7672,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7791,10 +7809,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -7838,6 +7852,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -7971,10 +7989,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8012,6 +8026,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -8145,10 +8163,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8222,7 +8236,7 @@
             "named": false
           },
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           }
         ]
@@ -8233,7 +8247,7 @@
       "required": true,
       "types": [
         {
-          "type": "proc_var",
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -8261,6 +8275,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -8397,10 +8415,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8444,6 +8458,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -8577,10 +8595,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8624,6 +8638,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -8757,10 +8775,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8798,6 +8812,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -8931,10 +8949,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -8988,6 +9002,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -9124,10 +9142,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -9157,6 +9171,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -9296,10 +9314,6 @@
           "named": true
         },
         {
-          "type": "proc_var",
-          "named": true
-        },
-        {
           "type": "quote",
           "named": true
         },
@@ -9336,6 +9350,10 @@
           },
           {
             "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -9472,10 +9490,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -9519,6 +9533,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -9652,10 +9670,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -9693,6 +9707,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -9826,10 +9844,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -9873,6 +9887,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10006,10 +10024,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -10047,6 +10061,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10183,10 +10201,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -10215,7 +10229,7 @@
         "required": true,
         "types": [
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -10257,6 +10271,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10390,10 +10408,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -10431,6 +10445,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10564,10 +10582,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -10611,6 +10625,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10744,10 +10762,6 @@
           },
           {
             "type": "plus_plus",
-            "named": true
-          },
-          {
-            "type": "proc_var",
             "named": true
           },
           {
@@ -10785,6 +10799,10 @@
             "named": true
           },
           {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
             "type": "add",
             "named": true
           },
@@ -10921,10 +10939,6 @@
             "named": true
           },
           {
-            "type": "proc_var",
-            "named": true
-          },
-          {
             "type": "quote",
             "named": true
           },
@@ -10945,25 +10959,6 @@
     }
   },
   {
-    "type": "proc_var",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "quote",
     "named": true,
     "fields": {},
@@ -10973,6 +10968,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -10997,10 +10996,6 @@
         },
         {
           "type": "negation",
-          "named": true
-        },
-        {
-          "type": "proc_var",
           "named": true
         },
         {
@@ -11042,7 +11037,7 @@
       "required": true,
       "types": [
         {
-          "type": "proc_var",
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -11061,7 +11056,7 @@
         "required": true,
         "types": [
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -11101,7 +11096,7 @@
         "required": true,
         "types": [
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -11142,7 +11137,7 @@
       "required": true,
       "types": [
         {
-          "type": "proc_var",
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -11181,7 +11176,7 @@
         "required": true,
         "types": [
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           },
           {
@@ -11205,7 +11200,7 @@
             "named": false
           },
           {
-            "type": "proc_var",
+            "type": "_proc_var",
             "named": true
           }
         ]
@@ -11217,6 +11212,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -11353,10 +11352,6 @@
         },
         {
           "type": "plus_plus",
-          "named": true
-        },
-        {
-          "type": "proc_var",
           "named": true
         },
         {
@@ -11387,7 +11382,7 @@
       "required": true,
       "types": [
         {
-          "type": "proc_var",
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -11412,6 +11407,10 @@
       "types": [
         {
           "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
           "named": true
         },
         {
@@ -11548,10 +11547,6 @@
         },
         {
           "type": "plus_plus",
-          "named": true
-        },
-        {
-          "type": "proc_var",
           "named": true
         },
         {
@@ -11605,6 +11600,10 @@
           "named": true
         },
         {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
           "type": "add",
           "named": true
         },
@@ -11738,10 +11737,6 @@
         },
         {
           "type": "plus_plus",
-          "named": true
-        },
-        {
-          "type": "proc_var",
           "named": true
         },
         {
