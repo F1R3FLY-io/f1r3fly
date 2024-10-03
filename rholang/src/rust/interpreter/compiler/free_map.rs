@@ -30,7 +30,6 @@ impl<T: Clone> FreeMap<T> {
   pub(crate) fn put(&self, binding: IdContext<T>) -> Self {
     let (name, typ, source_position) = binding;
 
-    // Створюємо нову копію level_bindings з додаванням нового елементу
     let mut new_level_bindings = self.level_bindings.clone();
     new_level_bindings.insert(
       name,
@@ -41,7 +40,6 @@ impl<T: Clone> FreeMap<T> {
       },
     );
 
-    // Повертаємо новий FreeMap зі збільшеним next_level
     FreeMap {
       next_level: self.next_level + 1,
       level_bindings: new_level_bindings,
@@ -77,7 +75,6 @@ impl<T: Clone> FreeMap<T> {
     shadowed
   }
 
-  //pub(crate) fn add_wildcard(&mut self, source_position: SourcePosition) {
   pub(crate) fn add_wildcard(&mut self, source_position: SourcePosition)-> Self {
     let mut updated_wildcards = self.wildcards.clone();
     updated_wildcards.push(source_position);
@@ -88,7 +85,6 @@ impl<T: Clone> FreeMap<T> {
       wildcards: updated_wildcards,
       connectives: self.connectives.clone(),
     }
-    //self.wildcards.push(source_position);
   }
 
   fn add_connective(&mut self, connective: ConnectiveInstance, source_position: SourcePosition) {

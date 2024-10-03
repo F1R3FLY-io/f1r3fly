@@ -2,7 +2,7 @@ use std::error::Error;
 use models::rhoapi::{EVar, Expr, expr, Par, Var, var};
 use tree_sitter::Node;
 use crate::rust::interpreter::compiler::bound_context::BoundContext;
-use crate::rust::interpreter::compiler::exports::FreeContext;
+use crate::rust::interpreter::compiler::exports::{BoundMapChain, FreeContext, FreeMap};
 use crate::rust::interpreter::compiler::normalize::{prepend_expr, VarSort};
 use crate::rust::interpreter::compiler::source_position::SourcePosition;
 use crate::rust::interpreter::errors::InterpreterError;
@@ -31,8 +31,7 @@ pub fn normalize_name(
 
       Ok(NameVisitOutputs {
         par: prepend_expr(Par::default(), new_expr, input.bound_map_chain.depth() as i32),
-        free_map: wildcard_bind_result,
-        //free_map: input.free_map.clone(), //updated in-memory free-map
+        free_map: wildcard_bind_result
       })
     }
     "var" => { //NameVar
@@ -104,6 +103,22 @@ pub fn normalize_name(
         }
       }
     }
+    "quote" => { // NameQuote
+      let proc_visit_result = normalize_match(
+        node.named_child(0).unwrap(),
+        ProcVisitInputs {
+          par: Par::default(),
+          bound_map_chain: input.bound_map_chain.clone(),
+          free_map: input.free_map.clone(),
+        },
+        source_code,
+      )?;
+
+      Ok(NameVisitOutputs {
+        par: proc_visit_result.par,
+        free_map: proc_visit_result.free_map,
+      })
+    }
     _ => {
       Err("Failed to normalize name value".into())
     }
@@ -115,4 +130,25 @@ fn test_normalize_name_wildcard() {
   let rholang_code = r#"_"#;
   let tree = parse_rholang_code(rholang_code);
   println!("Tree S-expression: {}", tree.root_node().to_sexp());
+}
+
+#[test]
+fn test_normalize_name_quote() {
+  let rholang_code = r#"@Nil"#;
+  let tree = parse_rholang_code(rholang_code);
+  println!("Tree S-expression: {}", tree.root_node().to_sexp());
+
+  let quote_node = tree.root_node().child(0).unwrap();
+  println!("Quote node: {}", quote_node.to_sexp());
+
+  let input = NameVisitInputs {
+    bound_map_chain: BoundMapChain::default(),
+    free_map: FreeMap::default(),
+  };
+
+  let output = normalize_name(quote_node, input, rholang_code.as_bytes()).unwrap();
+
+  assert_eq!(output.par.exprs.len(), 0);
+  assert!(output.par.bundles.is_empty());
+  println!("Normalized Par: {:?}", output.par);
 }
