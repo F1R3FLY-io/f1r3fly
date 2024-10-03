@@ -39,100 +39,78 @@ new philosopher1, philosopher2, north, south, knife, spoon in {
         left: (par
           left: (par
             left: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
                 (eval
-                  (proc_var
-                    (var)))))
+                  (var))))
             right: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
                 (eval
-                  (proc_var
-                    (var))))))
+                  (var)))))
           right: (input
             formals: (receipts
               (linear_bind
                 names: (names
                   (quote
-                    (proc_var
-                      (var))))
+                    (var)))
                 input: (simple_source
-                  (proc_var
-                    (var))))
+                  (var)))
               (linear_bind
                 names: (names
                   (quote
-                    (proc_var
-                      (var))))
+                    (var)))
                 input: (simple_source
-                  (proc_var
-                    (var)))))
+                  (var))))
             proc: (block
               body: (par
                 left: (par
                   left: (send
-                    name: (proc_var
-                      (var))
+                    name: (var)
                     send_type: (send_single)
                     inputs: (inputs
                       (string_literal)))
                   right: (send
-                    name: (proc_var
-                      (var))
+                    name: (var)
                     send_type: (send_single)
                     inputs: (inputs
-                      (proc_var
-                        (var)))))
+                      (var))))
                 right: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
-                    (proc_var
-                      (var))))))))
+                    (var)))))))
         right: (input
           formals: (receipts
             (linear_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
+                  (var)))
               input: (simple_source
-                (proc_var
-                  (var))))
+                (var)))
             (linear_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
+                  (var)))
               input: (simple_source
-                (proc_var
-                  (var)))))
+                (var))))
           proc: (block
             body: (par
               left: (par
                 left: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
                     (string_literal)))
                 right: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
-                    (proc_var
-                      (var)))))
+                    (var))))
               right: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
-                  (proc_var
-                    (var)))))))))))
+                  (var))))))))))

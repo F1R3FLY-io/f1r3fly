@@ -61,11 +61,9 @@ new MakeCoatCheck in {
     proc: (block
       body: (par
         left: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
-            (proc_var
-              (var)))
+            (var))
           proc: (block
             body: (new
               decls: (decls
@@ -78,13 +76,11 @@ new MakeCoatCheck in {
                   left: (par
                     left: (par
                       left: (send
-                        name: (proc_var
-                          (var))
+                        name: (var)
                         send_type: (send_single)
                         inputs: (inputs
                           (eval
-                            (proc_var
-                              (var)))))
+                            (var))))
                       right: (input
                         formals: (receipts
                           (repeated_bind
@@ -92,12 +88,9 @@ new MakeCoatCheck in {
                               (quote
                                 (string_literal))
                               (quote
-                                (proc_var
-                                  (var)))
-                              (proc_var
-                                (var)))
-                            input: (proc_var
-                              (var))))
+                                (var))
+                              (var))
+                            input: (var)))
                         proc: (block
                           body: (new
                             decls: (decls
@@ -106,27 +99,22 @@ new MakeCoatCheck in {
                             proc: (block
                               body: (par
                                 left: (send
-                                  name: (proc_var
-                                    (var))
+                                  name: (var)
                                   send_type: (send_single)
                                   inputs: (inputs
                                     (eval
-                                      (proc_var
-                                        (var)))))
+                                      (var))))
                                 right: (send
                                   name: (quote
                                     (block
                                       body: (par
                                         left: (eval
-                                          (proc_var
-                                            (var)))
+                                          (var))
                                         right: (eval
-                                          (proc_var
-                                            (var))))))
+                                          (var)))))
                                   send_type: (send_single)
                                   inputs: (inputs
-                                    (proc_var
-                                      (var))))))))))
+                                    (var)))))))))
                     right: (input
                       formals: (receipts
                         (repeated_bind
@@ -134,51 +122,40 @@ new MakeCoatCheck in {
                             (quote
                               (string_literal))
                             (quote
-                              (proc_var
-                                (var)))
-                            (proc_var
-                              (var)))
-                          input: (proc_var
-                            (var))))
+                              (var))
+                            (var))
+                          input: (var)))
                       proc: (block
                         body: (input
                           formals: (receipts
                             (linear_bind
                               names: (names
                                 (quote
-                                  (proc_var
-                                    (var))))
+                                  (var)))
                               input: (simple_source
                                 (quote
                                   (block
                                     body: (par
-                                      left: (proc_var
-                                        (var))
+                                      left: (var)
                                       right: (eval
-                                        (proc_var
-                                          (var)))))))))
+                                        (var))))))))
                           proc: (block
                             body: (par
                               left: (send
                                 name: (quote
                                   (block
                                     body: (par
-                                      left: (proc_var
-                                        (var))
+                                      left: (var)
                                       right: (eval
-                                        (proc_var
-                                          (var))))))
+                                        (var)))))
                                 send_type: (send_single)
                                 inputs: (inputs
-                                  (proc_var
-                                    (var))))
+                                  (var)))
                               right: (send
-                                name: (proc_var
-                                  (var))
+                                name: (var)
                                 send_type: (send_single)
                                 inputs: (inputs
-                                  (proc_var
-                                    (var))))))))))
+                                  (var)))))))))
                   right: (input
                     formals: (receipts
                       (repeated_bind
@@ -186,49 +163,38 @@ new MakeCoatCheck in {
                           (quote
                             (string_literal))
                           (quote
-                            (proc_var
-                              (var)))
+                            (var))
                           (quote
-                            (proc_var
-                              (var)))
-                          (proc_var
-                            (var)))
-                        input: (proc_var
-                          (var))))
+                            (var))
+                          (var))
+                        input: (var)))
                     proc: (block
                       body: (input
                         formals: (receipts
                           (linear_bind
                             names: (names
-                              (proc_var
-                                (wildcard)))
+                              (wildcard))
                             input: (simple_source
                               (quote
                                 (block
                                   body: (par
-                                    left: (proc_var
-                                      (var))
+                                    left: (var)
                                     right: (eval
-                                      (proc_var
-                                        (var)))))))))
+                                      (var))))))))
                         proc: (block
                           body: (par
                             left: (send
                               name: (quote
                                 (block
                                   body: (par
-                                    left: (proc_var
-                                      (var))
+                                    left: (var)
                                     right: (eval
-                                      (proc_var
-                                        (var))))))
+                                      (var)))))
                               send_type: (send_single)
                               inputs: (inputs
-                                (proc_var
-                                  (var))))
+                                (var)))
                             right: (send
-                              name: (proc_var
-                                (var))
+                              name: (var)
                               send_type: (send_single)
                               inputs: (inputs
                                 (bool_literal)))))))))))))
@@ -243,147 +209,115 @@ new MakeCoatCheck in {
           proc: (block
             body: (par
               left: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (eval
-                    (proc_var
-                      (var)))))
+                    (var))))
               right: (input
                 formals: (receipts
                   (linear_bind
                     names: (names
-                      (proc_var
-                        (var)))
+                      (var))
                     input: (simple_source
-                      (proc_var
-                        (var)))))
+                      (var))))
                 proc: (block
                   body: (par
                     left: (send
-                      name: (proc_var
-                        (var))
+                      name: (var)
                       send_type: (send_single)
                       inputs: (inputs
                         (string_literal)
                         (long_literal)
                         (eval
-                          (proc_var
-                            (var)))))
+                          (var))))
                     right: (input
                       formals: (receipts
                         (linear_bind
                           names: (names
-                            (proc_var
-                              (var)))
+                            (var))
                           input: (simple_source
-                            (proc_var
-                              (var)))))
+                            (var))))
                       proc: (block
                         body: (par
                           left: (par
                             left: (par
                               left: (contract
-                                name: (proc_var
-                                  (var))
+                                name: (var)
                                 formals: (names
-                                  (proc_var
-                                    (var)))
+                                  (var))
                                 proc: (block
                                   body: (send
-                                    name: (proc_var
-                                      (var))
+                                    name: (var)
                                     send_type: (send_single)
                                     inputs: (inputs
                                       (string_literal)
                                       (eval
-                                        (proc_var
-                                          (var)))
-                                      (eval
-                                        (proc_var
-                                          (var)))))))
-                              right: (contract
-                                name: (proc_var
-                                  (var))
-                                formals: (names
-                                  (quote
-                                    (proc_var
-                                      (var)))
-                                  (proc_var
-                                    (var)))
-                                proc: (block
-                                  body: (send
-                                    name: (proc_var
-                                      (var))
-                                    send_type: (send_single)
-                                    inputs: (inputs
-                                      (string_literal)
-                                      (eval
-                                        (proc_var
-                                          (var)))
-                                      (proc_var
                                         (var))
                                       (eval
-                                        (proc_var
-                                          (var))))))))
+                                        (var))))))
+                              right: (contract
+                                name: (var)
+                                formals: (names
+                                  (quote
+                                    (var))
+                                  (var))
+                                proc: (block
+                                  body: (send
+                                    name: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (string_literal)
+                                      (eval
+                                        (var))
+                                      (var)
+                                      (eval
+                                        (var)))))))
                             right: (send
-                              name: (proc_var
-                                (var))
+                              name: (var)
                               send_type: (send_single)
                               inputs: (inputs
                                 (eval
-                                  (proc_var
-                                    (var))))))
+                                  (var)))))
                           right: (input
                             formals: (receipts
                               (linear_bind
                                 names: (names
                                   (quote
-                                    (proc_var
-                                      (var))))
+                                    (var)))
                                 input: (simple_source
-                                  (proc_var
-                                    (var)))))
+                                  (var))))
                             proc: (block
                               body: (par
                                 left: (send
-                                  name: (proc_var
-                                    (var))
+                                  name: (var)
                                   send_type: (send_single)
                                   inputs: (inputs
                                     (long_literal)
                                     (eval
-                                      (proc_var
-                                        (var)))))
+                                      (var))))
                                 right: (input
                                   formals: (receipts
                                     (linear_bind
                                       names: (names
-                                        (proc_var
-                                          (wildcard)))
+                                        (wildcard))
                                       input: (simple_source
-                                        (proc_var
-                                          (var)))))
+                                        (var))))
                                   proc: (block
                                     body: (par
                                       left: (send
-                                        name: (proc_var
-                                          (var))
+                                        name: (var)
                                         send_type: (send_single)
                                         inputs: (inputs
                                           (eval
-                                            (proc_var
-                                              (var)))))
+                                            (var))))
                                       right: (input
                                         formals: (receipts
                                           (linear_bind
                                             names: (names
                                               (quote
-                                                (proc_var
-                                                  (var))))
+                                                (var)))
                                             input: (simple_source
-                                              (proc_var
-                                                (var)))))
+                                              (var))))
                                         proc: (block
                                           body: (nil))))))))))))))))))))))

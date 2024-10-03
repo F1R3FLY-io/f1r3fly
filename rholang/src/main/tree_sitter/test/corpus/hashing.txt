@@ -25,8 +25,7 @@ new x, y, stdout(`rho:io:stdout`) in {
       body: (par
         left: (par
           left: (send
-            name: (proc_var
-              (var))
+            name: (var)
             send_type: (send_single)
             inputs: (inputs
               (par
@@ -47,11 +46,9 @@ new x, y, stdout(`rho:io:stdout`) in {
               (linear_bind
                 names: (names
                   (quote
-                    (proc_var
-                      (var))))
+                    (var)))
                 input: (simple_source
-                  (proc_var
-                    (var)))))
+                  (var))))
             proc: (block
               body: (send
                 name: (quote
@@ -59,28 +56,22 @@ new x, y, stdout(`rho:io:stdout`) in {
                 send_type: (send_single)
                 inputs: (inputs
                   (method
-                    receiver: (proc_var
-                      (var))
+                    receiver: (var)
                     name: (var)
                     args: (args))
                   (eval
-                    (proc_var
-                      (var))))))))
+                    (var)))))))
         right: (input
           formals: (receipts
             (linear_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
+                  (var)))
               input: (simple_source
-                (proc_var
-                  (var)))))
+                (var))))
           proc: (block
             body: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
-                (proc_var
-                  (var))))))))))
+                (var)))))))))

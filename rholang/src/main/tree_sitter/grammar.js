@@ -13,6 +13,7 @@ module.exports = grammar({
         $._bundle,
         $._send_type,
         $._source,
+        $._proc_var,
         $._ground],
 
     inline: $ => [$.name, $.quotable],
@@ -162,12 +163,12 @@ module.exports = grammar({
         conjunction: $ => prec.left(14, seq(field('left', $._proc), '/\\', field('right', $._proc))),
         negation: $ => prec(15, seq('~', field('proc', $._proc))),
 
-        _ground_expression: $ => prec(16, choice($.block, $._ground, $.collection, $.proc_var, $.simple_type)),
+        _ground_expression: $ => prec(16, choice($.block, $._ground, $.collection, $._proc_var, $.simple_type)),
         block: $ => seq('{', field('body', $._proc), '}'),
 
         // process variables and names
         wildcard: $ => '_',
-        proc_var: $ => choice($.wildcard, $.var),
+        _proc_var: $ => choice($.wildcard, $.var),
 
         quotable: $ => choice(
             $.eval,
@@ -177,8 +178,8 @@ module.exports = grammar({
             $._ground_expression),
         quote: $ => prec(12, seq('@', $.quotable)),
 
-        name: $ => choice($.proc_var, $.quote),
-        _name_remainder: $ => seq('...', '@', $.proc_var),
+        name: $ => choice($._proc_var, $.quote),
+        _name_remainder: $ => seq('...', '@', $._proc_var),
         names: $ => seq(commaSep1($.name), field('cont', optional($._name_remainder))),
 
         // let declarations
@@ -270,7 +271,7 @@ module.exports = grammar({
             '}'
         ),
 
-        _proc_remainder: $ => seq('...', $.proc_var),
+        _proc_remainder: $ => seq('...', $._proc_var),
 
         key_value_pair: $ => seq(
             field('key', $._proc),

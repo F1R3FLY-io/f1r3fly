@@ -26,22 +26,17 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
     decls: (decls
       (name_decl
         (var)))
-    proc: (proc_var
-      (var)))
+    proc: (var))
   (input
     formals: (receipts
       (linear_bind
         names: (names
-          (proc_var
-            (var))
-          (proc_var
-            (var)))
+          (var)
+          (var))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (input
     formals: (receipts
       (linear_bind
@@ -49,18 +44,14 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
           (quote
             (block
               body: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
-                  (proc_var
-                    (var)))))))
+                  (var))))))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (input
     formals: (receipts
       (linear_bind
@@ -71,69 +62,49 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
                 formals: (receipts
                   (linear_bind
                     names: (names
-                      (proc_var
-                        (var)))
+                      (var))
                     input: (simple_source
-                      (proc_var
-                        (var)))))
+                      (var))))
                 proc: (block
-                  body: (proc_var
-                    (var)))))))
+                  body: (var))))))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (contract
-    name: (proc_var
-      (var))
+    name: (var)
     formals: (names
-      (proc_var
-        (var)))
-    proc: (block
-      body: (proc_var
-        (var))))
-  (match
-    expression: (proc_var
       (var))
+    proc: (block
+      body: (var)))
+  (match
+    expression: (var)
     cases: (cases
       (case
         pattern: (send
-          name: (proc_var
-            (var))
+          name: (var)
           send_type: (send_single)
           inputs: (inputs
-            (proc_var
-              (var))))
-        proc: (proc_var
-          (var)))))
+            (var)))
+        proc: (var))))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
         pattern: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
-            (proc_var
-              (var)))
+            (var))
           proc: (block
-            body: (proc_var
-              (var))))
-        proc: (proc_var
-          (var)))))
+            body: (var)))
+        proc: (var))))
   (contract
-    name: (proc_var
-      (var))
+    name: (var)
     formals: (names
       (quote
-        (proc_var
-          (var))))
+        (var)))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (input
     formals: (receipts
       (linear_bind
@@ -141,18 +112,14 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
           (quote
             (block
               body: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
-                  (proc_var
-                    (var)))))))
+                  (var))))))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (input
     formals: (receipts
       (linear_bind
@@ -164,20 +131,15 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
                   (linear_bind
                     names: (names
                       (quote
-                        (proc_var
-                          (var))))
+                        (var)))
                     input: (simple_source
-                      (proc_var
-                        (var)))))
+                      (var))))
                 proc: (block
-                  body: (proc_var
-                    (var)))))))
+                  body: (var))))))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (input
     formals: (receipts
       (linear_bind
@@ -185,78 +147,54 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
           (quote
             (block
               body: (par
-                left: (proc_var
-                  (var))
-                right: (proc_var
-                  (var))))))
+                left: (var)
+                right: (var)))))
         input: (simple_source
-          (proc_var
-            (var)))))
+          (var))))
     proc: (block
-      body: (proc_var
-        (var))))
+      body: (var)))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
-        pattern: (proc_var
-          (var))
-        proc: (proc_var
-          (var)))))
+        pattern: (var)
+        proc: (var))))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
         pattern: (collection
           (list
-            (proc_var
-              (var))
-            (proc_var
-              (var))
-            cont: (proc_var
-              (var))))
-        proc: (proc_var
-          (var)))))
+            (var)
+            (var)
+            cont: (var)))
+        proc: (var))))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
         pattern: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
-            (proc_var
-              (var)))
+            (var))
           proc: (block
-            body: (proc_var
-              (var))))
-        proc: (proc_var
-          (var)))))
+            body: (var)))
+        proc: (var))))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
         pattern: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
             (quote
-              (proc_var
-                (var))))
+              (var)))
           proc: (block
             body: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
                 (add
-                  left: (proc_var
-                    (var))
-                  right: (proc_var
-                    (var)))))))
-        proc: (proc_var
-          (var))))))
+                  left: (var)
+                  right: (var))))))
+        proc: (var)))))

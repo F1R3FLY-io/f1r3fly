@@ -13,19 +13,14 @@ match p {
 
 (source_file
   (matches
-    left: (proc_var
-      (var))
-    right: (proc_var
-      (var)))
+    left: (var)
+    right: (var))
   (match
-    expression: (proc_var
-      (var))
+    expression: (var)
     cases: (cases
       (case
-        pattern: (proc_var
-          (var))
+        pattern: (var)
         proc: (bool_literal))
       (case
-        pattern: (proc_var
-          (wildcard))
+        pattern: (wildcard)
         proc: (bool_literal)))))

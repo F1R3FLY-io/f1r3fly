@@ -25,23 +25,17 @@ Names
   (quote
     (block
       body: (par
-        left: (proc_var
-          (var))
-        right: (proc_var
-          (var)))))
+        left: (var)
+        right: (var))))
   (quote
     (block
       body: (par
-        left: (proc_var
-          (var))
-        right: (proc_var
-          (var)))))
+        left: (var)
+        right: (var))))
   (quote
     (block
       body: (par
         left: (par
-          left: (proc_var
-            (var))
-          right: (proc_var
-            (var)))
+          left: (var)
+          right: (var))
         right: (nil)))))

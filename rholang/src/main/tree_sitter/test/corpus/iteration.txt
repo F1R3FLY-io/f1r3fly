@@ -37,28 +37,21 @@ new iterate in {
     proc: (block
       body: (par
         left: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
             (quote
-              (proc_var
-                (var)))
-            (proc_var
               (var))
-            (proc_var
-              (var)))
+            (var)
+            (var))
           proc: (block
             body: (match
-              expression: (proc_var
-                (var))
+              expression: (var)
               cases: (cases
                 (case
                   pattern: (collection
                     (list
-                      (proc_var
-                        (var))
-                      cont: (proc_var
-                        (var))))
+                      (var)
+                      cont: (var)))
                   proc: (block
                     body: (new
                       decls: (decls
@@ -67,44 +60,33 @@ new iterate in {
                       proc: (block
                         body: (par
                           left: (send
-                            name: (proc_var
-                              (var))
+                            name: (var)
                             send_type: (send_single)
                             inputs: (inputs
-                              (proc_var
-                                (var))
+                              (var)
                               (eval
-                                (proc_var
-                                  (var)))))
+                                (var))))
                           right: (input
                             formals: (receipts
                               (linear_bind
                                 names: (names
-                                  (proc_var
-                                    (wildcard)))
+                                  (wildcard))
                                 input: (simple_source
-                                  (proc_var
-                                    (var)))))
+                                  (var))))
                             proc: (block
                               body: (send
-                                name: (proc_var
-                                  (var))
+                                name: (var)
                                 send_type: (send_single)
                                 inputs: (inputs
-                                  (proc_var
+                                  (var)
+                                  (eval
                                     (var))
                                   (eval
-                                    (proc_var
-                                      (var)))
-                                  (eval
-                                    (proc_var
-                                      (var))))))))))))
+                                    (var)))))))))))
                 (case
-                  pattern: (proc_var
-                    (wildcard))
+                  pattern: (wildcard)
                   proc: (send
-                    name: (proc_var
-                      (var))
+                    name: (var)
                     send_type: (send_single)
                     inputs: (inputs
                       (nil))))))))
@@ -118,8 +100,7 @@ new iterate in {
             body: (par
               left: (par
                 left: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
                     (collection
@@ -128,24 +109,18 @@ new iterate in {
                         (long_literal)
                         (long_literal)))
                     (eval
-                      (proc_var
-                        (var)))
+                      (var))
                     (eval
-                      (proc_var
-                        (var)))))
+                      (var))))
                 right: (contract
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   formals: (names
                     (quote
-                      (proc_var
-                        (var)))
-                    (proc_var
-                      (var)))
+                      (var))
+                    (var))
                   proc: (block
                     body: (send
-                      name: (proc_var
-                        (var))
+                      name: (var)
                       send_type: (send_single)
                       inputs: (inputs
                         (nil))))))
@@ -153,10 +128,8 @@ new iterate in {
                 formals: (receipts
                   (linear_bind
                     names: (names
-                      (proc_var
-                        (wildcard)))
+                      (wildcard))
                     input: (simple_source
-                      (proc_var
-                        (var)))))
+                      (var))))
                 proc: (block
                   body: (nil))))))))))

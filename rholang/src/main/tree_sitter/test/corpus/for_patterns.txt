@@ -31,8 +31,7 @@ new people, stdout(`rho:io:stdout`) in {
           left: (par
             left: (par
               left: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (par
@@ -63,8 +62,7 @@ new people, stdout(`rho:io:stdout`) in {
                       inputs: (inputs
                         (long_literal))))))
               right: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (par
@@ -95,8 +93,7 @@ new people, stdout(`rho:io:stdout`) in {
                       inputs: (inputs
                         (long_literal)))))))
             right: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
                 (par
@@ -127,8 +124,7 @@ new people, stdout(`rho:io:stdout`) in {
                     inputs: (inputs
                       (long_literal)))))))
           right: (send
-            name: (proc_var
-              (var))
+            name: (var)
             send_type: (send_single)
             inputs: (inputs
               (par
@@ -173,8 +169,7 @@ new people, stdout(`rho:io:stdout`) in {
                           (long_literal)))
                       right: (block
                         body: (conjunction
-                          left: (proc_var
-                            (var))
+                          left: (var)
                           right: (block
                             body: (par
                               left: (par
@@ -183,46 +178,36 @@ new people, stdout(`rho:io:stdout`) in {
                                     (string_literal))
                                   send_type: (send_single)
                                   inputs: (inputs
-                                    (proc_var
-                                      (var))))
+                                    (var)))
                                 right: (send
                                   name: (quote
                                     (string_literal))
                                   send_type: (send_single)
                                   inputs: (inputs
-                                    (proc_var
-                                      (var)))))
-                              right: (proc_var
-                                (wildcard))))))))))
-              input: (proc_var
-                (var))))
+                                    (var))))
+                              right: (wildcard)))))))))
+              input: (var)))
           proc: (block
             body: (par
               left: (ifElse
                 condition: (gt
-                  left: (proc_var
-                    (var))
+                  left: (var)
                   right: (long_literal))
                 ifTrue: (block
                   body: (send
-                    name: (proc_var
-                      (var))
+                    name: (var)
                     send_type: (send_single)
                     inputs: (inputs
                       (collection
                         (list
-                          (proc_var
-                            (var))
-                          (proc_var
-                            (var))))))))
+                          (var)
+                          (var)))))))
               right: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (par
-                    left: (proc_var
-                      (var))
+                    left: (var)
                     right: (send
                       name: (quote
                         (string_literal))

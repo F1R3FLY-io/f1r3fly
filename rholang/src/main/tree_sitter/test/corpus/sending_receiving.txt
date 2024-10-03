@@ -22,8 +22,7 @@ new HelloWorld, stdout(`rho:io:stdout`) in {
     proc: (block
       body: (par
         left: (send
-          name: (proc_var
-            (var))
+          name: (var)
           send_type: (send_single)
           inputs: (inputs
             (string_literal)))
@@ -32,16 +31,12 @@ new HelloWorld, stdout(`rho:io:stdout`) in {
             (linear_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
+                  (var)))
               input: (simple_source
-                (proc_var
-                  (var)))))
+                (var))))
           proc: (block
             body: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
-                (proc_var
-                  (var))))))))))
+                (var)))))))))

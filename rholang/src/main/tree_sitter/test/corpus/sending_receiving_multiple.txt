@@ -38,16 +38,14 @@ new chan, stdout(`rho:io:stdout`) in {
                 left: (par
                   left: (par
                     left: (send
-                      name: (proc_var
-                        (var))
+                      name: (var)
                       send_type: (send_single)
                       inputs: (inputs
                         (long_literal)
                         (long_literal)
                         (long_literal)))
                     right: (send
-                      name: (proc_var
-                        (var))
+                      name: (var)
                       send_type: (send_single)
                       inputs: (inputs
                         (collection
@@ -56,15 +54,13 @@ new chan, stdout(`rho:io:stdout`) in {
                             (long_literal)
                             (long_literal))))))
                   right: (send
-                    name: (proc_var
-                      (var))
+                    name: (var)
                     send_type: (send_single)
                     inputs: (inputs
                       (long_literal)
                       (long_literal))))
                 right: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
                     (collection
@@ -73,8 +69,7 @@ new chan, stdout(`rho:io:stdout`) in {
                         (long_literal)))
                     (long_literal))))
               right: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (par
@@ -85,73 +80,55 @@ new chan, stdout(`rho:io:stdout`) in {
                 (repeated_bind
                   names: (names
                     (quote
-                      (proc_var
-                        (var)))
+                      (var))
                     (quote
-                      (proc_var
-                        (var)))
+                      (var))
                     (quote
-                      (proc_var
-                        (var))))
-                  input: (proc_var
-                    (var))))
+                      (var)))
+                  input: (var)))
               proc: (block
                 body: (send
-                  name: (proc_var
-                    (var))
+                  name: (var)
                   send_type: (send_single)
                   inputs: (inputs
                     (collection
                       (list
                         (string_literal)
-                        (proc_var
-                          (var))
-                        (proc_var
-                          (var))
-                        (proc_var
-                          (var)))))))))
+                        (var)
+                        (var)
+                        (var))))))))
           right: (input
             formals: (receipts
               (repeated_bind
                 names: (names
                   (quote
-                    (proc_var
-                      (var)))
+                    (var))
                   (quote
-                    (proc_var
-                      (var))))
-                input: (proc_var
-                  (var))))
+                    (var)))
+                input: (var)))
             proc: (block
               body: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (collection
                     (list
                       (string_literal)
-                      (proc_var
-                        (var))
-                      (proc_var
-                        (var)))))))))
+                      (var)
+                      (var))))))))
         right: (input
           formals: (receipts
             (repeated_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
-              input: (proc_var
-                (var))))
+                  (var)))
+              input: (var)))
           proc: (block
             body: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
                 (collection
                   (list
                     (string_literal)
-                    (proc_var
-                      (var))))))))))))
+                    (var)))))))))))

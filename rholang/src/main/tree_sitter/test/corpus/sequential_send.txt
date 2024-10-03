@@ -28,8 +28,7 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
       body: (par
         left: (par
           left: (send
-            name: (proc_var
-              (var))
+            name: (var)
             send_type: (send_single)
             inputs: (inputs
               (long_literal)))
@@ -37,15 +36,12 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
             formals: (receipts
               (linear_bind
                 names: (names
-                  (proc_var
-                    (wildcard)))
+                  (wildcard))
                 input: (simple_source
-                  (proc_var
-                    (var)))))
+                  (var))))
             proc: (block
               body: (send
-                name: (proc_var
-                  (var))
+                name: (var)
                 send_type: (send_single)
                 inputs: (inputs
                   (long_literal))))))
@@ -54,18 +50,13 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
             (repeated_bind
               names: (names
                 (quote
-                  (proc_var
-                    (var))))
-              input: (proc_var
-                (var))))
+                  (var)))
+              input: (var)))
           proc: (block
             body: (send
-              name: (proc_var
-                (var))
+              name: (var)
               send_type: (send_single)
               inputs: (inputs
-                (proc_var
-                  (var))
+                (var)
                 (eval
-                  (proc_var
-                    (var)))))))))))
+                  (var))))))))))

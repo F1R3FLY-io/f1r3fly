@@ -56,14 +56,11 @@ new sumProd in {
     proc: (block
       body: (par
         left: (contract
-          name: (proc_var
-            (var))
+          name: (var)
           formals: (names
             (quote
-              (proc_var
-                (var)))
-            (proc_var
-              (var)))
+              (var))
+            (var))
           proc: (block
             body: (new
               decls: (decls
@@ -78,31 +75,23 @@ new sumProd in {
                   left: (par
                     left: (par
                       left: (contract
-                        name: (proc_var
-                          (var))
+                        name: (var)
                         formals: (names
                           (quote
-                            (proc_var
-                              (var)))
-                          (proc_var
                             (var))
+                          (var)
                           (quote
-                            (proc_var
-                              (var)))
-                          (proc_var
-                            (var)))
+                            (var))
+                          (var))
                         proc: (block
                           body: (match
-                            expression: (proc_var
-                              (var))
+                            expression: (var)
                             cases: (cases
                               (case
                                 pattern: (collection
                                   (list
-                                    (proc_var
-                                      (var))
-                                    cont: (proc_var
-                                      (var))))
+                                    (var)
+                                    cont: (var)))
                                 proc: (block
                                   body: (new
                                     decls: (decls
@@ -111,62 +100,46 @@ new sumProd in {
                                     proc: (block
                                       body: (par
                                         left: (send
-                                          name: (proc_var
-                                            (var))
+                                          name: (var)
                                           send_type: (send_single)
                                           inputs: (inputs
-                                            (proc_var
-                                              (var))
+                                            (var)
                                             (eval
-                                              (proc_var
-                                                (var)))
-                                            (proc_var
                                               (var))
+                                            (var)
                                             (eval
-                                              (proc_var
-                                                (var)))))
+                                              (var))))
                                         right: (input
                                           formals: (receipts
                                             (linear_bind
                                               names: (names
                                                 (quote
-                                                  (proc_var
-                                                    (var))))
+                                                  (var)))
                                               input: (simple_source
-                                                (proc_var
-                                                  (var)))))
+                                                (var))))
                                           proc: (block
                                             body: (send
-                                              name: (proc_var
-                                                (var))
+                                              name: (var)
                                               send_type: (send_single)
                                               inputs: (inputs
-                                                (proc_var
-                                                  (var))
-                                                (proc_var
-                                                  (var))
+                                                (var)
+                                                (var)
                                                 (eval
-                                                  (proc_var
-                                                    (var))))))))))))
+                                                  (var)))))))))))
                               (case
                                 pattern: (collection
                                   (list))
                                 proc: (send
-                                  name: (proc_var
-                                    (var))
+                                  name: (var)
                                   send_type: (send_single)
                                   inputs: (inputs
-                                    (proc_var
-                                      (var)))))))))
+                                    (var))))))))
                       right: (contract
-                        name: (proc_var
-                          (var))
+                        name: (var)
                         formals: (names
                           (quote
-                            (proc_var
-                              (var)))
-                          (proc_var
-                            (var)))
+                            (var))
+                          (var))
                         proc: (block
                           body: (new
                             decls: (decls
@@ -175,51 +148,37 @@ new sumProd in {
                             proc: (block
                               body: (par
                                 left: (contract
-                                  name: (proc_var
-                                    (var))
+                                  name: (var)
                                   formals: (names
                                     (quote
-                                      (proc_var
-                                        (var)))
+                                      (var))
                                     (quote
-                                      (proc_var
-                                        (var)))
-                                    (proc_var
-                                      (var)))
+                                      (var))
+                                    (var))
                                   proc: (block
                                     body: (send
-                                      name: (proc_var
-                                        (var))
+                                      name: (var)
                                       send_type: (send_single)
                                       inputs: (inputs
                                         (add
-                                          left: (proc_var
-                                            (var))
-                                          right: (proc_var
-                                            (var)))))))
+                                          left: (var)
+                                          right: (var))))))
                                 right: (send
-                                  name: (proc_var
-                                    (var))
+                                  name: (var)
                                   send_type: (send_single)
                                   inputs: (inputs
                                     (long_literal)
                                     (eval
-                                      (proc_var
-                                        (var)))
-                                    (proc_var
                                       (var))
+                                    (var)
                                     (eval
-                                      (proc_var
-                                        (var)))))))))))
+                                      (var))))))))))
                     right: (contract
-                      name: (proc_var
-                        (var))
+                      name: (var)
                       formals: (names
                         (quote
-                          (proc_var
-                            (var)))
-                        (proc_var
-                          (var)))
+                          (var))
+                        (var))
                       proc: (block
                         body: (new
                           decls: (decls
@@ -228,42 +187,31 @@ new sumProd in {
                           proc: (block
                             body: (par
                               left: (contract
-                                name: (proc_var
-                                  (var))
+                                name: (var)
                                 formals: (names
                                   (quote
-                                    (proc_var
-                                      (var)))
+                                    (var))
                                   (quote
-                                    (proc_var
-                                      (var)))
-                                  (proc_var
-                                    (var)))
+                                    (var))
+                                  (var))
                                 proc: (block
                                   body: (send
-                                    name: (proc_var
-                                      (var))
+                                    name: (var)
                                     send_type: (send_single)
                                     inputs: (inputs
                                       (mult
-                                        left: (proc_var
-                                          (var))
-                                        right: (proc_var
-                                          (var)))))))
+                                        left: (var)
+                                        right: (var))))))
                               right: (send
-                                name: (proc_var
-                                  (var))
+                                name: (var)
                                 send_type: (send_single)
                                 inputs: (inputs
                                   (long_literal)
                                   (eval
-                                    (proc_var
-                                      (var)))
-                                  (proc_var
                                     (var))
+                                  (var)
                                   (eval
-                                    (proc_var
-                                      (var)))))))))))
+                                    (var))))))))))
                   right: (new
                     decls: (decls
                       (name_decl
@@ -274,58 +222,44 @@ new sumProd in {
                       body: (par
                         left: (par
                           left: (send
-                            name: (proc_var
-                              (var))
+                            name: (var)
                             send_type: (send_single)
                             inputs: (inputs
-                              (proc_var
-                                (var))
+                              (var)
                               (eval
-                                (proc_var
-                                  (var)))))
+                                (var))))
                           right: (send
-                            name: (proc_var
-                              (var))
+                            name: (var)
                             send_type: (send_single)
                             inputs: (inputs
-                              (proc_var
-                                (var))
+                              (var)
                               (eval
-                                (proc_var
-                                  (var))))))
+                                (var)))))
                         right: (input
                           formals: (receipts
                             (linear_bind
                               names: (names
                                 (quote
-                                  (proc_var
-                                    (var))))
+                                  (var)))
                               input: (simple_source
-                                (proc_var
-                                  (var))))
+                                (var)))
                             (linear_bind
                               names: (names
                                 (quote
-                                  (proc_var
-                                    (var))))
+                                  (var)))
                               input: (simple_source
-                                (proc_var
-                                  (var)))))
+                                (var))))
                           proc: (block
                             body: (send
-                              name: (proc_var
-                                (var))
+                              name: (var)
                               send_type: (send_single)
                               inputs: (inputs
                                 (collection
                                   (list
-                                    (proc_var
-                                      (var))
-                                    (proc_var
-                                      (var))))))))))))))))
+                                    (var)
+                                    (var)))))))))))))))
         right: (send
-          name: (proc_var
-            (var))
+          name: (var)
           send_type: (send_single)
           inputs: (inputs
             (collection
