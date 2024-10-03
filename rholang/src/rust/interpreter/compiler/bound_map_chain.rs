@@ -19,7 +19,7 @@ impl<T: Clone> BoundMapChain<T> {
     self.chain.first().and_then(|map| map.get(name))
   }
 
-  fn find(&self, name: &str) -> Option<(BoundContext<T>, usize)>
+  pub fn find(&self, name: &str) -> Option<(BoundContext<T>, usize)>
   where
     T: Clone,
   {
