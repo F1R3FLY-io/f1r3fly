@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use crate::rust::interpreter::compiler::normalize::{CollectVisitInputs, prepend_expr, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::compiler::normalizer::collection_normalize_matcher::normalize_collection;
 
-pub fn normalize_collect(
+pub fn normalize_p_collect(
   node: Node,
   mut input: ProcVisitInputs,
   source_code: &[u8],

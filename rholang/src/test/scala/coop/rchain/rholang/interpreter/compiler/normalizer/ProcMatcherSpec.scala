@@ -1110,14 +1110,14 @@ class ProcMatcherSpec extends FlatSpec with Matchers {
     val pbundle = new PBundle(new BundleReadWrite(), new PVar(new ProcVarVar("x")))
     val boundInputs =
       inputs.copy(boundMapChain = inputs.boundMapChain.put(("x", ProcSort, SourcePosition(0, 0))))
-    println("boundInputs: " + boundInputs)
+
     val result = ProcNormalizeMatcher.normalizeMatch[Coeval](pbundle, boundInputs).value
-    println("result: " + result)
+
     val expectedResult =
       inputs.par
         .withBundles(List(Bundle(EVar(BoundVar(0)), writeFlag = true, readFlag = true)))
         .withLocallyFree(BitSet(0))
-    println("expectedResult: " + expectedResult)
+
     result.par should be(expectedResult)
     result.freeMap should be(inputs.freeMap)
   }
