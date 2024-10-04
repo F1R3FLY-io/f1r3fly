@@ -23,11 +23,15 @@ class NameMatcherSpec extends FlatSpec with Matchers {
   implicit val normalizerEnv: Map[String, Par] = Map.empty
 
   "NameWildcard" should "add a wildcard count to knownFree" in {
-    val nw                  = new NameWildcard()
-    val result              = NameNormalizeMatcher.normalizeMatch[Coeval](nw, inputs).value
+    val nw = new NameWildcard()
+    println("inputs before name normalizer: " + inputs)
+    val result = NameNormalizeMatcher.normalizeMatch[Coeval](nw, inputs).value
+    println("result after name normalizer: " + result)
     val expectedResult: Par = EVar(Wildcard(Var.WildcardMsg()))
+    println("expectedResult: " + expectedResult)
     result.par should be(expectedResult)
     result.freeMap.count shouldEqual 1
+
   }
 
   val nvar = new NameVar("x")

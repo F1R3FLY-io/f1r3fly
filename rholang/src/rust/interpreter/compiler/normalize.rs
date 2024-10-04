@@ -48,7 +48,7 @@ pub struct NameVisitOutputs {
 
 #[derive(Clone, Debug)]
 pub struct CollectVisitInputs {
-  bound_map_chain: BoundMapChain<VarSort>,
+  pub(crate) bound_map_chain: BoundMapChain<VarSort>,
   pub(crate) free_map: FreeMap<VarSort>,
 }
 
@@ -139,6 +139,7 @@ pub fn normalize_match(
       normalize_p_bundle(p_node, input, source_code)
     },
     "PGround" => normalize_p_ground(p_node, input, source_code),
+    "collection" => normalize_collect(p_node, input, source_code),
     "matches" => {
       println!("Found a matches node, calling normalize_p_matches");
       normalize_p_matches(p_node, input, source_code)
