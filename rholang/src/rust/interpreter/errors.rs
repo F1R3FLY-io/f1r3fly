@@ -3,6 +3,8 @@ use std::fmt;
 
 use rspace_plus_plus::rspace::errors::RSpaceError;
 
+use super::compiler::exports::SourcePosition;
+
 // PartialEq here is needed for testing purposes
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpreterError {
@@ -30,8 +32,8 @@ pub enum InterpreterError {
     },
     UnexpectedProcContext {
         var_name: String,
-        name_var_source_position: String,
-        process_source_position: String,
+        name_var_source_position: SourcePosition,
+        process_source_position: SourcePosition,
     },
     UnexpectedReuseOfProcContextFree {
         var_name: String,
