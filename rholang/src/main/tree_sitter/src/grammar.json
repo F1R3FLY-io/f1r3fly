@@ -311,7 +311,7 @@
           },
           {
             "type": "FIELD",
-            "name": "proc",
+            "name": "body",
             "content": {
               "type": "SYMBOL",
               "name": "block"
@@ -645,7 +645,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "plus_plus"
+          "name": "concat"
         },
         {
           "type": "SYMBOL",
@@ -987,7 +987,7 @@
         ]
       }
     },
-    "plus_plus": {
+    "concat": {
       "type": "PREC_LEFT",
       "value": 8,
       "content": {
@@ -1597,32 +1597,41 @@
         },
         {
           "type": "STRING",
-          "value": "<-"
+          "value": "="
         },
         {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_proc"
-            },
-            {
-              "type": "REPEAT",
-              "content": {
-                "type": "SEQ",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": ","
-                  },
-                  {
-                    "type": "SYMBOL",
-                    "name": "_proc"
+          "type": "FIELD",
+          "name": "procs",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_proc"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_proc"
+                      }
+                    ]
                   }
-                ]
-              }
-            }
-          ]
+                }
+              ]
+            },
+            "named": true,
+            "value": "procs"
+          }
         }
       ]
     },

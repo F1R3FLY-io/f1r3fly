@@ -60,7 +60,7 @@ module.exports = grammar({
             field('alternative', optional(seq('else', $._proc)))
         )),
 
-        let: $ => prec(2, seq('let', field('decls', $._decls), 'in', field('proc', $.block))),
+        let: $ => prec(2, seq('let', field('decls', $._decls), 'in', field('body', $.block))),
 
         bundle: $ => prec(2, seq(field('bundle_type', $._bundle), field('proc', $.block))),
 
@@ -112,7 +112,7 @@ module.exports = grammar({
             $.gte,
             $.add,
             $.minus,
-            $.plus_plus,
+            $.concat,
             $.minus_minus,
             $.percent_percent,
             $.mult,
@@ -139,7 +139,7 @@ module.exports = grammar({
         lte: $ => prec.left(7, seq(field('left', $._proc), '<=', field('right', $._proc))),
         gt: $ => prec.left(7, seq(field('left', $._proc), '>', field('right', $._proc))),
         gte: $ => prec.left(7, seq(field('left', $._proc), '>=', field('right', $._proc))),
-        plus_plus: $ => prec.left(8, seq(field('left', $._proc), '++', field('right', $._proc))),
+        concat: $ => prec.left(8, seq(field('left', $._proc), '++', field('right', $._proc))),
         minus_minus: $ => prec.left(8, seq(field('left', $._proc), '--', field('right', $._proc))),
         minus: $ => prec.left(8, seq(field('left', $._proc), '-', field('right', $._proc))),
         add: $ => prec.left(8, seq(field('left', $._proc), '+', field('right', $._proc))),
@@ -183,7 +183,7 @@ module.exports = grammar({
         names: $ => seq(commaSep1($.name), field('cont', optional($._name_remainder))),
 
         // let declarations
-        decl: $ => seq(field('names', $.names), '<-', commaSep1($._proc)),
+        decl: $ => seq(field('names', $.names), '=', field('procs', alias(commaSep1($._proc), $.procs))),
         linear_decls: $ => semiSep1($.decl),
         conc_decls: $ => prec(-1, conc1($.decl)),
         _decls: $ => choice($.linear_decls, $.conc_decls),
