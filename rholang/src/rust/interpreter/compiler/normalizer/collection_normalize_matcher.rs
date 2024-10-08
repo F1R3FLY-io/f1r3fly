@@ -1,9 +1,9 @@
 use models::rhoapi::{Expr,Par, Var};
+use models::rust::utils::union;
 use super::exports::*;
 use tree_sitter::Node;
 use std::error::Error;
 use std::result::Result;
-use std::collections::HashSet;
 use models::rhoapi::expr::ExprInstance;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
@@ -28,10 +28,10 @@ pub fn normalize_collection(
     input: CollectVisitInputs
   ) -> Result<CollectVisitOutputs, Box<dyn Error>>
   where
-    F: Fn(Vec<Par>, HashSet<usize>, bool) -> T,
+    F: Fn(Vec<Par>, Vec<u8>, bool) -> T,
     T: Into<Expr>,
   {
-    let init = (vec![], known_free.clone(), HashSet::new(), false);
+    let init = (vec![], known_free.clone(), Vec::new(), false);
 
     let (mut acc_pars, mut result_known_free, mut locally_free, mut connective_used) = init;
 
@@ -49,11 +49,7 @@ pub fn normalize_collection(
 
       acc_pars.push(result.par.clone());
       result_known_free = result.free_map.clone();
-
-      // union - because in Scala we use BitSet collection which collect only unique values
-      let par_locally_free: HashSet<usize> = result.par.locally_free.iter().map(|&x| x as usize).collect();
-      locally_free = locally_free.union(&par_locally_free).cloned().collect();
-
+      locally_free = union(locally_free, result.par.locally_free);
       connective_used = connective_used || result.par.connective_used;
     }
 
@@ -75,7 +71,7 @@ pub fn normalize_collection(
     source_code: &[u8],
     input: CollectVisitInputs,
   ) -> Result<CollectVisitOutputs, Box<dyn Error>> {
-    let init = (vec![], known_free.clone(), HashSet::new(), false);
+    let init = (vec![], known_free.clone(), Vec::new(), false);
 
     let (mut acc_pairs, mut result_known_free, mut locally_free, mut connective_used) = init;
 
@@ -102,12 +98,7 @@ pub fn normalize_collection(
 
       acc_pairs.push((key_result.par.clone(), value_result.par.clone()));
       result_known_free = value_result.free_map.clone();
-
-      // union - because in Scala we use BitSet collection which collect only unique values
-      let key_locally_free: HashSet<usize> = key_result.par.locally_free.iter().map(|&x| x as usize).collect();
-      let value_locally_free: HashSet<usize> = value_result.par.locally_free.iter().map(|&x| x as usize).collect();
-      locally_free = locally_free.union(&key_locally_free).cloned().collect();
-      locally_free = locally_free.union(&value_locally_free).cloned().collect();
+      locally_free = union(locally_free, union(key_result.par.locally_free, value_result.par.locally_free));
       connective_used = connective_used || key_result.par.connective_used || value_result.par.connective_used;
     }
 
@@ -124,22 +115,12 @@ pub fn normalize_collection(
       None => Vec::new(),
     };
 
-    let locally_free_set: HashSet<usize> = locally_free.into_iter().map(|x| x as usize).collect();
-    let remainder_locally_free_set: HashSet<usize> = remainder_locally_free.into_iter().map(|x| x as usize).collect();
-
-    let combined_locally_free_set: HashSet<usize> = locally_free_set
-      .union(&remainder_locally_free_set)
-      .cloned()
-      .collect();
-
-    let combined_locally_free: Vec<u8> = combined_locally_free_set.into_iter().map(|x| x as u8).collect();
-
     let expr = Expr {
       expr_instance: Some(ExprInstance::EMapBody(
         ParMapTypeMapper::par_map_to_emap(ParMap {
           ps: SortedParMap::create_from_vec(acc_pairs.clone().into_iter().rev().collect()),
           connective_used: connective_used || remainder_connective_used,
-          locally_free: combined_locally_free,
+          locally_free: union(locally_free, remainder_locally_free),
           remainder: remainder.clone(),
         })
       ))
