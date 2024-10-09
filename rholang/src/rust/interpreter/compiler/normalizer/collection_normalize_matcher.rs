@@ -1,4 +1,4 @@
-use models::rhoapi::{Expr,Par, Var};
+use models::rhoapi::{Expr, Par, Var};
 use models::rust::utils::union;
 use super::exports::*;
 use tree_sitter::Node;
@@ -16,9 +16,9 @@ use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 pub fn normalize_collection(
   node: Node,
   input: CollectVisitInputs,
-  source_code: &[u8],
+  source_code: &[u8]
 ) -> Result<CollectVisitOutputs, Box<dyn Error>> {
-    println!("Normalizing bundle node of kind: {}", node.kind());
+  println!("Normalizing collection node of kind: {}", node.kind());
 
   pub fn fold_match<T, F>(
     known_free: FreeMap<VarSort>,
@@ -132,5 +132,19 @@ pub fn normalize_collection(
     })
   }
 
-  todo!()
+  match node.kind() {
+    "list" => {
+      todo!()
+    }
+    "tuple" => {
+      todo!() //I'm not sure about single and multiple subcases
+    }
+    "set" => {
+      todo!()
+    }
+    "map" => {
+      todo!()
+    }
+    _ => Err(InterpreterError::NormalizerError("Unexpected node kind".to_string()).into()),
+  }
 }
