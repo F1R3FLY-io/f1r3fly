@@ -26,8 +26,8 @@ pub fn normalize_p_var_ref(
 
     let p_var = unwrap_option_safe(node.child_by_field_name("var"))?.kind();
     let p_var_ref_kind = unwrap_option_safe(node.child_by_field_name("var_ref_kind"))?.kind();
-    let p_line_num: usize = todo!();
-    let p_col_num: usize = todo!();
+    let p_line_num: usize = node.start_position().row;
+    let p_col_num: usize = node.start_position().column;
 
     match input.bound_map_chain.find(p_var) {
         Some((
