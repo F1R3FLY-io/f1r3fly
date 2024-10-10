@@ -37,8 +37,8 @@ pub enum InterpreterError {
     },
     UnexpectedReuseOfProcContextFree {
         var_name: String,
-        first_use: String,
-        second_use: String,
+        first_use: SourcePosition,
+        second_use: SourcePosition,
     },
     UnexpectedBundleContent(String),
     UnrecognizedNormalizerError(String),

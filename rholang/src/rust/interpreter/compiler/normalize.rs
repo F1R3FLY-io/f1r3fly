@@ -1,6 +1,8 @@
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::Ground;
+use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer::normalize_p_var;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
+use crate::rust::interpreter::compiler::rholang_ast::PVar;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::{
@@ -141,6 +143,9 @@ pub fn normalize_match(
 
     println!("Normalizing node kind: {}", p_node.kind());
 
+    let line_num = p_node.start_position().row;
+    let col_num = p_node.start_position().column;
+
     match p_node.kind() {
         "bundle" => {
             println!("Found a bundle node, calling normalize_p_bundle");
@@ -163,6 +168,20 @@ pub fn normalize_match(
         ),
 
         "var_ref" => Ok(normalize_p_var_ref(p_node, input)?),
+
+        "var" => Ok(normalize_p_var(
+            PVar::ProcVarVar {
+                name: "var".to_string(),
+                line_num,
+                col_num,
+            },
+            input,
+        )?),
+
+        "wildcard" => Ok(normalize_p_var(
+            PVar::ProcVarWildcard { line_num, col_num },
+            input,
+        )?),
 
         //unary
         "not" => handle_unary_expression(p_node, input, source_code, Box::new(ENot::default())),

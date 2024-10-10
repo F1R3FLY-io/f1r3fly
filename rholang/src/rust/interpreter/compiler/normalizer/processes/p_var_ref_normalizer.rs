@@ -11,12 +11,8 @@ use std::result::Result;
 use tree_sitter::Node;
 
 /*
-  Nazar:
-    - Is VarRef in grammar.js?
-    - How do I translate Scala types to Rust tree_sitter string types?
-    - What is p.line_num and p.col_num in Rust?
-    - Start using InterpreterError elsewhere?
-    - What is source code?
+ * TODO: VarRef is NOT in grammar.js becuase we think it was experimental
+ * TODO: Update the variables/string match cases below once it has been added to grammar.js
 */
 pub fn normalize_p_var_ref(
     node: Node,
@@ -24,10 +20,10 @@ pub fn normalize_p_var_ref(
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     println!("Normalizing p_var_ref node of kind: {}", node.kind());
 
-    let p_var = unwrap_option_safe(node.child_by_field_name("var"))?.kind();
+    let p_var = node.kind();
     let p_var_ref_kind = unwrap_option_safe(node.child_by_field_name("var_ref_kind"))?.kind();
-    let p_line_num: usize = node.start_position().row;
-    let p_col_num: usize = node.start_position().column;
+    let p_line_num = node.start_position().row;
+    let p_col_num = node.start_position().column;
 
     match input.bound_map_chain.find(p_var) {
         Some((
@@ -90,8 +86,8 @@ pub fn normalize_p_var_ref(
 
         None => Err(InterpreterError::UnboundVariableRef {
             var_name: p_var.to_string(),
-            line: 0, // TODO: Figure out eq for tree_sitter
-            col: 0,  // TODO: Figure out eq for tree_sitter
+            line: p_line_num,
+            col: p_col_num,
         }),
     }
 }
