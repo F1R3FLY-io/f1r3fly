@@ -1,10 +1,10 @@
 use std::error::Error;
-use models::rhoapi::{Expr, expr, Par};
+use models::rhoapi::{expr, Par};
 use tree_sitter::Node;
-use super::exports::parse_rholang_code;
+use crate::rust::interpreter::compiler::{normalizer::parser::parse_rholang_code, utils::ground_to_expr};
+use crate::rust::interpreter::util::prepend_expr;
+
 use super::exports::{normalize_ground, ProcVisitOutputs, ProcVisitInputs};
-use crate::rust::interpreter::compiler::normalize::prepend_expr;
-use crate::rust::interpreter::compiler::normalize::ground_to_expr;
 
 pub fn normalize_p_ground(
   p_node: Node,

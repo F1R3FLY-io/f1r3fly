@@ -27,8 +27,8 @@ use super::accounting::_cost;
 use super::accounting::costs::Cost;
 use super::env::Env;
 use super::errors::InterpreterError;
-use super::matcher::{prepend_connective, prepend_expr};
 use super::unwrap_option_safe;
+use super::util::{prepend_connective, prepend_expr};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Substitute.scala
 pub trait SubstituteTrait<A> {

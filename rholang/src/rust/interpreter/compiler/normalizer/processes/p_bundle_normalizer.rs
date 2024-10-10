@@ -1,12 +1,10 @@
-use models::rhoapi::{Bundle, EVar, Expr, expr, Par, Var, var};
+use models::rhoapi::{Bundle, Par};
 use super::exports::*;
 use tree_sitter::Node;
 use std::error::Error;
 use std::result::Result;
-use models::BitSet;
-use models::rhoapi::var::VarInstance::BoundVar;
-use crate::rust::interpreter::compiler::exports::{BoundMapChain, FreeMap};
-use crate::rust::interpreter::compiler::normalize::{normalize_match, VarSort};
+use crate::rust::interpreter::compiler::exports::BoundMapChain;
+use crate::rust::interpreter::compiler::normalize::normalize_match;
 
 
 /*

@@ -1,13 +1,12 @@
-use crate::rust::interpreter::compiler::normalize::{normalize_match, prepend_expr};
+use crate::rust::interpreter::{compiler::{normalize::normalize_match, normalizer::parser::parse_rholang_code}, util::prepend_expr};
 use super::exports::{ProcVisitOutputs, ProcVisitInputs, FreeMap};
-use super::exports::parse_rholang_code;
 use models::rhoapi::{EMatches, Expr, expr, Par};
 use std::error::Error;
 use tree_sitter::Node;
 
 pub fn normalize_p_matches(
   p_node: Node,
-  mut input: ProcVisitInputs,
+  input: ProcVisitInputs,
   source_code: &[u8],
 ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
   println!("Normalizing p_matches node of kind: {}", p_node.kind());

@@ -3,9 +3,10 @@ use models::rhoapi::{EVar, Expr, expr, Par, Var, var};
 use tree_sitter::Node;
 use crate::rust::interpreter::compiler::bound_context::BoundContext;
 use crate::rust::interpreter::compiler::exports::{BoundMapChain, FreeContext, FreeMap};
-use crate::rust::interpreter::compiler::normalize::{prepend_expr, VarSort};
+use crate::rust::interpreter::compiler::normalize::VarSort;
 use crate::rust::interpreter::compiler::source_position::SourcePosition;
 use crate::rust::interpreter::errors::InterpreterError;
+use crate::rust::interpreter::util::prepend_expr;
 use super::exports::*;
 
 pub fn normalize_name(

@@ -1,31 +1,19 @@
 use crate::rust::interpreter::compiler::exports::BoundContext;
 use crate::rust::interpreter::compiler::normalize::VarSort;
+use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::errors::InterpreterError;
-use crate::rust::interpreter::matcher::prepend_connective;
-use crate::rust::interpreter::unwrap_option_safe;
+use crate::rust::interpreter::util::prepend_connective;
 
 use super::exports::*;
 use models::rhoapi::connective::ConnectiveInstance;
 use models::rhoapi::{Connective, VarRef};
 use std::result::Result;
-use tree_sitter::Node;
 
-/*
- * TODO: VarRef is NOT in grammar.js becuase we think it was experimental
- * TODO: Update the variables/string match cases below once it has been added to grammar.js
-*/
 pub fn normalize_p_var_ref(
-    node: Node,
+    p: PVarRef,
     input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-    println!("Normalizing p_var_ref node of kind: {}", node.kind());
-
-    let p_var = node.kind();
-    let p_var_ref_kind = unwrap_option_safe(node.child_by_field_name("var_ref_kind"))?.kind();
-    let p_line_num = node.start_position().row;
-    let p_col_num = node.start_position().column;
-
-    match input.bound_map_chain.find(p_var) {
+    match input.bound_map_chain.find(&p.var) {
         Some((
             BoundContext {
                 index,
@@ -34,8 +22,8 @@ pub fn normalize_p_var_ref(
             },
             depth,
         )) => match typ {
-            VarSort::ProcSort => match p_var_ref_kind {
-                "var_ref_kind_proc" => Ok(ProcVisitOutputs {
+            VarSort::ProcSort => match p.var_ref_kind {
+                VarRefKind::Proc => Ok(ProcVisitOutputs {
                     par: prepend_connective(
                         input.par,
                         Connective {
@@ -50,16 +38,16 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p_var.to_string(),
+                    var_name: p.var,
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
-                        row: p_line_num,
-                        column: p_col_num,
+                        row: p.line_num,
+                        column: p.col_num,
                     },
                 }),
             },
-            VarSort::NameSort => match p_var_ref_kind {
-                "var_ref_kind_name" => Ok(ProcVisitOutputs {
+            VarSort::NameSort => match p.var_ref_kind {
+                VarRefKind::Name => Ok(ProcVisitOutputs {
                     par: prepend_connective(
                         input.par,
                         Connective {
@@ -74,20 +62,20 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p_var.to_string(),
+                    var_name: p.var,
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
-                        row: p_line_num,
-                        column: p_col_num,
+                        row: p.line_num,
+                        column: p.col_num,
                     },
                 }),
             },
         },
 
         None => Err(InterpreterError::UnboundVariableRef {
-            var_name: p_var.to_string(),
-            line: p_line_num,
-            col: p_col_num,
+            var_name: p.var,
+            line: p.line_num,
+            col: p.col_num,
         }),
     }
 }

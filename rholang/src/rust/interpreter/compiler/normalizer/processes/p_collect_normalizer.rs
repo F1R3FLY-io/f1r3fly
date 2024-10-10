@@ -1,11 +1,12 @@
 use std::error::Error;
 use tree_sitter::Node;
-use crate::rust::interpreter::compiler::normalize::{CollectVisitInputs, prepend_expr, ProcVisitInputs, ProcVisitOutputs};
+use crate::rust::interpreter::compiler::normalize::{CollectVisitInputs, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::compiler::normalizer::collection_normalize_matcher::normalize_collection;
+use crate::rust::interpreter::util::prepend_expr;
 
 pub fn normalize_p_collect(
   node: Node,
-  mut input: ProcVisitInputs,
+  input: ProcVisitInputs,
   source_code: &[u8],
 ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
   let collection_result = normalize_collection(

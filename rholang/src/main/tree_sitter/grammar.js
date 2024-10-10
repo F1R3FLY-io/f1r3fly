@@ -100,7 +100,15 @@ module.exports = grammar({
         send_multiple: $ => '!!',
         _send_type: $ => choice($.send_single, $.send_multiple),
 
+        var_ref: $ => seq(
+            field('var_ref_kind', $.var_ref_kind),
+            field('var', $.var)
+        ),
+
+        var_ref_kind: $ => choice('=', '= *'),
+
         _proc_expression: $ => choice(
+            $.var_ref,
             $.or,
             $.and,
             $.matches,

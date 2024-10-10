@@ -473,6 +473,20 @@ pub struct KeyValuePair {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct PVarRef {
+    pub var_ref_kind: VarRefKind,
+    pub var: String,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum VarRefKind {
+    Proc,
+    Name,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum PVar {
     ProcVarVar {
         name: String,

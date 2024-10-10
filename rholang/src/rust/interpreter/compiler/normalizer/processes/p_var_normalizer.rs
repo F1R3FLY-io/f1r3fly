@@ -1,9 +1,10 @@
 use models::rust::utils::{new_boundvar_expr, new_freevar_expr, new_wildcard_expr};
 
 use crate::rust::interpreter::compiler::exports::{BoundContext, FreeContext};
-use crate::rust::interpreter::compiler::normalize::{prepend_expr, VarSort};
+use crate::rust::interpreter::compiler::normalize::VarSort;
 use crate::rust::interpreter::compiler::rholang_ast::PVar;
 use crate::rust::interpreter::errors::InterpreterError;
+use crate::rust::interpreter::util::prepend_expr;
 
 use super::exports::*;
 use std::result::Result;

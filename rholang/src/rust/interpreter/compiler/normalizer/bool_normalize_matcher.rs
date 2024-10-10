@@ -1,5 +1,6 @@
 use tree_sitter::Node;
-use super::exports::parse_rholang_code;
+
+use crate::rust::interpreter::compiler::normalizer::parser::parse_rholang_code;
 
 pub fn normalize_bool(node: Node, source_code: &[u8]) -> Option<bool> {
   match node.kind() {

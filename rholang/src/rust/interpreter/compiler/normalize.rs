@@ -1,15 +1,13 @@
 use super::exports::*;
-use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::Ground;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer::normalize_p_var;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
-use crate::rust::interpreter::compiler::rholang_ast::PVar;
-use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
-use models::rhoapi::expr::ExprInstance;
+use crate::rust::interpreter::compiler::rholang_ast::{PVar, PVarRef, VarRefKind};
+use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
+use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{
-    expr, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq,
-    ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par,
+    EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr,
+    EPercentPercent, EPlus, EPlusPlus, Expr, Par,
 };
-use models::rust::utils::union;
 use std::error::Error;
 use tree_sitter::Node;
 
@@ -167,16 +165,51 @@ pub fn normalize_match(
             source_code,
         ),
 
-        "var_ref" => Ok(normalize_p_var_ref(p_node, input)?),
+        "var_ref" => {
+            let var_ref_kind_node = p_node
+                .child_by_field_name("var_ref_kind")
+                .ok_or("Expected a var_ref_kind node but found None")?;
+            let var_node = p_node
+                .child_by_field_name("var")
+                .ok_or("Expected a var node but found None")?;
 
-        "var" => Ok(normalize_p_var(
-            PVar::ProcVarVar {
-                name: "var".to_string(),
-                line_num,
-                col_num,
-            },
-            input,
-        )?),
+            let var_ref_kind = match std::str::from_utf8(
+                &source_code[var_ref_kind_node.start_byte()..var_ref_kind_node.end_byte()],
+            )? {
+                "=" => VarRefKind::Proc,
+                "= *" => VarRefKind::Name,
+                _ => return Err("Unexpected var_ref_kind".into()),
+            };
+
+            let var =
+                std::str::from_utf8(&source_code[var_node.start_byte()..var_node.end_byte()])?
+                    .to_string();
+
+            Ok(normalize_p_var_ref(
+                PVarRef {
+                    var_ref_kind,
+                    var,
+                    line_num,
+                    col_num,
+                },
+                input,
+            )?)
+        }
+
+        "var" => {
+            let var_name =
+                std::str::from_utf8(&source_code[p_node.start_byte()..p_node.end_byte()])?
+                    .to_string();
+
+            Ok(normalize_p_var(
+                PVar::ProcVarVar {
+                    name: var_name,
+                    line_num,
+                    col_num,
+                },
+                input,
+            )?)
+        }
 
         "wildcard" => Ok(normalize_p_var(
             PVar::ProcVarWildcard { line_num, col_num },
@@ -220,236 +253,5 @@ pub fn normalize_match(
             p_node.kind()
         )
         .into()),
-    }
-}
-
-// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
-pub fn prepend_expr(mut p: Par, e: Expr, depth: i32) -> Par {
-    let mut new_exprs = vec![e.clone()];
-    new_exprs.append(&mut p.exprs);
-
-    Par {
-        exprs: new_exprs,
-        locally_free: union(p.locally_free.clone(), e.locally_free(e.clone(), depth)),
-        connective_used: p.connective_used || e.clone().connective_used(e),
-        ..p.clone()
-    }
-}
-
-// I'm not sure about this func, but I need it for p_ground_normalizer.rs
-pub fn ground_to_expr(ground: Ground) -> Expr {
-    match ground {
-        Ground::Bool(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GBool(value)),
-        },
-        Ground::Int(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GInt(value)),
-        },
-        Ground::String(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GString(value)),
-        },
-        Ground::Uri(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GUri(value)),
-        },
-    }
-}
-
-pub trait UnaryExpr {
-    fn from_par(&self, p: Par) -> Expr;
-}
-
-pub trait BinaryExpr {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr;
-}
-
-impl UnaryExpr for ENot {
-    fn from_par(&self, p: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::ENotBody(ENot { p: Some(p) })),
-        }
-    }
-}
-
-impl UnaryExpr for ENeg {
-    fn from_par(&self, p: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::ENegBody(ENeg { p: Some(p) })),
-        }
-    }
-}
-
-impl BinaryExpr for EMult {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EMultBody(EMult {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EDiv {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EDivBody(EDiv {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EMod {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EModBody(EMod {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EPercentPercent {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EPlus {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EMinus {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EMinusBody(EMinus {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EPlusPlus {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EMinusMinus {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for ELt {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::ELtBody(ELt {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for ELte {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::ELteBody(ELte {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EGt {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EGtBody(EGt {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EGte {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EGteBody(EGte {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EEq {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EEqBody(EEq {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for ENeq {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::ENeqBody(ENeq {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EAnd {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EAndBody(EAnd {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
-    }
-}
-
-impl BinaryExpr for EOr {
-    fn from_pars(&self, p1: Par, p2: Par) -> Expr {
-        Expr {
-            expr_instance: Some(ExprInstance::EOrBody(EOr {
-                p1: Some(p1),
-                p2: Some(p2),
-            })),
-        }
     }
 }
