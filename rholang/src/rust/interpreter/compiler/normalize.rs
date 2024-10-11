@@ -117,7 +117,6 @@ pub fn normalize_match(
     ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
         let sub_proc_node = p_node
             .child_by_field_name("proc")
-            .or(p_node.child_by_field_name("left"))
             .ok_or("Expected a child node for unary expression but found None")?;
 
         unary_exp(sub_proc_node, input, source_code, constructor)
