@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::fmt;
 use super::exports::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FreeMap<T: Clone> {
   pub next_level: usize,
   pub level_bindings: HashMap<String, FreeContext<T>>,
@@ -11,7 +10,7 @@ pub struct FreeMap<T: Clone> {
 }
 
 impl<T: Clone> FreeMap<T> {
-  pub(crate) fn new() -> Self {
+  pub fn new() -> Self {
     FreeMap {
       next_level: 0,
       level_bindings: HashMap::new(),
@@ -27,7 +26,7 @@ impl<T: Clone> FreeMap<T> {
     self.level_bindings.get(name).cloned()
   }
 
-  pub(crate) fn put(&self, binding: IdContext<T>) -> Self {
+  pub fn put(&self, binding: IdContext<T>) -> Self {
     let (name, typ, source_position) = binding;
 
     let mut new_level_bindings = self.level_bindings.clone();

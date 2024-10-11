@@ -53,13 +53,15 @@ class ProcMatcherSpec extends FlatSpec with Matchers {
     result.freeMap should be(inputs.freeMap)
     result.par.locallyFree.get should be(BitSet(0))
   }
-  "PVar" should "Compile as FreeVar if it's not in env" in {
+  
+	"PVar" should "Compile as FreeVar if it's not in env" in {
     val result = ProcNormalizeMatcher.normalizeMatch[Coeval](pvar, inputs).value
     result.par should be(inputs.par.prepend(EVar(FreeVar(0)), 0))
     result.freeMap shouldEqual
       (inputs.freeMap.put(("x", ProcSort, SourcePosition(0, 0))))
   }
-  "PVar" should "Not compile if it's in env of the wrong sort" in {
+  
+	"PVar" should "Not compile if it's in env of the wrong sort" in {
     val boundInputs =
       inputs.copy(boundMapChain = inputs.boundMapChain.put(("x", NameSort, SourcePosition(0, 0))))
 
@@ -67,7 +69,8 @@ class ProcMatcherSpec extends FlatSpec with Matchers {
       ProcNormalizeMatcher.normalizeMatch[Coeval](pvar, boundInputs).value
     }
   }
-  "PVar" should "Not compile if it's used free somewhere else" in {
+  
+	"PVar" should "Not compile if it's used free somewhere else" in {
     val boundInputs =
       inputs.copy(freeMap = inputs.freeMap.put(("x", ProcSort, SourcePosition(0, 0))))
 

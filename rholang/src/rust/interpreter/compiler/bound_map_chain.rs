@@ -1,12 +1,12 @@
 use super::exports::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BoundMapChain<T> {
   chain: Vec<BoundMap<T>>,
 }
 
 impl<T: Clone> BoundMapChain<T> {
-  fn new() -> Self {
+  pub fn new() -> Self {
     BoundMapChain {
       chain: vec![BoundMap::new()],
     }

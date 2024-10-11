@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use super::exports::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BoundMap<T> {
   next_index: usize,
   index_bindings: HashMap<String, BoundContext<T>>,

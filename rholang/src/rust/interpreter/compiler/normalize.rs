@@ -11,7 +11,7 @@ use models::rhoapi::{
 use std::error::Error;
 use tree_sitter::Node;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VarSort {
     ProcSort,
     NameSort,
@@ -24,18 +24,18 @@ pub enum VarSort {
  * @param env
  * @param knownFree
  */
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProcVisitInputs {
-    pub(crate) par: Par,
+    pub par: Par,
     pub bound_map_chain: BoundMapChain<VarSort>,
-    pub(crate) free_map: FreeMap<VarSort>,
+    pub free_map: FreeMap<VarSort>,
 }
 
 // Returns the update Par and an updated map of free variables.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProcVisitOutputs {
-    pub(crate) par: Par,
-    pub(crate) free_map: FreeMap<VarSort>,
+    pub par: Par,
+    pub free_map: FreeMap<VarSort>,
 }
 
 #[derive(Clone, Debug)]
