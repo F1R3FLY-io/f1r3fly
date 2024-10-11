@@ -1,12 +1,11 @@
 use crate::rust::interpreter::compiler::exports::{FreeContext, FreeMap, SourcePosition};
 use crate::rust::interpreter::errors::InterpreterError;
 use models::rhoapi::Var;
-use models::rhoapi::Var::VarInstance::{FreeVar, Wildcard};
+use models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
+use models::rhoapi::var::WildcardMsg;
 use crate::rust::interpreter::compiler::normalize::VarSort;
 use tree_sitter::Node;
 use std::error::Error;
-use models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
-use models::rhoapi::var::WildcardMsg;
 
 pub fn handle_proc_var(
   node: Node,
@@ -17,7 +16,7 @@ pub fn handle_proc_var(
     "wildcard" => {
       let wildcard_var = Var {
         var_instance: Some(Wildcard(WildcardMsg {})),
-      };x
+      };
       let source_position = SourcePosition::new(
         node.start_position().row,
         node.start_position().column,
