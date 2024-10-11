@@ -171,11 +171,13 @@ module.exports = grammar({
         conjunction: $ => prec.left(14, seq(field('left', $._proc), '/\\', field('right', $._proc))),
         negation: $ => prec(15, seq('~', field('proc', $._proc))),
 
+        // TODO: Need help understanding _ground_expression and block.
         _ground_expression: $ => prec(16, choice($.block, $._ground, $.collection, $._proc_var, $.simple_type)),
         block: $ => seq('{', field('body', $._proc), '}'),
 
         // process variables and names
         wildcard: $ => '_',
+        // TODO: What is point of proc_var?
         _proc_var: $ => choice($.wildcard, $.var),
 
         quotable: $ => choice(
@@ -184,6 +186,7 @@ module.exports = grammar({
             $.conjunction,
             $.negation,
             $._ground_expression),
+            // TODO: Why is quote not .proc?
         quote: $ => prec(12, seq('@', $.quotable)),
 
         name: $ => choice($._proc_var, $.quote),
