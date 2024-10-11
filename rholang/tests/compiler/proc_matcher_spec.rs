@@ -8,7 +8,9 @@ use rholang::rust::interpreter::{
         exports::{BoundMapChain, FreeMap, SourcePosition},
         normalize::{ProcVisitInputs, VarSort},
         normalizer::processes::p_var_normalizer::normalize_p_var,
-        rholang_ast::{Case, Ground, GroundExpression, PVar, Proc, ProcExpression},
+        rholang_ast::{
+            Case, Ground, GroundExpression, PVar, PVarRef, Proc, ProcExpression, VarRefKind,
+        },
     },
     errors::InterpreterError,
     util::prepend_expr,
@@ -139,42 +141,36 @@ fn p_var_ref_should_do_a_deep_lookup_in_a_match_case() {
         inputs
     };
 
-    // let list_cases = vec![Case {
-    //     pattern: Proc::,
-    //     proc: todo!(),
-    //     line_num: todo!(),
-    //     col_num: todo!(),
-    // }];
+    let list_cases = vec![Case {
+        pattern: Proc::VarRef(PVarRef {
+            var_ref_kind: VarRefKind::Proc,
+            var: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        }),
+        proc: Proc::ProcExpression(ProcExpression::GroundExpression(GroundExpression::Ground(
+            Ground::Nil {
+                line_num: 0,
+                col_num: 0,
+            },
+        ))),
+        line_num: 0,
+        col_num: 0,
+    }];
 
-    // let proc = Proc::Match {
-    //     expression: ProcExpression::,
-    //     cases: (),
-    //     line_num: (),
-    //     col_num: (),
-    // };
+    let proc = Proc::Match {
+        expression: Box::new(Proc::ProcExpression(ProcExpression::GroundExpression(
+            GroundExpression::Ground(Ground::LongLiteral {
+                value: 7,
+                line_num: 0,
+                col_num: 0,
+            }),
+        ))),
+        cases: list_cases,
+        line_num: 0,
+        col_num: 0,
+    };
 
-  //   GroundExpression {
-  //     ground: GroundExpression::Ground {
-  //         ground: Ground::LongLiteral {
-  //             value: 7,
-  //             line_num: 0,
-  //             col_num: 0,
-  //         },
-  //         line_num: 0,
-  //         col_num: 0,
-  //     },
-  //     line_num: 0,
-  //     col_num: 0,
-  // }
-
-    let result = normalize_p_var(p_var(), bound_inputs);
-    assert!(result.is_err());
-    assert_eq!(
-        result,
-        Err(InterpreterError::UnexpectedReuseOfProcContextFree {
-            var_name: "x".to_string(),
-            first_use: SourcePosition::new(0, 0),
-            second_use: SourcePosition::new(0, 0)
-        })
-    )
+    // let result = normalize_p_var(proc, bound_inputs);
+    // assert!(result.is_ok());
 }

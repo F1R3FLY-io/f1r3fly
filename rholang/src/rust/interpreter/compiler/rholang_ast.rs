@@ -80,6 +80,10 @@ pub enum Proc {
         col_num: usize,
     },
 
+    Var(PVar),
+
+    VarRef(PVarRef),
+
     ProcExpression(ProcExpression),
 }
 
@@ -356,44 +360,18 @@ pub enum ProcExpression {
         col_num: usize,
     },
 
-    GroundExpression {
-        ground: GroundExpression,
-        line_num: usize,
-        col_num: usize,
-    },
+    GroundExpression(GroundExpression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum GroundExpression {
-    Block {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
+    Block(Box<Proc>),
 
-    Ground {
-        ground: Ground,
-        line_num: usize,
-        col_num: usize,
-    },
+    Ground(Ground),
 
-    Collection {
-        collection: Collection,
-        line_num: usize,
-        col_num: usize,
-    },
+    Collection(Collection),
 
-    ProcVar {
-        name: String,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    SimpleType {
-        simple_type: SimpleType,
-        line_num: usize,
-        col_num: usize,
-    },
+    SimpleType(SimpleType),
 }
 
 #[derive(Debug, PartialEq, Clone)]
