@@ -210,3 +210,76 @@ fn parse_proc(cursor: &mut TreeCursor, source: &str) -> Proc {
         _ => Proc::Ground(node.utf8_text(source.as_bytes()).unwrap().to_string()),
     }
 }
+
+fn parse_proc_list(cursor: &mut TreeCursor, source: &str) -> Vec<Proc> {
+  let mut procs = Vec::new();
+  cursor.goto_first_child();
+  loop {
+      procs.push(parse_proc(cursor, source));
+      if !cursor.goto_next_sibling() {
+          break;
+      }
+  }
+  cursor.goto_parent();
+  procs
+}
+
+fn parse_decls(cursor: &mut TreeCursor, source: &str) -> Vec<String> {
+  let mut decls = Vec::new();
+  cursor.goto_first_child();
+  loop {
+      let decl = cursor.node().utf8_text(source.as_bytes()).unwrap().to_string();
+      decls.push(decl);
+      if !cursor.goto_next_sibling() {
+          break;
+      }
+  }
+  cursor.goto_parent();
+  decls
+}
+
+fn parse_cases(cursor: &mut TreeCursor, source: &str) -> Vec<(Proc, Proc)> {
+  let mut cases = Vec::new();
+  cursor.goto_first_child();
+  loop {
+      let pattern = parse_proc(cursor, source);
+      cursor.goto_next_sibling();
+      let proc = parse_proc(cursor, source);
+      cases.push((pattern, proc));
+      if !cursor.goto_next_sibling() {
+          break;
+      }
+  }
+  cursor.goto_parent();
+  cases
+}
+
+fn parse_branches(cursor: &mut TreeCursor, source: &str) -> Vec<(Proc, Proc)> {
+  let mut branches = Vec::new();
+  cursor.goto_first_child();
+  loop {
+      let pattern = parse_proc(cursor, source);
+      cursor.goto_next_sibling();
+      let proc = parse_proc(cursor, source);
+      branches.push((pattern, proc));
+      if !cursor.goto_next_sibling() {
+          break;
+      }
+  }
+  cursor.goto_parent();
+  branches
+}
+
+fn parse_names(cursor: &mut TreeCursor, source: &str) -> Vec<String> {
+  let mut names = Vec::new();
+  cursor.goto_first_child();
+  loop {
+      let name = cursor.node().utf8_text(source.as_bytes()).unwrap().to_string();
+      names.push(name);
+      if !cursor.goto_next_sibling() {
+          break;
+      }
+  }
+  cursor.goto_parent();
+  names
+}
