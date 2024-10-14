@@ -1,7 +1,7 @@
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer::normalize_p_var;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
-use crate::rust::interpreter::compiler::rholang_ast::{PVar, PVarRef, VarRefKind};
+use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{
@@ -195,25 +195,25 @@ pub fn normalize_match(
             )?)
         }
 
-        "var" => {
-            let var_name =
-                std::str::from_utf8(&source_code[p_node.start_byte()..p_node.end_byte()])?
-                    .to_string();
+        // "var" => {
+        //     let var_name =
+        //         std::str::from_utf8(&source_code[p_node.start_byte()..p_node.end_byte()])?
+        //             .to_string();
 
-            Ok(normalize_p_var(
-                PVar::ProcVarVar {
-                    name: var_name,
-                    line_num,
-                    col_num,
-                },
-                input,
-            )?)
-        }
+        //     Ok(normalize_p_var(
+        //         PVar::ProcVarVar {
+        //             name: var_name,
+        //             line_num,
+        //             col_num,
+        //         },
+        //         input,
+        //     )?)
+        // }
 
-        "wildcard" => Ok(normalize_p_var(
-            PVar::ProcVarWildcard { line_num, col_num },
-            input,
-        )?),
+        // "wildcard" => Ok(normalize_p_var(
+        //     PVar::ProcVarWildcard { line_num, col_num },
+        //     input,
+        // )?),
 
         //unary
         "not" => handle_unary_expression(p_node, input, source_code, Box::new(ENot::default())),

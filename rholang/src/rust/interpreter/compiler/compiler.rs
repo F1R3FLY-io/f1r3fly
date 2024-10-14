@@ -7,7 +7,7 @@ use models::{
 use std::collections::HashMap;
 
 use crate::rust::interpreter::{
-    compiler::normalizer::parser::parse_rholang_code, errors::InterpreterError,
+    compiler::normalizer::parser::parse_rholang_code_to_proc, errors::InterpreterError,
 };
 
 use super::rholang_ast::Proc;
@@ -41,16 +41,7 @@ impl Compiler {
     }
 
     pub fn source_to_ast(source: &str) -> Result<Proc, InterpreterError> {
-        let tree = parse_rholang_code(source);
-        let root = tree.root_node();
-
-        if root.kind() != "source_file" {
-            return Err(InterpreterError::ParserError(
-                "Incorrent root kind".to_string(),
-            ));
-        }
-
-        todo!()
+        parse_rholang_code_to_proc(source)
     }
 
     fn normalize_term(
