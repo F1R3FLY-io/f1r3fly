@@ -148,7 +148,10 @@ pub fn normalize_match(
             println!("Found a bundle node, calling normalize_p_bundle");
             normalize_p_bundle(p_node, input, source_code)
         }
-        "ground" => normalize_p_ground(p_node, input, source_code),
+        "long_literal" | "bool_literal" | "string_literal" | "uri_literal" => {
+            println!("Found a ground node, calling normalize_p_ground");
+            normalize_p_ground(p_node, input, source_code)
+        }
         "collection" => normalize_p_collect(p_node, input, source_code),
         "matches" => {
             println!("Found a matches node, calling normalize_p_matches");
