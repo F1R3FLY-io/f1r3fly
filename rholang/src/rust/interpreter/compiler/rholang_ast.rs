@@ -192,6 +192,7 @@ pub struct UriLiteral {
 pub enum Collection {
     List {
         elements: Vec<Proc>,
+        cont: Option<ProcRemainder>,
         line_num: usize,
         col_num: usize,
     },
@@ -204,15 +205,24 @@ pub enum Collection {
 
     Set {
         elements: Vec<Proc>,
+        cont: Option<ProcRemainder>,
         line_num: usize,
         col_num: usize,
     },
 
     Map {
         pairs: Vec<KeyValuePair>,
+        cont: Option<ProcRemainder>,
         line_num: usize,
         col_num: usize,
     },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProcRemainder {
+    pub proc_var: ProcVar,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]

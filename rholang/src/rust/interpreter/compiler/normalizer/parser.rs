@@ -2,8 +2,9 @@ use tree_sitter::{Node, Parser, Tree};
 
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
-        Block, Collection, Conjunction, Disjunction, Eval, Ground, GroundExpression, Name,
-        Negation, Proc, ProcList, ProcVar, Quotable, Quote, SimpleType, SyncSendCont, UriLiteral,
+        Block, Collection, Conjunction, Disjunction, Eval, Ground, GroundExpression, KeyValuePair,
+        Name, Negation, Proc, ProcList, ProcRemainder, ProcVar, Quotable, Quote, SimpleType,
+        SyncSendCont, UriLiteral,
     },
     errors::InterpreterError,
 };
@@ -456,6 +457,133 @@ fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, Interprete
 }
 
 fn parse_collection(node: &Node, source: &str) -> Result<Collection, InterpreterError> {
+    let line_num = node.start_position().row;
+    let col_num = node.start_position().column;
+
+    match node.kind() {
+        "list" => Ok(Collection::List {
+            elements: {
+                let mut procs = Vec::new();
+                let mut cursor = node.walk();
+
+                cursor.goto_first_child(); // '['
+
+                while cursor.goto_next_sibling() {
+                    let current_node = cursor.node();
+                    match current_node.kind() {
+                        "_proc" => procs.push(parse_proc(&current_node, source)?),
+                        "," => continue,
+                        _ => break,
+                    }
+                }
+
+                procs
+            },
+            cont: {
+                let cont_node = node.child_by_field_name("cont");
+                match cont_node {
+                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    None => None,
+                }
+            },
+            line_num,
+            col_num,
+        }),
+
+        "set" => Ok(Collection::Set {
+            elements: {
+                let mut procs = Vec::new();
+                let mut cursor = node.walk();
+
+                cursor.goto_first_child(); // 'Set'
+                cursor.goto_next_sibling(); // '('
+
+                while cursor.goto_next_sibling() {
+                    let current_node = cursor.node();
+                    match current_node.kind() {
+                        "_proc" => procs.push(parse_proc(&current_node, source)?),
+                        "," => continue,
+                        _ => break,
+                    }
+                }
+
+                procs
+            },
+            cont: {
+                let cont_node = node.child_by_field_name("cont");
+                match cont_node {
+                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    None => None,
+                }
+            },
+            line_num,
+            col_num,
+        }),
+
+        "map" => Ok(Collection::Map {
+            pairs: {
+                let mut kvs = Vec::new();
+                let mut cursor = node.walk();
+
+                cursor.goto_first_child(); // '{'
+
+                while cursor.goto_next_sibling() {
+                    let current_node = cursor.node();
+                    match current_node.kind() {
+                        "key_value_pair" => kvs.push(parse_key_value_pair(&current_node, source)?),
+                        "," => continue,
+                        _ => break,
+                    }
+                }
+
+                kvs
+            },
+            cont: {
+                let cont_node = node.child_by_field_name("cont");
+                match cont_node {
+                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    None => None,
+                }
+            },
+            line_num,
+            col_num,
+        }),
+
+        "tuple" => Ok(Collection::Tuple {
+            elements: {
+                let mut procs = Vec::new();
+                let mut cursor = node.walk();
+
+                cursor.goto_first_child(); // '('
+
+                while cursor.goto_next_sibling() {
+                    let current_node = cursor.node();
+                    match current_node.kind() {
+                        "_proc" => procs.push(parse_proc(&current_node, source)?),
+                        "," => continue,
+                        ")" => break,
+                        _ => break,
+                    }
+                }
+
+                procs
+            },
+            line_num,
+            col_num,
+        }),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of collection",
+            node.kind(),
+        ))),
+    }
+}
+
+fn parse_proc_remainder(node: &Node, source: &str) -> Result<ProcRemainder, InterpreterError> {
+    todo!()
+}
+
+fn parse_key_value_pair(node: &Node, source: &str) -> Result<KeyValuePair, InterpreterError> {
     todo!()
 }
 
@@ -473,9 +601,7 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
         let current_node = cursor.node();
         match current_node.kind() {
             "_proc" => procs.push(parse_proc(&current_node, source)?),
-
             "," => continue,
-
             _ => break,
         }
     }
