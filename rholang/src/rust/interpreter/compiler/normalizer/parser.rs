@@ -1,9 +1,11 @@
-use tree_sitter::{Node, Parser, Tree, TreeCursor};
+use tree_sitter::{Node, Parser, Tree};
 
 use crate::rust::interpreter::{
-    compiler::rholang_ast::{Name, Proc, ProcVar, Quote, SyncSendCont},
+    compiler::rholang_ast::{
+        Block, Collection, Conjunction, Disjunction, Eval, Ground, GroundExpression, Name,
+        Negation, Proc, ProcList, ProcVar, Quotable, Quote, SimpleType, SyncSendCont, UriLiteral,
+    },
     errors::InterpreterError,
-    unwrap_option_safe,
 };
 
 pub fn parse_rholang_code(code: &str) -> Tree {
@@ -93,185 +95,396 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
             let cont: SyncSendCont = {
                 let cont_node = get_child_by_field_name(node, "cont")?;
-                if cont_node.kind() == "non_empty_cont" {
-                    SyncSendCont::NonEmpty {
+                match cont_node.kind() {
+                    "non_empty_cont" => SyncSendCont::NonEmpty {
                         proc: Box::new(parse_proc(&cont_node, source)?),
                         line_num: cont_node.start_position().row,
                         col_num: cont_node.start_position().column,
-                    }
-                } else if node.kind() == "empty_cont" {
-                    SyncSendCont::Empty {
+                    },
+
+                    "empty_cont" => SyncSendCont::Empty {
                         line_num: cont_node.start_position().row,
                         col_num: cont_node.start_position().column,
+                    },
+
+                    _ => {
+                        return Err(InterpreterError::ParserError(format!(
+                            "Unexpected choice node kind: {:?} of sync_send_cont",
+                            node.kind(),
+                        )))
                     }
-                } else {
-                    return Err(InterpreterError::ParserError(format!(
-                        "Unexpected choice node kind: {:?} on sync_send_cont",
-                        node.kind(),
-                    )));
                 }
             };
 
             Ok(Proc::SendSync {
-                name: name_val,
+                name: name_proc,
                 messages: messages_proc,
                 cont,
                 line_num: node.start_position().row,
                 col_num: node.start_position().column,
             })
         } // "new" => {
-          //     cursor.goto_first_child();
-          //     let decls = parse_decls(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let proc = parse_proc(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::New(decls, Box::new(proc))
-          // }
-          // "ifElse" => {
-          //     cursor.goto_first_child();
-          //     let condition = parse_proc(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let if_true = parse_proc(cursor, source);
-          //     let alternative = if cursor.goto_next_sibling() {
-          //         Some(Box::new(parse_proc(cursor, source)))
-          //     } else {
-          //         None
-          //     };
-          //     cursor.goto_parent();
-          //     Proc::IfElse(Box::new(condition), Box::new(if_true), alternative)
-          // }
-          // "let" => {
-          //     cursor.goto_first_child();
-          //     let decls = parse_decls(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let body = parse_proc(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Let(decls, Box::new(body))
-          // }
-          // "bundle" => {
-          //     cursor.goto_first_child();
-          //     let bundle_type = node
-          //         .child_by_field_name("bundle_type")
-          //         .unwrap()
-          //         .utf8_text(source.as_bytes())
-          //         .unwrap()
-          //         .to_string();
-          //     cursor.goto_next_sibling();
-          //     let proc = parse_proc(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Bundle(bundle_type, Box::new(proc))
-          // }
-          // "match" => {
-          //     cursor.goto_first_child();
-          //     let expression = parse_proc(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let cases = parse_cases(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Match(Box::new(expression), cases)
-          // }
-          // "choice" => {
-          //     cursor.goto_first_child();
-          //     let branches = parse_branches(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Choice(branches)
-          // }
-          // "contract" => {
-          //     cursor.goto_first_child();
-          //     let name = node
-          //         .child_by_field_name("name")
-          //         .unwrap()
-          //         .utf8_text(source.as_bytes())
-          //         .unwrap()
-          //         .to_string();
-          //     cursor.goto_next_sibling();
-          //     let formals = parse_names(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let proc = parse_proc(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Contract(name, formals, Box::new(proc))
-          // }
-          // "input" => {
-          //     cursor.goto_first_child();
-          //     let formals = parse_names(cursor, source);
-          //     cursor.goto_next_sibling();
-          //     let proc = parse_proc(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Input(formals, Box::new(proc))
-          // }
-          // "send" => {
-          //     cursor.goto_first_child();
-          //     let name = node
-          //         .child_by_field_name("name")
-          //         .unwrap()
-          //         .utf8_text(source.as_bytes())
-          //         .unwrap()
-          //         .to_string();
-          //     cursor.goto_next_sibling();
-          //     let inputs = parse_proc_list(cursor, source);
-          //     cursor.goto_parent();
-          //     Proc::Send(name, inputs)
-          // }
-          // "var_ref" => {
-          //     let var = node
-          //         .child_by_field_name("var")
-          //         .unwrap()
-          //         .utf8_text(source.as_bytes())
-          //         .unwrap()
-          //         .to_string();
-          //     Proc::VarRef(var)
-          // }
-          // "nil" => Proc::Nil,
-          // _ => Proc::Ground(node.utf8_text(source.as_bytes()).unwrap().to_string()),
+        //     cursor.goto_first_child();
+        //     let decls = parse_decls(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let proc = parse_proc(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::New(decls, Box::new(proc))
+        // }
+        // "ifElse" => {
+        //     cursor.goto_first_child();
+        //     let condition = parse_proc(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let if_true = parse_proc(cursor, source);
+        //     let alternative = if cursor.goto_next_sibling() {
+        //         Some(Box::new(parse_proc(cursor, source)))
+        //     } else {
+        //         None
+        //     };
+        //     cursor.goto_parent();
+        //     Proc::IfElse(Box::new(condition), Box::new(if_true), alternative)
+        // }
+        // "let" => {
+        //     cursor.goto_first_child();
+        //     let decls = parse_decls(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let body = parse_proc(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Let(decls, Box::new(body))
+        // }
+        // "bundle" => {
+        //     cursor.goto_first_child();
+        //     let bundle_type = node
+        //         .child_by_field_name("bundle_type")
+        //         .unwrap()
+        //         .utf8_text(source.as_bytes())
+        //         .unwrap()
+        //         .to_string();
+        //     cursor.goto_next_sibling();
+        //     let proc = parse_proc(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Bundle(bundle_type, Box::new(proc))
+        // }
+        // "match" => {
+        //     cursor.goto_first_child();
+        //     let expression = parse_proc(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let cases = parse_cases(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Match(Box::new(expression), cases)
+        // }
+        // "choice" => {
+        //     cursor.goto_first_child();
+        //     let branches = parse_branches(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Choice(branches)
+        // }
+        // "contract" => {
+        //     cursor.goto_first_child();
+        //     let name = node
+        //         .child_by_field_name("name")
+        //         .unwrap()
+        //         .utf8_text(source.as_bytes())
+        //         .unwrap()
+        //         .to_string();
+        //     cursor.goto_next_sibling();
+        //     let formals = parse_names(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let proc = parse_proc(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Contract(name, formals, Box::new(proc))
+        // }
+        // "input" => {
+        //     cursor.goto_first_child();
+        //     let formals = parse_names(cursor, source);
+        //     cursor.goto_next_sibling();
+        //     let proc = parse_proc(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Input(formals, Box::new(proc))
+        // }
+        // "send" => {
+        //     cursor.goto_first_child();
+        //     let name = node
+        //         .child_by_field_name("name")
+        //         .unwrap()
+        //         .utf8_text(source.as_bytes())
+        //         .unwrap()
+        //         .to_string();
+        //     cursor.goto_next_sibling();
+        //     let inputs = parse_proc_list(cursor, source);
+        //     cursor.goto_parent();
+        //     Proc::Send(name, inputs)
+        // }
+        // "var_ref" => {
+        //     let var = node
+        //         .child_by_field_name("var")
+        //         .unwrap()
+        //         .utf8_text(source.as_bytes())
+        //         .unwrap()
+        //         .to_string();
+        //     Proc::VarRef(var)
+        // }
+        // "nil" => Proc::Nil,
+        _ => Err(InterpreterError::ParserError(
+            "Unrecognizable process".to_string(),
+        )),
     }
 }
 
 fn parse_name(node: &Node, source: &str) -> Result<Name, InterpreterError> {
-    if node.kind() == "_proc_var" {
-        Ok(Name::NameProcVar(parse_proc_var(node, source)?))
-    } else if node.kind() == "quote" {
-        Ok(Name::NameQuote(Box::new(parse_quote(node, source)?)))
-    } else {
-        return Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} on name",
+    match node.kind() {
+        "_proc_var" => Ok(Name::NameProcVar(parse_proc_var(node, source)?)),
+
+        "quote" => Ok(Name::NameQuote(Box::new(parse_quote(node, source)?))),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of name",
             node.kind(),
-        )));
+        ))),
     }
 }
 
 fn parse_proc_var(node: &Node, source: &str) -> Result<ProcVar, InterpreterError> {
-    if node.kind() == "wildcard" {
-        Ok(ProcVar::Wildcard {
+    match node.kind() {
+        "wildcard" => Ok(ProcVar::Wildcard {
             line_num: node.start_position().row,
             col_num: node.start_position().column,
-        })
-    } else if node.kind() == "var" {
-        Ok(Name::NameQuote(Box::new(parse_quote(node, source)?)))
-    } else {
-        return Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} on _proc_var",
+        }),
+
+        "var" => Ok(ProcVar::Var {
+            name: get_node_value(node, source.as_bytes())?,
+            line_num: node.start_position().row,
+            col_num: node.start_position().column,
+        }),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of _proc_var",
             node.kind(),
-        )));
+        ))),
     }
 }
 
 fn parse_quote(node: &Node, source: &str) -> Result<Quote, InterpreterError> {
+    let quotable_node = node
+        .child(1)
+        .filter(|n| n.kind() == "quotable")
+        .ok_or_else(|| {
+            InterpreterError::ParserError(
+                "Expected a quotable node in quote at index 1".to_string(),
+            )
+        })?;
+
+    Ok(Quote {
+        quotable: parse_quotable(&quotable_node, source)?,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_quotable(node: &Node, source: &str) -> Result<Quotable, InterpreterError> {
+    match node.kind() {
+        "eval" => Ok(Quotable::Eval(parse_eval(node, source)?)),
+
+        "disjunction" => Ok(Quotable::Disjunction(parse_disjunction(node, source)?)),
+
+        "conjunction" => Ok(Quotable::Conjunction(parse_conjuction(node, source)?)),
+
+        "negation" => Ok(Quotable::Negation(parse_negation(node, source)?)),
+
+        "_ground_expression" => Ok(Quotable::GroundExpression(parse_ground_expression(
+            node, source,
+        )?)),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of quotable",
+            node.kind(),
+        ))),
+    }
+}
+
+fn parse_eval(node: &Node, source: &str) -> Result<Eval, InterpreterError> {
+    let name_node = node
+        .child(1)
+        .filter(|n| n.kind() == "name")
+        .ok_or_else(|| {
+            InterpreterError::ParserError("Expected a name node in eval at index 1".to_string())
+        })?;
+
+    Ok(Eval {
+        name: parse_name(&name_node, source)?,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_disjunction(node: &Node, source: &str) -> Result<Disjunction, InterpreterError> {
+    let left_node = get_child_by_field_name(node, "left")?;
+    let left_proc = parse_proc(&left_node, source)?;
+
+    let right_node = get_child_by_field_name(node, "right")?;
+    let right_proc = parse_proc(&right_node, source)?;
+
+    Ok(Disjunction {
+        left: left_proc,
+        right: right_proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_conjuction(node: &Node, source: &str) -> Result<Conjunction, InterpreterError> {
+    let left_node = get_child_by_field_name(node, "left")?;
+    let left_proc = parse_proc(&left_node, source)?;
+
+    let right_node = get_child_by_field_name(node, "right")?;
+    let right_proc = parse_proc(&right_node, source)?;
+
+    Ok(Conjunction {
+        left: left_proc,
+        right: right_proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_negation(node: &Node, source: &str) -> Result<Negation, InterpreterError> {
+    let proc_node = get_child_by_field_name(node, "proc")?;
+    let proc = parse_proc(&proc_node, source)?;
+
+    Ok(Negation {
+        proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_ground_expression(
+    node: &Node,
+    source: &str,
+) -> Result<GroundExpression, InterpreterError> {
+    match node.kind() {
+        "block" => Ok(GroundExpression::Block(parse_block(node, source)?)),
+
+        "_ground" => Ok(GroundExpression::Ground(parse_ground(node, source)?)),
+
+        "collection" => Ok(GroundExpression::Collection(parse_collection(
+            node, source,
+        )?)),
+
+        "_proc_var" => Ok(GroundExpression::ProcVar(parse_proc_var(node, source)?)),
+
+        "simple_type" => Ok(GroundExpression::SimpleType(parse_simple_type(
+            node, source,
+        )?)),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of _ground_expression",
+            node.kind(),
+        ))),
+    }
+}
+
+fn parse_block(node: &Node, source: &str) -> Result<Block, InterpreterError> {
+    let body_node = get_child_by_field_name(node, "body")?;
+    let body_proc = parse_proc(&body_node, source)?;
+
+    Ok(Block {
+        proc: body_proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_ground(node: &Node, source: &str) -> Result<Ground, InterpreterError> {
+    let line_num = node.start_position().row;
+    let col_num = node.start_position().column;
+
+    match node.kind() {
+        "bool_literal" => Ok(Ground::BoolLiteral {
+            value: match node.kind() {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Invalid bool literal value: {}",
+                        node.kind()
+                    )));
+                }
+            },
+            line_num,
+            col_num,
+        }),
+
+        "long_literal" => Ok(Ground::LongLiteral {
+            value: {
+                let long_string = get_node_value(node, source.as_bytes())?;
+                let long = long_string.parse::<i64>().or_else(|e| {
+                    Err(InterpreterError::ParserError(format!(
+                        "Failed to convert long_literal into i64. Error: {:?}",
+                        e,
+                    )))
+                })?;
+                long
+            },
+            line_num,
+            col_num,
+        }),
+
+        "string_literal" => Ok(Ground::StringLiteral {
+            value: get_node_value(node, source.as_bytes())?,
+            line_num,
+            col_num,
+        }),
+
+        "uri_literal" => Ok(Ground::UriLiteral(parse_uri_literal(node, source)?)),
+
+        "nil" => Ok(Ground::Nil { line_num, col_num }),
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of _ground",
+            node.kind(),
+        ))),
+    }
+}
+
+fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, InterpreterError> {
+    Ok(UriLiteral {
+        value: get_node_value(node, source.as_bytes())?,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_collection(node: &Node, source: &str) -> Result<Collection, InterpreterError> {
     todo!()
 }
 
-fn parse_proc_list(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
+fn parse_simple_type(node: &Node, source: &str) -> Result<SimpleType, InterpreterError> {
+    todo!()
+}
+
+fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterError> {
     let mut procs = Vec::new();
-    let comma_sep_node = get_child_by_field_name(node, "commaSep")?;
-    let mut cursor = comma_sep_node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            procs.push(parse_proc(&cursor.node(), source)?);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
+    let mut cursor = node.walk();
+
+    cursor.goto_first_child(); // '('
+
+    while cursor.goto_next_sibling() {
+        let current_node = cursor.node();
+        match current_node.kind() {
+            "_proc" => procs.push(parse_proc(&current_node, source)?),
+
+            "," => continue,
+
+            _ => break,
         }
     }
 
-    Ok(procs)
+    Ok(ProcList {
+        procs,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
 }
 
 // fn parse_decls(cursor: &mut TreeCursor, source: &str) -> Vec<String> {

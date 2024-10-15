@@ -1,3 +1,6 @@
+// NOTE: On 'choice' in grammar.js we are NOT having 'row' and 'column' fields
+// I'm not sure how important it is to have these two fields on every struct/enum
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Proc {
     Par {
@@ -9,12 +12,11 @@ pub enum Proc {
 
     SendSync {
         name: Name,
-        messages: Vec<Proc>,
+        messages: ProcList,
         cont: SyncSendCont,
         line_num: usize,
         col_num: usize,
     },
-
     // PGround(Ground),
     // PCollect(Collection),
     // PVar(ProcVar),
@@ -56,6 +58,13 @@ pub enum Proc {
     // PIf(Box<Proc>, Box<Proc>),
     // PIfElse(Box<Proc>, Box<Proc>, Box<Proc>),
     // PNew(Vec<NameDecl>, Box<Proc>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProcList {
+    pub procs: Vec<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -103,25 +112,25 @@ pub struct Eval {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Disjunction {
-    left: Proc,
-    right: Proc,
-    line_num: usize,
-    col_num: usize,
+    pub left: Proc,
+    pub right: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Conjunction {
-    left: Proc,
-    right: Proc,
-    line_num: usize,
-    col_num: usize,
+    pub left: Proc,
+    pub right: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Negation {
-    proc: Proc,
-    line_num: usize,
-    col_num: usize,
+    pub proc: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -132,14 +141,16 @@ pub enum GroundExpression {
 
     Collection(Collection),
 
+    ProcVar(ProcVar),
+
     SimpleType(SimpleType),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
-    proc: Proc,
-    line_num: usize,
-    col_num: usize,
+    pub proc: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -164,20 +175,17 @@ pub enum Ground {
 
     UriLiteral(UriLiteral),
 
-    Nil(Nil),
+    Nil {
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UriLiteral {
-    value: String,
-    line_num: usize,
-    col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Nil {
-    line_num: usize,
-    col_num: usize,
+    pub value: String,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
