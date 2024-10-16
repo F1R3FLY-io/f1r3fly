@@ -100,6 +100,22 @@ impl Par {
             && self.bundles.is_empty()
             && self.exprs.is_empty()
     }
+
+    pub fn single_connective(&self) -> Option<Connective> {
+        if self.sends.is_empty()
+            && self.receives.is_empty()
+            && self.news.is_empty()
+            && self.exprs.is_empty()
+            && self.matches.is_empty()
+            && self.bundles.is_empty()
+            && self.connectives.len() == 1
+       {
+            Some(self.connectives[0].clone())
+        } else {
+            None
+        }
+    }
+
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/package.scala - FreeMap

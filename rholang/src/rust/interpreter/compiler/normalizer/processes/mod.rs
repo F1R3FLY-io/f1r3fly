@@ -5,3 +5,4 @@ pub mod p_matches_normalizer;
 pub mod p_var_ref_normalizer;
 pub mod p_collect_normalizer;
 pub mod p_var_normalizer;
+pub mod p_conjunction_normalizer;
