@@ -1,7 +1,7 @@
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer::normalize_p_var;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
-use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
+// use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{
@@ -164,36 +164,36 @@ pub fn normalize_match(
             source_code,
         ),
 
-        "var_ref" => {
-            let var_ref_kind_node = p_node
-                .child_by_field_name("var_ref_kind")
-                .ok_or("Expected a var_ref_kind node but found None")?;
-            let var_node = p_node
-                .child_by_field_name("var")
-                .ok_or("Expected a var node but found None")?;
+        // "var_ref" => {
+        //     let var_ref_kind_node = p_node
+        //         .child_by_field_name("var_ref_kind")
+        //         .ok_or("Expected a var_ref_kind node but found None")?;
+        //     let var_node = p_node
+        //         .child_by_field_name("var")
+        //         .ok_or("Expected a var node but found None")?;
 
-            let var_ref_kind = match std::str::from_utf8(
-                &source_code[var_ref_kind_node.start_byte()..var_ref_kind_node.end_byte()],
-            )? {
-                "=" => VarRefKind::Proc,
-                "= *" => VarRefKind::Name,
-                _ => return Err("Unexpected var_ref_kind".into()),
-            };
+        //     let var_ref_kind = match std::str::from_utf8(
+        //         &source_code[var_ref_kind_node.start_byte()..var_ref_kind_node.end_byte()],
+        //     )? {
+        //         "=" => VarRefKind::Proc,
+        //         "= *" => VarRefKind::Name,
+        //         _ => return Err("Unexpected var_ref_kind".into()),
+        //     };
 
-            let var =
-                std::str::from_utf8(&source_code[var_node.start_byte()..var_node.end_byte()])?
-                    .to_string();
+        //     let var =
+        //         std::str::from_utf8(&source_code[var_node.start_byte()..var_node.end_byte()])?
+        //             .to_string();
 
-            Ok(normalize_p_var_ref(
-                PVarRef {
-                    var_ref_kind,
-                    var,
-                    line_num,
-                    col_num,
-                },
-                input,
-            )?)
-        }
+        //     Ok(normalize_p_var_ref(
+        //         PVarRef {
+        //             var_ref_kind,
+        //             var,
+        //             line_num,
+        //             col_num,
+        //         },
+        //         input,
+        //     )?)
+        // }
 
         // "var" => {
         //     let var_name =

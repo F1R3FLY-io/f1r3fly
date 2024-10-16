@@ -1,5 +1,4 @@
-// NOTE: On 'choice' in grammar.js we are NOT having 'row' and 'column' fields
-// I'm not sure how important it is to have these two fields on every struct/enum
+use rspace_plus_plus::rspace::history::Either;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Proc {
@@ -17,47 +16,56 @@ pub enum Proc {
         line_num: usize,
         col_num: usize,
     },
-    // PGround(Ground),
-    // PCollect(Collection),
-    // PVar(ProcVar),
-    // PVarRef(VarRefKind, Var),
-    // PNil,
-    // PSimpleType(SimpleType),
-    // PNegation(Box<Proc>),
-    // PConjunction(Box<Proc>, Box<Proc>),
-    // PDisjunction(Box<Proc>, Box<Proc>),
-    // PEval(Name),
-    // PMethod(Box<Proc>, Var, Vec<Proc>),
-    // PExprs(Box<Proc>),
-    // PNot(Box<Proc>),
-    // PNeg(Box<Proc>),
-    // PMult(Box<Proc>, Box<Proc>),
-    // PDiv(Box<Proc>, Box<Proc>),
-    // PMod(Box<Proc>, Box<Proc>),
-    // PPercentPercent(Box<Proc>, Box<Proc>),
-    // PAdd(Box<Proc>, Box<Proc>),
-    // PMinus(Box<Proc>, Box<Proc>),
-    // PPlusPlus(Box<Proc>, Box<Proc>),
-    // PMinusMinus(Box<Proc>, Box<Proc>),
-    // PLt(Box<Proc>, Box<Proc>),
-    // PLte(Box<Proc>, Box<Proc>),
-    // PGt(Box<Proc>, Box<Proc>),
-    // PGte(Box<Proc>, Box<Proc>),
-    // PMatches(Box<Proc>, Box<Proc>),
-    // PEq(Box<Proc>, Box<Proc>),
-    // PNeq(Box<Proc>, Box<Proc>),
-    // PAnd(Box<Proc>, Box<Proc>),
-    // POr(Box<Proc>, Box<Proc>),
-    // PSend(Name, Send, Vec<Proc>),
-    // PContr(Name, Vec<Name>, NameRemainder, Box<Proc>),
-    // PInput(Vec<Receipt>, Box<Proc>),
-    // PChoice(Vec<Branch>),
-    // PMatch(Box<Proc>, Vec<Case>),
-    // PBundle(Bundle, Box<Proc>),
-    // PLet(Decl, Decls, Box<Proc>),
-    // PIf(Box<Proc>, Box<Proc>),
-    // PIfElse(Box<Proc>, Box<Proc>, Box<Proc>),
-    // PNew(Vec<NameDecl>, Box<Proc>),
+
+    New {
+        decls: Decls,
+        proc: Box<Proc>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    IfElse {
+        condition: Box<Proc>,
+        if_true: Box<Proc>,
+        alternative: Option<Box<Proc>>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Let {
+        decls: Decls,
+        body: Box<Block>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Bundle {
+        bundle_type: Bundle,
+        proc: Box<Block>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Match {
+        expression: Box<ProcExpression>,
+        cases: Vec<Case>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Choice {
+        branches: Vec<Branch>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Contract {
+        name: Name,
+        formals: Names,
+        proc: Box<Block>,
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -75,16 +83,16 @@ pub enum Name {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ProcVar {
-    Var {
-        name: String,
-        line_num: usize,
-        col_num: usize,
-    },
+    Var(Var),
 
-    Wildcard {
-        line_num: usize,
-        col_num: usize,
-    },
+    Wildcard { line_num: usize, col_num: usize },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Var {
+    pub name: String,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -256,13 +264,17 @@ pub enum SyncSendCont {
     },
 }
 
-//
-//
+#[derive(Debug, PartialEq, Clone)]
+pub struct Decls {
+    pub decls: Vec<NameDecl>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NameDecl {
-    pub var: String,
-    pub uri: Option<String>,
+    pub var: Var,
+    pub uri: Option<UriLiteral>,
     pub line_num: usize,
     pub col_num: usize,
 }
@@ -276,11 +288,166 @@ pub struct Decl {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum BundleType {
-    Write { line_num: usize, col_num: usize },
-    Read { line_num: usize, col_num: usize },
-    Equiv { line_num: usize, col_num: usize },
-    ReadWrite { line_num: usize, col_num: usize },
+pub enum Bundle {
+    BundleWrite { line_num: usize, col_num: usize },
+    BundleRead { line_num: usize, col_num: usize },
+    BundleEquiv { line_num: usize, col_num: usize },
+    BundleReadWrite { line_num: usize, col_num: usize },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ProcExpression {
+    Or {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    And {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Matches {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Eq {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Neq {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Lt {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Lte {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Gt {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Gte {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Concat {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    MinusMinus {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Minus {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Add {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    PercentPercent {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Mult {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Div {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Mod {
+        left: Proc,
+        right: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Not {
+        proc: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Neg {
+        proc: Proc,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Method {
+        receiver: Proc,
+        name: Var,
+        args: ProcList,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Parenthesized {
+        proc_expression: Box<ProcExpression>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Eval(Eval),
+    Quote(Quote),
+    Disjunction(Disjunction),
+    Conjunction(Conjunction),
+    Negation(Negation),
+    GroundExpression(GroundExpression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -293,218 +460,74 @@ pub struct Case {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Branch {
-    pub pattern: Vec<Receipt>,
-    pub proc: Proc,
+    pub pattern: Vec<LinearBind>,
+    pub proc: Either<Proc, ProcExpression>,
     pub line_num: usize,
     pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Receipt {
-    LinearBind {
-        names: Vec<String>,
-        input: Source,
-        line_num: usize,
-        col_num: usize,
-    },
+pub struct LinearBind {
+    pub names: Names,
+    pub input: Source,
+    pub line_num: usize,
+    pub col_num: usize,
+}
 
-    RepeatedBind {
-        names: Vec<String>,
-        input: String,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    PeekBind {
-        names: Vec<String>,
-        input: String,
-        line_num: usize,
-        col_num: usize,
-    },
+#[derive(Debug, PartialEq, Clone)]
+pub struct Names {
+    pub names: Vec<Name>,
+    pub cont: Option<NameRemainder>,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Source {
     Simple {
-        name: String,
+        name: Name,
         line_num: usize,
         col_num: usize,
     },
 
     ReceiveSend {
-        name: String,
+        name: Name,
         line_num: usize,
         col_num: usize,
     },
 
     SendReceive {
-        name: String,
-        inputs: Vec<Proc>,
+        name: Name,
+        inputs: ProcList,
         line_num: usize,
         col_num: usize,
     },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SendType {
-    Single { line_num: usize, col_num: usize },
-    Multiple { line_num: usize, col_num: usize },
+pub enum Receipt {
+    LinearBind(LinearBind),
+
+    RepeatedBind {
+        names: Names,
+        input: Name,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    PeekBind {
+        names: Names,
+        input: Name,
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ProcExpression {
-    Or {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    And {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Matches {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Eq {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Neq {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Lt {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Lte {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Gt {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Gte {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Concat {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    MinusMinus {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Minus {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Add {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    PercentPercent {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Mult {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Div {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Mod {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Not {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Neg {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Method {
-        receiver: Box<Proc>,
-        name: String,
-        args: Vec<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Eval {
-        name: String,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Negation {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    GroundExpression(GroundExpression),
+pub struct NameRemainder {
+    pub proc_var: ProcVar,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
