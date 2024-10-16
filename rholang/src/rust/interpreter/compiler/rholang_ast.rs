@@ -66,6 +66,21 @@ pub enum Proc {
         line_num: usize,
         col_num: usize,
     },
+
+    Input {
+        formals: Vec<Receipt>,
+        proc: Box<Block>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Send {
+        name: Name,
+        send_type: SendType,
+        inputs: ProcList,
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -505,7 +520,14 @@ pub enum Source {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Receipt {
+pub struct Receipt {
+    pub bindings: Vec<ReceiptBindings>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ReceiptBindings {
     LinearBind(LinearBind),
 
     RepeatedBind {
@@ -528,6 +550,13 @@ pub struct NameRemainder {
     pub proc_var: ProcVar,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SendType {
+    Single { line_num: usize, col_num: usize },
+
+    Multiple { line_num: usize, col_num: usize },
 }
 
 #[derive(Debug, PartialEq, Clone)]

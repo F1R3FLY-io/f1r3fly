@@ -5,8 +5,8 @@ use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decls, Disjunction, Eval, Ground,
         GroundExpression, KeyValuePair, LinearBind, Name, NameDecl, NameRemainder, Names, Negation,
-        Proc, ProcExpression, ProcList, ProcRemainder, ProcVar, Quotable, Quote, SimpleType,
-        Source, SyncSendCont, UriLiteral, Var,
+        Proc, ProcExpression, ProcList, ProcRemainder, ProcVar, Quotable, Quote, Receipt,
+        ReceiptBindings, SendType, SimpleType, Source, SyncSendCont, UriLiteral, Var,
     },
     errors::InterpreterError,
 };
@@ -44,33 +44,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         )),
     }?;
 
-    parse_proc(&start_node, code);
-
-    // loop {
-    //     let node = cursor.node();
-    //     let node_name = node.kind();
-    //     let node_value = node.utf8_text(code.as_bytes()).unwrap_or("");
-
-    //     println!("Node: {}, Value: {}", node_name, node_value);
-
-    //     if cursor.goto_first_child() {
-    //         continue;
-    //     }
-
-    //     if cursor.goto_next_sibling() {
-    //         continue;
-    //     }
-
-    //     while !cursor.goto_next_sibling() {
-    //         if !cursor.goto_parent() {
-    //             return Err(InterpreterError::ParserError(
-    //                 "Traversal completed".to_string(),
-    //             ));
-    //         }
-    //     }
-    // }
-
-    todo!()
+    parse_proc(&start_node, code)
 }
 
 fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
@@ -264,7 +238,54 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         }
 
         "input" => {
-            todo!()
+            let formals_node = get_child_by_field_name(node, "formals")?;
+            let formals_proc = parse_receipts(&formals_node, source)?;
+
+            let proc_node = get_child_by_field_name(node, "proc")?;
+            let proc = parse_block(&proc_node, source)?;
+
+            Ok(Proc::Input {
+                formals: formals_proc,
+                proc: Box::new(proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "send" => {
+            let name_node = get_child_by_field_name(node, "name")?;
+            let name_proc = parse_name(&name_node, source)?;
+
+            let send_type_node = get_child_by_field_name(node, "_send_type")?;
+            let send_type_proc = match send_type_node.kind() {
+                "send_single" => SendType::Single {
+                    line_num: send_type_node.start_position().row,
+                    col_num: send_type_node.start_position().column,
+                },
+
+                "send_multiple" => SendType::Multiple {
+                    line_num: send_type_node.start_position().row,
+                    col_num: send_type_node.start_position().column,
+                },
+
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Unexpected choice node kind: {:?} of send_type",
+                        node.kind(),
+                    )))
+                }
+            };
+
+            let inputs_node = get_child_by_field_name(node, "inputs")?;
+            let inputs_proc = parse_proc_list(&inputs_node, source)?;
+
+            Ok(Proc::Send {
+                name: name_proc,
+                send_type: send_type_proc,
+                inputs: inputs_proc,
+                line_num,
+                col_num,
+            })
         }
 
         _ => Err(InterpreterError::ParserError(
@@ -1129,6 +1150,118 @@ fn parse_source(node: &Node, source: &str) -> Result<Source, InterpreterError> {
             )))
         }
     }
+}
+
+fn parse_receipts(node: &Node, source: &str) -> Result<Vec<Receipt>, InterpreterError> {
+    let mut receipts = Vec::new();
+    let mut cursor = node.walk();
+
+    if cursor.goto_first_child() {
+        loop {
+            let current_node = cursor.node();
+            if current_node.kind() == ";" {
+                continue;
+            }
+            receipts.push(parse_receipt(&current_node, source)?);
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    Ok(receipts)
+}
+
+fn parse_receipt(node: &Node, source: &str) -> Result<Receipt, InterpreterError> {
+    let line_num = node.start_position().row;
+    let col_num = node.start_position().column;
+
+    let mut bindings = Vec::new();
+    let mut cursor = node.walk();
+    cursor.goto_first_child();
+
+    match cursor.node().kind() {
+        "linear_bind" => loop {
+            let current_node = cursor.node();
+            match current_node.kind() {
+                "linear_bind" => bindings.push(ReceiptBindings::LinearBind(parse_linear_bind(
+                    &current_node,
+                    source,
+                )?)),
+                "&" => continue,
+                _ => break,
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        },
+
+        "repeated_bind" => loop {
+            let current_node = cursor.node();
+            match current_node.kind() {
+                "repeated_bind" => {
+                    let names_node = get_child_by_field_name(&current_node, "names")?;
+                    let names_proc = parse_names(&names_node, source)?;
+
+                    let input_node = get_child_by_field_name(&current_node, "input")?;
+                    let input_proc = parse_name(&input_node, source)?;
+
+                    bindings.push(ReceiptBindings::RepeatedBind {
+                        names: names_proc,
+                        input: input_proc,
+                        line_num,
+                        col_num,
+                    });
+                }
+                "&" => continue,
+                _ => break,
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        },
+
+        "peek_bind" => loop {
+            let current_node = cursor.node();
+            match current_node.kind() {
+                "peek_bind" => {
+                    let names_node = get_child_by_field_name(&current_node, "names")?;
+                    let names_proc = parse_names(&names_node, source)?;
+
+                    let input_node = get_child_by_field_name(&current_node, "input")?;
+                    let input_proc = parse_name(&input_node, source)?;
+
+                    bindings.push(ReceiptBindings::PeekBind {
+                        names: names_proc,
+                        input: input_proc,
+                        line_num,
+                        col_num,
+                    });
+                }
+                "&" => continue,
+                _ => break,
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        },
+
+        _ => {
+            return Err(InterpreterError::ParserError(format!(
+                "Unexpected choice node kind: {:?} of _receipt",
+                node.kind(),
+            )))
+        }
+    }
+
+    Ok(Receipt {
+        bindings,
+        line_num,
+        col_num,
+    })
 }
 
 fn parse_left_and_right_nodes(node: &Node, source: &str) -> Result<(Proc, Proc), InterpreterError> {
