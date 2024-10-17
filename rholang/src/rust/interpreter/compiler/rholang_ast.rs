@@ -81,6 +81,8 @@ pub enum Proc {
         line_num: usize,
         col_num: usize,
     },
+
+    ProcExpression(ProcExpression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -112,7 +114,7 @@ pub struct Var {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Quote {
-    pub quotable: Quotable,
+    pub quotable: Box<Quotable>,
     pub line_num: usize,
     pub col_num: usize,
 }
@@ -135,30 +137,30 @@ pub struct Eval {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Disjunction {
-    pub left: Proc,
-    pub right: Proc,
+    pub left: Box<Proc>,
+    pub right: Box<Proc>,
     pub line_num: usize,
     pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Conjunction {
-    pub left: Proc,
-    pub right: Proc,
+    pub left: Box<Proc>,
+    pub right: Box<Proc>,
     pub line_num: usize,
     pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Negation {
-    pub proc: Proc,
+    pub proc: Box<Proc>,
     pub line_num: usize,
     pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum GroundExpression {
-    Block(Block),
+    Block(Box<Block>),
 
     Ground(Ground),
 
@@ -313,138 +315,138 @@ pub enum Bundle {
 #[derive(Debug, PartialEq, Clone)]
 pub enum ProcExpression {
     Or {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     And {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Matches {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Eq {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Neq {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Lt {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Lte {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Gt {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Gte {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Concat {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     MinusMinus {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Minus {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Add {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     PercentPercent {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Mult {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Div {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Mod {
-        left: Proc,
-        right: Proc,
+        left: Box<Proc>,
+        right: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Not {
-        proc: Proc,
+        proc: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Neg {
-        proc: Proc,
+        proc: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
 
     Method {
-        receiver: Proc,
+        receiver: Box<Proc>,
         name: Var,
         args: ProcList,
         line_num: usize,
@@ -476,7 +478,16 @@ pub struct Case {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Branch {
     pub pattern: Vec<LinearBind>,
-    pub proc: Either<Proc, ProcExpression>,
+    pub proc: Either<SendRule, ProcExpression>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct SendRule {
+    pub name: Name,
+    pub send_type: SendType,
+    pub inputs: ProcList,
     pub line_num: usize,
     pub col_num: usize,
 }

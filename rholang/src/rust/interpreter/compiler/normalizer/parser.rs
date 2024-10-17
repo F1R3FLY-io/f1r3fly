@@ -6,7 +6,7 @@ use crate::rust::interpreter::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decls, Disjunction, Eval, Ground,
         GroundExpression, KeyValuePair, LinearBind, Name, NameDecl, NameRemainder, Names, Negation,
         Proc, ProcExpression, ProcList, ProcRemainder, ProcVar, Quotable, Quote, Receipt,
-        ReceiptBindings, SendType, SimpleType, Source, SyncSendCont, UriLiteral, Var,
+        ReceiptBindings, SendRule, SendType, SimpleType, Source, SyncSendCont, UriLiteral, Var,
     },
     errors::InterpreterError,
 };
@@ -72,16 +72,28 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let cont: SyncSendCont = {
                 let cont_node = get_child_by_field_name(node, "cont")?;
                 match cont_node.kind() {
-                    "non_empty_cont" => SyncSendCont::NonEmpty {
-                        proc: Box::new(parse_proc(&cont_node, source)?),
-                        line_num: cont_node.start_position().row,
-                        col_num: cont_node.start_position().column,
-                    },
-
                     "empty_cont" => SyncSendCont::Empty {
                         line_num: cont_node.start_position().row,
                         col_num: cont_node.start_position().column,
                     },
+
+                    "non_empty_cont" => {
+                        let proc_node = cont_node
+                            .child(1)
+                            .filter(|n| n.kind() == "_proc")
+                            .ok_or_else(|| {
+                                InterpreterError::ParserError(
+                                    "Expected a _proc node in non_empty_cont at index 1"
+                                        .to_string(),
+                                )
+                            })?;
+
+                        SyncSendCont::NonEmpty {
+                            proc: Box::new(parse_proc(&proc_node, source)?),
+                            line_num: cont_node.start_position().row,
+                            col_num: cont_node.start_position().column,
+                        }
+                    }
 
                     _ => {
                         return Err(InterpreterError::ParserError(format!(
@@ -122,15 +134,26 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let if_true_node = get_child_by_field_name(node, "ifTrue")?;
             let if_true_proc = parse_proc(&if_true_node, source)?;
 
-            let alternative = match node.child_by_field_name("else") {
-                Some(_node) => Some(Box::new(parse_proc(&_node, source)?)),
+            let alternative_proc = match node.child_by_field_name("alternative") {
+                Some(alternative_node) => {
+                    let proc_node = alternative_node
+                        .child(1)
+                        .filter(|n| n.kind() == "_proc")
+                        .ok_or_else(|| {
+                            InterpreterError::ParserError(
+                                "Expected a _proc node in alternative at index 1".to_string(),
+                            )
+                        })?;
+
+                    Some(Box::new(parse_proc(&proc_node, source)?))
+                }
                 None => None,
             };
 
             Ok(Proc::IfElse {
                 condition: Box::new(condition_proc),
                 if_true: Box::new(if_true_proc),
-                alternative,
+                alternative: alternative_proc,
                 line_num,
                 col_num,
             })
@@ -173,16 +196,15 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let cases_node = get_child_by_field_name(node, "cases")?;
             let mut cases = Vec::new();
             let mut cursor = cases_node.walk();
+            cursor.goto_first_child(); // 'repeat1' ensures there is at least one child
 
-            if cursor.goto_first_child() {
-                loop {
-                    let current_node = cursor.node();
-                    if current_node.kind() == "case" {
-                        cases.push(parse_case(&current_node, source)?);
-                    }
-                    if !cursor.goto_next_sibling() {
-                        break;
-                    }
+            loop {
+                let current_node = cursor.node();
+                if current_node.kind() == "case" {
+                    cases.push(parse_case(&current_node, source)?);
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
                 }
             }
 
@@ -198,16 +220,15 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let branches_node = get_child_by_field_name(node, "branches")?;
             let mut branches = Vec::new();
             let mut cursor = branches_node.walk();
+            cursor.goto_first_child(); // 'repeat1' ensures there is at least one child
 
-            if cursor.goto_first_child() {
-                loop {
-                    let current_node = cursor.node();
-                    if current_node.kind() == "branch" {
-                        branches.push(parse_branch(&current_node, source)?);
-                    }
-                    if !cursor.goto_next_sibling() {
-                        break;
-                    }
+            loop {
+                let current_node = cursor.node();
+                if current_node.kind() == "branch" {
+                    branches.push(parse_branch(&current_node, source)?);
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
                 }
             }
 
@@ -222,7 +243,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let name_node = get_child_by_field_name(node, "name")?;
             let name_proc = parse_name(&name_node, source)?;
 
-            let formals_node = get_child_by_field_name(node, "names")?;
+            let formals_node = get_child_by_field_name(node, "formals")?;
             let formals_proc = parse_names(&formals_node, source)?;
 
             let proc_node = get_child_by_field_name(node, "proc")?;
@@ -256,25 +277,8 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let name_node = get_child_by_field_name(node, "name")?;
             let name_proc = parse_name(&name_node, source)?;
 
-            let send_type_node = get_child_by_field_name(node, "_send_type")?;
-            let send_type_proc = match send_type_node.kind() {
-                "send_single" => SendType::Single {
-                    line_num: send_type_node.start_position().row,
-                    col_num: send_type_node.start_position().column,
-                },
-
-                "send_multiple" => SendType::Multiple {
-                    line_num: send_type_node.start_position().row,
-                    col_num: send_type_node.start_position().column,
-                },
-
-                _ => {
-                    return Err(InterpreterError::ParserError(format!(
-                        "Unexpected choice node kind: {:?} of send_type",
-                        node.kind(),
-                    )))
-                }
-            };
+            let send_type_node = get_child_by_field_name(node, "send_type")?;
+            let send_type_proc = parse_send_type(&send_type_node)?;
 
             let inputs_node = get_child_by_field_name(node, "inputs")?;
             let inputs_proc = parse_proc_list(&inputs_node, source)?;
@@ -287,6 +291,8 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 col_num,
             })
         }
+
+        "_proc_expression" => Ok(Proc::ProcExpression(parse_proc_expression(node, source)?)),
 
         _ => Err(InterpreterError::ParserError(
             "Unrecognizable process".to_string(),
@@ -343,7 +349,7 @@ fn parse_quote(node: &Node, source: &str) -> Result<Quote, InterpreterError> {
         })?;
 
     Ok(Quote {
-        quotable: parse_quotable(&quotable_node, source)?,
+        quotable: Box::new(parse_quotable(&quotable_node, source)?),
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
@@ -389,8 +395,8 @@ fn parse_disjunction(node: &Node, source: &str) -> Result<Disjunction, Interpret
     let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
     Ok(Disjunction {
-        left: left_proc,
-        right: right_proc,
+        left: Box::new(left_proc),
+        right: Box::new(right_proc),
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
@@ -400,8 +406,8 @@ fn parse_conjuction(node: &Node, source: &str) -> Result<Conjunction, Interprete
     let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
     Ok(Conjunction {
-        left: left_proc,
-        right: right_proc,
+        left: Box::new(left_proc),
+        right: Box::new(right_proc),
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
@@ -412,7 +418,7 @@ fn parse_negation(node: &Node, source: &str) -> Result<Negation, InterpreterErro
     let proc = parse_proc(&proc_node, source)?;
 
     Ok(Negation {
-        proc,
+        proc: Box::new(proc),
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
@@ -423,7 +429,9 @@ fn parse_ground_expression(
     source: &str,
 ) -> Result<GroundExpression, InterpreterError> {
     match node.kind() {
-        "block" => Ok(GroundExpression::Block(parse_block(node, source)?)),
+        "block" => Ok(GroundExpression::Block(Box::new(parse_block(
+            node, source,
+        )?))),
 
         "_ground" => Ok(GroundExpression::Ground(parse_ground(node, source)?)),
 
@@ -538,7 +546,9 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             },
             cont: {
                 match node.child_by_field_name("cont") {
-                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    Some(proc_remainder_node) => {
+                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                    }
                     None => None,
                 }
             },
@@ -567,7 +577,9 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             },
             cont: {
                 match node.child_by_field_name("cont") {
-                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    Some(proc_remainder_node) => {
+                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                    }
                     None => None,
                 }
             },
@@ -595,7 +607,9 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             },
             cont: {
                 match node.child_by_field_name("cont") {
-                    Some(_node) => Some(parse_proc_remainder(&_node, source)?),
+                    Some(proc_remainder_node) => {
+                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                    }
                     None => None,
                 }
             },
@@ -739,8 +753,8 @@ fn parse_name_decl(node: &Node, source: &str) -> Result<NameDecl, InterpreterErr
     })?;
     let var_proc = parse_var(&var_node, source)?;
 
-    let uri = match node.child_by_field_name("uri_literal") {
-        Some(_node) => Some(parse_uri_literal(&_node, source)?),
+    let uri = match node.child_by_field_name("uri") {
+        Some(uri_literal_node) => Some(parse_uri_literal(&uri_literal_node, source)?),
         None => None,
     };
 
@@ -766,7 +780,7 @@ fn parse_bundle(node: &Node) -> Result<Bundle, InterpreterError> {
         "bundle_read_write" => Ok(Bundle::BundleReadWrite { line_num, col_num }),
 
         _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of simple_type",
+            "Unexpected choice node kind: {:?} of _bundle",
             node.kind(),
         ))),
     }
@@ -781,8 +795,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Or {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -792,8 +806,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::And {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -803,8 +817,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Matches {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -814,8 +828,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Eq {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -825,8 +839,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Neq {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -836,8 +850,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Lt {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -847,8 +861,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Lte {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -858,8 +872,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Gt {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -869,8 +883,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Gte {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -880,8 +894,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Concat {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -891,8 +905,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::MinusMinus {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -902,8 +916,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Minus {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -913,8 +927,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Add {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -924,8 +938,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::PercentPercent {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -935,8 +949,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Mult {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -946,8 +960,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Div {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -957,8 +971,8 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
             Ok(ProcExpression::Mod {
-                left: left_proc,
-                right: right_proc,
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
                 line_num,
                 col_num,
             })
@@ -969,7 +983,7 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let proc = parse_proc(&proc_node, source)?;
 
             Ok(ProcExpression::Not {
-                proc,
+                proc: Box::new(proc),
                 line_num,
                 col_num,
             })
@@ -980,7 +994,7 @@ fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, In
             let proc = parse_proc(&proc_node, source)?;
 
             Ok(ProcExpression::Neg {
-                proc,
+                proc: Box::new(proc),
                 line_num,
                 col_num,
             })
@@ -1027,13 +1041,13 @@ fn parse_branch(node: &Node, source: &str) -> Result<Branch, InterpreterError> {
 
     let proc_node = get_child_by_field_name(node, "proc")?;
     let proc = match proc_node.kind() {
-        "send" => Either::Left(parse_proc(&proc_node, source)?),
+        "send" => Either::Left(parse_send(&proc_node, source)?),
 
         "_proc_expression" => Either::Right(parse_proc_expression(&proc_node, source)?),
 
         _ => {
             return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of _proc_expression",
+                "Unexpected choice node kind: {:?} of _proc in branch",
                 node.kind(),
             )))
         }
@@ -1045,6 +1059,43 @@ fn parse_branch(node: &Node, source: &str) -> Result<Branch, InterpreterError> {
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
+}
+
+fn parse_send(node: &Node, source: &str) -> Result<SendRule, InterpreterError> {
+    let name_node = get_child_by_field_name(node, "name")?;
+    let name_proc = parse_name(&name_node, source)?;
+
+    let send_type_node = get_child_by_field_name(node, "send_type")?;
+    let send_type_proc = parse_send_type(&send_type_node)?;
+
+    let inputs_node = get_child_by_field_name(node, "inputs")?;
+    let inputs_proc = parse_proc_list(&inputs_node, source)?;
+
+    Ok(SendRule {
+        name: name_proc,
+        send_type: send_type_proc,
+        inputs: inputs_proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_send_type(node: &Node) -> Result<SendType, InterpreterError> {
+    let line_num = node.start_position().row;
+    let col_num = node.start_position().column;
+
+    match node.kind() {
+        "send_single" => Ok(SendType::Single { line_num, col_num }),
+
+        "send_multiple" => Ok(SendType::Multiple { line_num, col_num }),
+
+        _ => {
+            return Err(InterpreterError::ParserError(format!(
+                "Unexpected choice node kind: {:?} of send_type",
+                node.kind(),
+            )))
+        }
+    }
 }
 
 fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, InterpreterError> {
@@ -1069,10 +1120,12 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
     if cursor.goto_first_child() {
         loop {
             let current_node = cursor.node();
-            if current_node.kind() == "," {
+            if current_node.kind() == "name" {
+                names.push(parse_name(&current_node, source)?);
+            } else if current_node.kind() == "," {
                 continue;
             }
-            names.push(parse_name(&current_node, source)?);
+
             if !cursor.goto_next_sibling() {
                 break;
             }
@@ -1080,10 +1133,20 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
     }
 
     let name_remainder = match node.child_by_field_name("cont") {
-        Some(_node) => Some(NameRemainder {
-            proc_var: parse_proc_var(&_node, source)?,
-            line_num: _node.start_position().row,
-            col_num: _node.start_position().column,
+        Some(name_remainder_node) => Some(NameRemainder {
+            proc_var: {
+                let proc_var_node = name_remainder_node
+                    .child(2)
+                    .filter(|n| n.kind() == "_proc_var")
+                    .ok_or_else(|| {
+                        InterpreterError::ParserError(
+                            "Expected a _proc_var node in _name_remainder at index 2".to_string(),
+                        )
+                    })?;
+                parse_proc_var(&proc_var_node, source)
+            }?,
+            line_num: name_remainder_node.start_position().row,
+            col_num: name_remainder_node.start_position().column,
         }),
         None => None,
     };
@@ -1136,7 +1199,7 @@ fn parse_source(node: &Node, source: &str) -> Result<Source, InterpreterError> {
                 parse_name(&name_node, source)?
             },
             inputs: {
-                let inputs_node = get_child_by_field_name(node, "input")?;
+                let inputs_node = get_child_by_field_name(node, "inputs")?;
                 parse_proc_list(&inputs_node, source)?
             },
             line_num,
@@ -1180,6 +1243,7 @@ fn parse_receipt(node: &Node, source: &str) -> Result<Receipt, InterpreterError>
     let mut cursor = node.walk();
     cursor.goto_first_child();
 
+    // Check which 'conc1' we are dealing with and then loop through
     match cursor.node().kind() {
         "linear_bind" => loop {
             let current_node = cursor.node();
