@@ -47,7 +47,7 @@ pub enum Proc {
     },
 
     Match {
-        expression: Box<ProcExpression>,
+        expression: Box<Proc>,
         cases: Vec<Case>,
         line_num: usize,
         col_num: usize,
@@ -82,238 +82,7 @@ pub enum Proc {
         col_num: usize,
     },
 
-    ProcExpression(ProcExpression),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProcList {
-    pub procs: Vec<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Name {
-    NameProcVar(ProcVar),
-    NameQuote(Box<Quote>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ProcVar {
-    Var(Var),
-
-    Wildcard { line_num: usize, col_num: usize },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Var {
-    pub name: String,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Quote {
-    pub quotable: Box<Quotable>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Quotable {
-    Eval(Eval),
-    Disjunction(Disjunction),
-    Conjunction(Conjunction),
-    Negation(Negation),
-    GroundExpression(GroundExpression),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Eval {
-    pub name: Name,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Disjunction {
-    pub left: Box<Proc>,
-    pub right: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Conjunction {
-    pub left: Box<Proc>,
-    pub right: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Negation {
-    pub proc: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum GroundExpression {
-    Block(Box<Block>),
-
-    Ground(Ground),
-
-    Collection(Collection),
-
-    ProcVar(ProcVar),
-
-    SimpleType(SimpleType),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Block {
-    pub proc: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Ground {
-    BoolLiteral {
-        value: bool,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    LongLiteral {
-        value: i64,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    StringLiteral {
-        value: String,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    UriLiteral(UriLiteral),
-
-    Nil {
-        line_num: usize,
-        col_num: usize,
-    },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct UriLiteral {
-    pub value: String,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Collection {
-    List {
-        elements: Vec<Proc>,
-        cont: Option<ProcRemainder>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Tuple {
-        elements: Vec<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Set {
-        elements: Vec<Proc>,
-        cont: Option<ProcRemainder>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Map {
-        pairs: Vec<KeyValuePair>,
-        cont: Option<ProcRemainder>,
-        line_num: usize,
-        col_num: usize,
-    },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProcRemainder {
-    pub proc_var: ProcVar,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct KeyValuePair {
-    pub key: Proc,
-    pub value: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum SimpleType {
-    Bool { line_num: usize, col_num: usize },
-    Int { line_num: usize, col_num: usize },
-    String { line_num: usize, col_num: usize },
-    Uri { line_num: usize, col_num: usize },
-    ByteArray { line_num: usize, col_num: usize },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum SyncSendCont {
-    Empty {
-        line_num: usize,
-        col_num: usize,
-    },
-
-    NonEmpty {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Decls {
-    pub decls: Vec<NameDecl>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct NameDecl {
-    pub var: Var,
-    pub uri: Option<UriLiteral>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Decl {
-    pub names: Vec<String>,
-    pub procs: Vec<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Bundle {
-    BundleWrite { line_num: usize, col_num: usize },
-    BundleRead { line_num: usize, col_num: usize },
-    BundleEquiv { line_num: usize, col_num: usize },
-    BundleReadWrite { line_num: usize, col_num: usize },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ProcExpression {
+    // ProcExpression
     Or {
         left: Box<Proc>,
         right: Box<Proc>,
@@ -454,7 +223,7 @@ pub enum ProcExpression {
     },
 
     Parenthesized {
-        proc_expression: Box<ProcExpression>,
+        proc_expression: Box<Proc>,
         line_num: usize,
         col_num: usize,
     },
@@ -464,7 +233,227 @@ pub enum ProcExpression {
     Disjunction(Disjunction),
     Conjunction(Conjunction),
     Negation(Negation),
-    GroundExpression(GroundExpression),
+
+    // GroundExpression
+    Block(Box<Block>),
+
+    Collection(Collection),
+
+    ProcVar(ProcVar),
+
+    SimpleType(SimpleType),
+
+    // Ground
+    BoolLiteral {
+        value: bool,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    LongLiteral {
+        value: i64,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    StringLiteral {
+        value: String,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    UriLiteral(UriLiteral),
+
+    Nil {
+        line_num: usize,
+        col_num: usize,
+    },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProcList {
+    pub procs: Vec<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Name {
+    NameProcVar(ProcVar),
+    NameQuote(Box<Quote>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ProcVar {
+    Var(Var),
+
+    Wildcard { line_num: usize, col_num: usize },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Var {
+    pub name: String,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Quote {
+    pub quotable: Box<Quotable>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Quotable {
+    Eval(Eval),
+    Disjunction(Disjunction),
+    Conjunction(Conjunction),
+    Negation(Negation),
+    GroundExpression(Proc),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Eval {
+    pub name: Name,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Disjunction {
+    pub left: Box<Proc>,
+    pub right: Box<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Conjunction {
+    pub left: Box<Proc>,
+    pub right: Box<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Negation {
+    pub proc: Box<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Block {
+    pub proc: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct UriLiteral {
+    pub value: String,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Collection {
+    List {
+        elements: Vec<Proc>,
+        cont: Option<ProcRemainder>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Tuple {
+        elements: Vec<Proc>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Set {
+        elements: Vec<Proc>,
+        cont: Option<ProcRemainder>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    Map {
+        pairs: Vec<KeyValuePair>,
+        cont: Option<ProcRemainder>,
+        line_num: usize,
+        col_num: usize,
+    },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProcRemainder {
+    pub proc_var: ProcVar,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct KeyValuePair {
+    pub key: Proc,
+    pub value: Proc,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SimpleType {
+    Bool { line_num: usize, col_num: usize },
+    Int { line_num: usize, col_num: usize },
+    String { line_num: usize, col_num: usize },
+    Uri { line_num: usize, col_num: usize },
+    ByteArray { line_num: usize, col_num: usize },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SyncSendCont {
+    Empty {
+        line_num: usize,
+        col_num: usize,
+    },
+
+    NonEmpty {
+        proc: Box<Proc>,
+        line_num: usize,
+        col_num: usize,
+    },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Decls {
+    pub decls: Vec<NameDecl>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct NameDecl {
+    pub var: Var,
+    pub uri: Option<UriLiteral>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Decl {
+    pub names: Vec<String>,
+    pub procs: Vec<Proc>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Bundle {
+    BundleWrite { line_num: usize, col_num: usize },
+    BundleRead { line_num: usize, col_num: usize },
+    BundleEquiv { line_num: usize, col_num: usize },
+    BundleReadWrite { line_num: usize, col_num: usize },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -478,7 +467,7 @@ pub struct Case {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Branch {
     pub pattern: Vec<LinearBind>,
-    pub proc: Either<SendRule, ProcExpression>,
+    pub proc: Either<SendRule, Proc>,
     pub line_num: usize,
     pub col_num: usize,
 }

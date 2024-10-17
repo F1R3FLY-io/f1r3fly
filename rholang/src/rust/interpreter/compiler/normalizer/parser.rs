@@ -3,10 +3,10 @@ use tree_sitter::{Node, Parser, Tree};
 
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
-        Block, Branch, Bundle, Case, Collection, Conjunction, Decls, Disjunction, Eval, Ground,
-        GroundExpression, KeyValuePair, LinearBind, Name, NameDecl, NameRemainder, Names, Negation,
-        Proc, ProcExpression, ProcList, ProcRemainder, ProcVar, Quotable, Quote, Receipt,
-        ReceiptBindings, SendRule, SendType, SimpleType, Source, SyncSendCont, UriLiteral, Var,
+        Block, Branch, Bundle, Case, Collection, Conjunction, Decls, Disjunction, Eval,
+        KeyValuePair, LinearBind, Name, NameDecl, NameRemainder, Names, Negation, Proc, ProcList,
+        ProcRemainder, ProcVar, Quotable, Quote, Receipt, ReceiptBindings, SendRule, SendType,
+        SimpleType, Source, SyncSendCont, UriLiteral, Var,
     },
     errors::InterpreterError,
 };
@@ -27,7 +27,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .expect("Error loading Rholang grammar");
 
     let tree = parser.parse(code, None).expect("Failed to parse code");
-    // println!("{:#?}", tree.root_node().to_sexp());
+    println!("\nTree: {:#?}", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
     if root_node.kind() != "source_file" {
@@ -44,7 +44,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         )),
     }?;
 
-    println!("{:?}", start_node.kind());
+    // println!("\n{:?}", root_node.child(0).unwrap().kind());
 
     parse_proc(&start_node, code)
 }
@@ -193,7 +193,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "match" => {
             let expression_node = get_child_by_field_name(node, "expression")?;
-            let expression_proc = parse_proc_expression(&expression_node, source)?;
+            let expression_proc = parse_proc(&expression_node, source)?;
 
             let cases_node = get_child_by_field_name(node, "cases")?;
             let mut cases = Vec::new();
@@ -294,7 +294,265 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             })
         }
 
-        "_proc_expression" => Ok(Proc::ProcExpression(parse_proc_expression(node, source)?)),
+        // _proc_expression
+        "or" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Or {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "and" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::And {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "matches" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Matches {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "eq" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Eq {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "neq" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Neq {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "lt" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Lt {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "lte" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Lte {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "gt" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Gt {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "gte" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Gte {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "concat" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Concat {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "minus_minus" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::MinusMinus {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "minus" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Minus {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "add" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Add {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "percent_percent" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::PercentPercent {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "mult" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Mult {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "div" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Div {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "mod" => {
+            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
+
+            Ok(Proc::Mod {
+                left: Box::new(left_proc),
+                right: Box::new(right_proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "not" => {
+            let proc_node = get_child_by_field_name(node, "proc")?;
+            let proc = parse_proc(&proc_node, source)?;
+
+            Ok(Proc::Not {
+                proc: Box::new(proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        "neg" => {
+            let proc_node = get_child_by_field_name(node, "proc")?;
+            let proc = parse_proc(&proc_node, source)?;
+
+            Ok(Proc::Neg {
+                proc: Box::new(proc),
+                line_num,
+                col_num,
+            })
+        }
+
+        // _ground_expression
+        "block" => Ok(Proc::Block(Box::new(parse_block(node, source)?))),
+
+        "collection" => Ok(Proc::Collection(parse_collection(node, source)?)),
+
+        "proc_var" => Ok(Proc::ProcVar(parse_proc_var(node, source)?)),
+
+        "simple_type" => Ok(Proc::SimpleType(parse_simple_type(node)?)),
+
+        //_ground
+        "bool_literal" => Ok(Proc::BoolLiteral {
+            value: match node.kind() {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Invalid bool literal value: {}",
+                        node.kind()
+                    )));
+                }
+            },
+            line_num,
+            col_num,
+        }),
+
+        "long_literal" => Ok(Proc::LongLiteral {
+            value: {
+                let long_string = get_node_value(node, source.as_bytes())?;
+                let long = long_string.parse::<i64>().or_else(|e| {
+                    Err(InterpreterError::ParserError(format!(
+                        "Failed to convert long_literal into i64. Error: {:?}",
+                        e,
+                    )))
+                })?;
+                long
+            },
+            line_num,
+            col_num,
+        }),
+
+        "string_literal" => Ok(Proc::StringLiteral {
+            value: get_node_value(node, source.as_bytes())?,
+            line_num,
+            col_num,
+        }),
+
+        "uri_literal" => Ok(Proc::UriLiteral(parse_uri_literal(node, source)?)),
+
+        "nil" => Ok(Proc::Nil { line_num, col_num }),
 
         _ => Err(InterpreterError::ParserError(
             "Unrecognizable process".to_string(),
@@ -304,7 +562,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
 fn parse_name(node: &Node, source: &str) -> Result<Name, InterpreterError> {
     match node.kind() {
-        "_proc_var" => Ok(Name::NameProcVar(parse_proc_var(node, source)?)),
+        "proc_var" => Ok(Name::NameProcVar(parse_proc_var(node, source)?)),
 
         "quote" => Ok(Name::NameQuote(Box::new(parse_quote(node, source)?))),
 
@@ -316,7 +574,9 @@ fn parse_name(node: &Node, source: &str) -> Result<Name, InterpreterError> {
 }
 
 fn parse_proc_var(node: &Node, source: &str) -> Result<ProcVar, InterpreterError> {
-    match node.kind() {
+    // println!("\nproc_var node: {:?}", node.to_sexp());
+
+    match get_choice_child_node(node)?.kind() {
         "wildcard" => Ok(ProcVar::Wildcard {
             line_num: node.start_position().row,
             col_num: node.start_position().column,
@@ -367,14 +627,17 @@ fn parse_quotable(node: &Node, source: &str) -> Result<Quotable, InterpreterErro
 
         "negation" => Ok(Quotable::Negation(parse_negation(node, source)?)),
 
-        "_ground_expression" => Ok(Quotable::GroundExpression(parse_ground_expression(
-            node, source,
-        )?)),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of quotable",
-            node.kind(),
-        ))),
+        _ => {
+            let proc_result = parse_proc(node, source);
+            match proc_result {
+                Ok(proc) => Ok(Quotable::GroundExpression(proc)),
+                Err(proc_err) => Err(InterpreterError::ParserError(format!(
+                    "{:?}. Unexpected choice node kind: {:?} of quotable.",
+                    proc_err,
+                    node.kind(),
+                ))),
+            }
+        }
     }
 }
 
@@ -426,32 +689,6 @@ fn parse_negation(node: &Node, source: &str) -> Result<Negation, InterpreterErro
     })
 }
 
-fn parse_ground_expression(
-    node: &Node,
-    source: &str,
-) -> Result<GroundExpression, InterpreterError> {
-    match node.kind() {
-        "block" => Ok(GroundExpression::Block(Box::new(parse_block(
-            node, source,
-        )?))),
-
-        "_ground" => Ok(GroundExpression::Ground(parse_ground(node, source)?)),
-
-        "collection" => Ok(GroundExpression::Collection(parse_collection(
-            node, source,
-        )?)),
-
-        "_proc_var" => Ok(GroundExpression::ProcVar(parse_proc_var(node, source)?)),
-
-        "simple_type" => Ok(GroundExpression::SimpleType(parse_simple_type(node)?)),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _ground_expression",
-            node.kind(),
-        ))),
-    }
-}
-
 fn parse_block(node: &Node, source: &str) -> Result<Block, InterpreterError> {
     let body_node = get_child_by_field_name(node, "body")?;
     let body_proc = parse_proc(&body_node, source)?;
@@ -461,58 +698,6 @@ fn parse_block(node: &Node, source: &str) -> Result<Block, InterpreterError> {
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
-}
-
-fn parse_ground(node: &Node, source: &str) -> Result<Ground, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "bool_literal" => Ok(Ground::BoolLiteral {
-            value: match node.kind() {
-                "true" => true,
-                "false" => false,
-                _ => {
-                    return Err(InterpreterError::ParserError(format!(
-                        "Invalid bool literal value: {}",
-                        node.kind()
-                    )));
-                }
-            },
-            line_num,
-            col_num,
-        }),
-
-        "long_literal" => Ok(Ground::LongLiteral {
-            value: {
-                let long_string = get_node_value(node, source.as_bytes())?;
-                let long = long_string.parse::<i64>().or_else(|e| {
-                    Err(InterpreterError::ParserError(format!(
-                        "Failed to convert long_literal into i64. Error: {:?}",
-                        e,
-                    )))
-                })?;
-                long
-            },
-            line_num,
-            col_num,
-        }),
-
-        "string_literal" => Ok(Ground::StringLiteral {
-            value: get_node_value(node, source.as_bytes())?,
-            line_num,
-            col_num,
-        }),
-
-        "uri_literal" => Ok(Ground::UriLiteral(parse_uri_literal(node, source)?)),
-
-        "nil" => Ok(Ground::Nil { line_num, col_num }),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _ground",
-            node.kind(),
-        ))),
-    }
 }
 
 fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, InterpreterError> {
@@ -704,6 +889,8 @@ fn parse_simple_type(node: &Node) -> Result<SimpleType, InterpreterError> {
 }
 
 fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterError> {
+    // println!("\nproc_list node: {:?}", node.to_sexp());
+
     let mut procs = Vec::new();
     let mut cursor = node.walk();
 
@@ -712,9 +899,21 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
     while cursor.goto_next_sibling() {
         let current_node = cursor.node();
         match current_node.kind() {
-            "_proc" => procs.push(parse_proc(&current_node, source)?),
             "," => continue,
-            _ => break,
+            _ => {
+                let proc_result = parse_proc(&current_node, source);
+                match proc_result {
+                    Ok(proc) => procs.push(proc),
+                    Err(_) => {
+                        // return Err(InterpreterError::ParserError(format!(
+                        //     "{:?}. Unexpected choice node kind: {:?} of _proc in proc_list",
+                        //     proc_err,
+                        //     node.kind(),
+                        // )))
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -788,227 +987,6 @@ fn parse_bundle(node: &Node) -> Result<Bundle, InterpreterError> {
     }
 }
 
-fn parse_proc_expression(node: &Node, source: &str) -> Result<ProcExpression, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "or" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Or {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "and" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::And {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "matches" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Matches {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "eq" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Eq {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "neq" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Neq {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "lt" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Lt {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "lte" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Lte {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "gt" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Gt {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "gte" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Gte {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "concat" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Concat {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "minus_minus" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::MinusMinus {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "minus" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Minus {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "add" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Add {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "percent_percent" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::PercentPercent {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "mult" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Mult {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "div" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Div {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "mod" => {
-            let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
-
-            Ok(ProcExpression::Mod {
-                left: Box::new(left_proc),
-                right: Box::new(right_proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "not" => {
-            let proc_node = get_child_by_field_name(node, "proc")?;
-            let proc = parse_proc(&proc_node, source)?;
-
-            Ok(ProcExpression::Not {
-                proc: Box::new(proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        "neg" => {
-            let proc_node = get_child_by_field_name(node, "proc")?;
-            let proc = parse_proc(&proc_node, source)?;
-
-            Ok(ProcExpression::Neg {
-                proc: Box::new(proc),
-                line_num,
-                col_num,
-            })
-        }
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _proc_expression",
-            node.kind(),
-        ))),
-    }
-}
-
 fn parse_case(node: &Node, source: &str) -> Result<Case, InterpreterError> {
     let pattern_node = get_child_by_field_name(node, "pattern")?;
     let pattern_proc = parse_proc(&pattern_node, source)?;
@@ -1045,13 +1023,18 @@ fn parse_branch(node: &Node, source: &str) -> Result<Branch, InterpreterError> {
     let proc = match proc_node.kind() {
         "send" => Either::Left(parse_send(&proc_node, source)?),
 
-        "_proc_expression" => Either::Right(parse_proc_expression(&proc_node, source)?),
-
         _ => {
-            return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of _proc in branch",
-                node.kind(),
-            )))
+            let proc_result = parse_proc(node, source);
+            match proc_result {
+                Ok(proc) => Either::Right(proc),
+                Err(proc_err) => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "{:?}. Unexpected choice node kind: {:?} of _proc in branch",
+                        proc_err,
+                        node.kind(),
+                    )))
+                }
+            }
         }
     };
 
@@ -1354,9 +1337,21 @@ fn get_child_by_field_name<'a>(
     }
 }
 
+fn get_choice_child_node<'a>(node: &'a Node<'a>) -> Result<Node<'a>, InterpreterError> {
+    match node.child(0) {
+        Some(child_node) => Ok(child_node),
+        None => Err(InterpreterError::ParserError(format!(
+            "Error: did not find expected child node at index 0 on node {:?}",
+            node.kind(),
+        ))),
+    }
+}
+
 fn get_node_value(node: &Node, bytes: &[u8]) -> Result<String, InterpreterError> {
+    // println!("\nnode in get_node_value: {:?}", node.to_sexp());
+
     match node.utf8_text(bytes) {
-        Ok(str) => Ok(str.to_string()),
+        Ok(str) => Ok(str.to_owned()),
         Err(e) => Err(InterpreterError::ParserError(format!(
             "Failed to get node value. Error: {:?}",
             e,
