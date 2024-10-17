@@ -86,8 +86,16 @@ impl<T: Clone> FreeMap<T> {
     }
   }
 
-  fn add_connective(&mut self, connective: ConnectiveInstance, source_position: SourcePosition) {
-    self.connectives.push((connective, source_position));
+  pub fn add_connective(&self, connective: ConnectiveInstance, source_position: SourcePosition) -> Self {
+    let mut updated_connectives = self.connectives.clone();
+    updated_connectives.push((connective, source_position));
+
+    FreeMap {
+      next_level: self.next_level,
+      level_bindings: self.level_bindings.clone(),
+      wildcards: self.wildcards.clone(),
+      connectives: updated_connectives,
+    }
   }
 
   fn count(&self) -> usize {

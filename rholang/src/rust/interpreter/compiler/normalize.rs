@@ -4,12 +4,11 @@ use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normali
 // use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
 use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::{
-    EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr,
-    EPercentPercent, EPlus, EPlusPlus, Expr, Par,
-};
+use models::rhoapi::{Connective, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par};
 use std::error::Error;
+use models::rust::utils::union;
 use tree_sitter::Node;
+use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum VarSort {
@@ -148,11 +147,18 @@ pub fn normalize_match(
             println!("Found a bundle node, calling normalize_p_bundle");
             normalize_p_bundle(p_node, input, source_code)
         }
-        "ground" => normalize_p_ground(p_node, input, source_code),
+        "long_literal" | "bool_literal" | "string_literal" | "uri_literal" => {
+            println!("Found a ground node, calling normalize_p_ground");
+            normalize_p_ground(p_node, input, source_code)
+        }
         "collection" => normalize_p_collect(p_node, input, source_code),
         "matches" => {
             println!("Found a matches node, calling normalize_p_matches");
             normalize_p_matches(p_node, input, source_code)
+        }
+        "conjunction" => {
+            println!("Found a conjunction node, calling normalize_p_conjunction");
+            normalize_p_сonjunction(p_node, input, source_code)
         }
         "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
