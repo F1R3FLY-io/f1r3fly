@@ -160,6 +160,10 @@ pub fn normalize_match(
             println!("Found a conjunction node, calling normalize_p_conjunction");
             normalize_p_сonjunction(p_node, input, source_code)
         }
+        "disjunction" => {
+            println!("Found a disjunction node, calling normalize_p_disjunction");
+            normalize_p_disjunction(p_node, input, source_code)
+        }
         "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
