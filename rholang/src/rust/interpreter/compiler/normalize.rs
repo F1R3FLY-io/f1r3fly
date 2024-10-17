@@ -3,12 +3,15 @@ use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer:
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
 // use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
-use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::{Connective, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par};
-use std::error::Error;
-use models::rust::utils::union;
-use tree_sitter::Node;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
+use crate::rust::interpreter::util::prepend_expr;
+use models::rhoapi::{
+    Connective, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg,
+    ENeq, ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par,
+};
+use models::rust::utils::union;
+use std::error::Error;
+use tree_sitter::Node;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum VarSort {
@@ -139,9 +142,6 @@ pub fn normalize_match(
 
     println!("Normalizing node kind: {}", p_node.kind());
 
-    let line_num = p_node.start_position().row;
-    let col_num = p_node.start_position().column;
-
     match p_node.kind() {
         "bundle" => {
             println!("Found a bundle node, calling normalize_p_bundle");
@@ -169,57 +169,6 @@ pub fn normalize_match(
             input,
             source_code,
         ),
-
-        // "var_ref" => {
-        //     let var_ref_kind_node = p_node
-        //         .child_by_field_name("var_ref_kind")
-        //         .ok_or("Expected a var_ref_kind node but found None")?;
-        //     let var_node = p_node
-        //         .child_by_field_name("var")
-        //         .ok_or("Expected a var node but found None")?;
-
-        //     let var_ref_kind = match std::str::from_utf8(
-        //         &source_code[var_ref_kind_node.start_byte()..var_ref_kind_node.end_byte()],
-        //     )? {
-        //         "=" => VarRefKind::Proc,
-        //         "= *" => VarRefKind::Name,
-        //         _ => return Err("Unexpected var_ref_kind".into()),
-        //     };
-
-        //     let var =
-        //         std::str::from_utf8(&source_code[var_node.start_byte()..var_node.end_byte()])?
-        //             .to_string();
-
-        //     Ok(normalize_p_var_ref(
-        //         PVarRef {
-        //             var_ref_kind,
-        //             var,
-        //             line_num,
-        //             col_num,
-        //         },
-        //         input,
-        //     )?)
-        // }
-
-        // "var" => {
-        //     let var_name =
-        //         std::str::from_utf8(&source_code[p_node.start_byte()..p_node.end_byte()])?
-        //             .to_string();
-
-        //     Ok(normalize_p_var(
-        //         PVar::ProcVarVar {
-        //             name: var_name,
-        //             line_num,
-        //             col_num,
-        //         },
-        //         input,
-        //     )?)
-        // }
-
-        // "wildcard" => Ok(normalize_p_var(
-        //     PVar::ProcVarWildcard { line_num, col_num },
-        //     input,
-        // )?),
 
         //unary
         "not" => handle_unary_expression(p_node, input, source_code, Box::new(ENot::default())),

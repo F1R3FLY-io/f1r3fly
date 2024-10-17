@@ -44,6 +44,8 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         )),
     }?;
 
+    println!("{:?}", start_node.kind());
+
     parse_proc(&start_node, code)
 }
 
