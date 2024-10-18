@@ -2,7 +2,7 @@ use models::rust::utils::{new_boundvar_expr, new_freevar_expr, new_wildcard_expr
 
 use crate::rust::interpreter::compiler::exports::{BoundContext, FreeContext};
 use crate::rust::interpreter::compiler::normalize::VarSort;
-use crate::rust::interpreter::compiler::rholang_ast::ProcVar;
+use crate::rust::interpreter::compiler::rholang_ast::Proc;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_expr;
 
@@ -10,11 +10,11 @@ use super::exports::*;
 use std::result::Result;
 
 pub fn normalize_p_var(
-    p: ProcVar,
+    p: Proc,
     mut input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     match p {
-        ProcVar::Var(var) => {
+        Proc::Var(var) => {
             let var_name = var.name;
             let row = var.line_num;
             let column = var.col_num;
@@ -69,7 +69,7 @@ pub fn normalize_p_var(
             }
         }
 
-        ProcVar::Wildcard { line_num, col_num } => Ok(ProcVisitOutputs {
+        Proc::Wildcard { line_num, col_num } => Ok(ProcVisitOutputs {
             par: {
                 let mut par = prepend_expr(
                     input.par,
@@ -84,5 +84,10 @@ pub fn normalize_p_var(
                 column: col_num,
             }),
         }),
+
+        _ => Err(InterpreterError::NormalizerError(format!(
+            "Expected Var or Wildcard, found {:?}",
+            p,
+        ))),
     }
 }

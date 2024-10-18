@@ -239,8 +239,6 @@ pub enum Proc {
 
     Collection(Collection),
 
-    ProcVar(ProcVar),
-
     SimpleType(SimpleType),
 
     // Ground
@@ -268,6 +266,14 @@ pub enum Proc {
         line_num: usize,
         col_num: usize,
     },
+
+    // ProcVar
+    Var(Var),
+
+    Wildcard {
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -279,15 +285,8 @@ pub struct ProcList {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Name {
-    NameProcVar(ProcVar),
-    NameQuote(Box<Quote>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ProcVar {
-    Var(Var),
-
-    Wildcard { line_num: usize, col_num: usize },
+    ProcVar(Box<Proc>),
+    Quote(Box<Quote>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -361,7 +360,7 @@ pub struct UriLiteral {
 pub enum Collection {
     List {
         elements: Vec<Proc>,
-        cont: Option<ProcRemainder>,
+        cont: Option<Box<Proc>>,
         line_num: usize,
         col_num: usize,
     },
@@ -374,24 +373,17 @@ pub enum Collection {
 
     Set {
         elements: Vec<Proc>,
-        cont: Option<ProcRemainder>,
+        cont: Option<Box<Proc>>,
         line_num: usize,
         col_num: usize,
     },
 
     Map {
         pairs: Vec<KeyValuePair>,
-        cont: Option<ProcRemainder>,
+        cont: Option<Box<Proc>>,
         line_num: usize,
         col_num: usize,
     },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProcRemainder {
-    pub proc_var: ProcVar,
-    pub line_num: usize,
-    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -492,7 +484,7 @@ pub struct LinearBind {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Names {
     pub names: Vec<Name>,
-    pub cont: Option<NameRemainder>,
+    pub cont: Option<Box<Proc>>,
     pub line_num: usize,
     pub col_num: usize,
 }
@@ -543,13 +535,6 @@ pub enum ReceiptBindings {
         line_num: usize,
         col_num: usize,
     },
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct NameRemainder {
-    pub proc_var: ProcVar,
-    pub line_num: usize,
-    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]

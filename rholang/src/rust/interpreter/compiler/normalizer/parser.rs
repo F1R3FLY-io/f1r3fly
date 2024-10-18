@@ -4,9 +4,9 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decls, Disjunction, Eval,
-        KeyValuePair, LinearBind, Name, NameDecl, NameRemainder, Names, Negation, Proc, ProcList,
-        ProcRemainder, ProcVar, Quotable, Quote, Receipt, ReceiptBindings, SendRule, SendType,
-        SimpleType, Source, SyncSendCont, UriLiteral, Var,
+        KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, Proc, ProcList, Quotable, Quote,
+        Receipt, ReceiptBindings, SendRule, SendType, SimpleType, Source, SyncSendCont, UriLiteral,
+        Var,
     },
     errors::InterpreterError,
 };
@@ -509,8 +509,6 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "collection" => Ok(Proc::Collection(parse_collection(node, source)?)),
 
-        "proc_var" => Ok(Proc::ProcVar(parse_proc_var(node, source)?)),
-
         "simple_type" => Ok(Proc::SimpleType(parse_simple_type(node)?)),
 
         //_ground
@@ -545,7 +543,11 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         }),
 
         "string_literal" => Ok(Proc::StringLiteral {
-            value: get_node_value(node, source.as_bytes())?,
+            value: {
+                let value_with_quotes = get_node_value(node, source.as_bytes())?;
+                let value = value_with_quotes.trim_matches('"').to_string();
+                value
+            },
             line_num,
             col_num,
         }),
@@ -554,6 +556,14 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "nil" => Ok(Proc::Nil { line_num, col_num }),
 
+        // _proc_var
+        "wildcard" => Ok(Proc::Wildcard {
+            line_num: node.start_position().row,
+            col_num: node.start_position().column,
+        }),
+
+        "var" => Ok(Proc::Var(parse_var(node, source)?)),
+
         _ => Err(InterpreterError::ParserError(
             "Unrecognizable process".to_string(),
         )),
@@ -561,33 +571,22 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 }
 
 fn parse_name(node: &Node, source: &str) -> Result<Name, InterpreterError> {
-    match node.kind() {
-        "proc_var" => Ok(Name::NameProcVar(parse_proc_var(node, source)?)),
-
-        "quote" => Ok(Name::NameQuote(Box::new(parse_quote(node, source)?))),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of name",
-            node.kind(),
-        ))),
-    }
-}
-
-fn parse_proc_var(node: &Node, source: &str) -> Result<ProcVar, InterpreterError> {
     // println!("\nproc_var node: {:?}", node.to_sexp());
 
-    match get_choice_child_node(node)?.kind() {
-        "wildcard" => Ok(ProcVar::Wildcard {
-            line_num: node.start_position().row,
-            col_num: node.start_position().column,
-        }),
+    match node.kind() {
+        "quote" => Ok(Name::Quote(Box::new(parse_quote(node, source)?))),
 
-        "var" => Ok(ProcVar::Var(parse_var(node, source)?)),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _proc_var",
-            node.kind(),
-        ))),
+        _ => {
+            let proc_result = parse_proc(node, source);
+            match proc_result {
+                Ok(proc) => Ok(Name::ProcVar(Box::new(proc))),
+                Err(proc_err) => Err(InterpreterError::ParserError(format!(
+                    "{:?}. Unexpected choice node kind: {:?} of name.",
+                    proc_err,
+                    node.kind(),
+                ))),
+            }
+        }
     }
 }
 
@@ -734,7 +733,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
-                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
                     }
                     None => None,
                 }
@@ -765,7 +764,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
-                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
                     }
                     None => None,
                 }
@@ -795,7 +794,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
-                        Some(parse_proc_remainder(&proc_remainder_node, source)?)
+                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
                     }
                     None => None,
                 }
@@ -832,23 +831,6 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
             node.kind(),
         ))),
     }
-}
-
-fn parse_proc_remainder(node: &Node, source: &str) -> Result<ProcRemainder, InterpreterError> {
-    let proc_var_node = node
-        .child(1)
-        .filter(|n| n.kind() == "_proc_var")
-        .ok_or_else(|| {
-            InterpreterError::ParserError(
-                "Expected a _proc_var node in _proc_remainder at index 1".to_string(),
-            )
-        })?;
-
-    Ok(ProcRemainder {
-        proc_var: parse_proc_var(&proc_var_node, source)?,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
 }
 
 fn parse_key_value_pair(node: &Node, source: &str) -> Result<KeyValuePair, InterpreterError> {
@@ -1118,21 +1100,7 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
     }
 
     let name_remainder = match node.child_by_field_name("cont") {
-        Some(name_remainder_node) => Some(NameRemainder {
-            proc_var: {
-                let proc_var_node = name_remainder_node
-                    .child(2)
-                    .filter(|n| n.kind() == "_proc_var")
-                    .ok_or_else(|| {
-                        InterpreterError::ParserError(
-                            "Expected a _proc_var node in _name_remainder at index 2".to_string(),
-                        )
-                    })?;
-                parse_proc_var(&proc_var_node, source)
-            }?,
-            line_num: name_remainder_node.start_position().row,
-            col_num: name_remainder_node.start_position().column,
-        }),
+        Some(name_remainder_node) => Some(Box::new(parse_proc(&name_remainder_node, source)?)),
         None => None,
     };
 
