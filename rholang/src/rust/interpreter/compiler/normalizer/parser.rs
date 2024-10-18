@@ -6,7 +6,7 @@ use crate::rust::interpreter::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, Proc,
         ProcList, Quotable, Quote, Receipt, ReceiptBindings, SendRule, SendType, SimpleType,
-        Source, SyncSendCont, UriLiteral, Var,
+        Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
     errors::InterpreterError,
 };
@@ -632,6 +632,9 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "var" => Ok(Proc::Var(parse_var(node, source)?)),
 
+        // var_ref
+        "var_ref" => Ok(Proc::VarRef(parse_var_ref(node, source)?)),
+
         _ => Err(InterpreterError::ParserError(format!(
             "Unrecognizable process. Node: {:?}",
             node.kind()
@@ -663,6 +666,41 @@ fn parse_var(node: &Node, source: &str) -> Result<Var, InterpreterError> {
     let var_value = get_node_value(node, source.as_bytes())?;
     Ok(Var {
         name: var_value,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
+}
+
+fn parse_var_ref(node: &Node, source: &str) -> Result<VarRef, InterpreterError> {
+    let var_ref_kind_node = node
+        .child(0)
+        .filter(|n| n.kind() == "var_ref_kind")
+        .ok_or_else(|| {
+            InterpreterError::ParserError(
+                "Expected a var_ref_kind node in var_ref at index 0".to_string(),
+            )
+        })?;
+
+    let var_ref_kind = match var_ref_kind_node.kind() {
+        "=" => VarRefKind::Proc,
+        "=*" => VarRefKind::Name,
+        _ => {
+            return Err(InterpreterError::ParserError(format!(
+                "Unexpected choice node kind: {:?} of var_ref_kind.",
+                node.kind(),
+            )))
+        }
+    };
+
+    let var_node = node.child(1).filter(|n| n.kind() == "var").ok_or_else(|| {
+        InterpreterError::ParserError("Expected a var node in var_ref at index 1".to_string())
+    })?;
+
+    let var = parse_var(&var_node, source)?;
+
+    Ok(VarRef {
+        var_ref_kind,
+        var,
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
@@ -949,6 +987,7 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
 
     let mut cursor = node.walk();
     cursor.goto_first_child(); // '('
+    cursor.goto_next_sibling();
     let procs = parse_comma_sep_procs(&cursor.node(), source)?;
 
     Ok(ProcList {

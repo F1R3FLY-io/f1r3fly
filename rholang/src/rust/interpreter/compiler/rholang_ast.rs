@@ -274,6 +274,9 @@ pub enum Proc {
         line_num: usize,
         col_num: usize,
     },
+
+    // VarRef
+    VarRef(VarRef),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -560,9 +563,9 @@ pub enum SendType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct PVarRef {
+pub struct VarRef {
     pub var_ref_kind: VarRefKind,
-    pub var: String,
+    pub var: Var,
     pub line_num: usize,
     pub col_num: usize,
 }
