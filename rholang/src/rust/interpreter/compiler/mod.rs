@@ -10,3 +10,4 @@ pub mod normalizer;
 pub mod normalize;
 pub mod rholang_ast;
 pub mod utils;
+pub mod compiler;
