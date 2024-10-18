@@ -8,7 +8,7 @@ use rholang::rust::interpreter::{
         exports::{BoundMapChain, FreeMap, SourcePosition},
         normalize::{ProcVisitInputs, VarSort},
         normalizer::processes::p_var_normalizer::normalize_p_var,
-        rholang_ast::{Case, PVarRef, Proc, VarRefKind},
+        rholang_ast::Case,
     },
     errors::InterpreterError,
     util::prepend_expr,

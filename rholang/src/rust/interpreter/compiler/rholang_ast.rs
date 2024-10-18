@@ -33,7 +33,7 @@ pub enum Proc {
     },
 
     Let {
-        decls: Decls,
+        decls: DeclsChoice,
         body: Box<Block>,
         line_num: usize,
         col_num: usize,
@@ -434,10 +434,25 @@ pub struct NameDecl {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Decl {
-    pub names: Vec<String>,
+    pub names: Names,
     pub procs: Vec<Proc>,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeclsChoice {
+    LinearDecls {
+        decls: Vec<Decl>,
+        line_num: usize,
+        col_num: usize,
+    },
+
+    ConcDecls {
+        decls: Vec<Decl>,
+        line_num: usize,
+        col_num: usize,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
