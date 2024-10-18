@@ -557,9 +557,13 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             })
         }
 
-        // TODO: Figure this case out
-        "_parenthesized" => {
-            todo!()
+        "parenthesized" => {
+            let expr_node = node.child(1).ok_or_else(|| {
+                InterpreterError::ParserError(
+                    "Expected an expression inside parenthesized".to_string(),
+                )
+            })?;
+            parse_proc(&expr_node, source)
         }
 
         "eval" => Ok(Proc::Eval(parse_eval(node, source)?)),
