@@ -279,6 +279,16 @@ pub enum Proc {
     VarRef(VarRef),
 }
 
+impl Proc {
+    pub fn new_int_proc(value: i64, line_num: usize, col_num: usize) -> Proc {
+        Proc::LongLiteral {
+            value,
+            line_num,
+            col_num,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct ProcList {
     pub procs: Vec<Proc>,

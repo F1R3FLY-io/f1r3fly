@@ -27,7 +27,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .expect("Error loading Rholang grammar");
 
     let tree = parser.parse(code, None).expect("Failed to parse code");
-    println!("\nTree: {:#?}", tree.root_node().to_sexp());
+    // println!("\nTree: {:#?}", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
     if root_node.kind() != "source_file" {
@@ -51,7 +51,6 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
 
 /*
  * TODO: How to handle '_line_comment' and '_block_comment'
- * TODO: VarRef
  */
 fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
     let line_num = node.start_position().row;
@@ -585,14 +584,17 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         //_ground
         "bool_literal" => Ok(Proc::BoolLiteral {
-            value: match node.kind() {
-                "true" => true,
-                "false" => false,
-                _ => {
-                    return Err(InterpreterError::ParserError(format!(
-                        "Invalid bool literal value: {}",
-                        node.kind()
-                    )));
+            value: {
+                let bool_value = get_node_value(node, source.as_bytes())?;
+                match bool_value.as_str() {
+                    "true" => true,
+                    "false" => false,
+                    _ => {
+                        return Err(InterpreterError::ParserError(format!(
+                            "Invalid bool literal value: {}",
+                            bool_value
+                        )));
+                    }
                 }
             },
             line_num,
@@ -826,20 +828,12 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
     let line_num = node.start_position().row;
     let col_num = node.start_position().column;
 
-    match node.kind() {
+    let mut cursor = node.walk();
+    cursor.goto_first_child();
+    let current_node = cursor.node();
+    match current_node.kind() {
         "list" => Ok(Collection::List {
-            elements: {
-                match node.child(1) {
-                    Some(comma_sep_procs_node) => {
-                        parse_comma_sep_procs(&comma_sep_procs_node, source)?
-                    }
-                    None => {
-                        return Err(InterpreterError::ParserError(
-                            "Expected a commaSep node of procs in list at index 1".to_string(),
-                        ))
-                    }
-                }
-            },
+            elements: { parse_comma_sep_procs(&current_node, source)? },
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
@@ -853,18 +847,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
         }),
 
         "set" => Ok(Collection::Set {
-            elements: {
-                match node.child(1) {
-                    Some(comma_sep_procs_node) => {
-                        parse_comma_sep_procs(&comma_sep_procs_node, source)?
-                    }
-                    None => {
-                        return Err(InterpreterError::ParserError(
-                            "Expected a commaSep node of procs in set at index 1".to_string(),
-                        ))
-                    }
-                }
-            },
+            elements: { parse_comma_sep_procs(&current_node, source)? },
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
@@ -883,14 +866,11 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
                 let mut cursor = node.walk();
 
                 cursor.goto_first_child(); // '{'
-
-                while cursor.goto_next_sibling() {
-                    let current_node = cursor.node();
-                    match current_node.kind() {
-                        "key_value_pair" => kvs.push(parse_key_value_pair(&current_node, source)?),
-                        "," => continue,
-                        _ => break,
+                for child in current_node.named_children(&mut node.walk()) {
+                    if child.kind() == "cont" {
+                        continue;
                     }
+                    kvs.push(parse_key_value_pair(&child, source)?);
                 }
 
                 kvs
@@ -908,18 +888,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
         }),
 
         "tuple" => Ok(Collection::Tuple {
-            elements: {
-                match node.child(1) {
-                    Some(comma_sep_procs_node) => {
-                        parse_comma_sep_procs(&comma_sep_procs_node, source)?
-                    }
-                    None => {
-                        return Err(InterpreterError::ParserError(
-                            "Expected a commaSep node of procs in tuple at index 1".to_string(),
-                        ))
-                    }
-                }
-            },
+            elements: { parse_comma_sep_procs(&current_node, source)? },
             line_num,
             col_num,
         }),
@@ -932,20 +901,15 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
 }
 
 fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
-    let mut procs = Vec::new();
-    let mut cursor = node.walk();
+    // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
 
-    loop {
-        let current_node = cursor.node();
-        if current_node.kind() == "," {
+    let mut procs = Vec::new();
+    for child in node.named_children(&mut node.walk()) {
+        if child.kind() == "cont" {
             continue;
         }
-        procs.push(parse_proc(&current_node, source)?);
-        if !cursor.goto_next_sibling() {
-            break;
-        }
+        procs.push(parse_proc(&child, source)?);
     }
-
     Ok(procs)
 }
 
@@ -988,12 +952,9 @@ fn parse_simple_type(node: &Node) -> Result<SimpleType, InterpreterError> {
 
 fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterError> {
     // println!("\nproc_list node: {:?}", node.to_sexp());
+    // println!("\nproc_list node: {:?}", node.child(1).unwrap().to_sexp());
 
-    let mut cursor = node.walk();
-    cursor.goto_first_child(); // '('
-    cursor.goto_next_sibling();
-    let procs = parse_comma_sep_procs(&cursor.node(), source)?;
-
+    let procs = parse_comma_sep_procs(&node, source)?;
     Ok(ProcList {
         procs,
         line_num: node.start_position().row,
