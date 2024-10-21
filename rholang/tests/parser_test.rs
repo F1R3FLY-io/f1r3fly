@@ -1,20 +1,145 @@
 use rholang::rust::interpreter::compiler::{
     normalizer::parser::parse_rholang_code_to_proc,
-    rholang_ast::{Collection, Name, Proc, ProcList, SendType, UriLiteral, Var},
+    rholang_ast::{
+        Block, Branch, Collection, LinearBind, Name, Names, Proc, ProcList, Receipt, Receipts,
+        SendType, Source, UriLiteral, Var,
+    },
 };
+use rspace_plus_plus::rspace::history::Either;
 
-// println!("\n{:?}", result);
+// println!("\n{:#?}", result);
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_select() {
+    let input_code = r#"
+      select {
+        x <- chan1 & y <- chan2 => { Nil }
+        z <- chan3 => { Nil }
+      }
+    "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let branches = vec![
+        Branch {
+            pattern: vec![
+                LinearBind {
+                    names: Names {
+                        names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "x".to_string(),
+                            line_num: 2,
+                            col_num: 8,
+                        })))],
+                        cont: None,
+                        line_num: 2,
+                        col_num: 8,
+                    },
+                    input: Source::Simple {
+                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "chan1".to_string(),
+                            line_num: 2,
+                            col_num: 13,
+                        }))),
+                        line_num: 2,
+                        col_num: 13,
+                    },
+                    line_num: 2,
+                    col_num: 8,
+                },
+                LinearBind {
+                    names: Names {
+                        names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "y".to_string(),
+                            line_num: 2,
+                            col_num: 21,
+                        })))],
+                        cont: None,
+                        line_num: 2,
+                        col_num: 21,
+                    },
+                    input: Source::Simple {
+                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "chan2".to_string(),
+                            line_num: 2,
+                            col_num: 26,
+                        }))),
+                        line_num: 2,
+                        col_num: 26,
+                    },
+                    line_num: 2,
+                    col_num: 21,
+                },
+            ],
+            proc: Either::Right(Proc::Block(Box::new(Block {
+                proc: Proc::Nil {
+                    line_num: 2,
+                    col_num: 37,
+                },
+                line_num: 2,
+                col_num: 35,
+            }))),
+            line_num: 2,
+            col_num: 8,
+        },
+        Branch {
+            pattern: vec![LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "z".to_string(),
+                        line_num: 3,
+                        col_num: 8,
+                    })))],
+                    cont: None,
+                    line_num: 3,
+                    col_num: 8,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "chan3".to_string(),
+                        line_num: 3,
+                        col_num: 13,
+                    }))),
+                    line_num: 3,
+                    col_num: 13,
+                },
+                line_num: 3,
+                col_num: 8,
+            }],
+            proc: Either::Right(Proc::Block(Box::new(Block {
+                proc: Proc::Nil {
+                    line_num: 3,
+                    col_num: 24,
+                },
+                line_num: 3,
+                col_num: 22,
+            }))),
+            line_num: 3,
+            col_num: 8,
+        },
+    ];
+
+    let expected_result = Proc::Choice {
+        branches,
+        line_num: 1,
+        col_num: 6,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
 
 #[test]
 fn parse_rholang_code_to_proc_should_handle_string_literal() {
     let input_code = r#""Hello, Rholang!""#;
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::StringLiteral {
         value: "Hello, Rholang!".to_owned(),
         line_num: 0,
         col_num: 0,
     };
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
@@ -23,11 +148,13 @@ fn parse_rholang_code_to_proc_should_handle_bool_literal() {
     let input_code = "true";
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::BoolLiteral {
         value: true,
         line_num: 0,
         col_num: 0,
     };
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
@@ -36,11 +163,13 @@ fn parse_rholang_code_to_proc_should_handle_uri_literal() {
     let input_code = "`http://example.com`";
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::UriLiteral(UriLiteral {
         value: "`http://example.com`".to_string(),
         line_num: 0,
         col_num: 0,
     });
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
@@ -49,11 +178,13 @@ fn parse_rholang_code_to_proc_should_handle_int_literal() {
     let input_code = "42";
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::LongLiteral {
         value: 42,
         line_num: 0,
         col_num: 0,
     };
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
@@ -62,10 +193,12 @@ fn parse_rholang_code_to_proc_should_handle_nil() {
     let input_code = "Nil";
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::Nil {
         line_num: 0,
         col_num: 0,
     };
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
@@ -74,6 +207,7 @@ fn parse_rholang_code_to_proc_should_handle_collection_list() {
     let input_code = "[1,2,3]";
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
+
     let expected_result = Proc::Collection(Collection::List {
         elements: vec![
             Proc::new_int_proc(1, 0, 1),
@@ -84,14 +218,14 @@ fn parse_rholang_code_to_proc_should_handle_collection_list() {
         line_num: 0,
         col_num: 0,
     });
+
     assert_eq!(result.unwrap(), expected_result)
 }
 
 #[test]
-fn parse_rholang_code_to_proc_should_successfully_parse_simple_send() {
-    let rholang_code = r#"x!("Hello")"#;
-    let result = parse_rholang_code_to_proc(&rholang_code);
-
+fn parse_rholang_code_to_proc_should_parse_simple_send() {
+    let input_code = r#"x!("Hello")"#;
+    let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
 
     let expected_result = Proc::Send {
@@ -115,6 +249,270 @@ fn parse_rholang_code_to_proc_should_successfully_parse_simple_send() {
         },
         line_num: 0,
         col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_simple_input_process() {
+    let input_code = r#"
+     for (x <- y) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let receipts = Receipts {
+        receipts: vec![Receipt::LinearBinds(LinearBind {
+            names: Names {
+                names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "x".to_string(),
+                    line_num: 1,
+                    col_num: 10,
+                })))],
+                cont: None,
+                line_num: 1,
+                col_num: 10,
+            },
+            input: Source::Simple {
+                name: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 1,
+                    col_num: 15,
+                }))),
+                line_num: 1,
+                col_num: 15,
+            },
+            line_num: 1,
+            col_num: 10,
+        })],
+        line_num: 1,
+        col_num: 10,
+    };
+
+    let expected_result = Proc::Input {
+        formals: receipts,
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 18,
+        }),
+        line_num: 1,
+        col_num: 5,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
+    let input_code = r#"
+     for (x <- y; a <- b) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let receipts = Receipts {
+        receipts: vec![
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "x".to_string(),
+                        line_num: 1,
+                        col_num: 10,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 10,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "y".to_string(),
+                        line_num: 1,
+                        col_num: 15,
+                    }))),
+                    line_num: 1,
+                    col_num: 15,
+                },
+                line_num: 1,
+                col_num: 10,
+            }),
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "a".to_string(),
+                        line_num: 1,
+                        col_num: 18,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 18,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "b".to_string(),
+                        line_num: 1,
+                        col_num: 23,
+                    }))),
+                    line_num: 1,
+                    col_num: 23,
+                },
+                line_num: 1,
+                col_num: 18,
+            }),
+        ],
+        line_num: 1,
+        col_num: 10,
+    };
+
+    let expected_result = Proc::Input {
+        formals: receipts,
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 26,
+        }),
+        line_num: 1,
+        col_num: 5,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts_and_linear_binds() {
+    let input_code = r#"
+     for (x <- y & z <- w; a <- b & c <- d) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let receipts = Receipts {
+        receipts: vec![
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "x".to_string(),
+                        line_num: 1,
+                        col_num: 10,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 10,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "y".to_string(),
+                        line_num: 1,
+                        col_num: 15,
+                    }))),
+                    line_num: 1,
+                    col_num: 15,
+                },
+                line_num: 1,
+                col_num: 10,
+            }),
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "z".to_string(),
+                        line_num: 1,
+                        col_num: 19,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 19,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "w".to_string(),
+                        line_num: 1,
+                        col_num: 24,
+                    }))),
+                    line_num: 1,
+                    col_num: 24,
+                },
+                line_num: 1,
+                col_num: 19,
+            }),
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "a".to_string(),
+                        line_num: 1,
+                        col_num: 27,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 27,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "b".to_string(),
+                        line_num: 1,
+                        col_num: 32,
+                    }))),
+                    line_num: 1,
+                    col_num: 32,
+                },
+                line_num: 1,
+                col_num: 27,
+            }),
+            Receipt::LinearBinds(LinearBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "c".to_string(),
+                        line_num: 1,
+                        col_num: 36,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 36,
+                },
+                input: Source::Simple {
+                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "d".to_string(),
+                        line_num: 1,
+                        col_num: 41,
+                    }))),
+                    line_num: 1,
+                    col_num: 41,
+                },
+                line_num: 1,
+                col_num: 36,
+            }),
+        ],
+        line_num: 1,
+        col_num: 10,
+    };
+
+    let expected_result = Proc::Input {
+        formals: receipts,
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 44,
+        }),
+        line_num: 1,
+        col_num: 5,
     };
 
     assert_eq!(result.unwrap(), expected_result)

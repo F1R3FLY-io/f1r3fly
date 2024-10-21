@@ -68,7 +68,7 @@ pub enum Proc {
     },
 
     Input {
-        formals: Vec<Receipt>,
+        formals: Receipts,
         proc: Box<Block>,
         line_num: usize,
         col_num: usize,
@@ -533,11 +533,18 @@ pub enum Source {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Receipt {
-    LinearBinds(Vec<LinearBind>),
+    LinearBinds(LinearBind),
 
-    RepeatedBinds(Vec<RepeatedBind>),
+    RepeatedBinds(RepeatedBind),
 
-    PeekBinds(Vec<PeekBind>),
+    PeekBinds(PeekBind),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Receipts {
+    pub receipts: Vec<Receipt>,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]

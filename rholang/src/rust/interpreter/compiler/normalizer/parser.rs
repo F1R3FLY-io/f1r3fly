@@ -5,8 +5,8 @@ use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
-        Proc, ProcList, Quotable, Quote, Receipt, RepeatedBind, SendRule, SendType, SimpleType,
-        Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
+        Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendRule, SendType,
+        SimpleType, Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
     errors::InterpreterError,
 };
@@ -317,13 +317,21 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "choice" => {
             let branches_node = get_child_by_field_name(node, "branches")?;
+            // println!("\nbranches_node: {:?}", branches_node.to_sexp());
             let mut branches = Vec::new();
 
-            for child in branches_node.named_children(&mut branches_node.walk()) {
-                let pattern_node = get_child_by_field_name(&child, "pattern")?;
-                let linear_binds = parse_linear_binds(&pattern_node, source)?;
+            for branch_node in branches_node.named_children(&mut branches_node.walk()) {
+                // println!("\nbranch_node: {:?}", branch_node.to_sexp());
 
-                let proc_node = get_child_by_field_name(&child, "proc")?;
+                let mut linear_binds = Vec::new();
+                for pattern_node in branch_node.named_children(&mut branch_node.walk()) {
+                    // println!("\npattern_node: {:?}", pattern_node.to_sexp());
+                    if pattern_node.kind() == "linear_bind" {
+                        linear_binds.push(parse_linear_bind(&pattern_node, source)?);
+                    }
+                }
+
+                let proc_node = get_child_by_field_name(&branch_node, "proc")?;
                 let proc = match proc_node.kind() {
                     "send" => Either::Left(parse_send(&proc_node, source)?),
 
@@ -345,8 +353,8 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 branches.push(Branch {
                     pattern: linear_binds,
                     proc,
-                    line_num: child.start_position().row,
-                    col_num: child.start_position().column,
+                    line_num: branch_node.start_position().row,
+                    col_num: branch_node.start_position().column,
                 });
             }
 
@@ -377,14 +385,74 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         }
 
         "input" => {
-            let formals_node = get_child_by_field_name(node, "formals")?;
-            let formals_proc = parse_receipts(&formals_node, source)?;
+            fn parse_receipt(
+                receipt_node: &Node,
+                source: &str,
+            ) -> Result<Receipt, InterpreterError> {
+                // Check which '_receipt' we are dealing with and then iterate through
+                match receipt_node.kind() {
+                    "linear_bind" => Ok(Receipt::LinearBinds(parse_linear_bind(
+                        &receipt_node,
+                        source,
+                    )?)),
+
+                    "repeated_bind" => {
+                        let names_node = get_child_by_field_name(&receipt_node, "names")?;
+                        let names_proc = parse_names(&names_node, source)?;
+
+                        let input_node = get_child_by_field_name(&receipt_node, "input")?;
+                        let input_proc = parse_name(&input_node, source)?;
+
+                        Ok(Receipt::RepeatedBinds(RepeatedBind {
+                            names: names_proc,
+                            input: input_proc,
+                            line_num: receipt_node.start_position().row,
+                            col_num: receipt_node.start_position().column,
+                        }))
+                    }
+
+                    "peek_bind" => {
+                        let names_node = get_child_by_field_name(&receipt_node, "names")?;
+                        let names_proc = parse_names(&names_node, source)?;
+
+                        let input_node = get_child_by_field_name(&receipt_node, "input")?;
+                        let input_proc = parse_name(&input_node, source)?;
+
+                        Ok(Receipt::PeekBinds(PeekBind {
+                            names: names_proc,
+                            input: input_proc,
+                            line_num: receipt_node.start_position().row,
+                            col_num: receipt_node.start_position().column,
+                        }))
+                    }
+
+                    _ => {
+                        return Err(InterpreterError::ParserError(format!(
+                            "Unexpected choice node kind: {:?} of _receipt",
+                            receipt_node.kind(),
+                        )))
+                    }
+                }
+            }
+
+            let receipts_node = get_child_by_field_name(node, "formals")?;
+            // println!("\nreceipts_node: {:?}", receipts_node.to_sexp());
+            let mut receipts = Vec::new();
+
+            for child in receipts_node.named_children(&mut receipts_node.walk()) {
+                // println!("\nchild_node: {:?}", child.to_sexp());
+                receipts.push(parse_receipt(&child, source)?);
+            }
 
             let proc_node = get_child_by_field_name(node, "proc")?;
             let proc = parse_block(&proc_node, source)?;
 
             Ok(Proc::Input {
-                formals: formals_proc,
+                formals: Receipts {
+                    receipts,
+                    line_num: receipts_node.start_position().row,
+                    col_num: receipts_node.start_position().column,
+                },
                 proc: Box::new(proc),
                 line_num,
                 col_num,
@@ -1092,44 +1160,76 @@ fn parse_send_type(node: &Node) -> Result<SendType, InterpreterError> {
     }
 }
 
-fn parse_linear_binds(node: &Node, source: &str) -> Result<Vec<LinearBind>, InterpreterError> {
-    let mut linear_binds = Vec::new();
+fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, InterpreterError> {
+    let names_node = get_child_by_field_name(&node, "names")?;
+    let names_proc = parse_names(&names_node, source)?;
 
-    for linear_bind_node in node.named_children(&mut node.walk()) {
-        let names_node = get_child_by_field_name(&linear_bind_node, "names")?;
-        let names_proc = parse_names(&names_node, source)?;
+    let input_node = get_child_by_field_name(&node, "input")?;
+    let input_node_line_num = input_node.start_position().row;
+    let input_node_line_col = input_node.start_position().column;
 
-        let input_node = get_child_by_field_name(&linear_bind_node, "input")?;
-        let input_proc = parse_source(&input_node, source)?;
+    let input_proc = match input_node.kind() {
+        "simple_source" => Source::Simple {
+            name: {
+                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
+                    "Expected name node in simple_source at index 0".to_string(),
+                ))?;
+                parse_name(&name_node, source)?
+            },
+            line_num: input_node_line_num,
+            col_num: input_node_line_col,
+        },
 
-        linear_binds.push(LinearBind {
-            names: names_proc,
-            input: input_proc,
-            line_num: linear_bind_node.start_position().row,
-            col_num: linear_bind_node.start_position().column,
-        });
-    }
+        "receive_send_source" => Source::ReceiveSend {
+            name: {
+                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
+                    "Expected name node in receive_send_source at index 0".to_string(),
+                ))?;
+                parse_name(&name_node, source)?
+            },
+            line_num: input_node_line_num,
+            col_num: input_node_line_col,
+        },
 
-    Ok(linear_binds)
+        "send_receive_source" => Source::SendReceive {
+            name: {
+                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
+                    "Expected name node in send_receive_source at index 0".to_string(),
+                ))?;
+                parse_name(&name_node, source)?
+            },
+            inputs: {
+                let inputs_node = get_child_by_field_name(&input_node, "inputs")?;
+                parse_proc_list(&inputs_node, source)?
+            },
+            line_num: input_node_line_num,
+            col_num: input_node_line_col,
+        },
+
+        _ => {
+            return Err(InterpreterError::ParserError(format!(
+                "Unexpected choice node kind: {:?} of _source",
+                input_node.kind(),
+            )))
+        }
+    };
+
+    Ok(LinearBind {
+        names: names_proc,
+        input: input_proc,
+        line_num: node.start_position().row,
+        col_num: node.start_position().column,
+    })
 }
 
 fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
     let mut names = Vec::new();
-    let mut cursor = node.walk();
 
-    if cursor.goto_first_child() {
-        loop {
-            let current_node = cursor.node();
-            if current_node.kind() == "name" {
-                names.push(parse_name(&current_node, source)?);
-            } else if current_node.kind() == "," {
-                continue;
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
+    for child in node.named_children(&mut node.walk()) {
+        if child.kind() == "cont" {
+            continue;
         }
+        names.push(parse_name(&child, source)?);
     }
 
     let name_remainder = match node.child_by_field_name("cont") {
@@ -1143,160 +1243,6 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
-}
-
-fn parse_source(node: &Node, source: &str) -> Result<Source, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "simple_source" => Ok(Source::Simple {
-            name: parse_name(node, source)?,
-            line_num,
-            col_num,
-        }),
-
-        "receive_send_source" => Ok(Source::ReceiveSend {
-            name: {
-                let name_node = node
-                    .child(0)
-                    .filter(|n| n.kind() == "name")
-                    .ok_or_else(|| {
-                        InterpreterError::ParserError(
-                            "Expected a name node in receive_send_source at index 0".to_string(),
-                        )
-                    })?;
-                parse_name(&name_node, source)?
-            },
-            line_num,
-            col_num,
-        }),
-
-        "send_receive_source" => Ok(Source::SendReceive {
-            name: {
-                let name_node = node
-                    .child(0)
-                    .filter(|n| n.kind() == "name")
-                    .ok_or_else(|| {
-                        InterpreterError::ParserError(
-                            "Expected a name node in send_receive_source at index 0".to_string(),
-                        )
-                    })?;
-                parse_name(&name_node, source)?
-            },
-            inputs: {
-                let inputs_node = get_child_by_field_name(node, "inputs")?;
-                parse_proc_list(&inputs_node, source)?
-            },
-            line_num,
-            col_num,
-        }),
-
-        _ => {
-            return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of _source",
-                node.kind(),
-            )))
-        }
-    }
-}
-
-fn parse_receipts(node: &Node, source: &str) -> Result<Vec<Receipt>, InterpreterError> {
-    let mut receipts = Vec::new();
-    let mut cursor = node.walk();
-
-    if cursor.goto_first_child() {
-        loop {
-            let current_node = cursor.node();
-            if current_node.kind() == ";" {
-                continue;
-            }
-            receipts.push(parse_receipt(&current_node, source)?);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    Ok(receipts)
-}
-
-fn parse_receipt(node: &Node, source: &str) -> Result<Receipt, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-    let mut cursor = node.walk();
-
-    // Check which 'conc1' we are dealing with and then loop through
-    match node.kind() {
-        "linear_bind" => Ok(Receipt::LinearBinds(parse_linear_binds(node, source)?)),
-
-        "repeated_bind" => {
-            let mut repeated_bindings = Vec::new();
-            loop {
-                let current_node = cursor.node();
-                match current_node.kind() {
-                    "repeated_bind" => {
-                        let names_node = get_child_by_field_name(&current_node, "names")?;
-                        let names_proc = parse_names(&names_node, source)?;
-
-                        let input_node = get_child_by_field_name(&current_node, "input")?;
-                        let input_proc = parse_name(&input_node, source)?;
-
-                        repeated_bindings.push(RepeatedBind {
-                            names: names_proc,
-                            input: input_proc,
-                            line_num,
-                            col_num,
-                        });
-                    }
-                    "&" => continue,
-                    _ => break,
-                }
-
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
-            }
-
-            Ok(Receipt::RepeatedBinds(repeated_bindings))
-        }
-
-        "peek_bind" => {
-            let mut peek_binds = Vec::new();
-            loop {
-                let current_node = cursor.node();
-                match current_node.kind() {
-                    "peek_bind" => {
-                        let names_node = get_child_by_field_name(&current_node, "names")?;
-                        let names_proc = parse_names(&names_node, source)?;
-
-                        let input_node = get_child_by_field_name(&current_node, "input")?;
-                        let input_proc = parse_name(&input_node, source)?;
-
-                        peek_binds.push(PeekBind {
-                            names: names_proc,
-                            input: input_proc,
-                            line_num,
-                            col_num,
-                        });
-                    }
-                    "&" => continue,
-                    _ => break,
-                }
-
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
-            }
-
-            Ok(Receipt::PeekBinds(peek_binds))
-        }
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _receipt",
-            node.kind(),
-        ))),
-    }
 }
 
 fn parse_left_and_right_nodes(node: &Node, source: &str) -> Result<(Proc, Proc), InterpreterError> {
