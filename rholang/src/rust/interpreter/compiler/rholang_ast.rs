@@ -502,14 +502,6 @@ pub struct SendRule {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LinearBind {
-    pub names: Names,
-    pub input: Source,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct Names {
     pub names: Vec<Name>,
     pub cont: Option<Box<Proc>>,
@@ -540,29 +532,36 @@ pub enum Source {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Receipt {
-    pub bindings: Vec<ReceiptBindings>,
+pub enum Receipt {
+    LinearBinds(Vec<LinearBind>),
+
+    RepeatedBinds(Vec<RepeatedBind>),
+
+    PeekBinds(Vec<PeekBind>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct LinearBind {
+    pub names: Names,
+    pub input: Source,
     pub line_num: usize,
     pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ReceiptBindings {
-    LinearBind(LinearBind),
+pub struct RepeatedBind {
+    pub names: Names,
+    pub input: Name,
+    pub line_num: usize,
+    pub col_num: usize,
+}
 
-    RepeatedBind {
-        names: Names,
-        input: Name,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    PeekBind {
-        names: Names,
-        input: Name,
-        line_num: usize,
-        col_num: usize,
-    },
+#[derive(Debug, PartialEq, Clone)]
+pub struct PeekBind {
+    pub names: Names,
+    pub input: Name,
+    pub line_num: usize,
+    pub col_num: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -4,8 +4,8 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
-        Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, Proc,
-        ProcList, Quotable, Quote, Receipt, ReceiptBindings, SendRule, SendType, SimpleType,
+        Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
+        Proc, ProcList, Quotable, Quote, Receipt, RepeatedBind, SendRule, SendType, SimpleType,
         Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
     errors::InterpreterError,
@@ -76,32 +76,40 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let messages_proc = parse_proc_list(&messages_node, source)?;
 
             let cont: SyncSendCont = {
-                let cont_node = get_child_by_field_name(node, "cont")?;
-                match cont_node.kind() {
-                    "empty_cont" => SyncSendCont::Empty {
-                        line_num: cont_node.start_position().row,
-                        col_num: cont_node.start_position().column,
-                    },
+                let sync_send_cont_node = get_child_by_field_name(node, "cont")?;
+                match sync_send_cont_node.child(0) {
+                    Some(choice_node) => match choice_node.kind() {
+                        "empty_cont" => SyncSendCont::Empty {
+                            line_num: choice_node.start_position().row,
+                            col_num: choice_node.start_position().column,
+                        },
 
-                    "non_empty_cont" => {
-                        let proc_node = match cont_node.child(1) {
-                            Some(_proc_node) => Ok(_proc_node),
-                            None => Err(InterpreterError::ParserError(
-                                "Expected a _proc node in non_empty_cont at index 1".to_string(),
-                            )),
-                        }?;
+                        "non_empty_cont" => {
+                            let proc_node = match choice_node.child(1) {
+                                Some(_proc_node) => Ok(_proc_node),
+                                None => Err(InterpreterError::ParserError(
+                                    "Expected a _proc node in non_empty_cont at index 1"
+                                        .to_string(),
+                                )),
+                            }?;
 
-                        SyncSendCont::NonEmpty {
-                            proc: Box::new(parse_proc(&proc_node, source)?),
-                            line_num: cont_node.start_position().row,
-                            col_num: cont_node.start_position().column,
+                            SyncSendCont::NonEmpty {
+                                proc: Box::new(parse_proc(&proc_node, source)?),
+                                line_num: choice_node.start_position().row,
+                                col_num: choice_node.start_position().column,
+                            }
                         }
-                    }
 
-                    _ => {
+                        _ => {
+                            return Err(InterpreterError::ParserError(format!(
+                                "Unexpected choice node kind: {:?} of sync_send_cont",
+                                choice_node.kind(),
+                            )))
+                        }
+                    },
+                    None => {
                         return Err(InterpreterError::ParserError(format!(
-                            "Unexpected choice node kind: {:?} of sync_send_cont",
-                            node.kind(),
+                            "No child choice node at index 0 for sync_send_cont",
                         )))
                     }
                 }
@@ -118,10 +126,41 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "new" => {
             let decls_node = get_child_by_field_name(node, "decls")?;
-            let decls_proc = parse_decls(&decls_node, source)?;
+            let mut name_decls = Vec::new();
+
+            for child in decls_node.named_children(&mut decls_node.walk()) {
+                let var_node = child
+                    .child(0)
+                    .filter(|n| n.kind() == "var")
+                    .ok_or_else(|| {
+                        InterpreterError::ParserError(
+                            "Expected a var node in name_decl at index 0".to_string(),
+                        )
+                    })?;
+                let var_proc = parse_var(&var_node, source)?;
+
+                let uri = match child.child_by_field_name("uri") {
+                    Some(uri_literal_node) => Some(parse_uri_literal(&uri_literal_node, source)?),
+                    None => None,
+                };
+
+                name_decls.push(NameDecl {
+                    var: var_proc,
+                    uri,
+                    line_num: child.start_position().row,
+                    col_num: child.start_position().column,
+                });
+            }
+
+            let decls_proc = Decls {
+                decls: name_decls,
+                line_num: decls_node.start_position().row,
+                col_num: decls_node.start_position().column,
+            };
 
             let proc_node = get_child_by_field_name(node, "proc")?;
             let proc = parse_proc(&proc_node, source)?;
+
             Ok(Proc::New {
                 decls: decls_proc,
                 proc: Box::new(proc),
@@ -161,33 +200,40 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         }
 
         "let" => {
-            let decls_node = get_child_by_field_name(node, "decls")?;
-            let mut decls = Vec::new();
-            let mut cursor = decls_node.walk();
-            cursor.goto_first_child(); // 'semiSep1' and `conc1` ensures there is at least one child
+            fn parse_decls(node: &Node, source: &str) -> Result<Vec<Decl>, InterpreterError> {
+                let mut decls = Vec::new();
 
-            loop {
-                let current_node = cursor.node();
-                if current_node.kind() == "decl" {
-                    decls.push(parse_decl(&current_node, source)?);
+                for child in node.named_children(&mut node.walk()) {
+                    let names_node = get_child_by_field_name(&child, "names")?;
+                    let names_proc = parse_names(&names_node, source)?;
+
+                    let procs_node = get_child_by_field_name(&child, "procs")?;
+                    let procs = parse_comma_sep_procs(&procs_node, source)?;
+
+                    decls.push(Decl {
+                        names: names_proc,
+                        procs,
+                        line_num: child.start_position().row,
+                        col_num: child.start_position().column,
+                    });
                 }
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+
+                Ok(decls)
             }
 
+            let decls_node = get_child_by_field_name(node, "decls")?;
             let decls_row = decls_node.start_position().row;
             let decls_col = decls_node.start_position().column;
 
             let decls_proc = match decls_node.kind() {
                 "linear_decls" => Ok(DeclsChoice::LinearDecls {
-                    decls,
+                    decls: parse_decls(&decls_node, source)?,
                     line_num: decls_row,
                     col_num: decls_col,
                 }),
 
                 "conc_decls" => Ok(DeclsChoice::ConcDecls {
-                    decls,
+                    decls: parse_decls(&decls_node, source)?,
                     line_num: decls_row,
                     col_num: decls_col,
                 }),
@@ -211,7 +257,22 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "bundle" => {
             let bundle_node = get_child_by_field_name(node, "bundle_type")?;
-            let bundle = parse_bundle_choice(&bundle_node)?;
+            let line_num = node.start_position().row;
+            let col_num = node.start_position().column;
+
+            let bundle = match bundle_node.kind() {
+                "bundle_write" => Bundle::BundleWrite { line_num, col_num },
+                "bundle_read" => Bundle::BundleRead { line_num, col_num },
+                "bundle_equiv" => Bundle::BundleEquiv { line_num, col_num },
+                "bundle_read_write" => Bundle::BundleReadWrite { line_num, col_num },
+
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Unexpected choice node kind: {:?} of _bundle",
+                        bundle_node.kind(),
+                    )))
+                }
+            };
 
             let proc_node = get_child_by_field_name(node, "proc")?;
             let proc = parse_block(&proc_node, source)?;
@@ -230,17 +291,20 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
             let cases_node = get_child_by_field_name(node, "cases")?;
             let mut cases = Vec::new();
-            let mut cursor = cases_node.walk();
-            cursor.goto_first_child(); // 'repeat1' ensures there is at least one child
 
-            loop {
-                let current_node = cursor.node();
-                if current_node.kind() == "case" {
-                    cases.push(parse_case(&current_node, source)?);
-                }
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+            for child in cases_node.named_children(&mut cases_node.walk()) {
+                let pattern_node = get_child_by_field_name(&child, "pattern")?;
+                let pattern_proc = parse_proc(&pattern_node, source)?;
+
+                let proc_node = get_child_by_field_name(&child, "proc")?;
+                let proc = parse_proc(&proc_node, source)?;
+
+                cases.push(Case {
+                    pattern: pattern_proc,
+                    proc,
+                    line_num: child.start_position().row,
+                    col_num: child.start_position().column,
+                });
             }
 
             Ok(Proc::Match {
@@ -254,17 +318,36 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         "choice" => {
             let branches_node = get_child_by_field_name(node, "branches")?;
             let mut branches = Vec::new();
-            let mut cursor = branches_node.walk();
-            cursor.goto_first_child(); // 'repeat1' ensures there is at least one child
 
-            loop {
-                let current_node = cursor.node();
-                if current_node.kind() == "branch" {
-                    branches.push(parse_branch(&current_node, source)?);
-                }
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+            for child in branches_node.named_children(&mut branches_node.walk()) {
+                let pattern_node = get_child_by_field_name(&child, "pattern")?;
+                let linear_binds = parse_linear_binds(&pattern_node, source)?;
+
+                let proc_node = get_child_by_field_name(&child, "proc")?;
+                let proc = match proc_node.kind() {
+                    "send" => Either::Left(parse_send(&proc_node, source)?),
+
+                    _ => {
+                        let proc_result = parse_proc(&proc_node, source);
+                        match proc_result {
+                            Ok(proc) => Either::Right(proc),
+                            Err(proc_err) => {
+                                return Err(InterpreterError::ParserError(format!(
+                                    "{:?}. Unexpected choice node kind: {:?} of _proc in branch",
+                                    proc_err,
+                                    proc_node.kind(),
+                                )))
+                            }
+                        }
+                    }
+                };
+
+                branches.push(Branch {
+                    pattern: linear_binds,
+                    proc,
+                    line_num: child.start_position().row,
+                    col_num: child.start_position().column,
+                });
             }
 
             Ok(Proc::Choice {
@@ -825,6 +908,19 @@ fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, Interprete
 }
 
 fn parse_collection(node: &Node, source: &str) -> Result<Collection, InterpreterError> {
+    fn parse_comma_sep(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
+        // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
+
+        let mut procs = Vec::new();
+        for child in node.named_children(&mut node.walk()) {
+            if child.kind() == "cont" {
+                continue;
+            }
+            procs.push(parse_proc(&child, source)?);
+        }
+        Ok(procs)
+    }
+
     let line_num = node.start_position().row;
     let col_num = node.start_position().column;
 
@@ -833,7 +929,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
     let current_node = cursor.node();
     match current_node.kind() {
         "list" => Ok(Collection::List {
-            elements: { parse_comma_sep_procs(&current_node, source)? },
+            elements: { parse_comma_sep(&current_node, source)? },
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
@@ -847,7 +943,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
         }),
 
         "set" => Ok(Collection::Set {
-            elements: { parse_comma_sep_procs(&current_node, source)? },
+            elements: { parse_comma_sep(&current_node, source)? },
             cont: {
                 match node.child_by_field_name("cont") {
                     Some(proc_remainder_node) => {
@@ -888,7 +984,7 @@ fn parse_collection(node: &Node, source: &str) -> Result<Collection, Interpreter
         }),
 
         "tuple" => Ok(Collection::Tuple {
-            elements: { parse_comma_sep_procs(&current_node, source)? },
+            elements: { parse_comma_sep(&current_node, source)? },
             line_num,
             col_num,
         }),
@@ -905,9 +1001,6 @@ fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, Interpr
 
     let mut procs = Vec::new();
     for child in node.named_children(&mut node.walk()) {
-        if child.kind() == "cont" {
-            continue;
-        }
         procs.push(parse_proc(&child, source)?);
     }
     Ok(procs)
@@ -962,143 +1055,6 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
     })
 }
 
-fn parse_decls(node: &Node, source: &str) -> Result<Decls, InterpreterError> {
-    let mut decls = Vec::new();
-    let mut cursor = node.walk();
-
-    if cursor.goto_first_child() {
-        loop {
-            let current_node = cursor.node();
-            if current_node.kind() == "," {
-                continue;
-            }
-            decls.push(parse_name_decl(&current_node, source)?);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    Ok(Decls {
-        decls,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_name_decl(node: &Node, source: &str) -> Result<NameDecl, InterpreterError> {
-    let var_node = node.child(0).filter(|n| n.kind() == "var").ok_or_else(|| {
-        InterpreterError::ParserError("Expected a var node in name_decl at index 0".to_string())
-    })?;
-    let var_proc = parse_var(&var_node, source)?;
-
-    let uri = match node.child_by_field_name("uri") {
-        Some(uri_literal_node) => Some(parse_uri_literal(&uri_literal_node, source)?),
-        None => None,
-    };
-
-    Ok(NameDecl {
-        var: var_proc,
-        uri,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_decl(node: &Node, source: &str) -> Result<Decl, InterpreterError> {
-    let names_node = get_child_by_field_name(node, "names")?;
-    let names_proc = parse_names(&names_node, source)?;
-
-    let procs_node = get_child_by_field_name(node, "procs")?;
-    let procs = parse_comma_sep_procs(&procs_node, source)?;
-
-    Ok(Decl {
-        names: names_proc,
-        procs,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_bundle_choice(node: &Node) -> Result<Bundle, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "bundle_write" => Ok(Bundle::BundleWrite { line_num, col_num }),
-
-        "bundle_read" => Ok(Bundle::BundleRead { line_num, col_num }),
-
-        "bundle_equiv" => Ok(Bundle::BundleEquiv { line_num, col_num }),
-
-        "bundle_read_write" => Ok(Bundle::BundleReadWrite { line_num, col_num }),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of _bundle",
-            node.kind(),
-        ))),
-    }
-}
-
-fn parse_case(node: &Node, source: &str) -> Result<Case, InterpreterError> {
-    let pattern_node = get_child_by_field_name(node, "pattern")?;
-    let pattern_proc = parse_proc(&pattern_node, source)?;
-
-    let proc_node = get_child_by_field_name(node, "proc")?;
-    let proc = parse_proc(&proc_node, source)?;
-
-    Ok(Case {
-        pattern: pattern_proc,
-        proc,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_branch(node: &Node, source: &str) -> Result<Branch, InterpreterError> {
-    let pattern_node = get_child_by_field_name(node, "pattern")?;
-    let mut pattern_proc = Vec::new();
-    let mut cursor = pattern_node.walk();
-
-    if cursor.goto_first_child() {
-        loop {
-            let current_node = cursor.node();
-            if current_node.kind() == "linear_bind" {
-                pattern_proc.push(parse_linear_bind(&current_node, source)?);
-            }
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    let proc_node = get_child_by_field_name(node, "proc")?;
-    let proc = match proc_node.kind() {
-        "send" => Either::Left(parse_send(&proc_node, source)?),
-
-        _ => {
-            let proc_result = parse_proc(node, source);
-            match proc_result {
-                Ok(proc) => Either::Right(proc),
-                Err(proc_err) => {
-                    return Err(InterpreterError::ParserError(format!(
-                        "{:?}. Unexpected choice node kind: {:?} of _proc in branch",
-                        proc_err,
-                        node.kind(),
-                    )))
-                }
-            }
-        }
-    };
-
-    Ok(Branch {
-        pattern: pattern_proc,
-        proc,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
 fn parse_send(node: &Node, source: &str) -> Result<SendRule, InterpreterError> {
     let name_node = get_child_by_field_name(node, "name")?;
     let name_proc = parse_name(&name_node, source)?;
@@ -1136,19 +1092,25 @@ fn parse_send_type(node: &Node) -> Result<SendType, InterpreterError> {
     }
 }
 
-fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, InterpreterError> {
-    let names_node = get_child_by_field_name(node, "names")?;
-    let names_proc = parse_names(&names_node, source)?;
+fn parse_linear_binds(node: &Node, source: &str) -> Result<Vec<LinearBind>, InterpreterError> {
+    let mut linear_binds = Vec::new();
 
-    let input_node = get_child_by_field_name(node, "input")?;
-    let input_proc = parse_source(&input_node, source)?;
+    for linear_bind_node in node.named_children(&mut node.walk()) {
+        let names_node = get_child_by_field_name(&linear_bind_node, "names")?;
+        let names_proc = parse_names(&names_node, source)?;
 
-    Ok(LinearBind {
-        names: names_proc,
-        input: input_proc,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
+        let input_node = get_child_by_field_name(&linear_bind_node, "input")?;
+        let input_proc = parse_source(&input_node, source)?;
+
+        linear_binds.push(LinearBind {
+            names: names_proc,
+            input: input_proc,
+            line_num: linear_bind_node.start_position().row,
+            col_num: linear_bind_node.start_position().column,
+        });
+    }
+
+    Ok(linear_binds)
 }
 
 fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
@@ -1262,93 +1224,79 @@ fn parse_receipts(node: &Node, source: &str) -> Result<Vec<Receipt>, Interpreter
 fn parse_receipt(node: &Node, source: &str) -> Result<Receipt, InterpreterError> {
     let line_num = node.start_position().row;
     let col_num = node.start_position().column;
-
-    let mut bindings = Vec::new();
     let mut cursor = node.walk();
 
     // Check which 'conc1' we are dealing with and then loop through
     match node.kind() {
-        "linear_bind" => loop {
-            let current_node = cursor.node();
-            match current_node.kind() {
-                "linear_bind" => bindings.push(ReceiptBindings::LinearBind(parse_linear_bind(
-                    &current_node,
-                    source,
-                )?)),
-                "&" => continue,
-                _ => break,
-            }
+        "linear_bind" => Ok(Receipt::LinearBinds(parse_linear_binds(node, source)?)),
 
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        },
+        "repeated_bind" => {
+            let mut repeated_bindings = Vec::new();
+            loop {
+                let current_node = cursor.node();
+                match current_node.kind() {
+                    "repeated_bind" => {
+                        let names_node = get_child_by_field_name(&current_node, "names")?;
+                        let names_proc = parse_names(&names_node, source)?;
 
-        "repeated_bind" => loop {
-            let current_node = cursor.node();
-            match current_node.kind() {
-                "repeated_bind" => {
-                    let names_node = get_child_by_field_name(&current_node, "names")?;
-                    let names_proc = parse_names(&names_node, source)?;
+                        let input_node = get_child_by_field_name(&current_node, "input")?;
+                        let input_proc = parse_name(&input_node, source)?;
 
-                    let input_node = get_child_by_field_name(&current_node, "input")?;
-                    let input_proc = parse_name(&input_node, source)?;
-
-                    bindings.push(ReceiptBindings::RepeatedBind {
-                        names: names_proc,
-                        input: input_proc,
-                        line_num,
-                        col_num,
-                    });
+                        repeated_bindings.push(RepeatedBind {
+                            names: names_proc,
+                            input: input_proc,
+                            line_num,
+                            col_num,
+                        });
+                    }
+                    "&" => continue,
+                    _ => break,
                 }
-                "&" => continue,
-                _ => break,
-            }
 
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        },
-
-        "peek_bind" => loop {
-            let current_node = cursor.node();
-            match current_node.kind() {
-                "peek_bind" => {
-                    let names_node = get_child_by_field_name(&current_node, "names")?;
-                    let names_proc = parse_names(&names_node, source)?;
-
-                    let input_node = get_child_by_field_name(&current_node, "input")?;
-                    let input_proc = parse_name(&input_node, source)?;
-
-                    bindings.push(ReceiptBindings::PeekBind {
-                        names: names_proc,
-                        input: input_proc,
-                        line_num,
-                        col_num,
-                    });
+                if !cursor.goto_next_sibling() {
+                    break;
                 }
-                "&" => continue,
-                _ => break,
             }
 
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        },
-
-        _ => {
-            return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of _receipt",
-                node.kind(),
-            )))
+            Ok(Receipt::RepeatedBinds(repeated_bindings))
         }
-    }
 
-    Ok(Receipt {
-        bindings,
-        line_num,
-        col_num,
-    })
+        "peek_bind" => {
+            let mut peek_binds = Vec::new();
+            loop {
+                let current_node = cursor.node();
+                match current_node.kind() {
+                    "peek_bind" => {
+                        let names_node = get_child_by_field_name(&current_node, "names")?;
+                        let names_proc = parse_names(&names_node, source)?;
+
+                        let input_node = get_child_by_field_name(&current_node, "input")?;
+                        let input_proc = parse_name(&input_node, source)?;
+
+                        peek_binds.push(PeekBind {
+                            names: names_proc,
+                            input: input_proc,
+                            line_num,
+                            col_num,
+                        });
+                    }
+                    "&" => continue,
+                    _ => break,
+                }
+
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+
+            Ok(Receipt::PeekBinds(peek_binds))
+        }
+
+        _ => Err(InterpreterError::ParserError(format!(
+            "Unexpected choice node kind: {:?} of _receipt",
+            node.kind(),
+        ))),
+    }
 }
 
 fn parse_left_and_right_nodes(node: &Node, source: &str) -> Result<(Proc, Proc), InterpreterError> {
