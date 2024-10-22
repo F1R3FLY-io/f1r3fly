@@ -1,11 +1,10 @@
 use rholang::rust::interpreter::compiler::{
     normalizer::parser::parse_rholang_code_to_proc,
     rholang_ast::{
-        Block, Branch, Collection, LinearBind, Name, Names, Proc, ProcList, Receipt, Receipts,
-        SendType, Source, UriLiteral, Var,
+        Block, Branch, Collection, KeyValuePair, LinearBind, Name, Names, Proc, ProcList, Receipt,
+        Receipts, SendType, Source, UriLiteral, Var,
     },
 };
-use rspace_plus_plus::rspace::history::Either;
 
 // println!("\n{:#?}", result);
 
@@ -71,14 +70,14 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                     col_num: 21,
                 },
             ],
-            proc: Either::Right(Proc::Block(Box::new(Block {
+            proc: Proc::Block(Box::new(Block {
                 proc: Proc::Nil {
                     line_num: 2,
                     col_num: 37,
                 },
                 line_num: 2,
                 col_num: 35,
-            }))),
+            })),
             line_num: 2,
             col_num: 8,
         },
@@ -106,14 +105,14 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                 line_num: 3,
                 col_num: 8,
             }],
-            proc: Either::Right(Proc::Block(Box::new(Block {
+            proc: Proc::Block(Box::new(Block {
                 proc: Proc::Nil {
                     line_num: 3,
                     col_num: 24,
                 },
                 line_num: 3,
                 col_num: 22,
-            }))),
+            })),
             line_num: 3,
             col_num: 8,
         },
@@ -124,6 +123,148 @@ fn parse_rholang_code_to_proc_should_parse_select() {
         line_num: 1,
         col_num: 6,
     };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_handle_list() {
+    let input_code = r#"[1, "two", true, `rho:uri`, Nil]"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Collection(Collection::List {
+        elements: vec![
+            Proc::LongLiteral {
+                value: 1,
+                line_num: 0,
+                col_num: 1,
+            },
+            Proc::StringLiteral {
+                value: "two".to_string(),
+                line_num: 0,
+                col_num: 4,
+            },
+            Proc::BoolLiteral {
+                value: true,
+                line_num: 0,
+                col_num: 11,
+            },
+            Proc::UriLiteral(UriLiteral {
+                value: "`rho:uri`".to_string(),
+                line_num: 0,
+                col_num: 17,
+            }),
+            Proc::Nil {
+                line_num: 0,
+                col_num: 28,
+            },
+        ],
+        cont: None,
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_handle_set() {
+    let input_code = r#"Set(true, Nil)"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Collection(Collection::Set {
+        elements: vec![
+            Proc::BoolLiteral {
+                value: true,
+                line_num: 0,
+                col_num: 4,
+            },
+            Proc::Nil {
+                line_num: 0,
+                col_num: 10,
+            },
+        ],
+        cont: None,
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_handle_map() {
+    let input_code = r#"{ "integer": 1, "string": "two" }"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Collection(Collection::Map {
+        pairs: vec![
+            KeyValuePair {
+                key: Proc::StringLiteral {
+                    value: "integer".to_string(),
+                    line_num: 0,
+                    col_num: 2,
+                },
+                value: Proc::LongLiteral {
+                    value: 1,
+                    line_num: 0,
+                    col_num: 13,
+                },
+                line_num: 0,
+                col_num: 2,
+            },
+            KeyValuePair {
+                key: Proc::StringLiteral {
+                    value: "string".to_string(),
+                    line_num: 0,
+                    col_num: 16,
+                },
+                value: Proc::StringLiteral {
+                    value: "two".to_string(),
+                    line_num: 0,
+                    col_num: 26,
+                },
+                line_num: 0,
+                col_num: 16,
+            },
+        ],
+        cont: None,
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_handle_tuple() {
+    let input_code = r#"(1, true, Nil)"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Collection(Collection::Tuple {
+        elements: vec![
+            Proc::LongLiteral {
+                value: 1,
+                line_num: 0,
+                col_num: 1,
+            },
+            Proc::BoolLiteral {
+                value: true,
+                line_num: 0,
+                col_num: 4,
+            },
+            Proc::Nil {
+                line_num: 0,
+                col_num: 10,
+            },
+        ],
+        line_num: 0,
+        col_num: 0,
+    });
 
     assert_eq!(result.unwrap(), expected_result)
 }
@@ -236,7 +377,7 @@ fn parse_rholang_code_to_proc_should_parse_simple_send() {
         }))),
         send_type: SendType::Single {
             line_num: 0,
-            col_num: 1,
+            col_num: 0,
         },
         inputs: ProcList {
             procs: vec![Proc::StringLiteral {

@@ -1,5 +1,3 @@
-use rspace_plus_plus::rspace::history::Either;
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Proc {
     Par {
@@ -487,16 +485,7 @@ pub struct Case {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Branch {
     pub pattern: Vec<LinearBind>,
-    pub proc: Either<SendRule, Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct SendRule {
-    pub name: Name,
-    pub send_type: SendType,
-    pub inputs: ProcList,
+    pub proc: Proc,
     pub line_num: usize,
     pub col_num: usize,
 }

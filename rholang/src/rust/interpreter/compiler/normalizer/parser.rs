@@ -1,12 +1,11 @@
-use rspace_plus_plus::rspace::history::Either;
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, Bundle, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
-        Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendRule, SendType,
-        SimpleType, Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
+        Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendType, SimpleType,
+        Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
     errors::InterpreterError,
 };
@@ -27,7 +26,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .expect("Error loading Rholang grammar");
 
     let tree = parser.parse(code, None).expect("Failed to parse code");
-    // println!("\nTree: {:#?}", tree.root_node().to_sexp());
+    // println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
     if root_node.kind() != "source_file" {
@@ -43,8 +42,6 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
                 .to_string(),
         )),
     }?;
-
-    // println!("\n{:?}", root_node.child(0).unwrap().kind());
 
     parse_proc(&start_node, code)
 }
@@ -332,23 +329,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 }
 
                 let proc_node = get_child_by_field_name(&branch_node, "proc")?;
-                let proc = match proc_node.kind() {
-                    "send" => Either::Left(parse_send(&proc_node, source)?),
-
-                    _ => {
-                        let proc_result = parse_proc(&proc_node, source);
-                        match proc_result {
-                            Ok(proc) => Either::Right(proc),
-                            Err(proc_err) => {
-                                return Err(InterpreterError::ParserError(format!(
-                                    "{:?}. Unexpected choice node kind: {:?} of _proc in branch",
-                                    proc_err,
-                                    proc_node.kind(),
-                                )))
-                            }
-                        }
-                    }
-                };
+                let proc = parse_proc(&proc_node, source)?;
 
                 branches.push(Branch {
                     pattern: linear_binds,
@@ -464,7 +445,18 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let name_proc = parse_name(&name_node, source)?;
 
             let send_type_node = get_child_by_field_name(node, "send_type")?;
-            let send_type_proc = parse_send_type(&send_type_node)?;
+            let send_type_proc = match send_type_node.kind() {
+                "send_single" => SendType::Single { line_num, col_num },
+
+                "send_multiple" => SendType::Multiple { line_num, col_num },
+
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Unexpected choice node kind: {:?} of send_type",
+                        node.kind(),
+                    )))
+                }
+            };
 
             let inputs_node = get_child_by_field_name(node, "inputs")?;
             let inputs_proc = parse_proc_list(&inputs_node, source)?;
@@ -729,9 +721,127 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         // _ground_expression
         "block" => Ok(Proc::Block(Box::new(parse_block(node, source)?))),
 
-        "collection" => Ok(Proc::Collection(parse_collection(node, source)?)),
+        "collection" => {
+            fn parse_comma_collection(
+                node: &Node,
+                source: &str,
+            ) -> Result<Vec<Proc>, InterpreterError> {
+                // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
 
-        "simple_type" => Ok(Proc::SimpleType(parse_simple_type(node)?)),
+                let mut procs = Vec::new();
+                for child in node.named_children(&mut node.walk()) {
+                    if child.kind() == "cont" {
+                        continue;
+                    }
+                    procs.push(parse_proc(&child, source)?);
+                }
+                Ok(procs)
+            }
+
+            let line_num = node.start_position().row;
+            let col_num = node.start_position().column;
+
+            let mut cursor = node.walk();
+            cursor.goto_first_child();
+            let current_node = cursor.node();
+            let collection = match current_node.kind() {
+                "list" => Ok(Collection::List {
+                    elements: { parse_comma_collection(&current_node, source)? },
+                    cont: {
+                        match node.child_by_field_name("cont") {
+                            Some(proc_remainder_node) => {
+                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
+                            }
+                            None => None,
+                        }
+                    },
+                    line_num,
+                    col_num,
+                }),
+
+                "set" => Ok(Collection::Set {
+                    elements: { parse_comma_collection(&current_node, source)? },
+                    cont: {
+                        match node.child_by_field_name("cont") {
+                            Some(proc_remainder_node) => {
+                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
+                            }
+                            None => None,
+                        }
+                    },
+                    line_num,
+                    col_num,
+                }),
+
+                "map" => Ok(Collection::Map {
+                    pairs: {
+                        let mut kvs = Vec::new();
+                        for child in current_node.named_children(&mut node.walk()) {
+                            if child.kind() == "cont" {
+                                continue;
+                            }
+                            let key_node = get_child_by_field_name(&child, "key")?;
+                            let key_proc = parse_proc(&key_node, source)?;
+
+                            let value_node = get_child_by_field_name(&child, "value")?;
+                            let value_proc = parse_proc(&value_node, source)?;
+
+                            kvs.push(KeyValuePair {
+                                key: key_proc,
+                                value: value_proc,
+                                line_num: child.start_position().row,
+                                col_num: child.start_position().column,
+                            });
+                        }
+
+                        kvs
+                    },
+                    cont: {
+                        match node.child_by_field_name("cont") {
+                            Some(proc_remainder_node) => {
+                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
+                            }
+                            None => None,
+                        }
+                    },
+                    line_num,
+                    col_num,
+                }),
+
+                "tuple" => Ok(Collection::Tuple {
+                    elements: { parse_comma_collection(&current_node, source)? },
+                    line_num,
+                    col_num,
+                }),
+
+                _ => Err(InterpreterError::ParserError(format!(
+                    "Unexpected choice node kind: {:?} of collection",
+                    node.kind(),
+                ))),
+            }?;
+
+            Ok(Proc::Collection(collection))
+        }
+
+        "simple_type" => match node.kind() {
+            "Bool" => Ok(Proc::SimpleType(SimpleType::Bool { line_num, col_num })),
+
+            "Int" => Ok(Proc::SimpleType(SimpleType::Int { line_num, col_num })),
+
+            "String" => Ok(Proc::SimpleType(SimpleType::String { line_num, col_num })),
+
+            "Uri" => Ok(Proc::SimpleType(SimpleType::Uri { line_num, col_num })),
+
+            "ByteArray" => Ok(Proc::SimpleType(SimpleType::ByteArray {
+                line_num,
+                col_num,
+            })),
+
+            _ => Err(InterpreterError::ParserError(format!(
+                "Unexpected choice node kind: {:?} of simple_type",
+                node.kind(),
+            ))),
+        },
 
         //_ground
         "bool_literal" => Ok(Proc::BoolLiteral {
@@ -975,95 +1085,6 @@ fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, Interprete
     })
 }
 
-fn parse_collection(node: &Node, source: &str) -> Result<Collection, InterpreterError> {
-    fn parse_comma_sep(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
-        // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
-
-        let mut procs = Vec::new();
-        for child in node.named_children(&mut node.walk()) {
-            if child.kind() == "cont" {
-                continue;
-            }
-            procs.push(parse_proc(&child, source)?);
-        }
-        Ok(procs)
-    }
-
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    let mut cursor = node.walk();
-    cursor.goto_first_child();
-    let current_node = cursor.node();
-    match current_node.kind() {
-        "list" => Ok(Collection::List {
-            elements: { parse_comma_sep(&current_node, source)? },
-            cont: {
-                match node.child_by_field_name("cont") {
-                    Some(proc_remainder_node) => {
-                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                    }
-                    None => None,
-                }
-            },
-            line_num,
-            col_num,
-        }),
-
-        "set" => Ok(Collection::Set {
-            elements: { parse_comma_sep(&current_node, source)? },
-            cont: {
-                match node.child_by_field_name("cont") {
-                    Some(proc_remainder_node) => {
-                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                    }
-                    None => None,
-                }
-            },
-            line_num,
-            col_num,
-        }),
-
-        "map" => Ok(Collection::Map {
-            pairs: {
-                let mut kvs = Vec::new();
-                let mut cursor = node.walk();
-
-                cursor.goto_first_child(); // '{'
-                for child in current_node.named_children(&mut node.walk()) {
-                    if child.kind() == "cont" {
-                        continue;
-                    }
-                    kvs.push(parse_key_value_pair(&child, source)?);
-                }
-
-                kvs
-            },
-            cont: {
-                match node.child_by_field_name("cont") {
-                    Some(proc_remainder_node) => {
-                        Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                    }
-                    None => None,
-                }
-            },
-            line_num,
-            col_num,
-        }),
-
-        "tuple" => Ok(Collection::Tuple {
-            elements: { parse_comma_sep(&current_node, source)? },
-            line_num,
-            col_num,
-        }),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of collection",
-            node.kind(),
-        ))),
-    }
-}
-
 fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
     // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
 
@@ -1072,43 +1093,6 @@ fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, Interpr
         procs.push(parse_proc(&child, source)?);
     }
     Ok(procs)
-}
-
-fn parse_key_value_pair(node: &Node, source: &str) -> Result<KeyValuePair, InterpreterError> {
-    let key_node = get_child_by_field_name(node, "key")?;
-    let key_proc = parse_proc(&key_node, source)?;
-
-    let value_node = get_child_by_field_name(node, "value")?;
-    let value_proc = parse_proc(&value_node, source)?;
-
-    Ok(KeyValuePair {
-        key: key_proc,
-        value: value_proc,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_simple_type(node: &Node) -> Result<SimpleType, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "Bool" => Ok(SimpleType::Bool { line_num, col_num }),
-
-        "Int" => Ok(SimpleType::Int { line_num, col_num }),
-
-        "String" => Ok(SimpleType::String { line_num, col_num }),
-
-        "Uri" => Ok(SimpleType::Uri { line_num, col_num }),
-
-        "ByteArray" => Ok(SimpleType::ByteArray { line_num, col_num }),
-
-        _ => Err(InterpreterError::ParserError(format!(
-            "Unexpected choice node kind: {:?} of simple_type",
-            node.kind(),
-        ))),
-    }
 }
 
 fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterError> {
@@ -1121,43 +1105,6 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
-}
-
-fn parse_send(node: &Node, source: &str) -> Result<SendRule, InterpreterError> {
-    let name_node = get_child_by_field_name(node, "name")?;
-    let name_proc = parse_name(&name_node, source)?;
-
-    let send_type_node = get_child_by_field_name(node, "send_type")?;
-    let send_type_proc = parse_send_type(&send_type_node)?;
-
-    let inputs_node = get_child_by_field_name(node, "inputs")?;
-    let inputs_proc = parse_proc_list(&inputs_node, source)?;
-
-    Ok(SendRule {
-        name: name_proc,
-        send_type: send_type_proc,
-        inputs: inputs_proc,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
-fn parse_send_type(node: &Node) -> Result<SendType, InterpreterError> {
-    let line_num = node.start_position().row;
-    let col_num = node.start_position().column;
-
-    match node.kind() {
-        "send_single" => Ok(SendType::Single { line_num, col_num }),
-
-        "send_multiple" => Ok(SendType::Multiple { line_num, col_num }),
-
-        _ => {
-            return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of send_type",
-                node.kind(),
-            )))
-        }
-    }
 }
 
 fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, InterpreterError> {
