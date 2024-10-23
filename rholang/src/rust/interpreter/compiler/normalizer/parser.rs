@@ -956,14 +956,11 @@ fn parse_var(node: &Node, source: &str) -> Result<Var, InterpreterError> {
 }
 
 fn parse_var_ref(node: &Node, source: &str) -> Result<VarRef, InterpreterError> {
-    let var_ref_kind_node = node
-        .child(0)
-        .filter(|n| n.kind() == "var_ref_kind")
-        .ok_or_else(|| {
-            InterpreterError::ParserError(
-                "Expected a var_ref_kind node in var_ref at index 0".to_string(),
-            )
-        })?;
+    let var_ref_kind_node = node.child(0).ok_or_else(|| {
+        InterpreterError::ParserError(
+            "Expected a var_ref_kind node in var_ref at index 0".to_string(),
+        )
+    })?;
 
     let var_ref_kind = match var_ref_kind_node.kind() {
         "=" => VarRefKind::Proc,
@@ -976,7 +973,7 @@ fn parse_var_ref(node: &Node, source: &str) -> Result<VarRef, InterpreterError> 
         }
     };
 
-    let var_node = node.child(1).filter(|n| n.kind() == "var").ok_or_else(|| {
+    let var_node = node.child(1).ok_or_else(|| {
         InterpreterError::ParserError("Expected a var node in var_ref at index 1".to_string())
     })?;
 
@@ -1027,12 +1024,9 @@ fn parse_quotable(node: &Node, source: &str) -> Result<Quotable, InterpreterErro
 }
 
 fn parse_eval(node: &Node, source: &str) -> Result<Eval, InterpreterError> {
-    let name_node = node
-        .child(1)
-        .filter(|n| n.kind() == "name")
-        .ok_or_else(|| {
-            InterpreterError::ParserError("Expected a name node in eval at index 1".to_string())
-        })?;
+    let name_node = node.child(1).ok_or_else(|| {
+        InterpreterError::ParserError("Expected a name node in eval at index 1".to_string())
+    })?;
 
     Ok(Eval {
         name: parse_name(&name_node, source)?,
