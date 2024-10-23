@@ -44,6 +44,7 @@ Several working examples have been included in the examples directory, and the e
 
 - To install the tree-sitter-cli, run: `cargo install tree-sitter-cli`. This is needed to generate necessary files for compiler.
 - Within rholang directory, `cargo build --profile dev -p rholang` to build `rholang` library. Outputs to `rholang/target/debug/`.
+- To regenerate tree-sitter parser, run `cargo clean` and then go to `tree-sitter` dir and run `tree-sitter generate`
 
 ### Testing Rust (within rholang directory)
 
@@ -51,6 +52,7 @@ Several working examples have been included in the examples directory, and the e
 - Run Spatial Matcher Tests: `cargo test matcher::match_test`
 - Run Substitute Tests: `cargo test --test substitute_test`
 - Run Normalize Matcher Tests: `cargo test compiler::proc_matcher_spec`
+- Run Custom Type Parser Tests: `cargo test --test parser_test`
 
 (Run specifc test case: `cargo test --test <test_file_name> -- <test_case_name>`)<br>
 (`--test-threads=1` runs them sequentially)<br>

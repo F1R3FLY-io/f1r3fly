@@ -100,15 +100,7 @@ module.exports = grammar({
         send_multiple: $ => '!!',
         _send_type: $ => choice($.send_single, $.send_multiple),
 
-        var_ref: $ => seq(
-            field('var_ref_kind', $.var_ref_kind),
-            field('var', $.var)
-        ),
-
-        var_ref_kind: $ => choice('=', '= *'),
-
         _proc_expression: $ => choice(
-            $.var_ref,
             $.or,
             $.and,
             $.matches,
@@ -125,18 +117,20 @@ module.exports = grammar({
             $.percent_percent,
             $.mult,
             $.div,
+            $.mod,
             $.not,
             $.neg,
             $.method,
-            $._parenthesized,
+            $.parenthesized,
             $.eval,
             $.quote,
             $.disjunction,
             $.conjunction,
             $.negation,
-            $._ground_expression
+            $._ground_expression,
+						$.var_ref
         ),
-        _parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
+        parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
 
         or: $ => prec.left(4, seq(field('left', $._proc), 'or', field('right', $._proc))),
         and: $ => prec.left(5, seq(field('left', $._proc), 'and', field('right', $._proc))),
@@ -177,6 +171,9 @@ module.exports = grammar({
         // process variables and names
         wildcard: $ => '_',
         _proc_var: $ => choice($.wildcard, $.var),
+
+        var_ref_kind: $ => choice('=', '=*'),
+        var_ref: $ => seq($.var_ref_kind, $.var),
 
         quotable: $ => choice(
             $.eval,

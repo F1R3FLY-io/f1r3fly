@@ -1,6 +1,6 @@
 use crate::rust::interpreter::compiler::exports::BoundContext;
 use crate::rust::interpreter::compiler::normalize::VarSort;
-use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
+use crate::rust::interpreter::compiler::rholang_ast::{VarRef as PVarRef, VarRefKind};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
 
@@ -13,7 +13,7 @@ pub fn normalize_p_var_ref(
     p: PVarRef,
     input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-    match input.bound_map_chain.find(&p.var) {
+    match input.bound_map_chain.find(&p.var.name) {
         Some((
             BoundContext {
                 index,
@@ -38,7 +38,7 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p.var,
+                    var_name: p.var.name,
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
                         row: p.line_num,
@@ -62,7 +62,7 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p.var,
+                    var_name: p.var.name,
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
                         row: p.line_num,
@@ -73,7 +73,7 @@ pub fn normalize_p_var_ref(
         },
 
         None => Err(InterpreterError::UnboundVariableRef {
-            var_name: p.var,
+            var_name: p.var.name,
             line: p.line_num,
             col: p.col_num,
         }),

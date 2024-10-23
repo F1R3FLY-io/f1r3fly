@@ -665,6 +665,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "mod"
+        },
+        {
+          "type": "SYMBOL",
           "name": "not"
         },
         {
@@ -677,7 +681,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_parenthesized"
+          "name": "parenthesized"
         },
         {
           "type": "SYMBOL",
@@ -702,10 +706,14 @@
         {
           "type": "SYMBOL",
           "name": "_ground_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "var_ref"
         }
       ]
     },
-    "_parenthesized": {
+    "parenthesized": {
       "type": "PREC",
       "value": 11,
       "content": {
@@ -1459,6 +1467,32 @@
         {
           "type": "SYMBOL",
           "name": "wildcard"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "var"
+        }
+      ]
+    },
+    "var_ref_kind": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "STRING",
+          "value": "=*"
+        }
+      ]
+    },
+    "var_ref": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "var_ref_kind"
         },
         {
           "type": "SYMBOL",
