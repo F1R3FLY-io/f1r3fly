@@ -1,13 +1,12 @@
 use rholang::rust::interpreter::compiler::{
     normalizer::parser::parse_rholang_code_to_proc,
     rholang_ast::{
-        Block, Branch, BundleType, Case, Collection, Decl, Decls, DeclsChoice, KeyValuePair,
-        LinearBind, Name, NameDecl, Names, Proc, ProcList, Quotable, Quote, Receipt, Receipts,
-        SendType, Source, SyncSendCont, UriLiteral, Var,
+        Block, Branch, BundleType, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
+        Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
+        Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendType, Source,
+        SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
 };
-
-// println!("\n{:#?}", result);
 
 #[test]
 fn parse_rholang_code_to_proc_should_parse_par() {
@@ -1062,6 +1061,152 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts_and_line
 }
 
 #[test]
+fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
+    let input_code = r#"
+     for (x <= y; a <= b) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let receipts = Receipts {
+        receipts: vec![
+            Receipt::RepeatedBinds(RepeatedBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "x".to_string(),
+                        line_num: 1,
+                        col_num: 10,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 10,
+                },
+                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 1,
+                    col_num: 15,
+                }))),
+                line_num: 1,
+                col_num: 10,
+            }),
+            Receipt::RepeatedBinds(RepeatedBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "a".to_string(),
+                        line_num: 1,
+                        col_num: 18,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 18,
+                },
+                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "b".to_string(),
+                    line_num: 1,
+                    col_num: 23,
+                }))),
+                line_num: 1,
+                col_num: 18,
+            }),
+        ],
+        line_num: 1,
+        col_num: 10,
+    };
+
+    let expected_result = Proc::Input {
+        formals: receipts,
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 26,
+        }),
+        line_num: 1,
+        col_num: 5,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
+    let input_code = r#"
+     for (x <<- y; a <<- b) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let receipts = Receipts {
+        receipts: vec![
+            Receipt::PeekBinds(PeekBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "x".to_string(),
+                        line_num: 1,
+                        col_num: 10,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 10,
+                },
+                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 1,
+                    col_num: 16,
+                }))),
+                line_num: 1,
+                col_num: 10,
+            }),
+            Receipt::PeekBinds(PeekBind {
+                names: Names {
+                    names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                        name: "a".to_string(),
+                        line_num: 1,
+                        col_num: 19,
+                    })))],
+                    cont: None,
+                    line_num: 1,
+                    col_num: 19,
+                },
+                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "b".to_string(),
+                    line_num: 1,
+                    col_num: 25,
+                }))),
+                line_num: 1,
+                col_num: 19,
+            }),
+        ],
+        line_num: 1,
+        col_num: 10,
+    };
+
+    let expected_result = Proc::Input {
+        formals: receipts,
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 28,
+        }),
+        line_num: 1,
+        col_num: 5,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
 fn parse_rholang_code_to_proc_should_parse_simple_send() {
     let input_code = r#"x!("Hello")"#;
     let result = parse_rholang_code_to_proc(&input_code);
@@ -1540,6 +1685,156 @@ fn parse_rholang_code_to_proc_should_parse_neg() {
 }
 
 #[test]
+fn parse_rholang_code_to_proc_should_parse_method() {
+    let input_code = r#"x.method(y, z)"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Method {
+        receiver: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        name: Var {
+            name: "method".to_string(),
+            line_num: 0,
+            col_num: 2,
+        },
+        args: ProcList {
+            procs: vec![
+                Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 0,
+                    col_num: 9,
+                }),
+                Proc::Var(Var {
+                    name: "z".to_string(),
+                    line_num: 0,
+                    col_num: 12,
+                }),
+            ],
+            line_num: 0,
+            col_num: 8,
+        },
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_parenthesized() {
+    let input_code = r#"(x + y)"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Add {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 1,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 1,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_eval() {
+    let input_code = r#"*x"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Eval(Eval {
+        name: Name::ProcVar(Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 1,
+        }))),
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_disjunction() {
+    let input_code = r#"x \/ y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Disjunction(Disjunction {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_conjunction() {
+    let input_code = r#"x /\ y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Conjunction(Conjunction {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_negation() {
+    let input_code = r#"~x"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Negation(Negation {
+        proc: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 1,
+        })),
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
 fn parse_rholang_code_to_proc_should_handle_list() {
     let input_code = r#"[1, "two", true, `rho:uri`, Nil]"#;
     let result = parse_rholang_code_to_proc(&input_code);
@@ -1870,6 +2165,859 @@ fn parse_rholang_code_to_proc_should_handle_nil() {
     let expected_result = Proc::Nil {
         line_num: 0,
         col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_var_ref() {
+    let input_code_proc = r#"=x"#;
+    let result_proc = parse_rholang_code_to_proc(&input_code_proc);
+    assert!(result_proc.is_ok());
+
+    let expected_result_proc = Proc::VarRef(VarRef {
+        var_ref_kind: VarRefKind::Proc,
+        var: Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 1,
+        },
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result_proc.unwrap(), expected_result_proc);
+
+    let input_code_name = r#"=*x"#;
+    let result_name = parse_rholang_code_to_proc(&input_code_name);
+    assert!(result_name.is_ok());
+
+    let expected_result_name = Proc::VarRef(VarRef {
+        var_ref_kind: VarRefKind::Name,
+        var: Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 2,
+        },
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result_name.unwrap(), expected_result_name);
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_ignore_line_comment() {
+    let input_code = r#"
+       // This is a line comment
+       new x in {
+         x!("Hello")
+       }
+    "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::New {
+        decls: Decls {
+            decls: vec![NameDecl {
+                var: Var {
+                    name: "x".to_string(),
+                    line_num: 2,
+                    col_num: 11,
+                },
+                uri: None,
+                line_num: 2,
+                col_num: 11,
+            }],
+            line_num: 2,
+            col_num: 11,
+        },
+        proc: Box::new(Proc::Block(Box::new(Block {
+            proc: Proc::Send {
+                name: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "x".to_string(),
+                    line_num: 3,
+                    col_num: 9,
+                }))),
+                send_type: SendType::Single {
+                    line_num: 3,
+                    col_num: 9,
+                },
+                inputs: ProcList {
+                    procs: vec![Proc::StringLiteral {
+                        value: "Hello".to_string(),
+                        line_num: 3,
+                        col_num: 12,
+                    }],
+                    line_num: 3,
+                    col_num: 11,
+                },
+                line_num: 3,
+                col_num: 9,
+            },
+            line_num: 2,
+            col_num: 16,
+        }))),
+        line_num: 2,
+        col_num: 7,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_ignore_block_comment() {
+    let input_code = r#"
+       /* This is a block comment */
+       new y in {
+         y!("World")
+       }
+    "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::New {
+        decls: Decls {
+            decls: vec![NameDecl {
+                var: Var {
+                    name: "y".to_string(),
+                    line_num: 2,
+                    col_num: 11,
+                },
+                uri: None,
+                line_num: 2,
+                col_num: 11,
+            }],
+            line_num: 2,
+            col_num: 11,
+        },
+        proc: Box::new(Proc::Block(Box::new(Block {
+            proc: Proc::Send {
+                name: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 3,
+                    col_num: 9,
+                }))),
+                send_type: SendType::Single {
+                    line_num: 3,
+                    col_num: 9,
+                },
+                inputs: ProcList {
+                    procs: vec![Proc::StringLiteral {
+                        value: "World".to_string(),
+                        line_num: 3,
+                        col_num: 12,
+                    }],
+                    line_num: 3,
+                    col_num: 11,
+                },
+                line_num: 3,
+                col_num: 9,
+            },
+            line_num: 2,
+            col_num: 16,
+        }))),
+        line_num: 2,
+        col_num: 7,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_attenuation_example() {
+    let input_code = r#"
+     new MakeGetForwarder in {
+       contract MakeGetForwarder(target, ret) = {
+         new port in {
+           ret!(*port) |
+           contract port(@method, @arg, ack) = {
+             match method == "get" { true => target!("get", arg, *ack) }
+           }
+         }
+       }
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::New {
+        decls: Decls {
+            decls: vec![NameDecl {
+                var: Var {
+                    name: "MakeGetForwarder".to_string(),
+                    line_num: 1,
+                    col_num: 9,
+                },
+                uri: None,
+                line_num: 1,
+                col_num: 9,
+            }],
+            line_num: 1,
+            col_num: 9,
+        },
+        proc: Box::new(Proc::Block(Box::new(Block {
+            proc: Proc::Contract {
+                name: Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "MakeGetForwarder".to_string(),
+                    line_num: 2,
+                    col_num: 16,
+                }))),
+                formals: Names {
+                    names: vec![
+                        Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "target".to_string(),
+                            line_num: 2,
+                            col_num: 33,
+                        }))),
+                        Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "ret".to_string(),
+                            line_num: 2,
+                            col_num: 41,
+                        }))),
+                    ],
+                    cont: None,
+                    line_num: 2,
+                    col_num: 33,
+                },
+                proc: Box::new(Block {
+                    proc: Proc::New {
+                        decls: Decls {
+                            decls: vec![NameDecl {
+                                var: Var {
+                                    name: "port".to_string(),
+                                    line_num: 3,
+                                    col_num: 13,
+                                },
+                                uri: None,
+                                line_num: 3,
+                                col_num: 13,
+                            }],
+                            line_num: 3,
+                            col_num: 13,
+                        },
+                        proc: Box::new(Proc::Block(Box::new(Block {
+                            proc: Proc::Par {
+                                left: Box::new(Proc::Send {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "ret".to_string(),
+                                        line_num: 4,
+                                        col_num: 11,
+                                    }))),
+                                    send_type: SendType::Single {
+                                        line_num: 4,
+                                        col_num: 11,
+                                    },
+                                    inputs: ProcList {
+                                        procs: vec![Proc::Eval(Eval {
+                                            name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                                name: "port".to_string(),
+                                                line_num: 4,
+                                                col_num: 17,
+                                            }))),
+                                            line_num: 4,
+                                            col_num: 16,
+                                        })],
+                                        line_num: 4,
+                                        col_num: 15,
+                                    },
+                                    line_num: 4,
+                                    col_num: 11,
+                                }),
+                                right: Box::new(Proc::Contract {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "port".to_string(),
+                                        line_num: 5,
+                                        col_num: 20,
+                                    }))),
+                                    formals: Names {
+                                        names: vec![
+                                            Name::Quote(Box::new(Quote {
+                                                quotable: Box::new(Quotable::GroundExpression(
+                                                    Proc::Var(Var {
+                                                        name: "method".to_string(),
+                                                        line_num: 5,
+                                                        col_num: 26,
+                                                    }),
+                                                )),
+                                                line_num: 5,
+                                                col_num: 25,
+                                            })),
+                                            Name::Quote(Box::new(Quote {
+                                                quotable: Box::new(Quotable::GroundExpression(
+                                                    Proc::Var(Var {
+                                                        name: "arg".to_string(),
+                                                        line_num: 5,
+                                                        col_num: 35,
+                                                    }),
+                                                )),
+                                                line_num: 5,
+                                                col_num: 34,
+                                            })),
+                                            Name::ProcVar(Box::new(Proc::Var(Var {
+                                                name: "ack".to_string(),
+                                                line_num: 5,
+                                                col_num: 40,
+                                            }))),
+                                        ],
+                                        cont: None,
+                                        line_num: 5,
+                                        col_num: 25,
+                                    },
+                                    proc: Box::new(Block {
+                                        proc: Proc::Match {
+                                            expression: Box::new(Proc::Eq {
+                                                left: Box::new(Proc::Var(Var {
+                                                    name: "method".to_string(),
+                                                    line_num: 6,
+                                                    col_num: 19,
+                                                })),
+                                                right: Box::new(Proc::StringLiteral {
+                                                    value: "get".to_string(),
+                                                    line_num: 6,
+                                                    col_num: 29,
+                                                }),
+                                                line_num: 6,
+                                                col_num: 19,
+                                            }),
+                                            cases: vec![Case {
+                                                pattern: Proc::BoolLiteral {
+                                                    value: true,
+                                                    line_num: 6,
+                                                    col_num: 37,
+                                                },
+                                                proc: Proc::Send {
+                                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                                        name: "target".to_string(),
+                                                        line_num: 6,
+                                                        col_num: 45,
+                                                    }))),
+                                                    send_type: SendType::Single {
+                                                        line_num: 6,
+                                                        col_num: 45,
+                                                    },
+                                                    inputs: ProcList {
+                                                        procs: vec![
+                                                            Proc::StringLiteral {
+                                                                value: "get".to_string(),
+                                                                line_num: 6,
+                                                                col_num: 53,
+                                                            },
+                                                            Proc::Var(Var {
+                                                                name: "arg".to_string(),
+                                                                line_num: 6,
+                                                                col_num: 60,
+                                                            }),
+                                                            Proc::Eval(Eval {
+                                                                name: Name::ProcVar(Box::new(
+                                                                    Proc::Var(Var {
+                                                                        name: "ack".to_string(),
+                                                                        line_num: 6,
+                                                                        col_num: 66,
+                                                                    }),
+                                                                )),
+                                                                line_num: 6,
+                                                                col_num: 65,
+                                                            }),
+                                                        ],
+                                                        line_num: 6,
+                                                        col_num: 52,
+                                                    },
+                                                    line_num: 6,
+                                                    col_num: 45,
+                                                },
+                                                line_num: 6,
+                                                col_num: 37,
+                                            }],
+                                            line_num: 6,
+                                            col_num: 13,
+                                        },
+                                        line_num: 5,
+                                        col_num: 47,
+                                    }),
+                                    line_num: 5,
+                                    col_num: 11,
+                                }),
+                                line_num: 4,
+                                col_num: 11,
+                            },
+                            line_num: 3,
+                            col_num: 21,
+                        }))),
+                        line_num: 3,
+                        col_num: 9,
+                    },
+                    line_num: 2,
+                    col_num: 48,
+                }),
+                line_num: 2,
+                col_num: 7,
+            },
+            line_num: 1,
+            col_num: 29,
+        }))),
+        line_num: 1,
+        col_num: 5,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
+    let input_code = r#"
+     new philosopher1, philosopher2, north, south, knife, spoon in {
+         north!(*knife) |
+         south!(*spoon) |
+         for (@knf <- north; @spn <- south) {
+           philosopher1!("Complete!") |
+           north!(knf) |
+           south!(spn)
+         } |
+         for (@spn <- south; @knf <- north) {
+           philosopher2!("Complete!") |
+           north!(knf) |
+           south!(spn)
+         }
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::New {
+        decls: Decls {
+            decls: vec![
+                NameDecl {
+                    var: Var {
+                        name: "philosopher1".to_string(),
+                        line_num: 1,
+                        col_num: 9,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 9,
+                },
+                NameDecl {
+                    var: Var {
+                        name: "philosopher2".to_string(),
+                        line_num: 1,
+                        col_num: 23,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 23,
+                },
+                NameDecl {
+                    var: Var {
+                        name: "north".to_string(),
+                        line_num: 1,
+                        col_num: 37,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 37,
+                },
+                NameDecl {
+                    var: Var {
+                        name: "south".to_string(),
+                        line_num: 1,
+                        col_num: 44,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 44,
+                },
+                NameDecl {
+                    var: Var {
+                        name: "knife".to_string(),
+                        line_num: 1,
+                        col_num: 51,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 51,
+                },
+                NameDecl {
+                    var: Var {
+                        name: "spoon".to_string(),
+                        line_num: 1,
+                        col_num: 58,
+                    },
+                    uri: None,
+                    line_num: 1,
+                    col_num: 58,
+                },
+            ],
+            line_num: 1,
+            col_num: 9,
+        },
+        proc: Box::new(Proc::Block(Box::new(Block {
+            proc: Proc::Par {
+                left: Box::new(Proc::Par {
+                    left: Box::new(Proc::Par {
+                        left: Box::new(Proc::Send {
+                            name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                name: "north".to_string(),
+                                line_num: 2,
+                                col_num: 9,
+                            }))),
+                            send_type: SendType::Single {
+                                line_num: 2,
+                                col_num: 9,
+                            },
+                            inputs: ProcList {
+                                procs: vec![Proc::Eval(Eval {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "knife".to_string(),
+                                        line_num: 2,
+                                        col_num: 17,
+                                    }))),
+                                    line_num: 2,
+                                    col_num: 16,
+                                })],
+                                line_num: 2,
+                                col_num: 15,
+                            },
+                            line_num: 2,
+                            col_num: 9,
+                        }),
+                        right: Box::new(Proc::Send {
+                            name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                name: "south".to_string(),
+                                line_num: 3,
+                                col_num: 9,
+                            }))),
+                            send_type: SendType::Single {
+                                line_num: 3,
+                                col_num: 9,
+                            },
+                            inputs: ProcList {
+                                procs: vec![Proc::Eval(Eval {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "spoon".to_string(),
+                                        line_num: 3,
+                                        col_num: 17,
+                                    }))),
+                                    line_num: 3,
+                                    col_num: 16,
+                                })],
+                                line_num: 3,
+                                col_num: 15,
+                            },
+                            line_num: 3,
+                            col_num: 9,
+                        }),
+                        line_num: 2,
+                        col_num: 9,
+                    }),
+                    right: Box::new(Proc::Input {
+                        formals: Receipts {
+                            receipts: vec![
+                                Receipt::LinearBinds(LinearBind {
+                                    names: Names {
+                                        names: vec![Name::Quote(Box::new(Quote {
+                                            quotable: Box::new(Quotable::GroundExpression(
+                                                Proc::Var(Var {
+                                                    name: "knf".to_string(),
+                                                    line_num: 4,
+                                                    col_num: 15,
+                                                }),
+                                            )),
+                                            line_num: 4,
+                                            col_num: 14,
+                                        }))],
+                                        cont: None,
+                                        line_num: 4,
+                                        col_num: 14,
+                                    },
+                                    input: Source::Simple {
+                                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                            name: "north".to_string(),
+                                            line_num: 4,
+                                            col_num: 22,
+                                        }))),
+                                        line_num: 4,
+                                        col_num: 22,
+                                    },
+                                    line_num: 4,
+                                    col_num: 14,
+                                }),
+                                Receipt::LinearBinds(LinearBind {
+                                    names: Names {
+                                        names: vec![Name::Quote(Box::new(Quote {
+                                            quotable: Box::new(Quotable::GroundExpression(
+                                                Proc::Var(Var {
+                                                    name: "spn".to_string(),
+                                                    line_num: 4,
+                                                    col_num: 30,
+                                                }),
+                                            )),
+                                            line_num: 4,
+                                            col_num: 29,
+                                        }))],
+                                        cont: None,
+                                        line_num: 4,
+                                        col_num: 29,
+                                    },
+                                    input: Source::Simple {
+                                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                            name: "south".to_string(),
+                                            line_num: 4,
+                                            col_num: 37,
+                                        }))),
+                                        line_num: 4,
+                                        col_num: 37,
+                                    },
+                                    line_num: 4,
+                                    col_num: 29,
+                                }),
+                            ],
+                            line_num: 4,
+                            col_num: 14,
+                        },
+                        proc: Box::new(Block {
+                            proc: Proc::Par {
+                                left: Box::new(Proc::Par {
+                                    left: Box::new(Proc::Send {
+                                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                            name: "philosopher1".to_string(),
+                                            line_num: 5,
+                                            col_num: 11,
+                                        }))),
+                                        send_type: SendType::Single {
+                                            line_num: 5,
+                                            col_num: 11,
+                                        },
+                                        inputs: ProcList {
+                                            procs: vec![Proc::StringLiteral {
+                                                value: "Complete!".to_string(),
+                                                line_num: 5,
+                                                col_num: 25,
+                                            }],
+                                            line_num: 5,
+                                            col_num: 24,
+                                        },
+                                        line_num: 5,
+                                        col_num: 11,
+                                    }),
+                                    right: Box::new(Proc::Send {
+                                        name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                            name: "north".to_string(),
+                                            line_num: 6,
+                                            col_num: 11,
+                                        }))),
+                                        send_type: SendType::Single {
+                                            line_num: 6,
+                                            col_num: 11,
+                                        },
+                                        inputs: ProcList {
+                                            procs: vec![Proc::Var(Var {
+                                                name: "knf".to_string(),
+                                                line_num: 6,
+                                                col_num: 18,
+                                            })],
+                                            line_num: 6,
+                                            col_num: 17,
+                                        },
+                                        line_num: 6,
+                                        col_num: 11,
+                                    }),
+                                    line_num: 5,
+                                    col_num: 11,
+                                }),
+                                right: Box::new(Proc::Send {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "south".to_string(),
+                                        line_num: 7,
+                                        col_num: 11,
+                                    }))),
+                                    send_type: SendType::Single {
+                                        line_num: 7,
+                                        col_num: 11,
+                                    },
+                                    inputs: ProcList {
+                                        procs: vec![Proc::Var(Var {
+                                            name: "spn".to_string(),
+                                            line_num: 7,
+                                            col_num: 18,
+                                        })],
+                                        line_num: 7,
+                                        col_num: 17,
+                                    },
+                                    line_num: 7,
+                                    col_num: 11,
+                                }),
+                                line_num: 5,
+                                col_num: 11,
+                            },
+                            line_num: 4,
+                            col_num: 44,
+                        }),
+                        line_num: 4,
+                        col_num: 9,
+                    }),
+                    line_num: 2,
+                    col_num: 9,
+                }),
+                right: Box::new(Proc::Input {
+                    formals: Receipts {
+                        receipts: vec![
+                            Receipt::LinearBinds(LinearBind {
+                                names: Names {
+                                    names: vec![Name::Quote(Box::new(Quote {
+                                        quotable: Box::new(Quotable::GroundExpression(Proc::Var(
+                                            Var {
+                                                name: "spn".to_string(),
+                                                line_num: 9,
+                                                col_num: 15,
+                                            },
+                                        ))),
+                                        line_num: 9,
+                                        col_num: 14,
+                                    }))],
+                                    cont: None,
+                                    line_num: 9,
+                                    col_num: 14,
+                                },
+                                input: Source::Simple {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "south".to_string(),
+                                        line_num: 9,
+                                        col_num: 22,
+                                    }))),
+                                    line_num: 9,
+                                    col_num: 22,
+                                },
+                                line_num: 9,
+                                col_num: 14,
+                            }),
+                            Receipt::LinearBinds(LinearBind {
+                                names: Names {
+                                    names: vec![Name::Quote(Box::new(Quote {
+                                        quotable: Box::new(Quotable::GroundExpression(Proc::Var(
+                                            Var {
+                                                name: "knf".to_string(),
+                                                line_num: 9,
+                                                col_num: 30,
+                                            },
+                                        ))),
+                                        line_num: 9,
+                                        col_num: 29,
+                                    }))],
+                                    cont: None,
+                                    line_num: 9,
+                                    col_num: 29,
+                                },
+                                input: Source::Simple {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "north".to_string(),
+                                        line_num: 9,
+                                        col_num: 37,
+                                    }))),
+                                    line_num: 9,
+                                    col_num: 37,
+                                },
+                                line_num: 9,
+                                col_num: 29,
+                            }),
+                        ],
+                        line_num: 9,
+                        col_num: 14,
+                    },
+                    proc: Box::new(Block {
+                        proc: Proc::Par {
+                            left: Box::new(Proc::Par {
+                                left: Box::new(Proc::Send {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "philosopher2".to_string(),
+                                        line_num: 10,
+                                        col_num: 11,
+                                    }))),
+                                    send_type: SendType::Single {
+                                        line_num: 10,
+                                        col_num: 11,
+                                    },
+                                    inputs: ProcList {
+                                        procs: vec![Proc::StringLiteral {
+                                            value: "Complete!".to_string(),
+                                            line_num: 10,
+                                            col_num: 25,
+                                        }],
+                                        line_num: 10,
+                                        col_num: 24,
+                                    },
+                                    line_num: 10,
+                                    col_num: 11,
+                                }),
+                                right: Box::new(Proc::Send {
+                                    name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                        name: "north".to_string(),
+                                        line_num: 11,
+                                        col_num: 11,
+                                    }))),
+                                    send_type: SendType::Single {
+                                        line_num: 11,
+                                        col_num: 11,
+                                    },
+                                    inputs: ProcList {
+                                        procs: vec![Proc::Var(Var {
+                                            name: "knf".to_string(),
+                                            line_num: 11,
+                                            col_num: 18,
+                                        })],
+                                        line_num: 11,
+                                        col_num: 17,
+                                    },
+                                    line_num: 11,
+                                    col_num: 11,
+                                }),
+                                line_num: 10,
+                                col_num: 11,
+                            }),
+                            right: Box::new(Proc::Send {
+                                name: Name::ProcVar(Box::new(Proc::Var(Var {
+                                    name: "south".to_string(),
+                                    line_num: 12,
+                                    col_num: 11,
+                                }))),
+                                send_type: SendType::Single {
+                                    line_num: 12,
+                                    col_num: 11,
+                                },
+                                inputs: ProcList {
+                                    procs: vec![Proc::Var(Var {
+                                        name: "spn".to_string(),
+                                        line_num: 12,
+                                        col_num: 18,
+                                    })],
+                                    line_num: 12,
+                                    col_num: 17,
+                                },
+                                line_num: 12,
+                                col_num: 11,
+                            }),
+                            line_num: 10,
+                            col_num: 11,
+                        },
+                        line_num: 9,
+                        col_num: 44,
+                    }),
+                    line_num: 9,
+                    col_num: 9,
+                }),
+                line_num: 2,
+                col_num: 9,
+            },
+            line_num: 1,
+            col_num: 67,
+        }))),
+        line_num: 1,
+        col_num: 5,
     };
 
     assert_eq!(result.unwrap(), expected_result)

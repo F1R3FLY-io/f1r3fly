@@ -26,7 +26,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .expect("Error loading Rholang grammar");
 
     let tree = parser.parse(code, None).expect("Failed to parse code");
-    println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
+    // println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
     if root_node.kind() != "source_file" {
@@ -46,9 +46,6 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
     parse_proc(&start_node, code)
 }
 
-/*
- * TODO: How to handle '_line_comment' and '_block_comment'
- */
 fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
     let line_num = node.start_position().row;
     let col_num = node.start_position().column;
@@ -317,15 +314,11 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "choice" => {
             let branches_node = get_child_by_field_name(node, "branches")?;
-            // println!("\nbranches_node: {:?}", branches_node.to_sexp());
             let mut branches = Vec::new();
 
             for branch_node in branches_node.named_children(&mut branches_node.walk()) {
-                // println!("\nbranch_node: {:?}", branch_node.to_sexp());
-
                 let mut linear_binds = Vec::new();
                 for pattern_node in branch_node.named_children(&mut branch_node.walk()) {
-                    // println!("\npattern_node: {:?}", pattern_node.to_sexp());
                     if pattern_node.kind() == "linear_bind" {
                         linear_binds.push(parse_linear_bind(&pattern_node, source)?);
                     }
@@ -420,11 +413,9 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             }
 
             let receipts_node = get_child_by_field_name(node, "formals")?;
-            // println!("\nreceipts_node: {:?}", receipts_node.to_sexp());
             let mut receipts = Vec::new();
 
             for child in receipts_node.named_children(&mut receipts_node.walk()) {
-                // println!("\nchild_node: {:?}", child.to_sexp());
                 receipts.push(parse_receipt(&child, source)?);
             }
 
@@ -717,7 +708,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "disjunction" => Ok(Proc::Disjunction(parse_disjunction(node, source)?)),
 
-        "conjuction" => Ok(Proc::Conjunction(parse_conjuction(node, source)?)),
+        "conjunction" => Ok(Proc::Conjunction(parse_conjunction(node, source)?)),
 
         "negation" => Ok(Proc::Negation(parse_negation(node, source)?)),
 
@@ -917,7 +908,47 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         "var" => Ok(Proc::Var(parse_var(node, source)?)),
 
         // var_ref
-        "var_ref" => Ok(Proc::VarRef(parse_var_ref(node, source)?)),
+        "var_ref" => {
+            let var_ref_kind_node = node.child(0).ok_or_else(|| {
+                InterpreterError::ParserError(
+                    "Expected a var_ref_kind node in var_ref at index 0".to_string(),
+                )
+            })?;
+
+            let var_ref_kind = match var_ref_kind_node
+                .child(0)
+                .ok_or_else(|| {
+                    InterpreterError::ParserError(
+                        "Expected a var_ref_kind in var_ref_kind_node at index 0".to_string(),
+                    )
+                })?
+                .kind()
+            {
+                "=" => VarRefKind::Proc,
+                "=*" => VarRefKind::Name,
+                _ => {
+                    return Err(InterpreterError::ParserError(format!(
+                        "Unexpected choice node kind: {:?} of var_ref_kind.",
+                        var_ref_kind_node.kind(),
+                    )))
+                }
+            };
+
+            let var_node = node.child(1).ok_or_else(|| {
+                InterpreterError::ParserError(
+                    "Expected a var node in var_ref at index 1".to_string(),
+                )
+            })?;
+
+            let var = parse_var(&var_node, source)?;
+
+            Ok(Proc::VarRef(VarRef {
+                var_ref_kind,
+                var,
+                line_num: node.start_position().row,
+                col_num: node.start_position().column,
+            }))
+        }
 
         _ => Err(InterpreterError::ParserError(format!(
             "Unrecognizable process. Node: {:?}",
@@ -927,8 +958,6 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 }
 
 fn parse_name(node: &Node, source: &str) -> Result<Name, InterpreterError> {
-    // println!("\nproc_var node: {:?}", node.to_sexp());
-
     match node.kind() {
         "quote" => Ok(Name::Quote(Box::new(parse_quote(node, source)?))),
 
@@ -955,38 +984,6 @@ fn parse_var(node: &Node, source: &str) -> Result<Var, InterpreterError> {
     })
 }
 
-fn parse_var_ref(node: &Node, source: &str) -> Result<VarRef, InterpreterError> {
-    let var_ref_kind_node = node.child(0).ok_or_else(|| {
-        InterpreterError::ParserError(
-            "Expected a var_ref_kind node in var_ref at index 0".to_string(),
-        )
-    })?;
-
-    let var_ref_kind = match var_ref_kind_node.kind() {
-        "=" => VarRefKind::Proc,
-        "=*" => VarRefKind::Name,
-        _ => {
-            return Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of var_ref_kind.",
-                node.kind(),
-            )))
-        }
-    };
-
-    let var_node = node.child(1).ok_or_else(|| {
-        InterpreterError::ParserError("Expected a var node in var_ref at index 1".to_string())
-    })?;
-
-    let var = parse_var(&var_node, source)?;
-
-    Ok(VarRef {
-        var_ref_kind,
-        var,
-        line_num: node.start_position().row,
-        col_num: node.start_position().column,
-    })
-}
-
 fn parse_quote(node: &Node, source: &str) -> Result<Quote, InterpreterError> {
     let quotable_node = node.child(1).ok_or_else(|| {
         InterpreterError::ParserError("Expected a quotable node in quote at index 1".to_string())
@@ -1005,7 +1002,7 @@ fn parse_quotable(node: &Node, source: &str) -> Result<Quotable, InterpreterErro
 
         "disjunction" => Ok(Quotable::Disjunction(parse_disjunction(node, source)?)),
 
-        "conjunction" => Ok(Quotable::Conjunction(parse_conjuction(node, source)?)),
+        "conjunction" => Ok(Quotable::Conjunction(parse_conjunction(node, source)?)),
 
         "negation" => Ok(Quotable::Negation(parse_negation(node, source)?)),
 
@@ -1046,7 +1043,7 @@ fn parse_disjunction(node: &Node, source: &str) -> Result<Disjunction, Interpret
     })
 }
 
-fn parse_conjuction(node: &Node, source: &str) -> Result<Conjunction, InterpreterError> {
+fn parse_conjunction(node: &Node, source: &str) -> Result<Conjunction, InterpreterError> {
     let (left_proc, right_proc) = parse_left_and_right_nodes(node, source)?;
 
     Ok(Conjunction {
@@ -1092,8 +1089,6 @@ fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, Interprete
 }
 
 fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, InterpreterError> {
-    // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
-
     let mut procs = Vec::new();
     for child in node.named_children(&mut node.walk()) {
         procs.push(parse_proc(&child, source)?);
@@ -1102,9 +1097,6 @@ fn parse_comma_sep_procs(node: &Node, source: &str) -> Result<Vec<Proc>, Interpr
 }
 
 fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterError> {
-    // println!("\nproc_list node: {:?}", node.to_sexp());
-    // println!("\nproc_list node: {:?}", node.child(1).unwrap().to_sexp());
-
     let procs = parse_comma_sep_procs(&node, source)?;
     Ok(ProcList {
         procs,
@@ -1255,8 +1247,6 @@ fn get_child_by_field_name<'a>(
 }
 
 fn get_node_value(node: &Node, bytes: &[u8]) -> Result<String, InterpreterError> {
-    // println!("\nnode in get_node_value: {:?}", node.to_sexp());
-
     match node.utf8_text(bytes) {
         Ok(str) => Ok(str.to_owned()),
         Err(e) => Err(InterpreterError::ParserError(format!(
