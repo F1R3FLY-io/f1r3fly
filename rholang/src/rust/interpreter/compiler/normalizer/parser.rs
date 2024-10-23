@@ -137,7 +137,17 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 let var_proc = parse_var(&var_node, source)?;
 
                 let uri = match child.child_by_field_name("uri") {
-                    Some(uri_literal_node) => Some(parse_uri_literal(&uri_literal_node, source)?),
+                    Some(uri_literal_node) => {
+                        match uri_literal_node.next_sibling() {
+                            // 'uri_literal_node' is '(' so it's sibling is the actual rule we want
+                            Some(rule_node) => Some(parse_uri_literal(&rule_node, source)?),
+                            None => {
+                                return Err(InterpreterError::ParserError(
+                                    "Expected rule on uri_literal node".to_string(),
+                                ))
+                            }
+                        }
+                    }
                     None => None,
                 };
 
@@ -173,16 +183,9 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let if_true_node = get_child_by_field_name(node, "ifTrue")?;
             let if_true_proc = parse_proc(&if_true_node, source)?;
 
-            let alternative_proc = match node.child_by_field_name("alternative") {
-                Some(alternative_node) => {
-                    let proc_node = match alternative_node.child(1) {
-                        Some(_proc_node) => Ok(_proc_node),
-                        None => Err(InterpreterError::ParserError(
-                            "Expected a _proc node in alternative at index 1".to_string(),
-                        )),
-                    }?;
-
-                    Some(Box::new(parse_proc(&proc_node, source)?))
+            let alternative_proc = match node.named_child(2) {
+                Some(alternative_proc_node) => {
+                    Some(Box::new(parse_proc(&alternative_proc_node, source)?))
                 }
                 None => None,
             };
@@ -722,19 +725,52 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         "block" => Ok(Proc::Block(Box::new(parse_block(node, source)?))),
 
         "collection" => {
+            fn get_cont_id(node: &Node) -> Result<i32, InterpreterError> {
+                match node.child_by_field_name("cont") {
+                    Some(cont_node) => match cont_node.next_sibling() {
+                        // 'cont_node' is '...' so it's sibling is the actual rule we want
+                        Some(rule_node) => Ok(rule_node.id() as i32),
+                        None => {
+                            return Err(InterpreterError::ParserError(
+                                "Expected rule on cont node".to_string(),
+                            ))
+                        }
+                    },
+                    None => Ok(-1),
+                }
+            }
+
+            fn get_cont_proc(
+                node: &Node,
+                source: &str,
+            ) -> Result<Option<Box<Proc>>, InterpreterError> {
+                match node.child_by_field_name("cont") {
+                    Some(cont_node) => match cont_node.next_sibling() {
+                        // 'cont_node' is '...' so it's sibling is the actual rule we want
+                        Some(rule_node) => Ok(Some(Box::new(parse_proc(&rule_node, source)?))),
+                        None => {
+                            return Err(InterpreterError::ParserError(
+                                "Expected rule on cont node".to_string(),
+                            ))
+                        }
+                    },
+                    None => Ok(None),
+                }
+            }
+
             fn parse_comma_collection(
                 node: &Node,
                 source: &str,
             ) -> Result<Vec<Proc>, InterpreterError> {
-                // println!("\ncomma_sep_procs node: {:?}", node.to_sexp());
-
                 let mut procs = Vec::new();
+
                 for child in node.named_children(&mut node.walk()) {
-                    if child.kind() == "cont" {
+                    if child.id() as i32 == get_cont_id(node)? {
                         continue;
                     }
-                    procs.push(parse_proc(&child, source)?);
+                    procs.push(parse_proc(&child, source)?)
                 }
+
                 Ok(procs)
             }
 
@@ -744,31 +780,18 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let mut cursor = node.walk();
             cursor.goto_first_child();
             let current_node = cursor.node();
+
             let collection = match current_node.kind() {
                 "list" => Ok(Collection::List {
-                    elements: { parse_comma_collection(&current_node, source)? },
-                    cont: {
-                        match node.child_by_field_name("cont") {
-                            Some(proc_remainder_node) => {
-                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                            }
-                            None => None,
-                        }
-                    },
+                    elements: parse_comma_collection(&current_node, source)?,
+                    cont: get_cont_proc(&current_node, source)?,
                     line_num,
                     col_num,
                 }),
 
                 "set" => Ok(Collection::Set {
                     elements: { parse_comma_collection(&current_node, source)? },
-                    cont: {
-                        match node.child_by_field_name("cont") {
-                            Some(proc_remainder_node) => {
-                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                            }
-                            None => None,
-                        }
-                    },
+                    cont: get_cont_proc(&current_node, source)?,
                     line_num,
                     col_num,
                 }),
@@ -776,8 +799,9 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 "map" => Ok(Collection::Map {
                     pairs: {
                         let mut kvs = Vec::new();
-                        for child in current_node.named_children(&mut node.walk()) {
-                            if child.kind() == "cont" {
+
+                        for child in current_node.named_children(&mut current_node.walk()) {
+                            if child.id() as i32 == get_cont_id(&current_node)? {
                                 continue;
                             }
                             let key_node = get_child_by_field_name(&child, "key")?;
@@ -796,14 +820,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
                         kvs
                     },
-                    cont: {
-                        match node.child_by_field_name("cont") {
-                            Some(proc_remainder_node) => {
-                                Some(Box::new(parse_proc(&proc_remainder_node, source)?))
-                            }
-                            None => None,
-                        }
-                    },
+                    cont: get_cont_proc(&current_node, source)?,
                     line_num,
                     col_num,
                 }),
@@ -974,14 +991,9 @@ fn parse_var_ref(node: &Node, source: &str) -> Result<VarRef, InterpreterError> 
 }
 
 fn parse_quote(node: &Node, source: &str) -> Result<Quote, InterpreterError> {
-    let quotable_node = node
-        .child(1)
-        .filter(|n| n.kind() == "quotable")
-        .ok_or_else(|| {
-            InterpreterError::ParserError(
-                "Expected a quotable node in quote at index 1".to_string(),
-            )
-        })?;
+    let quotable_node = node.child(1).ok_or_else(|| {
+        InterpreterError::ParserError("Expected a quotable node in quote at index 1".to_string())
+    })?;
 
     Ok(Quote {
         quotable: Box::new(parse_quotable(&quotable_node, source)?),
@@ -1170,23 +1182,55 @@ fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, Interprete
 }
 
 fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
-    let mut names = Vec::new();
+    fn get_cont_id(node: &Node) -> Result<i32, InterpreterError> {
+        match node.child_by_field_name("cont") {
+            Some(cont_node) => {
+                // 'cont_node' is '...@' so it's subsequent sibling is the actual rule we want
+                let sibling_node = match cont_node.next_sibling().and_then(|n| n.next_sibling()) {
+                    Some(node) => node,
+                    None => {
+                        return Err(InterpreterError::ParserError(
+                            "Expected sibling node not found".to_string(),
+                        ))
+                    }
+                };
 
+                Ok(sibling_node.id() as i32)
+            }
+            None => Ok(-1),
+        }
+    }
+
+    fn get_cont_proc(node: &Node, source: &str) -> Result<Option<Box<Proc>>, InterpreterError> {
+        match node.child_by_field_name("cont") {
+            Some(cont_node) => {
+                // 'cont_node' is '...@' so it's subsequent sibling is the actual rule we want
+                let sibling_node = match cont_node.next_sibling().and_then(|n| n.next_sibling()) {
+                    Some(node) => node,
+                    None => {
+                        return Err(InterpreterError::ParserError(
+                            "Expected sibling node not found".to_string(),
+                        ))
+                    }
+                };
+
+                Ok(Some(Box::new(parse_proc(&sibling_node, source)?)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    let mut names = Vec::new();
     for child in node.named_children(&mut node.walk()) {
-        if child.kind() == "cont" {
+        if child.id() as i32 == get_cont_id(node)? {
             continue;
         }
         names.push(parse_name(&child, source)?);
     }
 
-    let name_remainder = match node.child_by_field_name("cont") {
-        Some(name_remainder_node) => Some(Box::new(parse_proc(&name_remainder_node, source)?)),
-        None => None,
-    };
-
     Ok(Names {
         names,
-        cont: name_remainder,
+        cont: get_cont_proc(node, source)?,
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
