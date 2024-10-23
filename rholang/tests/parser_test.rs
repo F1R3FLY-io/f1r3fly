@@ -1,9 +1,9 @@
 use rholang::rust::interpreter::compiler::{
     normalizer::parser::parse_rholang_code_to_proc,
     rholang_ast::{
-        Block, Branch, Collection, Decls, KeyValuePair, LinearBind, Name, NameDecl, Names, Proc,
-        ProcList, Quotable, Quote, Receipt, Receipts, SendType, Source, SyncSendCont, UriLiteral,
-        Var,
+        Block, Branch, BundleType, Case, Collection, Decl, Decls, DeclsChoice, KeyValuePair,
+        LinearBind, Name, NameDecl, Names, Proc, ProcList, Quotable, Quote, Receipt, Receipts,
+        SendType, Source, SyncSendCont, UriLiteral, Var,
     },
 };
 
@@ -284,59 +284,336 @@ fn parse_rholang_code_to_proc_should_parse_if_without_else() {
     assert_eq!(result.unwrap(), expected_result)
 }
 
-// Also tests 'cont' within 'names'
 #[test]
-fn parse_rholang_code_to_proc_should_parse_contract() {
+fn parse_rholang_code_to_proc_should_parse_let() {
     let input_code = r#"
-       contract @"example"(x, y ...@rest) = {
-         Nil
-       }
-    "#;
+        let x = 5; y = 10 in {
+          x + y
+        }
+      "#;
 
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
 
-    let expected_result = Proc::Contract {
-        name: Name::Quote(Box::new(Quote {
-            quotable: Box::new(Quotable::GroundExpression(Proc::StringLiteral {
-                value: "example".to_string(),
-                line_num: 1,
-                col_num: 17,
-            })),
-            line_num: 1,
-            col_num: 16,
-        })),
-        formals: Names {
-            names: vec![
-                Name::ProcVar(Box::new(Proc::Var(Var {
-                    name: "x".to_string(),
+    let expected_result = Proc::Let {
+        decls: DeclsChoice::LinearDecls {
+            decls: vec![
+                Decl {
+                    names: Names {
+                        names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "x".to_string(),
+                            line_num: 1,
+                            col_num: 12,
+                        })))],
+                        cont: None,
+                        line_num: 1,
+                        col_num: 12,
+                    },
+                    procs: vec![Proc::LongLiteral {
+                        value: 5,
+                        line_num: 1,
+                        col_num: 16,
+                    }],
                     line_num: 1,
-                    col_num: 27,
-                }))),
-                Name::ProcVar(Box::new(Proc::Var(Var {
-                    name: "y".to_string(),
+                    col_num: 12,
+                },
+                Decl {
+                    names: Names {
+                        names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
+                            name: "y".to_string(),
+                            line_num: 1,
+                            col_num: 19,
+                        })))],
+                        cont: None,
+                        line_num: 1,
+                        col_num: 19,
+                    },
+                    procs: vec![Proc::LongLiteral {
+                        value: 10,
+                        line_num: 1,
+                        col_num: 23,
+                    }],
                     line_num: 1,
-                    col_num: 30,
-                }))),
+                    col_num: 19,
+                },
             ],
-            cont: Some(Box::new(Proc::Var(Var {
-                name: "rest".to_string(),
-                line_num: 1,
-                col_num: 36,
-            }))),
             line_num: 1,
-            col_num: 27,
+            col_num: 12,
+        },
+        body: Box::new(Block {
+            proc: Proc::Add {
+                left: Box::new(Proc::Var(Var {
+                    name: "x".to_string(),
+                    line_num: 2,
+                    col_num: 10,
+                })),
+                right: Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 2,
+                    col_num: 14,
+                })),
+                line_num: 2,
+                col_num: 10,
+            },
+            line_num: 1,
+            col_num: 29,
+        }),
+        line_num: 1,
+        col_num: 8,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_bundle() {
+    let input_code_bundle_write = r#"
+        bundle+ {Nil}
+      "#;
+
+    let bundle_write_result = parse_rholang_code_to_proc(&input_code_bundle_write);
+    assert!(bundle_write_result.is_ok());
+
+    let bundle_write_expected_result = Proc::Bundle {
+        bundle_type: BundleType::BundleWrite {
+            line_num: 1,
+            col_num: 8,
         },
         proc: Box::new(Block {
             proc: Proc::Nil {
-                line_num: 2,
-                col_num: 9,
+                line_num: 1,
+                col_num: 17,
             },
             line_num: 1,
-            col_num: 44,
+            col_num: 16,
         }),
         line_num: 1,
-        col_num: 7,
+        col_num: 8,
+    };
+
+    assert_eq!(bundle_write_result.unwrap(), bundle_write_expected_result);
+
+    let input_code_bundle_read = r#"
+        bundle- {Nil}
+      "#;
+
+    let bundle_read_result = parse_rholang_code_to_proc(&input_code_bundle_read);
+    assert!(bundle_read_result.is_ok());
+
+    let bundle_read_expected_result = Proc::Bundle {
+        bundle_type: BundleType::BundleRead {
+            line_num: 1,
+            col_num: 8,
+        },
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 1,
+                col_num: 17,
+            },
+            line_num: 1,
+            col_num: 16,
+        }),
+        line_num: 1,
+        col_num: 8,
+    };
+
+    assert_eq!(bundle_read_result.unwrap(), bundle_read_expected_result);
+
+    let input_code_bundle_equiv = r#"
+        bundle0 {Nil}
+      "#;
+
+    let bundle_equiv_result = parse_rholang_code_to_proc(&input_code_bundle_equiv);
+    assert!(bundle_equiv_result.is_ok());
+
+    let bundle_equiv_expected_result = Proc::Bundle {
+        bundle_type: BundleType::BundleEquiv {
+            line_num: 1,
+            col_num: 8,
+        },
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 1,
+                col_num: 17,
+            },
+            line_num: 1,
+            col_num: 16,
+        }),
+        line_num: 1,
+        col_num: 8,
+    };
+
+    assert_eq!(bundle_equiv_result.unwrap(), bundle_equiv_expected_result);
+
+    let input_code_bundle_read_write = r#"
+        bundle {Nil}
+      "#;
+
+    let bundle_read_write_result = parse_rholang_code_to_proc(&input_code_bundle_read_write);
+    assert!(bundle_read_write_result.is_ok());
+
+    let bundle_read_write_expected_result = Proc::Bundle {
+        bundle_type: BundleType::BundleReadWrite {
+            line_num: 1,
+            col_num: 8,
+        },
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 1,
+                col_num: 16,
+            },
+            line_num: 1,
+            col_num: 15,
+        }),
+        line_num: 1,
+        col_num: 8,
+    };
+
+    assert_eq!(
+        bundle_read_write_result.unwrap(),
+        bundle_read_write_expected_result
+    );
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_match() {
+    let input_code = r#"
+         match x {
+           1 => { @"one"!("Matched one") }
+           true => { @"true"!("Matched true") }
+           _ => { @"default"!("Matched default") }
+         }
+      "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Match {
+        expression: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 1,
+            col_num: 15,
+        })),
+        cases: vec![
+            Case {
+                pattern: Proc::LongLiteral {
+                    value: 1,
+                    line_num: 2,
+                    col_num: 11,
+                },
+                proc: Proc::Block(Box::new(Block {
+                    proc: Proc::Send {
+                        name: Name::Quote(Box::new(Quote {
+                            quotable: Box::new(Quotable::GroundExpression(Proc::StringLiteral {
+                                value: "one".to_string(),
+                                line_num: 2,
+                                col_num: 19,
+                            })),
+                            line_num: 2,
+                            col_num: 18,
+                        })),
+                        send_type: SendType::Single {
+                            line_num: 2,
+                            col_num: 18,
+                        },
+                        inputs: ProcList {
+                            procs: vec![Proc::StringLiteral {
+                                value: "Matched one".to_string(),
+                                line_num: 2,
+                                col_num: 26,
+                            }],
+                            line_num: 2,
+                            col_num: 25,
+                        },
+                        line_num: 2,
+                        col_num: 18,
+                    },
+                    line_num: 2,
+                    col_num: 16,
+                })),
+                line_num: 2,
+                col_num: 11,
+            },
+            Case {
+                pattern: Proc::BoolLiteral {
+                    value: true,
+                    line_num: 3,
+                    col_num: 11,
+                },
+                proc: Proc::Block(Box::new(Block {
+                    proc: Proc::Send {
+                        name: Name::Quote(Box::new(Quote {
+                            quotable: Box::new(Quotable::GroundExpression(Proc::StringLiteral {
+                                value: "true".to_string(),
+                                line_num: 3,
+                                col_num: 22,
+                            })),
+                            line_num: 3,
+                            col_num: 21,
+                        })),
+                        send_type: SendType::Single {
+                            line_num: 3,
+                            col_num: 21,
+                        },
+                        inputs: ProcList {
+                            procs: vec![Proc::StringLiteral {
+                                value: "Matched true".to_string(),
+                                line_num: 3,
+                                col_num: 30,
+                            }],
+                            line_num: 3,
+                            col_num: 29,
+                        },
+                        line_num: 3,
+                        col_num: 21,
+                    },
+                    line_num: 3,
+                    col_num: 19,
+                })),
+                line_num: 3,
+                col_num: 11,
+            },
+            Case {
+                pattern: Proc::Wildcard {
+                    line_num: 4,
+                    col_num: 11,
+                },
+                proc: Proc::Block(Box::new(Block {
+                    proc: Proc::Send {
+                        name: Name::Quote(Box::new(Quote {
+                            quotable: Box::new(Quotable::GroundExpression(Proc::StringLiteral {
+                                value: "default".to_string(),
+                                line_num: 4,
+                                col_num: 19,
+                            })),
+                            line_num: 4,
+                            col_num: 18,
+                        })),
+                        send_type: SendType::Single {
+                            line_num: 4,
+                            col_num: 18,
+                        },
+                        inputs: ProcList {
+                            procs: vec![Proc::StringLiteral {
+                                value: "Matched default".to_string(),
+                                line_num: 4,
+                                col_num: 30,
+                            }],
+                            line_num: 4,
+                            col_num: 29,
+                        },
+                        line_num: 4,
+                        col_num: 18,
+                    },
+                    line_num: 4,
+                    col_num: 16,
+                })),
+                line_num: 4,
+                col_num: 11,
+            },
+        ],
+        line_num: 1,
+        col_num: 9,
     };
 
     assert_eq!(result.unwrap(), expected_result)
@@ -457,6 +734,64 @@ fn parse_rholang_code_to_proc_should_parse_select() {
         branches,
         line_num: 1,
         col_num: 6,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+// Also tests 'cont' within 'names'
+#[test]
+fn parse_rholang_code_to_proc_should_parse_contract() {
+    let input_code = r#"
+       contract @"example"(x, y ...@rest) = {
+         Nil
+       }
+    "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Contract {
+        name: Name::Quote(Box::new(Quote {
+            quotable: Box::new(Quotable::GroundExpression(Proc::StringLiteral {
+                value: "example".to_string(),
+                line_num: 1,
+                col_num: 17,
+            })),
+            line_num: 1,
+            col_num: 16,
+        })),
+        formals: Names {
+            names: vec![
+                Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "x".to_string(),
+                    line_num: 1,
+                    col_num: 27,
+                }))),
+                Name::ProcVar(Box::new(Proc::Var(Var {
+                    name: "y".to_string(),
+                    line_num: 1,
+                    col_num: 30,
+                }))),
+            ],
+            cont: Some(Box::new(Proc::Var(Var {
+                name: "rest".to_string(),
+                line_num: 1,
+                col_num: 36,
+            }))),
+            line_num: 1,
+            col_num: 27,
+        },
+        proc: Box::new(Block {
+            proc: Proc::Nil {
+                line_num: 2,
+                col_num: 9,
+            },
+            line_num: 1,
+            col_num: 44,
+        }),
+        line_num: 1,
+        col_num: 7,
     };
 
     assert_eq!(result.unwrap(), expected_result)

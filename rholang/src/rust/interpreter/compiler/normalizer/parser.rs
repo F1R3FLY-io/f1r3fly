@@ -2,7 +2,7 @@ use tree_sitter::{Node, Parser, Tree};
 
 use crate::rust::interpreter::{
     compiler::rholang_ast::{
-        Block, Branch, Bundle, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
+        Block, Branch, BundleType, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
         Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendType, SimpleType,
         Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
@@ -26,7 +26,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .expect("Error loading Rholang grammar");
 
     let tree = parser.parse(code, None).expect("Failed to parse code");
-    // println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
+    println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
     if root_node.kind() != "source_file" {
@@ -261,10 +261,10 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             let col_num = node.start_position().column;
 
             let bundle = match bundle_node.kind() {
-                "bundle_write" => Bundle::BundleWrite { line_num, col_num },
-                "bundle_read" => Bundle::BundleRead { line_num, col_num },
-                "bundle_equiv" => Bundle::BundleEquiv { line_num, col_num },
-                "bundle_read_write" => Bundle::BundleReadWrite { line_num, col_num },
+                "bundle_write" => BundleType::BundleWrite { line_num, col_num },
+                "bundle_read" => BundleType::BundleRead { line_num, col_num },
+                "bundle_equiv" => BundleType::BundleEquiv { line_num, col_num },
+                "bundle_read_write" => BundleType::BundleReadWrite { line_num, col_num },
 
                 _ => {
                     return Err(InterpreterError::ParserError(format!(

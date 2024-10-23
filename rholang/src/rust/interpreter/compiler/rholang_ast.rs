@@ -38,7 +38,7 @@ pub enum Proc {
     },
 
     Bundle {
-        bundle_type: Bundle,
+        bundle_type: BundleType,
         proc: Box<Block>,
         line_num: usize,
         col_num: usize,
@@ -467,7 +467,7 @@ pub enum DeclsChoice {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Bundle {
+pub enum BundleType {
     BundleWrite { line_num: usize, col_num: usize },
     BundleRead { line_num: usize, col_num: usize },
     BundleEquiv { line_num: usize, col_num: usize },
