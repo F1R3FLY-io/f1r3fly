@@ -1094,6 +1094,452 @@ fn parse_rholang_code_to_proc_should_parse_simple_send() {
 }
 
 #[test]
+fn parse_rholang_code_to_proc_should_parse_or() {
+    let input_code = r#"x or y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Or {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_and() {
+    let input_code = r#"x and y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::And {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 6,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_matches() {
+    let input_code = r#"x matches y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Matches {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 10,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_eq() {
+    let input_code = r#"x == y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Eq {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_neq() {
+    let input_code = r#"x != y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Neq {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_lt() {
+    let input_code = r#"x < y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Lt {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_lte() {
+    let input_code = r#"x <= y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Lte {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_gt() {
+    let input_code = r#"x > y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Gt {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_gte() {
+    let input_code = r#"x >= y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Gte {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_concat() {
+    let input_code = r#"x ++ y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Concat {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_minus_minus() {
+    let input_code = r#"x -- y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::MinusMinus {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_minus() {
+    let input_code = r#"x - y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Minus {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_add() {
+    let input_code = r#"x + y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Add {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_percent_percent() {
+    let input_code = r#"x %% y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::PercentPercent {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 5,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_mult() {
+    let input_code = r#"x * y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Mult {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_div() {
+    let input_code = r#"x / y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Div {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_mod() {
+    let input_code = r#"x % y"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Mod {
+        left: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 0,
+        })),
+        right: Box::new(Proc::Var(Var {
+            name: "y".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_not() {
+    let input_code = r#"not x"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Not {
+        proc: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 4,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_neg() {
+    let input_code = r#"-x"#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::Neg {
+        proc: Box::new(Proc::Var(Var {
+            name: "x".to_string(),
+            line_num: 0,
+            col_num: 1,
+        })),
+        line_num: 0,
+        col_num: 0,
+    };
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
 fn parse_rholang_code_to_proc_should_handle_list() {
     let input_code = r#"[1, "two", true, `rho:uri`, Nil]"#;
     let result = parse_rholang_code_to_proc(&input_code);

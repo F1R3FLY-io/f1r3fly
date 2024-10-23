@@ -117,6 +117,7 @@ module.exports = grammar({
             $.percent_percent,
             $.mult,
             $.div,
+            $.mod,
             $.not,
             $.neg,
             $.method,

@@ -112,17 +112,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -232,6 +224,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -264,6 +260,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -281,22 +281,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -406,6 +402,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -438,6 +438,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -455,6 +459,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -466,17 +474,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -586,6 +586,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -618,6 +622,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -635,22 +643,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -760,6 +764,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -792,6 +800,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -809,6 +821,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -932,6 +948,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -964,6 +984,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -982,6 +1006,10 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
@@ -991,17 +1019,9 @@
     "named": true,
     "fields": {
       "body": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -1111,6 +1131,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -1143,6 +1167,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -1160,6 +1188,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -1190,17 +1222,9 @@
         ]
       },
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -1282,6 +1306,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -1306,6 +1334,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -1319,6 +1351,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -1371,17 +1407,9 @@
     "named": true,
     "fields": {
       "pattern": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -1491,6 +1519,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -1523,6 +1555,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -1540,22 +1576,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -1665,6 +1697,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -1697,6 +1733,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -1714,6 +1754,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -1798,17 +1842,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -1918,6 +1954,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -1950,6 +1990,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -1967,22 +2011,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -2092,6 +2132,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -2124,6 +2168,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -2141,6 +2189,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -2152,17 +2204,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -2272,6 +2316,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -2304,6 +2352,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -2321,22 +2373,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -2446,6 +2494,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -2478,6 +2530,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -2495,6 +2551,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -2587,17 +2647,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -2707,6 +2759,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -2739,6 +2795,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -2756,22 +2816,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -2881,6 +2937,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -2913,6 +2973,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -2930,6 +2994,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -2941,17 +3009,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3061,6 +3121,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3093,6 +3157,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -3110,22 +3178,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3235,6 +3299,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3267,6 +3335,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -3284,6 +3356,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -3300,17 +3376,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3420,6 +3488,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3452,6 +3524,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -3469,22 +3545,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3594,6 +3666,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3626,6 +3702,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -3643,6 +3723,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -3673,17 +3757,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3793,6 +3869,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3825,6 +3905,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -3842,22 +3926,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -3967,6 +4047,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -3999,6 +4083,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4016,6 +4104,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -4027,17 +4119,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -4147,6 +4231,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -4179,6 +4267,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4196,22 +4288,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -4321,6 +4409,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -4353,6 +4445,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4370,6 +4466,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -4384,14 +4484,6 @@
         "multiple": true,
         "required": false,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -4505,6 +4597,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -4537,6 +4633,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4554,22 +4654,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "condition": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -4679,6 +4775,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -4711,6 +4811,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4728,22 +4832,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "ifTrue": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -4853,6 +4953,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -4885,6 +4989,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -4902,6 +5010,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -5051,6 +5163,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -5083,6 +5199,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -5101,6 +5221,10 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
@@ -5110,17 +5234,9 @@
     "named": true,
     "fields": {
       "key": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -5230,6 +5346,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -5262,6 +5382,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -5279,22 +5403,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "value": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -5404,6 +5524,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -5436,6 +5560,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -5453,6 +5581,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -5658,6 +5790,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -5690,6 +5826,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -5708,6 +5848,10 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
@@ -5717,17 +5861,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -5837,6 +5973,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -5869,6 +6009,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -5886,22 +6030,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6011,6 +6151,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6043,6 +6187,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6060,6 +6208,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -6071,17 +6223,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6191,6 +6335,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6223,6 +6371,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6240,22 +6392,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6365,6 +6513,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6397,6 +6549,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6414,6 +6570,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -6465,17 +6625,9 @@
         ]
       },
       "expression": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6557,6 +6709,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6581,6 +6737,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6590,6 +6750,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -6601,17 +6765,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6721,6 +6877,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6753,6 +6913,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6770,22 +6934,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -6895,6 +7055,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -6927,6 +7091,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -6944,6 +7112,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -7067,6 +7239,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -7099,6 +7275,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -7116,6 +7296,10 @@
         },
         {
           "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "var_ref",
           "named": true
         }
       ]
@@ -7146,17 +7330,9 @@
         ]
       },
       "receiver": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -7266,6 +7442,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -7298,6 +7478,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -7315,6 +7499,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -7326,17 +7514,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -7446,6 +7626,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -7478,6 +7662,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -7495,22 +7683,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -7620,6 +7804,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -7652,6 +7840,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -7669,6 +7861,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -7680,17 +7876,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -7800,6 +7988,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -7832,6 +8024,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -7849,22 +8045,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -7974,6 +8166,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8006,6 +8202,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8023,6 +8223,372 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "mod",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "minus",
+            "named": true
+          },
+          {
+            "type": "minus_minus",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
+            "type": "percent_percent",
+            "named": true
+          },
+          {
+            "type": "quote",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "right": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_ground",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "minus",
+            "named": true
+          },
+          {
+            "type": "minus_minus",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
+            "type": "percent_percent",
+            "named": true
+          },
+          {
+            "type": "quote",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -8034,17 +8600,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -8154,6 +8712,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8186,6 +8748,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8203,22 +8769,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -8328,6 +8890,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8360,6 +8926,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8377,6 +8947,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -8460,17 +9034,9 @@
     "named": true,
     "fields": {
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -8580,6 +9146,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8612,6 +9182,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8629,6 +9203,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -8640,17 +9218,9 @@
     "named": true,
     "fields": {
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -8760,6 +9330,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8792,6 +9366,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8809,6 +9387,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -8820,17 +9402,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -8940,6 +9514,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -8972,6 +9550,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -8989,22 +9571,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -9114,6 +9692,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -9146,6 +9728,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -9163,6 +9749,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -9184,17 +9774,9 @@
         ]
       },
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -9304,6 +9886,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -9336,6 +9922,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -9353,6 +9943,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -9476,6 +10070,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -9508,6 +10106,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -9526,6 +10128,10 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
@@ -9535,17 +10141,9 @@
     "named": true,
     "fields": {
       "proc": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -9655,6 +10253,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -9687,6 +10289,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -9704,6 +10310,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -9715,17 +10325,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -9835,6 +10437,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -9867,6 +10473,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -9884,22 +10494,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -10009,6 +10615,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -10041,6 +10651,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -10058,6 +10672,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -10069,17 +10687,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -10189,6 +10799,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -10221,6 +10835,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -10238,22 +10856,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -10363,6 +10977,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -10395,6 +11013,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -10413,9 +11035,152 @@
           {
             "type": "simple_type",
             "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "parenthesized",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "_ground",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "add",
+          "named": true
+        },
+        {
+          "type": "and",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "collection",
+          "named": true
+        },
+        {
+          "type": "concat",
+          "named": true
+        },
+        {
+          "type": "conjunction",
+          "named": true
+        },
+        {
+          "type": "disjunction",
+          "named": true
+        },
+        {
+          "type": "div",
+          "named": true
+        },
+        {
+          "type": "eq",
+          "named": true
+        },
+        {
+          "type": "eval",
+          "named": true
+        },
+        {
+          "type": "gt",
+          "named": true
+        },
+        {
+          "type": "gte",
+          "named": true
+        },
+        {
+          "type": "lt",
+          "named": true
+        },
+        {
+          "type": "lte",
+          "named": true
+        },
+        {
+          "type": "matches",
+          "named": true
+        },
+        {
+          "type": "method",
+          "named": true
+        },
+        {
+          "type": "minus",
+          "named": true
+        },
+        {
+          "type": "minus_minus",
+          "named": true
+        },
+        {
+          "type": "mod",
+          "named": true
+        },
+        {
+          "type": "mult",
+          "named": true
+        },
+        {
+          "type": "neg",
+          "named": true
+        },
+        {
+          "type": "negation",
+          "named": true
+        },
+        {
+          "type": "neq",
+          "named": true
+        },
+        {
+          "type": "not",
+          "named": true
+        },
+        {
+          "type": "or",
+          "named": true
+        },
+        {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
+          "type": "percent_percent",
+          "named": true
+        },
+        {
+          "type": "quote",
+          "named": true
+        },
+        {
+          "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -10453,17 +11218,9 @@
     "named": true,
     "fields": {
       "left": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -10573,6 +11330,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -10605,6 +11366,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -10622,22 +11387,18 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
       },
       "right": {
-        "multiple": true,
+        "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "_ground",
             "named": true
@@ -10747,6 +11508,10 @@
             "named": true
           },
           {
+            "type": "mod",
+            "named": true
+          },
+          {
             "type": "mult",
             "named": true
           },
@@ -10779,6 +11544,10 @@
             "named": true
           },
           {
+            "type": "parenthesized",
+            "named": true
+          },
+          {
             "type": "percent_percent",
             "named": true
           },
@@ -10796,6 +11565,10 @@
           },
           {
             "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "var_ref",
             "named": true
           }
         ]
@@ -10919,6 +11692,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -10951,6 +11728,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -10968,6 +11749,10 @@
         },
         {
           "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "var_ref",
           "named": true
         }
       ]
@@ -11334,6 +12119,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -11366,6 +12155,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -11383,6 +12176,10 @@
         },
         {
           "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "var_ref",
           "named": true
         }
       ]
@@ -11529,6 +12326,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -11561,6 +12362,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -11578,6 +12383,10 @@
         },
         {
           "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "var_ref",
           "named": true
         }
       ]
@@ -11719,6 +12528,10 @@
           "named": true
         },
         {
+          "type": "mod",
+          "named": true
+        },
+        {
           "type": "mult",
           "named": true
         },
@@ -11751,6 +12564,10 @@
           "named": true
         },
         {
+          "type": "parenthesized",
+          "named": true
+        },
+        {
           "type": "percent_percent",
           "named": true
         },
@@ -11769,9 +12586,37 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
+  },
+  {
+    "type": "var_ref",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "var",
+          "named": true
+        },
+        {
+          "type": "var_ref_kind",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "var_ref_kind",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "!=",
@@ -11871,6 +12716,10 @@
   },
   {
     "type": "=",
+    "named": false
+  },
+  {
+    "type": "=*",
     "named": false
   },
   {
