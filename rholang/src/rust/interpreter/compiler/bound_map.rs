@@ -26,9 +26,10 @@ impl<T: Clone> BoundMap<T> {
     })
   }
 
-  pub fn put(&mut self, binding: IdContext<T>) {
+  pub fn put(&self, binding: IdContext<T>) -> BoundMap<T> {
     let (name, typ, source_position) = binding;
-    self.index_bindings.insert(
+    let mut new_bindings = self.index_bindings.clone();
+    new_bindings.insert(
       name,
       BoundContext {
         index: self.next_index,
@@ -36,18 +37,24 @@ impl<T: Clone> BoundMap<T> {
         source_position,
       },
     );
-    self.next_index += 1;
-  }
-
-  pub fn put_all(&mut self, bindings: Vec<IdContext<T>>) {
-    for binding in bindings {
-      self.put(binding);
+    BoundMap {
+      next_index: self.next_index + 1,
+      index_bindings: new_bindings,
     }
   }
 
-  pub fn absorb_free(&mut self, free_map: FreeMap<T>) {
+  pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> BoundMap<T> {
+    let mut new_map = self.clone();
+    for binding in bindings {
+      new_map = new_map.put(binding);
+    }
+    new_map
+  }
+
+  pub fn absorb_free(&self, free_map: FreeMap<T>) -> BoundMap<T> {
+    let mut new_bindings = self.index_bindings.clone();
     for (name, context) in free_map.level_bindings {
-      self.index_bindings.insert(
+      new_bindings.insert(
         name,
         BoundContext {
           index: context.level + self.next_index,
@@ -56,10 +63,14 @@ impl<T: Clone> BoundMap<T> {
         },
       );
     }
-    self.next_index += free_map.next_level;
+    BoundMap {
+      next_index: self.next_index + free_map.next_level,
+      index_bindings: new_bindings,
+    }
   }
 
-  pub fn count(&self) -> usize {
+  // Rename this method to avoid conflict with Iterator::count
+  pub fn get_count(&self) -> usize {
     self.next_index
   }
 }

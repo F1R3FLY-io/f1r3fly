@@ -36,7 +36,7 @@ fn p_var() -> PVar {
 fn p_var_should_compile_as_bound_var_if_its_in_env() {
     let bound_inputs = {
         let mut inputs = inputs();
-        inputs.bound_map_chain.put((
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
             "x".to_string(),
             VarSort::ProcSort,
             SourcePosition::new(0, 0),
@@ -81,7 +81,7 @@ fn p_var_should_compile_as_free_var_if_its_not_in_env() {
 fn p_var_should_not_compile_if_its_in_env_of_the_wrong_sort() {
     let bound_inputs = {
         let mut inputs = inputs();
-        inputs.bound_map_chain.put((
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
             "x".to_string(),
             VarSort::NameSort,
             SourcePosition::new(0, 0),

@@ -583,3 +583,13 @@ impl HasLocallyFree<Connective> for Connective {
         }
     }
 }
+
+impl HasLocallyFree<Par> for Par {
+  fn connective_used(&self, p: Par) -> bool {
+    p.connective_used
+  }
+
+  fn locally_free(&self, p: Par, _depth: i32) -> Vec<u8> {
+    p.locally_free
+  }
+}

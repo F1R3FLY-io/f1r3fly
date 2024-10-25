@@ -7,3 +7,5 @@ pub mod p_collect_normalizer;
 pub mod p_var_normalizer;
 pub mod p_conjunction_normalizer;
 pub mod p_disjunction_normalizer;
+pub mod p_contr_normalizer;
+pub mod Utils;

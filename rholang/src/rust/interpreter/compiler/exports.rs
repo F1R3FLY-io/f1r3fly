@@ -13,3 +13,4 @@ pub use crate::rust::interpreter::compiler::normalizer::processes::p_matches_nor
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_collect_normalizer::normalize_p_collect;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_conjunction_normalizer::normalize_p_сonjunction;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_disjunction_normalizer::normalize_p_disjunction;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_contr_normalizer::normalize_p_contr;
