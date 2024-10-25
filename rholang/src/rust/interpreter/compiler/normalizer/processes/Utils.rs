@@ -21,7 +21,7 @@ pub fn fail_on_invalid_connective(
           ConnectiveInstance::ConnNotBody(_) => {
             Some(PatternReceiveError(format!("~ (negation) at {}", source_position)))
           }
-          _ => Option::from(InterpreterError::NormalizerError("Unexpected connective on fail_on_invalid_connective".to_string())),
+          _ => Some(InterpreterError::NormalizerError("Unexpected connective on fail_on_invalid_connective".to_string())),
         }
       })
       .map_or(Ok(name_res.clone()), Err)

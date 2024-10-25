@@ -12,24 +12,15 @@ use super::exports::*;
 
 pub fn normalize_p_contr(
   node: Node,
-  mut input: ProcVisitInputs,
+  input: ProcVisitInputs,
   source_code: &[u8],
 ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
   println!("Normalizing contract node of kind: {}", node.kind());
 
-  let mut name_node = node.child_by_field_name("name").ok_or_else(|| {
+  let name_node = node.child_by_field_name("name").ok_or_else(|| {
     InterpreterError::SyntaxError("Expected contract name".to_string())
   })?;
 
-  //name normalizer can't handle proc_var, so I should take child from proc_var and provide it to normalize_name
-  //If the name is of type "proc_var", extract the actual variable or wildcard
-  if name_node.kind() == "proc_var" {
-    if let Some(child) = name_node.named_child(0) {
-      name_node = child;
-    } else {
-      return Err(InterpreterError::SyntaxError("Expected a child of proc_var".to_string()).into());
-    }
-  }
   println!("name node before first call: {}", name_node.kind());
   let name_match_result = normalize_name(
     name_node,
@@ -46,15 +37,7 @@ pub fn normalize_p_contr(
     InterpreterError::SyntaxError("Expected contract formals".to_string())
   })?;
 
-  for mut name in names_node.named_children(&mut node.walk()) { //fold is better?
-    // If the name is of type "proc_var", extract the actual variable or wildcard
-    if name.kind() == "proc_var" {
-      if let Some(child) = name.named_child(0) {
-        name = child;
-      } else {
-        return Err(InterpreterError::SyntaxError("Expected a child of proc_var".to_string()).into());
-      }
-    }
+  for name in names_node.named_children(&mut node.walk()) { //fold is better?
     println!("name node in cycle: {}", name.kind());
     let res = normalize_name(
       name,
@@ -68,7 +51,7 @@ pub fn normalize_p_contr(
     let result = fail_on_invalid_connective(&input, &res)?;
 
     // Accumulate the result
-    init_acc.0.push(result.par.clone());
+    init_acc.0.insert(0, result.par.clone());
     init_acc.1 = result.free_map.clone();
     init_acc.2 = union(init_acc.clone().2, result.par.locally_free(result.par.clone(), (input.bound_map_chain.depth() + 1) as i32));
   }
@@ -93,27 +76,37 @@ pub fn normalize_p_contr(
   let receive = Receive {
     binds: vec![ReceiveBind {
       patterns: init_acc.0.clone().into_iter().rev().collect(),
-      source: Option::from(name_match_result.par.clone()),
+      source: Some(name_match_result.par.clone()),
       remainder: remainder_result.0.clone(),
       free_count: bound_count as i32,
     }],
-    body: Option::from(body_result.par.clone()),
+    body: Some(body_result.par.clone()),
     persistent: true,
     peek: false,
     bind_count: bound_count as i32,
+    // locally_free: union(
+    //   union(
+    //     init_acc.2,
+    //     name_match_result.par.locally_free(name_match_result.par.clone(), (input.bound_map_chain.depth() + 1) as i32),
+    //   ),
+    //   //In Scala, .from(boundCount) returns a new collection starting at element boundCount, that is, it contains all elements greater than or equal to boundCount.
+    //   //Next, .map(x => x - boundCount) decrements each value in this collection by boundCount.
+    //   body_result.par.locally_free(body_result.par.clone(), (bound_count as i32))
+    //     .iter()
+    //     .filter(|&&x| x >= bound_count as u8)
+    //     .map(|&x| x - bound_count as u8)
+    //     .collect::<Vec<u8>>(),
+    // ),
     locally_free: union(
-      union(
-        init_acc.2,
-        name_match_result.par.locally_free(name_match_result.par.clone(), (input.bound_map_chain.depth() + 1) as i32),
+      name_match_result.par.locally_free(
+          name_match_result.par.clone(),
+          input.bound_map_chain.depth() as i32,
       ),
-      //In Scala, .from(boundCount) returns a new collection starting at element boundCount, that is, it contains all elements greater than or equal to boundCount.
-      //Next, .map(x => x - boundCount) decrements each value in this collection by boundCount.
-      body_result.par.locally_free(body_result.par.clone(), (bound_count as i32))
-        .iter()
-        .filter(|&&x| x >= bound_count as u8)
-        .map(|&x| x - bound_count as u8)
-        .collect::<Vec<u8>>(),
-    ),
+      union(
+          init_acc.2,
+          filter_and_adjust_bitset(body_result.par.clone().locally_free, bound_count),
+      ),
+  ),
     connective_used: name_match_result.par.connective_used(name_match_result.par.clone())
       || body_result.par.connective_used(body_result.par.clone()),
   };
@@ -123,6 +116,13 @@ pub fn normalize_p_contr(
     par: updated_par,
     free_map: body_result.free_map,
   })
+}
+
+fn filter_and_adjust_bitset(bitset: Vec<u8>, bound_count: usize) -> Vec<u8> {
+    bitset.into_iter()
+        .enumerate()
+        .filter_map(|(i, _)| if i >= bound_count { Some(i as u8 - bound_count as u8) } else { None })
+        .collect()
 }
 
 #[test]
