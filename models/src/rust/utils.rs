@@ -128,6 +128,21 @@ impl Par {
         }
     }
 
+  pub fn append(&self, other: Par) -> Par {
+    Par {
+      sends: [self.sends.clone(), other.sends].concat(),
+      receives: [self.receives.clone(), other.receives].concat(),
+      news: [self.news.clone(), other.news].concat(),
+      exprs: [self.exprs.clone(), other.exprs].concat(),
+      matches: [self.matches.clone(), other.matches].concat(),
+      unforgeables: [self.unforgeables.clone(), other.unforgeables].concat(),
+      bundles: [self.bundles.clone(), other.bundles].concat(),
+      connectives: [self.connectives.clone(), other.connectives].concat(),
+      locally_free: union(self.locally_free.clone(), other.locally_free),
+      connective_used: self.connective_used || other.connective_used,
+    }
+  }
+
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/package.scala - FreeMap

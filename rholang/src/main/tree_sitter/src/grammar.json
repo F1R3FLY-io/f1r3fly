@@ -596,9 +596,47 @@
         }
       ]
     },
+    "var_ref": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "var_ref_kind",
+          "content": {
+            "type": "SYMBOL",
+            "name": "var_ref_kind"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "var",
+          "content": {
+            "type": "SYMBOL",
+            "name": "var"
+          }
+        }
+      ]
+    },
+    "var_ref_kind": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "STRING",
+          "value": "= *"
+        }
+      ]
+    },
     "_proc_expression": {
       "type": "CHOICE",
       "members": [
+        {
+          "type": "SYMBOL",
+          "name": "var_ref"
+        },
         {
           "type": "SYMBOL",
           "name": "or"
