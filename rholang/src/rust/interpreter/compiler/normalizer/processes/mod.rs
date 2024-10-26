@@ -9,4 +9,6 @@ pub mod p_conjunction_normalizer;
 pub mod p_disjunction_normalizer;
 pub mod p_contr_normalizer;
 pub mod p_eval_normalizer;
-pub mod Utils;
+pub mod p_send_normalizer;
+
+pub mod utils;

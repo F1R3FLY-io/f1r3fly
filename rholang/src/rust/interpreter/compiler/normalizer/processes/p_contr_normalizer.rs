@@ -4,7 +4,7 @@ use models::rhoapi::expr::ExprInstance;
 use models::rust::utils::union;
 use tree_sitter::Node;
 use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, normalize_match, ProcVisitInputs, ProcVisitOutputs, VarSort};
-use crate::rust::interpreter::compiler::normalizer::processes::Utils::fail_on_invalid_connective;
+use crate::rust::interpreter::compiler::normalizer::processes::utils::fail_on_invalid_connective;
 use crate::rust::interpreter::compiler::normalizer::remainder_normalizer_matcher::normalize_match_name;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;

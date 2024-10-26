@@ -175,6 +175,10 @@ pub fn normalize_match(
           println!("Found an eval node, calling normalize_p_eval");
           normalize_p_eval(p_node, input, source_code)
         }
+        "send" => {
+          println!("Found a send node, calling normalize_p_send");
+          normalize_p_send(p_node, input, source_code)
+        }
          "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
