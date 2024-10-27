@@ -1,0 +1,12 @@
+=======
+Negation
+=======
+
+{ ~x }
+
+---
+
+(source_file
+  (block
+    body: (negation
+      proc: (var))))

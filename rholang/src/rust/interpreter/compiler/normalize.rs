@@ -187,6 +187,10 @@ pub fn normalize_match(
           println!("Found a par node, calling normalize_p_par");
           normalize_p_par(p_node, input, source_code)
         }
+        "negation" => {
+          println!("Found a negation node, calling normalize_p_negation");
+          normalize_p_negation(p_node, input, source_code)
+        }
          "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),

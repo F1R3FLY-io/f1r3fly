@@ -18,3 +18,4 @@ pub use crate::rust::interpreter::compiler::normalizer::processes::p_eval_normal
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_send_normalizer::normalize_p_send;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_method_normalizer::normalize_p_method;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_par_normalizer::normalize_p_par;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_negation_normalizer::normalize_p_negation;
