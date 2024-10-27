@@ -7,7 +7,7 @@ use super::exports::*;
 
 pub fn normalize_p_par(
   node: Node,
-  mut input: ProcVisitInputs,
+  input: ProcVisitInputs,
   source_code: &[u8],
 ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
   println!("Normalizing par node of kind: {}", node.kind());

@@ -9,7 +9,7 @@ use super::exports::*;
 
 pub fn normalize_p_send(
   node: Node,
-  mut input: ProcVisitInputs,
+  input: ProcVisitInputs,
   source_code: &[u8],
 ) -> Result<ProcVisitOutputs, Box<dyn Error>> {
   println!("Normalizing send node of kind: {}", node.kind());
@@ -77,7 +77,7 @@ pub fn normalize_p_send(
     connective_used: name_match_result.par.connective_used(name_match_result.par.clone()) || acc.3,
   };
 
-  let updated_par = input.par.prepend_send(send);
+  let updated_par = input.par.clone().prepend_send(send);
 
   Ok(ProcVisitOutputs {
     par: updated_par,
