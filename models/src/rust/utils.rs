@@ -92,6 +92,18 @@ impl Par {
         }
     }
 
+  pub fn prepend_receive(&mut self, s: Receive) -> Par {
+    let mut new_receives = vec![s.clone()];
+    new_receives.append(&mut self.receives);
+
+    Par {
+      receives: new_receives,
+      locally_free: union(self.locally_free.clone(), s.locally_free),
+      connective_used: self.connective_used || s.connective_used,
+      ..self.clone()
+    }
+  }
+
     pub fn is_empty(&self) -> bool {
         self.sends.is_empty()
             && self.receives.is_empty()
@@ -115,6 +127,21 @@ impl Par {
             None
         }
     }
+
+  pub fn append(&self, other: Par) -> Par {
+    Par {
+      sends: [self.sends.clone(), other.sends].concat(),
+      receives: [self.receives.clone(), other.receives].concat(),
+      news: [self.news.clone(), other.news].concat(),
+      exprs: [self.exprs.clone(), other.exprs].concat(),
+      matches: [self.matches.clone(), other.matches].concat(),
+      unforgeables: [self.unforgeables.clone(), other.unforgeables].concat(),
+      bundles: [self.bundles.clone(), other.bundles].concat(),
+      connectives: [self.connectives.clone(), other.connectives].concat(),
+      locally_free: union(self.locally_free.clone(), other.locally_free),
+      connective_used: self.connective_used || other.connective_used,
+    }
+  }
 
 }
 

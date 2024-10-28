@@ -2,7 +2,7 @@ use super::exports::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoundMapChain<T> {
-  chain: Vec<BoundMap<T>>,
+  pub(crate) chain: Vec<BoundMap<T>>,
 }
 
 impl<T: Clone> BoundMapChain<T> {
@@ -12,47 +12,48 @@ impl<T: Clone> BoundMapChain<T> {
     }
   }
 
-  pub(crate) fn get(&self, name: &str) -> Option<BoundContext<T>>
-  where
-    T: Clone,
-  {
+  pub fn get(&self, name: &str) -> Option<BoundContext<T>> {
     self.chain.first().and_then(|map| map.get(name))
   }
 
-  pub fn find(&self, name: &str) -> Option<(BoundContext<T>, usize)>
-  where
-    T: Clone,
-  {
+  pub fn find(&self, name: &str) -> Option<(BoundContext<T>, usize)> {
     self.chain.iter().enumerate().find_map(|(depth, map)| {
       map.get(name).map(|context| (context, depth))
     })
   }
 
-  pub fn put(&mut self, binding: IdContext<T>) {
-    if let Some(map) = self.chain.first_mut() {
-      map.put(binding);
+  pub fn put(&self, binding: IdContext<T>) -> BoundMapChain<T> {
+    let mut new_chain = self.chain.clone();
+    if let Some(map) = new_chain.first_mut() {
+      new_chain[0] = map.put(binding);
     }
+    BoundMapChain { chain: new_chain }
   }
 
-  fn put_all(&mut self, bindings: Vec<IdContext<T>>) {
-    if let Some(map) = self.chain.first_mut() {
+  pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> BoundMapChain<T> {
+    let mut new_chain = self.chain.clone();
+    if let Some(map) = new_chain.first_mut() {
       map.put_all(bindings);
     }
+    BoundMapChain { chain: new_chain }
   }
 
-  fn absorb_free(&mut self, free_map: FreeMap<T>) {
-    if let Some(map) = self.chain.first_mut() {
+  pub(crate) fn absorb_free(&self, free_map: FreeMap<T>) -> BoundMapChain<T> {
+    let mut new_chain = self.chain.clone();
+    if let Some(map) = new_chain.first_mut() {
       map.absorb_free(free_map);
     }
+    BoundMapChain { chain: new_chain }
   }
 
-  pub(crate) fn push(mut self) -> BoundMapChain<T> {
-    self.chain.insert(0, BoundMap::new());
-    self
+  pub fn push(&self) -> BoundMapChain<T> {
+    let mut new_chain = self.chain.clone();
+    new_chain.insert(0, BoundMap::new());
+    BoundMapChain { chain: new_chain }
   }
 
-  fn count(&self) -> usize {
-    self.chain.first().map_or(0, |map| map.count())
+  pub fn get_count(&self) -> usize {
+    self.chain.first().map_or(0, |map| map.get_count())
   }
 
   pub(crate) fn depth(&self) -> usize {

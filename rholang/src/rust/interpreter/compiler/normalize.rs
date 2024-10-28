@@ -64,6 +64,9 @@ pub struct CollectVisitOutputs {
     pub(crate) free_map: FreeMap<VarSort>,
 }
 
+/**
+ * Rholang normalizer entry point
+ */
 pub fn normalize_match(
     p_node: Node,
     input: ProcVisitInputs,
@@ -160,7 +163,35 @@ pub fn normalize_match(
             println!("Found a conjunction node, calling normalize_p_conjunction");
             normalize_p_сonjunction(p_node, input, source_code)
         }
-        "nil" => Ok(ProcVisitOutputs {
+        "disjunction" => {
+            println!("Found a disjunction node, calling normalize_p_disjunction");
+            normalize_p_disjunction(p_node, input, source_code)
+        }
+        "contract" => {
+            println!("Found a contract node, calling normalize_p_contract");
+            normalize_p_contr(p_node, input, source_code)
+        }
+        "eval" => {
+          println!("Found an eval node, calling normalize_p_eval");
+          normalize_p_eval(p_node, input, source_code)
+        }
+        "send" => {
+          println!("Found a send node, calling normalize_p_send");
+          normalize_p_send(p_node, input, source_code)
+        }
+        "method" => {
+          println!("Found a method node, calling normalize_p_method");
+          normalize_p_method(p_node, input, source_code)
+        }
+        "par" => {
+          println!("Found a par node, calling normalize_p_par");
+          normalize_p_par(p_node, input, source_code)
+        }
+        "negation" => {
+          println!("Found a negation node, calling normalize_p_negation");
+          normalize_p_negation(p_node, input, source_code)
+        }
+         "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
         }),
