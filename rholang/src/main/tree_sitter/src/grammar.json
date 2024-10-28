@@ -1,4 +1,5 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "rholang",
   "word": "var",
   "rules": {
@@ -681,7 +682,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "parenthesized"
+          "name": "_parenthesized"
         },
         {
           "type": "SYMBOL",
@@ -713,7 +714,7 @@
         }
       ]
     },
-    "parenthesized": {
+    "_parenthesized": {
       "type": "PREC",
       "value": 11,
       "content": {

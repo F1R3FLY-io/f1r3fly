@@ -121,7 +121,7 @@ module.exports = grammar({
             $.not,
             $.neg,
             $.method,
-            $.parenthesized,
+            $._parenthesized,
             $.eval,
             $.quote,
             $.disjunction,
@@ -130,7 +130,7 @@ module.exports = grammar({
             $._ground_expression,
 						$.var_ref
         ),
-        parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
+        _parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
 
         or: $ => prec.left(4, seq(field('left', $._proc), 'or', field('right', $._proc))),
         and: $ => prec.left(5, seq(field('left', $._proc), 'and', field('right', $._proc))),

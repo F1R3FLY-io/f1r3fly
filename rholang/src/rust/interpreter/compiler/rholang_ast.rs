@@ -309,18 +309,9 @@ pub struct Var {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Quote {
-    pub quotable: Box<Quotable>,
+    pub quotable: Box<Proc>,
     pub line_num: usize,
     pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Quotable {
-    Eval(Eval),
-    Disjunction(Disjunction),
-    Conjunction(Conjunction),
-    Negation(Negation),
-    GroundExpression(Proc),
 }
 
 #[derive(Debug, PartialEq, Clone)]

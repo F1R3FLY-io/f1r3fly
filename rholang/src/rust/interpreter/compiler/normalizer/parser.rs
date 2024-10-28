@@ -4,8 +4,8 @@ use crate::rust::interpreter::{
     compiler::rholang_ast::{
         Block, Branch, BundleType, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
-        Proc, ProcList, Quotable, Quote, Receipt, Receipts, RepeatedBind, SendType, SimpleType,
-        Source, SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
+        Proc, ProcList, Quote, Receipt, Receipts, RepeatedBind, SendType, SimpleType, Source,
+        SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
     errors::InterpreterError,
 };
@@ -29,13 +29,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
     // println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
 
     let root_node = tree.root_node();
-    if root_node.kind() != "source_file" {
-        return Err(InterpreterError::ParserError(
-            "Incorrent root kind".to_string(),
-        ));
-    }
-
-    let start_node = match root_node.child(0) {
+    let start_node = match root_node.named_child(0) {
         Some(node) => Ok(node),
         None => Err(InterpreterError::ParserError(
             "The code does not contain any valid Rholang process. Expected a child node"
@@ -71,7 +65,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
             let cont: SyncSendCont = {
                 let sync_send_cont_node = get_child_by_field_name(node, "cont")?;
-                match sync_send_cont_node.child(0) {
+                match sync_send_cont_node.named_child(0) {
                     Some(choice_node) => match choice_node.kind() {
                         "empty_cont" => SyncSendCont::Empty {
                             line_num: choice_node.start_position().row,
@@ -79,7 +73,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                         },
 
                         "non_empty_cont" => {
-                            let proc_node = match choice_node.child(1) {
+                            let proc_node = match choice_node.named_child(0) {
                                 Some(_proc_node) => Ok(_proc_node),
                                 None => Err(InterpreterError::ParserError(
                                     "Expected a _proc node in non_empty_cont at index 1"
@@ -124,7 +118,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
             for child in decls_node.named_children(&mut decls_node.walk()) {
                 let var_node = child
-                    .child(0)
+                    .named_child(0)
                     .filter(|n| n.kind() == "var")
                     .ok_or_else(|| {
                         InterpreterError::ParserError(
@@ -135,7 +129,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
                 let uri = match child.child_by_field_name("uri") {
                     Some(uri_literal_node) => {
-                        match uri_literal_node.next_sibling() {
+                        match uri_literal_node.next_named_sibling() {
                             // 'uri_literal_node' is '(' so it's sibling is the actual rule we want
                             Some(rule_node) => Some(parse_uri_literal(&rule_node, source)?),
                             None => {
@@ -206,6 +200,12 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
                     let procs_node = get_child_by_field_name(&child, "procs")?;
                     let procs = parse_comma_sep_procs(&procs_node, source)?;
+
+                    if names_proc.names.len() != procs.len() {
+                        return Err(InterpreterError::ParserError(
+                            "Names must have the same length as Procs".to_string(),
+                        ));
+                    }
 
                     decls.push(Decl {
                         names: names_proc,
@@ -693,15 +693,6 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             })
         }
 
-        "parenthesized" => {
-            let expr_node = node.child(1).ok_or_else(|| {
-                InterpreterError::ParserError(
-                    "Expected an expression inside parenthesized".to_string(),
-                )
-            })?;
-            parse_proc(&expr_node, source)
-        }
-
         "eval" => Ok(Proc::Eval(parse_eval(node, source)?)),
 
         "quote" => Ok(Proc::Quote(parse_quote(node, source)?)),
@@ -718,7 +709,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         "collection" => {
             fn get_cont_id(node: &Node) -> Result<i32, InterpreterError> {
                 match node.child_by_field_name("cont") {
-                    Some(cont_node) => match cont_node.next_sibling() {
+                    Some(cont_node) => match cont_node.next_named_sibling() {
                         // 'cont_node' is '...' so it's sibling is the actual rule we want
                         Some(rule_node) => Ok(rule_node.id() as i32),
                         None => {
@@ -736,7 +727,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 source: &str,
             ) -> Result<Option<Box<Proc>>, InterpreterError> {
                 match node.child_by_field_name("cont") {
-                    Some(cont_node) => match cont_node.next_sibling() {
+                    Some(cont_node) => match cont_node.next_named_sibling() {
                         // 'cont_node' is '...' so it's sibling is the actual rule we want
                         Some(rule_node) => Ok(Some(Box::new(parse_proc(&rule_node, source)?))),
                         None => {
@@ -909,7 +900,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         // var_ref
         "var_ref" => {
-            let var_ref_kind_node = node.child(0).ok_or_else(|| {
+            let var_ref_kind_node = node.named_child(0).ok_or_else(|| {
                 InterpreterError::ParserError(
                     "Expected a var_ref_kind node in var_ref at index 0".to_string(),
                 )
@@ -934,7 +925,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
                 }
             };
 
-            let var_node = node.child(1).ok_or_else(|| {
+            let var_node = node.named_child(1).ok_or_else(|| {
                 InterpreterError::ParserError(
                     "Expected a var node in var_ref at index 1".to_string(),
                 )
@@ -985,43 +976,19 @@ fn parse_var(node: &Node, source: &str) -> Result<Var, InterpreterError> {
 }
 
 fn parse_quote(node: &Node, source: &str) -> Result<Quote, InterpreterError> {
-    let quotable_node = node.child(1).ok_or_else(|| {
+    let quotable_node = node.named_child(0).ok_or_else(|| {
         InterpreterError::ParserError("Expected a quotable node in quote at index 1".to_string())
     })?;
 
     Ok(Quote {
-        quotable: Box::new(parse_quotable(&quotable_node, source)?),
+        quotable: Box::new(parse_proc(&quotable_node, source)?),
         line_num: node.start_position().row,
         col_num: node.start_position().column,
     })
 }
 
-fn parse_quotable(node: &Node, source: &str) -> Result<Quotable, InterpreterError> {
-    match node.kind() {
-        "eval" => Ok(Quotable::Eval(parse_eval(node, source)?)),
-
-        "disjunction" => Ok(Quotable::Disjunction(parse_disjunction(node, source)?)),
-
-        "conjunction" => Ok(Quotable::Conjunction(parse_conjunction(node, source)?)),
-
-        "negation" => Ok(Quotable::Negation(parse_negation(node, source)?)),
-
-        _ => {
-            let proc_result = parse_proc(node, source);
-            match proc_result {
-                Ok(proc) => Ok(Quotable::GroundExpression(proc)),
-                Err(proc_err) => Err(InterpreterError::ParserError(format!(
-                    "{:?}. Unexpected choice node kind: {:?} of quotable.",
-                    proc_err,
-                    node.kind(),
-                ))),
-            }
-        }
-    }
-}
-
 fn parse_eval(node: &Node, source: &str) -> Result<Eval, InterpreterError> {
-    let name_node = node.child(1).ok_or_else(|| {
+    let name_node = node.named_child(0).ok_or_else(|| {
         InterpreterError::ParserError("Expected a name node in eval at index 1".to_string())
     })?;
 
@@ -1116,9 +1083,11 @@ fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, Interprete
     let input_proc = match input_node.kind() {
         "simple_source" => Source::Simple {
             name: {
-                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
-                    "Expected name node in simple_source at index 0".to_string(),
-                ))?;
+                let name_node = input_node
+                    .named_child(0)
+                    .ok_or(InterpreterError::ParserError(
+                        "Expected name node in simple_source at index 0".to_string(),
+                    ))?;
                 parse_name(&name_node, source)?
             },
             line_num: input_node_line_num,
@@ -1127,9 +1096,11 @@ fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, Interprete
 
         "receive_send_source" => Source::ReceiveSend {
             name: {
-                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
-                    "Expected name node in receive_send_source at index 0".to_string(),
-                ))?;
+                let name_node = input_node
+                    .named_child(0)
+                    .ok_or(InterpreterError::ParserError(
+                        "Expected name node in receive_send_source at index 0".to_string(),
+                    ))?;
                 parse_name(&name_node, source)?
             },
             line_num: input_node_line_num,
@@ -1138,9 +1109,11 @@ fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, Interprete
 
         "send_receive_source" => Source::SendReceive {
             name: {
-                let name_node = input_node.child(0).ok_or(InterpreterError::ParserError(
-                    "Expected name node in send_receive_source at index 0".to_string(),
-                ))?;
+                let name_node = input_node
+                    .named_child(0)
+                    .ok_or(InterpreterError::ParserError(
+                        "Expected name node in send_receive_source at index 0".to_string(),
+                    ))?;
                 parse_name(&name_node, source)?
             },
             inputs: {
@@ -1172,7 +1145,7 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
         match node.child_by_field_name("cont") {
             Some(cont_node) => {
                 // 'cont_node' is '...@' so it's subsequent sibling is the actual rule we want
-                let sibling_node = match cont_node.next_sibling().and_then(|n| n.next_sibling()) {
+                let sibling_node = match cont_node.next_named_sibling() {
                     Some(node) => node,
                     None => {
                         return Err(InterpreterError::ParserError(
@@ -1191,7 +1164,7 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
         match node.child_by_field_name("cont") {
             Some(cont_node) => {
                 // 'cont_node' is '...@' so it's subsequent sibling is the actual rule we want
-                let sibling_node = match cont_node.next_sibling().and_then(|n| n.next_sibling()) {
+                let sibling_node = match cont_node.next_named_sibling() {
                     Some(node) => node,
                     None => {
                         return Err(InterpreterError::ParserError(
