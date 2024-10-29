@@ -6,3 +6,6 @@ pub use crate::rust::interpreter::compiler::normalizer::parser::parse_rholang_co
 pub use models::rust::utils::new_boundvar_par;
 pub use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::normalize_ground;
 pub use crate::rust::interpreter::compiler::normalizer::name_normalize_matcher::normalize_name;
+pub use crate::rust::interpreter::errors::InterpreterError;
+pub use crate::rust::interpreter::util::prepend_expr;
+pub use crate::rust::interpreter::compiler::rholang_ast::Proc;

@@ -10,7 +10,7 @@ use models::rhoapi::{Connective, VarRef};
 use std::result::Result;
 
 pub fn normalize_p_var_ref(
-    p: PVarRef,
+    p: &PVarRef,
     input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     match input.bound_map_chain.find(&p.var.name) {
@@ -38,7 +38,7 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p.var.name,
+                    var_name: p.var.name.clone(),
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
                         row: p.line_num,
@@ -62,7 +62,7 @@ pub fn normalize_p_var_ref(
                 }),
 
                 _ => Err(InterpreterError::UnexpectedProcContext {
-                    var_name: p.var.name,
+                    var_name: p.var.name.clone(),
                     name_var_source_position: source_position,
                     process_source_position: SourcePosition {
                         row: p.line_num,
@@ -73,7 +73,7 @@ pub fn normalize_p_var_ref(
         },
 
         None => Err(InterpreterError::UnboundVariableRef {
-            var_name: p.var.name,
+            var_name: p.var.name.clone(),
             line: p.line_num,
             col: p.col_num,
         }),

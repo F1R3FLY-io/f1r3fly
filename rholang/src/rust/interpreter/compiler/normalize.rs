@@ -1,18 +1,14 @@
 use super::exports::*;
-use super::normalizer::exports::normalize_bool;
 use super::normalizer::processes::p_var_normalizer::normalize_p_var;
 use super::rholang_ast::Proc;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
-// use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
 use crate::rust::interpreter::errors::InterpreterError;
-use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{
-    Connective, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg,
-    ENeq, ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par,
+    EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr,
+    EPercentPercent, EPlus, EPlusPlus, Expr, Par,
 };
-use models::rust::utils::union;
 use std::error::Error;
 use tree_sitter::Node;
 
@@ -153,10 +149,10 @@ pub fn normalize_match(
             println!("Found a bundle node, calling normalize_p_bundle");
             normalize_p_bundle(p_node, input, source_code)
         }
-        "long_literal" | "bool_literal" | "string_literal" | "uri_literal" => {
-            println!("Found a ground node, calling normalize_p_ground");
-            normalize_p_ground(p_node, input, source_code)
-        }
+        // "long_literal" | "bool_literal" | "string_literal" | "uri_literal" => {
+        //     println!("Found a ground node, calling normalize_p_ground");
+        //     normalize_p_ground(p_node, input, source_code)
+        // }
         "collection" => normalize_p_collect(p_node, input, source_code),
         "matches" => {
             println!("Found a matches node, calling normalize_p_matches");
@@ -252,10 +248,48 @@ pub fn normalize_match(
 }
 
 pub fn normalize_match_proc(
-    p_node: Proc,
+    proc: &Proc,
     input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-    match p_node.clone() {
+    fn unary_exp(
+        sub_proc: &Proc,
+        input: ProcVisitInputs,
+        constructor: Box<dyn UnaryExpr>,
+    ) -> Result<ProcVisitOutputs, InterpreterError> {
+        let sub_result = normalize_match_proc(sub_proc, input.clone())?;
+        let expr = constructor.from_par(sub_result.par.clone());
+
+        Ok(ProcVisitOutputs {
+            par: prepend_expr(input.par, expr, input.bound_map_chain.depth() as i32),
+            free_map: sub_result.free_map,
+        })
+    }
+
+    fn binary_exp(
+        left_proc: &Proc,
+        right_proc: &Proc,
+        input: ProcVisitInputs,
+        constructor: Box<dyn BinaryExpr>,
+    ) -> Result<ProcVisitOutputs, InterpreterError> {
+        let left_result = normalize_match_proc(left_proc, input.clone())?;
+        let right_result = normalize_match_proc(
+            right_proc,
+            ProcVisitInputs {
+                par: Par::default(),
+                free_map: left_result.free_map.clone(),
+                ..input.clone()
+            },
+        )?;
+
+        let expr: Expr = constructor.from_pars(left_result.par.clone(), right_result.par.clone());
+
+        Ok(ProcVisitOutputs {
+            par: prepend_expr(input.par, expr, input.bound_map_chain.depth() as i32),
+            free_map: right_result.free_map,
+        })
+    }
+
+    match proc {
         Proc::Par {
             left,
             right,
@@ -314,6 +348,7 @@ pub fn normalize_match_proc(
             line_num,
             col_num,
         } => todo!(),
+
         Proc::Contract {
             name,
             formals,
@@ -337,20 +372,6 @@ pub fn normalize_match_proc(
             col_num,
         } => todo!(),
 
-        Proc::Or {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::And {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
         Proc::Matches {
             left,
             right,
@@ -358,114 +379,43 @@ pub fn normalize_match_proc(
             col_num,
         } => todo!(),
 
-        Proc::Eq {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        // binary
+        Proc::Mult { left, right, .. } => {
+            binary_exp(left, right, input, Box::new(EMult::default()))
+        }
 
-        Proc::Neq {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::PercentPercent { left, right, .. } => {
+            binary_exp(left, right, input, Box::new(EPercentPercent::default()))
+        }
 
-        Proc::Lt {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Minus { left, right, .. } => {
+            binary_exp(left, right, input, Box::new(EMinus::default()))
+        }
 
-        Proc::Lte {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        // PlusPlus
+        Proc::Concat { left, right, .. } => {
+            binary_exp(left, right, input, Box::new(EPlusPlus::default()))
+        }
 
-        Proc::Gt {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-        Proc::Gte {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::MinusMinus { left, right, .. } => {
+            binary_exp(left, right, input, Box::new(EMinusMinus::default()))
+        }
 
-        Proc::Concat {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Div { left, right, .. } => binary_exp(left, right, input, Box::new(EDiv::default())),
+        Proc::Mod { left, right, .. } => binary_exp(left, right, input, Box::new(EMod::default())),
+        Proc::Add { left, right, .. } => binary_exp(left, right, input, Box::new(EPlus::default())),
+        Proc::Or { left, right, .. } => binary_exp(left, right, input, Box::new(EOr::default())),
+        Proc::And { left, right, .. } => binary_exp(left, right, input, Box::new(EAnd::default())),
+        Proc::Eq { left, right, .. } => binary_exp(left, right, input, Box::new(EEq::default())),
+        Proc::Neq { left, right, .. } => binary_exp(left, right, input, Box::new(ENeq::default())),
+        Proc::Lt { left, right, .. } => binary_exp(left, right, input, Box::new(ELt::default())),
+        Proc::Lte { left, right, .. } => binary_exp(left, right, input, Box::new(ELte::default())),
+        Proc::Gt { left, right, .. } => binary_exp(left, right, input, Box::new(EGt::default())),
+        Proc::Gte { left, right, .. } => binary_exp(left, right, input, Box::new(EGte::default())),
 
-        Proc::MinusMinus {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Minus {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Add {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::PercentPercent {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Mult {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Div {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Mod {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Not {
-            proc,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Neg {
-            proc,
-            line_num,
-            col_num,
-        } => todo!(),
+        // unary
+        Proc::Not { proc: sub_proc, .. } => unary_exp(sub_proc, input, Box::new(ENot::default())),
+        Proc::Neg { proc: sub_proc, .. } => unary_exp(sub_proc, input, Box::new(ENeg::default())),
 
         Proc::Method {
             receiver,
@@ -497,32 +447,19 @@ pub fn normalize_match_proc(
 
         Proc::SimpleType(simple_type) => todo!(),
 
-        Proc::BoolLiteral {
-            value,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::BoolLiteral { .. } => normalize_p_ground(proc, input),
+        Proc::LongLiteral { .. } => normalize_p_ground(proc, input),
+        Proc::StringLiteral { .. } => normalize_p_ground(proc, input),
+        Proc::UriLiteral(_) => normalize_p_ground(proc, input),
 
-        Proc::LongLiteral {
-            value,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Nil { .. } => Ok(ProcVisitOutputs {
+            par: input.par.clone(),
+            free_map: input.free_map.clone(),
+        }),
 
-        Proc::StringLiteral {
-            value,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Var(_) => normalize_p_var(proc, input),
+        Proc::Wildcard { .. } => normalize_p_var(proc, input),
 
-        Proc::UriLiteral(uri_literal) => todo!(),
-
-        Proc::Nil { line_num, col_num } => todo!(),
-
-        Proc::Var(var) => normalize_p_var(p_node, input),
-
-        Proc::Wildcard { line_num, col_num } => todo!(),
-
-        Proc::VarRef(var_ref) => todo!(),
+        Proc::VarRef(var_ref) => normalize_p_var_ref(var_ref, input),
     }
 }

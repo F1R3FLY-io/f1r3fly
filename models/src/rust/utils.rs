@@ -92,29 +92,29 @@ impl Par {
         }
     }
 
-  pub fn prepend_receive(&mut self, s: Receive) -> Par {
-    let mut new_receives = vec![s.clone()];
-    new_receives.append(&mut self.receives);
+    pub fn prepend_receive(&mut self, s: Receive) -> Par {
+        let mut new_receives = vec![s.clone()];
+        new_receives.append(&mut self.receives);
 
-    Par {
-      receives: new_receives,
-      locally_free: union(self.locally_free.clone(), s.locally_free),
-      connective_used: self.connective_used || s.connective_used,
-      ..self.clone()
+        Par {
+            receives: new_receives,
+            locally_free: union(self.locally_free.clone(), s.locally_free),
+            connective_used: self.connective_used || s.connective_used,
+            ..self.clone()
+        }
     }
-  }
 
-  pub fn prepend_match(&mut self, m: Match) -> Par {
-    let mut new_matches = vec![m.clone()];
-    new_matches.append(&mut self.matches);
+    pub fn prepend_match(&mut self, m: Match) -> Par {
+        let mut new_matches = vec![m.clone()];
+        new_matches.append(&mut self.matches);
 
-    Par {
-      matches: new_matches,
-      locally_free: union(self.locally_free.clone(), m.locally_free),
-      connective_used: self.connective_used || m.connective_used,
-      ..self.clone()
+        Par {
+            matches: new_matches,
+            locally_free: union(self.locally_free.clone(), m.locally_free),
+            connective_used: self.connective_used || m.connective_used,
+            ..self.clone()
+        }
     }
-  }
 
     pub fn is_empty(&self) -> bool {
         self.sends.is_empty()
@@ -133,28 +133,27 @@ impl Par {
             && self.matches.is_empty()
             && self.bundles.is_empty()
             && self.connectives.len() == 1
-       {
+        {
             Some(self.connectives[0].clone())
         } else {
             None
         }
     }
 
-  pub fn append(&self, other: Par) -> Par {
-    Par {
-      sends: [self.sends.clone(), other.sends].concat(),
-      receives: [self.receives.clone(), other.receives].concat(),
-      news: [self.news.clone(), other.news].concat(),
-      exprs: [self.exprs.clone(), other.exprs].concat(),
-      matches: [self.matches.clone(), other.matches].concat(),
-      unforgeables: [self.unforgeables.clone(), other.unforgeables].concat(),
-      bundles: [self.bundles.clone(), other.bundles].concat(),
-      connectives: [self.connectives.clone(), other.connectives].concat(),
-      locally_free: union(self.locally_free.clone(), other.locally_free),
-      connective_used: self.connective_used || other.connective_used,
+    pub fn append(&self, other: Par) -> Par {
+        Par {
+            sends: [self.sends.clone(), other.sends].concat(),
+            receives: [self.receives.clone(), other.receives].concat(),
+            news: [self.news.clone(), other.news].concat(),
+            exprs: [self.exprs.clone(), other.exprs].concat(),
+            matches: [self.matches.clone(), other.matches].concat(),
+            unforgeables: [self.unforgeables.clone(), other.unforgeables].concat(),
+            bundles: [self.bundles.clone(), other.bundles].concat(),
+            connectives: [self.connectives.clone(), other.connectives].concat(),
+            locally_free: union(self.locally_free.clone(), other.locally_free),
+            connective_used: self.connective_used || other.connective_used,
+        }
     }
-  }
-
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/package.scala - FreeMap
@@ -460,6 +459,16 @@ pub fn new_gstring_par(
 pub fn new_gstring_expr(value: String) -> Expr {
     Expr {
         expr_instance: Some(GString(value)),
+    }
+}
+
+pub fn new_guri_par(value: String, _locally_free_par: Vec<u8>, _connective_used_par: bool) -> Par {
+    vector_par(_locally_free_par, _connective_used_par).with_exprs(vec![new_guri_expr(value)])
+}
+
+pub fn new_guri_expr(value: String) -> Expr {
+    Expr {
+        expr_instance: Some(GUri(value)),
     }
 }
 

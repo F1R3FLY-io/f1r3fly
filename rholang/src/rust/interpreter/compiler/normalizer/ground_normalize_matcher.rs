@@ -1,59 +1,29 @@
-use tree_sitter::Node;
-use crate::rust::interpreter::compiler::rholang_ast::Proc;
+use crate::rust::interpreter::compiler::normalizer::exports::normalize_bool;
+use crate::rust::interpreter::compiler::rholang_ast::{Proc, UriLiteral};
 use crate::rust::interpreter::errors::InterpreterError;
-
-use super::exports::parse_rholang_code;
-use super::exports::normalize_bool;
+use models::rhoapi::Expr;
+use models::rust::utils::{new_gbool_expr, new_gint_expr, new_gstring_expr, new_guri_expr};
 
 /*
-  This normalizer works with various types of "ground" (primitive) values, such as Bool, Int, String, and Uri.
- */
+ This normalizer works with various types of "ground" (primitive) values, such as Bool, Int, String, and Uri.
+*/
+pub fn normalize_ground(proc: &Proc) -> Result<Expr, InterpreterError> {
+    match proc.clone() {
+        Proc::BoolLiteral { .. } => Ok(new_gbool_expr(normalize_bool(proc)?)),
 
-#[derive(Debug, PartialEq)]
-pub enum Ground {
-  Bool(bool),
-  Int(i64),
-  String(String),
-  Uri(String),
-}
+        Proc::LongLiteral { value, .. } => Ok(new_gint_expr(value)),
 
-pub fn normalize_ground(proc: Proc) -> Result<Option<Ground>, InterpreterError> {
+        // The 'value' here is already stripped. This happens in custom parser.
+        Proc::StringLiteral { value, .. } => Ok(new_gstring_expr(value)),
 
-  // match proc {
-      
-  // }
+        // The 'value' here is already stripped. This happens in custom parser.
+        Proc::UriLiteral(UriLiteral { value, .. }) => Ok(new_guri_expr(value)),
 
-  // match node.kind() {
-  //   "bool_literal" => {
-  //     if let Some(value) = normalize_bool(node, source_code) {
-  //       return Some(Ground::Bool(value));
-  //     }
-  //     None
-  //   },
-  //   "long_literal" => {
-  //     let text = node.utf8_text(source_code).unwrap();
-  //     text.parse::<i64>().ok().map(Ground::Int)
-  //   }
-  //   "string_literal" => {
-  //     let text = node.utf8_text(source_code).unwrap();
-  //     Some(Ground::String(strip_string(text)))
-  //   }
-  //   "uri_literal" => {
-  //     let text = node.utf8_text(source_code).unwrap();
-  //     Some(Ground::Uri(strip_uri(text)))
-  //   }
-  //   _ => None,
-  // }
-
-  todo!()
-}
-
-fn strip_uri(raw: &str) -> String {
-  raw[1..raw.len() - 1].to_string()
-}
-
-fn strip_string(raw: &str) -> String {
-  raw[1..raw.len() - 1].to_string()
+        _ => Err(InterpreterError::BugFoundError(format!(
+            "Expected a ground type, found: {:?}",
+            proc
+        ))),
+    }
 }
 
 // first 3 tests based on src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala

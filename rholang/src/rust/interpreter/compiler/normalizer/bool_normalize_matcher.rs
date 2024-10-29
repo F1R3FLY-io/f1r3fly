@@ -1,10 +1,10 @@
 use crate::rust::interpreter::{compiler::rholang_ast::Proc, errors::InterpreterError};
 
-pub fn normalize_bool(proc: Proc) -> Result<Option<bool>, InterpreterError> {
+pub fn normalize_bool(proc: &Proc) -> Result<bool, InterpreterError> {
     match proc {
         Proc::BoolLiteral { value, .. } => match value {
-            true => Ok(Some(true)),
-            false => Ok(Some(false)),
+            true => Ok(true),
+            false => Ok(false),
         },
 
         _ => Err(InterpreterError::BugFoundError(format!(
@@ -23,9 +23,9 @@ fn bool_true_should_compile_as_proc_bool() {
         col_num: 0,
     };
 
-    let res = normalize_bool(b_true);
+    let res = normalize_bool(&b_true);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), Some(true));
+    assert_eq!(res.unwrap(), true);
 }
 
 // #[test]

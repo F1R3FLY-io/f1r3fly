@@ -1,28 +1,8 @@
-use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::Ground;
-
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::{
-    expr, EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq,
-    ENot, EOr, EPercentPercent, EPlus, EPlusPlus, Expr, Par,
+    EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr,
+    EPercentPercent, EPlus, EPlusPlus, Expr, Par,
 };
-
-// I'm not sure about this func, but I need it for p_ground_normalizer.rs
-pub fn ground_to_expr(ground: Ground) -> Expr {
-    match ground {
-        Ground::Bool(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GBool(value)),
-        },
-        Ground::Int(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GInt(value)),
-        },
-        Ground::String(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GString(value)),
-        },
-        Ground::Uri(value) => Expr {
-            expr_instance: Some(expr::ExprInstance::GUri(value)),
-        },
-    }
-}
 
 pub trait UnaryExpr {
     fn from_par(&self, p: Par) -> Expr;
