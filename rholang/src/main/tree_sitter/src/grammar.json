@@ -1,4 +1,5 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "rholang",
   "word": "var",
   "rules": {
@@ -596,47 +597,9 @@
         }
       ]
     },
-    "var_ref": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "var_ref_kind",
-          "content": {
-            "type": "SYMBOL",
-            "name": "var_ref_kind"
-          }
-        },
-        {
-          "type": "FIELD",
-          "name": "var",
-          "content": {
-            "type": "SYMBOL",
-            "name": "var"
-          }
-        }
-      ]
-    },
-    "var_ref_kind": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "="
-        },
-        {
-          "type": "STRING",
-          "value": "= *"
-        }
-      ]
-    },
     "_proc_expression": {
       "type": "CHOICE",
       "members": [
-        {
-          "type": "SYMBOL",
-          "name": "var_ref"
-        },
         {
           "type": "SYMBOL",
           "name": "or"
@@ -703,6 +666,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "mod"
+        },
+        {
+          "type": "SYMBOL",
           "name": "not"
         },
         {
@@ -740,6 +707,10 @@
         {
           "type": "SYMBOL",
           "name": "_ground_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "var_ref"
         }
       ]
     },
@@ -1497,6 +1468,32 @@
         {
           "type": "SYMBOL",
           "name": "wildcard"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "var"
+        }
+      ]
+    },
+    "var_ref_kind": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "STRING",
+          "value": "=*"
+        }
+      ]
+    },
+    "var_ref": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "var_ref_kind"
         },
         {
           "type": "SYMBOL",
