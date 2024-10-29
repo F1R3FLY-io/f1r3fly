@@ -1,8 +1,11 @@
 use super::exports::*;
-use crate::rust::interpreter::compiler::normalizer::processes::p_var_normalizer::normalize_p_var;
+use super::normalizer::exports::normalize_bool;
+use super::normalizer::processes::p_var_normalizer::normalize_p_var;
+use super::rholang_ast::Proc;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
 // use crate::rust::interpreter::compiler::rholang_ast::{PVarRef, VarRefKind};
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
+use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{
@@ -172,36 +175,32 @@ pub fn normalize_match(
             normalize_p_contr(p_node, input, source_code)
         }
         "eval" => {
-          println!("Found an eval node, calling normalize_p_eval");
-          normalize_p_eval(p_node, input, source_code)
+            println!("Found an eval node, calling normalize_p_eval");
+            normalize_p_eval(p_node, input, source_code)
         }
         "send" => {
-          println!("Found a send node, calling normalize_p_send");
-          normalize_p_send(p_node, input, source_code)
+            println!("Found a send node, calling normalize_p_send");
+            normalize_p_send(p_node, input, source_code)
         }
         "method" => {
-          println!("Found a method node, calling normalize_p_method");
-          normalize_p_method(p_node, input, source_code)
+            println!("Found a method node, calling normalize_p_method");
+            normalize_p_method(p_node, input, source_code)
         }
         "par" => {
-          println!("Found a par node, calling normalize_p_par");
-          normalize_p_par(p_node, input, source_code)
+            println!("Found a par node, calling normalize_p_par");
+            normalize_p_par(p_node, input, source_code)
         }
         "negation" => {
-          println!("Found a negation node, calling normalize_p_negation");
-          normalize_p_negation(p_node, input, source_code)
+            println!("Found a negation node, calling normalize_p_negation");
+            normalize_p_negation(p_node, input, source_code)
         }
         //TODO should be tested, this is not possible now as we have deleted p_var_normalizer
-        "ifElse" => {
-          match p_node.child_by_field_name("alternative") {
+        "ifElse" => match p_node.child_by_field_name("alternative") {
             Some(alternative_node) => {
-              normalize_p_if(p_node, input, Option::from(alternative_node), source_code)
+                normalize_p_if(p_node, input, Option::from(alternative_node), source_code)
             }
-            None => {
-              normalize_p_if(p_node, input, None, source_code)
-            }
-          }
-        }
+            None => normalize_p_if(p_node, input, None, source_code),
+        },
         "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
@@ -249,5 +248,281 @@ pub fn normalize_match(
             p_node.kind()
         )
         .into()),
+    }
+}
+
+pub fn normalize_match_proc(
+    p_node: Proc,
+    input: ProcVisitInputs,
+) -> Result<ProcVisitOutputs, InterpreterError> {
+    match p_node.clone() {
+        Proc::Par {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::SendSync {
+            name,
+            messages,
+            cont,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::New {
+            decls,
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::IfElse {
+            condition,
+            if_true,
+            alternative,
+            line_num,
+            col_num,
+        } => {
+            todo!()
+        }
+
+        Proc::Let {
+            decls,
+            body,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Bundle {
+            bundle_type,
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Match {
+            expression,
+            cases,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Choice {
+            branches,
+            line_num,
+            col_num,
+        } => todo!(),
+        Proc::Contract {
+            name,
+            formals,
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Input {
+            formals,
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Send {
+            name,
+            send_type,
+            inputs,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Or {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::And {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Matches {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Eq {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Neq {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Lt {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Lte {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Gt {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+        Proc::Gte {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Concat {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::MinusMinus {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Minus {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Add {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::PercentPercent {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Mult {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Div {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Mod {
+            left,
+            right,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Not {
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Neg {
+            proc,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Method {
+            receiver,
+            name,
+            args,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Parenthesized {
+            proc_expression,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::Eval(eval) => todo!(),
+
+        Proc::Quote(quote) => todo!(),
+
+        Proc::Disjunction(disjunction) => todo!(),
+
+        Proc::Conjunction(conjunction) => todo!(),
+
+        Proc::Negation(negation) => todo!(),
+
+        Proc::Block(block) => todo!(),
+
+        Proc::Collection(collection) => todo!(),
+
+        Proc::SimpleType(simple_type) => todo!(),
+
+        Proc::BoolLiteral {
+            value,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::LongLiteral {
+            value,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::StringLiteral {
+            value,
+            line_num,
+            col_num,
+        } => todo!(),
+
+        Proc::UriLiteral(uri_literal) => todo!(),
+
+        Proc::Nil { line_num, col_num } => todo!(),
+
+        Proc::Var(var) => normalize_p_var(p_node, input),
+
+        Proc::Wildcard { line_num, col_num } => todo!(),
+
+        Proc::VarRef(var_ref) => todo!(),
     }
 }
