@@ -5,9 +5,10 @@
     oldNixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.follows = "typelevel-nix/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    nixpkgs-23.url = "github:NixOS/nixpkgs/d4f247e89f6e10120f911e2e2d2254a050d0f732"; #https://www.nixhub.io/packages/tree-sitter
   };
 
-  outputs = { self, nixpkgs, oldNixpkgs, flake-utils, typelevel-nix, rust-overlay }:
+  outputs = { self, nixpkgs, oldNixpkgs, flake-utils, typelevel-nix, rust-overlay, nixpkgs-23 }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         graalOverlay = final: prev: rec {
@@ -39,6 +40,7 @@
           inherit system overlays;
           crossSystem = nixpkgs.lib.systems.examples.aarch64-multiplatform;
         };
+        pkgs23 = import nixpkgs-23 { inherit system; };
       in
       with pkgs;
       {
@@ -100,19 +102,7 @@
             }
             {
               name = "tree-sitter";
-              package = pkgs.stdenv.mkDerivation {
-                pname = "tree-sitter-cli";
-                version = "0.23.0";
-                src = pkgs.fetchurl {
-                  url = "https://registry.npmjs.org/tree-sitter-cli/-/tree-sitter-cli-0.23.0.tgz";
-                  sha256 = "18m7ih9dk45kkbxxci2qx5kf30ysrz2039mbdzhcwfsyxj6p2iqr"; # nix-prefetch-url https://registry.npmjs.org/tree-sitter-cli/-/tree-sitter-cli-0.23.0.tgz
-                };
-                buildInputs = [ pkgs.nodejs-18_x ];
-                installPhase = ''
-                  mkdir -p $out/bin
-                  cp -r ./* $out/bin/
-                '';
-              };
+              package = pkgs23.tree-sitter;
               help = "Parser generator tool and incremental parsing library";
             }
           ];
