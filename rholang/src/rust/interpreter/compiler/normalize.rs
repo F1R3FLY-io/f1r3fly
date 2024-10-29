@@ -191,7 +191,18 @@ pub fn normalize_match(
           println!("Found a negation node, calling normalize_p_negation");
           normalize_p_negation(p_node, input, source_code)
         }
-         "nil" => Ok(ProcVisitOutputs {
+        //TODO should be tested, this is not possible now as we have deleted p_var_normalizer
+        "ifElse" => {
+          match p_node.child_by_field_name("alternative") {
+            Some(alternative_node) => {
+              normalize_p_if(p_node, input, Option::from(alternative_node), source_code)
+            }
+            None => {
+              normalize_p_if(p_node, input, None, source_code)
+            }
+          }
+        }
+        "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
         }),

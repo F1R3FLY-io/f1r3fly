@@ -104,6 +104,18 @@ impl Par {
     }
   }
 
+  pub fn prepend_match(&mut self, m: Match) -> Par {
+    let mut new_matches = vec![m.clone()];
+    new_matches.append(&mut self.matches);
+
+    Par {
+      matches: new_matches,
+      locally_free: union(self.locally_free.clone(), m.locally_free),
+      connective_used: self.connective_used || m.connective_used,
+      ..self.clone()
+    }
+  }
+
     pub fn is_empty(&self) -> bool {
         self.sends.is_empty()
             && self.receives.is_empty()

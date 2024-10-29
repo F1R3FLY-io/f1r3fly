@@ -1,0 +1,21 @@
+=======
+If
+=======
+
+{ if (x) { y } else { z } }
+{ if (x) { y } }
+---
+
+(source_file
+  (block
+    body: (ifElse
+      condition: (var)
+      ifTrue: (block
+        body: (var))
+      alternative: (block
+        body: (var))))
+  (block
+    body: (ifElse
+      condition: (var)
+      ifTrue: (block
+        body: (var)))))
