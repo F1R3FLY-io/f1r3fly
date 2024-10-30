@@ -1,4 +1,3 @@
-use crate::rust::interpreter::compiler::normalizer::exports::normalize_bool;
 use crate::rust::interpreter::compiler::rholang_ast::{Proc, UriLiteral};
 use crate::rust::interpreter::errors::InterpreterError;
 use models::rhoapi::Expr;
@@ -9,7 +8,7 @@ use models::rust::utils::{new_gbool_expr, new_gint_expr, new_gstring_expr, new_g
 */
 pub fn normalize_ground(proc: &Proc) -> Result<Expr, InterpreterError> {
     match proc.clone() {
-        Proc::BoolLiteral { .. } => Ok(new_gbool_expr(normalize_bool(proc)?)),
+        Proc::BoolLiteral { value, .. } => Ok(new_gbool_expr(value)),
 
         Proc::LongLiteral { value, .. } => Ok(new_gint_expr(value)),
 

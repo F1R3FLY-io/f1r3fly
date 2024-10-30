@@ -182,10 +182,10 @@ pub fn normalize_match(
             println!("Found a method node, calling normalize_p_method");
             normalize_p_method(p_node, input, source_code)
         }
-        "par" => {
-            println!("Found a par node, calling normalize_p_par");
-            normalize_p_par(p_node, input, source_code)
-        }
+        // "par" => {
+        //     println!("Found a par node, calling normalize_p_par");
+        //     normalize_p_par(p_node, input, source_code)
+        // }
         "negation" => {
             println!("Found a negation node, calling normalize_p_negation");
             normalize_p_negation(p_node, input, source_code)
@@ -290,12 +290,7 @@ pub fn normalize_match_proc(
     }
 
     match proc {
-        Proc::Par {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Par { left, right, .. } => normalize_p_par(left, right, input),
 
         Proc::SendSync {
             name,
