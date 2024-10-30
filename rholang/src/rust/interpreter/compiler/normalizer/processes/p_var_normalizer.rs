@@ -83,7 +83,7 @@ pub fn normalize_p_var(
         }),
 
         _ => Err(InterpreterError::NormalizerError(format!(
-            "Expected Var or Wildcard, found {:?}",
+            "Expected Proc::Var or Proc::Wildcard, found {:?}",
             p,
         ))),
     }

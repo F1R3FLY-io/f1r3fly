@@ -11,7 +11,7 @@ pub use crate::rust::interpreter::compiler::normalizer::processes::p_bundle_norm
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_ground_normalizer::normalize_p_ground;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_matches_normalizer::normalize_p_matches;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_collect_normalizer::normalize_p_collect;
-pub use crate::rust::interpreter::compiler::normalizer::processes::p_conjunction_normalizer::normalize_p_сonjunction;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_conjunction_normalizer::normalize_p_conjunction;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_disjunction_normalizer::normalize_p_disjunction;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_contr_normalizer::normalize_p_contr;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_eval_normalizer::normalize_p_eval;

@@ -1,98 +1,82 @@
 use crate::rust::interpreter::compiler::exports::{FreeContext, FreeMap, SourcePosition};
+use crate::rust::interpreter::compiler::normalize::VarSort;
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Var;
 use models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
 use models::rhoapi::var::WildcardMsg;
-use crate::rust::interpreter::compiler::normalize::VarSort;
-use tree_sitter::Node;
-use std::error::Error;
-use crate::rust::interpreter::compiler::rholang_ast::Names;
+use models::rhoapi::Var as ModelsVar;
 
-pub fn handle_proc_var(
-  node: Node,
-  mut known_free: FreeMap<VarSort>,
-  source_code: &[u8],
-) -> Result<(Option<Var>, FreeMap<VarSort>), Box<dyn Error>> {
-  match node.kind() {
-    "wildcard" => {
-      let wildcard_var = Var {
-        var_instance: Some(Wildcard(WildcardMsg {})),
-      };
-      let source_position = SourcePosition::new(
-        node.start_position().row,
-        node.start_position().column,
-      );
+use super::processes::exports::Proc;
+use crate::rust::interpreter::compiler::rholang_ast::Var;
 
-      known_free.add_wildcard(source_position);
-      Ok((Some(wildcard_var), known_free))
-    }
-    "var" => {
-      let var_name = node.utf8_text(source_code)?;
-      let source_position = SourcePosition::new(
-        node.start_position().row,
-        node.start_position().column,
-      );
+fn handle_proc_var(
+    proc: &Proc,
+    mut known_free: FreeMap<VarSort>,
+) -> Result<(Option<ModelsVar>, FreeMap<VarSort>), InterpreterError> {
+    match proc {
+        Proc::Wildcard { line_num, col_num } => {
+            let wildcard_var = ModelsVar {
+                var_instance: Some(Wildcard(WildcardMsg {})),
+            };
+            let source_position = SourcePosition::new(*line_num, *col_num);
 
-      match known_free.get(var_name) {
-        None => {
-          let binding = (var_name.to_string(), VarSort::ProcSort, source_position);
-          let new_bindings_pair = known_free.put(binding);
-          let free_var = Var {
-            var_instance: Some(FreeVar(new_bindings_pair.next_level as i32)),
-          };
-          Ok((Some(free_var), new_bindings_pair))
+            known_free.add_wildcard(source_position);
+            Ok((Some(wildcard_var), known_free))
         }
-        Some(FreeContext {
-               source_position: first_source_position,
-               ..
-             }) => Err(InterpreterError::UnexpectedReuseOfProcContextFree {
-          var_name: var_name.to_string(),
-          first_use: first_source_position,
-          second_use: source_position,
+
+        Proc::Var(Var {
+            name,
+            line_num,
+            col_num,
+        }) => {
+            let source_position = SourcePosition::new(*line_num, *col_num);
+
+            match known_free.get(&name) {
+                None => {
+                    let binding = (name.clone(), VarSort::ProcSort, source_position);
+                    let new_bindings_pair = known_free.put(binding);
+                    let free_var = ModelsVar {
+                        var_instance: Some(FreeVar(new_bindings_pair.next_level as i32)),
+                    };
+                    Ok((Some(free_var), new_bindings_pair))
+                }
+                Some(FreeContext {
+                    source_position: first_source_position,
+                    ..
+                }) => Err(InterpreterError::UnexpectedReuseOfProcContextFree {
+                    var_name: name.clone(),
+                    first_use: first_source_position,
+                    second_use: source_position,
+                }),
+            }
         }
-          .into()),
-      }
+
+        _ => Err(InterpreterError::NormalizerError(format!(
+            "Expected Proc::Var or Proc::Wildcard, found {:?}",
+            proc,
+        ))),
     }
-    _ => Err(InterpreterError::NormalizerError("Unexpected node kind for Remainder".to_string())
-      .into())
-  }
 }
 
 // coop.rchain.rholang.interpreter.compiler.normalizer.RemainderNormalizeMatcher.normalizeMatchProc
+// This function is to be called in `collection_normalize_matcher`
+// This handles the 'cont' field in our grammar.js for 'collection' types. AKA '_proc_remainder'
 pub fn normalize_remainder(
-  list_node: Node,
-  known_free: FreeMap<VarSort>,
-  source_code: &[u8],
-) -> Result<(Option<Var>, FreeMap<VarSort>), Box<dyn Error>> {
-  if let Some(remainder) = list_node.child_by_field_name("cont") {
-    match remainder.kind() {
-      "var" => {
-        handle_proc_var(remainder, known_free, source_code)
-      }
-      _ => Err(InterpreterError::NormalizerError("Unexpected node kind for proc Remainder".to_string())
-        .into())
+    r: &Option<Box<Proc>>,
+    known_free: FreeMap<VarSort>,
+) -> Result<(Option<ModelsVar>, FreeMap<VarSort>), InterpreterError> {
+    match r {
+        Some(pr) => handle_proc_var(pr, known_free),
+        None => Ok((None, known_free)),
     }
-  } else {
-    Ok((None, known_free))
-  }
 }
 
+// This function handles the 'cont' field in our grammar.js for 'names' types. AKA '_name_remainder'
 pub fn normalize_match_name(
-  formals: &Names,
-  known_free: FreeMap<VarSort>
-) -> Result<(Option<Var>, FreeMap<VarSort>), InterpreterError> {
-  todo!()
-  // if let Some(remainder) = formals.clone().cont {
-  //   //I'm not sure here, but based on grammar.js names contains 'cont' field which can provide
-  //   //optional remainder '...' or "@" (quote) or _proc_var (wildcard and var)
-  //   match remainder.kind() {
-  //     "'...'" | "quote" | "wildcard" | "var"=> {
-  //       handle_proc_var(remainder, known_free, source_code)
-  //     }
-  //     _ => Err(InterpreterError::NormalizerError("Unexpected node kind for name Remainder".to_string())
-  //       .into())
-  //   }
-  // } else {
-  //   Ok((None, known_free))
-  // }
+    nr: &Option<Box<Proc>>,
+    known_free: FreeMap<VarSort>,
+) -> Result<(Option<ModelsVar>, FreeMap<VarSort>), InterpreterError> {
+    match nr {
+        Some(pr) => handle_proc_var(&pr, known_free),
+        None => Ok((None, known_free)),
+    }
 }

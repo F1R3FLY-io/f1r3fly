@@ -1,7 +1,7 @@
 use models::rhoapi::{Bundle, Par};
 use super::exports::*;
 use std::result::Result;
-use crate::rust::interpreter::compiler::normalize::{normalize_match_proc};
+use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
 use crate::rust::interpreter::compiler::rholang_ast::{Block, BundleType};
 
 pub fn normalize_p_bundle(

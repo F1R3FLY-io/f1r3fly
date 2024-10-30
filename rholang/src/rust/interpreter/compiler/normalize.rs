@@ -437,7 +437,7 @@ pub fn normalize_match_proc(
 
         Proc::Disjunction(disjunction) => normalize_p_disjunction(disjunction, input),
 
-        Proc::Conjunction(conjunction) => normalize_p_сonjunction(conjunction, input),
+        Proc::Conjunction(conjunction) => normalize_p_conjunction(conjunction, input),
 
         Proc::Negation(negation) => todo!(),
 

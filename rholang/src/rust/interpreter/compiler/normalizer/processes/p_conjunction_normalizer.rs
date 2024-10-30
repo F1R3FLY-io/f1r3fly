@@ -6,7 +6,7 @@ use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
 
-pub fn normalize_p_сonjunction(
+pub fn normalize_p_conjunction(
   proc: &Conjunction,
   input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
@@ -18,7 +18,7 @@ pub fn normalize_p_сonjunction(
       free_map: input.free_map.clone(),
     })?;
 
-  let mut right_result = normalize_match_proc(
+  let right_result = normalize_match_proc(
     &proc.right,
     ProcVisitInputs {
       par: Par::default(),

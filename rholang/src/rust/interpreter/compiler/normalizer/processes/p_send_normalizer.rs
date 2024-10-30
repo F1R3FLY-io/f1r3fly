@@ -53,7 +53,6 @@ pub fn normalize_p_send(
   let persistent = match send_type {
     SendType::Single { ..} => false,
     SendType::Multiple {..} => true,
-    _ => return Err(InterpreterError::SyntaxError("Unknown send type".to_string()).into()),
   };
 
   let send = Send {

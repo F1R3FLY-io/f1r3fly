@@ -41,7 +41,7 @@ pub fn normalize_p_contr(
     init_acc.2 = union(init_acc.clone().2, result.par.locally_free(result.par.clone(), (input.bound_map_chain.depth() + 1) as i32));
   }
 
-  let remainder_result = normalize_match_name(formals, init_acc.1.clone())?;
+  let remainder_result = normalize_match_name(&formals.cont, init_acc.1.clone())?;
 
   let new_enw = input.bound_map_chain.absorb_free(remainder_result.1.clone());
   let bound_count = remainder_result.1.count_no_wildcards();
