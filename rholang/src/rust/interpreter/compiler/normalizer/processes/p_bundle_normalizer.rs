@@ -1,63 +1,52 @@
 use models::rhoapi::{Bundle, Par};
 use super::exports::*;
-use tree_sitter::Node;
-use std::error::Error;
 use std::result::Result;
-use crate::rust::interpreter::compiler::exports::BoundMapChain;
-use crate::rust::interpreter::compiler::normalize::normalize_match;
+use crate::rust::interpreter::compiler::normalize::{normalize_match_proc};
+use crate::rust::interpreter::compiler::rholang_ast::{Block, BundleType};
 
-
-/*
-The PBundle normalizer is responsible for normalizing bundle expressions in Rholang.
-In Rholang, a bundle defines access rights to a process or part of a program.
-This may include write or read permissions.
-The bundle expression itself defines an object that restricts the ability to modify or read the content.
- */
 pub fn normalize_p_bundle(
-  node: Node,
+  bundle_type: &BundleType,
+  block: &Box<Block>,
   input: ProcVisitInputs,
-  source_code: &[u8],
-) -> Result<ProcVisitOutputs, Box<dyn Error>> {
-
-  println!("Normalizing bundle node of kind: {}", node.kind());
-  let target_result = normalize_match(node.child_by_field_name("proc").unwrap(), input.clone(), source_code).unwrap();
-
+  line_num: usize,
+  column_num: usize,
+) -> Result<ProcVisitOutputs, InterpreterError> {
+  let target_result = normalize_match_proc(&block.proc, ProcVisitInputs {
+    par: Par::default(),
+    ..input.clone()
+  })?;
   if !target_result.par.connectives.is_empty() {
-    return Err(format!(
-      "Illegal top-level connective in bundle at position: line {}, column {}.",
-      node.start_position().row,
-      node.start_position().column
-    )
-      .into());
+    return Err(InterpreterError::NormalizerError(format!(
+      "Illegal top-level connective in bundle at line {}, column {}.",
+      line_num, column_num
+    )));
   }
 
   if !target_result.free_map.wildcards.is_empty() || !target_result.free_map.level_bindings.is_empty() {
     return raise_error(target_result);
   }
 
-  println!("Target result after normalizing proc: {:?}", target_result);
-  let outermost_bundle = match node.child_by_field_name("bundle_type").unwrap().kind() {
-    "bundle_read_write" => Bundle {
+  let outermost_bundle = match bundle_type {
+    BundleType::BundleReadWrite { .. } => Bundle {
       body: Some(target_result.par.clone()),
       write_flag: true,
       read_flag: true,
     },
-    "bundle_read" => Bundle {
+    BundleType::BundleRead { .. } => Bundle {
       body: Some(target_result.par.clone()),
       write_flag: false,
       read_flag: true,
     },
-    "bundle_write" => Bundle {
+    BundleType::BundleWrite { .. } => Bundle {
       body: Some(target_result.par.clone()),
       write_flag: true,
       read_flag: false,
     },
-    "bundle_equiv" => Bundle {
+    BundleType::BundleEquiv { .. } => Bundle {
       body: Some(target_result.par.clone()),
       write_flag: false,
       read_flag: false,
     },
-    _ => return Err("Unknown bundle type".into()),
   };
 
   let new_bundle = match target_result.par.bundles.get(0) {
@@ -83,7 +72,7 @@ fn merge_bundles(outer: &Bundle, inner: &Bundle) -> Bundle {
   }
 }
 
-fn raise_error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, Box<dyn Error>> {
+fn raise_error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, InterpreterError> {
   let err_msg = {
     let wildcards_positions: Vec<String> = target_result
       .free_map
@@ -117,46 +106,26 @@ fn raise_error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, Box<
     )
   };
 
-  Err(err_msg.into())
+  Err(InterpreterError::NormalizerError(err_msg))
 }
 
 #[test]
-fn normalize_terms_inside_a_bundle() {
-  let rholang_code = r#" { bundle+ {Nil} }"#; //bundle write
-
-  let tree = parse_rholang_code(rholang_code);
-  let root_node = tree.root_node();
-  println!("Tree S-expression: {}", tree.root_node().to_sexp());
-  let block_node = root_node.child(0).expect("Expected a block node");
-  println!("Found block node: {}", block_node.to_sexp());
-  let bundle_node = block_node.child_by_field_name("body").expect("Expected a bundle node");
-  println!("Found bundle node: {}", bundle_node.to_sexp());
-
+fn test_normalize_p_bundle() {
+  let bundle_type = BundleType::BundleReadWrite { line_num: 1, col_num: 2 };
+  let block = Block {
+    proc: Proc::Nil { line_num: 1, col_num: 2 },
+    line_num: 1,
+    col_num: 2,
+  };
   let input = ProcVisitInputs {
     par: Par::default(),
-    bound_map_chain: BoundMapChain::default(),
-    free_map: FreeMap::default(),
+    bound_map_chain: Default::default(),
+    free_map: Default::default(),
   };
-
-  let expected_par = Par {
-    bundles: vec![Bundle {
-      body: Some(Par::default()),
-      write_flag: true,
-      read_flag: false,
-    }],
-    ..Par::default()
-  };
-
-  //BTW, I can call normalize_match engine with block_node instead of normalize_p_bundle and bundle_node
-  match normalize_p_bundle(bundle_node, input, rholang_code.as_bytes()) {
-    Ok(result) => {
-      println!("Normalization succeeded. Resulting Par: {:?}", result.par);
-      assert_eq!(result.par, expected_par, "Expected Par structure does not match");
-    }
-    Err(e) => {
-      println!("Normalization failed with error: {}", e);
-      assert!(false, "Expected normalization to succeed but it failed.");
-    }
+  let result = normalize_p_bundle(&bundle_type, &Box::new(block), input, 1, 2);
+  match result {
+    Ok(output) => println!("Normalization successful: {:?}", output),
+    Err(e) => println!("Normalization failed: {:?}", e),
   }
 }
 

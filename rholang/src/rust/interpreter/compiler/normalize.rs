@@ -145,10 +145,10 @@ pub fn normalize_match(
     println!("Normalizing node kind: {}", p_node.kind());
 
     match p_node.kind() {
-        "bundle" => {
-            println!("Found a bundle node, calling normalize_p_bundle");
-            normalize_p_bundle(p_node, input, source_code)
-        }
+        // "bundle" => {
+        //     println!("Found a bundle node, calling normalize_p_bundle");
+        //     normalize_p_bundle(p_node, input, source_code)
+        // }
         // "long_literal" | "bool_literal" | "string_literal" | "uri_literal" => {
         //     println!("Found a ground node, calling normalize_p_ground");
         //     normalize_p_ground(p_node, input, source_code)
@@ -158,22 +158,22 @@ pub fn normalize_match(
             println!("Found a matches node, calling normalize_p_matches");
             normalize_p_matches(p_node, input, source_code)
         }
-        "conjunction" => {
-            println!("Found a conjunction node, calling normalize_p_conjunction");
-            normalize_p_сonjunction(p_node, input, source_code)
-        }
-        "disjunction" => {
-            println!("Found a disjunction node, calling normalize_p_disjunction");
-            normalize_p_disjunction(p_node, input, source_code)
-        }
+        // "conjunction" => {
+        //     println!("Found a conjunction node, calling normalize_p_conjunction");
+        //     normalize_p_сonjunction(p_node, input, source_code)
+        // }
+        // "disjunction" => {
+        //     println!("Found a disjunction node, calling normalize_p_disjunction");
+        //     normalize_p_disjunction(p_node, input, source_code)
+        // }
         "contract" => {
             println!("Found a contract node, calling normalize_p_contract");
             normalize_p_contr(p_node, input, source_code)
         }
-        "eval" => {
-            println!("Found an eval node, calling normalize_p_eval");
-            normalize_p_eval(p_node, input, source_code)
-        }
+        // "eval" => {
+        //     println!("Found an eval node, calling normalize_p_eval");
+        //     normalize_p_eval(p_node, input, source_code)
+        // }
         "send" => {
             println!("Found a send node, calling normalize_p_send");
             normalize_p_send(p_node, input, source_code)
@@ -334,7 +334,7 @@ pub fn normalize_match_proc(
             proc,
             line_num,
             col_num,
-        } => todo!(),
+        } => normalize_p_bundle(bundle_type, proc, input, *line_num, *col_num),
 
         Proc::Match {
             expression,
@@ -431,13 +431,13 @@ pub fn normalize_match_proc(
             col_num,
         } => todo!(),
 
-        Proc::Eval(eval) => todo!(),
+        Proc::Eval(eval) => normalize_p_eval(eval, input),
 
         Proc::Quote(quote) => todo!(),
 
-        Proc::Disjunction(disjunction) => todo!(),
+        Proc::Disjunction(disjunction) => normalize_p_disjunction(disjunction, input),
 
-        Proc::Conjunction(conjunction) => todo!(),
+        Proc::Conjunction(conjunction) => normalize_p_сonjunction(conjunction, input),
 
         Proc::Negation(negation) => todo!(),
 
