@@ -1,4 +1,3 @@
-use std::error::Error;
 use models::rhoapi::{Connective, ConnectiveBody, Par};
 use models::rhoapi::connective::ConnectiveInstance;
 use crate::rust::interpreter::compiler::exports::SourcePosition;

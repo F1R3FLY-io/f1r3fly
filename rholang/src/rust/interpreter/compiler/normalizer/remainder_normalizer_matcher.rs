@@ -6,6 +6,7 @@ use models::rhoapi::var::WildcardMsg;
 use crate::rust::interpreter::compiler::normalize::VarSort;
 use tree_sitter::Node;
 use std::error::Error;
+use crate::rust::interpreter::compiler::rholang_ast::Names;
 
 pub fn handle_proc_var(
   node: Node,
@@ -77,21 +78,21 @@ pub fn normalize_remainder(
 }
 
 pub fn normalize_match_name(
-  list_node: Node,
-  known_free: FreeMap<VarSort>,
-  source_code: &[u8],
-) -> Result<(Option<Var>, FreeMap<VarSort>), Box<dyn Error>> {
-  if let Some(remainder) = list_node.child_by_field_name("cont") {
-    //I'm not sure here, but based on grammar.js names contains 'cont' field which can provide
-    //optional remainder '...' or "@" (quote) or _proc_var (wildcard and var)
-    match remainder.kind() {
-      "'...'" | "quote" | "wildcard" | "var"=> {
-        handle_proc_var(remainder, known_free, source_code)
-      }
-      _ => Err(InterpreterError::NormalizerError("Unexpected node kind for name Remainder".to_string())
-        .into())
-    }
-  } else {
-    Ok((None, known_free))
-  }
+  formals: &Names,
+  known_free: FreeMap<VarSort>
+) -> Result<(Option<Var>, FreeMap<VarSort>), InterpreterError> {
+  todo!()
+  // if let Some(remainder) = formals.clone().cont {
+  //   //I'm not sure here, but based on grammar.js names contains 'cont' field which can provide
+  //   //optional remainder '...' or "@" (quote) or _proc_var (wildcard and var)
+  //   match remainder.kind() {
+  //     "'...'" | "quote" | "wildcard" | "var"=> {
+  //       handle_proc_var(remainder, known_free, source_code)
+  //     }
+  //     _ => Err(InterpreterError::NormalizerError("Unexpected node kind for name Remainder".to_string())
+  //       .into())
+  //   }
+  // } else {
+  //   Ok((None, known_free))
+  // }
 }

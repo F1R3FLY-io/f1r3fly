@@ -166,18 +166,18 @@ pub fn normalize_match(
         //     println!("Found a disjunction node, calling normalize_p_disjunction");
         //     normalize_p_disjunction(p_node, input, source_code)
         // }
-        "contract" => {
-            println!("Found a contract node, calling normalize_p_contract");
-            normalize_p_contr(p_node, input, source_code)
-        }
+        // "contract" => {
+        //     println!("Found a contract node, calling normalize_p_contract");
+        //     normalize_p_contr(p_node, input, source_code)
+        // }
         // "eval" => {
         //     println!("Found an eval node, calling normalize_p_eval");
         //     normalize_p_eval(p_node, input, source_code)
         // }
-        "send" => {
-            println!("Found a send node, calling normalize_p_send");
-            normalize_p_send(p_node, input, source_code)
-        }
+        // "send" => {
+        //     println!("Found a send node, calling normalize_p_send");
+        //     normalize_p_send(p_node, input, source_code)
+        // }
         "method" => {
             println!("Found a method node, calling normalize_p_method");
             normalize_p_method(p_node, input, source_code)
@@ -355,7 +355,7 @@ pub fn normalize_match_proc(
             proc,
             line_num,
             col_num,
-        } => todo!(),
+        } => normalize_p_contr(name, formals, proc, input),
 
         Proc::Input {
             formals,
@@ -370,7 +370,7 @@ pub fn normalize_match_proc(
             inputs,
             line_num,
             col_num,
-        } => todo!(),
+        } => normalize_p_send(name, send_type, inputs, input),
 
         Proc::Matches {
             left,
