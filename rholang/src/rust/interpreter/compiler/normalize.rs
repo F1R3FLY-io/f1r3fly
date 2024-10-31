@@ -153,7 +153,7 @@ pub fn normalize_match(
         //     println!("Found a ground node, calling normalize_p_ground");
         //     normalize_p_ground(p_node, input, source_code)
         // }
-        "collection" => normalize_p_collect(p_node, input, source_code),
+        // "collection" => normalize_p_collect(p_node, input, source_code),
         // "matches" => {
         //     println!("Found a matches node, calling normalize_p_matches");
         //     normalize_p_matches(p_node, input, source_code)
@@ -449,7 +449,7 @@ pub fn normalize_match_proc(
 
         Proc::Block(block) => todo!(),
 
-        Proc::Collection(collection) => todo!(),
+        Proc::Collection(collection) => normalize_p_collect(collection, input),
 
         Proc::SimpleType(simple_type) => todo!(),
 
