@@ -220,12 +220,6 @@ pub enum Proc {
         col_num: usize,
     },
 
-    Parenthesized {
-        proc_expression: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
     Eval(Eval),
     Quote(Quote),
     Disjunction(Disjunction),

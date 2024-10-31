@@ -154,10 +154,10 @@ pub fn normalize_match(
         //     normalize_p_ground(p_node, input, source_code)
         // }
         "collection" => normalize_p_collect(p_node, input, source_code),
-        "matches" => {
-            println!("Found a matches node, calling normalize_p_matches");
-            normalize_p_matches(p_node, input, source_code)
-        }
+        // "matches" => {
+        //     println!("Found a matches node, calling normalize_p_matches");
+        //     normalize_p_matches(p_node, input, source_code)
+        // }
         // "conjunction" => {
         //     println!("Found a conjunction node, calling normalize_p_conjunction");
         //     normalize_p_сonjunction(p_node, input, source_code)
@@ -178,25 +178,24 @@ pub fn normalize_match(
         //     println!("Found a send node, calling normalize_p_send");
         //     normalize_p_send(p_node, input, source_code)
         // }
-        "method" => {
-            println!("Found a method node, calling normalize_p_method");
-            normalize_p_method(p_node, input, source_code)
-        }
+        // "method" => {
+        //     println!("Found a method node, calling normalize_p_method");
+        //     normalize_p_method(p_node, input, source_code)
+        // }
         // "par" => {
         //     println!("Found a par node, calling normalize_p_par");
         //     normalize_p_par(p_node, input, source_code)
         // }
-        "negation" => {
-            println!("Found a negation node, calling normalize_p_negation");
-            normalize_p_negation(p_node, input, source_code)
-        }
-        //TODO should be tested, this is not possible now as we have deleted p_var_normalizer
-        "ifElse" => match p_node.child_by_field_name("alternative") {
-            Some(alternative_node) => {
-                normalize_p_if(p_node, input, Option::from(alternative_node), source_code)
-            }
-            None => normalize_p_if(p_node, input, None, source_code),
-        },
+        // "negation" => {
+        //     println!("Found a negation node, calling normalize_p_negation");
+        //     normalize_p_negation(p_node, input, source_code)
+        // }
+        // "ifElse" => match p_node.child_by_field_name("alternative") {
+        //     Some(alternative_node) => {
+        //         normalize_p_if(p_node, input, Option::from(alternative_node), source_code)
+        //     }
+        //     None => normalize_p_if(p_node, input, None, source_code),
+        // },
         "nil" => Ok(ProcVisitOutputs {
             par: input.par.clone(),
             free_map: input.free_map.clone(),
@@ -311,10 +310,36 @@ pub fn normalize_match_proc(
             condition,
             if_true,
             alternative,
-            line_num,
-            col_num,
+            ..
         } => {
-            todo!()
+            let mut empty_par_input = input.clone();
+            empty_par_input.par = Par::default();
+
+            match alternative {
+                Some(alternative_proc) => {
+                    normalize_p_if(condition, if_true, alternative_proc, empty_par_input).map(
+                        |mut new_visits| {
+                            let new_par = new_visits.par.append(input.par);
+                            new_visits.par = new_par;
+                            new_visits
+                        },
+                    )
+                }
+                None => normalize_p_if(
+                    condition,
+                    if_true,
+                    &Proc::Nil {
+                        line_num: 0,
+                        col_num: 0,
+                    },
+                    empty_par_input,
+                )
+                .map(|mut new_visits| {
+                    let new_par = new_visits.par.append(input.par);
+                    new_visits.par = new_par;
+                    new_visits
+                }),
+            }
         }
 
         Proc::Let {
@@ -348,8 +373,7 @@ pub fn normalize_match_proc(
             name,
             formals,
             proc,
-            line_num,
-            col_num,
+            ..
         } => normalize_p_contr(name, formals, proc, input),
 
         Proc::Input {
@@ -363,16 +387,10 @@ pub fn normalize_match_proc(
             name,
             send_type,
             inputs,
-            line_num,
-            col_num,
+            ..
         } => normalize_p_send(name, send_type, inputs, input),
 
-        Proc::Matches {
-            left,
-            right,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Matches { left, right, .. } => normalize_p_matches(&left, &right, input),
 
         // binary
         Proc::Mult { left, right, .. } => {
@@ -416,15 +434,8 @@ pub fn normalize_match_proc(
             receiver,
             name,
             args,
-            line_num,
-            col_num,
-        } => todo!(),
-
-        Proc::Parenthesized {
-            proc_expression,
-            line_num,
-            col_num,
-        } => todo!(),
+            ..
+        } => normalize_p_method(receiver, name, args, input),
 
         Proc::Eval(eval) => normalize_p_eval(eval, input),
 
@@ -434,7 +445,7 @@ pub fn normalize_match_proc(
 
         Proc::Conjunction(conjunction) => normalize_p_conjunction(conjunction, input),
 
-        Proc::Negation(negation) => todo!(),
+        Proc::Negation(negation) => normalize_p_negation(negation, input),
 
         Proc::Block(block) => todo!(),
 

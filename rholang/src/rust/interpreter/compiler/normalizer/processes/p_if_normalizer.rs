@@ -1,100 +1,72 @@
-use std::error::Error;
-use models::rhoapi::{Par, Match, MatchCase, expr, Expr};
-use models::rust::utils::{new_gbool_par, union};
-use tree_sitter::Node;
-use crate::rust::interpreter::compiler::normalize::{normalize_match, ProcVisitInputs, ProcVisitOutputs};
-use crate::rust::interpreter::errors::InterpreterError;
 use super::exports::*;
+use crate::rust::interpreter::compiler::normalize::{
+    normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
+};
+use crate::rust::interpreter::errors::InterpreterError;
+use models::rhoapi::{Match, MatchCase, Par};
+use models::rust::utils::{new_gbool_par, union};
 
 pub fn normalize_p_if(
-  node: Node, // ifElse
-  mut input: ProcVisitInputs,
-  else_node: Option<Node>,
-  source_code: &[u8],
-) -> Result<ProcVisitOutputs, Box<dyn Error>> {
-  println!("Normalizing if node of kind: {}", node.kind());
+    value_proc: &Proc,
+    true_body_proc: &Proc,
+    false_body_proc: &Proc,
+    mut input: ProcVisitInputs,
+) -> Result<ProcVisitOutputs, InterpreterError> {
+    let target_result = normalize_match_proc(&value_proc, ProcVisitInputs { ..input.clone() })?;
 
-  let condition_node = node.child_by_field_name("condition").ok_or_else(|| {
-    InterpreterError::SyntaxError("Expected condition in if expression".to_string())
-  })?;
+    let true_case_body = normalize_match_proc(
+        &true_body_proc,
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: target_result.free_map.clone(),
+        },
+    )?;
 
-  let true_branch_node = node.child_by_field_name("ifTrue").ok_or_else(|| {
-    InterpreterError::SyntaxError("Expected ifTrue branch in if expression".to_string())
-  })?;
+    let false_case_body = normalize_match_proc(
+        &false_body_proc,
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: true_case_body.free_map.clone(),
+        },
+    )?;
 
+    // Construct the desugared if as a Match
+    let desugared_if = Match {
+        target: Some(target_result.par.clone()),
+        cases: vec![
+            MatchCase {
+                pattern: Some(new_gbool_par(true, vec![], false)),
+                source: Some(true_case_body.par.clone()),
+                free_count: 0,
+            },
+            MatchCase {
+                pattern: Some(new_gbool_par(false, vec![], false)),
+                source: Some(false_case_body.par.clone()),
+                free_count: 0,
+            },
+        ],
+        locally_free: union(
+            union(
+                target_result.par.locally_free.clone(),
+                true_case_body.par.locally_free.clone(),
+            ),
+            false_case_body.par.locally_free.clone(),
+        ),
+        connective_used: target_result.par.connective_used
+            || true_case_body.par.connective_used
+            || false_case_body.par.connective_used,
+    };
 
-  let target_result = normalize_match(
-    condition_node,
-    ProcVisitInputs {
-      ..input.clone()
-    },
-    source_code,
-  )?;
+    // Update the input par by prepending the desugared if statement
+    let updated_par = input.par.prepend_match(desugared_if);
 
-  // Normalize the true branch
-  let true_case_body = normalize_match(
-    true_branch_node,
-    ProcVisitInputs {
-      par: Par::default(),
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: target_result.free_map.clone(),
-    },
-    source_code,
-  )?;
-
-  //TODO I can't properly test it because we deleted p_var_normalizer from normalize_match engine
-  let false_case_body = {
-    let false_body_node = else_node
-      .and_then(|false_node| false_node.named_child(0))
-      .unwrap_or_else(|| {
-        // If alternative does not exist, create a "nil" equivalent node which will be simple node == None
-        node // Here we use the original `node` just as a placeholder since we always normalize regardless
-      });
-
-    normalize_match(
-      false_body_node,
-      ProcVisitInputs {
-        par: Par::default(),
-        bound_map_chain: input.bound_map_chain.clone(),
-        free_map: true_case_body.free_map.clone(),
-      },
-      source_code,
-    )?
-  };
-
-  // Construct the desugared if as a Match
-  let desugared_if = Match {
-    target: Some(target_result.par.clone()),
-    cases: vec![
-      MatchCase {
-        pattern: Some(new_gbool_par(true, vec![], false)),
-        source: Some(true_case_body.par.clone()),
-        free_count: 0,
-      },
-      MatchCase {
-        pattern: Some(new_gbool_par(false, vec![], false)),
-        source: Some(false_case_body.par.clone()),
-        free_count: 0,
-      },
-    ],
-    locally_free: union(
-      union(target_result.par.locally_free.clone(), true_case_body.par.locally_free.clone()),
-      false_case_body.par.locally_free.clone(),
-    ),
-    connective_used: target_result.par.connective_used
-      || true_case_body.par.connective_used
-      || false_case_body.par.connective_used,
-  };
-
-  // Update the input par by prepending the desugared if statement
-  let updated_par = input.par.prepend_match(desugared_if);
-
-  Ok(ProcVisitOutputs {
-    par: updated_par,
-    free_map: false_case_body.free_map,
-  })
+    Ok(ProcVisitOutputs {
+        par: updated_par,
+        free_map: false_case_body.free_map,
+    })
 }
-
 
 // #[test]
 // fn test_normalize_p_if() {
