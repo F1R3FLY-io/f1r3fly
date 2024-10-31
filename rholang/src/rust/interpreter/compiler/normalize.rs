@@ -451,7 +451,7 @@ pub fn normalize_match_proc(
 
         Proc::Collection(collection) => normalize_p_collect(collection, input),
 
-        Proc::SimpleType(simple_type) => todo!(),
+        Proc::SimpleType(simple_type) => normalize_simple_type(simple_type, input),
 
         Proc::BoolLiteral { .. } => normalize_p_ground(proc, input),
         Proc::LongLiteral { .. } => normalize_p_ground(proc, input),

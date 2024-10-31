@@ -20,3 +20,4 @@ pub use crate::rust::interpreter::compiler::normalizer::processes::p_method_norm
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_par_normalizer::normalize_p_par;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_negation_normalizer::normalize_p_negation;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_if_normalizer::normalize_p_if;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_simple_type_normalizer::normalize_simple_type;
