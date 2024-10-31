@@ -36,7 +36,6 @@ pub fn prepend_connective(mut p: Par, c: Connective, depth: i32) -> Par {
     }
 }
 
-// See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
 pub fn prepend_expr(mut p: Par, e: Expr, depth: i32) -> Par {
     let mut new_exprs = vec![e.clone()];
     new_exprs.append(&mut p.exprs);
@@ -45,6 +44,18 @@ pub fn prepend_expr(mut p: Par, e: Expr, depth: i32) -> Par {
         exprs: new_exprs,
         locally_free: union(p.locally_free.clone(), e.locally_free(e.clone(), depth)),
         connective_used: p.connective_used || e.clone().connective_used(e),
+        ..p.clone()
+    }
+}
+
+pub fn prepend_new(mut p: Par, n: New) -> Par {
+    let mut new_news = vec![n.clone()];
+    new_news.append(&mut p.news);
+
+    Par {
+        news: new_news,
+        locally_free: union(p.locally_free.clone(), n.clone().locally_free),
+        connective_used: p.connective_used || n.clone().connective_used(n),
         ..p.clone()
     }
 }
