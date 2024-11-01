@@ -16,8 +16,12 @@ pub fn normalize_p_send_sync(
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let identifier = Uuid::new_v4().to_string();
-  let name_var: rholang_ast::Proc = Proc::Var(rholang_ast::Var {
-    name: identifier.clone(),
+  let name_var: rholang_ast::Proc = Proc::Eval(rholang_ast::Eval {
+    name: rholang_ast::Name::ProcVar(Box::new(rholang_ast::Proc::Var(rholang_ast::Var {
+      name: identifier.clone(),
+      line_num,
+      col_num,
+    })),),
     line_num,
     col_num,
   });
@@ -27,7 +31,7 @@ pub fn normalize_p_send_sync(
     let mut listproc =
       messages.procs.clone();
 
-    listproc.push(name_var.clone());
+    listproc.insert(0, name_var.clone());
 
     Proc::Send {
       name: name.clone(),
@@ -148,7 +152,68 @@ pub fn normalize_p_send_sync(
 
 }
 
-#[test]
-fn test_normalize_p_send_sync() {
-  // TODO
+
+#[cfg(test)]
+mod tests {
+
+  use super::*;
+  use models::rhoapi::Par;
+  use crate::rust::interpreter::compiler::bound_map_chain::BoundMapChain;
+  use crate::rust::interpreter::compiler::normalize::{ProcVisitInputs, VarSort};
+  use crate::rust::interpreter::compiler::rholang_ast;
+  use crate::rust::interpreter::compiler::rholang_ast::Proc;
+
+  fn p_send_sync() -> Proc {
+    let p_send_sync = Proc::SendSync {
+      name: rholang_ast::Name::ProcVar(Box::new(rholang_ast::Proc::Wildcard {
+        line_num: 0,
+        col_num: 0,
+      })),
+      messages: rholang_ast::ProcList {
+        procs: vec![],
+        line_num: 1,
+        col_num: 1,
+      },
+      cont: rholang_ast::SyncSendCont::Empty {
+        line_num: 2,
+        col_num: 2,
+      },
+      line_num: 3,
+      col_num: 3,
+    };
+
+    p_send_sync
+  }
+
+  #[test]
+  fn test_normalize_p_send_sync() {
+    let p = p_send_sync();
+    fn inputs() -> ProcVisitInputs {
+      ProcVisitInputs {
+        par: Par::default(),
+        bound_map_chain: BoundMapChain::new(),
+        free_map: FreeMap::<VarSort>::new(),
+      }
+    }
+
+    let result = match p {
+      Proc::SendSync {
+        name,
+        messages,
+        cont,
+        line_num,
+        col_num,
+      } => normalize_p_send_sync(&name, &messages, &cont, line_num, col_num, inputs()),
+      _ => Result::Err(InterpreterError::NormalizerError("Expected Proc::SendSync".to_string())),
+    };
+
+    assert!(result.is_ok());
+
+    // check the result
+    let result = result.unwrap();
+    let par = result.par;
+    // review assertions when p_new is implemented
+    assert_eq!(par.sends.len(), 1);
+    assert_eq!(par.receives.len(), 1);
+  }
 }
