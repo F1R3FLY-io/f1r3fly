@@ -1152,6 +1152,7 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-rholang",
  "tree-sitter-rust",
+ "uuid",
  "zbase32",
 ]
 
