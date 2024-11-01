@@ -21,4 +21,4 @@ pub use crate::rust::interpreter::compiler::normalizer::processes::p_par_normali
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_negation_normalizer::normalize_p_negation;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_if_normalizer::normalize_p_if;
 pub use crate::rust::interpreter::compiler::normalizer::processes::p_simple_type_normalizer::normalize_simple_type;
-// pub use crate::rust::interpreter::compiler::normalizer::processes::p_new_normalizer::normalize_p_new;
+pub use crate::rust::interpreter::compiler::normalizer::processes::p_new_normalizer::normalize_p_new;
