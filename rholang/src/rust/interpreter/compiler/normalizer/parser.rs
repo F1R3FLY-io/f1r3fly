@@ -1047,7 +1047,8 @@ fn parse_uri_literal(node: &Node, source: &str) -> Result<UriLiteral, Interprete
     Ok(UriLiteral {
         value: {
             let value_with_quotes = get_node_value(node, source.as_bytes())?;
-            let value = value_with_quotes.trim_matches('"').to_string();
+            let value_with_ticks = value_with_quotes.trim_matches('"').to_string();
+            let value = value_with_ticks.trim_matches('`').to_string();
             value
         },
         line_num: node.start_position().row,

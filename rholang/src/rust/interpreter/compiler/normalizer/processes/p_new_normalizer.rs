@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
-use models::rhoapi::{expr, New, Par};
+use models::rhoapi::{New, Par};
 use crate::rust::interpreter::compiler::exports::{BoundMapChain, IdContext, SourcePosition};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, ProcVisitInputs, ProcVisitOutputs, VarSort};
-use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::normalize_ground;
 use crate::rust::interpreter::compiler::rholang_ast::{Decls, NameDecl, Proc};
 use crate::rust::interpreter::util::prepend_new;
 use crate::rust::interpreter::util::filter_and_adjust_bitset;
@@ -14,7 +13,6 @@ pub fn normalize_p_new(
   input: ProcVisitInputs,
   env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-  //TODO need review for new_tagged_bindings
   let new_tagged_bindings:Vec<(Option<String>, String, VarSort, usize, usize)> = decls
     .decls
     .iter()
@@ -23,17 +21,7 @@ pub fn normalize_p_new(
         Ok((None, var.name.clone(), VarSort::NameSort, *line_num, *col_num))
       }
       NameDecl { var, uri: Some(urn), line_num, col_num } => {
-        let uri_expr = normalize_ground(&Proc::UriLiteral(urn.clone()))?;
-        //normalize ground return an Expr, not an String, so we need to match it for future usage inside sorted_bindings
-        match uri_expr.expr_instance {
-          Some(expr::ExprInstance::GUri(uri_string)) => {
-            Ok((Some(uri_string), var.name.clone(), VarSort::NameSort, *line_num, *col_num))
-          }
-          _ => Err(InterpreterError::BugFoundError(format!(
-            "Expected a URI literal, found: {:?}",
-            uri_expr
-          )))
-        }
+        Ok((Some(urn.value.clone()), var.name.clone(), VarSort::NameSort, *line_num, *col_num))
       }
     })
     .collect::<Result<Vec<_>, InterpreterError>>()?;

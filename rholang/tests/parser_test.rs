@@ -183,7 +183,7 @@ fn parse_rholang_code_to_proc_should_parse_new() {
                     col_num: 11,
                 },
                 uri: Some(UriLiteral {
-                    value: "`rho:registry:lookup`".to_string(),
+                    value: "rho:registry:lookup".to_string(),
                     line_num: 1,
                     col_num: 13,
                 }),
@@ -1858,7 +1858,7 @@ fn parse_rholang_code_to_proc_should_handle_list() {
                 col_num: 11,
             },
             Proc::UriLiteral(UriLiteral {
-                value: "`rho:uri`".to_string(),
+                value: "rho:uri".to_string(),
                 line_num: 0,
                 col_num: 17,
             }),
@@ -1899,7 +1899,7 @@ fn parse_rholang_code_to_proc_should_handle_list_with_continuation() {
                 col_num: 11,
             },
             Proc::UriLiteral(UriLiteral {
-                value: "`rho:uri`".to_string(),
+                value: "rho:uri".to_string(),
                 line_num: 0,
                 col_num: 17,
             }),
@@ -2148,7 +2148,7 @@ fn parse_rholang_code_to_proc_should_handle_uri_literal() {
     assert!(result.is_ok());
 
     let expected_result = Proc::UriLiteral(UriLiteral {
-        value: "`http://example.com`".to_string(),
+        value: "http://example.com".to_string(),
         line_num: 0,
         col_num: 0,
     });
