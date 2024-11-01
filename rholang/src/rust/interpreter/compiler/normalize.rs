@@ -360,6 +360,7 @@ pub fn normalize_match_proc(
             col_num,
         } => normalize_p_match(expression, cases, input, *line_num, *col_num),
 
+        // I don't think the previous scala developers implemented this
         Proc::Choice {
             branches,
             line_num,
@@ -466,7 +467,7 @@ pub fn normalize_match_proc(
 
         Proc::Eval(eval) => normalize_p_eval(eval, input, env),
 
-        Proc::Quote(quote) => todo!(),
+        Proc::Quote(quote) => normalize_match_proc(&quote.quotable, input, env),
 
         Proc::Disjunction(disjunction) => normalize_p_disjunction(disjunction, input, env),
 
@@ -474,7 +475,7 @@ pub fn normalize_match_proc(
 
         Proc::Negation(negation) => normalize_p_negation(negation, input, env),
 
-        Proc::Block(block) => todo!(),
+        Proc::Block(block) => normalize_match_proc(&block.proc, input, env),
 
         Proc::Collection(collection) => normalize_p_collect(collection, input, env),
 
