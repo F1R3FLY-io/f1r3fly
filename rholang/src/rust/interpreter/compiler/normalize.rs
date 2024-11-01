@@ -369,7 +369,7 @@ pub fn normalize_match_proc(
             cases,
             line_num,
             col_num,
-        } => todo!(),
+        } => normalize_p_match(expression, cases,input, *line_num, *col_num, ),
 
         Proc::Choice {
             branches,

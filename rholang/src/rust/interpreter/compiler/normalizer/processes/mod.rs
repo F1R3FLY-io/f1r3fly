@@ -16,5 +16,6 @@ pub mod p_negation_normalizer;
 pub mod p_if_normalizer;
 pub mod p_simple_type_normalizer;
 pub mod p_new_normalizer;
+pub mod p_match_normalizer;
 
 pub mod utils;
