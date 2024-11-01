@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
@@ -14,6 +15,7 @@ pub fn normalize_p_method(
     name_var: &Var,
     args: &ProcList,
     input: ProcVisitInputs,
+    env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     let target_result = normalize_match_proc(
         receiver,
@@ -21,6 +23,7 @@ pub fn normalize_p_method(
             par: Par::default(),
             ..input.clone()
         },
+        env
     )?;
 
     let target = target_result.par;
@@ -37,7 +40,7 @@ pub fn normalize_p_method(
     );
 
     for arg in &args.procs {
-        let proc_match_result = normalize_match_proc(&arg, acc.1.clone())?;
+        let proc_match_result = normalize_match_proc(&arg, acc.1.clone(), env)?;
 
         acc.0.insert(0, proc_match_result.par.clone());
         acc.1 = ProcVisitInputs {

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use models::rhoapi::Par;
 use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::compiler::rholang_ast::Eval;
 use crate::rust::interpreter::errors::InterpreterError;
@@ -6,6 +8,7 @@ use super::exports::*;
 pub fn normalize_p_eval(
   proc: &Eval,
   input: ProcVisitInputs,
+  env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> { ;
 
   let name_match_result = normalize_name(
@@ -13,7 +16,7 @@ pub fn normalize_p_eval(
     NameVisitInputs {
       bound_map_chain: input.bound_map_chain.clone(),
       free_map: input.free_map.clone(),
-    })?;
+    }, env)?;
 
   let updated_par = input.par.append(name_match_result.par.clone());
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use models::rhoapi::{Connective, ConnectiveBody, Par};
 use models::rhoapi::connective::ConnectiveInstance;
 use crate::rust::interpreter::compiler::exports::SourcePosition;
@@ -9,6 +10,7 @@ use crate::rust::interpreter::util::prepend_connective;
 pub fn normalize_p_disjunction(
   proc: &Disjunction,
   input: ProcVisitInputs,
+  env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let left_result = normalize_match_proc(
@@ -17,7 +19,8 @@ pub fn normalize_p_disjunction(
       par: Par::default(),
       bound_map_chain: input.bound_map_chain.clone(),
       free_map: input.free_map.clone(),
-    })?;
+    },
+    env)?;
 
   let mut right_result = normalize_match_proc(
     &proc.right,
@@ -25,7 +28,8 @@ pub fn normalize_p_disjunction(
       par: Par::default(),
       bound_map_chain: input.bound_map_chain.clone(),
       free_map: left_result.free_map.clone(),
-    })?;
+    },
+    env)?;
 
   let lp = left_result.par;
   let result_connective = match lp.single_connective() {

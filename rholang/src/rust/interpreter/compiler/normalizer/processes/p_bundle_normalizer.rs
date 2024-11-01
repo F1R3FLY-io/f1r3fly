@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use models::rhoapi::{Bundle, Par};
 use super::exports::*;
 use std::result::Result;
@@ -10,11 +11,12 @@ pub fn normalize_p_bundle(
   input: ProcVisitInputs,
   line_num: usize,
   column_num: usize,
+  env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
   let target_result = normalize_match_proc(&block.proc, ProcVisitInputs {
     par: Par::default(),
     ..input.clone()
-  })?;
+  }, env)?;
   if !target_result.par.connectives.is_empty() {
     return Err(InterpreterError::NormalizerError(format!(
       "Illegal top-level connective in bundle at line {}, column {}.",
@@ -122,7 +124,7 @@ fn test_normalize_p_bundle() {
     bound_map_chain: Default::default(),
     free_map: Default::default(),
   };
-  let result = normalize_p_bundle(&bundle_type, &Box::new(block), input, 1, 2);
+  let result = normalize_p_bundle(&bundle_type, &Box::new(block), input, 1, 2, &HashMap::new());
   match result {
     Ok(output) => println!("Normalization successful: {:?}", output),
     Err(e) => println!("Normalization failed: {:?}", e),

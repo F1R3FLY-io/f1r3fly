@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use models::rhoapi::{EList, ETuple, Expr, Par, Var};
 use models::rust::utils::union;
 use super::exports::*;
@@ -19,12 +20,14 @@ use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 pub fn normalize_collection(
   proc: &Collection,
   input: CollectVisitInputs,
+  env: &HashMap<String, Par>
 ) -> Result<CollectVisitOutputs, InterpreterError> {
   pub fn fold_match<F>(
     known_free: FreeMap<VarSort>,
     elements: &Vec<Proc>,
     constructor: F,
     input: CollectVisitInputs,
+    env: &HashMap<String, Par>
   ) -> Result<CollectVisitOutputs, InterpreterError>
   where
     F: Fn(Vec<Par>, Vec<u8>, bool) -> Expr,
@@ -39,7 +42,9 @@ pub fn normalize_collection(
           par: Par::default(),
           bound_map_chain: input.bound_map_chain.clone(),
           free_map: result_known_free.clone(),
-        })?;
+        },
+        env
+      )?;
 
       acc_pars.push(result.par.clone());
       result_known_free = result.free_map.clone();
@@ -61,6 +66,7 @@ pub fn normalize_collection(
     remainder: Option<Var>,
     pairs: &Vec<KeyValuePair>,
     input: CollectVisitInputs,
+    env: &HashMap<String, Par>
   ) -> Result<CollectVisitOutputs, InterpreterError> {
     let init = (vec![], known_free.clone(), Vec::new(), false);
 
@@ -73,7 +79,9 @@ pub fn normalize_collection(
           par: Par::default(),
           bound_map_chain: input.bound_map_chain.clone(),
           free_map: result_known_free.clone(),
-        })?;
+        },
+        env
+      )?;
 
       let value_result = normalize_match_proc(
         &key_value_pair.value,
@@ -81,7 +89,9 @@ pub fn normalize_collection(
           par: Par::default(),
           bound_map_chain: input.bound_map_chain.clone(),
           free_map: key_result.free_map.clone(),
-        })?;
+        },
+        env
+      )?;
 
       acc_pairs.push((key_result.par.clone(), value_result.par.clone()));
       result_known_free = value_result.free_map.clone();
@@ -134,7 +144,7 @@ pub fn normalize_collection(
         }
       };
 
-      fold_match(known_free, elements, constructor, input)
+      fold_match(known_free, elements, constructor, input, env)
     }
 
     Collection::Tuple { elements, .. } => {
@@ -150,7 +160,7 @@ pub fn normalize_collection(
         }
       };
 
-      fold_match(input.free_map.clone(), elements, constructor, input)
+      fold_match(input.free_map.clone(), elements, constructor, input, env)
     }
 
     Collection::Set { elements, cont, .. } => {
@@ -174,14 +184,14 @@ pub fn normalize_collection(
         }
       };
 
-      fold_match(known_free, elements, constructor, input)
+      fold_match(known_free, elements, constructor, input, env)
     }
 
     Collection::Map { pairs, cont, .. } => {
       let (optional_remainder, known_free) =
         normalize_remainder(cont, input.free_map.clone())?;
 
-      fold_match_map(known_free, optional_remainder, pairs, input)
+      fold_match_map(known_free, optional_remainder, pairs, input, env)
     }
 
     _ => Err(InterpreterError::NormalizerError("Unexpected collection type".to_string()).into()),

@@ -1,4 +1,5 @@
-use models::rhoapi::Connective;
+use std::collections::HashMap;
+use models::rhoapi::{Connective, Par};
 use models::rhoapi::connective::ConnectiveInstance;
 use crate::rust::interpreter::compiler::normalize::{ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::compiler::rholang_ast::SimpleType;
@@ -50,7 +51,7 @@ mod tests {
       free_map: Default::default(),
     };
 
-    let result = normalize_match_proc(&proc, input);
+    let result = normalize_match_proc(&proc, input, &HashMap::new());
     assert!(result.is_ok());
     let output = result.unwrap();
     println!("normalized output: {:?}", output);

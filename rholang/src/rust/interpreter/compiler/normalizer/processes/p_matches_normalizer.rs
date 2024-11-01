@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::exports::{FreeMap, InterpreterError, Proc, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::{compiler::normalize::normalize_match_proc, util::prepend_expr};
 use models::rhoapi::{expr, EMatches, Expr, Par};
@@ -6,6 +7,7 @@ pub fn normalize_p_matches(
     left_proc: &Proc,
     right_proc: &Proc,
     input: ProcVisitInputs,
+    env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     let left_result = normalize_match_proc(
         left_proc,
@@ -14,6 +16,7 @@ pub fn normalize_p_matches(
             bound_map_chain: input.bound_map_chain.clone(),
             free_map: input.free_map.clone(),
         },
+        env
     )?;
 
     let right_result = normalize_match_proc(
@@ -23,6 +26,7 @@ pub fn normalize_p_matches(
             bound_map_chain: input.bound_map_chain.clone().push(),
             free_map: FreeMap::default(),
         },
+        env
     )?;
 
     let new_expr = Expr {

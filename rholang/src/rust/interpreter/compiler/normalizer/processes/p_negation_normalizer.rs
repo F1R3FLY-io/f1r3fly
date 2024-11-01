@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
@@ -10,6 +11,7 @@ use models::rhoapi::{connective, Connective, Par};
 pub fn normalize_p_negation(
     negation: &Negation,
     input: ProcVisitInputs,
+    env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     let body_result = normalize_match_proc(
         &negation.proc,
@@ -18,6 +20,7 @@ pub fn normalize_p_negation(
             bound_map_chain: input.bound_map_chain.clone(),
             free_map: FreeMap::default(),
         },
+        env
     )?;
 
     // Create Connective with ConnNotBody

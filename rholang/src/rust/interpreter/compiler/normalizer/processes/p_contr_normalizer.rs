@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use models::rhoapi::{Par, Receive, ReceiveBind};
 use models::rust::utils::union;
 use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, normalize_match_proc, ProcVisitInputs, ProcVisitOutputs, VarSort};
@@ -6,6 +7,7 @@ use crate::rust::interpreter::compiler::normalizer::remainder_normalizer_matcher
 use crate::rust::interpreter::compiler::rholang_ast::{Block, Name, Names};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
+use crate::rust::interpreter::util::filter_and_adjust_bitset;
 use super::exports::*;
 
 pub fn normalize_p_contr(
@@ -13,6 +15,7 @@ pub fn normalize_p_contr(
   formals: &Names,
   proc: &Box<Block>,
   input: ProcVisitInputs,
+  env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let name_match_result = normalize_name(
@@ -20,7 +23,8 @@ pub fn normalize_p_contr(
     NameVisitInputs {
       bound_map_chain: input.bound_map_chain.clone(),
       free_map: input.free_map.clone(),
-    }
+    },
+    env
   )?;
 
   let mut init_acc = (vec![], FreeMap::<VarSort>::default(), Vec::new());
@@ -31,7 +35,8 @@ pub fn normalize_p_contr(
       NameVisitInputs {
         bound_map_chain: input.clone().bound_map_chain.push(),
         free_map: init_acc.1.clone(),
-      })?;
+      },
+      env)?;
 
     let result = fail_on_invalid_connective(&input, &res)?;
 
@@ -52,7 +57,8 @@ pub fn normalize_p_contr(
       par: Par::default(),
       bound_map_chain: new_enw,
       free_map: name_match_result.free_map.clone(),
-    }
+    },
+    env
   )?;
 
   let receive = Receive {
@@ -98,13 +104,6 @@ pub fn normalize_p_contr(
     par: updated_par,
     free_map: body_result.free_map,
   })
-}
-
-fn filter_and_adjust_bitset(bitset: Vec<u8>, bound_count: usize) -> Vec<u8> {
-    bitset.into_iter()
-        .enumerate()
-        .filter_map(|(i, _)| if i >= bound_count { Some(i as u8 - bound_count as u8) } else { None })
-        .collect()
 }
 
 // #[test]

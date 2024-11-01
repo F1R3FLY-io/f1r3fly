@@ -59,3 +59,11 @@ pub fn prepend_new(mut p: Par, n: New) -> Par {
         ..p.clone()
     }
 }
+
+// for locally_free parameter, in case when we have (bodyResult.par.locallyFree.from(boundCount).map(x => x - boundCount))
+pub(crate) fn filter_and_adjust_bitset(bitset: Vec<u8>, bound_count: usize) -> Vec<u8> {
+  bitset.into_iter()
+    .enumerate()
+    .filter_map(|(i, _)| if i >= bound_count { Some(i as u8 - bound_count as u8) } else { None })
+    .collect()
+}

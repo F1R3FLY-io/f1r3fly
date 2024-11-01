@@ -1,4 +1,4 @@
-
+use std::collections::HashMap;
 use models::rhoapi::{Par, Send};
 use models::rust::utils::union;
 use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, normalize_match_proc, ProcVisitInputs, ProcVisitOutputs};
@@ -12,6 +12,7 @@ pub fn normalize_p_send(
   send_type: &SendType,
   inputs: &ProcList,
   input: ProcVisitInputs,
+  env: &HashMap<String, Par>
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let name_match_result = normalize_name(
@@ -19,7 +20,8 @@ pub fn normalize_p_send(
     NameVisitInputs {
       bound_map_chain: input.bound_map_chain.clone(),
       free_map: input.free_map.clone(),
-    }
+    },
+    env
   )?;
 
   let mut acc = (
@@ -38,6 +40,7 @@ pub fn normalize_p_send(
     let proc_match_result = normalize_match_proc(
       &proc,
       acc.1.clone(),
+      env
     )?;
 
     acc.0.insert(0, proc_match_result.par.clone());

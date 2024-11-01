@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::rust::interpreter::compiler::exports::BoundContext;
 use crate::rust::interpreter::compiler::normalize::VarSort;
 use crate::rust::interpreter::compiler::rholang_ast::{VarRef as PVarRef, VarRefKind};

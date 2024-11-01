@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::bound_context::BoundContext;
 use crate::rust::interpreter::compiler::exports::FreeContext;
@@ -11,6 +12,7 @@ use models::rhoapi::{expr, var, EVar, Expr, Par, Var as model_var};
 pub fn normalize_name(
     proc: &Name,
     mut input: NameVisitInputs,
+    env: &HashMap<String, Par>
 ) -> Result<NameVisitOutputs, InterpreterError> {
     match proc {
         Name::ProcVar(boxed_proc) => match *boxed_proc.clone() {
@@ -142,6 +144,7 @@ pub fn normalize_name(
                     bound_map_chain: input.bound_map_chain.clone(),
                     free_map: input.free_map.clone(),
                 },
+                env
             )?;
 
             Ok(NameVisitOutputs {
