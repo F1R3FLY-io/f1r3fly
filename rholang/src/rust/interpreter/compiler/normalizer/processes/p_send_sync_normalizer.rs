@@ -63,7 +63,7 @@ pub fn normalize_p_send_sync(
     let linear_bind_impl: rholang_ast::LinearBind = rholang_ast::LinearBind {
       names: list_name,
       input: rholang_ast::Source::Simple {
-        name: rholang_ast::Name::ProcVar(Box::new(name_var)),
+        name: rholang_ast::Name::ProcVar(Box::new(name_var)), // This I think needs to be Proc::Var( Var { .. }), not Proc::Eval inside Name::ProcVar
         line_num,
         col_num,
       },
@@ -122,7 +122,7 @@ pub fn normalize_p_send_sync(
         line_num,
         col_num,
       },
-      uri: None, // TODO: fix?
+      uri: None, // TODO: fix?. This is correct. 'NamedDeclSimpl' in scala means this is set to None, and 'NameDeclUrn' in scala means we set this field to Some
       line_num,
       col_num,
     }
@@ -148,7 +148,7 @@ pub fn normalize_p_send_sync(
     col_num,
   };
 
-  normalize_match_proc(&p_new, input).map_err(|e| e.into())
+  normalize_match_proc(&p_new, input)
 
 }
 
