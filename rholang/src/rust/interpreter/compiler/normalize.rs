@@ -359,7 +359,7 @@ pub fn normalize_match_proc(
             cases,
             line_num,
             col_num,
-        } => normalize_p_match(expression, cases, input, *line_num, *col_num),
+        } => normalize_p_match(expression, cases, input, env),
 
         // I don't think the previous scala developers implemented a normalize function for this
         Proc::Choice {
