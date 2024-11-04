@@ -304,7 +304,7 @@ pub fn normalize_match_proc(
             cont,
             line_num,
             col_num,
-        } => todo!(),
+        } => normalize_p_send_sync(name, messages, cont, *line_num, *col_num, input, env),
 
         Proc::New { decls, proc, .. } => normalize_p_new(decls, proc, input, env),
 
