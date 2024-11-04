@@ -18,5 +18,6 @@ pub mod p_simple_type_normalizer;
 pub mod p_let_normalizer;
 pub mod p_new_normalizer;
 pub mod p_match_normalizer;
+pub mod p_input_normalizer;
 
 pub mod utils;

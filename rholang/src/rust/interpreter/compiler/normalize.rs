@@ -1,6 +1,7 @@
 use super::exports::*;
 use super::normalizer::processes::p_var_normalizer::normalize_p_var;
 use super::rholang_ast::Proc;
+use crate::rust::interpreter::compiler::normalizer::processes::p_input_normalizer::normalize_p_input;
 use crate::rust::interpreter::compiler::normalizer::processes::p_let_normalizer::normalize_p_let;
 use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
@@ -360,7 +361,7 @@ pub fn normalize_match_proc(
             col_num,
         } => normalize_p_match(expression, cases, input, *line_num, *col_num),
 
-        // I don't think the previous scala developers implemented this
+        // I don't think the previous scala developers implemented a normalize function for this
         Proc::Choice {
             branches,
             line_num,
@@ -374,12 +375,7 @@ pub fn normalize_match_proc(
             ..
         } => normalize_p_contr(name, formals, proc, input, env),
 
-        Proc::Input {
-            formals,
-            proc,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Input { formals, proc, .. } => normalize_p_input(formals, proc, input, env),
 
         Proc::Send {
             name,
