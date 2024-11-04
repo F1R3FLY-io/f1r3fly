@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use models::rhoapi::Par;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::compiler::rholang_ast;
@@ -13,6 +15,7 @@ pub fn normalize_p_send_sync(
   line_num: usize,
   col_num: usize,
   input: ProcVisitInputs,
+  env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let identifier = Uuid::new_v4().to_string();
@@ -122,7 +125,7 @@ pub fn normalize_p_send_sync(
         line_num,
         col_num,
       },
-      uri: None, // TODO: fix?. This is correct. 'NamedDeclSimpl' in scala means this is set to None, and 'NameDeclUrn' in scala means we set this field to Some
+      uri: None,
       line_num,
       col_num,
     }
@@ -148,7 +151,7 @@ pub fn normalize_p_send_sync(
     col_num,
   };
 
-  normalize_match_proc(&p_new, input)
+  normalize_match_proc(&p_new, input, env)
 
 }
 
@@ -196,6 +199,8 @@ mod tests {
       }
     }
 
+    let env = HashMap::<String, Par>::new();
+
     let result = match p {
       Proc::SendSync {
         name,
@@ -203,7 +208,7 @@ mod tests {
         cont,
         line_num,
         col_num,
-      } => normalize_p_send_sync(&name, &messages, &cont, line_num, col_num, inputs()),
+      } => normalize_p_send_sync(&name, &messages, &cont, line_num, col_num, inputs(), &env),
       _ => Result::Err(InterpreterError::NormalizerError("Expected Proc::SendSync".to_string())),
     };
 
