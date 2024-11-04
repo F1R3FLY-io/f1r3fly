@@ -19,22 +19,22 @@ pub fn normalize_p_send_sync(
 ) -> Result<ProcVisitOutputs, InterpreterError> {
 
   let identifier = Uuid::new_v4().to_string();
-  let name_var: rholang_ast::Proc = Proc::Eval(rholang_ast::Eval {
-    name: rholang_ast::Name::ProcVar(Box::new(rholang_ast::Proc::Var(rholang_ast::Var {
+  let name_var: rholang_ast::Name = Name::ProcVar(Box::new(rholang_ast::Proc::Var(rholang_ast::Var {
       name: identifier.clone(),
       line_num,
       col_num,
-    })),),
-    line_num,
-    col_num,
-  });
+    })));
 
 
   let send: Proc = {
     let mut listproc =
       messages.procs.clone();
 
-    listproc.insert(0, name_var.clone());
+    listproc.insert(0, Proc::Eval(rholang_ast::Eval {
+      name: name_var.clone(),
+      line_num,
+      col_num,
+    }));
 
     Proc::Send {
       name: name.clone(),
@@ -66,7 +66,7 @@ pub fn normalize_p_send_sync(
     let linear_bind_impl: rholang_ast::LinearBind = rholang_ast::LinearBind {
       names: list_name,
       input: rholang_ast::Source::Simple {
-        name: rholang_ast::Name::ProcVar(Box::new(name_var)), // This I think needs to be Proc::Var( Var { .. }), not Proc::Eval inside Name::ProcVar
+        name: name_var,
         line_num,
         col_num,
       },
@@ -217,7 +217,7 @@ mod tests {
     // check the result
     let result = result.unwrap();
     let par = result.par;
-    // review assertions when p_new is implemented
+    // TODO: review assertions when p_input is implemented
     assert_eq!(par.sends.len(), 1);
     assert_eq!(par.receives.len(), 1);
   }
