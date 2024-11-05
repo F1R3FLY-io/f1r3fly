@@ -25,71 +25,38 @@ pub fn normalize_ground(proc: &Proc) -> Result<Expr, InterpreterError> {
     }
 }
 
-// first 3 tests based on src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala
-// #[test]
-// fn test_normalize_ground_int() {
-//   let rholang_code = "42";
+#[cfg(test)]
+mod tests {
+  use models::rhoapi::expr::ExprInstance;
+  use super::*;
 
-//   let tree = parse_rholang_code(rholang_code);
-//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//   let root = tree.root_node();
+  //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/BoolMatcherSpec.scala
+  #[test]
+  fn bool_true_should_compile_as_gbool_true() {
+    let proc = Proc::BoolLiteral {
+      value: true,
+      line_num: 1,
+      col_num: 1,
+    };
+    let result = normalize_ground(&proc);
+    assert!(result.is_ok());
+    let expr = result.unwrap();
+    assert_eq!(expr.expr_instance, Some(ExprInstance::GBool(true)));
+  }
 
-//   let literal_node = root
-//     .child(0)
-//     .expect("Expected a long_literal node");
+  //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/BoolMatcherSpec.scala
+  #[test]
+  fn bool_false_should_compile_as_gbool_false() {
+    let proc = Proc::BoolLiteral {
+      value: false,
+      line_num: 1,
+      col_num: 1,
+    };
+    let result = normalize_ground(&proc);
+    assert!(result.is_ok());
+    let expr = result.unwrap();
+    assert_eq!(expr.expr_instance, Some(ExprInstance::GBool(false)));
+  }
+}
 
-//   assert_eq!(literal_node.kind(), "long_literal");
 
-//   let normalized_ground = normalize_ground(literal_node, rholang_code.as_bytes())
-//     .expect("Expected to normalize an int");
-
-//   assert_eq!(normalized_ground, Ground::Int(42));
-// }
-
-// #[test]
-// fn test_normalize_ground_string() {
-//   let rholang_code = r#""Hello, Rholang!""#;
-
-//   let tree = parse_rholang_code(rholang_code);
-//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//   let root = tree.root_node();
-//   let literal_node = root
-//     .child(0)
-//     .expect("Expected a string_literal node");
-//   let normalized_ground = normalize_ground(literal_node, rholang_code.as_bytes())
-//     .expect("Expected to normalize a string");
-
-//   assert_eq!(normalized_ground, Ground::String("Hello, Rholang!".to_string()));
-// }
-
-// #[test]
-// fn test_normalize_ground_uri() {
-//   let rholang_code = "`http://example.com`";
-
-//   let tree = parse_rholang_code(rholang_code);
-//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//   let root = tree.root_node();
-//   let literal_node = root
-//     .child(0)
-//     .expect("Expected a uri_literal node");
-//   let normalized_ground = normalize_ground(literal_node, rholang_code.as_bytes())
-//     .expect("Expected to normalize a uri");
-
-//   assert_eq!(normalized_ground, Ground::Uri("http://example.com".to_string()));
-// }
-
-// #[test]
-// fn test_normalize_ground_bool() {
-//   let rholang_code = r#"true"#;
-
-//   let tree = parse_rholang_code(rholang_code);
-//   println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//   let root = tree.root_node();
-//   let literal_node = root
-//     .child(0)
-//     .expect("Expected a bool_literal node");
-//   let normalized_ground = normalize_ground(literal_node, rholang_code.as_bytes())
-//     .expect("Expected to normalize a bool");
-
-//   assert_eq!(normalized_ground, Ground::Bool(true));
-// }
