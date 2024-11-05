@@ -12,7 +12,7 @@ use super::{
 pub struct ReceiveSortMatcher;
 
 impl ReceiveSortMatcher {
-    fn sort_bind(bind: ReceiveBind) -> ScoredTerm<ReceiveBind> {
+    pub fn sort_bind(bind: ReceiveBind) -> ScoredTerm<ReceiveBind> {
         let patterns = bind.patterns;
         let source = bind
             .source

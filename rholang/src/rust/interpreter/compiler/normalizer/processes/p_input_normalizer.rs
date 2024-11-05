@@ -1,8 +1,12 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/normalizer/processes/PInputNormalizer.scala
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use models::{rhoapi::Par, rust::utils::union, BitSet};
+use models::{
+    rhoapi::{Par, ReceiveBind},
+    rust::utils::{new_receive_par, union},
+    BitSet,
+};
 use uuid::Uuid;
 
 use crate::rust::interpreter::{
@@ -13,48 +17,36 @@ use crate::rust::interpreter::{
             name_normalize_matcher::normalize_name, processes::utils::fail_on_invalid_connective,
             remainder_normalizer_matcher::normalize_match_name,
         },
+        receive_binds_sort_matcher::pre_sort_binds,
         rholang_ast::{
             Block, Decls, Eval, LinearBind, Name, NameDecl, Names, ProcList, Receipt, Receipts,
             SendType, Source, Var,
         },
     },
     matcher::has_locally_free::HasLocallyFree,
+    unwrap_option_safe,
+    util::filter_and_adjust_bitset,
 };
 
 use super::exports::{InterpreterError, Proc, ProcVisitInputs, ProcVisitOutputs};
 
-// TODO: Review
 pub fn normalize_p_input(
     formals: &Receipts,
     body: &Block,
+    line_num: usize,
+    col_num: usize,
     input: ProcVisitInputs,
     env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-    if formals.receipts.len() > 1 {
-        let folded_proc: Proc = formals
-            .clone()
-            .receipts
-            .into_iter()
-            .rev()
-            // I'm not sure if this is corrrectly ported, should 'receipts' be better collected?
-            .fold(body.proc.clone(), |proc, receipt| Proc::Input {
-                formals: Receipts {
-                    receipts: vec![receipt],
-                    line_num: 0,
-                    col_num: 0,
-                },
-                proc: Box::new(Block {
-                    proc,
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                line_num: 0,
-                col_num: 0,
-            });
-
-        normalize_match_proc(&folded_proc, input, env)
+    // Do I return an error for this case?
+    if formals.receipts.is_empty() {
+        return Err(InterpreterError::BugFoundError(
+            "Exepected at least one receipt".to_string(),
+        ));
     } else {
-        let receipt_contains_complex_source = match &formals.receipts[0] {
+        let head_receipt = &formals.receipts[0];
+
+        let receipt_contains_complex_source = match head_receipt {
             Receipt::LinearBinds(linear_bind) => match linear_bind.input {
                 Source::Simple { .. } => false,
                 _ => true,
@@ -63,7 +55,7 @@ pub fn normalize_p_input(
         };
 
         if receipt_contains_complex_source {
-            match &formals.receipts[0] {
+            match head_receipt {
                 Receipt::LinearBinds(linear_bind) => match &linear_bind.input {
                     Source::Simple { .. } => {
                         let list_receipt = Receipts {
@@ -378,23 +370,143 @@ pub fn normalize_p_input(
                     .collect()
             }
 
-            // If we get to this point, we know p.listreceipt.size() == 1
-            // TODO: Implement
             let (consumes, persistent, peek): (
                 Vec<((Vec<Name>, Option<Box<Proc>>), Name)>,
                 bool,
                 bool,
-            ) = (Vec::new(), false, false);
+            ) = {
+                let consumes: Vec<((Vec<Name>, Option<Box<Proc>>), Name)> = formals
+                    .receipts
+                    .clone()
+                    .into_iter()
+                    .map(|receipt| match receipt {
+                        Receipt::LinearBinds(linear_bind) => {
+                            ((linear_bind.names.names, linear_bind.names.cont), {
+                                match linear_bind.input {
+                                    Source::Simple { name, .. } => name,
+                                    Source::ReceiveSend { name, .. } => name,
+                                    Source::SendReceive { name, .. } => name,
+                                }
+                            })
+                        }
+
+                        Receipt::RepeatedBinds(repeated_bind) => (
+                            (repeated_bind.names.names, repeated_bind.names.cont),
+                            repeated_bind.input,
+                        ),
+
+                        Receipt::PeekBinds(peek_bind) => (
+                            (peek_bind.names.names, peek_bind.names.cont),
+                            peek_bind.input,
+                        ),
+                    })
+                    .collect();
+
+                match head_receipt {
+                    Receipt::LinearBinds(_) => (consumes, false, false),
+                    Receipt::RepeatedBinds(_) => (consumes, true, false),
+                    Receipt::PeekBinds(_) => (consumes, false, true),
+                }
+            };
 
             let (patterns, names): (Vec<(Vec<Name>, Option<Box<Proc>>)>, Vec<Name>) =
                 consumes.into_iter().unzip();
 
+            let processed_patterns = process_patterns(patterns, input.clone(), env)?;
             let processed_sources = process_sources(names, input.clone(), env)?;
             let (sources, sources_free, sources_locally_free, sources_connective_used) =
                 processed_sources;
-            let processed_patterns = process_patterns(patterns, input, env)?;
 
-            todo!()
+            let receive_binds_and_free_maps = pre_sort_binds(
+                processed_patterns
+                    .clone()
+                    .into_iter()
+                    .zip(sources)
+                    .into_iter()
+                    .map(|((a, b, c, _), e)| (a, b, e, c))
+                    .collect(),
+            )?;
+
+            let (receive_binds, receive_bind_free_maps): (Vec<ReceiveBind>, Vec<FreeMap<VarSort>>) =
+                receive_binds_and_free_maps.into_iter().unzip();
+
+            let channels: Vec<Par> = receive_binds
+                .clone()
+                .into_iter()
+                .map(|rb| rb.source.unwrap())
+                .collect();
+
+            let channels_set: HashSet<Par> = channels.clone().into_iter().collect();
+            let has_same_channels = channels.len() > channels_set.len();
+
+            if has_same_channels {
+                return Err(InterpreterError::ReceiveOnSameChannelsError {
+                    line: line_num,
+                    col: col_num,
+                });
+            }
+
+            let receive_binds_free_map = receive_bind_free_maps.into_iter().try_fold(
+                FreeMap::new(),
+                |mut known_free, receive_bind_free_map| {
+                    let (updated_known_free, conflicts) = known_free.merge(receive_bind_free_map);
+
+                    if conflicts.is_empty() {
+                        Ok(updated_known_free)
+                    } else {
+                        let (shadowing_var, source_position) = &conflicts[0];
+                        let original_position =
+                            unwrap_option_safe(known_free.get(shadowing_var))?.source_position;
+                        Err(InterpreterError::UnexpectedReuseOfNameContextFree {
+                            var_name: shadowing_var.to_string(),
+                            first_use: original_position.to_string(),
+                            second_use: source_position.to_string(),
+                        })
+                    }
+                },
+            )?;
+
+            let proc_visit_outputs = normalize_match_proc(
+                &body.proc,
+                ProcVisitInputs {
+                    par: Par::default(),
+                    bound_map_chain: input
+                        .bound_map_chain
+                        .absorb_free(receive_binds_free_map.clone()),
+                    free_map: sources_free,
+                },
+                env,
+            )?;
+
+            let bind_count = receive_binds_free_map.count_no_wildcards();
+
+            Ok(ProcVisitOutputs {
+                par: new_receive_par(
+                    receive_binds,
+                    proc_visit_outputs.clone().par,
+                    persistent,
+                    peek,
+                    bind_count as i32,
+                    {
+                        union(
+                            sources_locally_free,
+                            filter_and_adjust_bitset(
+                                processed_patterns
+                                    .into_iter()
+                                    .map(|pattern| pattern.3)
+                                    .fold(Vec::new(), |locally_free1, locally_free2| {
+                                        union(locally_free1, locally_free2)
+                                    }),
+                                bind_count,
+                            ),
+                        )
+                    },
+                    sources_connective_used || proc_visit_outputs.par.connective_used,
+                    Vec::new(),
+                    false,
+                ),
+                free_map: proc_visit_outputs.free_map,
+            })
         }
     }
 }

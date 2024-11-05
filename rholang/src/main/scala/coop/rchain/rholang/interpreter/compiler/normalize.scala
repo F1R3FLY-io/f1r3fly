@@ -20,6 +20,7 @@ object ProcNormalizeMatcher {
   def normalizeMatch[F[_]: Sync](p: Proc, input: ProcVisitInputs)(
       implicit env: Map[String, Par]
   ): F[ProcVisitOutputs] = Sync[F].defer {
+    println("\np: " + p.toString())
     def unaryExp[T](subProc: Proc, input: ProcVisitInputs, constructor: Par => T)(
         implicit toExprInstance: T => Expr
     ): F[ProcVisitOutputs] =

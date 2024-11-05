@@ -934,7 +934,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
 }
 
 #[test]
-fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts_and_linear_binds() {
+fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
     let input_code = r#"
      for (x <- y & z <- w; a <- b & c <- d) {
        Nil
@@ -1204,6 +1204,18 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
     };
 
     assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_parse_input_with_mixed_binds() {
+    let input_code = r#"
+     for (x <- y & z <- w; a <<- b & c <<- d) {
+       Nil
+     }
+   "#;
+
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -2437,24 +2449,20 @@ fn parse_rholang_code_to_proc_should_parse_attenuation_example() {
                                     formals: Names {
                                         names: vec![
                                             Name::Quote(Box::new(Quote {
-                                                quotable: Box::new(
-                                                    Proc::Var(Var {
-                                                        name: "method".to_string(),
-                                                        line_num: 5,
-                                                        col_num: 26,
-                                                    },
-                                                )),
+                                                quotable: Box::new(Proc::Var(Var {
+                                                    name: "method".to_string(),
+                                                    line_num: 5,
+                                                    col_num: 26,
+                                                })),
                                                 line_num: 5,
                                                 col_num: 25,
                                             })),
                                             Name::Quote(Box::new(Quote {
-                                                quotable: Box::new(
-                                                    Proc::Var(Var {
-                                                        name: "arg".to_string(),
-                                                        line_num: 5,
-                                                        col_num: 35,
-                                                    }),
-                                                ),
+                                                quotable: Box::new(Proc::Var(Var {
+                                                    name: "arg".to_string(),
+                                                    line_num: 5,
+                                                    col_num: 35,
+                                                })),
                                                 line_num: 5,
                                                 col_num: 34,
                                             })),
@@ -2721,13 +2729,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                 Receipt::LinearBinds(LinearBind {
                                     names: Names {
                                         names: vec![Name::Quote(Box::new(Quote {
-                                            quotable: Box::new(
-                                                Proc::Var(Var {
-                                                    name: "knf".to_string(),
-                                                    line_num: 4,
-                                                    col_num: 15,
-                                                },
-                                            )),
+                                            quotable: Box::new(Proc::Var(Var {
+                                                name: "knf".to_string(),
+                                                line_num: 4,
+                                                col_num: 15,
+                                            })),
                                             line_num: 4,
                                             col_num: 14,
                                         }))],
@@ -2750,13 +2756,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                 Receipt::LinearBinds(LinearBind {
                                     names: Names {
                                         names: vec![Name::Quote(Box::new(Quote {
-                                            quotable: Box::new(
-                                                Proc::Var(Var {
-                                                    name: "spn".to_string(),
-                                                    line_num: 4,
-                                                    col_num: 30,
-                                                }),
-                                            ),
+                                            quotable: Box::new(Proc::Var(Var {
+                                                name: "spn".to_string(),
+                                                line_num: 4,
+                                                col_num: 30,
+                                            })),
                                             line_num: 4,
                                             col_num: 29,
                                         }))],
@@ -2870,13 +2874,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                             Receipt::LinearBinds(LinearBind {
                                 names: Names {
                                     names: vec![Name::Quote(Box::new(Quote {
-                                        quotable: Box::new(Proc::Var(
-                                            Var {
-                                                name: "spn".to_string(),
-                                                line_num: 9,
-                                                col_num: 15,
-                                            },
-                                        )),
+                                        quotable: Box::new(Proc::Var(Var {
+                                            name: "spn".to_string(),
+                                            line_num: 9,
+                                            col_num: 15,
+                                        })),
                                         line_num: 9,
                                         col_num: 14,
                                     }))],
@@ -2899,13 +2901,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                             Receipt::LinearBinds(LinearBind {
                                 names: Names {
                                     names: vec![Name::Quote(Box::new(Quote {
-                                        quotable: Box::new(Proc::Var(
-                                            Var {
-                                                name: "knf".to_string(),
-                                                line_num: 9,
-                                                col_num: 30,
-                                            },
-                                        )),
+                                        quotable: Box::new(Proc::Var(Var {
+                                            name: "knf".to_string(),
+                                            line_num: 9,
+                                            col_num: 30,
+                                        })),
                                         line_num: 9,
                                         col_num: 29,
                                     }))],

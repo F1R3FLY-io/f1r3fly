@@ -375,7 +375,12 @@ pub fn normalize_match_proc(
             ..
         } => normalize_p_contr(name, formals, proc, input, env),
 
-        Proc::Input { formals, proc, .. } => normalize_p_input(formals, proc, input, env),
+        Proc::Input {
+            formals,
+            proc,
+            line_num,
+            col_num,
+        } => normalize_p_input(formals, proc, *line_num, *col_num, input, env),
 
         Proc::Send {
             name,

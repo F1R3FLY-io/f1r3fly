@@ -53,7 +53,7 @@ impl<T: Clone> FreeMap<T> {
     }
   }
 
-  fn merge(&mut self, free_map: FreeMap<T>) -> Vec<(String, SourcePosition)> {
+  pub fn merge(&mut self, free_map: FreeMap<T>) -> (FreeMap<T>, Vec<(String, SourcePosition)>) {
     let mut shadowed = Vec::new();
     for (name, context) in free_map.level_bindings {
       if self.level_bindings.contains_key(&name) {
@@ -71,7 +71,8 @@ impl<T: Clone> FreeMap<T> {
     self.next_level += free_map.next_level;
     self.wildcards.extend(free_map.wildcards);
     self.connectives.extend(free_map.connectives);
-    shadowed
+
+    (self.clone(), shadowed)
   }
 
   pub(crate) fn add_wildcard(&mut self, source_position: SourcePosition)-> Self {
