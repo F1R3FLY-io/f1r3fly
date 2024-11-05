@@ -25,6 +25,10 @@ pub fn normalize_ground(proc: &Proc) -> Result<Expr, InterpreterError> {
     }
 }
 
+/*
+  In the new engine, we don't have a separate BoolMatcher normalizer for BoolLiteral,
+  which is why the tests with BoolMatcherSpec as well as with GroundMatcherSpec will be described below.
+ */
 #[cfg(test)]
 mod tests {
   use models::rhoapi::expr::ExprInstance;
@@ -56,6 +60,62 @@ mod tests {
     assert!(result.is_ok());
     let expr = result.unwrap();
     assert_eq!(expr.expr_instance, Some(ExprInstance::GBool(false)));
+  }
+
+  //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala
+  #[test]
+  fn ground_int_should_compile_as_gint() {
+    let proc = Proc::LongLiteral {
+      value: 7,
+      line_num: 1,
+      col_num: 1,
+    };
+    let result = normalize_ground(&proc);
+    assert!(result.is_ok());
+    let expr = result.unwrap();
+    assert_eq!(expr.expr_instance, Some(ExprInstance::GInt(7)));
+  }
+
+  //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala
+  #[test]
+  fn ground_string_should_compile_as_gstring() {
+    let proc = Proc::StringLiteral {
+      value: "String".to_string(),
+      line_num: 1,
+      col_num: 1,
+    };
+    let result = normalize_ground(&proc);
+    assert!(result.is_ok());
+    let expr = result.unwrap();
+    assert_eq!(expr.expr_instance, Some(ExprInstance::GString("String".to_string())));
+  }
+
+  //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala
+  /*
+    Steven: I'm not sure that this stripped works as in Scala, because when I provide `rho:uri` as a value,
+    normalizer should return "rho:uri" not an "`rho:uri`"
+   */
+  #[test]
+  fn ground_uri_should_compile_as_guri() {
+    let proc = Proc::UriLiteral(UriLiteral {
+      value: "rho:uri".to_string(),
+      line_num: 1,
+      col_num: 1,
+    });
+    let result = normalize_ground(&proc);
+    assert!(result.is_ok());
+    let expr = result.unwrap();
+    assert_eq!(expr.expr_instance, Some(ExprInstance::GUri("rho:uri".to_string())));
+  }
+
+  #[test]
+  fn unsupported_proc_should_return_bug_found_error() {
+    let proc = Proc::Nil {
+      line_num: 1,
+      col_num: 1,
+    };
+    let result = normalize_ground(&proc);
+    assert!(matches!(result, Err(InterpreterError::BugFoundError(_))));
   }
 }
 
