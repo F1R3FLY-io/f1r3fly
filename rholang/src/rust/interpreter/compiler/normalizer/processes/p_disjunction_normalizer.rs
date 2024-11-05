@@ -22,7 +22,7 @@ pub fn normalize_p_disjunction(
     },
     env)?;
 
-  let mut right_result = normalize_match_proc(
+  let right_result = normalize_match_proc(
     &proc.right,
     ProcVisitInputs {
       par: Par::default(),

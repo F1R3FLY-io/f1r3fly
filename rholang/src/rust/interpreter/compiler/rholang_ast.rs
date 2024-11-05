@@ -288,10 +288,50 @@ pub struct ProcList {
     pub col_num: usize,
 }
 
+impl ProcList {
+    pub fn create(procs: Vec<Proc>, line_num: usize, col_num: usize) -> ProcList {
+        ProcList {
+            procs,
+            line_num,
+            col_num,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Name {
     ProcVar(Box<Proc>),
     Quote(Box<Quote>),
+}
+
+impl Name {
+    pub fn new_name_var(name: &str, line_num: usize, col_num: usize) -> Name {
+        Name::ProcVar(Box::new(Proc::Var(Var {
+            name: name.to_string(),
+            line_num,
+            col_num,
+        })))
+    }
+
+    pub fn new_name_quote_var(name: &str, line_num: usize, col_num: usize) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::Var(Var {
+                name: name.to_string(),
+                line_num,
+                col_num,
+            })),
+            line_num,
+            col_num,
+        }))
+    }
+
+    pub fn new_name_quote_nil(line_num: usize, col_num: usize) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::Nil { line_num, col_num }),
+            line_num,
+            col_num,
+        }))
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -483,6 +523,22 @@ pub struct Names {
     pub col_num: usize,
 }
 
+impl Names {
+    pub fn create(
+        names: Vec<Name>,
+        cont: Option<Box<Proc>>,
+        line_num: usize,
+        col_num: usize,
+    ) -> Names {
+        Names {
+            names,
+            cont,
+            line_num,
+            col_num,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Source {
     Simple {
@@ -503,6 +559,16 @@ pub enum Source {
         line_num: usize,
         col_num: usize,
     },
+}
+
+impl Source {
+    pub fn new_simple_source(name: Name, line_num: usize, col_num: usize) -> Source {
+        Source::Simple {
+            name,
+            line_num,
+            col_num,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -193,8 +193,6 @@ pub fn normalize_collection(
 
       fold_match_map(known_free, optional_remainder, pairs, input, env)
     }
-
-    _ => Err(InterpreterError::NormalizerError("Unexpected collection type".to_string()).into()),
   }
 }
 

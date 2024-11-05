@@ -9,7 +9,7 @@ pub fn normalize_p_eval(
   proc: &Eval,
   input: ProcVisitInputs,
   env: &HashMap<String, Par>
-) -> Result<ProcVisitOutputs, InterpreterError> { ;
+) -> Result<ProcVisitOutputs, InterpreterError> { 
 
   let name_match_result = normalize_name(
     &proc.name,

@@ -466,6 +466,14 @@ pub fn normalize_p_input(
                 },
             )?;
 
+            // println!(
+            //     "\nfree_map: {:?}",
+            //     input
+            //         .bound_map_chain
+            //         .absorb_free(receive_binds_free_map.clone()),
+            // );
+            // println!("\nsources_free: {:?}", sources_free);
+
             let proc_visit_outputs = normalize_match_proc(
                 &body.proc,
                 ProcVisitInputs {
@@ -508,5 +516,113 @@ pub fn normalize_p_input(
                 free_map: proc_visit_outputs.free_map,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use models::{
+        create_bit_vector,
+        rhoapi::Receive,
+        rust::utils::{new_boundvar_par, new_freevar_par, new_send_par},
+    };
+
+    use crate::rust::interpreter::compiler::exports::BoundMapChain;
+
+    use super::*;
+
+    fn inputs() -> ProcVisitInputs {
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: BoundMapChain::new(),
+            free_map: FreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn p_input_should_handle_a_simple_receive() {
+        // for ( x, y <- @Nil ) { x!(*y) }
+        let mut list_bindings: Vec<Name> = Vec::new();
+        list_bindings.push(Name::new_name_var("x", 0, 0));
+        list_bindings.push(Name::new_name_var("y", 0, 0));
+
+        let mut list_linear_binds: Vec<Receipt> = Vec::new();
+        list_linear_binds.push(Receipt::LinearBinds(LinearBind {
+            names: Names::create(list_bindings, None, 0, 0),
+            input: Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
+            line_num: 0,
+            col_num: 0,
+        }));
+
+        let body = Proc::Send {
+            name: Name::new_name_var("x", 0, 0),
+            send_type: SendType::Single {
+                line_num: 0,
+                col_num: 0,
+            },
+            inputs: ProcList::create(
+                vec![Proc::Eval(Eval {
+                    name: Name::new_name_var("y", 0, 0),
+                    line_num: 0,
+                    col_num: 0,
+                })],
+                0,
+                0,
+            ),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let basic_input = Proc::Input {
+            formals: Receipts {
+                receipts: list_linear_binds,
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(Block {
+                proc: body,
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let bind_count = 2;
+
+        let result = normalize_match_proc(&basic_input, inputs(), &HashMap::new());
+        assert!(result.is_ok());
+
+        let expected_result = inputs().par.prepend_receive(Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
+                source: Some(Par::default()),
+                remainder: None,
+                free_count: 2,
+            }],
+            body: Some(new_send_par(
+                new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                vec![new_boundvar_par(0, create_bit_vector(&vec![0]), false)],
+                false,
+                create_bit_vector(&vec![0, 1]),
+                false,
+                create_bit_vector(&vec![0, 1]),
+                false,
+            )),
+            persistent: false,
+            peek: false,
+            bind_count,
+            locally_free: Vec::new(),
+            connective_used: false,
+        });
+
+        // println!("\nresult: {:#?}", result.clone().unwrap().par);
+        // println!("\nexpected_result: {:#?}", expected_result);
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs().free_map);
     }
 }

@@ -18,9 +18,6 @@ pub fn normalize_p_match(
   fn lift_case(case: &Case) -> Result<(&Proc, &Proc), InterpreterError> {
     match case {
       Case { pattern, proc, .. } => Ok((pattern, proc)),
-      _ => Err(InterpreterError::UnrecognizedNormalizerError(
-        "Unexpected Case type provided.".to_string(),
-      )),
     }
   }
 

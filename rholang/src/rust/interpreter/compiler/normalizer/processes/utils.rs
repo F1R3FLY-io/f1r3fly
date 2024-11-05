@@ -8,7 +8,7 @@ pub fn fail_on_invalid_connective(
   name_res: &NameVisitOutputs,
 ) -> Result<NameVisitOutputs, InterpreterError> {
   if input.bound_map_chain.depth() == 0 {
-    println!("fail_on_invalid_connective: input.bound_map_chain.depth() == 0");
+    // println!("fail_on_invalid_connective: input.bound_map_chain.depth() == 0");
     name_res
       .free_map
       .connectives
