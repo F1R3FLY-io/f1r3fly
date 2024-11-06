@@ -53,6 +53,7 @@ impl Compiler {
     ) -> Result<Par, InterpreterError> {
         normalize_match_proc(&term, ProcVisitInputs::new(), &normalizer_env).map(
             |normalized_term| {
+                // println!("\nnormalized term: {:?}", normalized_term);
                 if normalized_term.free_map.count() > 0 {
                     if normalized_term.free_map.wildcards.is_empty()
                         && normalized_term.free_map.connectives.is_empty()
@@ -62,7 +63,7 @@ impl Compiler {
                             .level_bindings
                             .into_iter()
                             .map(|(name, free_context)| {
-                                format!("{:?} at {:?}", name, free_context.source_position)
+                                format!("{} at {:?}", name, free_context.source_position)
                             })
                             .collect();
 
@@ -92,7 +93,7 @@ impl Compiler {
                             .into_iter()
                             .map(|(conn_type, source_position)| {
                                 format!(
-                                    "{:?} at {:?}",
+                                    "{} at {:?}",
                                     connective_instance_to_string(conn_type),
                                     source_position
                                 )

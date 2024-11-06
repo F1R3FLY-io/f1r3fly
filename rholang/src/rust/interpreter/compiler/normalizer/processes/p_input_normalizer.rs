@@ -54,6 +54,11 @@ pub fn normalize_p_input(
             _ => false,
         };
 
+        // println!(
+        //     "\nreceipt_contains_complex_source: {:?}",
+        //     receipt_contains_complex_source,
+        // );
+
         if receipt_contains_complex_source {
             match head_receipt {
                 Receipt::LinearBinds(linear_bind) => match &linear_bind.input {
@@ -412,10 +417,15 @@ pub fn normalize_p_input(
             let (patterns, names): (Vec<(Vec<Name>, Option<Box<Proc>>)>, Vec<Name>) =
                 consumes.into_iter().unzip();
 
+            // println!("\npatterns: {:#?}", patterns);
+
             let processed_patterns = process_patterns(patterns, input.clone(), env)?;
+            // println!("\nprocessed_patterns: {:#?}", processed_patterns);
             let processed_sources = process_sources(names, input.clone(), env)?;
             let (sources, sources_free, sources_locally_free, sources_connective_used) =
                 processed_sources;
+
+            // println!("\nsources: {:?}", sources);
 
             let receive_binds_and_free_maps = pre_sort_binds(
                 processed_patterns
@@ -445,6 +455,8 @@ pub fn normalize_p_input(
                     col: col_num,
                 });
             }
+
+            // println!("\nreceive_binds_free_map: {:?}", receive_bind_free_maps);
 
             let receive_binds_free_map = receive_bind_free_maps.into_iter().try_fold(
                 FreeMap::new(),
@@ -519,15 +531,24 @@ pub fn normalize_p_input(
     }
 }
 
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
     use models::{
         create_bit_vector,
         rhoapi::Receive,
-        rust::utils::{new_boundvar_par, new_freevar_par, new_send_par},
+        rust::utils::{
+            new_boundvar_par, new_elist_par, new_freevar_par, new_freevar_var, new_gint_par,
+            new_send, new_send_par,
+        },
     };
 
-    use crate::rust::interpreter::compiler::exports::BoundMapChain;
+    use crate::rust::interpreter::compiler::{
+        compiler::Compiler,
+        exports::{BoundMapChain, SourcePosition},
+        normalizer::parser::parse_rholang_code_to_proc,
+        rholang_ast::{Collection, Quote},
+    };
 
     use super::*;
 
@@ -624,5 +645,429 @@ mod tests {
 
         assert_eq!(result.clone().unwrap().par, expected_result);
         assert_eq!(result.unwrap().free_map, inputs().free_map);
+    }
+
+    #[test]
+    fn p_input_should_handle_peek() {
+        let basic_input = parse_rholang_code_to_proc(r#"for ( x, y <<- @Nil ) { x!(*y) }"#);
+        assert!(basic_input.is_ok());
+
+        let result = normalize_match_proc(&basic_input.unwrap(), inputs(), &HashMap::new());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().par.receives[0].peek, true);
+    }
+
+    #[test]
+    fn p_input_should_handle_a_more_complicated_receive() {
+        // for ( (x1, @y1) <- @Nil  & (x2, @y2) <- @1) { x1!(y2) | x2!(y1) }
+        let mut list_bindings1: Vec<Name> = Vec::new();
+        list_bindings1.push(Name::new_name_var("x1", 0, 0));
+        list_bindings1.push(Name::new_name_quote_var("y1", 0, 0));
+
+        let mut list_bindings2: Vec<Name> = Vec::new();
+        list_bindings2.push(Name::new_name_var("x2", 0, 0));
+        list_bindings2.push(Name::new_name_quote_var("y2", 0, 0));
+
+        let list_receipt = vec![
+            Receipt::new_linear_bind_receipt(
+                Names {
+                    names: list_bindings1,
+                    cont: None,
+                    line_num: 0,
+                    col_num: 0,
+                },
+                Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
+                0,
+                0,
+            ),
+            Receipt::new_linear_bind_receipt(
+                Names {
+                    names: list_bindings2,
+                    cont: None,
+                    line_num: 0,
+                    col_num: 0,
+                },
+                Source::new_simple_source(
+                    Name::Quote(Box::new(Quote {
+                        quotable: Box::new(Proc::new_proc_int(1, 0, 0)),
+                        line_num: 0,
+                        col_num: 0,
+                    })),
+                    0,
+                    0,
+                ),
+                0,
+                0,
+            ),
+        ];
+
+        let list_send1 = ProcList {
+            procs: vec![Proc::Var(Var {
+                name: "y2".to_string(),
+                line_num: 0,
+                col_num: 0,
+            })],
+            line_num: 0,
+            col_num: 0,
+        };
+        let list_send2 = ProcList {
+            procs: vec![Proc::Var(Var {
+                name: "y1".to_string(),
+                line_num: 0,
+                col_num: 0,
+            })],
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let body = Block {
+            proc: Proc::Par {
+                left: Box::new(Proc::Send {
+                    name: Name::new_name_var("x1", 0, 0),
+                    send_type: SendType::Single {
+                        line_num: 0,
+                        col_num: 0,
+                    },
+                    inputs: list_send1,
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                right: Box::new(Proc::Send {
+                    name: Name::new_name_var("x2", 0, 0),
+                    send_type: SendType::Single {
+                        line_num: 0,
+                        col_num: 0,
+                    },
+                    inputs: list_send2,
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                line_num: 0,
+                col_num: 0,
+            },
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let p_input = Proc::Input {
+            formals: Receipts {
+                receipts: list_receipt,
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(body),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let bind_count = 4;
+
+        let result = normalize_match_proc(&p_input, inputs(), &HashMap::new());
+        assert!(result.is_ok());
+
+        let expected_result = inputs().par.prepend_receive(Receive {
+            binds: vec![
+                ReceiveBind {
+                    patterns: vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_freevar_par(1, Vec::new()),
+                    ],
+                    source: Some(Par::default()),
+                    remainder: None,
+                    free_count: 2,
+                },
+                ReceiveBind {
+                    patterns: vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_freevar_par(1, Vec::new()),
+                    ],
+                    source: Some(new_gint_par(1, Vec::new(), false)),
+                    remainder: None,
+                    free_count: 2,
+                },
+            ],
+            body: Some({
+                let mut par = Par::default().with_sends(vec![
+                    new_send(
+                        new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                        vec![new_boundvar_par(2, create_bit_vector(&vec![2]), false)],
+                        false,
+                        create_bit_vector(&vec![1, 2]),
+                        false,
+                    ),
+                    new_send(
+                        new_boundvar_par(3, create_bit_vector(&vec![3]), false),
+                        vec![new_boundvar_par(0, create_bit_vector(&vec![0]), false)],
+                        false,
+                        create_bit_vector(&vec![0, 3]),
+                        false,
+                    ),
+                ]);
+                par.locally_free = create_bit_vector(&vec![0, 1, 2, 3]);
+                par
+            }),
+            persistent: false,
+            peek: false,
+            bind_count,
+            locally_free: Vec::new(),
+            connective_used: false,
+        });
+
+        // println!("\nresult: {:#?}", result.clone().unwrap().par);
+        // println!("\nexpected_result: {:#?}", expected_result);
+
+        assert_eq!(result.unwrap().par, expected_result)
+    }
+
+    // This case is (I think) dependent on collection. TODO: Come back after collection is tested
+    #[test]
+    fn p_input_should_bind_whole_list_to_the_list_remainder() {
+        // for (@[...a] <- @0) { … }
+        let list_bindings = vec![Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::Collection(Collection::List {
+                elements: vec![],
+                cont: Some(Box::new(Proc::new_proc_var("a", 0, 0))),
+                line_num: 0,
+                col_num: 0,
+            })),
+            line_num: 0,
+            col_num: 0,
+        }))];
+
+        let bind_count = 1;
+        let p_input = Proc::Input {
+            formals: Receipts {
+                receipts: vec![Receipt::LinearBinds(LinearBind {
+                    names: Names {
+                        names: list_bindings,
+                        cont: None,
+                        line_num: 0,
+                        col_num: 0,
+                    },
+                    input: Source::Simple {
+                        name: Name::new_name_quote_nil(0, 0),
+                        line_num: 0,
+                        col_num: 0,
+                    },
+                    line_num: 0,
+                    col_num: 0,
+                })],
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(Block::new_block_nil(0, 0)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&p_input, inputs(), &HashMap::new());
+        assert!(result.is_ok());
+        let expected_result = inputs().par.prepend_receive(Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![new_elist_par(
+                    Vec::new(),
+                    Vec::new(),
+                    true,
+                    Some(new_freevar_var(0)),
+                    Vec::new(),
+                    true,
+                )],
+                source: Some(Par::default()),
+                remainder: None,
+                free_count: 1,
+            }],
+            body: Some(Par::default()),
+            persistent: false,
+            peek: false,
+            bind_count,
+            locally_free: Vec::new(),
+            connective_used: false,
+        });
+
+        assert_eq!(result.unwrap().par, expected_result);
+    }
+
+    // TODO: This test is failing because of free_map mismatch in process_patterns
+    #[test]
+    fn p_input_should_fail_if_a_free_variable_is_used_in_two_different_receives() {
+        // for ( (x1, @y1) <- @Nil  & (x2, @y1) <- @1) { Nil }
+        let mut list_bindings1: Vec<Name> = Vec::new();
+        list_bindings1.push(Name::new_name_var("x1", 0, 0));
+        list_bindings1.push(Name::new_name_quote_var("y1", 0, 0));
+
+        let mut list_bindings2: Vec<Name> = Vec::new();
+        list_bindings2.push(Name::new_name_var("x2", 0, 0));
+        list_bindings2.push(Name::new_name_quote_var("y2", 0, 0));
+
+        let list_receipt = vec![
+            Receipt::new_linear_bind_receipt(
+                Names {
+                    names: list_bindings1,
+                    cont: None,
+                    line_num: 0,
+                    col_num: 0,
+                },
+                Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
+                0,
+                0,
+            ),
+            Receipt::new_linear_bind_receipt(
+                Names {
+                    names: list_bindings2,
+                    cont: None,
+                    line_num: 0,
+                    col_num: 0,
+                },
+                Source::new_simple_source(
+                    Name::Quote(Box::new(Quote {
+                        quotable: Box::new(Proc::new_proc_int(1, 0, 0)),
+                        line_num: 0,
+                        col_num: 0,
+                    })),
+                    0,
+                    0,
+                ),
+                0,
+                0,
+            ),
+        ];
+
+        let p_input = Proc::Input {
+            formals: Receipts {
+                receipts: list_receipt,
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(Block {
+                proc: Proc::Nil {
+                    line_num: 0,
+                    col_num: 0,
+                },
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&p_input, inputs(), &HashMap::new());
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::UnexpectedReuseOfNameContextFree {
+                var_name: "testing".to_string(),
+                first_use: "testing".to_string(),
+                second_use: "testing".to_string(),
+            })
+        )
+    }
+
+    #[test]
+    fn p_input_should_not_compile_when_connectives_are_used_in_the_cahnnel() {
+        let result1 = Compiler::source_to_adt(r#"for(x <- @{Nil \/ Nil}){ Nil }"#);
+        assert!(result1.is_err());
+        assert_eq!(
+            result1,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "\\/ (disjunction) at {:?}",
+                    SourcePosition { row: 0, column: 11 }
+                )
+            ))
+        );
+
+        let result2 = Compiler::source_to_adt(r#"for(x <- @{Nil /\ Nil}){ Nil }"#);
+        assert!(result2.is_err());
+        assert_eq!(
+            result2,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "/\\ (conjunction) at {:?}",
+                    SourcePosition { row: 0, column: 11 }
+                )
+            ))
+        );
+
+        let result3 = Compiler::source_to_adt(r#"for(x <- @{~Nil}){ Nil }"#);
+        assert!(result3.is_err());
+        assert_eq!(
+            result3,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "~ (negation) at {:?}",
+                    SourcePosition { row: 0, column: 11 }
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn p_input_should_not_compile_when_connectives_are_at_the_top_level_expression_in_the_body() {
+        let result1 = Compiler::source_to_adt(r#"for(x <- @Nil){ 1 /\ 2 }"#);
+        assert!(result1.is_err());
+        assert_eq!(
+            result1,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "/\\ (conjunction) at {:?}",
+                    SourcePosition { row: 0, column: 16 }
+                )
+            ))
+        );
+
+        let result2 = Compiler::source_to_adt(r#"for(x <- @Nil){ 1 \/ 2 }"#);
+        assert!(result2.is_err());
+        assert_eq!(
+            result2,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "\\/ (disjunction) at {:?}",
+                    SourcePosition { row: 0, column: 16 }
+                )
+            ))
+        );
+
+        let result3 = Compiler::source_to_adt(r#"for(x <- @Nil){ ~1 }"#);
+        assert!(result3.is_err());
+        assert_eq!(
+            result3,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "~ (negation) at {:?}",
+                    SourcePosition { row: 0, column: 16 }
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn p_input_should_not_compile_when_logical_or_or_not_is_used_in_pattern_of_receive() {
+        let result1 = Compiler::source_to_adt(r#"new x in { for(@{Nil \/ Nil} <- x) { Nil } }"#);
+        assert!(result1.is_err());
+        assert_eq!(
+            result1,
+            Err(InterpreterError::PatternReceiveError(format!(
+                "\\/ (disjunction) at {:?}",
+                SourcePosition { row: 0, column: 17 }
+            )))
+        );
+
+        let result2 = Compiler::source_to_adt(r#"new x in { for(@{~Nil} <- x) { Nil } }"#);
+        assert!(result2.is_err());
+        assert_eq!(
+            result2,
+            Err(InterpreterError::PatternReceiveError(format!(
+                "~ (negation) at {:?}",
+                SourcePosition { row: 0, column: 17 }
+            )))
+        );
+    }
+
+    // TODO: This test depends on p_new
+    #[test]
+    fn p_input_should_compile_when_logical_and_is_used_in_pattern_of_receive() {
+        let result1 = Compiler::source_to_adt(r#"new x in { for(@{Nil /\ Nil} <- x) { Nil } }"#);
+        println!("\nresult1: {:?}", result1);
+        assert!(result1.is_ok());
     }
 }

@@ -1,4 +1,3 @@
-pub use crate::rust::interpreter::compiler::normalize::normalize_match;
 pub use crate::rust::interpreter::compiler::normalize::CollectVisitInputs;
 pub use crate::rust::interpreter::compiler::normalize::CollectVisitOutputs;
 pub use crate::rust::interpreter::compiler::normalize::NameVisitInputs;

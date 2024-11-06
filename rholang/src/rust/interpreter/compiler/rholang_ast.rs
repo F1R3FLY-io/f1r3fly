@@ -272,12 +272,20 @@ pub enum Proc {
 }
 
 impl Proc {
-    pub fn new_int_proc(value: i64, line_num: usize, col_num: usize) -> Proc {
+    pub fn new_proc_int(value: i64, line_num: usize, col_num: usize) -> Proc {
         Proc::LongLiteral {
             value,
             line_num,
             col_num,
         }
+    }
+
+    pub fn new_proc_var(value: &str, line_num: usize, col_num: usize) -> Proc {
+        Proc::Var(Var {
+            name: value.to_string(),
+            line_num,
+            col_num,
+        })
     }
 }
 
@@ -442,6 +450,16 @@ pub struct Block {
     pub proc: Proc,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+impl Block {
+    pub fn new_block_nil(line_num: usize, col_num: usize) -> Block {
+        Block {
+            proc: Proc::Nil { line_num, col_num },
+            line_num,
+            col_num,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -631,6 +649,13 @@ impl Source {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Receipts {
+    pub receipts: Vec<Receipt>,
+    pub line_num: usize,
+    pub col_num: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Receipt {
     LinearBinds(LinearBind),
 
@@ -639,11 +664,20 @@ pub enum Receipt {
     PeekBinds(PeekBind),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Receipts {
-    pub receipts: Vec<Receipt>,
-    pub line_num: usize,
-    pub col_num: usize,
+impl Receipt {
+    pub fn new_linear_bind_receipt(
+        names: Names,
+        input: Source,
+        line_num: usize,
+        col_num: usize,
+    ) -> Receipt {
+        Receipt::LinearBinds(LinearBind {
+            names,
+            input,
+            line_num,
+            col_num,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
