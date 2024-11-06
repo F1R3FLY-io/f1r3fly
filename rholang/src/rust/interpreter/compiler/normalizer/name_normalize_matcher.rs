@@ -165,7 +165,7 @@ mod tests {
   use crate::rust::interpreter::compiler::exports::FreeMap;
   use crate::rust::interpreter::compiler::rholang_ast::Name;
 
-  fn common_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
+  fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
     let input: NameVisitInputs = NameVisitInputs {
       bound_map_chain: BoundMapChain::default(),
       free_map: FreeMap::default(),
@@ -206,7 +206,7 @@ mod tests {
   #[test]
   fn name_wildcard_should_add_a_wildcard_count_to_known_free() {
     let nw = Name::new_name_wildcard(1, 1);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
 
     let result = normalize_name(&nw, input, &env);
     let expected_result = new_wildcard_par(Vec::new(), true);
@@ -218,7 +218,7 @@ mod tests {
 
   #[test]
   fn name_var_should_compile_as_bound_var_if_its_in_env() {
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let n_var: Name = Name::new_name_var("x", 1, 1);
     let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
@@ -234,7 +234,7 @@ mod tests {
   #[test]
   fn name_var_should_compile_as_free_var_if_its_not_in_env() {
     let n_var: Name = Name::new_name_var("x", 1, 1);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
 
     let result = normalize_name(&n_var, input.clone(), &env);
     let expected_result = new_freevar_par(0, Vec::new());
@@ -248,7 +248,7 @@ mod tests {
 
   #[test]
   fn name_var_should_not_compile_if_its_in_env_of_wrong_sort() {
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let n_var: Name = Name::new_name_var("x", 1, 1);
     let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
 
@@ -258,7 +258,7 @@ mod tests {
 
   #[test]
   fn name_var_should_not_compile_if_used_free_somewhere_else() {
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let n_var: Name = Name::new_name_var("x", 1, 1);
     let bound_inputs = bound_name_inputs_with_free_map(input.clone(), "x", VarSort::NameSort, 0, 0);
 
@@ -269,7 +269,7 @@ mod tests {
   #[test]
   fn name_quote_should_compile_to_bound_var() {
     let n_q_var = Name::new_name_quote_var("x", 1, 1);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
 
     let result = normalize_name(&n_q_var, bound_inputs.clone(), &env);
@@ -284,7 +284,7 @@ mod tests {
   #[test]
   fn name_quote_should_return_a_free_use_if_the_quoted_proc_has_a_free_var() {
     let n_q_var = Name::new_name_quote_var("x", 1, 1);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
 
     let result = normalize_name(&n_q_var, input.clone(), &env);
     let expected_result = new_freevar_par(0, Vec::new());
@@ -299,7 +299,7 @@ mod tests {
   #[test]
   fn name_quote_should_compile_to_a_ground() {
     let n_q_ground = Name::new_name_quote_ground_long_literal(7, 0, 0);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
 
     let result = normalize_name(&n_q_ground, input.clone(), &env);
     let expected_result = new_gint_par(7, Vec::new(), false);
@@ -313,7 +313,7 @@ mod tests {
   #[test]
   fn name_quote_should_collapse_an_eval() {
     let n_q_eval = Name::new_name_quote_eval("x", 0, 0);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
     let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
@@ -327,7 +327,7 @@ mod tests {
   #[test]
   fn name_quote_should_not_collapse_an_eval_eval() {
     let n_q_eval = Name::new_name_quote_par_of_evals("x", 0, 0);
-    let (input, env) = common_inputs_and_env();
+    let (input, env) = name_visit_inputs_and_env();
     let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
     let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
