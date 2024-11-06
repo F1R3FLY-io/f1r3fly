@@ -91,10 +91,6 @@ mod tests {
   }
 
   //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/GroundMatcherSpec.scala
-  /*
-    Steven: I'm not sure that this stripped works as in Scala, because when I provide `rho:uri` as a value,
-    normalizer should return "rho:uri" not an "`rho:uri`"
-   */
   #[test]
   fn ground_uri_should_compile_as_guri() {
     let proc = Proc::UriLiteral(UriLiteral {

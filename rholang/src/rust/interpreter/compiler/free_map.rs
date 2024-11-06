@@ -99,7 +99,7 @@ impl<T: Clone> FreeMap<T> {
     }
   }
 
-  fn count(&self) -> usize {
+  pub fn count(&self) -> usize {
     self.next_level + self.wildcards.len() + self.connectives.len()
   }
 
