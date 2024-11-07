@@ -12,15 +12,15 @@ fn handle_proc_var(
     proc: &Proc,
     mut known_free: FreeMap<VarSort>,
 ) -> Result<(Option<ModelsVar>, FreeMap<VarSort>), InterpreterError> {
+    // println!("\nhit handle_proc_var");
+    // println!("\nknown_free: {:?}", known_free);
     match proc {
         Proc::Wildcard { line_num, col_num } => {
             let wildcard_var = ModelsVar {
                 var_instance: Some(Wildcard(WildcardMsg {})),
             };
             let source_position = SourcePosition::new(*line_num, *col_num);
-
-            known_free.add_wildcard(source_position);
-            Ok((Some(wildcard_var), known_free))
+            Ok((Some(wildcard_var), known_free.add_wildcard(source_position)))
         }
 
         Proc::Var(Var {
@@ -35,7 +35,7 @@ fn handle_proc_var(
                     let binding = (name.clone(), VarSort::ProcSort, source_position);
                     let new_bindings_pair = known_free.put(binding);
                     let free_var = ModelsVar {
-                        var_instance: Some(FreeVar(new_bindings_pair.next_level as i32)),
+                        var_instance: Some(FreeVar(known_free.next_level as i32)),
                     };
                     Ok((Some(free_var), new_bindings_pair))
                 }

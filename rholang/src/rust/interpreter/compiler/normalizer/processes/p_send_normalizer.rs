@@ -1,80 +1,82 @@
-use std::collections::HashMap;
-use models::rhoapi::{Par, Send};
-use models::rust::utils::union;
-use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, normalize_match_proc, ProcVisitInputs, ProcVisitOutputs};
+use super::exports::*;
+use crate::rust::interpreter::compiler::normalize::{
+    normalize_match_proc, NameVisitInputs, ProcVisitInputs, ProcVisitOutputs,
+};
 use crate::rust::interpreter::compiler::rholang_ast::{Name, ProcList, SendType};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
-use super::exports::*;
+use models::rhoapi::{Par, Send};
+use models::rust::utils::union;
+use std::collections::HashMap;
 
 pub fn normalize_p_send(
-  name: &Name,
-  send_type: &SendType,
-  inputs: &ProcList,
-  input: ProcVisitInputs,
-  env: &HashMap<String, Par>
+    name: &Name,
+    send_type: &SendType,
+    inputs: &ProcList,
+    input: ProcVisitInputs,
+    env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-
-  let name_match_result = normalize_name(
-    name,
-    NameVisitInputs {
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: input.free_map.clone(),
-    },
-    env
-  )?;
-
-  let mut acc = (
-    Vec::new(),
-    ProcVisitInputs {
-      par: Par::default(),
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: name_match_result.free_map.clone(),
-    },
-    Vec::new(),
-    false,
-  );
-
-
-  for proc in inputs.procs.clone() {
-    let proc_match_result = normalize_match_proc(
-      &proc,
-      acc.1.clone(),
-      env
+    let name_match_result = normalize_name(
+        name,
+        NameVisitInputs {
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: input.free_map.clone(),
+        },
+        env,
     )?;
 
-    acc.0.insert(0, proc_match_result.par.clone());
-    acc.1 = ProcVisitInputs {
-      par: Par::default(),
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: proc_match_result.free_map.clone(),
+    let mut acc = (
+        Vec::new(),
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: name_match_result.free_map.clone(),
+        },
+        Vec::new(),
+        false,
+    );
+
+    for proc in inputs.procs.clone() {
+        let proc_match_result = normalize_match_proc(&proc, acc.1.clone(), env)?;
+
+        acc.0.insert(0, proc_match_result.par.clone());
+        acc.1 = ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: proc_match_result.free_map.clone(),
+        };
+        acc.2 = union(acc.2.clone(), proc_match_result.par.locally_free.clone());
+        acc.3 = acc.3 || proc_match_result.par.connective_used;
+    }
+
+    let persistent = match send_type {
+        SendType::Single { .. } => false,
+        SendType::Multiple { .. } => true,
     };
-    acc.2 = union(acc.2.clone(), proc_match_result.par.locally_free.clone());
-    acc.3 = acc.3 || proc_match_result.par.connective_used;
-  }
 
-  let persistent = match send_type {
-    SendType::Single { ..} => false,
-    SendType::Multiple {..} => true,
-  };
+    let send = Send {
+        chan: Some(name_match_result.par.clone()),
+        data: acc.0,
+        persistent,
+        locally_free: union(
+            name_match_result.par.clone().locally_free(
+                name_match_result.par.clone(),
+                input.bound_map_chain.depth() as i32,
+            ),
+            acc.2,
+        ),
+        connective_used: name_match_result
+            .par
+            .connective_used(name_match_result.par.clone())
+            || acc.3,
+    };
 
-  let send = Send {
-    chan: Some(name_match_result.par.clone()),
-    data: acc.0,
-    persistent,
-    locally_free: union(
-      name_match_result.par.clone()
-        .locally_free(name_match_result.par.clone(), input.bound_map_chain.depth() as i32),
-      acc.2),
-    connective_used: name_match_result.par.connective_used(name_match_result.par.clone()) || acc.3,
-  };
+    let updated_par = input.par.clone().prepend_send(send);
 
-  let updated_par = input.par.clone().prepend_send(send);
-
-  Ok(ProcVisitOutputs {
-    par: updated_par,
-    free_map: acc.1.free_map,
-  })
+    Ok(ProcVisitOutputs {
+        par: updated_par,
+        free_map: acc.1.free_map,
+    })
 }
 
 // #[test]

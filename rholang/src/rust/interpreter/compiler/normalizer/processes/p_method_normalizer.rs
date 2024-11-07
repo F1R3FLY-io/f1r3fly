@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
@@ -9,13 +8,14 @@ use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{expr, EMethod, Expr, Par};
 use models::rust::utils::union;
+use std::collections::HashMap;
 
 pub fn normalize_p_method(
     receiver: &Proc,
     name_var: &Var,
     args: &ProcList,
     input: ProcVisitInputs,
-    env: &HashMap<String, Par>
+    env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     let target_result = normalize_match_proc(
         receiver,
@@ -23,7 +23,7 @@ pub fn normalize_p_method(
             par: Par::default(),
             ..input.clone()
         },
-        env
+        env,
     )?;
 
     let target = target_result.par;

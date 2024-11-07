@@ -1,67 +1,77 @@
-use std::collections::HashMap;
-use models::rhoapi::{Connective, ConnectiveBody, Par};
-use models::rhoapi::connective::ConnectiveInstance;
 use crate::rust::interpreter::compiler::exports::SourcePosition;
-use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, ProcVisitInputs, ProcVisitOutputs};
+use crate::rust::interpreter::compiler::normalize::{
+    normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
+};
 use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
+use models::rhoapi::connective::ConnectiveInstance;
+use models::rhoapi::{Connective, ConnectiveBody, Par};
+use std::collections::HashMap;
 
 pub fn normalize_p_conjunction(
-  proc: &Conjunction,
-  input: ProcVisitInputs,
-  env: &HashMap<String, Par>
+    proc: &Conjunction,
+    input: ProcVisitInputs,
+    env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-  let left_result = normalize_match_proc(
-    &proc.left,
-    ProcVisitInputs {
-      par: Par::default(),
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: input.free_map.clone(),
-    },
-    env)?;
+    let left_result = normalize_match_proc(
+        &proc.left,
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: input.free_map.clone(),
+        },
+        env,
+    )?;
 
-  let right_result = normalize_match_proc(
-    &proc.right,
-    ProcVisitInputs {
-      par: Par::default(),
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: left_result.free_map.clone(),
-    },
-    env)?;
+    let right_result = normalize_match_proc(
+        &proc.right,
+        ProcVisitInputs {
+            par: Par::default(),
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: left_result.free_map.clone(),
+        },
+        env,
+    )?;
 
-  let lp = left_result.par;
-  let result_connective = match lp.single_connective() {
-    Some(Connective { connective_instance: Some(ConnectiveInstance::ConnAndBody(conn_body)), }) =>
-      Connective {
-        connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
-          ps: {
-            let mut ps = conn_body.ps.clone();
-            ps.push(right_result.par);
-            ps
-          },
-        })),
-      },
-    _ => Connective {
-      connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
-        ps: vec![lp, right_result.par],
-      })),
-    },
-  };
+    let lp = left_result.par;
+    let result_connective = match lp.single_connective() {
+        Some(Connective {
+            connective_instance: Some(ConnectiveInstance::ConnAndBody(conn_body)),
+        }) => Connective {
+            connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
+                ps: {
+                    let mut ps = conn_body.ps.clone();
+                    ps.push(right_result.par);
+                    ps
+                },
+            })),
+        },
+        _ => Connective {
+            connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
+                ps: vec![lp, right_result.par],
+            })),
+        },
+    };
 
-  let result_par = prepend_connective(input.par, result_connective.clone(), input.bound_map_chain.depth() as i32);
+    let result_par = prepend_connective(
+        input.par,
+        result_connective.clone(),
+        input.bound_map_chain.depth() as i32,
+    );
 
-  let updated_free_map = right_result
-    .free_map
-    .add_connective(result_connective.connective_instance.unwrap(), SourcePosition {
-      row: proc.line_num,
-      column: proc.col_num,
-    });
+    let updated_free_map = right_result.free_map.add_connective(
+        result_connective.connective_instance.unwrap(),
+        SourcePosition {
+            row: proc.line_num,
+            column: proc.col_num,
+        },
+    );
 
-  Ok(ProcVisitOutputs {
-    par: result_par,
-    free_map: updated_free_map,
-  })
+    Ok(ProcVisitOutputs {
+        par: result_par,
+        free_map: updated_free_map,
+    })
 }
 
 // #[test]

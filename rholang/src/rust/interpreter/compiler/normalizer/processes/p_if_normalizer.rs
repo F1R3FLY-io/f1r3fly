@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
@@ -6,15 +5,17 @@ use crate::rust::interpreter::compiler::normalize::{
 use crate::rust::interpreter::errors::InterpreterError;
 use models::rhoapi::{Match, MatchCase, Par};
 use models::rust::utils::{new_gbool_par, union};
+use std::collections::HashMap;
 
 pub fn normalize_p_if(
     value_proc: &Proc,
     true_body_proc: &Proc,
     false_body_proc: &Proc,
     mut input: ProcVisitInputs,
-    env: &HashMap<String, Par>
+    env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
-    let target_result = normalize_match_proc(&value_proc, ProcVisitInputs { ..input.clone() }, env)?;
+    let target_result =
+        normalize_match_proc(&value_proc, ProcVisitInputs { ..input.clone() }, env)?;
 
     let true_case_body = normalize_match_proc(
         &true_body_proc,
@@ -23,7 +24,7 @@ pub fn normalize_p_if(
             bound_map_chain: input.bound_map_chain.clone(),
             free_map: target_result.free_map.clone(),
         },
-        env
+        env,
     )?;
 
     let false_case_body = normalize_match_proc(
@@ -33,7 +34,7 @@ pub fn normalize_p_if(
             bound_map_chain: input.bound_map_chain.clone(),
             free_map: true_case_body.free_map.clone(),
         },
-        env
+        env,
     )?;
 
     // Construct the desugared if as a Match

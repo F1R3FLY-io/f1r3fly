@@ -333,21 +333,24 @@ pub fn normalize_p_input(
                     .into_iter()
                     .map(|(names, name_remainder)| {
                         let mut vector_par = Vec::new();
-                        let mut known_free = FreeMap::new();
+                        let mut current_known_free = FreeMap::new();
                         let mut locally_free = Vec::new();
 
                         for name in names {
                             let NameVisitOutputs {
                                 par,
                                 free_map: updated_known_free,
-                            } = normalize_name(
-                                &name,
-                                NameVisitInputs {
+                            } = {
+                                let input = NameVisitInputs {
                                     bound_map_chain: input.bound_map_chain.push(),
-                                    free_map: known_free,
-                                },
-                                env,
-                            )?;
+                                    free_map: current_known_free,
+                                };
+                                // println!("\ninput: {:?}", input);
+                                // println!("\nname: {:?}", name);
+                                normalize_name(&name, input, env)?
+                            };
+
+                            // println!("\npar: {:?}", par);
 
                             fail_on_invalid_connective(
                                 &input,
@@ -358,7 +361,7 @@ pub fn normalize_p_input(
                             )?;
 
                             vector_par.push(par.clone());
-                            known_free = updated_known_free;
+                            current_known_free = updated_known_free;
                             locally_free = union(
                                 locally_free,
                                 par.locally_free(
@@ -368,8 +371,14 @@ pub fn normalize_p_input(
                             );
                         }
 
+                        // println!("\ncurrent_known_free: {:?}", current_known_free);
+
                         let (optional_var, known_free) =
-                            normalize_match_name(&name_remainder, known_free)?;
+                            normalize_match_name(&name_remainder, current_known_free)?;
+
+                        // println!("\noptional_var: {:?}", optional_var);
+                        // println!("\nknown_free: {:?}", known_free);
+
                         Ok((vector_par, optional_var, known_free, locally_free))
                     })
                     .collect()
@@ -456,7 +465,7 @@ pub fn normalize_p_input(
                 });
             }
 
-            // println!("\nreceive_binds_free_map: {:?}", receive_bind_free_maps);
+            // println!("\nreceive_binds_free_maps: {:?}", receive_bind_free_maps);
 
             let receive_binds_free_map = receive_bind_free_maps.into_iter().try_fold(
                 FreeMap::new(),
@@ -478,6 +487,7 @@ pub fn normalize_p_input(
                 },
             )?;
 
+            // println!("\nreceive_binds_free_map: {:?}", receive_binds_free_map);
             // println!(
             //     "\nfree_map: {:?}",
             //     input
@@ -819,7 +829,6 @@ mod tests {
         assert_eq!(result.unwrap().par, expected_result)
     }
 
-    // This case is (I think) dependent on collection. TODO: Come back after collection is tested
     #[test]
     fn p_input_should_bind_whole_list_to_the_list_remainder() {
         // for (@[...a] <- @0) { … }
@@ -887,7 +896,6 @@ mod tests {
         assert_eq!(result.unwrap().par, expected_result);
     }
 
-    // TODO: This test is failing because of free_map mismatch in process_patterns
     #[test]
     fn p_input_should_fail_if_a_free_variable_is_used_in_two_different_receives() {
         // for ( (x1, @y1) <- @Nil  & (x2, @y1) <- @1) { Nil }
@@ -897,7 +905,7 @@ mod tests {
 
         let mut list_bindings2: Vec<Name> = Vec::new();
         list_bindings2.push(Name::new_name_var("x2", 0, 0));
-        list_bindings2.push(Name::new_name_quote_var("y2", 0, 0));
+        list_bindings2.push(Name::new_name_quote_var("y1", 0, 0));
 
         let list_receipt = vec![
             Receipt::new_linear_bind_receipt(
@@ -955,9 +963,9 @@ mod tests {
         assert_eq!(
             result,
             Err(InterpreterError::UnexpectedReuseOfNameContextFree {
-                var_name: "testing".to_string(),
-                first_use: "testing".to_string(),
-                second_use: "testing".to_string(),
+                var_name: "y1".to_string(),
+                first_use: "0:0".to_string(),
+                second_use: "0:0".to_string(),
             })
         )
     }

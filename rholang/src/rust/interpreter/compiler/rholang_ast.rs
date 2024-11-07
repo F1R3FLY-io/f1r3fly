@@ -321,12 +321,9 @@ impl Name {
         })))
     }
 
-  pub fn new_name_wildcard(line_num: usize, col_num: usize) -> Name {
-    Name::ProcVar(Box::new(Proc::Wildcard {
-      line_num,
-      col_num,
-    }))
-  }
+    pub fn new_name_wildcard(line_num: usize, col_num: usize) -> Name {
+        Name::ProcVar(Box::new(Proc::Wildcard { line_num, col_num }))
+    }
 
     pub fn new_name_quote_var(name: &str, line_num: usize, col_num: usize) -> Name {
         Name::Quote(Box::new(Quote {
@@ -348,57 +345,56 @@ impl Name {
         }))
     }
 
-  pub fn new_name_quote_ground_long_literal(value: i64, line_num: usize, col_num: usize) -> Name {
-    Name::Quote(Box::new(Quote {
-      quotable: Box::new(Proc::LongLiteral {
-        value,
-        line_num,
-        col_num,
-      }),
-      line_num,
-      col_num,
-    }))
-  }
-
-  pub fn new_name_quote_eval(name: &str, line_num: usize, col_num: usize) -> Name {
-    Name::Quote(Box::new(Quote {
-      quotable: Box::new(Proc::Eval(Eval {
-        name: Name::new_name_var(name, line_num, col_num),
-        line_num,
-        col_num,
-      })),
-      line_num,
-      col_num,
-    }))
-  }
-
-    pub fn new_name_quote_par_of_evals(var_name: &str, line_num: usize, col_num: usize) -> Name {
-      let eval_left = Proc::Eval(Eval {
-        name: Name::new_name_var(var_name, line_num, col_num),
-        line_num,
-        col_num,
-      });
-
-      let eval_right = Proc::Eval(Eval {
-        name: Name::new_name_var(var_name, line_num, col_num),
-        line_num,
-        col_num,
-      });
-
-      let par_proc = Proc::Par {
-        left: Box::new(eval_left),
-        right: Box::new(eval_right),
-        line_num,
-        col_num,
-      };
-
-      Name::Quote(Box::new(Quote {
-        quotable: Box::new(par_proc),
-        line_num,
-        col_num,
-      }))
+    pub fn new_name_quote_ground_long_literal(value: i64, line_num: usize, col_num: usize) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::LongLiteral {
+                value,
+                line_num,
+                col_num,
+            }),
+            line_num,
+            col_num,
+        }))
     }
 
+    pub fn new_name_quote_eval(name: &str, line_num: usize, col_num: usize) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::Eval(Eval {
+                name: Name::new_name_var(name, line_num, col_num),
+                line_num,
+                col_num,
+            })),
+            line_num,
+            col_num,
+        }))
+    }
+
+    pub fn new_name_quote_par_of_evals(var_name: &str, line_num: usize, col_num: usize) -> Name {
+        let eval_left = Proc::Eval(Eval {
+            name: Name::new_name_var(var_name, line_num, col_num),
+            line_num,
+            col_num,
+        });
+
+        let eval_right = Proc::Eval(Eval {
+            name: Name::new_name_var(var_name, line_num, col_num),
+            line_num,
+            col_num,
+        });
+
+        let par_proc = Proc::Par {
+            left: Box::new(eval_left),
+            right: Box::new(eval_right),
+            line_num,
+            col_num,
+        };
+
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(par_proc),
+            line_num,
+            col_num,
+        }))
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use super::exports::*;
 use crate::rust::interpreter::compiler::bound_context::BoundContext;
 use crate::rust::interpreter::compiler::exports::FreeContext;
@@ -8,11 +7,12 @@ use crate::rust::interpreter::compiler::source_position::SourcePosition;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_expr;
 use models::rhoapi::{expr, var, EVar, Expr, Par, Var as model_var};
+use std::collections::HashMap;
 
 pub fn normalize_name(
     proc: &Name,
     mut input: NameVisitInputs,
-    env: &HashMap<String, Par>
+    env: &HashMap<String, Par>,
 ) -> Result<NameVisitOutputs, InterpreterError> {
     match proc {
         Name::ProcVar(boxed_proc) => match *boxed_proc.clone() {
@@ -144,7 +144,7 @@ pub fn normalize_name(
                     bound_map_chain: input.bound_map_chain.clone(),
                     free_map: input.free_map.clone(),
                 },
-                env
+                env,
             )?;
 
             Ok(NameVisitOutputs {
@@ -158,186 +158,221 @@ pub fn normalize_name(
 //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/NameMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-  use models::create_bit_vector;
-  use models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
-  use crate::rust::interpreter::compiler::bound_map_chain::BoundMapChain;
-  use super::*;
-  use crate::rust::interpreter::compiler::exports::FreeMap;
-  use crate::rust::interpreter::compiler::rholang_ast::Name;
+    use super::*;
+    use crate::rust::interpreter::compiler::bound_map_chain::BoundMapChain;
+    use crate::rust::interpreter::compiler::exports::FreeMap;
+    use crate::rust::interpreter::compiler::rholang_ast::Name;
+    use models::create_bit_vector;
+    use models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
 
-  fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
-    let input: NameVisitInputs = NameVisitInputs {
-      bound_map_chain: BoundMapChain::default(),
-      free_map: FreeMap::default(),
-    };
-    let env: HashMap<String, Par> = HashMap::new();
+    fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
+        let input: NameVisitInputs = NameVisitInputs {
+            bound_map_chain: BoundMapChain::default(),
+            free_map: FreeMap::default(),
+        };
+        let env: HashMap<String, Par> = HashMap::new();
 
-    (input, env)
-  }
-
-  fn bound_name_inputs_with_bound_map_chain(input: NameVisitInputs, name: &str, v_type: VarSort, line_num: usize, col_num: usize) -> NameVisitInputs {
-    NameVisitInputs {
-      bound_map_chain: {
-        let updated_bound_map_chain = input.bound_map_chain.put((
-          name.to_string(),
-          v_type,
-          SourcePosition { row: line_num, column: col_num }
-        ));
-        updated_bound_map_chain
-      },
-      ..input.clone()
+        (input, env)
     }
-  }
 
-  fn bound_name_inputs_with_free_map(input: NameVisitInputs, name: &str, v_type: VarSort, line_num: usize, col_num: usize) -> NameVisitInputs {
-    NameVisitInputs {
-      free_map: {
-        let updated_free_map = input.clone().free_map.put((
-          name.to_string(),
-          v_type,
-          SourcePosition { row: line_num, column: col_num }
-        ));
-        updated_free_map
-      },
-      ..input.clone()
+    fn bound_name_inputs_with_bound_map_chain(
+        input: NameVisitInputs,
+        name: &str,
+        v_type: VarSort,
+        line_num: usize,
+        col_num: usize,
+    ) -> NameVisitInputs {
+        NameVisitInputs {
+            bound_map_chain: {
+                let updated_bound_map_chain = input.bound_map_chain.put((
+                    name.to_string(),
+                    v_type,
+                    SourcePosition {
+                        row: line_num,
+                        column: col_num,
+                    },
+                ));
+                updated_bound_map_chain
+            },
+            ..input.clone()
+        }
     }
-  }
 
-  #[test]
-  fn name_wildcard_should_add_a_wildcard_count_to_known_free() {
-    let nw = Name::new_name_wildcard(1, 1);
-    let (input, env) = name_visit_inputs_and_env();
+    fn bound_name_inputs_with_free_map(
+        input: NameVisitInputs,
+        name: &str,
+        v_type: VarSort,
+        line_num: usize,
+        col_num: usize,
+    ) -> NameVisitInputs {
+        NameVisitInputs {
+            free_map: {
+                let updated_free_map = input.clone().free_map.put((
+                    name.to_string(),
+                    v_type,
+                    SourcePosition {
+                        row: line_num,
+                        column: col_num,
+                    },
+                ));
+                updated_free_map
+            },
+            ..input.clone()
+        }
+    }
 
-    let result = normalize_name(&nw, input, &env);
-    let expected_result = new_wildcard_par(Vec::new(), true);
+    #[test]
+    fn name_wildcard_should_add_a_wildcard_count_to_known_free() {
+        let nw = Name::new_name_wildcard(1, 1);
+        let (input, env) = name_visit_inputs_and_env();
 
-    let unwrap_result = result.clone().unwrap();
-    assert_eq!(unwrap_result.clone().par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map.count(), 1);
-  }
+        let result = normalize_name(&nw, input, &env);
+        let expected_result = new_wildcard_par(Vec::new(), true);
 
-  #[test]
-  fn name_var_should_compile_as_bound_var_if_its_in_env() {
-    let (input, env) = name_visit_inputs_and_env();
-    let n_var: Name = Name::new_name_var("x", 1, 1);
-    let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
+        let unwrap_result = result.clone().unwrap();
+        assert_eq!(unwrap_result.clone().par, expected_result);
+        assert_eq!(unwrap_result.clone().free_map.count(), 1);
+    }
 
-    let result = normalize_name(&n_var, bound_inputs.clone(), &env);
-    let expected_result = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
+    #[test]
+    fn name_var_should_compile_as_bound_var_if_its_in_env() {
+        let (input, env) = name_visit_inputs_and_env();
+        let n_var: Name = Name::new_name_var("x", 1, 1);
+        let bound_inputs =
+            bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
-    let unwrap_result: NameVisitOutputs = result.clone().unwrap();
-    println!("Rust BoundVar result par: {:?}", unwrap_result.clone().par);
-    assert_eq!(unwrap_result.par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map, bound_inputs.clone().free_map);
-  }
+        let result = normalize_name(&n_var, bound_inputs.clone(), &env);
+        let expected_result = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
 
-  #[test]
-  fn name_var_should_compile_as_free_var_if_its_not_in_env() {
-    let n_var: Name = Name::new_name_var("x", 1, 1);
-    let (input, env) = name_visit_inputs_and_env();
+        let unwrap_result: NameVisitOutputs = result.clone().unwrap();
+        println!("Rust BoundVar result par: {:?}", unwrap_result.clone().par);
+        assert_eq!(unwrap_result.par, expected_result);
+        assert_eq!(
+            unwrap_result.clone().free_map,
+            bound_inputs.clone().free_map
+        );
+    }
 
-    let result = normalize_name(&n_var, input.clone(), &env);
-    let expected_result = new_freevar_par(0, Vec::new());
+    #[test]
+    fn name_var_should_compile_as_free_var_if_its_not_in_env() {
+        let n_var: Name = Name::new_name_var("x", 1, 1);
+        let (input, env) = name_visit_inputs_and_env();
 
-    let unwrap_result = result.clone().unwrap();
-    assert_eq!(unwrap_result.par, expected_result);
-    let bound_inputs = bound_name_inputs_with_free_map(input.clone(), "x", VarSort::NameSort, 1, 1);
-    assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
-  }
+        let result = normalize_name(&n_var, input.clone(), &env);
+        let expected_result = new_freevar_par(0, Vec::new());
 
+        let unwrap_result = result.clone().unwrap();
+        assert_eq!(unwrap_result.par, expected_result);
+        let bound_inputs =
+            bound_name_inputs_with_free_map(input.clone(), "x", VarSort::NameSort, 1, 1);
+        assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
+    }
 
-  #[test]
-  fn name_var_should_not_compile_if_its_in_env_of_wrong_sort() {
-    let (input, env) = name_visit_inputs_and_env();
-    let n_var: Name = Name::new_name_var("x", 1, 1);
-    let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
+    #[test]
+    fn name_var_should_not_compile_if_its_in_env_of_wrong_sort() {
+        let (input, env) = name_visit_inputs_and_env();
+        let n_var: Name = Name::new_name_var("x", 1, 1);
+        let bound_inputs =
+            bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
 
-    let result = normalize_name(&n_var, bound_inputs, &env);
-    assert!(matches!(result, Err(InterpreterError::UnexpectedNameContext { .. })));
-  }
+        let result = normalize_name(&n_var, bound_inputs, &env);
+        assert!(matches!(
+            result,
+            Err(InterpreterError::UnexpectedNameContext { .. })
+        ));
+    }
 
-  #[test]
-  fn name_var_should_not_compile_if_used_free_somewhere_else() {
-    let (input, env) = name_visit_inputs_and_env();
-    let n_var: Name = Name::new_name_var("x", 1, 1);
-    let bound_inputs = bound_name_inputs_with_free_map(input.clone(), "x", VarSort::NameSort, 0, 0);
+    #[test]
+    fn name_var_should_not_compile_if_used_free_somewhere_else() {
+        let (input, env) = name_visit_inputs_and_env();
+        let n_var: Name = Name::new_name_var("x", 1, 1);
+        let bound_inputs =
+            bound_name_inputs_with_free_map(input.clone(), "x", VarSort::NameSort, 0, 0);
 
-    let result = normalize_name(&n_var, bound_inputs, &env);
-    assert!(matches!(result, Err(InterpreterError::UnexpectedReuseOfNameContextFree { .. })));
-  }
+        let result = normalize_name(&n_var, bound_inputs, &env);
+        assert!(matches!(
+            result,
+            Err(InterpreterError::UnexpectedReuseOfNameContextFree { .. })
+        ));
+    }
 
-  #[test]
-  fn name_quote_should_compile_to_bound_var() {
-    let n_q_var = Name::new_name_quote_var("x", 1, 1);
-    let (input, env) = name_visit_inputs_and_env();
-    let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
+    #[test]
+    fn name_quote_should_compile_to_bound_var() {
+        let n_q_var = Name::new_name_quote_var("x", 1, 1);
+        let (input, env) = name_visit_inputs_and_env();
+        let bound_inputs =
+            bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::ProcSort, 0, 0);
 
-    let result = normalize_name(&n_q_var, bound_inputs.clone(), &env);
-    let expected_result: Par = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
+        let result = normalize_name(&n_q_var, bound_inputs.clone(), &env);
+        let expected_result: Par = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
 
-    let unwrap_result = result.clone().unwrap();
-    println!("Rust Quote BoundVar result par: {:?}", unwrap_result.par);
-    assert_eq!(unwrap_result.clone().par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
-  }
+        let unwrap_result = result.clone().unwrap();
+        println!("Rust Quote BoundVar result par: {:?}", unwrap_result.par);
+        assert_eq!(unwrap_result.clone().par, expected_result);
+        assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
+    }
 
-  #[test]
-  fn name_quote_should_return_a_free_use_if_the_quoted_proc_has_a_free_var() {
-    let n_q_var = Name::new_name_quote_var("x", 1, 1);
-    let (input, env) = name_visit_inputs_and_env();
+    #[test]
+    fn name_quote_should_return_a_free_use_if_the_quoted_proc_has_a_free_var() {
+        let n_q_var = Name::new_name_quote_var("x", 1, 1);
+        let (input, env) = name_visit_inputs_and_env();
 
-    let result = normalize_name(&n_q_var, input.clone(), &env);
-    let expected_result = new_freevar_par(0, Vec::new());
+        let result = normalize_name(&n_q_var, input.clone(), &env);
+        let expected_result = new_freevar_par(0, Vec::new());
 
-    let unwrap_result = result.clone().unwrap();
-    assert_eq!(unwrap_result.clone().par, expected_result);
+        let unwrap_result = result.clone().unwrap();
+        assert_eq!(unwrap_result.clone().par, expected_result);
 
-    let bound_inputs = bound_name_inputs_with_free_map(input.clone(), "x", VarSort::ProcSort, 1, 1);
-    assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
-  }
+        let bound_inputs =
+            bound_name_inputs_with_free_map(input.clone(), "x", VarSort::ProcSort, 1, 1);
+        assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
+    }
 
-  #[test]
-  fn name_quote_should_compile_to_a_ground() {
-    let n_q_ground = Name::new_name_quote_ground_long_literal(7, 0, 0);
-    let (input, env) = name_visit_inputs_and_env();
+    #[test]
+    fn name_quote_should_compile_to_a_ground() {
+        let n_q_ground = Name::new_name_quote_ground_long_literal(7, 0, 0);
+        let (input, env) = name_visit_inputs_and_env();
 
-    let result = normalize_name(&n_q_ground, input.clone(), &env);
-    let expected_result = new_gint_par(7, Vec::new(), false);
+        let result = normalize_name(&n_q_ground, input.clone(), &env);
+        let expected_result = new_gint_par(7, Vec::new(), false);
 
-    let unwrap_result = result.clone().unwrap();
+        let unwrap_result = result.clone().unwrap();
 
-    assert_eq!(unwrap_result.clone().par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map, input.free_map);
-  }
+        assert_eq!(unwrap_result.clone().par, expected_result);
+        assert_eq!(unwrap_result.clone().free_map, input.free_map);
+    }
 
-  #[test]
-  fn name_quote_should_collapse_an_eval() {
-    let n_q_eval = Name::new_name_quote_eval("x", 0, 0);
-    let (input, env) = name_visit_inputs_and_env();
-    let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
+    #[test]
+    fn name_quote_should_collapse_an_eval() {
+        let n_q_eval = Name::new_name_quote_eval("x", 0, 0);
+        let (input, env) = name_visit_inputs_and_env();
+        let bound_inputs =
+            bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
-    let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
-    let expected_result = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
+        let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
+        let expected_result = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
 
-    let unwrap_result = result.clone().unwrap();
-    assert_eq!(unwrap_result.clone().par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
-  }
+        let unwrap_result = result.clone().unwrap();
+        assert_eq!(unwrap_result.clone().par, expected_result);
+        assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
+    }
 
-  #[test]
-  fn name_quote_should_not_collapse_an_eval_eval() {
-    let n_q_eval = Name::new_name_quote_par_of_evals("x", 0, 0);
-    let (input, env) = name_visit_inputs_and_env();
-    let bound_inputs = bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
+    #[test]
+    fn name_quote_should_not_collapse_an_eval_eval() {
+        let n_q_eval = Name::new_name_quote_par_of_evals("x", 0, 0);
+        let (input, env) = name_visit_inputs_and_env();
+        let bound_inputs =
+            bound_name_inputs_with_bound_map_chain(input.clone(), "x", VarSort::NameSort, 0, 0);
 
-    let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
+        let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
 
-    //TODO not sure here -> val expectedResult: Par = EVar(BoundVar(0)).prepend(EVar(BoundVar(0)), 0)
-    let bound_var_expr = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
-    let expected_result = prepend_expr(bound_var_expr.clone(), bound_var_expr.exprs[0].clone(), 0);
+        //TODO not sure here -> val expectedResult: Par = EVar(BoundVar(0)).prepend(EVar(BoundVar(0)), 0)
+        let bound_var_expr = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
+        let expected_result =
+            prepend_expr(bound_var_expr.clone(), bound_var_expr.exprs[0].clone(), 0);
 
-    let unwrap_result = result.clone().unwrap();
-    assert_eq!(unwrap_result.clone().par, expected_result);
-    assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
-  }
+        let unwrap_result = result.clone().unwrap();
+        assert_eq!(unwrap_result.clone().par, expected_result);
+        assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
+    }
 }

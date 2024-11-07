@@ -1,16 +1,16 @@
-use std::collections::HashMap;
-use models::rhoapi::Par;
 use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
 };
 use crate::rust::interpreter::errors::InterpreterError;
+use models::rhoapi::Par;
+use std::collections::HashMap;
 
 pub fn normalize_p_par(
     left: &Proc,
     right: &Proc,
     input: ProcVisitInputs,
-    env: &HashMap<String, Par>
+    env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     let result = normalize_match_proc(&left, input.clone(), env)?;
     let chained_input = ProcVisitInputs {

@@ -1,31 +1,33 @@
-use std::collections::HashMap;
-use models::rhoapi::Par;
-use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, ProcVisitInputs, ProcVisitOutputs};
+use super::exports::*;
+use crate::rust::interpreter::compiler::normalize::{
+    NameVisitInputs, ProcVisitInputs, ProcVisitOutputs,
+};
 use crate::rust::interpreter::compiler::rholang_ast::Eval;
 use crate::rust::interpreter::errors::InterpreterError;
-use super::exports::*;
+use models::rhoapi::Par;
+use std::collections::HashMap;
 
 pub fn normalize_p_eval(
-  proc: &Eval,
-  input: ProcVisitInputs,
-  env: &HashMap<String, Par>
-) -> Result<ProcVisitOutputs, InterpreterError> { 
+    proc: &Eval,
+    input: ProcVisitInputs,
+    env: &HashMap<String, Par>,
+) -> Result<ProcVisitOutputs, InterpreterError> {
+    let name_match_result = normalize_name(
+        &proc.name,
+        NameVisitInputs {
+            bound_map_chain: input.bound_map_chain.clone(),
+            free_map: input.free_map.clone(),
+        },
+        env,
+    )?;
 
-  let name_match_result = normalize_name(
-    &proc.name,
-    NameVisitInputs {
-      bound_map_chain: input.bound_map_chain.clone(),
-      free_map: input.free_map.clone(),
-    }, env)?;
+    let updated_par = input.par.append(name_match_result.par.clone());
 
-  let updated_par = input.par.append(name_match_result.par.clone());
-
-  Ok(ProcVisitOutputs {
-    par: updated_par,
-    free_map: name_match_result.free_map,
-  })
+    Ok(ProcVisitOutputs {
+        par: updated_par,
+        free_map: name_match_result.free_map,
+    })
 }
-
 
 // #[test]
 // fn test_normalize_p_eval() {
@@ -59,5 +61,3 @@ pub fn normalize_p_eval(
 //     }
 //   }
 // }
-
-

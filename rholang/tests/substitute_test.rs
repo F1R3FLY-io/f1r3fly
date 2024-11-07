@@ -18,7 +18,8 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 use rholang::rust::interpreter::{
     accounting::{costs::Cost, CostManager},
     env::Env,
-    substitute::{Substitute, SubstituteTrait}, util::prepend_connective,
+    substitute::{Substitute, SubstituteTrait},
+    util::prepend_connective,
 };
 use rspace_plus_plus::rspace::history::Either;
 
