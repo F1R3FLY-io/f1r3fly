@@ -208,3 +208,84 @@ pub fn normalize_collection(
         }
     }
 }
+
+//rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/CollectMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::exports::SourcePosition;
+    use crate::rust::interpreter::compiler::normalize::VarSort;
+    use crate::rust::interpreter::test_utils::par_builder_util::ParBuilderUtil;
+    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+    use models::rhoapi::Par;
+
+    fn get_normalized_par(rho: &str) -> Par {
+        ParBuilderUtil::mk_term(rho).expect("Compilation failed to normalize Par")
+    }
+
+    pub fn assert_equal_normalized(rho1: &str, rho2: &str) {
+        assert_eq!(
+            get_normalized_par(rho1),
+            get_normalized_par(rho2),
+            "Normalized Par values are not equal"
+        );
+    }
+
+    #[test]
+    fn list_should_sort_the_insides_ot_their_elements() {
+        assert_equal_normalized("@0!([{1 | 2}])", "@0!([{2 | 1}])");
+    }
+
+    // fn strip_margin(s: &str) -> String {
+    //     s.lines()
+    //         .map(|line| {
+    //             if let Some(pos) = line.find('|') {
+    //                 &line[(pos + 1)..]
+    //             } else {
+    //                 line
+    //             }
+    //         })
+    //         .collect::<Vec<&str>>()
+    //         .join("\n")
+    // }
+
+    // #[test]
+    // fn list_should_sort_the_insides_of_send_encoded_as_byte_array() {
+    //     let rho1 = "new x in {x!([@\"a\"!(@\"x\"!(\"abc\") |@\"y\"!(1))].toByteArray())}";
+    //     let rho2 = "new x in {x!([@\"a\"!(@\"y\"!(1) |@\"x\"!(\"abc\"))].toByteArray())}";
+    //     // let (mut proc_inputs, env) = proc_visit_inputs_and_env();
+    //     // proc_inputs.bound_map_chain.put_all(vec![
+    //     //   (
+    //     //     "x".to_string(),
+    //     //     VarSort::NameSort,
+    //     //     SourcePosition { row: 0, column: 0 },
+    //     //   ),
+    //     //   (
+    //     //     "y".to_string(),
+    //     //     VarSort::NameSort,
+    //     //     SourcePosition { row: 0, column: 0 },
+    //     //   ),
+    //     // ]);
+    //
+    //     assert_equal_normalized(&rho1, &rho2);
+    // }
+
+    #[test]
+    fn tuple_should_sort_the_insides_of_their_elements() {
+        assert_equal_normalized("@0!(({1 | 2}))", "@0!(({2 | 1}))");
+    }
+
+    #[test]
+    fn set_should_sort_the_insides_of_their_elements() {
+        assert_equal_normalized("@0!(Set({1 | 2}))", "@0!(Set({2 | 1}))")
+    }
+
+    #[test]
+    fn map_should_sort_the_insides_of_their_keys() {
+        assert_equal_normalized("@0!({{1 | 2} : 0})", "@0!({{2 | 1} : 0})")
+    }
+
+    #[test]
+    fn map_should_sort_the_insides_of_their_values() {
+        assert_equal_normalized("@0!({0 : {1 | 2}})", "@0!({0 : {2 | 1}})")
+    }
+}
