@@ -1071,11 +1071,9 @@ mod tests {
         );
     }
 
-    // TODO: This test depends on p_new
     #[test]
     fn p_input_should_compile_when_logical_and_is_used_in_pattern_of_receive() {
         let result1 = Compiler::source_to_adt(r#"new x in { for(@{Nil /\ Nil} <- x) { Nil } }"#);
-        println!("\nresult1: {:?}", result1);
         assert!(result1.is_ok());
     }
 }

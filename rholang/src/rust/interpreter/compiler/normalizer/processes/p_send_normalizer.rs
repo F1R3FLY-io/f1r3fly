@@ -39,7 +39,7 @@ pub fn normalize_p_send(
     for proc in inputs.procs.clone() {
         let proc_match_result = normalize_match_proc(&proc, acc.1.clone(), env)?;
 
-        acc.0.insert(0, proc_match_result.par.clone());
+        acc.0.push(proc_match_result.par.clone());
         acc.1 = ProcVisitInputs {
             par: Par::default(),
             bound_map_chain: input.bound_map_chain.clone(),
@@ -79,69 +79,222 @@ pub fn normalize_p_send(
     })
 }
 
-// #[test]
-// fn test_normalize_p_send() {
-//   let rholang_code = r#"
-//         stdout!("hello, world!", *z)
-//     "#;
-//
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", root_node.to_sexp());
-//   println!("Root node kind: {}", root_node.kind());
-//
-//   let send_node = root_node.child(0).expect("Expected a send node");
-//   println!("Found send node: {}", send_node.to_sexp());
-//
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: Default::default(),
-//     free_map: Default::default(),
-//   };
-//
-//   match normalize_match(send_node, input, rholang_code.as_bytes()) {
-//     Ok(result) => {
-//       println!("Normalization successful!");
-//       println!("Resulting Par: {:?}", result.par);
-//       assert_eq!(result.par.sends.len(), 1, "Expected one send in the resulting Par");
-//     }
-//     Err(e) => {
-//       println!("Normalization failed: {}", e);
-//       panic!("Test failed due to normalization error");
-//     }
-//   }
-// }
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
 
-// #[test]
-// fn test_normalize_p_send_multiple() {
-//   let rholang_code = r#"
-//         HelloWorld!!("Hello, world!")
-//     "#;
-//
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", root_node.to_sexp());
-//   println!("Root node kind: {}", root_node.kind());
-//
-//   let send_node = root_node.child(0).expect("Expected a send node");
-//   println!("Found send node: {}", send_node.to_sexp());
-//
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: Default::default(),
-//     free_map: Default::default(),
-//   };
-//
-//   match normalize_match(send_node, input, rholang_code.as_bytes()) {
-//     Ok(result) => {
-//       println!("Normalization successful!");
-//       println!("Resulting Par: {:?}", result.par);
-//       assert_eq!(result.par.sends.len(), 1, "Expected one send in the resulting Par");
-//       assert!(result.par.sends[0].persistent, "Expected the send to be persistent");
-//     }
-//     Err(e) => {
-//       println!("Normalization failed: {}", e);
-//       panic!("Test failed due to normalization error");
-//     }
-//   }
-// }
+    use models::{
+        create_bit_vector,
+        rhoapi::Par,
+        rust::utils::{new_boundvar_par, new_gint_par, new_send},
+    };
+
+    use crate::rust::interpreter::{
+        compiler::{
+            compiler::Compiler,
+            normalize::{normalize_match_proc, ProcVisitInputs, VarSort},
+            rholang_ast::{Name, ProcList, SendType},
+        },
+        errors::InterpreterError,
+        test_utils::utils::proc_visit_inputs_and_env,
+    };
+
+    use super::{Proc, SourcePosition};
+
+    #[test]
+    fn p_send_should_handle_a_basic_send() {
+        let p_send = Proc::Send {
+            name: Name::new_name_quote_nil(0, 0),
+            send_type: SendType::new_single(0, 0),
+            inputs: ProcList::create(
+                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_int(8, 0, 0)],
+                0,
+                0,
+            ),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+
+        let result = normalize_match_proc(&p_send, inputs.clone(), &env);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.clone().unwrap().par,
+            inputs.par.prepend_send(new_send(
+                Par::default(),
+                vec![
+                    new_gint_par(7, Vec::new(), false),
+                    new_gint_par(8, Vec::new(), false)
+                ],
+                false,
+                Vec::new(),
+                false
+            ))
+        );
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_send_should_handle_a_name_var() {
+        let p_send = Proc::Send {
+            name: Name::new_name_var("x", 0, 0),
+            send_type: SendType::new_single(0, 0),
+            inputs: ProcList::create(
+                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_int(8, 0, 0)],
+                0,
+                0,
+            ),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
+            "x".to_string(),
+            VarSort::NameSort,
+            SourcePosition::new(0, 0),
+        ));
+
+        let result = normalize_match_proc(&p_send, inputs.clone(), &env);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.clone().unwrap().par,
+            inputs.par.prepend_send(new_send(
+                new_boundvar_par(0, create_bit_vector(&vec![0]), false),
+                vec![
+                    new_gint_par(7, Vec::new(), false),
+                    new_gint_par(8, Vec::new(), false)
+                ],
+                false,
+                create_bit_vector(&vec![0]),
+                false
+            ))
+        );
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_send_should_propagate_known_free() {
+        let p_send = Proc::Send {
+            name: Name::new_name_quote_var("x", 0, 0),
+            send_type: SendType::new_single(0, 0),
+            inputs: ProcList::create(
+                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_var("x", 0, 0)],
+                0,
+                0,
+            ),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&p_send, ProcVisitInputs::new(), &HashMap::new());
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::UnexpectedReuseOfProcContextFree {
+                var_name: "x".to_string(),
+                first_use: SourcePosition::new(0, 0),
+                second_use: SourcePosition::new(0, 0)
+            })
+        );
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_data_contains_negation() {
+        let result = Compiler::source_to_adt(r#"new x in { x!(~1) }"#);
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!("~ (negation) at {:?}", SourcePosition::new(0, 14))
+            ))
+        )
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_data_contains_conjuction() {
+        let result = Compiler::source_to_adt(r#"new x in { x!(1 /\ 2) }"#);
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!("/\\ (conjunction) at {:?}", SourcePosition::new(0, 14))
+            ))
+        )
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_data_contains_disjunction() {
+        let result = Compiler::source_to_adt(r#"new x in { x!(1 \/ 2) }"#);
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!("\\/ (disjunction) at {:?}", SourcePosition::new(0, 14))
+            ))
+        )
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_data_contains_wildcard() {
+        let result = Compiler::source_to_adt(r#"@"x"!(_)"#);
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::TopLevelWildcardsNotAllowedError(format!(
+                "_ (wildcard) at {:?}",
+                SourcePosition::new(0, 6)
+            )))
+        )
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_data_contains_free_variable() {
+        let result = Compiler::source_to_adt(r#"@"x"!(y)"#);
+        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(InterpreterError::TopLevelFreeVariablesNotAllowedError(
+                format!("y at {:?}", SourcePosition::new(0, 6))
+            ))
+        )
+    }
+
+    #[test]
+    fn p_send_should_not_compile_if_name_contains_connectives() {
+        let result1 = Compiler::source_to_adt(r#"@{Nil /\ Nil}!(1)"#);
+        assert!(result1.is_err());
+        assert_eq!(
+            result1,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "/\\ (conjunction) at {:?}",
+                    SourcePosition { row: 0, column: 2 }
+                )
+            ))
+        );
+
+        let result2 = Compiler::source_to_adt(r#"@{Nil \/ Nil}!(1)"#);
+        assert!(result2.is_err());
+        assert_eq!(
+            result2,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!(
+                    "\\/ (disjunction) at {:?}",
+                    SourcePosition { row: 0, column: 2 }
+                )
+            ))
+        );
+
+        let result3 = Compiler::source_to_adt(r#"@{~Nil}!(1)"#);
+        assert!(result3.is_err());
+        assert_eq!(
+            result3,
+            Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                format!("~ (negation) at {:?}", SourcePosition { row: 0, column: 2 })
+            ))
+        );
+    }
+}

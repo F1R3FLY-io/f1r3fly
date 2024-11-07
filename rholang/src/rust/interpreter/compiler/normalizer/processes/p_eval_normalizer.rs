@@ -29,7 +29,7 @@ pub fn normalize_p_eval(
     })
 }
 
-// Seerholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
     use models::rust::utils::new_boundvar_expr;
