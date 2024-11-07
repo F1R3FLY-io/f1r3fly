@@ -29,35 +29,80 @@ pub fn normalize_p_eval(
     })
 }
 
-// #[test]
-// fn test_normalize_p_eval() {
-//   let rholang_code = r#"
-//         *x
-//     "#;
-//
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", root_node.to_sexp());
-//   println!("Root node kind: {}", root_node.kind());
-//
-//   let eval_node = root_node.child(0).expect("Expected an eval node");
-//   println!("Found eval node: {}", eval_node.to_sexp());
-//
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: Default::default(),
-//     free_map: Default::default(),
-//   };
-//
-//   match normalize_match(eval_node, input, rholang_code.as_bytes()) {
-//     Ok(result) => {
-//       println!("Normalization successful!");
-//       println!("Resulting Par: {:?}", result.par);
-//       assert_eq!(result.par.exprs.len(), 1, "Expected one expression in the resulting Par");
-//     }
-//     Err(e) => {
-//       println!("Normalization failed: {}", e);
-//       panic!("Test failed due to normalization error");
-//     }
-//   }
-// }
+// Seerholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use models::rust::utils::new_boundvar_expr;
+
+    use crate::rust::interpreter::{
+        compiler::{
+            normalize::{normalize_match_proc, VarSort},
+            rholang_ast::{Eval, Name, Quote},
+        },
+        test_utils::utils::proc_visit_inputs_and_env,
+        util::prepend_expr,
+    };
+
+    use super::{Proc, SourcePosition};
+
+    #[test]
+    fn p_eval_should_handle_a_bound_name_variable() {
+        let p_eval = Proc::Eval(Eval {
+            name: Name::new_name_var("x", 0, 0),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
+            "x".to_string(),
+            VarSort::NameSort,
+            SourcePosition::new(0, 0),
+        ));
+
+        let result = normalize_match_proc(&p_eval, inputs.clone(), &env);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.clone().unwrap().par,
+            prepend_expr(inputs.par, new_boundvar_expr(0), 0)
+        );
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_eval_should_collapse_a_quote() {
+        let p_eval = Proc::Eval(Eval {
+            name: Name::Quote(Box::new(Quote {
+                quotable: Box::new(Proc::Par {
+                    left: Box::new(Proc::new_proc_var("x", 0, 0)),
+                    right: Box::new(Proc::new_proc_var("x", 0, 0)),
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                line_num: 0,
+                col_num: 0,
+            })),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
+            "x".to_string(),
+            VarSort::ProcSort,
+            SourcePosition::new(0, 0),
+        ));
+
+        let result = normalize_match_proc(&p_eval, inputs.clone(), &env);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.clone().unwrap().par,
+            prepend_expr(
+                prepend_expr(inputs.par, new_boundvar_expr(0), 0),
+                new_boundvar_expr(0),
+                0
+            )
+        );
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+}
