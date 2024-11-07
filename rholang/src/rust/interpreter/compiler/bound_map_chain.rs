@@ -34,7 +34,7 @@ impl<T: Clone> BoundMapChain<T> {
     pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> BoundMapChain<T> {
         let mut new_chain = self.chain.clone();
         if let Some(map) = new_chain.first_mut() {
-            map.put_all(bindings);
+            new_chain[0] = map.put_all(bindings);
         }
         BoundMapChain { chain: new_chain }
     }

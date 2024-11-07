@@ -15,6 +15,7 @@ pub fn normalize_p_new(
     input: ProcVisitInputs,
     env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
+    // TODO: bindings within a single new shouldn't have overlapping names. - OLD
     let new_tagged_bindings: Vec<(Option<String>, String, VarSort, usize, usize)> = decls
         .decls
         .iter()
@@ -96,4 +97,266 @@ pub fn normalize_p_new(
         par: prepend_new(input.par.clone(), result_new),
         free_map: body_result.free_map.clone(),
     })
+}
+
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use models::{
+        create_bit_vector,
+        rhoapi::{New, Par},
+        rust::utils::{new_boundvar_par, new_gint_par, new_send},
+    };
+
+    use crate::rust::interpreter::{
+        compiler::{
+            normalize::normalize_match_proc,
+            rholang_ast::{Decls, Name, NameDecl, Proc, ProcList, SendType},
+        },
+        test_utils::utils::proc_visit_inputs_and_env,
+        util::prepend_new,
+    };
+
+    #[test]
+    fn p_new_should_bind_new_variables() {
+        let p_new = Proc::New {
+            decls: Decls {
+                decls: vec![
+                    NameDecl::create("x", None, 0, 0),
+                    NameDecl::create("y", None, 0, 0),
+                    NameDecl::create("z", None, 0, 0),
+                ],
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(Proc::Par {
+                left: Box::new(Proc::Par {
+                    left: Box::new(Proc::Send {
+                        name: Name::new_name_var("x", 0, 0),
+                        send_type: SendType::new_single(0, 0),
+                        inputs: ProcList::create(vec![Proc::new_proc_int(7, 0, 0)], 0, 0),
+                        line_num: 0,
+                        col_num: 0,
+                    }),
+                    right: Box::new(Proc::Send {
+                        name: Name::new_name_var("y", 0, 0),
+                        send_type: SendType::new_single(0, 0),
+                        inputs: ProcList::create(vec![Proc::new_proc_int(8, 0, 0)], 0, 0),
+                        line_num: 0,
+                        col_num: 0,
+                    }),
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                right: Box::new(Proc::Send {
+                    name: Name::new_name_var("z", 0, 0),
+                    send_type: SendType::new_single(0, 0),
+                    inputs: ProcList::create(vec![Proc::new_proc_int(9, 0, 0)], 0, 0),
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(
+            &p_new,
+            proc_visit_inputs_and_env().0,
+            &proc_visit_inputs_and_env().1,
+        );
+        assert!(result.is_ok());
+
+        let expected_result = prepend_new(
+            Par::default(),
+            New {
+                bind_count: 3,
+                p: Some(
+                    Par::default()
+                        .prepend_send(new_send(
+                            new_boundvar_par(2, create_bit_vector(&vec![2]), false),
+                            vec![new_gint_par(7, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![2]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                            vec![new_gint_par(8, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![1]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(0, create_bit_vector(&vec![0]), false),
+                            vec![new_gint_par(9, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![0]),
+                            false,
+                        )),
+                ),
+                uri: Vec::new(),
+                injections: BTreeMap::new(),
+                locally_free: Vec::new(),
+            },
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.unwrap().free_map,
+            proc_visit_inputs_and_env().0.free_map
+        )
+    }
+
+    #[test]
+    fn p_new_should_sort_uris_and_place_them_at_the_end() {
+        let p_new = Proc::New {
+            decls: Decls {
+                decls: vec![
+                    NameDecl::create("x", None, 0, 0),
+                    NameDecl::create("y", None, 0, 0),
+                    NameDecl::create("r", Some("rho:registry"), 0, 0),
+                    NameDecl::create("out", Some("rho:stdout"), 0, 0),
+                    NameDecl::create("z", None, 0, 0),
+                ],
+                line_num: 0,
+                col_num: 0,
+            },
+            proc: Box::new(Proc::Par {
+                left: Box::new(Proc::Par {
+                    left: Box::new(Proc::Par {
+                        left: Box::new(Proc::Par {
+                            left: Box::new(Proc::Send {
+                                name: Name::new_name_var("x", 0, 0),
+                                send_type: SendType::new_single(0, 0),
+                                inputs: ProcList::create(vec![Proc::new_proc_int(7, 0, 0)], 0, 0),
+                                line_num: 0,
+                                col_num: 0,
+                            }),
+                            right: Box::new(Proc::Send {
+                                name: Name::new_name_var("y", 0, 0),
+                                send_type: SendType::new_single(0, 0),
+                                inputs: ProcList::create(vec![Proc::new_proc_int(8, 0, 0)], 0, 0),
+                                line_num: 0,
+                                col_num: 0,
+                            }),
+                            line_num: 0,
+                            col_num: 0,
+                        }),
+                        right: Box::new(Proc::Send {
+                            name: Name::new_name_var("r", 0, 0),
+                            send_type: SendType::new_single(0, 0),
+                            inputs: ProcList::create(vec![Proc::new_proc_int(9, 0, 0)], 0, 0),
+                            line_num: 0,
+                            col_num: 0,
+                        }),
+                        line_num: 0,
+                        col_num: 0,
+                    }),
+                    right: Box::new(Proc::Send {
+                        name: Name::new_name_var("out", 0, 0),
+                        send_type: SendType::new_single(0, 0),
+                        inputs: ProcList::create(vec![Proc::new_proc_int(10, 0, 0)], 0, 0),
+                        line_num: 0,
+                        col_num: 0,
+                    }),
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                right: Box::new(Proc::Send {
+                    name: Name::new_name_var("z", 0, 0),
+                    send_type: SendType::new_single(0, 0),
+                    inputs: ProcList::create(vec![Proc::new_proc_int(11, 0, 0)], 0, 0),
+                    line_num: 0,
+                    col_num: 0,
+                }),
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(
+            &p_new,
+            proc_visit_inputs_and_env().0,
+            &proc_visit_inputs_and_env().1,
+        );
+        assert!(result.is_ok());
+
+        let expected_result = prepend_new(
+            Par::default(),
+            New {
+                bind_count: 5,
+                p: Some(
+                    Par::default()
+                        .prepend_send(new_send(
+                            new_boundvar_par(4, create_bit_vector(&vec![4]), false),
+                            vec![new_gint_par(7, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![4]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(3, create_bit_vector(&vec![3]), false),
+                            vec![new_gint_par(8, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![3]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                            vec![new_gint_par(9, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![1]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(0, create_bit_vector(&vec![0]), false),
+                            vec![new_gint_par(10, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![0]),
+                            false,
+                        ))
+                        .prepend_send(new_send(
+                            new_boundvar_par(2, create_bit_vector(&vec![2]), false),
+                            vec![new_gint_par(11, Vec::new(), false)],
+                            false,
+                            create_bit_vector(&vec![2]),
+                            false,
+                        )),
+                ),
+                uri: vec!["rho:registry".to_string(), "rho:stdout".to_string()],
+                injections: BTreeMap::new(),
+                locally_free: Vec::new(),
+            },
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.clone().unwrap().par.news[0]
+                .p
+                .clone()
+                .unwrap()
+                .sends
+                .into_iter()
+                .map(|x| x.locally_free)
+                .collect::<Vec<Vec<u8>>>(),
+            vec![
+                create_bit_vector(&vec![2]),
+                create_bit_vector(&vec![0]),
+                create_bit_vector(&vec![1]),
+                create_bit_vector(&vec![3]),
+                create_bit_vector(&vec![4])
+            ]
+        );
+        assert_eq!(
+            result.unwrap().par.news[0].p.clone().unwrap().locally_free,
+            create_bit_vector(&vec![0, 1, 2, 3, 4])
+        );
+    }
 }

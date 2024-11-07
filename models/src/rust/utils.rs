@@ -92,14 +92,14 @@ impl Par {
         }
     }
 
-    pub fn prepend_receive(&mut self, s: Receive) -> Par {
-        let mut new_receives = vec![s.clone()];
+    pub fn prepend_receive(&mut self, r: Receive) -> Par {
+        let mut new_receives = vec![r.clone()];
         new_receives.append(&mut self.receives);
 
         Par {
             receives: new_receives,
-            locally_free: union(self.locally_free.clone(), s.locally_free),
-            connective_used: self.connective_used || s.connective_used,
+            locally_free: union(self.locally_free.clone(), r.locally_free),
+            connective_used: self.connective_used || r.connective_used,
             ..self.clone()
         }
     }

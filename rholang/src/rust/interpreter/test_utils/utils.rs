@@ -20,7 +20,7 @@ pub fn proc_visit_inputs_and_env() -> (ProcVisitInputs, HashMap<String, Par>) {
     let proc_inputs = ProcVisitInputs {
         par: Default::default(),
         bound_map_chain: {
-            let mut bound_map_chain = BoundMapChain::new();
+            let bound_map_chain = BoundMapChain::new();
             bound_map_chain.put_all(vec![
                 (
                     "P".to_string(),

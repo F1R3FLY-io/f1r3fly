@@ -541,6 +541,35 @@ pub struct NameDecl {
     pub col_num: usize,
 }
 
+impl NameDecl {
+    pub fn create(
+        var_value: &str,
+        uri_value: Option<&str>,
+        line_num: usize,
+        col_num: usize,
+    ) -> NameDecl {
+        NameDecl {
+            var: Var {
+                name: var_value.to_string(),
+                line_num,
+                col_num,
+            },
+            uri: {
+                match uri_value {
+                    Some(value) => Some(UriLiteral {
+                        value: value.to_string(),
+                        line_num,
+                        col_num,
+                    }),
+                    None => None,
+                }
+            },
+            line_num,
+            col_num,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Decl {
     pub names: Names,
@@ -705,6 +734,16 @@ pub enum SendType {
     Single { line_num: usize, col_num: usize },
 
     Multiple { line_num: usize, col_num: usize },
+}
+
+impl SendType {
+    pub fn new_single(line_num: usize, col_num: usize) -> Self {
+        SendType::Single { line_num, col_num }
+    }
+
+    pub fn new_multiple(line_num: usize, col_num: usize) -> Self {
+        SendType::Multiple { line_num, col_num }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
