@@ -11,5 +11,4 @@ pub mod normalizer;
 pub mod receive_binds_sort_matcher;
 pub mod rholang_ast;
 pub mod source_position;
-pub mod test_utils;
 pub mod utils;

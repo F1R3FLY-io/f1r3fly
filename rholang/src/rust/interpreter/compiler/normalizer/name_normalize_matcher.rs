@@ -160,7 +160,7 @@ pub fn normalize_name(
 mod tests {
     use super::*;
     use crate::rust::interpreter::compiler::rholang_ast::Name;
-    use crate::rust::interpreter::compiler::test_utils::name_visit_inputs_and_env;
+    use crate::rust::interpreter::test_utils::utils::name_visit_inputs_and_env;
     use models::create_bit_vector;
     use models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
 
