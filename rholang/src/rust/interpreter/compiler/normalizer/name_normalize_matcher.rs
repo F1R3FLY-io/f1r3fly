@@ -159,21 +159,10 @@ pub fn normalize_name(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rust::interpreter::compiler::bound_map_chain::BoundMapChain;
-    use crate::rust::interpreter::compiler::exports::FreeMap;
     use crate::rust::interpreter::compiler::rholang_ast::Name;
+    use crate::rust::interpreter::compiler::test_utils::name_visit_inputs_and_env;
     use models::create_bit_vector;
     use models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
-
-    fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
-        let input: NameVisitInputs = NameVisitInputs {
-            bound_map_chain: BoundMapChain::default(),
-            free_map: FreeMap::default(),
-        };
-        let env: HashMap<String, Par> = HashMap::new();
-
-        (input, env)
-    }
 
     fn bound_name_inputs_with_bound_map_chain(
         input: NameVisitInputs,
