@@ -82,19 +82,6 @@ pub fn normalize_p_contr(
         persistent: true,
         peek: false,
         bind_count: bound_count as i32,
-        // locally_free: union(
-        //   union(
-        //     init_acc.2,
-        //     name_match_result.par.locally_free(name_match_result.par.clone(), (input.bound_map_chain.depth() + 1) as i32),
-        //   ),
-        //   //In Scala, .from(boundCount) returns a new collection starting at element boundCount, that is, it contains all elements greater than or equal to boundCount.
-        //   //Next, .map(x => x - boundCount) decrements each value in this collection by boundCount.
-        //   body_result.par.locally_free(body_result.par.clone(), (bound_count as i32))
-        //     .iter()
-        //     .filter(|&&x| x >= bound_count as u8)
-        //     .map(|&x| x - bound_count as u8)
-        //     .collect::<Vec<u8>>(),
-        // ),
         locally_free: union(
             name_match_result.par.locally_free(
                 name_match_result.par.clone(),
@@ -118,50 +105,227 @@ pub fn normalize_p_contr(
     })
 }
 
-// #[test]
-// fn test_normalize_p_contr() {
-//   let rholang_code = r#"
-//     contract sum(var) = {
-//         "10"
-//     }
-//     "#;
-//
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", root_node.to_sexp());
-//   println!("Root node kind: {}", root_node.kind());
-//
-//   let contract_node = root_node.child(0).expect("Expected a contract node");
-//   println!("Found contract node: {}", contract_node.to_sexp());
-//
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: Default::default(),
-//     free_map: Default::default(),
-//   };
-//
-//   match normalize_match(contract_node, input, rholang_code.as_bytes()) {
-//     Ok(result) => {
-//       println!("Normalization successful!");
-//
-//       assert_eq!(result.par.receives.len(), 1);
-//       if let Some(receive) = result.par.receives.get(0) {
-//         if let Some(body_par) = &receive.body {
-//           if let Some(ExprInstance::GString(value)) = body_par.exprs.get(0).and_then(|e| e.expr_instance.clone()) {
-//             assert_eq!(value, "10", "Expected value '10' in contract body");
-//           } else {
-//             panic!("Contract body is not a GString with value '10'");
-//           }
-//         } else {
-//           panic!("Receive body is missing");
-//         }
-//       } else {
-//         panic!("No Receive found in result.par");
-//       }
-//     }
-//     Err(e) => {
-//       println!("Normalization failed: {}", e);
-//       panic!("Test failed due to normalization error");
-//     }
-//   }
-// }
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+
+    use models::{
+        create_bit_vector,
+        rhoapi::{expr::ExprInstance, EPlus, Expr, Par, Receive, ReceiveBind},
+        rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_send_par},
+    };
+
+    use crate::rust::interpreter::{
+        compiler::{
+            compiler::Compiler,
+            normalize::{normalize_match_proc, VarSort},
+            rholang_ast::{Block, Name, Names, ProcList, SendType},
+        },
+        errors::InterpreterError,
+        test_utils::utils::proc_visit_inputs_and_env,
+    };
+
+    use super::{Proc, SourcePosition};
+
+    #[test]
+    fn p_contr_should_handle_a_basic_contract() {
+        /*  new add in {
+             contract add(ret, @x, @y) = {
+               ret!(x + y)
+             }
+           }
+           // new is simulated by bindings.
+        */
+        let p_contract = Proc::Contract {
+            name: Name::new_name_var("add", 0, 0),
+            formals: Names::create(
+                vec![
+                    Name::new_name_var("ret", 0, 0),
+                    Name::new_name_quote_var("x", 0, 0),
+                    Name::new_name_quote_var("y", 0, 0),
+                ],
+                None,
+                0,
+                0,
+            ),
+            proc: Box::new(Block {
+                proc: Proc::Send {
+                    name: Name::new_name_var("ret", 0, 0),
+                    send_type: SendType::new_single(0, 0),
+                    inputs: ProcList::create(
+                        vec![Proc::Add {
+                            left: Box::new(Proc::new_proc_var("x", 0, 0)),
+                            right: Box::new(Proc::new_proc_var("y", 0, 0)),
+                            line_num: 0,
+                            col_num: 0,
+                        }],
+                        0,
+                        0,
+                    ),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
+            "add".to_string(),
+            VarSort::NameSort,
+            SourcePosition::new(0, 0),
+        ));
+
+        let result = normalize_match_proc(&p_contract, inputs.clone(), &env);
+        assert!(result.is_ok());
+
+        let expected_result = inputs.par.prepend_receive(Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                    new_freevar_par(2, Vec::new()),
+                ],
+                source: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                remainder: None,
+                free_count: 3,
+            }],
+            body: Some(new_send_par(
+                new_boundvar_par(2, create_bit_vector(&vec![2]), false),
+                vec![{
+                    let mut par = Par::default().with_exprs(vec![Expr {
+                        expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+                            p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                            p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                        })),
+                    }]);
+                    par.locally_free = create_bit_vector(&vec![0, 1]);
+                    par
+                }],
+                false,
+                create_bit_vector(&vec![0, 1, 2]),
+                false,
+                create_bit_vector(&vec![0, 1, 2]),
+                false,
+            )),
+            persistent: true,
+            peek: false,
+            bind_count: 3,
+            locally_free: create_bit_vector(&vec![0]),
+            connective_used: false,
+        });
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_contr_should_not_count_ground_values_in_the_formals_towards_the_bind_count() {
+        /*  new ret5 in {
+             contract ret5(ret, @5) = {
+               ret!(5)
+             }
+           }
+           // new is simulated by bindings.
+        */
+        let p_contract = Proc::Contract {
+            name: Name::new_name_var("ret5", 0, 0),
+            formals: Names::create(
+                vec![
+                    Name::new_name_var("ret", 0, 0),
+                    Name::new_name_quote_ground_long_literal(5, 0, 0),
+                ],
+                None,
+                0,
+                0,
+            ),
+            proc: Box::new(Block {
+                proc: Proc::Send {
+                    name: Name::new_name_var("ret", 0, 0),
+                    send_type: SendType::new_single(0, 0),
+                    inputs: ProcList::create(vec![Proc::new_proc_int(5, 0, 0)], 0, 0),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let (mut inputs, env) = proc_visit_inputs_and_env();
+        inputs.bound_map_chain = inputs.bound_map_chain.put((
+            "ret5".to_string(),
+            VarSort::NameSort,
+            SourcePosition::new(0, 0),
+        ));
+
+        let result = normalize_match_proc(&p_contract, inputs.clone(), &env);
+        assert!(result.is_ok());
+
+        let expected_result = inputs.par.prepend_receive(Receive {
+            binds: vec![ReceiveBind {
+                patterns: vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_gint_par(5, Vec::new(), false),
+                ],
+                source: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                remainder: None,
+                free_count: 1,
+            }],
+            body: Some(new_send_par(
+                new_boundvar_par(0, create_bit_vector(&vec![0]), false),
+                vec![new_gint_par(5, Vec::new(), false)],
+                false,
+                create_bit_vector(&vec![0]),
+                false,
+                create_bit_vector(&vec![0]),
+                false,
+            )),
+            persistent: true,
+            peek: false,
+            bind_count: 1,
+            locally_free: create_bit_vector(&vec![0]),
+            connective_used: false,
+        });
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_contr_should_not_compile_when_logical_or_or_not_is_used_in_the_pattern_of_the_receive() {
+        let result1 =
+            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ {Nil \/ Nil}}) = { Nil } }"#);
+        assert!(result1.is_err());
+        assert_eq!(
+            result1,
+            Err(InterpreterError::PatternReceiveError(format!(
+                "\\/ (disjunction) at {:?}",
+                SourcePosition { row: 0, column: 31 }
+            )))
+        );
+
+        let result2 =
+            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ ~Nil}) = { Nil } }"#);
+        assert!(result2.is_err());
+        assert_eq!(
+            result2,
+            Err(InterpreterError::PatternReceiveError(format!(
+                "~ (negation) at {:?}",
+                SourcePosition { row: 0, column: 30 }
+            )))
+        );
+    }
+
+    #[test]
+    fn p_contr_should_compile_when_logical_and_is_used_in_the_pattern_of_the_receive() {
+        let result1 =
+            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ {Nil /\ Nil}}) = { Nil } }"#);
+        assert!(result1.is_ok());
+    }
+}
