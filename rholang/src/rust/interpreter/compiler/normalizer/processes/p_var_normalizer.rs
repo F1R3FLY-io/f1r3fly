@@ -8,7 +8,7 @@ use std::result::Result;
 
 pub fn normalize_p_var(
     p: &Proc,
-    mut input: ProcVisitInputs,
+    input: ProcVisitInputs,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
     match p {
         Proc::Var(var) => {

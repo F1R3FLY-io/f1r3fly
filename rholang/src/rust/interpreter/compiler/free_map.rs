@@ -47,14 +47,16 @@ impl<T: Clone> FreeMap<T> {
         }
     }
 
-    fn put_all(&mut self, bindings: Vec<IdContext<T>>) {
+    pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> Self {
+        let mut new_free_map = self.clone();
         for binding in bindings {
-            self.put(binding);
+            new_free_map = new_free_map.put(binding);
         }
+        new_free_map
     }
 
     // Returns the new map, and a list of the shadowed variables
-    pub fn merge(&mut self, free_map: FreeMap<T>) -> (FreeMap<T>, Vec<(String, SourcePosition)>) {
+    pub fn merge(&self, free_map: FreeMap<T>) -> (FreeMap<T>, Vec<(String, SourcePosition)>) {
         let (acc_env, shadowed) = free_map.level_bindings.into_iter().fold(
             (self.level_bindings.clone(), Vec::new()),
             |(mut acc_env, mut shadowed), (name, free_context)| {
@@ -94,7 +96,7 @@ impl<T: Clone> FreeMap<T> {
         )
     }
 
-    pub(crate) fn add_wildcard(&mut self, source_position: SourcePosition) -> Self {
+    pub(crate) fn add_wildcard(&self, source_position: SourcePosition) -> Self {
         let mut updated_wildcards = self.wildcards.clone();
         updated_wildcards.push(source_position);
 

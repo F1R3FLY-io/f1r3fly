@@ -469,7 +469,7 @@ pub fn normalize_p_input(
 
             let receive_binds_free_map = receive_bind_free_maps.into_iter().try_fold(
                 FreeMap::new(),
-                |mut known_free, receive_bind_free_map| {
+                |known_free, receive_bind_free_map| {
                     let (updated_known_free, conflicts) = known_free.merge(receive_bind_free_map);
 
                     if conflicts.is_empty() {

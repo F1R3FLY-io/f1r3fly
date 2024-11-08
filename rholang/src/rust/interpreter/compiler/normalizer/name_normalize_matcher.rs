@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 pub fn normalize_name(
     proc: &Name,
-    mut input: NameVisitInputs,
+    input: NameVisitInputs,
     env: &HashMap<String, Par>,
 ) -> Result<NameVisitOutputs, InterpreterError> {
     match proc {

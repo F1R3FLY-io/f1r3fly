@@ -10,7 +10,7 @@ use crate::rust::interpreter::compiler::rholang_ast::Var;
 
 fn handle_proc_var(
     proc: &Proc,
-    mut known_free: FreeMap<VarSort>,
+    known_free: FreeMap<VarSort>,
 ) -> Result<(Option<ModelsVar>, FreeMap<VarSort>), InterpreterError> {
     // println!("\nhit handle_proc_var");
     // println!("\nknown_free: {:?}", known_free);
