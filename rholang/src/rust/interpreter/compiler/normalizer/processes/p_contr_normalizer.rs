@@ -137,31 +137,25 @@ mod tests {
            // new is simulated by bindings.
         */
         let p_contract = Proc::Contract {
-            name: Name::new_name_var("add", 0, 0),
-            formals: Names::create(
+            name: Name::new_name_var("add"),
+            formals: Names::new(
                 vec![
-                    Name::new_name_var("ret", 0, 0),
-                    Name::new_name_quote_var("x", 0, 0),
-                    Name::new_name_quote_var("y", 0, 0),
+                    Name::new_name_var("ret"),
+                    Name::new_name_quote_var("x"),
+                    Name::new_name_quote_var("y"),
                 ],
                 None,
-                0,
-                0,
             ),
             proc: Box::new(Block {
                 proc: Proc::Send {
-                    name: Name::new_name_var("ret", 0, 0),
-                    send_type: SendType::new_single(0, 0),
-                    inputs: ProcList::create(
-                        vec![Proc::Add {
-                            left: Box::new(Proc::new_proc_var("x", 0, 0)),
-                            right: Box::new(Proc::new_proc_var("y", 0, 0)),
-                            line_num: 0,
-                            col_num: 0,
-                        }],
-                        0,
-                        0,
-                    ),
+                    name: Name::new_name_var("ret"),
+                    send_type: SendType::new_single(),
+                    inputs: ProcList::new(vec![Proc::Add {
+                        left: Box::new(Proc::new_proc_var("x")),
+                        right: Box::new(Proc::new_proc_var("y")),
+                        line_num: 0,
+                        col_num: 0,
+                    }]),
                     line_num: 0,
                     col_num: 0,
                 },
@@ -232,21 +226,19 @@ mod tests {
            // new is simulated by bindings.
         */
         let p_contract = Proc::Contract {
-            name: Name::new_name_var("ret5", 0, 0),
-            formals: Names::create(
+            name: Name::new_name_var("ret5"),
+            formals: Names::new(
                 vec![
-                    Name::new_name_var("ret", 0, 0),
-                    Name::new_name_quote_ground_long_literal(5, 0, 0),
+                    Name::new_name_var("ret"),
+                    Name::new_name_quote_ground_long_literal(5),
                 ],
                 None,
-                0,
-                0,
             ),
             proc: Box::new(Block {
                 proc: Proc::Send {
-                    name: Name::new_name_var("ret", 0, 0),
-                    send_type: SendType::new_single(0, 0),
-                    inputs: ProcList::create(vec![Proc::new_proc_int(5, 0, 0)], 0, 0),
+                    name: Name::new_name_var("ret"),
+                    send_type: SendType::new_single(),
+                    inputs: ProcList::new(vec![Proc::new_proc_int(5)]),
                     line_num: 0,
                     col_num: 0,
                 },

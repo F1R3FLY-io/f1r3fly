@@ -574,32 +574,28 @@ mod tests {
     fn p_input_should_handle_a_simple_receive() {
         // for ( x, y <- @Nil ) { x!(*y) }
         let mut list_bindings: Vec<Name> = Vec::new();
-        list_bindings.push(Name::new_name_var("x", 0, 0));
-        list_bindings.push(Name::new_name_var("y", 0, 0));
+        list_bindings.push(Name::new_name_var("x"));
+        list_bindings.push(Name::new_name_var("y"));
 
         let mut list_linear_binds: Vec<Receipt> = Vec::new();
         list_linear_binds.push(Receipt::LinearBinds(LinearBind {
-            names: Names::create(list_bindings, None, 0, 0),
-            input: Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
+            names: Names::new(list_bindings, None),
+            input: Source::new_simple_source(Name::new_name_quote_nil()),
             line_num: 0,
             col_num: 0,
         }));
 
         let body = Proc::Send {
-            name: Name::new_name_var("x", 0, 0),
+            name: Name::new_name_var("x"),
             send_type: SendType::Single {
                 line_num: 0,
                 col_num: 0,
             },
-            inputs: ProcList::create(
-                vec![Proc::Eval(Eval {
-                    name: Name::new_name_var("y", 0, 0),
-                    line_num: 0,
-                    col_num: 0,
-                })],
-                0,
-                0,
-            ),
+            inputs: ProcList::new(vec![Proc::Eval(Eval {
+                name: Name::new_name_var("y"),
+                line_num: 0,
+                col_num: 0,
+            })]),
             line_num: 0,
             col_num: 0,
         };
@@ -671,12 +667,12 @@ mod tests {
     fn p_input_should_handle_a_more_complicated_receive() {
         // for ( (x1, @y1) <- @Nil  & (x2, @y2) <- @1) { x1!(y2) | x2!(y1) }
         let mut list_bindings1: Vec<Name> = Vec::new();
-        list_bindings1.push(Name::new_name_var("x1", 0, 0));
-        list_bindings1.push(Name::new_name_quote_var("y1", 0, 0));
+        list_bindings1.push(Name::new_name_var("x1"));
+        list_bindings1.push(Name::new_name_quote_var("y1"));
 
         let mut list_bindings2: Vec<Name> = Vec::new();
-        list_bindings2.push(Name::new_name_var("x2", 0, 0));
-        list_bindings2.push(Name::new_name_quote_var("y2", 0, 0));
+        list_bindings2.push(Name::new_name_var("x2"));
+        list_bindings2.push(Name::new_name_quote_var("y2"));
 
         let list_receipt = vec![
             Receipt::new_linear_bind_receipt(
@@ -686,9 +682,7 @@ mod tests {
                     line_num: 0,
                     col_num: 0,
                 },
-                Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
-                0,
-                0,
+                Source::new_simple_source(Name::new_name_quote_nil()),
             ),
             Receipt::new_linear_bind_receipt(
                 Names {
@@ -697,17 +691,11 @@ mod tests {
                     line_num: 0,
                     col_num: 0,
                 },
-                Source::new_simple_source(
-                    Name::Quote(Box::new(Quote {
-                        quotable: Box::new(Proc::new_proc_int(1, 0, 0)),
-                        line_num: 0,
-                        col_num: 0,
-                    })),
-                    0,
-                    0,
-                ),
-                0,
-                0,
+                Source::new_simple_source(Name::Quote(Box::new(Quote {
+                    quotable: Box::new(Proc::new_proc_int(1)),
+                    line_num: 0,
+                    col_num: 0,
+                }))),
             ),
         ];
 
@@ -733,7 +721,7 @@ mod tests {
         let body = Block {
             proc: Proc::Par {
                 left: Box::new(Proc::Send {
-                    name: Name::new_name_var("x1", 0, 0),
+                    name: Name::new_name_var("x1"),
                     send_type: SendType::Single {
                         line_num: 0,
                         col_num: 0,
@@ -743,7 +731,7 @@ mod tests {
                     col_num: 0,
                 }),
                 right: Box::new(Proc::Send {
-                    name: Name::new_name_var("x2", 0, 0),
+                    name: Name::new_name_var("x2"),
                     send_type: SendType::Single {
                         line_num: 0,
                         col_num: 0,
@@ -835,7 +823,7 @@ mod tests {
         let list_bindings = vec![Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::Collection(Collection::List {
                 elements: vec![],
-                cont: Some(Box::new(Proc::new_proc_var("a", 0, 0))),
+                cont: Some(Box::new(Proc::new_proc_var("a"))),
                 line_num: 0,
                 col_num: 0,
             })),
@@ -854,7 +842,7 @@ mod tests {
                         col_num: 0,
                     },
                     input: Source::Simple {
-                        name: Name::new_name_quote_nil(0, 0),
+                        name: Name::new_name_quote_nil(),
                         line_num: 0,
                         col_num: 0,
                     },
@@ -864,7 +852,7 @@ mod tests {
                 line_num: 0,
                 col_num: 0,
             },
-            proc: Box::new(Block::new_block_nil(0, 0)),
+            proc: Box::new(Block::new_block_nil()),
             line_num: 0,
             col_num: 0,
         };
@@ -900,12 +888,12 @@ mod tests {
     fn p_input_should_fail_if_a_free_variable_is_used_in_two_different_receives() {
         // for ( (x1, @y1) <- @Nil  & (x2, @y1) <- @1) { Nil }
         let mut list_bindings1: Vec<Name> = Vec::new();
-        list_bindings1.push(Name::new_name_var("x1", 0, 0));
-        list_bindings1.push(Name::new_name_quote_var("y1", 0, 0));
+        list_bindings1.push(Name::new_name_var("x1"));
+        list_bindings1.push(Name::new_name_quote_var("y1"));
 
         let mut list_bindings2: Vec<Name> = Vec::new();
-        list_bindings2.push(Name::new_name_var("x2", 0, 0));
-        list_bindings2.push(Name::new_name_quote_var("y1", 0, 0));
+        list_bindings2.push(Name::new_name_var("x2"));
+        list_bindings2.push(Name::new_name_quote_var("y1"));
 
         let list_receipt = vec![
             Receipt::new_linear_bind_receipt(
@@ -915,9 +903,7 @@ mod tests {
                     line_num: 0,
                     col_num: 0,
                 },
-                Source::new_simple_source(Name::new_name_quote_nil(0, 0), 0, 0),
-                0,
-                0,
+                Source::new_simple_source(Name::new_name_quote_nil()),
             ),
             Receipt::new_linear_bind_receipt(
                 Names {
@@ -926,17 +912,11 @@ mod tests {
                     line_num: 0,
                     col_num: 0,
                 },
-                Source::new_simple_source(
-                    Name::Quote(Box::new(Quote {
-                        quotable: Box::new(Proc::new_proc_int(1, 0, 0)),
-                        line_num: 0,
-                        col_num: 0,
-                    })),
-                    0,
-                    0,
-                ),
-                0,
-                0,
+                Source::new_simple_source(Name::Quote(Box::new(Quote {
+                    quotable: Box::new(Proc::new_proc_int(1)),
+                    line_num: 0,
+                    col_num: 0,
+                }))),
             ),
         ];
 

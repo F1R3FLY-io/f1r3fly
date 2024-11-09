@@ -105,13 +105,9 @@ mod tests {
     #[test]
     fn p_send_should_handle_a_basic_send() {
         let p_send = Proc::Send {
-            name: Name::new_name_quote_nil(0, 0),
-            send_type: SendType::new_single(0, 0),
-            inputs: ProcList::create(
-                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_int(8, 0, 0)],
-                0,
-                0,
-            ),
+            name: Name::new_name_quote_nil(),
+            send_type: SendType::new_single(),
+            inputs: ProcList::new(vec![Proc::new_proc_int(7), Proc::new_proc_int(8)]),
             line_num: 0,
             col_num: 0,
         };
@@ -139,13 +135,9 @@ mod tests {
     #[test]
     fn p_send_should_handle_a_name_var() {
         let p_send = Proc::Send {
-            name: Name::new_name_var("x", 0, 0),
-            send_type: SendType::new_single(0, 0),
-            inputs: ProcList::create(
-                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_int(8, 0, 0)],
-                0,
-                0,
-            ),
+            name: Name::new_name_var("x"),
+            send_type: SendType::new_single(),
+            inputs: ProcList::new(vec![Proc::new_proc_int(7), Proc::new_proc_int(8)]),
             line_num: 0,
             col_num: 0,
         };
@@ -178,13 +170,9 @@ mod tests {
     #[test]
     fn p_send_should_propagate_known_free() {
         let p_send = Proc::Send {
-            name: Name::new_name_quote_var("x", 0, 0),
-            send_type: SendType::new_single(0, 0),
-            inputs: ProcList::create(
-                vec![Proc::new_proc_int(7, 0, 0), Proc::new_proc_var("x", 0, 0)],
-                0,
-                0,
-            ),
+            name: Name::new_name_quote_var("x"),
+            send_type: SendType::new_single(),
+            inputs: ProcList::new(vec![Proc::new_proc_int(7), Proc::new_proc_var("x")]),
             line_num: 0,
             col_num: 0,
         };

@@ -19,6 +19,17 @@ pub fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {
 pub fn proc_visit_inputs_and_env() -> (ProcVisitInputs, HashMap<String, Par>) {
     let proc_inputs = ProcVisitInputs {
         par: Default::default(),
+        bound_map_chain: BoundMapChain::new(),
+        free_map: Default::default(),
+    };
+    let env: HashMap<String, Par> = HashMap::new();
+
+    (proc_inputs, env)
+}
+
+pub fn collection_proc_visit_inputs_and_env() -> (ProcVisitInputs, HashMap<String, Par>) {
+    let proc_inputs = ProcVisitInputs {
+        par: Default::default(),
         bound_map_chain: {
             let bound_map_chain = BoundMapChain::new();
             bound_map_chain.put_all(vec![

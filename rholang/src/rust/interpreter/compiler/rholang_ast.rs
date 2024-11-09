@@ -272,20 +272,34 @@ pub enum Proc {
 }
 
 impl Proc {
-    pub fn new_proc_int(value: i64, line_num: usize, col_num: usize) -> Proc {
+    pub fn new_proc_int(value: i64) -> Proc {
         Proc::LongLiteral {
             value,
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }
     }
 
-    pub fn new_proc_var(value: &str, line_num: usize, col_num: usize) -> Proc {
+    pub fn new_proc_var(value: &str) -> Proc {
         Proc::Var(Var {
             name: value.to_string(),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         })
+    }
+
+    pub fn new_proc_wildcard() -> Proc {
+        Proc::Wildcard {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_proc_nil() -> Proc {
+        Proc::Nil {
+            line_num: 0,
+            col_num: 0,
+        }
     }
 }
 
@@ -297,11 +311,11 @@ pub struct ProcList {
 }
 
 impl ProcList {
-    pub fn create(procs: Vec<Proc>, line_num: usize, col_num: usize) -> ProcList {
+    pub fn new(procs: Vec<Proc>) -> ProcList {
         ProcList {
             procs,
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }
     }
 }
@@ -313,86 +327,92 @@ pub enum Name {
 }
 
 impl Name {
-    pub fn new_name_var(name: &str, line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_var(name: &str) -> Name {
         Name::ProcVar(Box::new(Proc::Var(Var {
             name: name.to_string(),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         })))
     }
 
-    pub fn new_name_wildcard(line_num: usize, col_num: usize) -> Name {
-        Name::ProcVar(Box::new(Proc::Wildcard { line_num, col_num }))
+    pub fn new_name_wildcard() -> Name {
+        Name::ProcVar(Box::new(Proc::Wildcard {
+            line_num: 0,
+            col_num: 0,
+        }))
     }
 
-    pub fn new_name_quote_var(name: &str, line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_quote_var(name: &str) -> Name {
         Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::Var(Var {
                 name: name.to_string(),
-                line_num,
-                col_num,
+                line_num: 0,
+                col_num: 0,
             })),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }))
     }
 
-    pub fn new_name_quote_nil(line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_quote_nil() -> Name {
         Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::Nil { line_num, col_num }),
-            line_num,
-            col_num,
+            quotable: Box::new(Proc::Nil {
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
         }))
     }
 
-    pub fn new_name_quote_ground_long_literal(value: i64, line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_quote_ground_long_literal(value: i64) -> Name {
         Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::LongLiteral {
                 value,
-                line_num,
-                col_num,
+                line_num: 0,
+                col_num: 0,
             }),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }))
     }
 
-    pub fn new_name_quote_eval(name: &str, line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_quote_eval(name: &str) -> Name {
         Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::Eval(Eval {
-                name: Name::new_name_var(name, line_num, col_num),
-                line_num,
-                col_num,
+                name: Name::new_name_var(name),
+                line_num: 0,
+                col_num: 0,
             })),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }))
     }
 
-    pub fn new_name_quote_par_of_evals(var_name: &str, line_num: usize, col_num: usize) -> Name {
+    pub fn new_name_quote_par_of_evals(var_name: &str) -> Name {
         let eval_left = Proc::Eval(Eval {
-            name: Name::new_name_var(var_name, line_num, col_num),
-            line_num,
-            col_num,
+            name: Name::new_name_var(var_name),
+            line_num: 0,
+            col_num: 0,
         });
 
         let eval_right = Proc::Eval(Eval {
-            name: Name::new_name_var(var_name, line_num, col_num),
-            line_num,
-            col_num,
+            name: Name::new_name_var(var_name),
+            line_num: 0,
+            col_num: 0,
         });
 
         let par_proc = Proc::Par {
             left: Box::new(eval_left),
             right: Box::new(eval_right),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         };
 
         Name::Quote(Box::new(Quote {
             quotable: Box::new(par_proc),
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }))
     }
 }
@@ -449,11 +469,22 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new_block_nil(line_num: usize, col_num: usize) -> Block {
+    pub fn new(proc: Proc) -> Block {
         Block {
-            proc: Proc::Nil { line_num, col_num },
-            line_num,
-            col_num,
+            proc,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_block_nil() -> Block {
+        Block {
+            proc: Proc::Nil {
+                line_num: 0,
+                col_num: 0,
+            },
+            line_num: 0,
+            col_num: 0,
         }
     }
 }
@@ -542,30 +573,25 @@ pub struct NameDecl {
 }
 
 impl NameDecl {
-    pub fn create(
-        var_value: &str,
-        uri_value: Option<&str>,
-        line_num: usize,
-        col_num: usize,
-    ) -> NameDecl {
+    pub fn new(var_value: &str, uri_value: Option<&str>) -> NameDecl {
         NameDecl {
             var: Var {
                 name: var_value.to_string(),
-                line_num,
-                col_num,
+                line_num: 0,
+                col_num: 0,
             },
             uri: {
                 match uri_value {
                     Some(value) => Some(UriLiteral {
                         value: value.to_string(),
-                        line_num,
-                        col_num,
+                        line_num: 0,
+                        col_num: 0,
                     }),
                     None => None,
                 }
             },
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }
     }
 }
@@ -609,6 +635,17 @@ pub struct Case {
     pub col_num: usize,
 }
 
+impl Case {
+    pub fn new(pattern: Proc, proc: Proc) -> Case {
+        Case {
+            pattern,
+            proc,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Branch {
     pub pattern: Vec<LinearBind>,
@@ -626,17 +663,12 @@ pub struct Names {
 }
 
 impl Names {
-    pub fn create(
-        names: Vec<Name>,
-        cont: Option<Box<Proc>>,
-        line_num: usize,
-        col_num: usize,
-    ) -> Names {
+    pub fn new(names: Vec<Name>, cont: Option<Box<Proc>>) -> Names {
         Names {
             names,
             cont,
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }
     }
 }
@@ -664,11 +696,11 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn new_simple_source(name: Name, line_num: usize, col_num: usize) -> Source {
+    pub fn new_simple_source(name: Name) -> Source {
         Source::Simple {
             name,
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         }
     }
 }
@@ -678,6 +710,16 @@ pub struct Receipts {
     pub receipts: Vec<Receipt>,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+impl Receipts {
+    pub fn new(receipts: Vec<Receipt>) -> Self {
+        Receipts {
+            receipts,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -690,17 +732,12 @@ pub enum Receipt {
 }
 
 impl Receipt {
-    pub fn new_linear_bind_receipt(
-        names: Names,
-        input: Source,
-        line_num: usize,
-        col_num: usize,
-    ) -> Receipt {
+    pub fn new_linear_bind_receipt(names: Names, input: Source) -> Receipt {
         Receipt::LinearBinds(LinearBind {
             names,
             input,
-            line_num,
-            col_num,
+            line_num: 0,
+            col_num: 0,
         })
     }
 }
@@ -737,12 +774,18 @@ pub enum SendType {
 }
 
 impl SendType {
-    pub fn new_single(line_num: usize, col_num: usize) -> Self {
-        SendType::Single { line_num, col_num }
+    pub fn new_single() -> Self {
+        SendType::Single {
+            line_num: 0,
+            col_num: 0,
+        }
     }
 
-    pub fn new_multiple(line_num: usize, col_num: usize) -> Self {
-        SendType::Multiple { line_num, col_num }
+    pub fn new_multiple() -> Self {
+        SendType::Multiple {
+            line_num: 0,
+            col_num: 0,
+        }
     }
 }
 

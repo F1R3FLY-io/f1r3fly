@@ -124,9 +124,9 @@ mod tests {
         let p_new = Proc::New {
             decls: Decls {
                 decls: vec![
-                    NameDecl::create("x", None, 0, 0),
-                    NameDecl::create("y", None, 0, 0),
-                    NameDecl::create("z", None, 0, 0),
+                    NameDecl::new("x", None),
+                    NameDecl::new("y", None),
+                    NameDecl::new("z", None),
                 ],
                 line_num: 0,
                 col_num: 0,
@@ -134,16 +134,16 @@ mod tests {
             proc: Box::new(Proc::Par {
                 left: Box::new(Proc::Par {
                     left: Box::new(Proc::Send {
-                        name: Name::new_name_var("x", 0, 0),
-                        send_type: SendType::new_single(0, 0),
-                        inputs: ProcList::create(vec![Proc::new_proc_int(7, 0, 0)], 0, 0),
+                        name: Name::new_name_var("x"),
+                        send_type: SendType::new_single(),
+                        inputs: ProcList::new(vec![Proc::new_proc_int(7)]),
                         line_num: 0,
                         col_num: 0,
                     }),
                     right: Box::new(Proc::Send {
-                        name: Name::new_name_var("y", 0, 0),
-                        send_type: SendType::new_single(0, 0),
-                        inputs: ProcList::create(vec![Proc::new_proc_int(8, 0, 0)], 0, 0),
+                        name: Name::new_name_var("y"),
+                        send_type: SendType::new_single(),
+                        inputs: ProcList::new(vec![Proc::new_proc_int(8)]),
                         line_num: 0,
                         col_num: 0,
                     }),
@@ -151,9 +151,9 @@ mod tests {
                     col_num: 0,
                 }),
                 right: Box::new(Proc::Send {
-                    name: Name::new_name_var("z", 0, 0),
-                    send_type: SendType::new_single(0, 0),
-                    inputs: ProcList::create(vec![Proc::new_proc_int(9, 0, 0)], 0, 0),
+                    name: Name::new_name_var("z"),
+                    send_type: SendType::new_single(),
+                    inputs: ProcList::new(vec![Proc::new_proc_int(9)]),
                     line_num: 0,
                     col_num: 0,
                 }),
@@ -217,11 +217,11 @@ mod tests {
         let p_new = Proc::New {
             decls: Decls {
                 decls: vec![
-                    NameDecl::create("x", None, 0, 0),
-                    NameDecl::create("y", None, 0, 0),
-                    NameDecl::create("r", Some("rho:registry"), 0, 0),
-                    NameDecl::create("out", Some("rho:stdout"), 0, 0),
-                    NameDecl::create("z", None, 0, 0),
+                    NameDecl::new("x", None),
+                    NameDecl::new("y", None),
+                    NameDecl::new("r", Some("rho:registry")),
+                    NameDecl::new("out", Some("rho:stdout")),
+                    NameDecl::new("z", None),
                 ],
                 line_num: 0,
                 col_num: 0,
@@ -231,16 +231,16 @@ mod tests {
                     left: Box::new(Proc::Par {
                         left: Box::new(Proc::Par {
                             left: Box::new(Proc::Send {
-                                name: Name::new_name_var("x", 0, 0),
-                                send_type: SendType::new_single(0, 0),
-                                inputs: ProcList::create(vec![Proc::new_proc_int(7, 0, 0)], 0, 0),
+                                name: Name::new_name_var("x"),
+                                send_type: SendType::new_single(),
+                                inputs: ProcList::new(vec![Proc::new_proc_int(7)]),
                                 line_num: 0,
                                 col_num: 0,
                             }),
                             right: Box::new(Proc::Send {
-                                name: Name::new_name_var("y", 0, 0),
-                                send_type: SendType::new_single(0, 0),
-                                inputs: ProcList::create(vec![Proc::new_proc_int(8, 0, 0)], 0, 0),
+                                name: Name::new_name_var("y"),
+                                send_type: SendType::new_single(),
+                                inputs: ProcList::new(vec![Proc::new_proc_int(8)]),
                                 line_num: 0,
                                 col_num: 0,
                             }),
@@ -248,9 +248,9 @@ mod tests {
                             col_num: 0,
                         }),
                         right: Box::new(Proc::Send {
-                            name: Name::new_name_var("r", 0, 0),
-                            send_type: SendType::new_single(0, 0),
-                            inputs: ProcList::create(vec![Proc::new_proc_int(9, 0, 0)], 0, 0),
+                            name: Name::new_name_var("r"),
+                            send_type: SendType::new_single(),
+                            inputs: ProcList::new(vec![Proc::new_proc_int(9)]),
                             line_num: 0,
                             col_num: 0,
                         }),
@@ -258,9 +258,9 @@ mod tests {
                         col_num: 0,
                     }),
                     right: Box::new(Proc::Send {
-                        name: Name::new_name_var("out", 0, 0),
-                        send_type: SendType::new_single(0, 0),
-                        inputs: ProcList::create(vec![Proc::new_proc_int(10, 0, 0)], 0, 0),
+                        name: Name::new_name_var("out"),
+                        send_type: SendType::new_single(),
+                        inputs: ProcList::new(vec![Proc::new_proc_int(10)]),
                         line_num: 0,
                         col_num: 0,
                     }),
@@ -268,9 +268,9 @@ mod tests {
                     col_num: 0,
                 }),
                 right: Box::new(Proc::Send {
-                    name: Name::new_name_var("z", 0, 0),
-                    send_type: SendType::new_single(0, 0),
-                    inputs: ProcList::create(vec![Proc::new_proc_int(11, 0, 0)], 0, 0),
+                    name: Name::new_name_var("z"),
+                    send_type: SendType::new_single(),
+                    inputs: ProcList::new(vec![Proc::new_proc_int(11)]),
                     line_num: 0,
                     col_num: 0,
                 }),

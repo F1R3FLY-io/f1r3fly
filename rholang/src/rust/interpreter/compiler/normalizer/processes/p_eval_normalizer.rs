@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn p_eval_should_handle_a_bound_name_variable() {
         let p_eval = Proc::Eval(Eval {
-            name: Name::new_name_var("x", 0, 0),
+            name: Name::new_name_var("x"),
             line_num: 0,
             col_num: 0,
         });
@@ -74,8 +74,8 @@ mod tests {
         let p_eval = Proc::Eval(Eval {
             name: Name::Quote(Box::new(Quote {
                 quotable: Box::new(Proc::Par {
-                    left: Box::new(Proc::new_proc_var("x", 0, 0)),
-                    right: Box::new(Proc::new_proc_var("x", 0, 0)),
+                    left: Box::new(Proc::new_proc_var("x")),
+                    right: Box::new(Proc::new_proc_var("x")),
                     line_num: 0,
                     col_num: 0,
                 }),

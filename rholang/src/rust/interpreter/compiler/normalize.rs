@@ -346,8 +346,8 @@ mod tests {
     #[test]
     fn p_par_should_compile_both_branches_into_a_par_object() {
         let par_ground = Proc::Par {
-            left: Box::new(Proc::new_proc_int(7, 0, 0)),
-            right: Box::new(Proc::new_proc_int(8, 0, 0)),
+            left: Box::new(Proc::new_proc_int(7)),
+            right: Box::new(Proc::new_proc_int(8)),
             line_num: 0,
             col_num: 0,
         };
@@ -364,8 +364,8 @@ mod tests {
     #[test]
     fn p_par_should_compile_both_branches_with_the_same_environment() {
         let par_double_bound = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x", 0, 0)),
-            right: Box::new(Proc::new_proc_var("x", 0, 0)),
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::new_proc_var("x")),
             line_num: 0,
             col_num: 0,
         };
@@ -391,8 +391,8 @@ mod tests {
     #[test]
     fn p_par_should_not_compile_if_both_branches_use_the_same_free_variable() {
         let par_double_free = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x", 0, 0)),
-            right: Box::new(Proc::new_proc_var("x", 0, 0)),
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::new_proc_var("x")),
             line_num: 0,
             col_num: 0,
         };
@@ -413,8 +413,8 @@ mod tests {
     #[test]
     fn p_par_should_accumulate_free_counts_from_both_branches() {
         let par_double_free = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x", 0, 0)),
-            right: Box::new(Proc::new_proc_var("y", 0, 0)),
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::new_proc_var("y")),
             line_num: 0,
             col_num: 0,
         };
@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn p_par_should_normalize_without_stack_overflow_error_even_for_huge_program() {
         let huge_p_par = (1..=50)
-            .map(|x| Proc::new_proc_int(x as i64, 0, 0))
+            .map(|x| Proc::new_proc_int(x as i64))
             .reduce(|l, r| Proc::Par {
                 left: Box::new(l),
                 right: Box::new(r),
