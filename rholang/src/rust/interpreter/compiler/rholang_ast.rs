@@ -424,6 +424,16 @@ pub struct Var {
     pub col_num: usize,
 }
 
+impl Var {
+    pub fn new(name: String) -> Self {
+        Var {
+            name,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Quote {
     pub quotable: Box<Proc>,

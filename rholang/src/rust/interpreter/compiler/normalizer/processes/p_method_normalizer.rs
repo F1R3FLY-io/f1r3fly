@@ -77,65 +77,67 @@ pub fn normalize_p_method(
     })
 }
 
-// #[test]
-// fn test_normalize_p_method() {
-//     let rholang_code = r#"
-//         x.methodName("arg1", *arg2)
-//     "#;
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use models::{
+        create_bit_vector,
+        rhoapi::{expr::ExprInstance, EMethod, Expr, Par},
+        rust::utils::{new_boundvar_par, new_gint_par},
+    };
 
-//     let tree = parse_rholang_code(rholang_code);
-//     let root_node = tree.root_node();
-//     println!("Tree S-expression: {}", root_node.to_sexp());
-//     println!("Root node kind: {}", root_node.kind());
+    use crate::rust::interpreter::{
+        compiler::{
+            exports::SourcePosition,
+            normalize::{normalize_match_proc, VarSort},
+            rholang_ast::{Proc, ProcList, Var},
+        },
+        test_utils::utils::proc_visit_inputs_and_env,
+        util::prepend_expr,
+    };
 
-//     let method_node = root_node.named_child(0).expect("Expected a method node");
-//     println!("Found method node: {}", method_node.to_sexp());
+    #[test]
+    fn p_method_should_produce_proper_method_call() {
+        let methods = vec![String::from("nth"), String::from("toByteArray")];
 
-//     let input = ProcVisitInputs {
-//         par: Par::default(),
-//         bound_map_chain: Default::default(),
-//         free_map: Default::default(),
-//     };
+        fn test(method_name: String) {
+            let p_method = Proc::Method {
+                receiver: Box::new(Proc::new_proc_var("x")),
+                name: Var::new(method_name.clone()),
+                args: ProcList::new(vec![Proc::new_proc_int(0)]),
+                line_num: 0,
+                col_num: 0,
+            };
 
-//     match normalize_match(method_node, input, rholang_code.as_bytes()) {
-//         Ok(result) => {
-//             println!("Normalization successful!");
-//             println!("Resulting Par: {:?}", result.par);
-//             assert_eq!(
-//                 result.par.exprs.len(),
-//                 1,
-//                 "Expected one expression in the resulting Par"
-//             );
-//             if let Some(expr::ExprInstance::EMethodBody(emethod)) =
-//                 &result.par.exprs[0].expr_instance
-//             {
-//                 assert_eq!(
-//                     emethod.method_name, "methodName",
-//                     "Expected method name to be 'methodName'"
-//                 );
-//                 assert_eq!(
-//                     emethod.arguments.len(),
-//                     2,
-//                     "Expected two arguments in the method"
-//                 );
-//                 assert!(
-//                     matches!(emethod.arguments[1].exprs[0].expr_instance, Some(expr::ExprInstance::GString(ref s)) if s == "arg1"),
-//                     "Expected first argument to be 'arg1'"
-//                 );
-//                 assert!(
-//                     matches!(
-//                         emethod.arguments[0].exprs[0].expr_instance,
-//                         Some(expr::ExprInstance::EVarBody(_))
-//                     ),
-//                     "Expected second argument to be a variable"
-//                 );
-//             } else {
-//                 panic!("Expected an EMethodBody expression");
-//             }
-//         }
-//         Err(e) => {
-//             println!("Normalization failed: {}", e);
-//             panic!("Test failed due to normalization error");
-//         }
-//     }
-// }
+            let (mut inputs, env) = proc_visit_inputs_and_env();
+            inputs.bound_map_chain = inputs.bound_map_chain.put((
+                "x".to_string(),
+                VarSort::ProcSort,
+                SourcePosition::new(0, 0),
+            ));
+
+            let result = normalize_match_proc(&p_method, inputs.clone(), &env);
+            assert!(result.is_ok());
+
+            let expected_result = prepend_expr(
+                Par::default(),
+                Expr {
+                    expr_instance: Some(ExprInstance::EMethodBody(EMethod {
+                        method_name,
+                        target: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                        arguments: vec![new_gint_par(0, Vec::new(), false)],
+                        locally_free: create_bit_vector(&vec![0]),
+                        connective_used: false,
+                    })),
+                },
+                0,
+            );
+
+            assert_eq!(result.clone().unwrap().par, expected_result);
+            assert_eq!(result.unwrap().free_map, inputs.free_map);
+        }
+
+        test(methods[0].clone());
+        test(methods[1].clone());
+    }
+}
