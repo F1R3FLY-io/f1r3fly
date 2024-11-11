@@ -48,10 +48,11 @@ pub fn normalize_p_negation(
     })
 }
 
+//rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-    use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
+    use crate::rust::interpreter::compiler::rholang_ast::Negation;
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
     use models::rhoapi::connective::ConnectiveInstance;
     use models::rhoapi::Connective;

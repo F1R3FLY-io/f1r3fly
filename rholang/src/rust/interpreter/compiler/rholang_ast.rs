@@ -498,6 +498,17 @@ pub struct Conjunction {
     pub col_num: usize,
 }
 
+impl Conjunction {
+    pub fn new_conjunction_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
+        Proc::Conjunction(Conjunction {
+            left: Box::new(Proc::new_proc_var(value_left)),
+            right: Box::new(Proc::new_proc_var(value_right)),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Negation {
     pub proc: Box<Proc>,
