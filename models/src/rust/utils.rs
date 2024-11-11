@@ -579,7 +579,7 @@ pub fn new_etuple_expr(_ps: Vec<Par>, _locally_free: Vec<u8>, _connective_used: 
     }
 }
 
-pub fn new_eplus_par(
+pub fn new_eplus_par_gint(
     lhs_value: i64,
     rhs_value: i64,
     locally_free_par: Vec<u8>,
@@ -599,6 +599,18 @@ pub fn new_eplus_par(
             )),
         })),
     }])
+}
+
+pub fn new_eplus_par(
+  lhs_value: Par,
+  rhs_value: Par,
+) -> Par {
+  Par::default().with_exprs(vec![Expr {
+    expr_instance: Some(EPlusBody(EPlus {
+      p1: Some(lhs_value),
+      p2: Some(rhs_value),
+    })),
+  }])
 }
 
 pub fn new_bundle_par(body: Par, write_flag: bool, read_flag: bool) -> Par {

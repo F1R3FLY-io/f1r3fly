@@ -213,10 +213,23 @@ pub fn normalize_collection(
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::exports::SourcePosition;
-    use crate::rust::interpreter::compiler::normalize::VarSort;
+    use crate::rust::interpreter::compiler::normalize::VarSort::{NameSort, ProcSort};
+    use crate::rust::interpreter::compiler::normalize::{
+        normalize_match_proc, ProcVisitInputs, VarSort,
+    };
+    use crate::rust::interpreter::compiler::rholang_ast::{Collection, Proc};
+    use crate::rust::interpreter::compiler::rholang_ast::{KeyValuePair, Name};
+    use crate::rust::interpreter::errors::InterpreterError;
     use crate::rust::interpreter::test_utils::par_builder_util::ParBuilderUtil;
-    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::Par;
+    use crate::rust::interpreter::test_utils::utils::collection_proc_visit_inputs_and_env;
+    use crate::rust::interpreter::util::prepend_expr;
+    use models::create_bit_vector;
+    use models::rhoapi::{KeyValuePair as model_key_value_pair, Par};
+    use models::rust::utils::{
+        new_boundvar_par, new_elist_expr, new_emap_expr, new_eplus_par, new_eset_expr,
+        new_etuple_expr, new_freevar_expr, new_freevar_par, new_freevar_var, new_gint_par,
+        new_gstring_par,
+    };
 
     fn get_normalized_par(rho: &str) -> Par {
         ParBuilderUtil::mk_term(rho).expect("Compilation failed to normalize Par")
@@ -231,52 +244,240 @@ mod tests {
     }
 
     #[test]
+    fn list_should_delegate() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+
+        let proc = Proc::Collection(Collection::List {
+            elements: vec![
+                Proc::new_proc_var("P"),
+                Proc::new_proc_eval(Name::new_name_var("x")),
+                Proc::new_proc_int(7),
+            ],
+            cont: None,
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            new_elist_expr(
+                vec![
+                    new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                    new_boundvar_par(0, create_bit_vector(&vec![0]), false),
+                    new_gint_par(7, Vec::new(), false),
+                ],
+                create_bit_vector(&vec![0, 1]),
+                false,
+                None,
+            ),
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.clone().unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
     fn list_should_sort_the_insides_ot_their_elements() {
         assert_equal_normalized("@0!([{1 | 2}])", "@0!([{2 | 1}])");
     }
 
-    // fn strip_margin(s: &str) -> String {
-    //     s.lines()
-    //         .map(|line| {
-    //             if let Some(pos) = line.find('|') {
-    //                 &line[(pos + 1)..]
-    //             } else {
-    //                 line
-    //             }
-    //         })
-    //         .collect::<Vec<&str>>()
-    //         .join("\n")
-    // }
+    #[test]
+    fn list_should_sort_the_insides_of_send_encoded_as_byte_array() {
+        let rho1 = r#"
+        new x in {
+          x!(
+            [
+              @"a"!(
+                @"x"!("abc") |
+                @"y"!(1)
+              )
+            ].toByteArray()
+          )
+        }
+    "#;
+
+        let rho2 = r#"
+        new x in {
+          x!(
+            [
+              @"a"!(
+                @"y"!(1) |
+                @"x"!("abc")
+              )
+            ].toByteArray()
+          )
+        }
+    "#;
+        assert_equal_normalized(&rho1, &rho2);
+    }
 
     // #[test]
-    // fn list_should_sort_the_insides_of_send_encoded_as_byte_array() {
-    //     let rho1 = "new x in {x!([@\"a\"!(@\"x\"!(\"abc\") |@\"y\"!(1))].toByteArray())}";
-    //     let rho2 = "new x in {x!([@\"a\"!(@\"y\"!(1) |@\"x\"!(\"abc\"))].toByteArray())}";
-    //     // let (mut proc_inputs, env) = proc_visit_inputs_and_env();
-    //     // proc_inputs.bound_map_chain.put_all(vec![
-    //     //   (
-    //     //     "x".to_string(),
-    //     //     VarSort::NameSort,
-    //     //     SourcePosition { row: 0, column: 0 },
-    //     //   ),
-    //     //   (
-    //     //     "y".to_string(),
-    //     //     VarSort::NameSort,
-    //     //     SourcePosition { row: 0, column: 0 },
-    //     //   ),
-    //     // ]);
+    // fn tuple_should_delegate() {
+    //     let (inputs, env) = collection_proc_visit_inputs_and_env();
     //
-    //     assert_equal_normalized(&rho1, &rho2);
+    //     let proc = Proc::Collection(Collection::Tuple {
+    //         elements: vec![
+    //             Proc::new_proc_eval(Name::new_name_var("y")),
+    //             Proc::new_proc_var("Q"),
+    //         ],
+    //         line_num: 0,
+    //         col_num: 0,
+    //     });
+    //
+    //     let result = normalize_match_proc(&proc, inputs.clone(), &env);
+    //     let expected_result = prepend_expr(
+    //         inputs.par.clone(),
+    //         new_etuple_expr(
+    //             vec![
+    //                 new_freevar_par(0, Vec::new()),
+    //                 new_freevar_par(1, Vec::new()),
+    //             ],
+    //             Vec::new(),
+    //             true,
+    //         ),
+    //         0,
+    //     );
+    //
+    //     assert_eq!(result.clone().unwrap().par, expected_result);
+    //     assert_eq!(
+    //         result.clone().unwrap().free_map,
+    //         inputs.free_map.put_all(vec![
+    //             ("Q".to_string(), ProcSort, SourcePosition::new(0, 0)),
+    //             ("y".to_string(), NameSort, SourcePosition::new(0, 0))
+    //         ])
+    //     )
     // }
+
+    #[test]
+    fn tuple_should_propagate_free_variables() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+
+        let proc = Proc::Collection(Collection::Tuple {
+            elements: vec![
+                Proc::new_proc_int(7),
+                Proc::new_proc_par_with_int_and_var(7, "Q"),
+                Proc::new_proc_var("Q"),
+            ],
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        assert!(matches!(
+            result,
+            Err(InterpreterError::UnexpectedReuseOfProcContextFree { .. })
+        ));
+    }
 
     #[test]
     fn tuple_should_sort_the_insides_of_their_elements() {
         assert_equal_normalized("@0!(({1 | 2}))", "@0!(({2 | 1}))");
     }
 
+    // #[test]
+    // fn set_should_delegate() {
+    //     let (inputs, env) = collection_proc_visit_inputs_and_env();
+    //     let proc = Proc::Collection(Collection::Set {
+    //         elements: vec![
+    //             Proc::new_proc_add_with_par_of_var("P", "R"),
+    //             Proc::new_proc_int(7),
+    //             Proc::new_proc_par_with_int_and_var(8, "Q"),
+    //         ],
+    //         cont: Some(Box::new(Proc::new_proc_var("Z"))),
+    //         line_num: 0,
+    //         col_num: 0,
+    //     });
+    //
+    //     let result = normalize_match_proc(&proc, inputs.clone(), &env);
+    //     let expected_result = prepend_expr(
+    //         inputs.par.clone(),
+    //         new_eset_expr(
+    //             vec![
+    //                 new_eplus_par(
+    //                     new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+    //                     new_freevar_par(1, Vec::new()),
+    //                 ),
+    //                 new_gint_par(7, Vec::new(), false),
+    //                 prepend_expr(new_gint_par(8, Vec::new(), false), new_freevar_expr(2), 0),
+    //             ],
+    //             create_bit_vector(&vec![1]),
+    //             false,
+    //             Some(new_freevar_var(0)),
+    //         ),
+    //         0,
+    //     );
+    //
+    //     assert_eq!(result.clone().unwrap().par, expected_result);
+    //     assert_eq!(
+    //         result.unwrap().free_map,
+    //         inputs.free_map.put_all(vec![
+    //             ("Z".to_string(), ProcSort, SourcePosition::new(0, 0)),
+    //             ("R".to_string(), ProcSort, SourcePosition::new(0, 0)),
+    //             ("Q".to_string(), ProcSort, SourcePosition::new(0, 0)),
+    //         ])
+    //     );
+    // }
+
     #[test]
     fn set_should_sort_the_insides_of_their_elements() {
         assert_equal_normalized("@0!(Set({1 | 2}))", "@0!(Set({2 | 1}))")
+    }
+
+    #[test]
+    fn map_should_delegate() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::Map {
+            pairs: vec![
+                KeyValuePair {
+                    key: Proc::new_proc_int(7),
+                    value: Proc::new_proc_string("Seven".parse().unwrap()),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                KeyValuePair {
+                    key: Proc::new_proc_var("P"),
+                    value: Proc::new_proc_eval(Name::new_name_var("Q")),
+                    line_num: 0,
+                    col_num: 0,
+                },
+            ],
+            cont: Some(Box::new(Proc::new_proc_var("Z"))),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            new_emap_expr(
+                vec![
+                    model_key_value_pair {
+                        key: Some(new_gint_par(7, Vec::new(), false)),
+                        value: Some(new_gstring_par("Seven".parse().unwrap(), Vec::new(), false)),
+                    },
+                    model_key_value_pair {
+                        key: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                        value: Some(new_freevar_par(1, Vec::new())),
+                    },
+                ],
+                create_bit_vector(&vec![1]),
+                true,
+                Some(new_freevar_var(0)),
+            ),
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.unwrap().free_map,
+            inputs.free_map.put_all(vec![
+                ("Z".to_string(), ProcSort, SourcePosition::new(0, 0)),
+                ("Q".to_string(), NameSort, SourcePosition::new(0, 0)),
+            ])
+        );
     }
 
     #[test]

@@ -33,7 +33,7 @@ use models::{
         tagged_continuation::TaggedCont, BindPattern, Expr, ListParWithRandom, Par, ParWithRandom,
         Send, TaggedContinuation,
     },
-    rust::utils::{new_eplus_par, new_gint_expr, new_gint_par},
+    rust::utils::{new_eplus_par_gint, new_gint_expr, new_gint_par},
 };
 use rholang::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
@@ -130,7 +130,7 @@ async fn eval_expr_should_handle_simple_addition() {
     let (_, reducer) =
         create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
             .await;
-    let add_expr = new_eplus_par(7, 8, Vec::new(), false);
+    let add_expr = new_eplus_par_gint(7, 8, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&add_expr, &env);
     let expected = vec![new_gint_expr(15)];
@@ -144,7 +144,7 @@ async fn eval_expr_should_handle_long_addition() {
     let (_, reducer) =
         create_test_space::<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>()
             .await;
-    let add_expr = new_eplus_par(i64::MAX, i64::MAX, Vec::new(), false);
+    let add_expr = new_eplus_par_gint(i64::MAX, i64::MAX, Vec::new(), false);
     let env: Env<Par> = Env::new();
     let result = reducer.eval_expr(&add_expr, &env);
     let expected = vec![new_gint_expr(i64::MAX.wrapping_mul(2))];
@@ -794,7 +794,7 @@ async fn eval_of_send_on_seven_plus_eight_pipe_receive_on_fifteen_should_meet_in
     let merge_rand = Blake2b512Random::merge(vec![split_rand1.clone(), split_rand0.clone()]);
 
     let send = Par::default().with_sends(vec![Send {
-        chan: Some(new_eplus_par(7, 8, Vec::new(), false)),
+        chan: Some(new_eplus_par_gint(7, 8, Vec::new(), false)),
         data: vec![
             new_gint_par(7, Vec::new(), false),
             new_gint_par(8, Vec::new(), false),

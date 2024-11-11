@@ -280,12 +280,46 @@ impl Proc {
         }
     }
 
+    pub fn new_proc_string(value: String) -> Proc {
+        Proc::StringLiteral {
+            value,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
     pub fn new_proc_var(value: &str) -> Proc {
         Proc::Var(Var {
             name: value.to_string(),
             line_num: 0,
             col_num: 0,
         })
+    }
+
+    pub fn new_proc_eval(name: Name) -> Proc {
+        Proc::Eval(Eval {
+            name,
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+
+    pub fn new_proc_par_with_int_and_var(value_int: i64, value_var: &str) -> Proc {
+        Proc::Par {
+            left: Box::new(Self::new_proc_int(value_int)),
+            right: Box::new(Self::new_proc_var(value_var)),
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_proc_add_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
+        Proc::Add {
+            left: Box::new(Self::new_proc_var(value_left)),
+            right: Box::new(Self::new_proc_var(value_right)),
+            line_num: 0,
+            col_num: 0,
+        }
     }
 
     pub fn new_proc_wildcard() -> Proc {
