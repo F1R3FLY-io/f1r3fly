@@ -79,6 +79,20 @@ impl Par {
         }
     }
 
+    pub fn with_locally_free(&self, new_locally_free: Vec<u8>) -> Par {
+        Par {
+            locally_free: new_locally_free,
+            ..self.clone()
+        }
+    }
+
+    pub fn with_connective_used(&self, new_connective_used: bool) -> Par {
+        Par {
+            connective_used: new_connective_used,
+            ..self.clone()
+        }
+    }
+
     // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
     pub fn prepend_send(&mut self, s: Send) -> Par {
         let mut new_sends = vec![s.clone()];
@@ -371,6 +385,10 @@ pub fn new_eset_expr(
     _connective_used: bool,
     _remainder: Option<Var>,
 ) -> Expr {
+    println!("new_eset_expr: _ps: {:?}", _ps);
+    println!("new_eset_expr: _locally_free: {:?}", _locally_free);
+    println!("new_eset_expr: _connective_used: {:?}", _connective_used);
+    println!("new_eset_expr: _remainder: {:?}", _remainder);
     Expr {
         expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
             _ps,
@@ -587,30 +605,37 @@ pub fn new_eplus_par_gint(
 ) -> Par {
     Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-            p1: Some(new_gint_par(
-                lhs_value,
-                locally_free_par.clone(),
-                connective_used_par,
-            )),
-            p2: Some(new_gint_par(
-                rhs_value,
-                locally_free_par,
-                connective_used_par,
-            )),
+            p1: Some(new_gint_par(lhs_value, locally_free_par.clone(), connective_used_par)),
+            p2: Some(new_gint_par(rhs_value, locally_free_par, connective_used_par)),
         })),
     }])
 }
 
-pub fn new_eplus_par(
-  lhs_value: Par,
-  rhs_value: Par,
-) -> Par {
-  Par::default().with_exprs(vec![Expr {
-    expr_instance: Some(EPlusBody(EPlus {
-      p1: Some(lhs_value),
-      p2: Some(rhs_value),
-    })),
-  }])
+// pub fn new_eplus_par(
+//   lhs_value: Par,
+//   rhs_value: Par,
+// ) -> Par {
+//   Par::default().with_exprs(vec![Expr {
+//     expr_instance: Some(EPlusBody(EPlus {
+//       p1: Some(lhs_value),
+//       p2: Some(rhs_value),
+//     })),
+//   }])
+// }
+
+pub fn new_eplus_par(lhs_value: Par, rhs_value: Par) -> Par {
+    let locally_free = union(lhs_value.locally_free.clone(), rhs_value.locally_free.clone());
+    let connective_used = lhs_value.connective_used || rhs_value.connective_used;
+
+    Par::default()
+        .with_exprs(vec![Expr {
+            expr_instance: Some(EPlusBody(EPlus {
+                p1: Some(lhs_value),
+                p2: Some(rhs_value),
+            })),
+        }])
+        .with_locally_free(locally_free)
+        .with_connective_used(connective_used)
 }
 
 pub fn new_bundle_par(body: Par, write_flag: bool, read_flag: bool) -> Par {

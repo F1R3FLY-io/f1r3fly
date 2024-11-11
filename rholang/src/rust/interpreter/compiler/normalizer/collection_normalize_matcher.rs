@@ -213,10 +213,8 @@ pub fn normalize_collection(
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::exports::SourcePosition;
+    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
     use crate::rust::interpreter::compiler::normalize::VarSort::{NameSort, ProcSort};
-    use crate::rust::interpreter::compiler::normalize::{
-        normalize_match_proc, ProcVisitInputs, VarSort,
-    };
     use crate::rust::interpreter::compiler::rholang_ast::{Collection, Proc};
     use crate::rust::interpreter::compiler::rholang_ast::{KeyValuePair, Name};
     use crate::rust::interpreter::errors::InterpreterError;
@@ -230,6 +228,7 @@ mod tests {
         new_etuple_expr, new_freevar_expr, new_freevar_par, new_freevar_var, new_gint_par,
         new_gstring_par,
     };
+    use pretty_assertions::assert_eq;
 
     fn get_normalized_par(rho: &str) -> Par {
         ParBuilderUtil::mk_term(rho).expect("Compilation failed to normalize Par")
@@ -313,42 +312,42 @@ mod tests {
         assert_equal_normalized(&rho1, &rho2);
     }
 
-    // #[test]
-    // fn tuple_should_delegate() {
-    //     let (inputs, env) = collection_proc_visit_inputs_and_env();
-    //
-    //     let proc = Proc::Collection(Collection::Tuple {
-    //         elements: vec![
-    //             Proc::new_proc_eval(Name::new_name_var("y")),
-    //             Proc::new_proc_var("Q"),
-    //         ],
-    //         line_num: 0,
-    //         col_num: 0,
-    //     });
-    //
-    //     let result = normalize_match_proc(&proc, inputs.clone(), &env);
-    //     let expected_result = prepend_expr(
-    //         inputs.par.clone(),
-    //         new_etuple_expr(
-    //             vec![
-    //                 new_freevar_par(0, Vec::new()),
-    //                 new_freevar_par(1, Vec::new()),
-    //             ],
-    //             Vec::new(),
-    //             true,
-    //         ),
-    //         0,
-    //     );
-    //
-    //     assert_eq!(result.clone().unwrap().par, expected_result);
-    //     assert_eq!(
-    //         result.clone().unwrap().free_map,
-    //         inputs.free_map.put_all(vec![
-    //             ("Q".to_string(), ProcSort, SourcePosition::new(0, 0)),
-    //             ("y".to_string(), NameSort, SourcePosition::new(0, 0))
-    //         ])
-    //     )
-    // }
+    #[test]
+    fn tuple_should_delegate() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+
+        let proc = Proc::Collection(Collection::Tuple {
+            elements: vec![
+                Proc::new_proc_eval(Name::new_name_var("y")),
+                Proc::new_proc_var("Q"),
+            ],
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            new_etuple_expr(
+                vec![
+                    new_freevar_par(0, Vec::new()),
+                    new_freevar_par(1, Vec::new()),
+                ],
+                Vec::new(),
+                true,
+            ),
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.clone().unwrap().free_map,
+            inputs.free_map.put_all(vec![
+                ("y".to_string(), NameSort, SourcePosition::new(0, 0)),
+                ("Q".to_string(), ProcSort, SourcePosition::new(0, 0))
+            ])
+        )
+    }
 
     #[test]
     fn tuple_should_propagate_free_variables() {
@@ -377,49 +376,49 @@ mod tests {
         assert_equal_normalized("@0!(({1 | 2}))", "@0!(({2 | 1}))");
     }
 
-    // #[test]
-    // fn set_should_delegate() {
-    //     let (inputs, env) = collection_proc_visit_inputs_and_env();
-    //     let proc = Proc::Collection(Collection::Set {
-    //         elements: vec![
-    //             Proc::new_proc_add_with_par_of_var("P", "R"),
-    //             Proc::new_proc_int(7),
-    //             Proc::new_proc_par_with_int_and_var(8, "Q"),
-    //         ],
-    //         cont: Some(Box::new(Proc::new_proc_var("Z"))),
-    //         line_num: 0,
-    //         col_num: 0,
-    //     });
-    //
-    //     let result = normalize_match_proc(&proc, inputs.clone(), &env);
-    //     let expected_result = prepend_expr(
-    //         inputs.par.clone(),
-    //         new_eset_expr(
-    //             vec![
-    //                 new_eplus_par(
-    //                     new_boundvar_par(1, create_bit_vector(&vec![1]), false),
-    //                     new_freevar_par(1, Vec::new()),
-    //                 ),
-    //                 new_gint_par(7, Vec::new(), false),
-    //                 prepend_expr(new_gint_par(8, Vec::new(), false), new_freevar_expr(2), 0),
-    //             ],
-    //             create_bit_vector(&vec![1]),
-    //             false,
-    //             Some(new_freevar_var(0)),
-    //         ),
-    //         0,
-    //     );
-    //
-    //     assert_eq!(result.clone().unwrap().par, expected_result);
-    //     assert_eq!(
-    //         result.unwrap().free_map,
-    //         inputs.free_map.put_all(vec![
-    //             ("Z".to_string(), ProcSort, SourcePosition::new(0, 0)),
-    //             ("R".to_string(), ProcSort, SourcePosition::new(0, 0)),
-    //             ("Q".to_string(), ProcSort, SourcePosition::new(0, 0)),
-    //         ])
-    //     );
-    // }
+    #[test]
+    fn set_should_delegate() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::Set {
+            elements: vec![
+                Proc::new_proc_add_with_par_of_var("P", "R"),
+                Proc::new_proc_int(7),
+                Proc::new_proc_par_with_int_and_var(8, "Q"),
+            ],
+            cont: Some(Box::new(Proc::new_proc_var("Z"))),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            new_eset_expr(
+                vec![
+                    new_eplus_par(
+                        new_boundvar_par(1, create_bit_vector(&vec![1]), false),
+                        new_freevar_par(1, Vec::new()),
+                    ),
+                    new_gint_par(7, Vec::new(), false),
+                    prepend_expr(new_gint_par(8, Vec::new(), false), new_freevar_expr(2), 0),
+                ],
+                create_bit_vector(&vec![1]),
+                true,
+                Some(new_freevar_var(0)),
+            ),
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.unwrap().free_map,
+            inputs.free_map.put_all(vec![
+                ("Z".to_string(), ProcSort, SourcePosition::new(0, 0)),
+                ("R".to_string(), ProcSort, SourcePosition::new(0, 0)),
+                ("Q".to_string(), ProcSort, SourcePosition::new(0, 0)),
+            ])
+        );
+    }
 
     #[test]
     fn set_should_sort_the_insides_of_their_elements() {
