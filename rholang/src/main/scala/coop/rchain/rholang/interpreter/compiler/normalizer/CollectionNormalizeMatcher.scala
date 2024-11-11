@@ -103,7 +103,9 @@ object CollectionNormalizeMatcher {
         RemainderNormalizeMatcher
           .normalizeMatchProc[F](cl.procremainder_, input.freeMap)
           .flatMap {
-            case (optionalRemainder, knownFree) =>
+            case (optionalRemainder, knownFree) => {
+              // println("\noptionalRemainder: " + optionalRemainder)
+              // println("\nknownFree: " + knownFree)
               val constructor: Option[Var] => (Seq[Par], AlwaysEqual[BitSet], Boolean) => EList =
                 optionalRemainder =>
                   (ps, lf, cu) => {
@@ -114,6 +116,7 @@ object CollectionNormalizeMatcher {
                   }
 
               foldMatch(knownFree, cl.listproc_.toList, constructor(optionalRemainder))
+            }
           }
 
       case ct: CollectTuple =>

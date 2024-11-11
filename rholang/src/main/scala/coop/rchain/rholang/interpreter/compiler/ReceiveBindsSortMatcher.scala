@@ -12,6 +12,7 @@ object ReceiveBindsSortMatcher {
   def preSortBinds[F[_]: Sync, T](
       binds: Seq[(Seq[Par], Option[Var], Par, FreeMap[T])]
   ): F[Seq[(ReceiveBind, FreeMap[T])]] = {
+    // println("\nbinds in preSortBinds: " + binds)
     val bindSortings = binds.toList
       .map {
         case (

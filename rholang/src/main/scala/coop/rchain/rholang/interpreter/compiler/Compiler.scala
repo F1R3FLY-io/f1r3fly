@@ -96,6 +96,7 @@ object Compiler {
           ProcVisitInputs(VectorPar(), BoundMapChain.empty, FreeMap.empty)
         )
         .flatMap { normalizedTerm =>
+          // println("\nnormalizeTerm: " + normalizedTerm)
           if (normalizedTerm.freeMap.count > 0) {
             if (normalizedTerm.freeMap.wildcards.isEmpty && normalizedTerm.freeMap.connectives.isEmpty) {
               val topLevelFreeList = normalizedTerm.freeMap.levelBindings.map {

@@ -29,6 +29,8 @@ object RemainderNormalizeMatcher {
       pv: ProcVar,
       knownFree: FreeMap[VarSort]
   ): F[(Option[Var], FreeMap[VarSort])] =
+    // println("\nhit handle_proc_var")
+    // println("\nknownFree: " + knownFree)
     pv match {
       case pvw: ProcVarWildcard =>
         (

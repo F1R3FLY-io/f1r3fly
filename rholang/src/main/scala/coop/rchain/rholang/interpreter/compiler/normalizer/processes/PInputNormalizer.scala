@@ -62,6 +62,8 @@ object PInputNormalizer {
         }
       }
 
+      // println("\nreceiptContainsComplexSource: " + receiptContainsComplexSource)
+
       if (receiptContainsComplexSource) {
         p.listreceipt_.head match {
           case rl: ReceiptLinear =>
@@ -161,12 +163,15 @@ object PInputNormalizer {
               names
                 .foldM((Vector.empty[Par], FreeMap.empty[VarSort], BitSet.empty)) {
                   case ((vectorPar, knownFree, locallyFree), name) =>
+                    val nameVisitInputs = NameVisitInputs(input.boundMapChain.push, knownFree)
+                    // println(s"NameVisitInputs: $nameVisitInputs")
                     NameNormalizeMatcher
                       .normalizeMatch[F](
                         name,
-                        NameVisitInputs(input.boundMapChain.push, knownFree)
+                        nameVisitInputs
                       ) >>= {
-                      case nameVisitOutputs @ NameVisitOutputs(par, knownFree) =>
+                      case nameVisitOutputs @ NameVisitOutputs(par, knownFree) => {
+                        // println("\npar: " + par)
                         failOnInvalidConnective(input, nameVisitOutputs)
                           .fold(
                             _.raiseError[F, (Vector[Par], FreeMap[VarSort], BitSet)],
@@ -178,13 +183,19 @@ object PInputNormalizer {
                                   .locallyFree(par, input.boundMapChain.depth + 1)
                               ).pure[F]
                           )
+                      }
                     }
                 } >>= {
-                case (vectorPar, knownFree, locallyFree) =>
+                case (vectorPar, knownFree, locallyFree) => {
+                  // println("\ncurrentKnownFree: " + knownFree)
                   RemainderNormalizeMatcher.normalizeMatchName(nameRemainder, knownFree).map {
-                    case (optionalVar, knownFree) =>
+                    case (optionalVar, knownFree) => {
+                      // println("\noptionalVar: " + optionalVar)
+                      // println("\nknownFree: " + knownFree)
                       (vectorPar, optionalVar, knownFree, locallyFree)
+                    }
                   }
+                }
               }
           }
 
@@ -226,6 +237,8 @@ object PInputNormalizer {
           processedSources                                                  <- processSources(names)
           (sources, sourcesFree, sourcesLocallyFree, sourcesConnectiveUsed) = processedSources
           processedPatterns                                                 <- processPatterns(patterns)
+          // _                                                                 = println("\nprocessedPatterns: " + processedPatterns)
+          // _ = println("\nsources: " + sources)
           receiveBindsAndFreeMaps <- ReceiveBindsSortMatcher.preSortBinds[F, VarSort](
                                       processedPatterns.zip(sources).map {
                                         case ((a, b, c, _), e) => (a, b, e, c)
@@ -237,6 +250,7 @@ object PInputNormalizer {
           _ <- ReceiveOnSameChannelsError(p.line_num, p.col_num)
                 .raiseError[F, Unit]
                 .whenA(hasSameChannels)
+          // _ = println("\nreceiveBindFreeMaps: " + receiveBindFreeMaps)
           receiveBindsFreeMap <- receiveBindFreeMaps.toList.foldM(FreeMap.empty[VarSort]) {
                                   case (knownFree, receiveBindFreeMap) =>
                                     knownFree.merge(receiveBindFreeMap) match {
@@ -249,6 +263,9 @@ object PInputNormalizer {
                                         ).raiseError[F, FreeMap[VarSort]]
                                     }
                                 }
+          // _ = println("\nfree_map: " + input.boundMapChain.absorbFree(receiveBindsFreeMap))
+          // _ = println("\nsourcesFree: " + sourcesFree)
+          // _ = println("\nreceiveBindFreeMap: " + receiveBindsFreeMap)
           procVisitOutputs <- normalizeMatch[F](
                                p.proc_,
                                ProcVisitInputs(
