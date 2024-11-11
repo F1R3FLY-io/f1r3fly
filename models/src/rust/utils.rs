@@ -611,18 +611,6 @@ pub fn new_eplus_par_gint(
     }])
 }
 
-// pub fn new_eplus_par(
-//   lhs_value: Par,
-//   rhs_value: Par,
-// ) -> Par {
-//   Par::default().with_exprs(vec![Expr {
-//     expr_instance: Some(EPlusBody(EPlus {
-//       p1: Some(lhs_value),
-//       p2: Some(rhs_value),
-//     })),
-//   }])
-// }
-
 pub fn new_eplus_par(lhs_value: Par, rhs_value: Par) -> Par {
     let locally_free = union(lhs_value.locally_free.clone(), rhs_value.locally_free.clone());
     let connective_used = lhs_value.connective_used || rhs_value.connective_used;
