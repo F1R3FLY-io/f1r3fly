@@ -505,6 +505,20 @@ pub struct Negation {
     pub col_num: usize,
 }
 
+impl Negation {
+    pub fn new_negation_var(name: &str) -> Proc {
+        Proc::Negation(Negation {
+            proc: Box::new(Proc::Var(Var {
+                name: name.to_string(),
+                line_num: 0,
+                col_num: 0,
+            })),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
     pub proc: Proc,

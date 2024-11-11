@@ -48,49 +48,40 @@ pub fn normalize_p_negation(
     })
 }
 
-// #[test]
-// fn test_normalize_p_negation() {
-//     let rholang_code = r#"
-//         ~x
-//     "#;
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+    use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
+    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+    use models::rhoapi::connective::ConnectiveInstance;
+    use models::rhoapi::Connective;
+    use models::rust::utils::new_freevar_par;
+    use pretty_assertions::assert_eq;
 
-//     let tree = parse_rholang_code(rholang_code);
-//     let root_node = tree.root_node();
-//     println!("Tree S-expression: {}", root_node.to_sexp());
-//     println!("Root node kind: {}", root_node.kind());
+    #[test]
+    fn p_negation_should_delegate_but_not_count_any_free_variables_inside() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Negation::new_negation_var("x");
 
-//     let negation_node = root_node.named_child(0).expect("Expected a negation node");
-//     println!("Found negation node: {}", negation_node.to_sexp());
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = inputs
+            .par
+            .with_connectives(vec![Connective {
+                connective_instance: Some(ConnectiveInstance::ConnNotBody(new_freevar_par(
+                    0,
+                    Vec::new(),
+                ))),
+            }])
+            .with_connective_used(true);
 
-//     let input = ProcVisitInputs {
-//         par: Par::default(),
-//         bound_map_chain: Default::default(),
-//         free_map: Default::default(),
-//     };
-
-//     match normalize_match(negation_node, input, rholang_code.as_bytes()) {
-//         Ok(result) => {
-//             println!("Normalization successful!");
-//             println!("Resulting Par: {:?}", result.par);
-//             assert_eq!(
-//                 result.par.connectives.len(),
-//                 1,
-//                 "Expected one connective in the resulting Par"
-//             );
-//             if let Some(connective::ConnectiveInstance::ConnNotBody(body)) =
-//                 &result.par.connectives[0].connective_instance
-//             {
-//                 assert!(
-//                     body.exprs.len() > 0,
-//                     "Expected body of negation to contain an expression"
-//                 );
-//             } else {
-//                 panic!("Expected connective to be ConnNotBody");
-//             }
-//         }
-//         Err(e) => {
-//             println!("Normalization failed: {}", e);
-//             panic!("Test failed due to normalization error");
-//         }
-//     }
-// }
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.clone().unwrap().free_map.level_bindings,
+            inputs.free_map.level_bindings
+        );
+        assert_eq!(
+            result.unwrap().free_map.next_level,
+            inputs.free_map.next_level
+        )
+    }
+}
