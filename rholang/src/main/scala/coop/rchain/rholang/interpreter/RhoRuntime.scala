@@ -39,7 +39,10 @@ import rspacePlusPlus.{
   TuplespacePlusPlus
 }
 
-trait RhoRuntime[F[_]] extends HasCost[F] {
+import com.sun.jna.{Pointer}
+
+// trait RhoRuntime[F[_]] extends HasCost[F] {
+trait RhoRuntime[F[_]] {
 
   /**
     * Parse the rholang term into [[coop.rchain.models.Par]] and execute it with provided initial phlo.
@@ -145,6 +148,9 @@ trait RhoRuntime[F[_]] extends HasCost[F] {
     * Currently this is only for debug info mostly.
     */
   def getHotChanges: F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]]
+
+  /* Additional methods for Rholang Rust Integration */
+  def setCostToMax: F[Unit]
 }
 
 trait ReplayRhoRuntime[F[_]] extends RhoRuntime[F] {
@@ -154,103 +160,129 @@ trait ReplayRhoRuntime[F[_]] extends RhoRuntime[F] {
 }
 
 class RhoRuntimeImpl[F[_]: Sync: Span](
-    val reducer: Reduce[F],
-    val space: RhoISpace[F],
-    val cost: _cost[F],
-    val blockDataRef: Ref[F, BlockData],
-    val invalidBlocksParam: InvalidBlocks[F],
-    val mergeChs: Ref[F, Set[Par]]
+    // val reducer: Reduce[F],
+    // val space: RhoISpace[F],
+    // val cost: _cost[F],
+    // val blockDataRef: Ref[F, BlockData],
+    // val invalidBlocksParam: InvalidBlocks[F],
+    // val mergeChs: Ref[F, Set[Par]]
+    runtimePtr: Pointer
 ) extends RhoRuntime[F] {
   private val emptyContinuation = TaggedContinuation()
 
   override def getHotChanges
-      : F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]] = space.toMap
+      : F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]] =
+    // space.toMap
+    ???
 
   override def inj(par: Par, env: Env[Par] = Env[Par]())(implicit rand: Blake2b512Random): F[Unit] =
-    reducer.inj(par)
+    // reducer.inj(par)
+    ???
 
   override def consumeResult(
       channel: Seq[Par],
       pattern: Seq[BindPattern]
   ): F[Option[(TaggedContinuation, Seq[ListParWithRandom])]] =
-    space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    // space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    ???
 
   override def evaluate(term: String, initialPhlo: Cost, normalizerEnv: Map[String, Name])(
       implicit rand: Blake2b512Random
-  ): F[EvaluateResult] = {
-    implicit val c: _cost[F]       = cost
-    implicit val m                 = mergeChs
-    implicit val i: Interpreter[F] = Interpreter.newIntrepreter[F]
-    Interpreter[F].injAttempt(
-      reducer,
-      term,
-      initialPhlo,
-      normalizerEnv
-    )
-  }
+  ): F[EvaluateResult] =
+    // implicit val c: _cost[F]       = cost
+    // implicit val m                 = mergeChs
+    // implicit val i: Interpreter[F] = Interpreter.newIntrepreter[F]
+    // Interpreter[F].injAttempt(
+    //   reducer,
+    //   term,
+    //   initialPhlo,
+    //   normalizerEnv
+    // )
+    ???
 
-  override def reset(root: Blake2b256Hash): F[Unit] = space.reset(root)
+  override def reset(root: Blake2b256Hash): F[Unit] =
+    // space.reset(root)
+    ???
 
   override def createCheckpoint: F[Checkpoint] = Span[F].withMarks("create-checkpoint") {
-    space.createCheckpoint()
+    // space.createCheckpoint()
+    ???
   }
 
   override def createSoftCheckpoint
       : F[SoftCheckpoint[Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
     Span[F].withMarks("create-soft-heckpoint") {
-      space.createSoftCheckpoint()
+      // space.createSoftCheckpoint()
+      ???
     }
 
   override def revertToSoftCheckpoint(
       softCheckpoint: SoftCheckpoint[Name, BindPattern, ListParWithRandom, TaggedContinuation]
-  ): F[Unit] = space.revertToSoftCheckpoint(softCheckpoint)
+  ): F[Unit] =
+    // space.revertToSoftCheckpoint(softCheckpoint)
+    ???
 
-  override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] = space.getData(channel)
+  override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] =
+    // space.getData(channel)
+    ???
 
   override def getContinuation(
       channels: Seq[Name]
   ): F[Seq[WaitingContinuation[BindPattern, TaggedContinuation]]] =
-    space.getWaitingContinuations(channels)
+    // space.getWaitingContinuations(channels)
+    ???
 
-  override def getJoins(channel: Name): F[Seq[Seq[Name]]] = space.getJoins(channel)
+  override def getJoins(channel: Name): F[Seq[Seq[Name]]] =
+    // space.getJoins(channel)
+    ???
 
-  override def setBlockData(blockData: BlockData): F[Unit] = blockDataRef.set(blockData)
+  override def setBlockData(blockData: BlockData): F[Unit] =
+    // blockDataRef.set(blockData)
+    ???
 
-  override def setInvalidBlocks(invalidBlocks: Map[BlockHash, Validator]): F[Unit] = {
-    val invalidBlocksPar: Par =
-      Par(
-        exprs = Seq(
-          Expr(
-            Expr.ExprInstance.EMapBody(
-              ParMap(SortedParMap(invalidBlocks.map {
-                case (validator, blockHash) =>
-                  (
-                    RhoType.ByteArray(validator.toByteArray),
-                    RhoType.ByteArray(blockHash.toByteArray)
-                  )
-              }))
-            )
-          )
-        )
-      )
-    invalidBlocksParam.setParams(invalidBlocksPar)
-  }
+  override def setInvalidBlocks(invalidBlocks: Map[BlockHash, Validator]): F[Unit] =
+    // val invalidBlocksPar: Par =
+    //   Par(
+    //     exprs = Seq(
+    //       Expr(
+    //         Expr.ExprInstance.EMapBody(
+    //           ParMap(SortedParMap(invalidBlocks.map {
+    //             case (validator, blockHash) =>
+    //               (
+    //                 RhoType.ByteArray(validator.toByteArray),
+    //                 RhoType.ByteArray(blockHash.toByteArray)
+    //               )
+    //           }))
+    //         )
+    //       )
+    //     )
+    //   )
+    // invalidBlocksParam.setParams(invalidBlocksPar)
+    ???
+
+  override def setCostToMax: F[Unit] = ???
 }
 
 class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
-    override val reducer: Reduce[F],
-    override val space: RhoReplayISpace[F],
-    override val cost: _cost[F],
-    // TODO: Runtime must be immutable. Block data and invalid blocks should be supplied when Runtime is created.
-    //  This also means to unify all special names necessary to spawn a new Runtime.
-    override val blockDataRef: Ref[F, BlockData],
-    override val invalidBlocksParam: InvalidBlocks[F],
-    override val mergeChs: Ref[F, Set[Par]]
-) extends RhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
+    // override val reducer: Reduce[F],
+    // override val space: RhoReplayISpace[F],
+    // override val cost: _cost[F],
+    // // TODO: Runtime must be immutable. Block data and invalid blocks should be supplied when Runtime is created.
+    // //  This also means to unify all special names necessary to spawn a new Runtime.
+    // override val blockDataRef: Ref[F, BlockData],
+    // override val invalidBlocksParam: InvalidBlocks[F],
+    // override val mergeChs: Ref[F, Set[Par]]
+    runtimePtr: Pointer,
+    replayRuntimePtr: Pointer
+) extends RhoRuntimeImpl[F](runtimePtr)
     with ReplayRhoRuntime[F] {
-  override def checkReplayData: F[Unit] = space.checkReplayData()
+  override def checkReplayData: F[Unit] =
+    // space.checkReplayData()
+    ???
 
-  override def rig(log: trace.Log): F[Unit] = space.rig(log)
+  override def rig(log: trace.Log): F[Unit] =
+    // space.rig(log)
+    ???
 }
 
 object ReplayRhoRuntime {
@@ -261,7 +293,9 @@ object ReplayRhoRuntime {
       blockDataRef: Ref[F, BlockData],
       invalidBlocksParam: InvalidBlocks[F],
       mergeChs: Ref[F, Set[Par]]
-  ) = new ReplayRhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
+  ) =
+    // new ReplayRhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
+    ???
 }
 
 object RhoRuntime {
@@ -283,7 +317,9 @@ object RhoRuntime {
       blockDataRef: Ref[F, BlockData],
       invalidBlocksParam: InvalidBlocks[F],
       mergeChs: Ref[F, Set[Par]]
-  ) = new RhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
+  ) =
+    // new RhoRuntimeImpl[F](reducer, space, cost, blockDataRef, invalidBlocksParam, mergeChs)
+    ???
 
   type RhoTuplespace[F[_]]   = TCPAK[F, TuplespacePlusPlus]
   type RhoISpace[F[_]]       = TCPAK[F, ISpacePlusPlus]
@@ -530,37 +566,38 @@ object RhoRuntime {
   def bootstrapRegistry[F[_]: Monad](runtime: RhoRuntime[F]): F[Unit] = {
     implicit val rand: Blake2b512Random = bootstrapRand
     // println("\nhit bootstrapRegistry")
-    for {
-      cost <- runtime.cost.get
-      _    <- runtime.cost.set(Cost.UNSAFE_MAX)
-      // _    = println("\nRegistryBootstrap.AST: " + RegistryBootstrap.AST)
-      _ <- runtime.inj(RegistryBootstrap.AST)
-      _ <- runtime.cost.set(cost)
-    } yield ()
+    // for {
+    //   cost <- runtime.cost.get
+    //   _    <- runtime.cost.set(Cost.UNSAFE_MAX)
+    //   // _    = println("\nRegistryBootstrap.AST: " + RegistryBootstrap.AST)
+    //   _ <- runtime.inj(RegistryBootstrap.AST)
+    //   _ <- runtime.cost.set(cost)
+    // } yield ()
+    ???
   }
 
-  private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
-      rspace: RhoISpace[F],
-      extraSystemProcesses: Seq[Definition[F]],
-      initRegistry: Boolean,
-      mergeableTagName: Par
-  )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
-    Span[F].trace(createPlayRuntime) {
-      for {
-        cost <- CostAccounting.emptyCost[F]
-        // _        = println("\nhit createRuntime")
-        mergeChs <- Ref.of(Set[Par]())
-        rhoEnv <- {
-          implicit val c: _cost[F] = cost
-          createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
-        }
-        (reducer, blockRef, invalidBlocks) = rhoEnv
-        runtime                            = new RhoRuntimeImpl[F](reducer, rspace, cost, blockRef, invalidBlocks, mergeChs)
-        _ <- if (initRegistry) {
-              bootstrapRegistry(runtime) >> runtime.createCheckpoint
-            } else ().pure[F]
-      } yield runtime
-    }
+  // private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
+  //     rspace: RhoISpace[F],
+  //     extraSystemProcesses: Seq[Definition[F]],
+  //     initRegistry: Boolean,
+  //     mergeableTagName: Par
+  // )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
+  //   Span[F].trace(createPlayRuntime) {
+  //     for {
+  //       cost <- CostAccounting.emptyCost[F]
+  //       // _        = println("\nhit createRuntime")
+  //       mergeChs <- Ref.of(Set[Par]())
+  //       rhoEnv <- {
+  //         implicit val c: _cost[F] = cost
+  //         createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
+  //       }
+  //       (reducer, blockRef, invalidBlocks) = rhoEnv
+  //       runtime                            = new RhoRuntimeImpl[F](reducer, rspace, cost, blockRef, invalidBlocks, mergeChs)
+  //       _ <- if (initRegistry) {
+  //             bootstrapRegistry(runtime) >> runtime.createCheckpoint
+  //           } else ().pure[F]
+  //     } yield runtime
+  //   }
 
   /**
     *
@@ -585,7 +622,8 @@ object RhoRuntime {
       initRegistry: Boolean = true,
       extraSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
-    createRuntime[F](rspace, extraSystemProcesses, initRegistry, mergeableTagName)
+    // createRuntime[F](rspace, extraSystemProcesses, initRegistry, mergeableTagName)
+    ???
 
   /**
     *
@@ -602,26 +640,27 @@ object RhoRuntime {
       initRegistry: Boolean = true
   )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[ReplayRhoRuntime[F]] =
     Span[F].trace(createReplayRuntime) {
-      for {
-        cost     <- CostAccounting.emptyCost[F]
-        mergeChs <- Ref.of(Set[Par]())
-        rhoEnv <- {
-          implicit val c: _cost[F] = cost
-          createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
-        }
-        (reducer, blockRef, invalidBlocks) = rhoEnv
-        runtime = new ReplayRhoRuntimeImpl[F](
-          reducer,
-          rspace,
-          cost,
-          blockRef,
-          invalidBlocks,
-          mergeChs
-        )
-        _ <- if (initRegistry) {
-              bootstrapRegistry(runtime) >> runtime.createCheckpoint
-            } else ().pure[F]
-      } yield runtime
+      //   for {
+      //     cost     <- CostAccounting.emptyCost[F]
+      //     mergeChs <- Ref.of(Set[Par]())
+      //     rhoEnv <- {
+      //       implicit val c: _cost[F] = cost
+      //       createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
+      //     }
+      //     (reducer, blockRef, invalidBlocks) = rhoEnv
+      //     runtime = new ReplayRhoRuntimeImpl[F](
+      //       reducer,
+      //       rspace,
+      //       cost,
+      //       blockRef,
+      //       invalidBlocks,
+      //       mergeChs
+      //     )
+      //     _ <- if (initRegistry) {
+      //           bootstrapRegistry(runtime) >> runtime.createCheckpoint
+      //         } else ().pure[F]
+      //   } yield runtime
+      ???
     }
 
   def createRuntimes[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
@@ -631,20 +670,21 @@ object RhoRuntime {
       additionalSystemProcesses: Seq[Definition[F]],
       mergeableTagName: Par
   ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] =
-    for {
-      rhoRuntime <- RhoRuntime.createRhoRuntime[F](
-                     space,
-                     mergeableTagName,
-                     initRegistry,
-                     additionalSystemProcesses
-                   )
-      replayRhoRuntime <- RhoRuntime.createReplayRhoRuntime[F](
-                           replaySpace,
-                           mergeableTagName,
-                           additionalSystemProcesses,
-                           initRegistry
-                         )
-    } yield (rhoRuntime, replayRhoRuntime)
+    // for {
+    //   rhoRuntime <- RhoRuntime.createRhoRuntime[F](
+    //                  space,
+    //                  mergeableTagName,
+    //                  initRegistry,
+    //                  additionalSystemProcesses
+    //                )
+    //   replayRhoRuntime <- RhoRuntime.createReplayRhoRuntime[F](
+    //                        replaySpace,
+    //                        mergeableTagName,
+    //                        additionalSystemProcesses,
+    //                        initRegistry
+    //                      )
+    // } yield (rhoRuntime, replayRhoRuntime)
+    ???
 
   /*
    * Create from KeyValueStore's
@@ -658,21 +698,21 @@ object RhoRuntime {
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
       implicit scheduler: Scheduler
-  ): F[RhoRuntime[F]] = {
-    import coop.rchain.rholang.interpreter.storage._
-    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
-    for {
-      // space <- RSpace
-      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-      //             stores
-      //           )
-      space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
-      runtime <- createRhoRuntime[F](
-                  space,
-                  mergeableTagName,
-                  initRegistry,
-                  additionalSystemProcesses
-                )
-    } yield runtime
-  }
+  ): F[RhoRuntime[F]] =
+    // import coop.rchain.rholang.interpreter.storage._
+    // // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // for {
+    //   // space <- RSpace
+    //   //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+    //   //             stores
+    //   //           )
+    //   space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
+    //   runtime <- createRhoRuntime[F](
+    //               space,
+    //               mergeableTagName,
+    //               initRegistry,
+    //               additionalSystemProcesses
+    //             )
+    // } yield runtime
+    ???
 }

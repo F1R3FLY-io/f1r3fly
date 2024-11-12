@@ -283,7 +283,9 @@ lazy val casper = (project in file("casper"))
       monix,
       fs2Core,
       fs2Io,
-      scalacheck % "slowcooker"
+      scalacheck         % "slowcooker",
+      "net.java.dev.jna" % "jna" % "5.13.0",
+      "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
     javaOptions in Test ++= Seq(
       "-Djna.library.path=../rspace++/target/debug/"
@@ -446,7 +448,14 @@ lazy val node = (project in file("node"))
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
-    dockerBuildOptions := Seq("--builder", "default", "--platform", "linux/amd64,linux/arm64", "-t", "ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"),
+    dockerBuildOptions := Seq(
+      "--builder",
+      "default",
+      "--platform",
+      "linux/amd64,linux/arm64",
+      "-t",
+      "ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"
+    ),
     dockerCommands ++= {
       Seq(
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
@@ -551,7 +560,9 @@ lazy val rholang = (project in file("rholang"))
       lightningj,
       catsLawsTest,
       catsLawsTestkitTest,
-      catsMtlLawsTest
+      catsMtlLawsTest,
+      "net.java.dev.jna" % "jna"          % "5.13.0",
+      "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
     // TODO: investigate if still needed?
     // mainClass in assembly := Some("coop.rchain.rho2rose.Rholang2RosetteCompiler"),
