@@ -62,10 +62,7 @@ pub fn proc_visit_inputs_with_updated_bound_map_chain(
             let updated_bound_map_chain = input.bound_map_chain.put((
                 name.to_string(),
                 vs_type,
-                SourcePosition {
-                    row: 0,
-                    column: 0,
-                },
+                SourcePosition { row: 0, column: 0 },
             ));
             updated_bound_map_chain
         },
