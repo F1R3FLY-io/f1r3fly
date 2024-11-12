@@ -154,6 +154,24 @@ impl Par {
         }
     }
 
+    pub fn single_bundle(&self) -> Option<Bundle> {
+        if self.sends.is_empty()
+            && self.receives.is_empty()
+            && self.news.is_empty()
+            && self.exprs.is_empty()
+            && self.matches.is_empty()
+            && self.unforgeables.is_empty()
+            && self.connectives.is_empty()
+        {
+            match self.bundles.as_slice() {
+                [single] => Some(single.clone()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn append(&self, other: Par) -> Par {
         Par {
             sends: [self.sends.clone(), other.sends].concat(),
