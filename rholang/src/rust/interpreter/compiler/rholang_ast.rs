@@ -490,6 +490,17 @@ pub struct Disjunction {
     pub col_num: usize,
 }
 
+impl Disjunction {
+    pub fn new_disjunction_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
+        Proc::Disjunction(Disjunction {
+            left: Box::new(Proc::new_proc_var(value_left)),
+            right: Box::new(Proc::new_proc_var(value_right)),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Conjunction {
     pub left: Box<Proc>,

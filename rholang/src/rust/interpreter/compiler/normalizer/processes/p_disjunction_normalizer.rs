@@ -74,46 +74,35 @@ pub fn normalize_p_disjunction(
     })
 }
 
-// #[test]
-// fn test_normalize_disjunction() {
-//   let rholang_code = r#"{ "2" \/ Nil}"#;
-//   let tree = parse_rholang_code(rholang_code);
-//   let root_node = tree.root_node();
-//   println!("Tree S-expression: {}", root_node.to_sexp());
-//   println!("Root node kind: {}", root_node.kind());
+//rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+// #[cfg(test)]
+// mod tests {
+//     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+//     use crate::rust::interpreter::compiler::rholang_ast::Disjunction;
+//     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+//     use models::rhoapi::connective::ConnectiveInstance;
+//     use models::rhoapi::{Connective, ConnectiveBody};
+//   use models::rust::utils::new_freevar_par;
+//   use pretty_assertions::assert_eq;
 //
-//   let block_node = root_node.child(0).expect("Expected a block node");
-//   println!("Found block node: {}", block_node.to_sexp());
+//     #[test]
+//     fn p_disjunction_should_delegate_but_not_count_any_free_variables_inside() {
+//         let (inputs, env) = proc_visit_inputs_and_env();
+//         let proc = Disjunction::new_disjunction_with_par_of_var("x", "x");
 //
-//   let disjunction_node = block_node.child_by_field_name("body").expect("Expected a conjunction node");
-//   println!("Found disjunction node: {}", disjunction_node.to_sexp());
+//         let result = normalize_match_proc(&proc, inputs.clone(), &env);
+//         let expected_result = inputs
+//             .par
+//             .with_connectives(vec![Connective {
+//                 connective_instance: Some(ConnectiveInstance::ConnOrBody(ConnectiveBody {
+//                     ps: vec![
+//                         new_freevar_par(0, Vec::new()),
+//                         new_freevar_par(0, Vec::new()),
+//                     ],
+//                 })),
+//             }])
+//             .with_connective_used(true);
 //
-//   let input = ProcVisitInputs {
-//     par: Par::default(),
-//     bound_map_chain: Default::default(),
-//     free_map: Default::default(),
-//   };
-//
-//   match normalize_match(disjunction_node, input, rholang_code.as_bytes()) {
-//     Ok(result) => {
-//       println!("Normalization successful!");
-//
-//       assert_eq!(result.par.connectives.len(), 1);
-//       if let Some(ConnectiveInstance::ConnOrBody(conn_body)) = &result.par.connectives[0].connective_instance {
-//         assert_eq!(conn_body.ps.len(), 2);
-//         if let Some(ExprInstance::GString(value)) = conn_body.ps[0].exprs.get(0).and_then(|e| e.expr_instance.clone()) {
-//           assert_eq!(value, "2");
-//         } else {
-//           panic!("Left operand is not GInt(1)");
-//         }
-//         assert!(conn_body.ps[1].is_empty(), "Right operand is not Nil");
-//       } else {
-//         panic!("Expected ConnOrBody in connectives");
-//       }
+//       assert_eq!(result.clone().unwrap().par, expected_result);
 //     }
-//     Err(e) => {
-//       println!("Normalization failed: {}", e);
-//       panic!("Test failed due to normalization error");
-//     }
-//   }
 // }
