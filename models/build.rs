@@ -24,6 +24,7 @@ fn main() {
                 "scalapb/scalapb.proto",
                 "RhoTypes.proto",
                 "RSpacePlusPlusTypes.proto",
+                "RholangScalaRustTypes.proto",
             ],
             &["src/main/protobuf/", "src/"],
         )

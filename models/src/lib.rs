@@ -8,6 +8,10 @@ pub mod rspace_plus_plus_types {
     include!(concat!(env!("OUT_DIR"), "/rspace_plus_plus_types.rs"));
 }
 
+pub mod rholang_scala_rust_types {
+    include!(concat!(env!("OUT_DIR"), "/rholang_scala_rust_types.rs"));
+}
+
 pub type ByteVector = Vec<u8>;
 pub type ByteBuffer = Vec<u8>;
 pub type Byte = u8;

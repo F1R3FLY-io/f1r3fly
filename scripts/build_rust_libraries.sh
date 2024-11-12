@@ -2,14 +2,18 @@
 
 set -e
 
+mkdir -p ./rust_libraries
+
 cd rspace++/
 cargo build --profile dev -p rspace_plus_plus_rhotypes
+cp -r ./target/debug/librspace_plus_plus_rhotypes.* ../rust_libraries
 
 cd ../models
 cargo build --profile dev -p models
 
 cd ../rholang
 cargo build --profile dev -p rholang
+cp -r ./target/debug/librholang.* ../rust_libraries
 
 cd ../crypto
 cargo build --profile dev -p crypto

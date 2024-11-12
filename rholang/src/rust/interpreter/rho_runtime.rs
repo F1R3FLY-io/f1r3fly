@@ -1056,7 +1056,7 @@ where
     (rho_runtime, replay_rho_runtime)
 }
 
-fn create_runtime_from_kv_store(
+pub fn create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,

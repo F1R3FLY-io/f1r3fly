@@ -288,7 +288,7 @@ lazy val casper = (project in file("casper"))
       "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
     javaOptions in Test ++= Seq(
-      "-Djna.library.path=../rspace++/target/debug/"
+      // "-Djna.library.path=../rspace++/target/debug/"
     )
   )
   .dependsOn(
@@ -372,14 +372,14 @@ lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
-    runCargoBuildDocker := {
-      import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
-      if (exitCode != 0) {
-        throw new Exception("Rust build script failed with exit code " + exitCode)
-      }
-    },
-    (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
+    // runCargoBuildDocker := {
+    //   import scala.sys.process._
+    //   val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
+    //   if (exitCode != 0) {
+    //     throw new Exception("Rust build script failed with exit code " + exitCode)
+    //   }
+    // },
+    // (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
     version := git.gitDescribedVersion.value.getOrElse({
       val v = "0.0.0-unknown"
       System.err.println("Could not get version from `git describe`.")
@@ -571,16 +571,16 @@ lazy val rholang = (project in file("rholang"))
       "-Xss240k",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      "-Djna.library.path=../rspace++/target/debug/"
+      // "-Djna.library.path=../rspace++/target/debug/"
     ),
-    runCargoBuild := {
-      import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rust_libraries.sh").!
-      if (exitCode != 0) {
-        throw new Exception("Rust build script failed with exit code " + exitCode)
-      }
-    },
-    (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+    // runCargoBuild := {
+    //   import scala.sys.process._
+    //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
+    //   if (exitCode != 0) {
+    //     throw new Exception("Rust build script failed with exit code " + exitCode)
+    //   }
+    // },
+    // (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(
     models % "compile->compile;test->test",
@@ -647,14 +647,14 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
     ),
-    runCargoBuild := {
-      import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rust_libraries.sh").!
-      if (exitCode != 0) {
-        throw new Exception("Rust build script failed with exit code " + exitCode)
-      }
-    },
-    (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
+    // runCargoBuild := {
+    //   import scala.sys.process._
+    //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
+    //   if (exitCode != 0) {
+    //     throw new Exception("Rust build script failed with exit code " + exitCode)
+    //   }
+    // },
+    // (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(models, rspace)
 
@@ -712,7 +712,7 @@ lazy val rspaceBench = (project in file("rspace-bench"))
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail),
     compile in Jmh := (compile in Jmh).dependsOn(compile in Test).value,
     run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated,
-    javaOptions in Jmh += "-Djna.library.path=../rspace++/target/debug/"
+    // javaOptions in Jmh += "-Djna.library.path=../rspace++/target/debug/"
   )
   .enablePlugins(JmhPlugin)
   .dependsOn(rspace % "test->test", rholang % "test->test", models % "test->test", rspacePlusPlus)

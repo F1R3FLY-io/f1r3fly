@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package rholang_scala_rust_types;
+
+import "RhoTypes.proto";
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  package_name: "coop.rchain.models.rholang_scala_rust_types"
+  preserve_unknown_fields: false
+};
+
+message CreateRuntimeParams {
+	string storePath = 1;
+	rhoapi.Par mergeableTagName = 2;
+	bool initRegistry = 3;
+}

@@ -39,7 +39,9 @@ import rspacePlusPlus.{
   TuplespacePlusPlus
 }
 
-import com.sun.jna.{Pointer}
+import com.sun.jna.{Memory, Pointer}
+import coop.rchain.rholang.JNAInterfaceLoader.RHOLANG_RUST_INSTANCE
+import coop.rchain.models.rholang_scala_rust_types.CreateRuntimeParams
 
 // trait RhoRuntime[F[_]] extends HasCost[F] {
 trait RhoRuntime[F[_]] {
@@ -576,28 +578,29 @@ object RhoRuntime {
     ???
   }
 
-  // private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
-  //     rspace: RhoISpace[F],
-  //     extraSystemProcesses: Seq[Definition[F]],
-  //     initRegistry: Boolean,
-  //     mergeableTagName: Par
-  // )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
-  //   Span[F].trace(createPlayRuntime) {
-  //     for {
-  //       cost <- CostAccounting.emptyCost[F]
-  //       // _        = println("\nhit createRuntime")
-  //       mergeChs <- Ref.of(Set[Par]())
-  //       rhoEnv <- {
-  //         implicit val c: _cost[F] = cost
-  //         createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
-  //       }
-  //       (reducer, blockRef, invalidBlocks) = rhoEnv
-  //       runtime                            = new RhoRuntimeImpl[F](reducer, rspace, cost, blockRef, invalidBlocks, mergeChs)
-  //       _ <- if (initRegistry) {
-  //             bootstrapRegistry(runtime) >> runtime.createCheckpoint
-  //           } else ().pure[F]
-  //     } yield runtime
-  //   }
+  private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
+      rspace: RhoISpace[F],
+      extraSystemProcesses: Seq[Definition[F]],
+      initRegistry: Boolean,
+      mergeableTagName: Par
+  )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
+    Span[F].trace(createPlayRuntime) {
+      // for {
+      //   cost <- CostAccounting.emptyCost[F]
+      //   // _        = println("\nhit createRuntime")
+      //   mergeChs <- Ref.of(Set[Par]())
+      //   rhoEnv <- {
+      //     implicit val c: _cost[F] = cost
+      //     createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
+      //   }
+      //   (reducer, blockRef, invalidBlocks) = rhoEnv
+      //   runtime                            = new RhoRuntimeImpl[F](reducer, rspace, cost, blockRef, invalidBlocks, mergeChs)
+      //   _ <- if (initRegistry) {
+      //         bootstrapRegistry(runtime) >> runtime.createCheckpoint
+      //       } else ().pure[F]
+      // } yield runtime
+      ???
+    }
 
   /**
     *
@@ -688,8 +691,9 @@ object RhoRuntime {
 
   /*
    * Create from KeyValueStore's
+	 *
+	 * NOTE: NOT passing 'additionalSystemProcesses' parameter to rust side
    */
-
   def createRuntime[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
       // stores: RSpaceStore[F],
       storePath: String,
@@ -700,7 +704,7 @@ object RhoRuntime {
       implicit scheduler: Scheduler
   ): F[RhoRuntime[F]] =
     // import coop.rchain.rholang.interpreter.storage._
-    // // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // // // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     // for {
     //   // space <- RSpace
     //   //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
@@ -714,5 +718,20 @@ object RhoRuntime {
     //               additionalSystemProcesses
     //             )
     // } yield runtime
-    ???
+    Sync[F].delay {
+
+      val runtimeParams = CreateRuntimeParams(
+        storePath,
+        Some(mergeableTagName),
+        initRegistry
+      )
+
+      val runtimeParamsBytes = runtimeParams.toByteArray
+      val paramsPtr          = new Memory(runtimeParamsBytes.length.toLong)
+      paramsPtr.write(0, runtimeParamsBytes, 0, runtimeParamsBytes.length)
+
+      val runtimePtr = RHOLANG_RUST_INSTANCE.create_runtime(paramsPtr, runtimeParamsBytes.length)
+      assert(runtimePtr != null)
+      new RhoRuntimeImpl[F](runtimePtr)
+    }
 }
