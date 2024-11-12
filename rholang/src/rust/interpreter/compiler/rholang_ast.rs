@@ -335,6 +335,15 @@ impl Proc {
             col_num: 0,
         }
     }
+
+    pub fn new_proc_par_with_wildcard_and_var(value_var: &str) -> Proc {
+        Proc::Par {
+            left: Box::new(Self::new_proc_wildcard()),
+            right: Box::new(Self::new_proc_var(value_var)),
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -623,6 +632,43 @@ pub enum SimpleType {
     ByteArray { line_num: usize, col_num: usize },
 }
 
+impl SimpleType {
+    pub fn new_bool() -> Self {
+        SimpleType::Bool {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_int() -> Self {
+        SimpleType::Int {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_string() -> Self {
+        SimpleType::String {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_uri() -> Self {
+        SimpleType::Uri {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bytearray() -> Self {
+        SimpleType::ByteArray {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum SyncSendCont {
     Empty {
@@ -705,6 +751,36 @@ pub enum BundleType {
     BundleRead { line_num: usize, col_num: usize },
     BundleEquiv { line_num: usize, col_num: usize },
     BundleReadWrite { line_num: usize, col_num: usize },
+}
+
+impl BundleType {
+    pub fn new_bundle_write() -> Self {
+        BundleType::BundleWrite {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_read() -> Self {
+        BundleType::BundleRead {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_equiv() -> Self {
+        BundleType::BundleEquiv {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_read_write() -> Self {
+        BundleType::BundleReadWrite {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
