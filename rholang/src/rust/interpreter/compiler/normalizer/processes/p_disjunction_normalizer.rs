@@ -1,4 +1,5 @@
 use crate::rust::interpreter::compiler::exports::SourcePosition;
+use crate::rust::interpreter::compiler::free_map::FreeMap;
 use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
 };
@@ -19,7 +20,7 @@ pub fn normalize_p_disjunction(
         ProcVisitInputs {
             par: Par::default(),
             bound_map_chain: input.bound_map_chain.clone(),
-            free_map: input.free_map.clone(),
+            free_map: FreeMap::default(),
         },
         env,
     )?;
@@ -29,7 +30,7 @@ pub fn normalize_p_disjunction(
         ProcVisitInputs {
             par: Par::default(),
             bound_map_chain: input.bound_map_chain.clone(),
-            free_map: left_result.free_map.clone(),
+            free_map: FreeMap::default(),
         },
         env,
     )?;
@@ -55,12 +56,12 @@ pub fn normalize_p_disjunction(
     };
 
     let result_par = prepend_connective(
-        input.par,
+        input.par.clone(),
         result_connective.clone(),
         input.bound_map_chain.depth() as i32,
     );
 
-    let updated_free_map = right_result.free_map.add_connective(
+    let updated_free_map = input.free_map.add_connective(
         result_connective.connective_instance.unwrap(),
         SourcePosition {
             row: proc.line_num,
@@ -75,34 +76,42 @@ pub fn normalize_p_disjunction(
 }
 
 //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
-// #[cfg(test)]
-// mod tests {
-//     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-//     use crate::rust::interpreter::compiler::rholang_ast::Disjunction;
-//     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-//     use models::rhoapi::connective::ConnectiveInstance;
-//     use models::rhoapi::{Connective, ConnectiveBody};
-//   use models::rust::utils::new_freevar_par;
-//   use pretty_assertions::assert_eq;
-//
-//     #[test]
-//     fn p_disjunction_should_delegate_but_not_count_any_free_variables_inside() {
-//         let (inputs, env) = proc_visit_inputs_and_env();
-//         let proc = Disjunction::new_disjunction_with_par_of_var("x", "x");
-//
-//         let result = normalize_match_proc(&proc, inputs.clone(), &env);
-//         let expected_result = inputs
-//             .par
-//             .with_connectives(vec![Connective {
-//                 connective_instance: Some(ConnectiveInstance::ConnOrBody(ConnectiveBody {
-//                     ps: vec![
-//                         new_freevar_par(0, Vec::new()),
-//                         new_freevar_par(0, Vec::new()),
-//                     ],
-//                 })),
-//             }])
-//             .with_connective_used(true);
-//
-//       assert_eq!(result.clone().unwrap().par, expected_result);
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+    use crate::rust::interpreter::compiler::rholang_ast::Disjunction;
+    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+    use models::rhoapi::connective::ConnectiveInstance;
+    use models::rhoapi::{Connective, ConnectiveBody};
+    use models::rust::utils::new_freevar_par;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn p_disjunction_should_delegate_but_not_count_any_free_variables_inside() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Disjunction::new_disjunction_with_par_of_var("x", "x");
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = inputs
+            .par
+            .with_connectives(vec![Connective {
+                connective_instance: Some(ConnectiveInstance::ConnOrBody(ConnectiveBody {
+                    ps: vec![
+                        new_freevar_par(0, Vec::new()),
+                        new_freevar_par(0, Vec::new()),
+                    ],
+                })),
+            }])
+            .with_connective_used(true);
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.clone().unwrap().free_map.level_bindings,
+            inputs.free_map.level_bindings
+        );
+        assert_eq!(
+            result.clone().unwrap().free_map.next_level,
+            inputs.free_map.next_level
+        );
+    }
+}
