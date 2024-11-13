@@ -15,6 +15,7 @@ pub fn normalize_p_bundle(
     column_num: usize,
     env: &HashMap<String, Par>,
 ) -> Result<ProcVisitOutputs, InterpreterError> {
+    println!("normalize_p_bundle called with bundle_type: {:?}, block: {:?}, input: {:?}, line_num: {:?}, column_num: {:?}, env: {:?}", bundle_type, block, input, line_num, column_num, env);
     fn error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, InterpreterError> {
         let err_msg = {
             let at = |variable: &str, source_position: &SourcePosition| {
@@ -72,6 +73,7 @@ pub fn normalize_p_bundle(
         },
         env,
     )?;
+    println!("\ntarget_result: {:?}", target_result);
 
     let outermost_bundle = match bundle_type {
         BundleType::BundleReadWrite { .. } => Bundle {
@@ -126,7 +128,6 @@ pub fn normalize_p_bundle(
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, VarSort};
-    use crate::rust::interpreter::compiler::rholang_ast::BundleType::BundleReadWrite;
     use crate::rust::interpreter::compiler::rholang_ast::{
         Block, BundleType, Name, Proc, ProcList, SendType, SimpleType,
     };
@@ -149,9 +150,9 @@ mod tests {
         };
         let bound_inputs =
             proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
-
+        println!("\nbound_inputs: {:?}", bound_inputs);
         let result = normalize_match_proc(&proc, inputs.clone(), &env);
-
+        println!("\nresult: {:?}", result);
         let expected_result = inputs
             .par
             .with_bundles(vec![Bundle {
@@ -161,118 +162,114 @@ mod tests {
             }])
             .with_locally_free(create_bit_vector(&vec![0]));
 
-        //     //TODO fix assertions
-        //     assert_eq!(result.clone().unwrap().par, expected_result);
-        //     assert_eq!(result.clone().unwrap().free_map, bound_inputs.free_map);
-        // }
+        //TODO fix assertions
+        // assert_eq!(result.clone().unwrap().par, expected_result);
+        // assert_eq!(result.clone().unwrap().free_map, bound_inputs.free_map);
+    }
 
-        /** Example:
-         * bundle { _ | x }
-         */
-        #[test]
-        fn pbundle_should_throw_an_error_when_wildcard_or_free_variable_is_found_inside_body_of_bundle(
-        ) {
-            let (inputs, env) = proc_visit_inputs_and_env();
-            let proc = Proc::Bundle {
-                bundle_type: BundleType::new_bundle_read_write(),
-                proc: Box::new(Block::new(Proc::new_proc_par_with_wildcard_and_var("x"))),
+    /** Example:
+     * bundle { _ | x }
+     */
+    #[test]
+    fn pbundle_should_throw_an_error_when_wildcard_or_free_variable_is_found_inside_body_of_bundle()
+    {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::new_bundle_read_write(),
+            proc: Box::new(Block::new(Proc::new_proc_par_with_wildcard_and_var("x"))),
+            line_num: 0,
+            col_num: 0,
+        };
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        assert!(matches!(
+            result,
+            Err(InterpreterError::UnexpectedBundleContent { .. })
+        ));
+    }
+
+    /** Example:
+     * bundle { Uri }
+     */
+    #[test]
+    fn pbundle_should_throw_an_error_when_connective_is_used_at_top_level_of_body_of_bundle() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::new_bundle_read_write(),
+            proc: Box::new(Block::new(Proc::SimpleType(SimpleType::new_uri()))),
+            line_num: 0,
+            col_num: 0,
+        };
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        assert!(matches!(
+            result,
+            Err(InterpreterError::UnexpectedBundleContent { .. })
+        ));
+    }
+
+    /** Example:
+     * bundle { @Nil!(Uri) }
+     */
+    #[test]
+    fn pbundle_should_not_throw_an_error_when_connective_is_used_outside_of_top_level_of_body_of_bundle(
+    ) {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::new_bundle_read_write(),
+            proc: Box::new(Block::new(Proc::Send {
+                name: Name::new_name_quote_nil(),
+                send_type: SendType::new_single(),
+                inputs: ProcList::new(vec![Proc::SimpleType(SimpleType::new_uri())]),
                 line_num: 0,
                 col_num: 0,
-            };
-            let result = normalize_match_proc(&proc, inputs.clone(), &env);
-            assert!(matches!(
-                result,
-                Err(InterpreterError::UnexpectedBundleContent { .. })
-            ));
-        }
+            })),
+            line_num: 0,
+            col_num: 0,
+        };
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
 
-        /** Example:
-         * bundle { Uri }
-         */
-        #[test]
-        fn pbundle_should_throw_an_error_when_connective_is_used_at_top_level_of_body_of_bundle() {
-            let (inputs, env) = proc_visit_inputs_and_env();
-            let proc = Proc::Bundle {
-                bundle_type: BundleType::new_bundle_read_write(),
-                proc: Box::new(Block::new(Proc::SimpleType(SimpleType::new_uri()))),
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn pbundle_should_interpret_bundle_polarization() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        //TODO should be implemented
+    }
+
+    #[test]
+    fn pbundle_should_collapse_nested_bundles_merging_their_polarizations() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::new_bundle_read_write(),
+            proc: Box::new(Block::new(Proc::Bundle {
+                bundle_type: BundleType::new_bundle_read(),
+                proc: Box::new(Block::new(Proc::new_proc_var("x"))),
                 line_num: 0,
                 col_num: 0,
-            };
-            let result = normalize_match_proc(&proc, inputs.clone(), &env);
+            })),
+            line_num: 0,
+            col_num: 0,
+        };
 
-            assert!(matches!(
-                result,
-                Err(InterpreterError::UnexpectedBundleContent { .. })
-            ));
-        }
+        let bound_inputs =
+            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
 
-        /** Example:
-         * bundle { @Nil!(Uri) }
-         */
-        #[test]
-        fn pbundle_should_not_throw_an_error_when_connective_is_used_outside_of_top_level_of_body_of_bundle(
-        ) {
-            let (inputs, env) = proc_visit_inputs_and_env();
+        let expected_result = inputs
+            .par
+            .with_bundles(vec![Bundle {
+                body: Some(new_boundvar_par(0, Vec::new(), false)),
+                write_flag: false,
+                read_flag: true,
+            }])
+            .with_locally_free(create_bit_vector(&vec![0]));
 
-            let proc = Proc::Bundle {
-                bundle_type: BundleType::new_bundle_read_write(),
-                proc: Box::new(Block::new(Proc::Send {
-                    name: Name::new_name_quote_nil(),
-                    send_type: SendType::new_single(),
-                    inputs: ProcList::new(vec![Proc::SimpleType(SimpleType::new_uri())]),
-                    line_num: 0,
-                    col_num: 0,
-                })),
-                line_num: 0,
-                col_num: 0,
-            };
-            let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
 
-            assert!(result.is_ok());
-        }
-
-        #[test]
-        fn pbundle_should_interpret_bundle_polarization() {
-            let (inputs, env) = proc_visit_inputs_and_env();
-            //TODO should be implemented
-        }
-
-        #[test]
-        fn pbundle_should_collapse_nested_bundles_merging_their_polarizations() {
-            let (inputs, env) = proc_visit_inputs_and_env();
-
-            let proc = Proc::Bundle {
-                bundle_type: BundleType::new_bundle_read_write(),
-                proc: Box::new(Block::new(Proc::Bundle {
-                    bundle_type: BundleType::new_bundle_read(),
-                    proc: Box::new(Block::new(Proc::new_proc_var("x"))),
-                    line_num: 0,
-                    col_num: 0,
-                })),
-                line_num: 0,
-                col_num: 0,
-            };
-
-            let bound_inputs = proc_visit_inputs_with_updated_bound_map_chain(
-                inputs.clone(),
-                "x",
-                VarSort::ProcSort,
-            );
-
-            let expected_result = inputs
-                .par
-                .with_bundles(vec![Bundle {
-                    body: Some(new_boundvar_par(0, Vec::new(), false)),
-                    write_flag: false,
-                    read_flag: true,
-                }])
-                .with_locally_free(create_bit_vector(&vec![0]));
-
-            let result = normalize_match_proc(&proc, inputs.clone(), &env);
-
-            //TODO fix assertions
-            //assert_eq!(result.clone().unwrap().par, expected_result);
-            //assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
-        }
+        //TODO fix assertions
+        // assert_eq!(result.clone().unwrap().par, expected_result);
+        // assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
     }
 }
