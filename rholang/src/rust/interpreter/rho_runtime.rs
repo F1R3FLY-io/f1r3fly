@@ -903,7 +903,7 @@ fn bootstrap_rand() -> Blake2b512Random {
          .as_bytes())
 }
 
-fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
+pub fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     let rand = bootstrap_rand();
     let runtime_lock = runtime.lock().unwrap();
     let cost = runtime_lock.cost().get();

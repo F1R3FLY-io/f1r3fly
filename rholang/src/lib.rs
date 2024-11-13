@@ -13,7 +13,10 @@ use models::{
 use prost::Message;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rust::interpreter::{
-    rho_runtime::{create_rho_runtime, RhoRuntime as RhoRuntimeTrait, RhoRuntimeImpl},
+    rho_runtime::{
+        bootstrap_registry as bootstrap_registry_internal, create_rho_runtime,
+        RhoRuntime as RhoRuntimeTrait, RhoRuntimeImpl,
+    },
     system_processes::BlockData,
 };
 
@@ -49,6 +52,12 @@ extern "C" fn set_block_data(
             .unwrap()
             .set_block_data(block_data);
     }
+}
+
+#[no_mangle]
+extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
+    let runtime = unsafe { (*runtime_ptr).runtime.clone() };
+    bootstrap_registry_internal(runtime);
 }
 
 // Note: I am defaulting 'additional_system_processes' to 'Vec::new()'

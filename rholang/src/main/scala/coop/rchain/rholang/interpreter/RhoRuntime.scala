@@ -153,7 +153,10 @@ trait RhoRuntime[F[_]] {
   def getHotChanges: F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]]
 
   /* Additional methods for Rholang Rust Integration */
+
   def setCostToMax: F[Unit]
+
+  def getRuntimePtr: Pointer
 }
 
 trait ReplayRhoRuntime[F[_]] extends RhoRuntime[F] {
@@ -268,6 +271,8 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     ???
 
   override def setCostToMax: F[Unit] = ???
+
+  override def getRuntimePtr: Pointer = runtimePtr
 }
 
 class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
@@ -570,8 +575,8 @@ object RhoRuntime {
       .getBytes()
   )
 
-  def bootstrapRegistry[F[_]: Monad](runtime: RhoRuntime[F]): F[Unit] = {
-    implicit val rand: Blake2b512Random = bootstrapRand
+  def bootstrapRegistry[F[_]: Sync](runtime: RhoRuntime[F]): F[Unit] =
+    // implicit val rand: Blake2b512Random = bootstrapRand
     // println("\nhit bootstrapRegistry")
     // for {
     //   cost <- runtime.cost.get
@@ -580,8 +585,9 @@ object RhoRuntime {
     //   _ <- runtime.inj(RegistryBootstrap.AST)
     //   _ <- runtime.cost.set(cost)
     // } yield ()
-    ???
-  }
+    Sync[F].delay {
+      RHOLANG_RUST_INSTANCE.bootstrap_registry(runtime.getRuntimePtr)
+    }
 
   private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
       rspace: RhoISpace[F],
