@@ -43,6 +43,11 @@ import com.sun.jna.{Memory, Pointer}
 import coop.rchain.rholang.JNAInterfaceLoader.RHOLANG_RUST_INSTANCE
 import coop.rchain.models.rholang_scala_rust_types.{BlockDataProto, CreateRuntimeParams}
 import com.google.protobuf.ByteString
+import coop.rchain.models.rholang_scala_rust_types.EvaluateParams
+import coop.rchain.models.rholang_scala_rust_types.CostProto
+import coop.rchain.models.rholang_scala_rust_types.EvaluateResultProto
+import coop.rchain.rholang.interpreter.errors.BugFoundError
+import coop.rchain.rholang.interpreter.errors.RustError
 
 // trait RhoRuntime[F[_]] extends HasCost[F] {
 trait RhoRuntime[F[_]] {
@@ -202,7 +207,45 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     //   initialPhlo,
     //   normalizerEnv
     // )
-    ???
+    Sync[F].delay {
+      val evalParams = EvaluateParams(
+        term,
+        Some(CostProto(initialPhlo.value.toInt, initialPhlo.operation)),
+        normalizerEnv,
+        Blake2b512Random.typeMapper.toBase(rand)
+      )
+
+      val paramsBytes = evalParams.toByteArray
+      val paramsPtr   = new Memory(paramsBytes.length.toLong)
+      paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
+
+      val evalResultPtr = RHOLANG_RUST_INSTANCE.evaluate(runtimePtr, paramsPtr, paramsBytes.length)
+      assert(evalResultPtr != null)
+
+      try {
+        val resultByteslength = evalResultPtr.getInt(0)
+        val resultBytes       = evalResultPtr.getByteArray(4, resultByteslength)
+        val evalResultProto   = EvaluateResultProto.parseFrom(resultBytes)
+
+        EvaluateResult(
+          Cost(evalResultProto.getCost.value.toLong, evalResultProto.getCost.operation),
+          evalResultProto.errors
+            .map(
+              err =>
+                RustError(
+                  err
+                )
+            )
+            .toVector,
+          evalResultProto.mergeable.toSet
+        )
+
+      } catch {
+        case e: Throwable =>
+          println("Error parsing EvaluateResultProto: " + e)
+          throw e
+      }
+    }
 
   override def reset(root: Blake2b256Hash): F[Unit] =
     space.reset(root)
@@ -289,12 +332,10 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
 ) extends RhoRuntimeImpl[F](space, runtimePtr)
     with ReplayRhoRuntime[F] {
   override def checkReplayData: F[Unit] =
-    // space.checkReplayData()
-    ???
+    space.checkReplayData()
 
   override def rig(log: trace.Log): F[Unit] =
-    // space.rig(log)
-    ???
+    space.rig(log)
 }
 
 object ReplayRhoRuntime {

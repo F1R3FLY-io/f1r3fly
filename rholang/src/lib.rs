@@ -5,7 +5,7 @@ pub mod rust {
 
 use std::sync::{Arc, Mutex};
 
-use crypto::rust::public_key::PublicKey;
+use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
 use models::{
     rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation},
     rholang_scala_rust_types::*,
@@ -13,6 +13,7 @@ use models::{
 use prost::Message;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rust::interpreter::{
+    accounting::costs::Cost,
     rho_runtime::{
         bootstrap_registry as bootstrap_registry_internal, create_rho_runtime,
         RhoRuntime as RhoRuntimeTrait, RhoRuntimeImpl,
@@ -28,6 +29,53 @@ struct RhoRuntime {
 #[repr(C)]
 struct Space {
     rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
+}
+
+#[no_mangle]
+extern "C" fn evaluate(
+    runtime_ptr: *mut RhoRuntime,
+    params_ptr: *const u8,
+    params_bytes_len: usize,
+) -> *const u8 {
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let params = EvaluateParams::decode(params_slice).unwrap();
+
+    let term = params.term;
+    let cost_proto = params.initial_phlo.unwrap();
+    let initial_phlo = Cost::create(cost_proto.value.into(), cost_proto.operation);
+    let normalizer_env = params.normalizer_env;
+    let rand = Blake2b512Random::new(&params.rand);
+
+    let mut runtime = unsafe { (*runtime_ptr).runtime.lock().unwrap() };
+
+    let eval_result = runtime
+        .evaluate(
+            term,
+            initial_phlo,
+            normalizer_env.into_iter().collect(),
+            rand,
+        )
+        .unwrap();
+
+    let eval_result_proto = EvaluateResultProto {
+        cost: Some(CostProto {
+            value: eval_result.cost.value as i32,
+            operation: eval_result.cost.operation,
+        }),
+        errors: eval_result
+            .errors
+            .into_iter()
+            .map(|err| err.to_string())
+            .collect(),
+        mergeable: eval_result.mergeable.into_iter().collect(),
+    };
+
+    let mut bytes = eval_result_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]

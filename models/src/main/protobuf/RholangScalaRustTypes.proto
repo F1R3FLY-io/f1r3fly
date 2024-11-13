@@ -15,10 +15,29 @@ message CreateRuntimeParams {
 	bool initRegistry = 2;
 }
 
-// 'timeStamp' and 'blockNumber' should be type 'int64', but for some reason this causes an error with 'HashM'
+// 'timeStamp' and 'blockNumber' should be type 'int64' but, for some reason this causes an error with 'HashM'
 message BlockDataProto {
 	int32 timeStamp = 1;
 	int32 blockNumber = 2;
 	bytes publicKey = 3;
 	int32 seqNum = 4;
+}
+
+message EvaluateParams {
+	string term = 1;
+	CostProto initialPhlo = 2;
+	map<string, rhoapi.Par> normalizerEnv = 3;
+	bytes rand = 4;
+}
+
+// Again, 'value' should be type 'int64' but, this causes an error with 'HashM'
+message CostProto {
+	int32 value = 1;
+	string operation = 2;
+}
+
+message EvaluateResultProto {
+	CostProto cost = 1;
+	repeated string errors = 2;
+	repeated rhoapi.Par mergeable = 3;
 }

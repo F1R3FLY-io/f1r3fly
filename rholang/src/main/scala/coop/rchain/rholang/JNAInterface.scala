@@ -6,6 +6,8 @@ import com.sun.jna.{Library, Memory, Native, Pointer}
   * The JNA interface for Rholang Rust
   */
 trait JNAInterface extends Library {
+  def evaluate(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
+
   def set_block_data(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Unit
 
   def bootstrap_registry(runtime_ptr: Pointer): Pointer

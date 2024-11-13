@@ -14,6 +14,7 @@ object errors {
     }
   }
 
+  final case class RustError(message: String)       extends InterpreterError(message)
   final case class BugFoundError(message: String)   extends InterpreterError(message)
   final case class NormalizerError(message: String) extends InterpreterError(message)
   final case class SyntaxError(message: String)     extends InterpreterError(message)
