@@ -899,6 +899,7 @@ where
 
 // This is from Nassim Taleb's "Skin in the Game"
 fn bootstrap_rand() -> Blake2b512Random {
+    // println!("\nhit bootstrap_rand");
     Blake2b512Random::new("Decentralization is based on the simple notion that it is easier to macrobull***t than microbull***t. \
          Decentralization reduces large structural asymmetries."
          .as_bytes())
@@ -1056,7 +1057,7 @@ where
     (rho_runtime, replay_rho_runtime)
 }
 
-pub fn create_runtime_from_kv_store(
+fn create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,

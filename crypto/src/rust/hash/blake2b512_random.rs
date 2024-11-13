@@ -47,7 +47,7 @@ impl Blake2b512Random {
             if offset + length != partial_base {
                 let mut padded = vec![0; 128];
                 let remainder_length = (offset + length) - partial_base;
-                padded.copy_from_slice(&init[partial_base..(partial_base + remainder_length)]);
+                padded[..remainder_length].copy_from_slice(&init[partial_base..(partial_base + remainder_length)]);
                 result.digest.update(&padded, 0);
             }
         } else {
@@ -69,6 +69,7 @@ impl Blake2b512Random {
     }
 
     pub fn split_short(&self, index: u16) -> Blake2b512Random {
+        // println!("\nhit split_short");
         let mut split = self.clone();
         let packed = index.to_le_bytes();
         split.add_byte(packed[0]);
@@ -77,6 +78,7 @@ impl Blake2b512Random {
     }
 
     pub fn split_byte(&self, index: u8) -> Blake2b512Random {
+        // println!("\nhit split_byte");
         let mut split = self.clone();
         split.add_byte(index);
         split

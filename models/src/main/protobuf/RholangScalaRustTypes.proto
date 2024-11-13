@@ -11,7 +11,6 @@ option (scalapb.options) = {
 };
 
 message CreateRuntimeParams {
-	string storePath = 1;
-	rhoapi.Par mergeableTagName = 2;
-	bool initRegistry = 3;
+	rhoapi.Par mergeableTagName = 1;
+	bool initRegistry = 2;
 }

@@ -3,6 +3,7 @@ package rspacePlusPlus
 import coop.rchain.rspace.hashing.Blake2b256Hash
 import coop.rchain.rspace.{Checkpoint, SoftCheckpoint}
 import coop.rchain.rspace.internal.{Datum, Row, WaitingContinuation}
+import com.sun.jna.{Pointer}
 
 // See rspace/src/main/scala/coop/rchain/rspace/ISpace.scala
 /** The interface for RSpace
@@ -50,4 +51,6 @@ trait ISpacePlusPlus[F[_], C, P, A, K] extends TuplespacePlusPlus[F, C, P, A, K]
     Reverts the ISpace to the state checkpointed using {@link #createSoftCheckpoint()}
     */
   def revertToSoftCheckpoint(checkpoint: SoftCheckpoint[C, P, A, K]): F[Unit]
+
+  def getRspacePointer: Pointer
 }

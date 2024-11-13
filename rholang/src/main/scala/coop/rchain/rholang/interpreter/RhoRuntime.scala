@@ -579,11 +579,13 @@ object RhoRuntime {
   }
 
   private def createRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
-      rspace: RhoISpace[F],
+      // rspace: RhoISpace[F],
+      rspacePtr: Pointer,
       extraSystemProcesses: Seq[Definition[F]],
       initRegistry: Boolean,
       mergeableTagName: Par
-  )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
+      // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
+  )(): F[RhoRuntime[F]] =
     Span[F].trace(createPlayRuntime) {
       // for {
       //   cost <- CostAccounting.emptyCost[F]
@@ -599,7 +601,22 @@ object RhoRuntime {
       //         bootstrapRegistry(runtime) >> runtime.createCheckpoint
       //       } else ().pure[F]
       // } yield runtime
-      ???
+
+      Sync[F].delay {
+        val runtimeParams = CreateRuntimeParams(
+          Some(mergeableTagName),
+          initRegistry
+        )
+
+        val runtimeParamsBytes = runtimeParams.toByteArray
+        val paramsPtr          = new Memory(runtimeParamsBytes.length.toLong)
+        paramsPtr.write(0, runtimeParamsBytes, 0, runtimeParamsBytes.length)
+
+        val runtimePtr =
+          RHOLANG_RUST_INSTANCE.create_runtime(rspacePtr, paramsPtr, runtimeParamsBytes.length)
+        assert(runtimePtr != null)
+        new RhoRuntimeImpl[F](runtimePtr)
+      }
     }
 
   /**
@@ -620,13 +637,15 @@ object RhoRuntime {
     * @return
     */
   def createRhoRuntime[F[_]: Concurrent: Log: Metrics: Span: Parallel](
-      rspace: RhoISpace[F],
+      // rspace: RhoISpace[F],
+      rspacePtr: Pointer,
       mergeableTagName: Par,
       initRegistry: Boolean = true,
       extraSystemProcesses: Seq[Definition[F]] = Seq.empty
-  )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[RhoRuntime[F]] =
+      // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
+  )(): F[RhoRuntime[F]] =
     // createRuntime[F](rspace, extraSystemProcesses, initRegistry, mergeableTagName)
-    ???
+    createRuntime[F](rspacePtr, extraSystemProcesses, initRegistry, mergeableTagName)
 
   /**
     *
@@ -641,7 +660,8 @@ object RhoRuntime {
       mergeableTagName: Par,
       extraSystemProcesses: Seq[Definition[F]] = Seq.empty,
       initRegistry: Boolean = true
-  )(implicit costLog: FunctorTell[F, Chain[Cost]]): F[ReplayRhoRuntime[F]] =
+      // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
+  )(): F[ReplayRhoRuntime[F]] =
     Span[F].trace(createReplayRuntime) {
       //   for {
       //     cost     <- CostAccounting.emptyCost[F]
@@ -702,36 +722,22 @@ object RhoRuntime {
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   )(
       implicit scheduler: Scheduler
-  ): F[RhoRuntime[F]] =
-    // import coop.rchain.rholang.interpreter.storage._
-    // // // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
-    // for {
-    //   // space <- RSpace
-    //   //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-    //   //             stores
-    //   //           )
-    //   space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
-    //   runtime <- createRhoRuntime[F](
-    //               space,
-    //               mergeableTagName,
-    //               initRegistry,
-    //               additionalSystemProcesses
-    //             )
-    // } yield runtime
-    Sync[F].delay {
-
-      val runtimeParams = CreateRuntimeParams(
-        storePath,
-        Some(mergeableTagName),
-        initRegistry
-      )
-
-      val runtimeParamsBytes = runtimeParams.toByteArray
-      val paramsPtr          = new Memory(runtimeParamsBytes.length.toLong)
-      paramsPtr.write(0, runtimeParamsBytes, 0, runtimeParamsBytes.length)
-
-      val runtimePtr = RHOLANG_RUST_INSTANCE.create_runtime(paramsPtr, runtimeParamsBytes.length)
-      assert(runtimePtr != null)
-      new RhoRuntimeImpl[F](runtimePtr)
-    }
+  ): F[RhoRuntime[F]] = {
+    import coop.rchain.rholang.interpreter.storage._
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    for {
+      // space <- RSpace
+      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //             stores
+      //           )
+      space    <- RSpacePlusPlus_RhoTypes.create[F](storePath)
+      spacePtr = space.getRspacePointer
+      runtime <- createRhoRuntime[F](
+                  spacePtr,
+                  mergeableTagName,
+                  initRegistry,
+                  additionalSystemProcesses
+                )
+    } yield runtime
+  }
 }

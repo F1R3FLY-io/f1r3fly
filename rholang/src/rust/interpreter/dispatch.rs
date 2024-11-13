@@ -37,6 +37,7 @@ impl RholangAndScalaDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
+        // println!("\nhit dispatch");
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {

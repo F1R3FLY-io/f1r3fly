@@ -373,6 +373,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                  new RSpacePlusPlus_RhoTypes[F](rspace)
                }
     } yield result
+
+  def getRspacePointer: Pointer =
+    rspacePointer
 }
 
 object RSpacePlusPlus_RhoTypes {

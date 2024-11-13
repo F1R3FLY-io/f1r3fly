@@ -94,7 +94,8 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
       newSpace <- space
                    .asInstanceOf[RSpacePlusPlus_RhoTypes[F]]
                    .spawn
-      runtime <- RhoRuntime.createRhoRuntime(newSpace, mergeableTagName)
+      newSpacePtr = newSpace.getRspacePointer
+      runtime     <- RhoRuntime.createRhoRuntime(newSpacePtr, mergeableTagName)
     } yield runtime
 
   def spawnReplayRuntime: F[ReplayRhoRuntime[F]] =
