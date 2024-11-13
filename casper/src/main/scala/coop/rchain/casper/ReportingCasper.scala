@@ -173,7 +173,7 @@ object ReportingCasper {
 
 class ReportingRuntime[F[_]: Sync: Span](
     // override val reducer: Reduce[F],
-    // override val space: RhoReportingRspace[F],
+    override val space: RhoReportingRspace[F],
     // override val cost: _cost[F],
     // override val blockDataRef: Ref[F, BlockData],
     // override val invalidBlocksParam: InvalidBlocks[F],
@@ -182,7 +182,7 @@ class ReportingRuntime[F[_]: Sync: Span](
     replayRuntimePtr: Pointer
 ) extends ReplayRhoRuntimeImpl[F](
       // reducer,
-      // space,
+      space,
       // cost,
       // blockDataRef,
       // invalidBlocksParam,
@@ -191,8 +191,7 @@ class ReportingRuntime[F[_]: Sync: Span](
       replayRuntimePtr
     ) {
   def getReport: F[Seq[Seq[ReportingEvent]]] =
-    // space.getReport
-    ???
+    space.getReport
 }
 
 object ReportingRuntime {

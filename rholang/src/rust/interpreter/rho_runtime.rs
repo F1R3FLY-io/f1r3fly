@@ -365,10 +365,9 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 }
 
-// TODO: Where is this implementation for the scala code?
 impl HasCost for RhoRuntimeImpl {
     fn cost(&self) -> &_cost {
-        todo!()
+        &self.cost
     }
 }
 
@@ -530,10 +529,9 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     }
 }
 
-// TODO: Where is this implementation for the scala code?
 impl HasCost for ReplayRhoRuntimeImpl {
     fn cost(&self) -> &_cost {
-        todo!()
+        &self.cost
     }
 }
 

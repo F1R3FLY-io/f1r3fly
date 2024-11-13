@@ -252,10 +252,10 @@ impl Definition {
 }
 
 pub struct BlockData {
-    time_stamp: i64,
-    block_number: i64,
-    sender: PublicKey,
-    seq_num: i32,
+    pub time_stamp: i64,
+    pub block_number: i64,
+    pub sender: PublicKey,
+    pub seq_num: i32,
 }
 
 impl BlockData {
