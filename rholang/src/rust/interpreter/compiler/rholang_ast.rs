@@ -548,6 +548,14 @@ impl Negation {
             col_num: 0,
         })
     }
+
+    pub fn new_negation_int(value: i64) -> Proc {
+        Proc::Negation(Negation {
+            proc: Box::new(Proc::new_proc_int(value)),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
