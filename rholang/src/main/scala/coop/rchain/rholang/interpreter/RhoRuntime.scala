@@ -208,6 +208,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     //   normalizerEnv
     // )
     Sync[F].delay {
+      // println("\nrand in evaluate: " + rand)
       val evalParams = EvaluateParams(
         term,
         Some(CostProto(initialPhlo.value.toInt, initialPhlo.operation)),
@@ -358,6 +359,16 @@ object RhoRuntime {
 
   val jnaLibraryPath = System.getProperty("jna.library.path")
   println(s"Current jna.library.path: $jnaLibraryPath")
+
+  val maxHeapSize         = Runtime.getRuntime.maxMemory() / (1024 * 1024)
+  val initialHeapSize     = Runtime.getRuntime.totalMemory() / (1024 * 1024)
+  val freeMemory          = Runtime.getRuntime.freeMemory() / (1024 * 1024)
+  val availableProcessors = Runtime.getRuntime.availableProcessors()
+
+  println(s"Max Heap Size: ${maxHeapSize}MB")
+  println(s"Initial Heap Size: ${initialHeapSize}MB")
+  println(s"Free Memory: ${freeMemory}MB")
+  println(s"Available Processors: ${availableProcessors}")
 
   implicit val RuntimeMetricsSource: Source = Metrics.Source(RholangMetricsSource, "runtime")
   private[this] val createReplayRuntime     = Metrics.Source(RuntimeMetricsSource, "create-replay")

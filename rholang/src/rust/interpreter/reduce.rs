@@ -94,6 +94,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        // println!("\nhit eval");
         let terms: Vec<GeneratedMessage> = vec![
             par.sends
                 .into_iter()
@@ -3095,6 +3096,8 @@ impl DebruijnInterpreter {
                 "Error: parallel or non expression found where expression expected.",
             )))
         } else {
+            // println!("\np: {:?}", p);
+            // println!("\np.exprs: {:?}", p.exprs);
             match p.exprs.as_slice() {
                 [Expr {
                     expr_instance: Some(ExprInstance::GInt(v)),

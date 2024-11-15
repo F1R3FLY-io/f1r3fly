@@ -37,6 +37,8 @@ extern "C" fn evaluate(
     params_ptr: *const u8,
     params_bytes_len: usize,
 ) -> *const u8 {
+    // println!("\nhit rust lib evaluate");
+
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
     let params = EvaluateParams::decode(params_slice).unwrap();
 
@@ -45,17 +47,23 @@ extern "C" fn evaluate(
     let initial_phlo = Cost::create(cost_proto.value.into(), cost_proto.operation);
     let normalizer_env = params.normalizer_env;
     let rand = Blake2b512Random::new(&params.rand);
+    // println!("\nrand in rust lib: {:?}", rand.to_vec());
 
-    let mut runtime = unsafe { (*runtime_ptr).runtime.lock().unwrap() };
+    let mut rho_runtime = unsafe { (*runtime_ptr).runtime.lock().unwrap() };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let eval_result = rt.block_on(async {
+        rho_runtime
+            .evaluate(
+                term,
+                initial_phlo,
+                normalizer_env.into_iter().collect(),
+                rand,
+            )
+            .await
+            .unwrap()
+    });
 
-    let eval_result = runtime
-        .evaluate(
-            term,
-            initial_phlo,
-            normalizer_env.into_iter().collect(),
-            rand,
-        )
-        .unwrap();
+    // println!("\neval_result: {:?}", eval_result);
 
     let eval_result_proto = EvaluateResultProto {
         cost: Some(CostProto {

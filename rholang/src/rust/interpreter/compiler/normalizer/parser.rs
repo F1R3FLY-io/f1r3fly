@@ -20,6 +20,7 @@ pub fn parse_rholang_code(code: &str) -> Tree {
 }
 
 pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> {
+    // println!("\nhit parse_rholang_code_to_proc");
     let mut parser = Parser::new();
     parser
         .set_language(&tree_sitter_rholang::LANGUAGE.into())
@@ -665,13 +666,29 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "neg" => {
             let proc_node = get_child_by_field_name(node, "proc")?;
-            let proc = parse_proc(&proc_node, source)?;
+            if proc_node.is_named() {
+                let proc = parse_proc(&proc_node, source)?;
 
-            Ok(Proc::Neg {
-                proc: Box::new(proc),
-                line_num,
-                col_num,
-            })
+                Ok(Proc::Neg {
+                    proc: Box::new(proc),
+                    line_num,
+                    col_num,
+                })
+            } else {
+                match proc_node.next_named_sibling() {
+                    // At this point, the value is wrapped in parentheses
+                    Some(value_node) => Ok(Proc::Neg {
+                        proc: Box::new(parse_proc(&value_node, source)?),
+                        line_num,
+                        col_num,
+                    }),
+                    None => {
+                        return Err(InterpreterError::ParserError(
+                            "Expected named node inside neg parentheses".to_string(),
+                        ))
+                    }
+                }
+            }
         }
 
         "method" => {
@@ -863,14 +880,23 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
 
         "long_literal" => Ok(Proc::LongLiteral {
             value: {
-                let long_string = get_node_value(node, source.as_bytes())?;
-                let long = long_string.parse::<i64>().or_else(|e| {
-                    Err(InterpreterError::ParserError(format!(
-                        "Failed to convert long_literal into i64. Error: {:?}",
-                        e,
-                    )))
-                })?;
-                long
+                let i64_string = get_node_value(node, source.as_bytes())?;
+                match i64_string.parse::<i128>() {
+                    Ok(long) => {
+                        // Manually wrap around if it exceeds i64::MAX
+                        if long > i64::MAX as i128 {
+                            (long - (i64::MAX as i128 + 1)) as i64
+                        } else {
+                            long as i64
+                        }
+                    }
+                    Err(e) => {
+                        return Err(InterpreterError::ParserError(format!(
+                            "Failed to convert long_literal into i64. String: {:?}; Error: {:?}",
+                            i64_string, e
+                        )))
+                    }
+                }
             },
             line_num,
             col_num,

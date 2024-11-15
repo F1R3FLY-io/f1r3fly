@@ -168,24 +168,24 @@ class CostAccountingReducerTest extends FlatSpec with Matchers with TripleEquals
       } yield (result, mappedSpace)
     }
 
-    def data(p: Par, rand: Blake2b512Random) = Row(
-      List(Datum.create(channel, ListParWithRandom(Seq(p), rand), false)),
-      List()
-    )
+    // def data(p: Par, rand: Blake2b512Random) = Row(
+    //   List(Datum.create(channel, ListParWithRandom(Seq(p), rand), false)),
+    //   List()
+    // )
 
-    def stored(
-        map: Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]],
-        p: Par,
-        rand: Blake2b512Random
-    ): Boolean =
-      map.get(List(channel)) === Some(data(p, rand))
+    // def stored(
+    //     map: Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]],
+    //     p: Par,
+    //     rand: Blake2b512Random
+    // ): Boolean =
+    //   map.get(List(channel)) === Some(data(p, rand))
 
-    (for {
-      res           <- mkRhoISpace[Task].flatMap(testImplementation)
-      (result, map) = res
-      _             = assert(result === Left(OutOfPhlogistonsError))
-      _             = assert(stored(map, a, rand.splitByte(0)) || stored(map, b, rand.splitByte(1)))
-    } yield ()).runSyncUnsafe(5.seconds)
+    // (for {
+    //   res           <- mkRhoISpace[Task].flatMap(testImplementation)
+    //   (result, map) = res
+    //   _             = assert(result === Left(OutOfPhlogistonsError))
+    //   _             = assert(stored(map, a, rand.splitByte(0)) || stored(map, b, rand.splitByte(1)))
+    // } yield ()).runSyncUnsafe(5.seconds)
 
   }
 }

@@ -1753,6 +1753,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   override def createSoftCheckpoint(): F[SoftCheckpoint[C, P, A, K]] = {
     for {
       result <- Sync[F].delay {
+                 //  println("\nhit scala createSoftCheckpoint")
                  val softCheckpointPtr = INSTANCE.create_soft_checkpoint(rspacePointer)
 
                  if (softCheckpointPtr != null) {

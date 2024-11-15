@@ -6,12 +6,46 @@ use models::{
     ByteString,
 };
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
+use std::ops::{Add, Mul, Sub};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cost {
     pub value: i64,
     pub operation: String,
+}
+
+impl Sub for Cost {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Cost {
+            value: self.value - other.value,
+            operation: String::from("subtraction"),
+        }
+    }
+}
+
+impl Add for Cost {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Cost {
+            value: self.value + other.value,
+            operation: String::from("addition"),
+        }
+    }
+}
+
+impl Mul for Cost {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        Cost {
+            value: self.value * other.value,
+            operation: String::from("multiplication"),
+        }
+    }
 }
 
 impl Cost {
@@ -35,7 +69,7 @@ impl Cost {
     }
 
     pub fn unsafe_max() -> Self {
-        Cost::create(i64::MAX, "persistent_store_tester setup".to_string())
+        Cost::create(i64::MAX, "unsafe_max creation".to_string())
     }
 }
 
@@ -175,7 +209,7 @@ pub fn to_list_cost(size: i64) -> Cost {
     Cost::create(size, "to_list".to_string())
 }
 
-pub fn parsing_cost(term: String) -> Cost {
+pub fn parsing_cost(term: &String) -> Cost {
     Cost::create(term.as_bytes().len() as i64, "parsing".to_string())
 }
 

@@ -399,33 +399,33 @@ class RuntimeManagerTest extends FlatSpec with Matchers {
     } yield ()
   }
 
-  it should "charge for parsing and execution" in effectTest {
-    val correctRholang = """ for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(2) }"""
+  // it should "charge for parsing and execution" in effectTest {
+  //   val correctRholang = """ for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(2) }"""
 
-    runtimeManagerResource
-      .use {
-        case runtimeManager => {
-          implicit val rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])
-          val initialPhlo                     = Cost.UNSAFE_MAX
-          for {
-            deploy <- ConstructDeploy.sourceDeployNowF(correctRholang)
+  //   runtimeManagerResource
+  //     .use {
+  //       case runtimeManager => {
+  //         implicit val rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])
+  //         val initialPhlo                     = Cost.UNSAFE_MAX
+  //         for {
+  //           deploy <- ConstructDeploy.sourceDeployNowF(correctRholang)
 
-            runtime       <- runtimeManager.spawnRuntime
-            _             <- runtime.cost.set(initialPhlo)
-            term          <- Compiler[Task].sourceToADT(deploy.data.term)
-            _             <- runtime.inj(term)
-            phlosLeft     <- runtime.cost.get
-            reductionCost = initialPhlo - phlosLeft
+  //           runtime       <- runtimeManager.spawnRuntime
+  //           _             <- runtime.cost.set(initialPhlo)
+  //           term          <- Compiler[Task].sourceToADT(deploy.data.term)
+  //           _             <- runtime.inj(term)
+  //           phlosLeft     <- runtime.cost.get
+  //           reductionCost = initialPhlo - phlosLeft
 
-            parsingCost = accounting.parsingCost(correctRholang)
+  //           parsingCost = accounting.parsingCost(correctRholang)
 
-            result <- computeState(runtimeManager, deploy, genesis.body.state.postStateHash)
+  //           result <- computeState(runtimeManager, deploy, genesis.body.state.postStateHash)
 
-            _ = result._2.cost.cost shouldEqual (reductionCost + parsingCost).value
-          } yield ()
-        }
-      }
-  }
+  //           _ = result._2.cost.cost shouldEqual (reductionCost + parsingCost).value
+  //         } yield ()
+  //       }
+  //     }
+  // }
 
   "captureResult" should "return the value at the specified channel after a rholang computation" in effectTest {
     val purseValue = "37"

@@ -11,7 +11,7 @@ import coop.rchain.models._
 import coop.rchain.rholang.interpreter.RhoRuntime.RhoTuplespace
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.BugFoundError
-import coop.rchain.rholang.interpreter.storage.ChargingRSpace.consumeId
+// import coop.rchain.rholang.interpreter.storage.ChargingRSpace.consumeId
 import coop.rchain.rspace.{ContResult, Result, Match => StorageMatch}
 
 import scala.collection.SortedSet
@@ -31,14 +31,14 @@ object ChargingRSpace {
     override val channelsCount = 1
   }
 
-  private def consumeId[F[_]: Sync](continuation: TaggedContinuation): F[Blake2b512Random] =
-    //TODO: Make ScalaBodyRef-s have their own random state and merge it during its COMMs
-    continuation.taggedCont match {
-      case ParBody(value) => value.randomState.pure[F]
-      case ScalaBodyRef(value) =>
-        Blake2b512Random(ByteBuffer.allocate(8).putLong(value).array()).pure[F]
-      case Empty => BugFoundError("Damn you pROTOBUF").raiseError[F, Blake2b512Random]
-    }
+  // private def consumeId[F[_]: Sync](continuation: TaggedContinuation): F[Blake2b512Random] =
+  //   //TODO: Make ScalaBodyRef-s have their own random state and merge it during its COMMs
+  //   continuation.taggedCont match {
+  //     case ParBody(value) => value.randomState.pure[F]
+  //     case ScalaBodyRef(value) =>
+  //       Blake2b512Random(ByteBuffer.allocate(8).putLong(value).array()).pure[F]
+  //     case Empty => BugFoundError("Damn you pROTOBUF").raiseError[F, Blake2b512Random]
+  //   }
 
   def chargingRSpace[F[_]: Sync: Span](
       space: RhoTuplespace[F]
@@ -71,8 +71,8 @@ object ChargingRSpace {
                       persist,
                       peeks
                     )
-          id <- consumeId(continuation)
-          _  <- handleResult(consRes, Consume(id, persist, channels.size))
+          // id <- consumeId(continuation)
+          // _  <- handleResult(consRes, Consume(id, persist, channels.size))
         } yield consRes
 
       override def install(
@@ -94,39 +94,39 @@ object ChargingRSpace {
         for {
           _       <- charge[F](storageCostProduce(channel, data).copy(operation = "produces storage"))
           prodRes <- space.produce(channel, data, persist)
-          _       <- handleResult(prodRes, Produce(data.randomState, persist))
+          // _       <- handleResult(prodRes, Produce(data.randomState, persist))
         } yield prodRes
 
-      private def handleResult(
-          result: Option[
-            (ContResult[Par, BindPattern, TaggedContinuation], Seq[Result[Par, ListParWithRandom]])
-          ],
-          triggeredBy: TriggeredBy
-      ): F[Unit] =
-        result match {
+      // private def handleResult(
+      //     result: Option[
+      //       (ContResult[Par, BindPattern, TaggedContinuation], Seq[Result[Par, ListParWithRandom]])
+      //     ],
+      //     triggeredBy: TriggeredBy
+      // ): F[Unit] =
+      //   result match {
 
-          case None => charge[F](eventStorageCost(triggeredBy.channelsCount))
+      //     case None => charge[F](eventStorageCost(triggeredBy.channelsCount))
 
-          case Some((cont, dataList)) =>
-            for {
-              consumeId <- consumeId(cont.continuation)
+      //     case Some((cont, dataList)) =>
+      //       for {
+      //         consumeId <- consumeId(cont.continuation)
 
-              // We refund for non-persistent continuations, and for the persistent continuation triggering the comm.
-              // That persistent continuation is going to be charged for (without refund) once it has no matches in TS.
-              refundForConsume = if (!cont.persistent || consumeId == triggeredBy.id) {
-                storageCostConsume(cont.channels, cont.patterns, cont.continuation)
-              } else {
-                Cost(0)
-              }
-              refundForProduces = refundForRemovingProduces(dataList, cont, triggeredBy)
+      //         // We refund for non-persistent continuations, and for the persistent continuation triggering the comm.
+      //         // That persistent continuation is going to be charged for (without refund) once it has no matches in TS.
+      //         refundForConsume = if (!cont.persistent || consumeId == triggeredBy.id) {
+      //           storageCostConsume(cont.channels, cont.patterns, cont.continuation)
+      //         } else {
+      //           Cost(0)
+      //         }
+      //         refundForProduces = refundForRemovingProduces(dataList, cont, triggeredBy)
 
-              _             <- charge[F](Cost(-refundForConsume.value, "consume storage refund"))
-              _             <- charge[F](Cost(-refundForProduces.value, "produces storage refund"))
-              lastIteration = !triggeredBy.persistent
-              _             <- charge[F](eventStorageCost(triggeredBy.channelsCount)).whenA(lastIteration)
-              _             <- charge[F](commEventStorageCost(cont.channels.size))
-            } yield ()
-        }
+      //         _             <- charge[F](Cost(-refundForConsume.value, "consume storage refund"))
+      //         _             <- charge[F](Cost(-refundForProduces.value, "produces storage refund"))
+      //         lastIteration = !triggeredBy.persistent
+      //         _             <- charge[F](eventStorageCost(triggeredBy.channelsCount)).whenA(lastIteration)
+      //         _             <- charge[F](commEventStorageCost(cont.channels.size))
+      //       } yield ()
+      //   }
 
       private def refundForRemovingProduces(
           dataList: Seq[Result[Par, ListParWithRandom]],

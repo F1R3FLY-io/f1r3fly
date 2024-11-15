@@ -372,6 +372,7 @@ lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
+    // Universal / javaOptions ++= Seq("-J-Xmx2g"),
     // runCargoBuildDocker := {
     //   import scala.sys.process._
     //   val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
@@ -568,11 +569,12 @@ lazy val rholang = (project in file("rholang"))
     // mainClass in assembly := Some("coop.rchain.rho2rose.Rholang2RosetteCompiler"),
     //constrain the resource usage so that we hit SOE-s and OOME-s more quickly should they happen
     javaOptions in Test ++= Seq(
-      "-Xss240k",
+      // "-Xss240k",
+      "-Xss1m",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      // "-Djna.library.path=../rspace++/target/debug/"
-    ),
+      "-Djna.library.path=./rust_libraries"
+    )
     // runCargoBuild := {
     //   import scala.sys.process._
     //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
@@ -646,7 +648,7 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
     ),
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
-    ),
+    )
     // runCargoBuild := {
     //   import scala.sys.process._
     //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
@@ -711,7 +713,7 @@ lazy val rspaceBench = (project in file("rspace-bench"))
     dependencyClasspath in Jmh := (dependencyClasspath in Test).value,
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail),
     compile in Jmh := (compile in Jmh).dependsOn(compile in Test).value,
-    run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated,
+    run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated
     // javaOptions in Jmh += "-Djna.library.path=../rspace++/target/debug/"
   )
   .enablePlugins(JmhPlugin)

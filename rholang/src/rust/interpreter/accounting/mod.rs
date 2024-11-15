@@ -10,6 +10,7 @@ pub mod costs;
 pub mod has_cost;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/package.scala
+#[allow(non_camel_case_types)]
 pub type _cost = CostManager;
 
 #[derive(Clone)]
@@ -28,6 +29,7 @@ impl CostManager {
     }
 
     pub fn charge(&self, amount: Cost) -> Result<(), InterpreterError> {
+        // println!("\nhit charge");
         let permit = self
             .semaphore
             .try_acquire()

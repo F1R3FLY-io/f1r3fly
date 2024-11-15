@@ -1679,16 +1679,16 @@ fn parse_rholang_code_to_proc_should_parse_not() {
 
 #[test]
 fn parse_rholang_code_to_proc_should_parse_neg() {
-    let input_code = r#"-x"#;
+    let input_code = r#"-(364154898664707247)"#;
     let result = parse_rholang_code_to_proc(&input_code);
     assert!(result.is_ok());
 
     let expected_result = Proc::Neg {
-        proc: Box::new(Proc::Var(Var {
-            name: "x".to_string(),
+        proc: Box::new(Proc::LongLiteral {
+            value: 364154898664707247,
             line_num: 0,
-            col_num: 1,
-        })),
+            col_num: 2,
+        }),
         line_num: 0,
         col_num: 0,
     };

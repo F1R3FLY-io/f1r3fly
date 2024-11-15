@@ -51,6 +51,7 @@ impl Compiler {
         term: Proc,
         normalizer_env: HashMap<String, Par>,
     ) -> Result<Par, InterpreterError> {
+        // println!("\nhit normalize_term");
         normalize_match_proc(&term, ProcVisitInputs::new(), &normalizer_env).map(
             |normalized_term| {
                 // println!("\nnormalized term: {:?}", normalized_term);

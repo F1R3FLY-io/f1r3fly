@@ -422,8 +422,6 @@ fn new_should_only_substitute_all_variables_in_body_of_expression() {
         locally_free: create_bit_vector(&vec![0, 1]),
     };
 
-    println!("\ntarget: {:?}", target);
-
     let substitution = substitute_instance().substitute(target, DEPTH, &env);
     assert!(substitution.is_ok());
 
@@ -684,8 +682,6 @@ fn e_plus_plus_should_be_substituted_correctly() {
         })),
     }]);
 
-    println!("\nsource: {:?}", target);
-
     let substitution = substitute_instance().substitute(target.clone(), DEPTH, &env);
     assert!(substitution.is_ok());
 
@@ -721,8 +717,6 @@ fn e_percent_percent_should_be_substituted_correctly() {
         })),
     }]);
 
-    println!("\nsource: {:?}", target);
-
     let substitution = substitute_instance().substitute(target.clone(), DEPTH, &env);
     assert!(substitution.is_ok());
 
@@ -757,8 +751,6 @@ fn e_minus_minus_should_be_substituted_correctly() {
             p2: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
         })),
     }]);
-
-    println!("\nsource: {:?}", target);
 
     let substitution = substitute_instance().substitute(target.clone(), DEPTH, &env);
     assert!(substitution.is_ok());

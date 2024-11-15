@@ -143,7 +143,8 @@ pub extern "C" fn produce(
             .lock()
             .unwrap()
             .produce(channel, data, persist)
-    }.unwrap();
+    }
+    .unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -209,7 +210,8 @@ pub extern "C" fn consume(
             .lock()
             .unwrap()
             .consume(channels, patterns, continuation, persist, peeks)
-    }.unwrap();
+    }
+    .unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -273,7 +275,8 @@ pub extern "C" fn install(
             .lock()
             .unwrap()
             .install(channels, patterns, continuation)
-    }.unwrap();
+    }
+    .unwrap();
 
     match result_option {
         None => std::ptr::null(),
@@ -622,6 +625,7 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 
 #[no_mangle]
 pub extern "C" fn create_soft_checkpoint(rspace: *mut Space) -> *const u8 {
+    // println!("\nhit rust lib create_soft_checkpoint");
     let soft_checkpoint = unsafe { (*rspace).rspace.lock().unwrap().create_soft_checkpoint() };
 
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
@@ -1897,7 +1901,8 @@ pub extern "C" fn replay_produce(
             .lock()
             .unwrap()
             .produce(channel, data, persist)
-    }.unwrap();
+    }
+    .unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {
@@ -1958,14 +1963,13 @@ pub extern "C" fn replay_consume(
     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
     let result_option = unsafe {
-        (*rspace).rspace.lock().unwrap().consume(
-            channels,
-            patterns,
-            continuation,
-            persist,
-            peeks,
-        )
-    }.unwrap();
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .consume(channels, patterns, continuation, persist, peeks)
+    }
+    .unwrap();
 
     match result_option {
         Some((cont_result, rspace_results)) => {

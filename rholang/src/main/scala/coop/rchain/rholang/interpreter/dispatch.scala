@@ -34,7 +34,8 @@ class RholangAndScalaDispatcher[M[_]] private (
       case ParBody(parWithRand) =>
         val env     = Dispatch.buildEnv(dataList)
         val randoms = parWithRand.randomState +: dataList.toVector.map(_.randomState)
-        reducer.eval(parWithRand.body)(env, Blake2b512Random.merge(randoms))
+        // reducer.eval(parWithRand.body)(env, Blake2b512Random.merge(randoms))
+        s.unit
       case ScalaBodyRef(ref) =>
         _dispatchTable.get(ref) match {
           case Some(f) => f(dataList)

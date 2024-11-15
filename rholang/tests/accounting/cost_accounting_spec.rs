@@ -23,10 +23,14 @@ async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> Evaluate
         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new());
 
-    let eval_result = runtime.lock().unwrap().evaluate_with_phlo(
-        contract,
-        Cost::create(initial_phlo, "cost_accounting_spec setup".to_string()),
-    );
+    let eval_result = runtime
+        .lock()
+        .unwrap()
+        .evaluate_with_phlo(
+            contract,
+            Cost::create(initial_phlo, "cost_accounting_spec setup".to_string()),
+        )
+        .await;
     assert!(eval_result.is_ok());
     // (
     //     eval_result.as_ref().unwrap().clone(),

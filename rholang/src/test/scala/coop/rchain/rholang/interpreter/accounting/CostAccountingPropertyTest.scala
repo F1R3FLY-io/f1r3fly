@@ -94,6 +94,7 @@ object CostAccountingPropertyTest {
       par: Par
   ): F[EvaluateResult] = {
     val term = PP().buildString(par)
+    // println("\nterm: " + term)
     runtime.evaluate(term)
   }
 
@@ -106,7 +107,7 @@ object CostAccountingPropertyTest {
     val prefix = "cost-accounting-property-test"
     mkRuntime[Task](prefix).use { runtime =>
       for {
-        _    <- runtime.cost.set(Cost.UNSAFE_MAX)
+        // _    <- runtime.cost.set(Cost.UNSAFE_MAX)
         cost <- CostAccounting.emptyCost[Task]
         res <- {
           procs.toStream
