@@ -50,7 +50,7 @@ mod tests {
     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
     use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance::{ConnNotBody};
+    use models::rhoapi::connective::ConnectiveInstance::ConnNotBody;
 
     use crate::rust::interpreter::util::prepend_expr;
     use models::rhoapi::{expr, Connective, EMatches, Expr, Par};

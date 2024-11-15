@@ -397,6 +397,19 @@ impl Name {
         }))
     }
 
+    pub fn new_name_quote_var_ref(name: &str) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::VarRef(VarRef {
+                var_ref_kind: VarRefKind::Name,
+                var: Var::new(name.to_string()),
+                line_num: 0,
+                col_num: 0,
+            })),
+            line_num: 0,
+            col_num: 0,
+        }))
+    }
+
     pub fn new_name_quote_nil() -> Name {
         Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::Nil {
@@ -912,6 +925,17 @@ pub struct LinearBind {
     pub input: Source,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+impl LinearBind {
+    pub(crate) fn new_linear_bind(names: Names, source: Source) -> LinearBind {
+        LinearBind {
+            names,
+            input: source,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
