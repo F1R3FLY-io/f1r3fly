@@ -112,6 +112,7 @@ mod tests {
         assert_eq!(result.clone().unwrap().par, expected_par);
         assert_eq!(result.unwrap().par.connective_used, false);
     }
+
     //1 matches ~1
     #[test]
     fn p_matches_should_normalize_one_matches_tilda_with_connective_used_false() {
@@ -138,7 +139,7 @@ mod tests {
                                 false,
                             ))),
                         }],
-                        connective_used: true, // TODO I'm not sure about this flag true, it should be false, bt without this true test not worked.
+                        connective_used: true,
                         ..Par::default().clone()
                     }),
                 })),
@@ -175,7 +176,7 @@ mod tests {
                                 false,
                             ))),
                         }],
-                        connective_used: true, // TODO I'm not sure about this flag true, without it test not worked.
+                        connective_used: true,
                         ..Par::default().clone()
                     }),
                     pattern: Some(new_gint_par(1, Vec::new(), false)),

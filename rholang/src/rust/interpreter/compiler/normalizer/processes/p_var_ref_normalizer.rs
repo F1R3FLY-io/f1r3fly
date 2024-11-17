@@ -101,6 +101,10 @@ mod tests {
 
     #[test]
     fn p_var_ref_should_do_deep_lookup_in_match_case() {
+        // assuming `x` is bound
+        // example: @7!(10) | for (@x <- @7) { … }
+        // match 7 { =x => Nil }
+
         let (inputs, env) = proc_visit_inputs_and_env();
         let bound_inputs =
             proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", ProcSort);
@@ -162,6 +166,10 @@ mod tests {
 
     #[test]
     fn p_var_ref_should_do_deep_lookup_in_receive_case() {
+        // assuming `x` is bound:
+        // example : new x in { … }
+        // for(@{=*x} <- @Nil) { Nil }
+
         let (inputs, env) = proc_visit_inputs_and_env();
         let bound_inputs =
             proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", NameSort);
@@ -213,8 +221,12 @@ mod tests {
                 connective_used: false,
             }])
             .with_locally_free(create_bit_vector(&vec![0]));
-        println!("\nRust expected_result = {:?}", result.clone().unwrap().par);
-        //TODO fix assertion
-        //assert_eq!(result.clone().unwrap().par, expected_result);
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.clone().unwrap().free_map, inputs.free_map);
+        assert_eq!(
+            result.unwrap().par.locally_free,
+            create_bit_vector(&vec![0])
+        )
     }
 }

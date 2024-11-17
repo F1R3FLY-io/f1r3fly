@@ -3,8 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use models::{
-    rhoapi::{Par, ReceiveBind},
-    rust::utils::{new_receive_par, union},
+    rhoapi::{Par, Receive, ReceiveBind},
+    rust::utils::union,
     BitSet,
 };
 use uuid::Uuid;
@@ -511,30 +511,32 @@ pub fn normalize_p_input(
             let bind_count = receive_binds_free_map.count_no_wildcards();
 
             Ok(ProcVisitOutputs {
-                par: new_receive_par(
-                    receive_binds,
-                    proc_visit_outputs.clone().par,
+                par: input.par.clone().prepend_receive(Receive {
+                    binds: receive_binds,
+                    body: Some(proc_visit_outputs.clone().par),
                     persistent,
                     peek,
-                    bind_count as i32,
-                    {
+                    bind_count: bind_count as i32,
+                    locally_free: {
                         union(
                             sources_locally_free,
-                            filter_and_adjust_bitset(
+                            union(
                                 processed_patterns
                                     .into_iter()
                                     .map(|pattern| pattern.3)
                                     .fold(Vec::new(), |locally_free1, locally_free2| {
                                         union(locally_free1, locally_free2)
                                     }),
-                                bind_count,
+                                filter_and_adjust_bitset(
+                                    proc_visit_outputs.par.locally_free,
+                                    bind_count,
+                                ),
                             ),
                         )
                     },
-                    sources_connective_used || proc_visit_outputs.par.connective_used,
-                    Vec::new(),
-                    false,
-                ),
+                    connective_used: sources_connective_used
+                        || proc_visit_outputs.par.connective_used,
+                }),
                 free_map: proc_visit_outputs.free_map,
             })
         }
