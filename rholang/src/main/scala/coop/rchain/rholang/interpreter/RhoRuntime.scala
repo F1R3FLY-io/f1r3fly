@@ -287,11 +287,19 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
         blockData.seqNum
       )
 
-      val paramsBytes = setBlockDataParams.toByteArray
-      val paramsPtr   = new Memory(paramsBytes.length.toLong)
-      paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
+      // println("\nSetBlockDataParams: " + setBlockDataParams)
 
-      RHOLANG_RUST_INSTANCE.set_block_data(runtimePtr, paramsPtr, paramsBytes.length)
+      val paramsBytes = setBlockDataParams.toByteArray
+      // println("\nparamsBytes: " + paramsBytes.length)
+
+      // NOTE: Here, if 'blockData' fields are empty, then 'paramsBytes.length' will be 0 and throw an error.
+      // So in this case, I skip calling Rust 'set_block_data'
+      if (paramsBytes.length != 0) {
+        val paramsPtr = new Memory(paramsBytes.length.toLong)
+        paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
+
+        RHOLANG_RUST_INSTANCE.set_block_data(runtimePtr, paramsPtr, paramsBytes.length)
+      }
     }
 
   override def setInvalidBlocks(invalidBlocks: Map[BlockHash, Validator]): F[Unit] =

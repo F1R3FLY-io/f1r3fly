@@ -288,7 +288,8 @@ lazy val casper = (project in file("casper"))
       "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
     javaOptions in Test ++= Seq(
-      // "-Djna.library.path=../rspace++/target/debug/"
+      "-Xss32m",
+      "-Djna.library.path=../rust_libraries"
     )
   )
   .dependsOn(
@@ -573,7 +574,7 @@ lazy val rholang = (project in file("rholang"))
       "-Xss1m",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      "-Djna.library.path=./rust_libraries"
+      "-Djna.library.path=../rust_libraries"
     )
     // runCargoBuild := {
     //   import scala.sys.process._
