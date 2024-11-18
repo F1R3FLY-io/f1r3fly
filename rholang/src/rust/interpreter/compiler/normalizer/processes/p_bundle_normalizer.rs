@@ -72,7 +72,7 @@ pub fn normalize_p_bundle(
         },
         env,
     )?;
-    println!("\ntarget_result: {:?}", target_result);
+    // println!("\ntarget_result: {:?}", target_result);
 
     let outermost_bundle = match bundle_type {
         BundleType::BundleReadWrite { .. } => Bundle {
@@ -151,9 +151,9 @@ mod tests {
         };
         let bound_inputs =
             proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
-        println!("\nbound_inputs: {:?}", bound_inputs);
+        // println!("\nbound_inputs: {:?}", bound_inputs);
         let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
-        println!("\nresult: {:?}", result);
+        // println!("\nresult: {:?}", result);
         let expected_result = inputs
             .par
             .with_bundles(vec![Bundle {
@@ -269,10 +269,10 @@ mod tests {
         }
 
         let test = |read_only: bool, write_only: bool| {
-            println!(
-                "Testing bundle with flags read_only={}, write_only={}",
-                read_only, write_only
-            );
+            // println!(
+            //     "Testing bundle with flags read_only={}, write_only={}",
+            //     read_only, write_only
+            // );
             let bundle_proc = new_bundle(proc.clone(), read_only, write_only);
             let result = normalize_match_proc(&bundle_proc, bound_inputs.clone(), &env);
             let expected = expected_results(write_only, read_only, &bound_inputs);
