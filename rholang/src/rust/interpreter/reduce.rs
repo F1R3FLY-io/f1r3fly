@@ -24,7 +24,6 @@ use models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
 use models::ByteString;
-use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
@@ -717,6 +716,7 @@ impl DebruijnInterpreter {
         env: Env<Par>,
         mut rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        // println!("\nnew in eval_new: {:?}", new);
         let mut alloc = |count: usize, urns: Vec<String>| {
             let simple_news =
                 (0..(count - urns.len()))
@@ -733,35 +733,37 @@ impl DebruijnInterpreter {
             // println!("\nsimple_news in eval_new: {:?}", simple_news);
 
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
+                // println!("\nurn_map: {:?}", self.urn_map);
                 if !self.urn_map.contains_key(&urn) {
                     // TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]].
                     // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
+                    // println!("\nnew_injections: {:?}", new.injections);
                     match new.injections.get(&urn) {
                       Some(p) => {
                         if let Some(gunf) = RhoUnforgeable::unapply(p) {
                           if let Some(instance) = gunf.unf_instance {
-                              Either::Right(new_env.put(Par::default().with_unforgeables(vec![GUnforgeable {unf_instance: Some(instance)}])))
+                             Ok(new_env.put(Par::default().with_unforgeables(vec![GUnforgeable {unf_instance: Some(instance)}])))
                           } else {
-                               Either::Left(InterpreterError::BugFoundError("unf_instance field is None".to_string()))
+                               Err(InterpreterError::BugFoundError("unf_instance field is None".to_string()))
                           }
                       } else if let Some(expr) = RhoExpression::unapply(p) {
                           if let Some(instance) = expr.expr_instance {
-                              Either::Right(new_env.put(Par::default().with_exprs(vec![Expr {expr_instance: Some(instance)}])))
+                              Ok(new_env.put(Par::default().with_exprs(vec![Expr {expr_instance: Some(instance)}])))
                           } else {
-                               Either::Left(InterpreterError::BugFoundError("expr_instance field is None".to_string()))
+                               Err(InterpreterError::BugFoundError("expr_instance field is None".to_string()))
                           }
                       } else {
-                          Either::Left(InterpreterError::BugFoundError("invalid injection".to_string()))
+                        Err(InterpreterError::BugFoundError("invalid injection".to_string()))
                       }
                       },
                       None => {
-                        Either::Left(InterpreterError::BugFoundError(format!("No value set for {}. This is a bug in the normalizer or on the path from it.", urn)))
+                        Err(InterpreterError::BugFoundError(format!("No value set for {}. This is a bug in the normalizer or on the path from it.", urn)))
                       },
                     }
                 } else {
                     match self.urn_map.get(&urn) {
-                        Some(p) => Either::Right(new_env.put(p.clone())),
-                        None => Either::Left(InterpreterError::ReduceError(format!(
+                        Some(p) => Ok(new_env.put(p.clone())),
+                        None => Err(InterpreterError::ReduceError(format!(
                             "Unknown urn for new: {}",
                             urn
                         ))),
@@ -769,20 +771,14 @@ impl DebruijnInterpreter {
                 }
             };
 
-            // println!("\nurns in eval_new: {:?}", urns);
-            urns.into_iter()
-                .fold(Ok(simple_news), |acc, urn| match acc {
-                    Ok(mut news) => match add_urn(&mut news, urn) {
-                        Either::Left(err) => Err(err),
-                        Either::Right(env) => Ok(env),
-                    },
-
-                    Err(e) => Err(e),
-                })
+            urns.iter().try_fold(simple_news, |mut acc, urn| {
+                add_urn(&mut acc, urn.to_string())
+            })
         };
 
         // println!("\nhit eval_new");
         self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
+        // println!("\nnew uri: {:?}", new.uri);
         match alloc(new.bind_count as usize, new.uri.clone()) {
             Ok(env) => {
                 // println!("\nenv in eval_new: {:?}", env);

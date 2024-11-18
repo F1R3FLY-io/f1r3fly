@@ -864,10 +864,13 @@ fn setup_maps_and_refs(
         .chain(extra_system_processes.iter())
         .collect::<Vec<&Definition>>();
 
-    let urn_map = combined_processes
+    let mut urn_map: HashMap<_, _> = basic_processes();
+    combined_processes
         .iter()
         .map(|process| process.to_urn_map())
-        .collect::<HashMap<String, Par>>();
+        .for_each(|(key, value)| {
+            urn_map.insert(key, value);
+        });
 
     let proc_defs: Vec<(Par, i32, Option<Var>, i64)> = combined_processes
         .iter()
