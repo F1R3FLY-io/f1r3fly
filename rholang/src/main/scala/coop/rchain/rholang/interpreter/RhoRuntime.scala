@@ -208,7 +208,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     //   normalizerEnv
     // )
     Sync[F].delay {
-      // println("\nrand in evaluate: " + rand)
+      // println("\nterm in evaluate: " + term)
       val evalParams = EvaluateParams(
         term,
         Some(CostProto(initialPhlo.value.toInt, initialPhlo.operation)),

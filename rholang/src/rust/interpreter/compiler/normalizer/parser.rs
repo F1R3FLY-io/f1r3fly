@@ -1223,10 +1223,10 @@ fn parse_names(node: &Node, source: &str) -> Result<Names, InterpreterError> {
 }
 
 fn parse_left_and_right_nodes(node: &Node, source: &str) -> Result<(Proc, Proc), InterpreterError> {
-    let left_node = get_child_by_field_name(node, "left")?;
+    let left_node = get_named_child(node, 0)?;
     let left_proc = parse_proc(&left_node, source)?;
 
-    let right_node = get_child_by_field_name(node, "right")?;
+    let right_node = get_named_child(node, 1)?;
     let right_proc = parse_proc(&right_node, source)?;
 
     Ok((left_proc, right_proc))
@@ -1241,6 +1241,17 @@ fn get_child_by_field_name<'a>(
         None => Err(InterpreterError::ParserError(format!(
             "Error: did not find expected field: {:?}, on node {:?}",
             name,
+            node.kind(),
+        ))),
+    }
+}
+
+fn get_named_child<'a>(node: &'a Node<'a>, index: usize) -> Result<Node<'a>, InterpreterError> {
+    match node.named_child(index) {
+        Some(child_node) => Ok(child_node),
+        None => Err(InterpreterError::ParserError(format!(
+            "Error: did not find named child at index: {:?}, on node {:?}",
+            index,
             node.kind(),
         ))),
     }

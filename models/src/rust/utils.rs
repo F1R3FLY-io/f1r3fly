@@ -385,10 +385,10 @@ pub fn new_eset_expr(
     _connective_used: bool,
     _remainder: Option<Var>,
 ) -> Expr {
-    println!("new_eset_expr: _ps: {:?}", _ps);
-    println!("new_eset_expr: _locally_free: {:?}", _locally_free);
-    println!("new_eset_expr: _connective_used: {:?}", _connective_used);
-    println!("new_eset_expr: _remainder: {:?}", _remainder);
+    // println!("new_eset_expr: _ps: {:?}", _ps);
+    // println!("new_eset_expr: _locally_free: {:?}", _locally_free);
+    // println!("new_eset_expr: _connective_used: {:?}", _connective_used);
+    // println!("new_eset_expr: _remainder: {:?}", _remainder);
     Expr {
         expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(ParSet::new(
             _ps,

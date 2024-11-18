@@ -30,8 +30,8 @@ fn assert_spatial_match(
     pattern: Par,
     expected_captures: Option<FreeMap>,
 ) -> Result<(), String> {
-    println!("\ntest target: {:?}", target);
-    println!("\ntest pattern: {:?}", pattern);
+    // println!("\ntest target: {:?}", target);
+    // println!("\ntest pattern: {:?}", pattern);
 
     let mut spatial_matcher = SpatialMatcherContext::new();
     let spatial_match_result = spatial_matcher.spatial_match(target, pattern);
