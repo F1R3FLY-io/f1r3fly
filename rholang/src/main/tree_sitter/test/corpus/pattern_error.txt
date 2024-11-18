@@ -1,0 +1,14 @@
+=======
+SendData
+=======
+
+new x in {
+           for(@y <- x) {
+             match y {
+              {@=*x!(_)} => Nil
+             }
+           }
+         }
+---
+
+
