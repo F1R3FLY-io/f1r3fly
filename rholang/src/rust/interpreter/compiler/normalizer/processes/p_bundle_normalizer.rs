@@ -102,8 +102,8 @@ pub fn normalize_p_bundle(
             "Illegal top-level connective in bundle at line {}, column {}.",
             line_num, column_num
         )))
-    } else if (!target_result.clone().free_map.wildcards.is_empty()
-        || !target_result.free_map.level_bindings.is_empty())
+    } else if !target_result.clone().free_map.wildcards.is_empty()
+        || !target_result.free_map.level_bindings.is_empty()
     {
         error(target_result)
     } else {

@@ -93,7 +93,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\nhit eval");
+        println!("\neval");
         let terms: Vec<GeneratedMessage> = vec![
             par.sends
                 .into_iter()
@@ -198,13 +198,14 @@ impl DebruijnInterpreter {
         data: ListParWithRandom,
         persistent: bool,
     ) -> Result<(), InterpreterError> {
+        println!("\nreduce produce");
         self.update_mergeable_channels(&chan);
 
-        let produce_result =
-            self.space
-                .lock()
-                .unwrap()
-                .produce(chan.clone(), data.clone(), persistent)?;
+        println!("Attempting to lock space for produce");
+        let mut space_locked = self.space.lock().unwrap();
+        println!("Locked space for produce");
+        let produce_result = space_locked.produce(chan.clone(), data.clone(), persistent)?;
+        drop(space_locked);
 
         self.continue_produce_process(
             unpack_option_with_peek(produce_result),
@@ -229,7 +230,9 @@ impl DebruijnInterpreter {
             self.update_mergeable_channels(source);
         }
 
-        let consume_result = self.space.lock().unwrap().consume(
+        println!("Attempting to lock space for produce");
+        let mut space_locked = self.space.lock().unwrap();
+        let consume_result = space_locked.consume(
             sources.clone(),
             patterns.clone(),
             TaggedContinuation {
@@ -242,6 +245,7 @@ impl DebruijnInterpreter {
                 BTreeSet::new()
             },
         )?;
+        drop(space_locked);
 
         // println!("space map in reduce consume: {:?}", self.space.lock().unwrap().to_map());
         // println!("\nconsume_result in reduce consume: {:?}", consume_result);
@@ -263,6 +267,7 @@ impl DebruijnInterpreter {
         data: ListParWithRandom,
         persistent: bool,
     ) -> Result<(), InterpreterError> {
+        println!("\ncontinue_produce_process");
         match res {
             Some((continuation, data_list, peek)) => {
                 if persistent {
@@ -313,6 +318,7 @@ impl DebruijnInterpreter {
         persistent: bool,
         peek: bool,
     ) -> Result<(), InterpreterError> {
+        println!("\ncontinue_consume_process");
         // println!("\napplication in continue_consume_process: {:?}", res);
         match res {
             Some((continuation, data_list, _peek)) => {
@@ -361,20 +367,24 @@ impl DebruijnInterpreter {
         continuation: TaggedContinuation,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Result<(), InterpreterError> {
-        self.dispatcher
-            .lock()
-            .unwrap()
+        println!("\nreduce dispatch");
+        let dispatcher_lock = self.dispatcher.lock().unwrap();
+        println!("Dispatcher lock acquired");
+        let res = dispatcher_lock
             .dispatch(
                 continuation,
                 data_list.into_iter().map(|tuple| tuple.1).collect(),
             )
-            .await
+            .await;
+        drop(dispatcher_lock);
+        res
     }
 
     async fn produce_peeks(
         &self,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>> + '_>>> {
+        println!("\nreduce produce_peeks");
         data_list
             .into_iter()
             .filter(|(_, _, _, persist)| !persist)
@@ -448,6 +458,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        println!("\ngenerated_message_eval, term: {:?}", term);
         match term {
             GeneratedMessage::Send(term) => self.eval_send(term, env, rand).await,
             GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand).await,

@@ -37,7 +37,7 @@ impl RholangAndScalaDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
-        // println!("\nhit dispatch");
+        println!("\ndispatch");
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
@@ -88,6 +88,7 @@ impl RholangAndScalaDispatcher {
     where
         T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
+        println!("\ncreate");
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(Mutex::new(dispatch_table)),
             reducer: None,
@@ -104,8 +105,42 @@ impl RholangAndScalaDispatcher {
         };
 
         dispatcher.reducer = Some(reducer.clone());
-        reducer.dispatcher = Arc::new(Mutex::new(dispatcher.clone()));
+        let dispatcher_arc = Arc::new(Mutex::new(dispatcher.clone()));
+        reducer.dispatcher = dispatcher_arc.clone();
+        let mut dispatcher_locked = dispatcher_arc.lock().unwrap();
+        dispatcher_locked.reducer = Some(reducer.clone());
+        drop(dispatcher_locked);
 
         (dispatcher, reducer)
+    }
+
+    pub fn create_dispatcher<T>(tuplespace: T, cost: _cost) -> RhoDispatch
+    where
+        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+    {
+        println!("\ncreate_dispatcher");
+        let mut dispatcher = RholangAndScalaDispatcher {
+            _dispatch_table: Arc::new(Mutex::new(HashMap::new())),
+            reducer: None,
+        };
+
+        let mut reducer = DebruijnInterpreter {
+            space: Arc::new(Mutex::new(Box::new(tuplespace))),
+            dispatcher: Arc::new(Mutex::new(dispatcher.clone())),
+            urn_map: HashMap::new(),
+            merge_chs: Arc::new(RwLock::new(HashSet::new())),
+            mergeable_tag_name: Par::default(),
+            cost: cost.clone(),
+            substitute: Substitute { cost },
+        };
+
+        dispatcher.reducer = Some(reducer.clone());
+        let dispatcher_arc = Arc::new(Mutex::new(dispatcher.clone()));
+        reducer.dispatcher = dispatcher_arc.clone();
+        let mut dispatcher_locked = dispatcher_arc.lock().unwrap();
+        dispatcher_locked.reducer = Some(reducer.clone());
+        drop(dispatcher_locked);
+
+        Arc::new(Mutex::new(dispatcher))
     }
 }

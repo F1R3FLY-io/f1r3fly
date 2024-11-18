@@ -10,7 +10,7 @@ pub mod base58;
 pub mod rev_address;
 
 // Helper enum. This is 'GeneratedMessage' in Scala
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum GeneratedMessage {
     Send(Send),
     Receive(Receive),

@@ -822,12 +822,10 @@ fn setup_reducer<T>(
 where
     T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
+    println!("\nsetup_reducer");
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
-        Arc::new(Mutex::new(RholangAndScalaDispatcher {
-            _dispatch_table: Arc::new(Mutex::new(HashMap::new())),
-            reducer: None,
-        })),
+        RholangAndScalaDispatcher::create_dispatcher(charging_rspace.clone(), cost.clone()),
         block_data_ref,
         invalid_blocks,
         extra_system_processes,
