@@ -288,6 +288,14 @@ impl Proc {
         }
     }
 
+    pub fn new_proc_bool(value: bool) -> Proc {
+        Proc::BoolLiteral {
+            value,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
     pub fn new_proc_var(value: &str) -> Proc {
         Proc::Var(Var {
             name: value.to_string(),

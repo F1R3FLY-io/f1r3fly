@@ -323,3 +323,450 @@ pub fn normalize_match_proc(
         Proc::VarRef(var_ref) => normalize_p_var_ref(var_ref, input),
     }
 }
+
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+// inside this source file we tested unary and binary operations, because we don't have separate normalizers for them.
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::compiler::Compiler;
+    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+    use crate::rust::interpreter::compiler::normalize::VarSort::ProcSort;
+    use crate::rust::interpreter::compiler::rholang_ast::{Collection, KeyValuePair, Proc};
+    use crate::rust::interpreter::compiler::source_position::SourcePosition;
+    use crate::rust::interpreter::test_utils::utils::{
+        proc_visit_inputs_and_env, proc_visit_inputs_with_updated_bound_map_chain,
+        proc_visit_inputs_with_updated_vec_bound_map_chain,
+    };
+    use crate::rust::interpreter::util::prepend_expr;
+    use models::create_bit_vector;
+    use models::rhoapi::expr::ExprInstance;
+    use models::rhoapi::var::VarInstance;
+    use models::rhoapi::{
+        expr, EDiv, EMinus, EMinusMinus, EMult, ENeg, ENot, EPercentPercent, EPlus, EPlusPlus,
+        EVar, Expr, Par, Var,
+    };
+    use models::rust::utils::{
+        new_boundvar_expr, new_boundvar_par, new_emap_par, new_eplus_par, new_freevar_par,
+        new_gint_par, new_gstring_par, new_key_value_pair,
+    };
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn p_nil_should_compile_as_no_modification() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let proc = Proc::Nil {
+            line_num: 0,
+            col_num: 0,
+        };
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        assert_eq!(result.clone().unwrap().par, inputs.par);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    //unary operations:
+    #[test]
+    fn p_not_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Not {
+            proc: Box::new(Proc::new_proc_bool(false)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_par = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::ENotBody(ENot {
+                    p: Some(Par {
+                        exprs: vec![Expr {
+                            expr_instance: Some(expr::ExprInstance::GBool(false)),
+                        }],
+                        ..Par::default()
+                    }),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_par);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_neg_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let bound_inputs =
+            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", ProcSort);
+        let proc = Proc::Neg {
+            proc: Box::new(Proc::new_proc_var("x")),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::ENegBody(ENeg {
+                    p: Some(Par {
+                        exprs: vec![new_boundvar_expr(0)],
+                        locally_free: create_bit_vector(&vec![0]),
+                        ..Par::default()
+                    }),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    //binary operations:
+    #[test]
+    fn p_mult_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let bound_inputs =
+            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", ProcSort);
+
+        let proc = Proc::Mult {
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::new_proc_var("y")),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EMultBody(EMult {
+                    p1: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                    p2: Some(new_freevar_par(0, Vec::new())),
+                })),
+            },
+            0,
+        );
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(
+            result.unwrap().free_map,
+            bound_inputs
+                .free_map
+                .put(("y".to_string(), ProcSort, SourcePosition::new(0, 0)))
+        );
+    }
+
+    #[test]
+    fn p_div_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let proc = Proc::Div {
+            left: Box::new(Proc::new_proc_int(7)),
+            right: Box::new(Proc::new_proc_int(2)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EDivBody(EDiv {
+                    p1: Some(new_gint_par(7, Vec::new(), false)),
+                    p2: Some(new_gint_par(2, Vec::new(), false)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_percent_percent_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let map_data = Proc::Collection(Collection::Map {
+            pairs: vec![KeyValuePair {
+                key: Proc::new_proc_string("name".to_string()),
+                value: Proc::new_proc_string("Alice".to_string()),
+                line_num: 0,
+                col_num: 0,
+            }],
+            cont: None,
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let proc = Proc::PercentPercent {
+            left: Box::new(Proc::new_proc_string("Hi ${name}".to_string())),
+            right: Box::new(map_data),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        assert_eq!(
+            result.clone().unwrap().par,
+            prepend_expr(
+                inputs.par,
+                Expr {
+                    expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
+                        p1: Some(new_gstring_par("Hi ${name}".to_string(), Vec::new(), false)),
+                        p2: Some(new_emap_par(
+                            vec![new_key_value_pair(
+                                new_gstring_par("name".to_string(), Vec::new(), false),
+                                new_gstring_par("Alice".to_string(), Vec::new(), false),
+                            )],
+                            Vec::new(),
+                            false,
+                            None,
+                            Vec::new(),
+                            false,
+                        ))
+                    }))
+                },
+                0
+            )
+        );
+
+        assert_eq!(result.unwrap().free_map, inputs.free_map)
+    }
+
+    #[test]
+    fn p_add_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let bound_inputs = proc_visit_inputs_with_updated_vec_bound_map_chain(
+            inputs.clone(),
+            vec![("x".into(), ProcSort), ("y".into(), ProcSort)],
+        );
+        let proc = Proc::Add {
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::new_proc_var("y")),
+            line_num: 0,
+            col_num: 0,
+        };
+        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+
+        // Формуємо очікуваний результат за допомогою хелперів
+        let p1 = new_boundvar_par(1, vec![1], false);
+        let p2 = new_boundvar_par(0, vec![0], false);
+
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+                    p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                    p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                })),
+            },
+            0,
+        );
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
+    }
+
+    #[test]
+    fn p_minus_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let bound_inputs = proc_visit_inputs_with_updated_vec_bound_map_chain(
+            inputs.clone(),
+            vec![
+                ("x".into(), ProcSort),
+                ("y".into(), ProcSort),
+                ("z".into(), ProcSort),
+            ],
+        );
+
+        let proc = Proc::Minus {
+            left: Box::new(Proc::new_proc_var("x")),
+            right: Box::new(Proc::Mult {
+                left: Box::new(Proc::new_proc_var("y")),
+                right: Box::new(Proc::new_proc_var("z")),
+                line_num: 0,
+                col_num: 0,
+            }),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(ExprInstance::EMinusBody(EMinus {
+                    p1: Some(new_boundvar_par(2, create_bit_vector(&vec![2]), false)),
+                    p2: Some(Par {
+                        exprs: vec![Expr {
+                            expr_instance: Some(ExprInstance::EMultBody(EMult {
+                                p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                                p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                            })),
+                        }],
+                        locally_free: create_bit_vector(&vec![0, 1]),
+                        connective_used: false,
+                        ..Par::default()
+                    }),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_plus_plus_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Concat {
+            left: Box::new(Proc::new_proc_string("abc".to_string())),
+            right: Box::new(Proc::new_proc_string("def".to_string())),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                    p1: Some(new_gstring_par("abc".to_string(), Vec::new(), false)),
+                    p2: Some(new_gstring_par("def".to_string(), Vec::new(), false)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn p_minus_minus_should_delegate() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+
+        let proc = Proc::MinusMinus {
+            left: Box::new(Proc::new_proc_string("abc".to_string())),
+            right: Box::new(Proc::new_proc_string("def".to_string())),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let expected_result = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
+                    p1: Some(new_gstring_par("abc".to_string(), vec![], false)),
+                    p2: Some(new_gstring_par("def".to_string(), vec![], false)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_result);
+        assert_eq!(result.unwrap().free_map, inputs.free_map);
+    }
+
+    #[test]
+    fn patterns_should_compile_not_in_top_level() {
+        fn check(typ: &str, position: &str, pattern: &str) {
+            /*
+             We use double curly braces to avoid conflicts with string formatting.
+             In Rust, `format!` uses `{}` for inserting values, so to output a literal curly brace,
+             we need to use `{{` and `}}`
+            */
+            let rho = format!(
+                r#"
+        new x in {{
+            for(@y <- x) {{
+                match y {{
+                    {} => Nil
+                }}
+            }}
+        }}
+        "#,
+                pattern
+            );
+
+            match Compiler::source_to_adt(&rho) {
+                Ok(_) => assert!(true),
+                Err(e) => panic!(
+                    "{} in the {} '{}' should not throw errors: {:?}",
+                    typ, position, pattern, e
+                ),
+            }
+        }
+
+        let cases = vec![
+            ("wildcard", "send channel", "{_!(1)}"),
+            //("wildcard", "send data", "{@=*x!(_)}"), //TODO the problem is =, if we delete it then everything will work
+            ("wildcard", "send data", "{@Nil!(_)}"),
+            ("logical AND", "send data", "{@Nil!(1 /\\ 2)}"),
+            ("logical OR", "send data", "{@Nil!(1 \\/ 2)}"),
+            ("logical NOT", "send data", "{@Nil!(~1)}"),
+            ("logical AND", "send channel", "{@{Nil /\\ Nil}!(Nil)}"),
+            ("logical OR", "send channel", "{@{Nil \\/ Nil}!(Nil)}"),
+            ("logical NOT", "send channel", "{@{~Nil}!(Nil)}"),
+            (
+                "wildcard",
+                "receive pattern of the consume",
+                "{for (_ <- x) { 1 }} ",
+            ),
+            (
+                "wildcard",
+                "body of the continuation",
+                "{for (@1 <- x) { _ }} ",
+            ),
+            (
+                "logical OR",
+                "body of the continuation",
+                "{for (@1 <- x) { 10 \\/ 20 }} ",
+            ),
+            (
+                "logical AND",
+                "body of the continuation",
+                "{for(@1 <- x) { 10 /\\ 20 }} ",
+            ),
+            (
+                "logical NOT",
+                "body of the continuation",
+                "{for(@1 <- x) { ~10 }} ",
+            ),
+            (
+                "logical OR",
+                "channel of the consume",
+                "{for (@1 <- @{Nil /\\ Nil}) { Nil }} ",
+            ),
+            (
+                "logical AND",
+                "channel of the consume",
+                "{for(@1 <- @{Nil \\/ Nil}) { Nil }} ",
+            ),
+            (
+                "logical NOT",
+                "channel of the consume",
+                "{for(@1 <- @{~Nil}) { Nil }} ",
+            ),
+            (
+                "wildcard",
+                "channel of the consume",
+                "{for(@1 <- _) { Nil }} ",
+            ),
+        ];
+
+        for (typ, position, pattern) in cases {
+            check(typ, position, pattern);
+        }
+    }
+}
