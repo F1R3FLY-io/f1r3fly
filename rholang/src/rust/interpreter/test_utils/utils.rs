@@ -1,7 +1,7 @@
 use crate::rust::interpreter::compiler::bound_map_chain::BoundMapChain;
 use crate::rust::interpreter::compiler::free_map::FreeMap;
 use crate::rust::interpreter::compiler::normalize::VarSort::{NameSort, ProcSort};
-use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, ProcVisitInputs};
+use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, ProcVisitInputs, VarSort};
 use crate::rust::interpreter::compiler::source_position::SourcePosition;
 use models::rhoapi::Par;
 use std::collections::HashMap;
@@ -50,4 +50,22 @@ pub fn collection_proc_visit_inputs_and_env() -> (ProcVisitInputs, HashMap<Strin
     let env: HashMap<String, Par> = HashMap::new();
 
     (proc_inputs, env)
+}
+
+pub fn proc_visit_inputs_with_updated_bound_map_chain(
+    input: ProcVisitInputs,
+    name: &str,
+    vs_type: VarSort,
+) -> ProcVisitInputs {
+    ProcVisitInputs {
+        bound_map_chain: {
+            let updated_bound_map_chain = input.bound_map_chain.put((
+                name.to_string(),
+                vs_type,
+                SourcePosition { row: 0, column: 0 },
+            ));
+            updated_bound_map_chain
+        },
+        ..input.clone()
+    }
 }

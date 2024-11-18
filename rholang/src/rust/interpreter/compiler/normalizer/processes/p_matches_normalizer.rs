@@ -44,32 +44,148 @@ pub fn normalize_p_matches(
     })
 }
 
-//The test with Nil is described because the normalization logic for Nil is already ready in normalize_match engine.
-// #[test]
-// fn test_normalize_nil_matches_nil() {
-//     let rholang_code = "Nil matches Nil";
-//     let tree = parse_rholang_code(rholang_code);
-//     let root_node = tree.root_node();
-//     println!("Tree S-expression: {}", tree.root_node().to_sexp());
-//     let matches_node = root_node.child(0).unwrap();
-//     println!("Found matches node: {}", matches_node.to_sexp());
-//     let input = ProcVisitInputs {
-//         par: Par::default(),
-//         bound_map_chain: Default::default(),
-//         free_map: FreeMap::new(),
-//     };
+//rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+    use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
+    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+    use models::rhoapi::connective::ConnectiveInstance::ConnNotBody;
 
-//     let output = normalize_p_matches(matches_node, input.clone(), rholang_code.as_bytes()).unwrap();
+    use crate::rust::interpreter::util::prepend_expr;
+    use models::rhoapi::{expr, Connective, EMatches, Expr, Par};
+    use models::rust::utils::{new_gint_par, new_wildcard_par};
+    use pretty_assertions::assert_eq;
 
-//     let expected_par = Par {
-//         exprs: vec![Expr {
-//             expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-//                 target: Some(Par::default()),
-//                 pattern: Some(Par::default()),
-//             })),
-//         }],
-//         ..Default::default()
-//     };
+    //1 matches _
+    #[test]
+    fn p_matches_should_normalize_one_matches_wildcard() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Matches {
+            left: Box::new(Proc::new_proc_int(1)),
+            right: Box::new(Proc::new_proc_wildcard()),
+            line_num: 0,
+            col_num: 0,
+        };
 
-//     assert_eq!(output.par, expected_par);
-// }
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        let expected_par = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
+                    target: Some(new_gint_par(1, Vec::new(), false)),
+                    pattern: Some(new_wildcard_par(Vec::new(), true)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_par);
+        assert_eq!(result.unwrap().par.connective_used, false);
+    }
+
+    //1 matches 2
+    #[test]
+    fn p_matches_should_normalize_correctly_one_matches_two() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Matches {
+            left: Box::new(Proc::new_proc_int(1)),
+            right: Box::new(Proc::new_proc_int(2)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        let expected_par = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
+                    target: Some(new_gint_par(1, Vec::new(), false)),
+                    pattern: Some(new_gint_par(2, Vec::new(), false)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_par);
+        assert_eq!(result.unwrap().par.connective_used, false);
+    }
+
+    //1 matches ~1
+    #[test]
+    fn p_matches_should_normalize_one_matches_tilda_with_connective_used_false() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Matches {
+            left: Box::new(Proc::new_proc_int(1)),
+            right: Box::new(Negation::new_negation_int(1)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        let expected_par = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
+                    target: Some(new_gint_par(1, Vec::new(), false)),
+                    pattern: Some(Par {
+                        connectives: vec![Connective {
+                            connective_instance: Some(ConnNotBody(new_gint_par(
+                                1,
+                                Vec::new(),
+                                false,
+                            ))),
+                        }],
+                        connective_used: true,
+                        ..Par::default().clone()
+                    }),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_par);
+        assert_eq!(result.unwrap().par.connective_used, false);
+    }
+
+    //~1 matches 1
+    #[test]
+    fn p_matches_should_normalize_tilda_one_matches_one_with_connective_used_true() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Matches {
+            left: Box::new(Negation::new_negation_int(1)),
+            right: Box::new(Proc::new_proc_int(1)),
+            line_num: 0,
+            col_num: 0,
+        };
+
+        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+
+        let expected_par = prepend_expr(
+            inputs.par.clone(),
+            Expr {
+                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
+                    target: Some(Par {
+                        connectives: vec![Connective {
+                            connective_instance: Some(ConnNotBody(new_gint_par(
+                                1,
+                                Vec::new(),
+                                false,
+                            ))),
+                        }],
+                        connective_used: true,
+                        ..Par::default().clone()
+                    }),
+                    pattern: Some(new_gint_par(1, Vec::new(), false)),
+                })),
+            },
+            0,
+        );
+
+        assert_eq!(result.clone().unwrap().par, expected_par);
+        assert_eq!(result.unwrap().par.connective_used, true)
+    }
+}

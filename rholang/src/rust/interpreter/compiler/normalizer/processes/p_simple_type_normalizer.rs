@@ -36,36 +36,87 @@ pub fn normalize_simple_type(
     })
 }
 
+//rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
+#[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::rust::interpreter::compiler::exports::BoundMapChain;
     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
     use crate::rust::interpreter::compiler::rholang_ast::{Proc, SimpleType};
-    use models::rhoapi::Par;
+    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
+    use models::rhoapi::connective::ConnectiveInstance::{
+        ConnBool, ConnByteArray, ConnInt, ConnString, ConnUri,
+    };
+
+    use models::rhoapi::{Connective, Par};
+    use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_normalize_match_proc_with_simple_type_bool() {
-        let proc = Proc::SimpleType(SimpleType::Bool {
-            line_num: 1,
-            col_num: 1,
-        });
-        let input = ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: BoundMapChain::default(),
-            free_map: Default::default(),
-        };
+    fn p_simple_type_should_result_in_a_connective_of_the_correct_type() {
+        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc_bool = Proc::SimpleType(SimpleType::new_bool());
+        let proc_int = Proc::SimpleType(SimpleType::new_int());
+        let proc_string = Proc::SimpleType(SimpleType::new_string());
+        let proc_uri = Proc::SimpleType(SimpleType::new_uri());
+        let proc_byte_array = Proc::SimpleType(SimpleType::new_bytearray());
 
-        let result = normalize_match_proc(&proc, input, &HashMap::new());
-        assert!(result.is_ok());
-        let output = result.unwrap();
-        println!("normalized output: {:?}", output);
-        assert!(output.par.connectives.len() == 1);
-        if let Some(ConnectiveInstance::ConnBool(value)) =
-            &output.par.connectives[0].connective_instance
-        {
-            assert!(*value);
-        } else {
-            panic!("Expected ConnBool connective");
-        }
+        let result_bool = normalize_match_proc(&proc_bool, inputs.clone(), &env);
+        let result_int = normalize_match_proc(&proc_int, inputs.clone(), &env);
+        let result_string = normalize_match_proc(&proc_string, inputs.clone(), &env);
+        let result_uri = normalize_match_proc(&proc_uri, inputs.clone(), &env);
+        let result_byte_array = normalize_match_proc(&proc_byte_array, inputs.clone(), &env);
+
+        assert_eq!(
+            result_bool.unwrap().par,
+            Par {
+                connectives: vec![Connective {
+                    connective_instance: Some(ConnBool(true))
+                }],
+                connective_used: true,
+                ..Par::default().clone()
+            }
+        );
+
+        assert_eq!(
+            result_int.unwrap().par,
+            Par {
+                connectives: vec![Connective {
+                    connective_instance: Some(ConnInt(true))
+                }],
+                connective_used: true,
+                ..Par::default().clone()
+            }
+        );
+
+        assert_eq!(
+            result_string.unwrap().par,
+            Par {
+                connectives: vec![Connective {
+                    connective_instance: Some(ConnString(true))
+                }],
+                connective_used: true,
+                ..Par::default().clone()
+            }
+        );
+
+        assert_eq!(
+            result_uri.unwrap().par,
+            Par {
+                connectives: vec![Connective {
+                    connective_instance: Some(ConnUri(true))
+                }],
+                connective_used: true,
+                ..Par::default().clone()
+            }
+        );
+
+        assert_eq!(
+            result_byte_array.unwrap().par,
+            Par {
+                connectives: vec![Connective {
+                    connective_instance: Some(ConnByteArray(true))
+                }],
+                connective_used: true,
+                ..Par::default().clone()
+            }
+        );
     }
 }

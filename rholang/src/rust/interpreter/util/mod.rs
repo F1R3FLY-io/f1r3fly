@@ -60,6 +60,17 @@ pub fn prepend_new(mut p: Par, n: New) -> Par {
     }
 }
 
+pub fn prepend_bundle(mut p: Par, b: Bundle) -> Par {
+    let mut new_bundles = vec![b.clone()];
+    new_bundles.append(&mut p.bundles);
+
+    Par {
+        bundles: new_bundles,
+        locally_free: union(p.locally_free.clone(), b.body.unwrap().locally_free),
+        ..p.clone()
+    }
+}
+
 // for locally_free parameter, in case when we have (bodyResult.par.locallyFree.from(boundCount).map(x => x - boundCount))
 pub(crate) fn filter_and_adjust_bitset(bitset: Vec<u8>, bound_count: usize) -> Vec<u8> {
     bitset

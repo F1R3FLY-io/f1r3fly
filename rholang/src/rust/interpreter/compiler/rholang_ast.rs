@@ -335,6 +335,15 @@ impl Proc {
             col_num: 0,
         }
     }
+
+    pub fn new_proc_par_with_wildcard_and_var(value_var: &str) -> Proc {
+        Proc::Par {
+            left: Box::new(Self::new_proc_wildcard()),
+            right: Box::new(Self::new_proc_var(value_var)),
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -380,6 +389,19 @@ impl Name {
         Name::Quote(Box::new(Quote {
             quotable: Box::new(Proc::Var(Var {
                 name: name.to_string(),
+                line_num: 0,
+                col_num: 0,
+            })),
+            line_num: 0,
+            col_num: 0,
+        }))
+    }
+
+    pub fn new_name_quote_var_ref(name: &str) -> Name {
+        Name::Quote(Box::new(Quote {
+            quotable: Box::new(Proc::VarRef(VarRef {
+                var_ref_kind: VarRefKind::Name,
+                var: Var::new(name.to_string()),
                 line_num: 0,
                 col_num: 0,
             })),
@@ -490,6 +512,17 @@ pub struct Disjunction {
     pub col_num: usize,
 }
 
+impl Disjunction {
+    pub fn new_disjunction_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
+        Proc::Disjunction(Disjunction {
+            left: Box::new(Proc::new_proc_var(value_left)),
+            right: Box::new(Proc::new_proc_var(value_right)),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Conjunction {
     pub left: Box<Proc>,
@@ -524,6 +557,14 @@ impl Negation {
                 line_num: 0,
                 col_num: 0,
             })),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+
+    pub fn new_negation_int(value: i64) -> Proc {
+        Proc::Negation(Negation {
+            proc: Box::new(Proc::new_proc_int(value)),
             line_num: 0,
             col_num: 0,
         })
@@ -612,6 +653,43 @@ pub enum SimpleType {
     ByteArray { line_num: usize, col_num: usize },
 }
 
+impl SimpleType {
+    pub fn new_bool() -> Self {
+        SimpleType::Bool {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_int() -> Self {
+        SimpleType::Int {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_string() -> Self {
+        SimpleType::String {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_uri() -> Self {
+        SimpleType::Uri {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bytearray() -> Self {
+        SimpleType::ByteArray {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum SyncSendCont {
     Empty {
@@ -694,6 +772,36 @@ pub enum BundleType {
     BundleRead { line_num: usize, col_num: usize },
     BundleEquiv { line_num: usize, col_num: usize },
     BundleReadWrite { line_num: usize, col_num: usize },
+}
+
+impl BundleType {
+    pub fn new_bundle_write() -> Self {
+        BundleType::BundleWrite {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_read() -> Self {
+        BundleType::BundleRead {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_equiv() -> Self {
+        BundleType::BundleEquiv {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
+
+    pub fn new_bundle_read_write() -> Self {
+        BundleType::BundleReadWrite {
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -817,6 +925,17 @@ pub struct LinearBind {
     pub input: Source,
     pub line_num: usize,
     pub col_num: usize,
+}
+
+impl LinearBind {
+    pub(crate) fn new_linear_bind(names: Names, source: Source) -> LinearBind {
+        LinearBind {
+            names,
+            input: source,
+            line_num: 0,
+            col_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
