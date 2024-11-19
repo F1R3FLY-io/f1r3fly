@@ -128,7 +128,7 @@ module.exports = grammar({
             $.conjunction,
             $.negation,
             $._ground_expression,
-						$.var_ref
+            $.var_ref
         ),
         _parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
 
@@ -173,9 +173,10 @@ module.exports = grammar({
         _proc_var: $ => choice($.wildcard, $.var),
 
         var_ref_kind: $ => choice('=', '=*'),
-        var_ref: $ => seq($.var_ref_kind, $.var),
+        var_ref: $ => prec(13, seq(field('kind', $.var_ref_kind), field('var', $.var))),
 
         quotable: $ => choice(
+            $.var_ref,
             $.eval,
             $.disjunction,
             $.conjunction,
