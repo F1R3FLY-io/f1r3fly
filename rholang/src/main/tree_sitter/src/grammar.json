@@ -1488,21 +1488,37 @@
       ]
     },
     "var_ref": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "var_ref_kind"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "var"
-        }
-      ]
+      "type": "PREC",
+      "value": 13,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "kind",
+            "content": {
+              "type": "SYMBOL",
+              "name": "var_ref_kind"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "var",
+            "content": {
+              "type": "SYMBOL",
+              "name": "var"
+            }
+          }
+        ]
+      }
     },
     "quotable": {
       "type": "CHOICE",
       "members": [
+        {
+          "type": "SYMBOL",
+          "name": "var_ref"
+        },
         {
           "type": "SYMBOL",
           "name": "eval"

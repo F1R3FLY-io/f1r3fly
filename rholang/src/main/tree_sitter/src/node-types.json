@@ -11858,6 +11858,10 @@
         {
           "type": "simple_type",
           "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
         }
       ]
     }
@@ -12642,20 +12646,27 @@
   {
     "type": "var_ref",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "var_ref_kind",
-          "named": true
-        }
-      ]
+    "fields": {
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var_ref_kind",
+            "named": true
+          }
+        ]
+      },
+      "var": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {

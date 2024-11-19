@@ -234,7 +234,7 @@ mod tests {
         let expected_result = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
 
         let unwrap_result: NameVisitOutputs = result.clone().unwrap();
-        // println!("Rust BoundVar result par: {:?}", unwrap_result.clone().par);
+
         assert_eq!(unwrap_result.par, expected_result);
         assert_eq!(
             unwrap_result.clone().free_map,
@@ -296,7 +296,7 @@ mod tests {
         let expected_result: Par = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
 
         let unwrap_result = result.clone().unwrap();
-        // println!("Rust Quote BoundVar result par: {:?}", unwrap_result.par);
+
         assert_eq!(unwrap_result.clone().par, expected_result);
         assert_eq!(unwrap_result.clone().free_map, bound_inputs.free_map);
     }
@@ -355,7 +355,6 @@ mod tests {
 
         let result = normalize_name(&n_q_eval, bound_inputs.clone(), &env);
 
-        //TODO not sure here -> val expectedResult: Par = EVar(BoundVar(0)).prepend(EVar(BoundVar(0)), 0)
         let bound_var_expr = new_boundvar_par(0, create_bit_vector(&vec![0]), false);
         let expected_result =
             prepend_expr(bound_var_expr.clone(), bound_var_expr.exprs[0].clone(), 0);
