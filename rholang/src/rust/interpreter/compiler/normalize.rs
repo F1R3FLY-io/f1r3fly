@@ -340,14 +340,13 @@ mod tests {
     use crate::rust::interpreter::util::prepend_expr;
     use models::create_bit_vector;
     use models::rhoapi::expr::ExprInstance;
-    use models::rhoapi::var::VarInstance;
     use models::rhoapi::{
         expr, EDiv, EMinus, EMinusMinus, EMult, ENeg, ENot, EPercentPercent, EPlus, EPlusPlus,
-        EVar, Expr, Par, Var,
+        Expr, Par,
     };
     use models::rust::utils::{
-        new_boundvar_expr, new_boundvar_par, new_emap_par, new_eplus_par, new_freevar_par,
-        new_gint_par, new_gstring_par, new_key_value_pair,
+        new_boundvar_expr, new_boundvar_par, new_emap_par, new_freevar_par, new_gint_par,
+        new_gstring_par, new_key_value_pair,
     };
     use pretty_assertions::assert_eq;
 

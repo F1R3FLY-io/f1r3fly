@@ -3,8 +3,7 @@ use crate::rust::interpreter::compiler::rholang_ast::SimpleType;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
 use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::{Connective, Par};
-use std::collections::HashMap;
+use models::rhoapi::Connective;
 
 pub fn normalize_simple_type(
     simple_type: &SimpleType,
