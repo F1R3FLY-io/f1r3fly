@@ -710,7 +710,7 @@ mod tests {
 
         let cases = vec![
             ("wildcard", "send channel", "{_!(1)}"),
-            //("wildcard", "send data", "{@=*x!(_)}"), //TODO the problem is =, if we delete it then everything will work
+            ("wildcard", "send data", "{@=*x!(_)}"),
             ("wildcard", "send data", "{@Nil!(_)}"),
             ("logical AND", "send data", "{@Nil!(1 /\\ 2)}"),
             ("logical OR", "send data", "{@Nil!(1 \\/ 2)}"),
