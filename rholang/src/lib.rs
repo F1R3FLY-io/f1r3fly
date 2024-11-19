@@ -49,7 +49,7 @@ extern "C" fn evaluate(
     let rand = Blake2b512Random::new(&params.rand);
     // println!("\nrand in rust lib: {:?}", rand.to_vec());
 
-    let mut rho_runtime = unsafe { (*runtime_ptr).runtime.lock().unwrap() };
+    let mut rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
     let rt = tokio::runtime::Runtime::new().unwrap();
     let eval_result = rt.block_on(async {
         rho_runtime
@@ -104,7 +104,7 @@ extern "C" fn set_block_data(
     unsafe {
         (*runtime_ptr)
             .runtime
-            .lock()
+            .try_lock()
             .unwrap()
             .set_block_data(block_data);
     }
@@ -123,7 +123,7 @@ extern "C" fn create_runtime(
     params_ptr: *const u8,
     params_bytes_len: usize,
 ) -> *mut RhoRuntime {
-    let rspace = unsafe { (*rspace_ptr).rspace.lock().unwrap().clone() };
+    let rspace = unsafe { (*rspace_ptr).rspace.try_lock().unwrap().clone() };
 
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
     let params = CreateRuntimeParams::decode(params_slice).unwrap();

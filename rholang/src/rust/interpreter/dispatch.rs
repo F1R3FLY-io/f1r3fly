@@ -6,7 +6,7 @@ use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use super::{
@@ -27,7 +27,8 @@ pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
 
 #[derive(Clone)]
 pub struct RholangAndScalaDispatcher {
-    pub _dispatch_table: Arc<Mutex<HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>>>,
+    pub _dispatch_table:
+        Arc<std::sync::Mutex<HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>>>,
     pub reducer: Option<DebruijnInterpreter>,
 }
 
@@ -37,7 +38,7 @@ impl RholangAndScalaDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
-        println!("\ndispatch");
+        // println!("\ndispatch");
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
@@ -60,7 +61,7 @@ impl RholangAndScalaDispatcher {
                         .await
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
-                    match self._dispatch_table.lock().unwrap().get_mut(&_ref) {
+                    match self._dispatch_table.try_lock().unwrap().get_mut(&_ref) {
                         Some(f) => Ok(f(data_list)),
                         None => Err(InterpreterError::BugFoundError(format!(
                             "dispatch: no function for {}",
@@ -74,7 +75,7 @@ impl RholangAndScalaDispatcher {
     }
 }
 
-pub type RhoDispatch = Arc<Mutex<RholangAndScalaDispatcher>>;
+pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
 
 impl RholangAndScalaDispatcher {
     pub fn create<T>(
@@ -88,15 +89,15 @@ impl RholangAndScalaDispatcher {
     where
         T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
-        println!("\ncreate");
+        // println!("\ncreate");
         let mut dispatcher = RholangAndScalaDispatcher {
-            _dispatch_table: Arc::new(Mutex::new(dispatch_table)),
+            _dispatch_table: Arc::new(std::sync::Mutex::new(dispatch_table)),
             reducer: None,
         };
 
         let mut reducer = DebruijnInterpreter {
-            space: Arc::new(Mutex::new(Box::new(tuplespace))),
-            dispatcher: Arc::new(Mutex::new(dispatcher.clone())),
+            space: Arc::new(std::sync::Mutex::new(Box::new(tuplespace))),
+            dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
             urn_map,
             merge_chs,
             mergeable_tag_name,
@@ -105,9 +106,9 @@ impl RholangAndScalaDispatcher {
         };
 
         dispatcher.reducer = Some(reducer.clone());
-        let dispatcher_arc = Arc::new(Mutex::new(dispatcher.clone()));
+        let dispatcher_arc = Arc::new(RwLock::new(dispatcher.clone()));
         reducer.dispatcher = dispatcher_arc.clone();
-        let mut dispatcher_locked = dispatcher_arc.lock().unwrap();
+        let mut dispatcher_locked = dispatcher_arc.try_write().unwrap();
         dispatcher_locked.reducer = Some(reducer.clone());
         drop(dispatcher_locked);
 
@@ -118,15 +119,15 @@ impl RholangAndScalaDispatcher {
     where
         T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
-        println!("\ncreate_dispatcher");
+        // println!("\ncreate_dispatcher");
         let mut dispatcher = RholangAndScalaDispatcher {
-            _dispatch_table: Arc::new(Mutex::new(HashMap::new())),
+            _dispatch_table: Arc::new(std::sync::Mutex::new(HashMap::new())),
             reducer: None,
         };
 
         let mut reducer = DebruijnInterpreter {
-            space: Arc::new(Mutex::new(Box::new(tuplespace))),
-            dispatcher: Arc::new(Mutex::new(dispatcher.clone())),
+            space: Arc::new(std::sync::Mutex::new(Box::new(tuplespace))),
+            dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
             urn_map: HashMap::new(),
             merge_chs: Arc::new(RwLock::new(HashSet::new())),
             mergeable_tag_name: Par::default(),
@@ -135,12 +136,12 @@ impl RholangAndScalaDispatcher {
         };
 
         dispatcher.reducer = Some(reducer.clone());
-        let dispatcher_arc = Arc::new(Mutex::new(dispatcher.clone()));
+        let dispatcher_arc = Arc::new(RwLock::new(dispatcher.clone()));
         reducer.dispatcher = dispatcher_arc.clone();
-        let mut dispatcher_locked = dispatcher_arc.lock().unwrap();
+        let mut dispatcher_locked = dispatcher_arc.try_write().unwrap();
         dispatcher_locked.reducer = Some(reducer.clone());
         drop(dispatcher_locked);
 
-        Arc::new(Mutex::new(dispatcher))
+        Arc::new(RwLock::new(dispatcher))
     }
 }

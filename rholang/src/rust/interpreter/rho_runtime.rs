@@ -283,7 +283,7 @@ impl RhoRuntime for RhoRuntimeImpl {
     fn create_soft_checkpoint(
         &mut self,
     ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation> {
-        self.space.lock().unwrap().create_soft_checkpoint()
+        self.space.try_lock().unwrap().create_soft_checkpoint()
     }
 
     fn revert_to_soft_checkpoint(
@@ -291,18 +291,18 @@ impl RhoRuntime for RhoRuntimeImpl {
         soft_checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
     ) -> () {
         self.space
-            .lock()
+            .try_lock()
             .unwrap()
             .revert_to_soft_checkpoint(soft_checkpoint)
             .unwrap()
     }
 
     fn create_checkpoint(&mut self) -> Checkpoint {
-        self.space.lock().unwrap().create_checkpoint().unwrap()
+        self.space.try_lock().unwrap().create_checkpoint().unwrap()
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {
-        self.space.lock().unwrap().reset(root).unwrap()
+        self.space.try_lock().unwrap().reset(root).unwrap()
     }
 
     fn consume_result(
@@ -310,7 +310,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError> {
-        let v = self.space.lock().unwrap().consume(
+        let v = self.space.try_lock().unwrap().consume(
             channel,
             pattern,
             TaggedContinuation::default(),
@@ -322,11 +322,11 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 
     fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
-        self.space.lock().unwrap().get_data(channel)
+        self.space.try_lock().unwrap().get_data(channel)
     }
 
     fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
-        self.space.lock().unwrap().get_joins(channel)
+        self.space.try_lock().unwrap().get_joins(channel)
     }
 
     fn get_continuation(
@@ -334,7 +334,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         channels: Vec<Par>,
     ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
         self.space
-            .lock()
+            .try_lock()
             .unwrap()
             .get_waiting_continuations(channels)
     }
@@ -371,7 +371,7 @@ impl RhoRuntime for RhoRuntimeImpl {
     fn get_hot_changes(
         &self,
     ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
-        self.space.lock().unwrap().to_map()
+        self.space.try_lock().unwrap().to_map()
     }
 }
 
@@ -412,12 +412,12 @@ impl ReplayRhoRuntimeImpl {
 
 impl ReplayRhoRuntime for ReplayRhoRuntimeImpl {
     fn rig(&self, log: Log) -> Result<(), InterpreterError> {
-        self.space.lock().unwrap().rig(log)?;
+        self.space.try_lock().unwrap().rig(log)?;
         Ok(())
     }
 
     fn check_replay_data(&self) -> Result<(), InterpreterError> {
-        self.space.lock().unwrap().check_replay_data()?;
+        self.space.try_lock().unwrap().check_replay_data()?;
         Ok(())
     }
 }
@@ -448,7 +448,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     fn create_soft_checkpoint(
         &mut self,
     ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation> {
-        self.space.lock().unwrap().create_soft_checkpoint()
+        self.space.try_lock().unwrap().create_soft_checkpoint()
     }
 
     fn revert_to_soft_checkpoint(
@@ -456,18 +456,18 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         soft_checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
     ) -> () {
         self.space
-            .lock()
+            .try_lock()
             .unwrap()
             .revert_to_soft_checkpoint(soft_checkpoint)
             .unwrap()
     }
 
     fn create_checkpoint(&mut self) -> Checkpoint {
-        self.space.lock().unwrap().create_checkpoint().unwrap()
+        self.space.try_lock().unwrap().create_checkpoint().unwrap()
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {
-        self.space.lock().unwrap().reset(root).unwrap()
+        self.space.try_lock().unwrap().reset(root).unwrap()
     }
 
     fn consume_result(
@@ -475,7 +475,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError> {
-        let v = self.space.lock().unwrap().consume(
+        let v = self.space.try_lock().unwrap().consume(
             channel,
             pattern,
             TaggedContinuation::default(),
@@ -487,11 +487,11 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     }
 
     fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
-        self.space.lock().unwrap().get_data(channel)
+        self.space.try_lock().unwrap().get_data(channel)
     }
 
     fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
-        self.space.lock().unwrap().get_joins(channel)
+        self.space.try_lock().unwrap().get_joins(channel)
     }
 
     fn get_continuation(
@@ -499,7 +499,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         channels: Vec<Par>,
     ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
         self.space
-            .lock()
+            .try_lock()
             .unwrap()
             .get_waiting_continuations(channels)
     }
@@ -536,7 +536,7 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
     fn get_hot_changes(
         &self,
     ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
-        self.space.lock().unwrap().to_map()
+        self.space.try_lock().unwrap().to_map()
     }
 }
 
@@ -822,7 +822,7 @@ fn setup_reducer<T>(
 where
     T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
-    println!("\nsetup_reducer");
+    // println!("\nsetup_reducer");
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
         RholangAndScalaDispatcher::create_dispatcher(charging_rspace.clone(), cost.clone()),
@@ -917,7 +917,7 @@ fn bootstrap_rand() -> Blake2b512Random {
 
 pub fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     let rand = bootstrap_rand();
-    let runtime_lock = runtime.lock().unwrap();
+    let runtime_lock = runtime.try_lock().unwrap();
     let cost = runtime_lock.cost().get();
     let _ = runtime_lock
         .cost()
@@ -955,7 +955,7 @@ where
 
     if init_registry {
         let _ = bootstrap_registry(runtime.clone());
-        let _ = runtime.lock().unwrap().create_checkpoint();
+        let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
 
     runtime
@@ -1033,7 +1033,7 @@ where
 
     if init_registry {
         let _ = bootstrap_registry(runtime.clone());
-        let _ = runtime.lock().unwrap().create_checkpoint();
+        let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
 
     runtime

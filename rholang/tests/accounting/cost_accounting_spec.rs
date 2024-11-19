@@ -24,7 +24,7 @@ async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> Evaluate
     let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new());
 
     let eval_result = runtime
-        .lock()
+        .try_lock()
         .unwrap()
         .evaluate_with_phlo(
             contract,

@@ -33,7 +33,7 @@ pub type Producer = Box<
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
-        println!("\ncontract_call unapply");
+        // println!("\ncontract_call unapply");
         if contract_args.len() == 1 {
             let (args, rand) = (
                 contract_args[0].pars.clone(),
@@ -46,7 +46,7 @@ impl ContractCall {
                 let space = space.clone();
                 let rand = rand.clone();
                 Box::new(async move {
-                    let mut space_lock = space.lock().unwrap();
+                    let mut space_lock = space.try_lock().unwrap();
                     let produce_result = space_lock.produce(
                         ch,
                         ListParWithRandom {
@@ -59,7 +59,7 @@ impl ContractCall {
 
                     match produce_result {
                         Some((cont, channels)) => {
-                            let dispatcher_lock = dispatcher.lock().unwrap();
+                            let dispatcher_lock = dispatcher.try_read().unwrap();
                             let res = dispatcher_lock
                                 .dispatch(
                                     cont.continuation,

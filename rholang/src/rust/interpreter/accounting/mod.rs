@@ -35,7 +35,7 @@ impl CostManager {
             .try_acquire()
             .map_err(|_| InterpreterError::SetupError("Failed to acquire semaphore".to_string()))?;
 
-        let mut current_cost = self.state.lock().unwrap();
+        let mut current_cost = self.state.try_lock().unwrap();
 
         if current_cost.value < 0 {
             return Err(InterpreterError::OutOfPhlogistonsError);
@@ -49,12 +49,12 @@ impl CostManager {
     }
 
     pub fn get(&self) -> Cost {
-        let current_cost = self.state.lock().unwrap();
+        let current_cost = self.state.try_lock().unwrap();
         current_cost.clone()
     }
 
     pub fn set(&self, new_value: Cost) {
-        let mut current_cost = self.state.lock().unwrap();
+        let mut current_cost = self.state.try_lock().unwrap();
         *current_cost = new_value;
     }
 }
