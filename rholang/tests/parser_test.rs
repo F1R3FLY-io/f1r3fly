@@ -3,8 +3,8 @@ use rholang::rust::interpreter::compiler::{
     rholang_ast::{
         Block, Branch, BundleType, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,
         Disjunction, Eval, KeyValuePair, LinearBind, Name, NameDecl, Names, Negation, PeekBind,
-        Proc, ProcList, Quote, Receipt, Receipts, RepeatedBind, SendType, Source, SyncSendCont,
-        UriLiteral, Var, VarRef, VarRefKind,
+        Proc, ProcList, Quote, Receipt, Receipts, RepeatedBind, SendType, SimpleType, Source,
+        SyncSendCont, UriLiteral, Var, VarRef, VarRefKind,
     },
 };
 
@@ -2101,6 +2101,20 @@ fn parse_rholang_code_to_proc_should_handle_tuple() {
                 col_num: 10,
             },
         ],
+        line_num: 0,
+        col_num: 0,
+    });
+
+    assert_eq!(result.unwrap(), expected_result)
+}
+
+#[test]
+fn parse_rholang_code_to_proc_should_handle_simple_type() {
+    let input_code = "Int";
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+
+    let expected_result = Proc::SimpleType(SimpleType::Int {
         line_num: 0,
         col_num: 0,
     });

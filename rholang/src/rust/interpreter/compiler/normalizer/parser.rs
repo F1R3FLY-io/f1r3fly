@@ -839,25 +839,28 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
             Ok(Proc::Collection(collection))
         }
 
-        "simple_type" => match node.kind() {
-            "Bool" => Ok(Proc::SimpleType(SimpleType::Bool { line_num, col_num })),
+        "simple_type" => {
+            let simple_type_value = get_node_value(node, source.as_bytes())?;
+            match simple_type_value.as_str() {
+                "Bool" => Ok(Proc::SimpleType(SimpleType::Bool { line_num, col_num })),
 
-            "Int" => Ok(Proc::SimpleType(SimpleType::Int { line_num, col_num })),
+                "Int" => Ok(Proc::SimpleType(SimpleType::Int { line_num, col_num })),
 
-            "String" => Ok(Proc::SimpleType(SimpleType::String { line_num, col_num })),
+                "String" => Ok(Proc::SimpleType(SimpleType::String { line_num, col_num })),
 
-            "Uri" => Ok(Proc::SimpleType(SimpleType::Uri { line_num, col_num })),
+                "Uri" => Ok(Proc::SimpleType(SimpleType::Uri { line_num, col_num })),
 
-            "ByteArray" => Ok(Proc::SimpleType(SimpleType::ByteArray {
-                line_num,
-                col_num,
-            })),
+                "ByteArray" => Ok(Proc::SimpleType(SimpleType::ByteArray {
+                    line_num,
+                    col_num,
+                })),
 
-            _ => Err(InterpreterError::ParserError(format!(
-                "Unexpected choice node kind: {:?} of simple_type",
-                node.kind(),
-            ))),
-        },
+                _ => Err(InterpreterError::ParserError(format!(
+                    "Unexpected value: {:?} of node simple_type",
+                    simple_type_value,
+                ))),
+            }
+        }
 
         //_ground
         "bool_literal" => Ok(Proc::BoolLiteral {
