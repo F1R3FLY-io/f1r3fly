@@ -51,6 +51,7 @@ impl Interpreter for InterpreterImpl {
             let _ = self.c.charge(parsing_cost.clone())?;
             // let phlos_left_after = self.c.get();
 
+            // println!("\nterm: {:#?}", term);
             let parsed = Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env)?;
             // println!("\nparsed: {:?}", parsed);
             // let phlos_left_after_adt = self.c.get();

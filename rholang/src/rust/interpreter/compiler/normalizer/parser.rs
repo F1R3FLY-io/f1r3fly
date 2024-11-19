@@ -42,6 +42,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
 }
 
 fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
+    // println!("\nparse_proc, node: {:?}", node.to_sexp());
     let line_num = node.start_position().row;
     let col_num = node.start_position().column;
 
@@ -724,6 +725,7 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         "block" => Ok(Proc::Block(Box::new(parse_block(node, source)?))),
 
         "collection" => {
+            // println!("\ncollection node: {:?}", node.to_sexp());
             fn get_cont_id(node: &Node) -> Result<i32, InterpreterError> {
                 match node.child_by_field_name("cont") {
                     Some(cont_node) => match cont_node.next_named_sibling() {
@@ -1242,9 +1244,11 @@ fn get_child_by_field_name<'a>(
     match node.child_by_field_name(name) {
         Some(child_node) => Ok(child_node),
         None => Err(InterpreterError::ParserError(format!(
-            "Error: did not find expected field: {:?}, on node {:?}",
+            "Error: did not find expected field: {:?}, on node {:?}. Line: {:?}, Col: {:?}",
             name,
             node.kind(),
+            node.start_position().row,
+            node.start_position().column,
         ))),
     }
 }
@@ -1253,9 +1257,11 @@ fn get_named_child<'a>(node: &'a Node<'a>, index: usize) -> Result<Node<'a>, Int
     match node.named_child(index) {
         Some(child_node) => Ok(child_node),
         None => Err(InterpreterError::ParserError(format!(
-            "Error: did not find named child at index: {:?}, on node {:?}",
+            "Error: did not find named child at index: {:?}, on node {:?}. Line: {:?}, Col: {:?}",
             index,
             node.kind(),
+            node.start_position().row,
+            node.start_position().column,
         ))),
     }
 }

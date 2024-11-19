@@ -2234,6 +2234,17 @@ fn parse_rholang_code_to_proc_should_parse_var_ref() {
 }
 
 #[test]
+fn parse_rholang_code_to_proc_should_handle_trailing_comma() {
+    let input_code = r#"
+        stateCh!({
+								"randomNumbers"   : {},
+							})
+    "#;
+    let result = parse_rholang_code_to_proc(&input_code);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn parse_rholang_code_to_proc_should_ignore_line_comment() {
     let input_code = r#"
        // This is a line comment
