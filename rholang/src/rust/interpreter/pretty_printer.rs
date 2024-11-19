@@ -1041,3 +1041,61 @@ impl PrettyPrinter {
         news_shift_indices.contains(&(bound_shift - level - 1))
     }
 }
+
+// rholang/src/test/scala/coop/rchain/rholang/interpreter/PrettyPrinterTest.scala
+#[cfg(test)]
+mod tests {
+    use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::normalize_ground;
+    use crate::rust::interpreter::compiler::rholang_ast::{Proc, UriLiteral};
+    use crate::rust::interpreter::pretty_printer::PrettyPrinter;
+    use pretty_assertions;
+
+    #[test]
+    fn bool_true_should_print_as_true() {
+        let proc = Proc::new_proc_bool(true);
+        let expr = normalize_ground(&proc).unwrap();
+        let mut printer = PrettyPrinter::new();
+
+        assert_eq!(printer.build_string_from_expr(&expr), "true");
+    }
+
+    #[test]
+    fn bool_false_should_print_as_false() {
+        let proc = Proc::new_proc_bool(false);
+        let expr = normalize_ground(&proc).unwrap();
+        let mut printer = PrettyPrinter::new();
+
+        assert_eq!(printer.build_string_from_expr(&expr), "false");
+    }
+
+    #[test]
+    fn ground_int_should_print_as_string_int() {
+        let proc = Proc::new_proc_int(7);
+        let expr = normalize_ground(&proc).unwrap();
+        let mut printer = PrettyPrinter::new();
+
+        assert_eq!(printer.build_string_from_expr(&expr), "7".to_string());
+    }
+
+    //TODO why String equals "\"String\"" after normalization?
+    #[test]
+    fn ground_string_should_print_as_string() {
+        let proc = Proc::new_proc_string("String".to_string());
+        let expr = normalize_ground(&proc).unwrap();
+        let target: String = "\"String\"".to_string();
+        let mut printer = PrettyPrinter::new();
+
+        assert_eq!(printer.build_string_from_expr(&expr), target);
+    }
+
+    //TODO "Uri" equals "`Uri`" ?
+    #[test]
+    fn ground_uri_should_print_with_back_ticks() {
+        let proc = Proc::new_proc_uri("Uri".to_string());
+        let expr = normalize_ground(&proc).unwrap();
+        let target: String = "`Uri`".to_string();
+        let mut printer = PrettyPrinter::new();
+
+        assert_eq!(printer.build_string_from_expr(&expr), target);
+    }
+}
