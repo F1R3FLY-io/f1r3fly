@@ -113,7 +113,10 @@ extern "C" fn set_block_data(
 #[no_mangle]
 extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
-    bootstrap_registry_internal(runtime);
+    let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
+    tokio_runtime.block_on(async {
+        bootstrap_registry_internal(runtime).await;
+    });
 }
 
 // Note: I am defaulting 'additional_system_processes' to 'Vec::new()'
@@ -131,6 +134,11 @@ extern "C" fn create_runtime(
     let mergeable_tag_name = params.mergeable_tag_name.unwrap();
     let init_registry = params.init_registry;
 
-    let runtime = create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new());
-    Box::into_raw(Box::new(RhoRuntime { runtime }))
+    let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
+    let rho_runtime = tokio_runtime.block_on(async {
+        create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+    });
+    Box::into_raw(Box::new(RhoRuntime {
+        runtime: rho_runtime,
+    }))
 }

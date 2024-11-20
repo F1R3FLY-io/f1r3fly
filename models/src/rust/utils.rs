@@ -2,12 +2,12 @@ use expr::ExprInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::rhoapi::*;
 use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
 use crate::rust::utils::expr::ExprInstance::*;
 use crate::rust::utils::var::VarInstance::{BoundVar, FreeVar, Wildcard};
 use crate::rust::utils::var::WildcardMsg;
+use crate::{create_bit_vector, rhoapi::*};
 
 use super::par_map::ParMap;
 use super::par_map_type_mapper::ParMapTypeMapper;
@@ -535,7 +535,8 @@ pub fn new_wildcard_var() -> Var {
 }
 
 pub fn new_boundvar_par(value: i32, _locally_free_par: Vec<u8>, _connective_used_par: bool) -> Par {
-    vector_par(_locally_free_par, _connective_used_par).with_exprs(vec![new_boundvar_expr(value)])
+    vector_par(create_bit_vector(&vec![value as usize]), _connective_used_par)
+        .with_exprs(vec![new_boundvar_expr(value)])
 }
 
 pub fn new_boundvar_expr(value: i32) -> Expr {
@@ -623,14 +624,25 @@ pub fn new_eplus_par_gint(
 ) -> Par {
     Par::default().with_exprs(vec![Expr {
         expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-            p1: Some(new_gint_par(lhs_value, locally_free_par.clone(), connective_used_par)),
-            p2: Some(new_gint_par(rhs_value, locally_free_par, connective_used_par)),
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
         })),
     }])
 }
 
 pub fn new_eplus_par(lhs_value: Par, rhs_value: Par) -> Par {
-    let locally_free = union(lhs_value.locally_free.clone(), rhs_value.locally_free.clone());
+    let locally_free = union(
+        lhs_value.locally_free.clone(),
+        rhs_value.locally_free.clone(),
+    );
     let connective_used = lhs_value.connective_used || rhs_value.connective_used;
 
     Par::default()

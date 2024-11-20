@@ -915,18 +915,20 @@ fn bootstrap_rand() -> Blake2b512Random {
          .as_bytes())
 }
 
-pub fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
+pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
+    // println!("\nhit bootstrap_registry");
     let rand = bootstrap_rand();
     let runtime_lock = runtime.try_lock().unwrap();
     let cost = runtime_lock.cost().get();
     let _ = runtime_lock
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
-    let _ = runtime_lock.inj(ast(), Env::new(), rand);
+    // println!("\nast: {:?}", ast());
+    runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
-fn create_runtime<T>(
+async fn create_runtime<T>(
     rspace: T,
     extra_system_processes: &mut Vec<Definition>,
     init_registry: bool,
@@ -954,7 +956,7 @@ where
     let runtime = RhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
-        let _ = bootstrap_registry(runtime.clone());
+        bootstrap_registry(runtime.clone()).await;
         let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
 
@@ -978,7 +980,7 @@ where
  *                use [[coop.rchain.rholang.interpreter.accounting.noOpCostLog]]
  * @return
  */
-pub fn create_rho_runtime<T>(
+pub async fn create_rho_runtime<T>(
     rspace: T,
     mergeable_tag_name: Par,
     init_registry: bool,
@@ -992,7 +994,7 @@ where
         extra_system_processes,
         init_registry,
         mergeable_tag_name,
-    )
+    ).await
 }
 
 /**
@@ -1003,7 +1005,7 @@ where
  * @param costLog same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
  * @return
  */
-pub fn create_replay_rho_runtime<T>(
+pub async fn create_replay_rho_runtime<T>(
     rspace: T,
     mergeable_tag_name: Par,
     init_registry: bool,
@@ -1032,14 +1034,14 @@ where
         ReplayRhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
-        let _ = bootstrap_registry(runtime.clone());
+        bootstrap_registry(runtime.clone()).await;
         let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
 
     runtime
 }
 
-fn create_runtimes<T, R>(
+async fn create_runtimes<T, R>(
     space: T,
     replay_space: R,
     init_registry: bool,
@@ -1055,19 +1057,19 @@ where
         mergeable_tag_name.clone(),
         init_registry,
         additional_system_processes,
-    );
+    ).await;
 
     let replay_rho_runtime = create_replay_rho_runtime(
         replay_space,
         mergeable_tag_name,
         init_registry,
         additional_system_processes,
-    );
+    ).await;
 
     (rho_runtime, replay_rho_runtime)
 }
 
-fn create_runtime_from_kv_store(
+async fn create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,
@@ -1082,7 +1084,7 @@ fn create_runtime_from_kv_store(
         mergeable_tag_name,
         init_registry,
         additional_system_processes,
-    );
+    ).await;
 
     runtime
 }

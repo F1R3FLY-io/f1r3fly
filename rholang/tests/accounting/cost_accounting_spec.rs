@@ -21,7 +21,7 @@ async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> Evaluate
     let store = kvm.r_space_stores().await.unwrap();
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new());
+    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
 
     let eval_result = runtime
         .try_lock()

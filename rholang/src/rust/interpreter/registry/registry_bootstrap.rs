@@ -45,7 +45,7 @@ fn bootstrap(channel: Par) -> New {
                 }])),
                 persistent: false,
                 peek: false,
-                bind_count: 0,
+                bind_count: 1,
                 locally_free: Vec::new(),
                 connective_used: false,
             }],
