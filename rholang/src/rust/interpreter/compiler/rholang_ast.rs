@@ -520,6 +520,16 @@ pub struct Eval {
     pub col_num: usize,
 }
 
+impl Eval {
+    pub fn new_eval_name_var(value: &str) -> Proc {
+        Proc::Eval(Eval {
+            name: Name::new_name_var(value),
+            line_num: 0,
+            col_num: 0,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Disjunction {
     pub left: Box<Proc>,
