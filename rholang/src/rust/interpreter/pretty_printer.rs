@@ -332,11 +332,29 @@ impl PrettyPrinter {
                     )))
                 }
 
-                ExprInstance::EListBody(EList { ps, remainder, .. }) => Ok(format!(
-                    "[{},{}]",
-                    self.build_vec(ps),
-                    self.build_remainder_string(remainder)
-                )),
+                /*
+                  I change this code, because list with remainder with always return comma after last element, like [x0, x1, 7,...free0]
+                  However, in a conversation with Steven we decided that we should rely on Scala [x0, x1, 7...free0] (after last element we don't have comma)
+                */
+                // ExprInstance::EListBody(EList { ps, remainder, .. }) => Ok(format!(
+                //     "[{},{}]",
+                //     self.build_vec(ps),
+                //     self.build_remainder_string(remainder)
+                // )),
+                ExprInstance::EListBody(EList { ps, remainder, .. }) => {
+                    let elements = self.build_vec(ps);
+                    let remainder_string = self.build_remainder_string(remainder);
+
+                    let full_result = if remainder.is_some() && !elements.is_empty() {
+                        format!("[{}{}]", elements, remainder_string)
+                    } else if remainder.is_some() {
+                        format!("[{}]", remainder_string)
+                    } else {
+                        format!("[{}]", elements)
+                    };
+
+                    Ok(full_result)
+                }
 
                 ExprInstance::ETupleBody(ETuple { ps, .. }) => {
                     Ok(format!("({})", self.build_vec(ps),))
@@ -346,11 +364,26 @@ impl PrettyPrinter {
                     let par_set = ParSetTypeMapper::eset_to_par_set(eset.clone());
                     let pars = par_set.ps;
                     let remainder = &par_set.remainder;
-                    Ok(format!(
-                        "Set({},{})",
-                        self.build_vec(&pars.sorted_pars),
-                        self.build_remainder_string(remainder)
-                    ))
+
+                    //TODO same problem with comma
+
+                    // Ok(format!(
+                    //     "Set({},{})",
+                    //     self.build_vec(&pars.sorted_pars),
+                    //     self.build_remainder_string(remainder)
+                    // ))
+
+                    let elements = self.build_vec(&pars.sorted_pars);
+                    let remainder_string = self.build_remainder_string(remainder);
+                    let full_result = if remainder.is_some() && !elements.is_empty() {
+                        format!("Set({}{})", elements, remainder_string)
+                    } else if remainder.is_some() {
+                        format!("Set({})", remainder_string)
+                    } else {
+                        format!("Set({})", elements)
+                    };
+
+                    Ok(full_result)
                 }
 
                 ExprInstance::EMapBody(emap) => {
@@ -412,11 +445,32 @@ impl PrettyPrinter {
         }
     }
 
+    /*
+      I change this code, because we should properly work with option remainder, based on "list_should_print" test,
+      without a detailed treatment of each case, we will have the following result:
+      "[x0, x1, 7...Var { var_instance: Some(FreeVar(0)) }]" instead of "[x0, x1, 7...free0]"
+
+      So,  format!("...{:?}", v) not enough for all cases.
+    */
     fn build_remainder_string(&self, remainder: &Option<Var>) -> String {
+        // match remainder {
+        //     Some(v) => {
+        //         format!("...{:?}", v)
+        //     }
+        //     None => format!(""),
+        // }
+
         match remainder {
-            Some(v) => {
-                format!("...{:?}", v)
-            }
+            Some(v) => match &v.var_instance {
+                Some(VarInstance::FreeVar(level)) => {
+                    format!("...free{}", self.free_shift + level)
+                }
+                Some(VarInstance::BoundVar(level)) => {
+                    format!("...bound{}", self.bound_shift + level)
+                }
+                Some(VarInstance::Wildcard(_)) => String::from("..._"),
+                None => String::from("...Nil"),
+            },
             None => format!(""),
         }
     }
@@ -1045,11 +1099,15 @@ impl PrettyPrinter {
 // rholang/src/test/scala/coop/rchain/rholang/interpreter/PrettyPrinterTest.scala
 #[cfg(test)]
 mod tests {
+    use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, ProcVisitOutputs};
     use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::normalize_ground;
-    use crate::rust::interpreter::compiler::rholang_ast::{Proc, UriLiteral};
+    use crate::rust::interpreter::compiler::rholang_ast::{Collection, Eval, KeyValuePair, Proc};
+    use crate::rust::interpreter::errors::InterpreterError;
     use crate::rust::interpreter::pretty_printer::PrettyPrinter;
+    use crate::rust::interpreter::test_utils::utils::collection_proc_visit_inputs_and_env;
     use pretty_assertions;
 
+    //ground tests
     #[test]
     fn bool_true_should_print_as_true() {
         let proc = Proc::new_proc_bool(true);
@@ -1077,7 +1135,6 @@ mod tests {
         assert_eq!(printer.build_string_from_expr(&expr), "7".to_string());
     }
 
-    //TODO why String equals "\"String\"" after normalization?
     #[test]
     fn ground_string_should_print_as_string() {
         let proc = Proc::new_proc_string("String".to_string());
@@ -1088,7 +1145,6 @@ mod tests {
         assert_eq!(printer.build_string_from_expr(&expr), target);
     }
 
-    //TODO "Uri" equals "`Uri`" ?
     #[test]
     fn ground_uri_should_print_with_back_ticks() {
         let proc = Proc::new_proc_uri("Uri".to_string());
@@ -1097,5 +1153,123 @@ mod tests {
         let mut printer = PrettyPrinter::new();
 
         assert_eq!(printer.build_string_from_expr(&expr), target);
+    }
+
+    //collections tests
+    #[test]
+    fn list_should_print() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::List {
+            elements: vec![
+                Proc::new_proc_var("P"),
+                Eval::new_eval_name_var("x"),
+                Proc::new_proc_int(7),
+            ],
+            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let mut printer = PrettyPrinter::create(0, 2);
+        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
+            normalize_match_proc(&proc, inputs.clone(), &env);
+        let normalizer_result_as_par = &normalizer_result.unwrap().par;
+        let result = printer.build_string_from_message(normalizer_result_as_par);
+
+        assert_eq!(result, "[x0, x1, 7...free0]");
+    }
+
+    #[test]
+    fn set_should_print() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::Set {
+            elements: vec![
+                Proc::new_proc_var("P"),
+                Eval::new_eval_name_var("x"),
+                Proc::new_proc_int(7),
+            ],
+            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let mut printer = PrettyPrinter::create(0, 2);
+        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
+            normalize_match_proc(&proc, inputs.clone(), &env);
+        let normalizer_result_as_par = &normalizer_result.unwrap().par;
+        let result = printer.build_string_from_message(normalizer_result_as_par);
+
+        assert_eq!(result, "Set(7, x1, x0...free0)");
+    }
+
+    #[test]
+    fn map_should_print() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::Map {
+            pairs: vec![
+                KeyValuePair {
+                    key: Proc::new_proc_int(7),
+                    value: Proc::new_proc_string("Seven".to_string()),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                KeyValuePair {
+                    key: Proc::new_proc_var("P"),
+                    value: Eval::new_eval_name_var("x"),
+                    line_num: 0,
+                    col_num: 0,
+                },
+            ],
+            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let mut printer = PrettyPrinter::create(0, 2);
+        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
+            normalize_match_proc(&proc, inputs.clone(), &env);
+        let normalizer_result_as_par = &normalizer_result.unwrap().par;
+        let result = printer.build_string_from_message(normalizer_result_as_par);
+
+        assert_eq!(result, "{7 : \"Seven\", x0 : x1...free0}");
+    }
+
+    #[test]
+    fn map_should_print_commas_correctly() {
+        let (inputs, env) = collection_proc_visit_inputs_and_env();
+        let proc = Proc::Collection(Collection::Map {
+            pairs: vec![
+                KeyValuePair {
+                    key: Proc::new_proc_string("c".to_string()),
+                    value: Proc::new_proc_int(3),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                KeyValuePair {
+                    key: Proc::new_proc_string("b".to_string()),
+                    value: Proc::new_proc_int(2),
+                    line_num: 0,
+                    col_num: 0,
+                },
+                KeyValuePair {
+                    key: Proc::new_proc_string("a".to_string()),
+                    value: Proc::new_proc_int(1),
+                    line_num: 0,
+                    col_num: 0,
+                },
+            ],
+            cont: None,
+            line_num: 0,
+            col_num: 0,
+        });
+
+        let mut printer = PrettyPrinter::new();
+        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
+            normalize_match_proc(&proc, inputs.clone(), &env);
+        let normalizer_result_as_par = &normalizer_result.unwrap().par;
+        let result = printer.build_string_from_message(normalizer_result_as_par);
+
+        let target = r#"{"a" : 1, "b" : 2, "c" : 3}"#;
+        assert_eq!(result, target);
     }
 }
