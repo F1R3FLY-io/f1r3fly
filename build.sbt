@@ -374,14 +374,14 @@ lazy val node = (project in file("node"))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
     // Universal / javaOptions ++= Seq("-J-Xmx2g"),
-    // runCargoBuildDocker := {
-    //   import scala.sys.process._
-    //   val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
-    //   if (exitCode != 0) {
-    //     throw new Exception("Rust build script failed with exit code " + exitCode)
-    //   }
-    // },
-    // (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
+    runCargoBuildDocker := {
+      import scala.sys.process._
+      val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
+      if (exitCode != 0) {
+        throw new Exception("Rust build script failed with exit code " + exitCode)
+      }
+    },
+    (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
     version := git.gitDescribedVersion.value.getOrElse({
       val v = "0.0.0-unknown"
       System.err.println("Could not get version from `git describe`.")
