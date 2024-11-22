@@ -17,7 +17,7 @@ use rspace_plus_plus::rspace::{
 };
 
 fn empty_state_hash_fixed() -> String {
-    "Blake2b256Hash(575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508)".to_string()
+    "Blake2b256Hash(5144948f445bdb22d59ecd2fe012d53dcff9474f2d965197ad947cfc87c70c23)".to_string()
 }
 
 async fn empty_state_hash_from_runtime(runtime: Arc<Mutex<RhoRuntimeImpl>>) -> Blake2b256Hash {
@@ -38,7 +38,7 @@ async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let runtime = create_rho_runtime(
-        Arc::new(Mutex::new(space)),
+        Arc::new(Mutex::new(Box::new(space))),
         Par::default(),
         false,
         &mut Vec::new(),

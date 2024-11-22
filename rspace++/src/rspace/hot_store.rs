@@ -40,6 +40,11 @@ pub trait HotStore<C: Clone + Hash + Eq, P: Clone, A: Clone, K: Clone>: Sync + S
     fn is_empty(&self) -> bool;
 }
 
+// This is needed to ensure we use the same version of 'Dashmap' for outside use
+pub fn new_dashmap<K: std::cmp::Eq + std::hash::Hash, V>() -> DashMap<K, V> {
+    DashMap::new()
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct HotStoreState<C, P, A, K>
 where

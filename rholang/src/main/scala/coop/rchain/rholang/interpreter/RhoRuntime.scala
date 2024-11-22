@@ -48,6 +48,12 @@ import coop.rchain.models.rholang_scala_rust_types.CostProto
 import coop.rchain.models.rholang_scala_rust_types.EvaluateResultProto
 import coop.rchain.rholang.interpreter.errors.BugFoundError
 import coop.rchain.rholang.interpreter.errors.RustError
+import coop.rchain.rspace.trace.Produce
+import scala.collection.SortedSet
+import coop.rchain.rspace.trace.COMM
+import coop.rchain.rspace.trace.Consume
+import coop.rchain.rspace.trace.Event
+import coop.rchain.models.rspace_plus_plus_types._
 
 // trait RhoRuntime[F[_]] extends HasCost[F] {
 trait RhoRuntime[F[_]] {
@@ -183,7 +189,92 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
 
   override def getHotChanges
       : F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]] =
-    space.toMap
+    // space.toMap
+    for {
+      result <- Sync[F].delay {
+                 val toMapPtr = RHOLANG_RUST_INSTANCE.get_hot_changes(runtimePtr)
+
+                 if (toMapPtr != null) {
+                   val length = toMapPtr.getInt(0)
+
+                   try {
+                     val resultBytes = toMapPtr.getByteArray(4, length)
+                     val toMapResult = StoreToMapResult.parseFrom(resultBytes)
+
+                     val map = toMapResult.mapEntries.flatMap { mapEntry =>
+                       val key = mapEntry.key
+                       mapEntry.value match {
+                         case Some(row) =>
+                           val value = Row(
+                             data = row.data.map(
+                               datum =>
+                                 Datum[ListParWithRandom](
+                                   a = datum.a.get,
+                                   persist = datum.persist,
+                                   source = datum.source match {
+                                     case Some(produceEvent) =>
+                                       Produce(
+                                         channelsHash = Blake2b256Hash.fromByteArray(
+                                           produceEvent.channelHash.toByteArray
+                                         ),
+                                         hash = Blake2b256Hash.fromByteArray(
+                                           produceEvent.hash.toByteArray
+                                         ),
+                                         persistent = produceEvent.persistent
+                                       )
+                                     case None => {
+                                       println("ProduceEvent is None")
+                                       throw new RuntimeException("ProduceEvent is None")
+                                     }
+                                   }
+                                 )
+                             ),
+                             wks = row.wks.map(
+                               wk =>
+                                 WaitingContinuation[BindPattern, TaggedContinuation](
+                                   patterns = wk.patterns,
+                                   continuation = wk.continuation.get,
+                                   persist = wk.persist,
+                                   peeks = wk.peeks.map(_.value).to[SortedSet],
+                                   source = wk.source match {
+                                     case Some(consumeEvent) =>
+                                       Consume(
+                                         channelsHashes = consumeEvent.channelHashes.map(
+                                           bs => Blake2b256Hash.fromByteArray(bs.toByteArray)
+                                         ),
+                                         hash = Blake2b256Hash.fromByteArray(
+                                           consumeEvent.hash.toByteArray
+                                         ),
+                                         persistent = consumeEvent.persistent
+                                       )
+                                     case None => {
+                                       println("ConsumeEvent is None")
+                                       throw new RuntimeException("ConsumeEvent is None")
+                                     }
+                                   }
+                                 )
+                             )
+                           )
+                           Some(key -> value)
+                         case None =>
+                           println("Row is None")
+                           None
+                       }
+                     }.toMap
+
+                     map
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala toMap operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   println("toMapPtr is null")
+                   throw new RuntimeException("toMapPtr is null")
+                 }
+
+               }
+    } yield result
 
   override def inj(par: Par, env: Env[Par] = Env[Par]())(implicit rand: Blake2b512Random): F[Unit] =
     // reducer.inj(par)
@@ -193,7 +284,8 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
       channel: Seq[Par],
       pattern: Seq[BindPattern]
   ): F[Option[(TaggedContinuation, Seq[ListParWithRandom])]] =
-    space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    // space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    ???
 
   override def evaluate(term: String, initialPhlo: Cost, normalizerEnv: Map[String, Name])(
       implicit rand: Blake2b512Random
@@ -249,33 +341,583 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     }
 
   override def reset(root: Blake2b256Hash): F[Unit] =
-    space.reset(root)
+    // space.reset(root)
+    for {
+      _ <- Sync[F].delay {
+            // println("\nhit scala reset, root: " + root)
+            val rootBytes = root.bytes.toArray
 
-  override def createCheckpoint: F[Checkpoint] = Span[F].withMarks("create-checkpoint") {
-    space.createCheckpoint()
-  }
+            val rootMemory = new Memory(rootBytes.length.toLong)
+            rootMemory.write(0, rootBytes, 0, rootBytes.length)
+
+            val _ = RHOLANG_RUST_INSTANCE.reset(
+              runtimePtr,
+              rootMemory,
+              rootBytes.length
+            )
+
+            // Not sure if these lines are needed
+            // Need to figure out how to deallocate each memory instance
+            rootMemory.clear()
+          }
+    } yield ()
+
+  override def createCheckpoint: F[Checkpoint] =
+    // 	Span[F].withMarks("create-checkpoint") {
+    //   space.createCheckpoint()
+    // }
+    for {
+      result <- Sync[F].delay {
+                 //  println("\nhit scala createCheckpoint")
+
+                 val checkpointResultPtr = RHOLANG_RUST_INSTANCE.create_checkpoint(
+                   runtimePtr
+                 )
+
+                 if (checkpointResultPtr != null) {
+                   val resultByteslength = checkpointResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes     = checkpointResultPtr.getByteArray(4, resultByteslength)
+                     val checkpointProto = CheckpointProto.parseFrom(resultBytes)
+                     val checkpointRoot  = checkpointProto.root
+
+                     //  println(
+                     //    "\nscala createCheckpoint root: " + Blake2b256Hash
+                     //      .fromByteArray(checkpointRoot.toByteArray)
+                     //  )
+
+                     val checkpointLogProto = checkpointProto.log
+                     val checkpointLog = checkpointLogProto.map {
+                       case eventProto if eventProto.eventType.isComm =>
+                         val commProto = eventProto.eventType.comm.get
+                         val consume   = commProto.consume
+                         val produces = commProto.produces.map { produceProto =>
+                           Produce(
+                             channelsHash =
+                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                             persistent = produceProto.persistent
+                           )
+                         }
+                         val peeks = commProto.peeks.map(_.value).to[SortedSet]
+                         val timesRepeated = commProto.timesRepeated.map { entry =>
+                           val produceProto = entry.key.get
+                           val produce = Produce(
+                             channelsHash =
+                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                             persistent = produceProto.persistent
+                           )
+                           produce -> entry.value
+                         }.toMap
+                         COMM(
+                           consume = Consume(
+                             channelsHashes = consume.get.channelHashes
+                               .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                             hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
+                             persistent = consume.get.persistent
+                           ),
+                           produces = produces,
+                           peeks = peeks,
+                           timesRepeated = timesRepeated
+                         )
+                       case eventProto if eventProto.eventType.isIoEvent =>
+                         val ioEventProto = eventProto.eventType.ioEvent.get
+                         ioEventProto.ioEventType match {
+                           case IOEventProto.IoEventType.Produce(produceProto) =>
+                             Produce(
+                               channelsHash =
+                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                               persistent = produceProto.persistent
+                             )
+                           case IOEventProto.IoEventType.Consume(consumeProto) =>
+                             Consume(
+                               channelsHashes = consumeProto.channelHashes
+                                 .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                               hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+                               persistent = consumeProto.persistent
+                             )
+                           case _ =>
+                             throw new RuntimeException("Unknown IOEvent type")
+                         }
+                       case _ =>
+                         throw new RuntimeException("Unknown Event type")
+                     }
+
+                     //  println("\n log: " + checkpointLog)
+
+                     Checkpoint(
+                       root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                       log = checkpointLog
+                     )
+                     //  Checkpoint(
+                     //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                     //    log = Seq.empty[Event]
+                     //  )
+
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala createCheckpoint operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   println(
+                     "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
+                   )
+                   throw new RuntimeException("Checkpoint pointer from rust was null")
+                 }
+               }
+    } yield result
 
   override def createSoftCheckpoint
       : F[SoftCheckpoint[Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
-    Span[F].withMarks("create-soft-heckpoint") {
-      space.createSoftCheckpoint()
-    }
+    // Span[F].withMarks("create-soft-heckpoint") {
+    //   space.createSoftCheckpoint()
+    // }
+    for {
+      result <- Sync[F].delay {
+                 //  println("\nhit scala createSoftCheckpoint")
+                 val softCheckpointPtr = RHOLANG_RUST_INSTANCE.create_soft_checkpoint(runtimePtr)
+
+                 if (softCheckpointPtr != null) {
+                   val length = softCheckpointPtr.getInt(0)
+
+                   try {
+                     val softCheckpointBytes = softCheckpointPtr.getByteArray(4, length)
+                     val softCheckpointProto = SoftCheckpointProto.parseFrom(softCheckpointBytes)
+                     val storeStateProto     = softCheckpointProto.cacheSnapshot.get
+
+                     val continuationsMap = storeStateProto.continuations.map { mapEntry =>
+                       val key = mapEntry.key
+                       val value = mapEntry.value.map { wkProto =>
+                         WaitingContinuation(
+                           patterns = wkProto.patterns,
+                           continuation = wkProto.continuation.get,
+                           persist = wkProto.persist,
+                           peeks = wkProto.peeks.map(_.value).to[SortedSet],
+                           source = wkProto.source match {
+                             case Some(consumeEvent) =>
+                               Consume(
+                                 channelsHashes = consumeEvent.channelHashes.map(
+                                   bs => Blake2b256Hash.fromByteArray(bs.toByteArray)
+                                 ),
+                                 hash = Blake2b256Hash.fromByteArray(consumeEvent.hash.toByteArray),
+                                 persistent = consumeEvent.persistent
+                               )
+                             case None => {
+                               println("ConsumeEvent is None");
+                               throw new RuntimeException("ConsumeEvent is None")
+                             }
+                           }
+                         )
+                       }
+
+                       (key, value)
+                     }.toMap
+
+                     val installedContinuationsMap = storeStateProto.installedContinuations.map {
+                       mapEntry =>
+                         val key = mapEntry.key
+                         val value = mapEntry.value match {
+                           case Some(wkProto) => {
+                             WaitingContinuation(
+                               patterns = wkProto.patterns,
+                               continuation = wkProto.continuation.get,
+                               persist = wkProto.persist,
+                               peeks = wkProto.peeks.map(_.value).to[SortedSet],
+                               source = wkProto.source match {
+                                 case Some(consumeEvent) =>
+                                   Consume(
+                                     channelsHashes = consumeEvent.channelHashes.map(
+                                       bs => Blake2b256Hash.fromByteArray(bs.toByteArray)
+                                     ),
+                                     hash =
+                                       Blake2b256Hash.fromByteArray(consumeEvent.hash.toByteArray),
+                                     persistent = consumeEvent.persistent
+                                   )
+                                 case None => {
+                                   //  Log[F].debug("ConsumeEvent is None");
+                                   println("ConsumeEvent is None");
+                                   throw new RuntimeException("ConsumeEvent is None")
+                                 }
+                               }
+                             )
+                           }
+                           case None => {
+                             println("wkProto is None");
+                             throw new RuntimeException("wkProto is None")
+                           }
+                         }
+
+                         (key, value)
+                     }.toMap
+
+                     val datumsMap = storeStateProto.data.map { mapEntry =>
+                       val key = mapEntry.key.get
+                       val value = mapEntry.value.map(
+                         datum =>
+                           Datum(
+                             a = datum.a.get,
+                             persist = datum.persist,
+                             source = datum.source match {
+                               case Some(produceEvent) =>
+                                 Produce(
+                                   channelsHash = Blake2b256Hash.fromByteArray(
+                                     produceEvent.channelHash.toByteArray
+                                   ),
+                                   hash =
+                                     Blake2b256Hash.fromByteArray(produceEvent.hash.toByteArray),
+                                   persistent = produceEvent.persistent
+                                 )
+                               case None => {
+                                 println("ProduceEvent is None")
+                                 //  Log[F].debug("ProduceEvent is None");
+                                 throw new RuntimeException("ProduceEvent is None")
+                               }
+                             }
+                           )
+                       )
+
+                       (key, value)
+                     }.toMap
+
+                     val joinsMap = storeStateProto.joins.map { mapEntry =>
+                       val key = mapEntry.key.get
+                       val value = mapEntry.value.map(
+                         joinProto => joinProto.join
+                       )
+
+                       (key, value)
+                     }.toMap
+
+                     val installedJoinsMap = storeStateProto.installedJoins.map { mapEntry =>
+                       val key = mapEntry.key.get
+                       val value = mapEntry.value.map(
+                         joinProto => joinProto.join
+                       )
+
+                       (key, value)
+                     }.toMap
+
+                     val checkpointLog: Seq[Event] = softCheckpointProto.log.map { eventProto =>
+                       eventProto match {
+                         case EventProto(EventProto.EventType.Comm(commProto)) => {
+                           val consumeProto = commProto.consume.get
+                           val produces = commProto.produces.map { produceProto =>
+                             Produce(
+                               channelsHash =
+                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                               persistent = produceProto.persistent
+                             )
+                           }
+                           val peeks = commProto.peeks.map(_.value).to[SortedSet]
+                           val timesRepeated = commProto.timesRepeated.map { entry =>
+                             val produceProto = entry.key.get
+                             val produce = Produce(
+                               channelsHash =
+                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                               persistent = produceProto.persistent
+                             )
+                             produce -> entry.value
+                           }.toMap
+                           COMM(
+                             consume = Consume(
+                               channelsHashes = consumeProto.channelHashes
+                                 .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                               hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+                               persistent = consumeProto.persistent
+                             ),
+                             produces = produces,
+                             peeks = peeks,
+                             timesRepeated = timesRepeated
+                           )
+                         }
+
+                         case EventProto(EventProto.EventType.IoEvent(ioEvent)) =>
+                           ioEvent.ioEventType match {
+                             case IOEventProto.IoEventType.Produce(produceProto) => {
+                               Produce(
+                                 channelsHash = Blake2b256Hash.fromByteArray(
+                                   produceProto.channelHash.toByteArray
+                                 ),
+                                 hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                                 persistent = produceProto.persistent
+                               )
+                             }
+
+                             case IOEventProto.IoEventType.Consume(consumeProto) => {
+                               Consume(
+                                 channelsHashes = consumeProto.channelHashes
+                                   .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                                 hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+                                 persistent = consumeProto.persistent
+                               )
+                             }
+
+                             case _ => throw new RuntimeException("unkown IOEventType")
+                           }
+
+                         case _ => throw new RuntimeException("unkown EventType")
+                       }
+                     }
+
+                     val produceCounterMap = softCheckpointProto.produceCounter.map { mapEntry =>
+                       val keyProto = mapEntry.key.get
+                       val produce = Produce(
+                         channelsHash =
+                           Blake2b256Hash.fromByteArray(keyProto.channelHash.toByteArray),
+                         hash = Blake2b256Hash.fromByteArray(keyProto.hash.toByteArray),
+                         persistent = keyProto.persistent
+                       )
+
+                       val value = mapEntry.value
+                       (produce, value)
+                     }.toMap
+
+                     val cacheSnapshot
+                         : HotStoreState[Par, BindPattern, ListParWithRandom, TaggedContinuation] =
+                       HotStoreState(
+                         continuationsMap,
+                         installedContinuationsMap,
+                         datumsMap,
+                         joinsMap,
+                         installedJoinsMap
+                       )
+
+                     SoftCheckpoint(cacheSnapshot, checkpointLog, produceCounterMap)
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala createSoftCheckpoint operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   println("softCheckpointPtr is null")
+                   throw new RuntimeException("softCheckpointPtr is null")
+                 }
+
+               }
+    } yield result
 
   override def revertToSoftCheckpoint(
       softCheckpoint: SoftCheckpoint[Name, BindPattern, ListParWithRandom, TaggedContinuation]
   ): F[Unit] =
-    space.revertToSoftCheckpoint(softCheckpoint)
+    // space.revertToSoftCheckpoint(softCheckpoint)
+    for {
+      _ <- Sync[F].delay {
+            // println("\nhit scala revertToSoftCheckpoint")
+            val cacheSnapshot = softCheckpoint.cacheSnapshot
+
+            val continuationsMapEntries          = Seq.empty
+            val installedContinuationsMapEntries = Seq.empty
+            val datumsMapEntries                 = Seq.empty
+            val joinsMapEntries                  = Seq.empty
+            val installedJoinsMapEntries         = Seq.empty
+
+            cacheSnapshot.continuations.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map { wk =>
+                WaitingContinuationProto(
+                  patterns = wk.patterns,
+                  continuation = Some(wk.continuation),
+                  persist = wk.persist,
+                  peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
+                  source = Some(
+                    ConsumeProto(
+                      channelHashes = wk.source.channelsHashes.map(
+                        channelHash => channelHash.toByteString
+                      ),
+                      hash = wk.source.hash.toByteString,
+                      persistent = wk.source.persistent
+                    )
+                  )
+                )
+              }
+
+              continuationsMapEntries :+ StoreStateContMapEntry(key, value)
+            }
+
+            cacheSnapshot.installedContinuations.map { mapEntry =>
+              val key = mapEntry._1
+              val wk  = mapEntry._2
+              val value =
+                WaitingContinuationProto(
+                  patterns = wk.patterns,
+                  continuation = Some(wk.continuation),
+                  persist = wk.persist,
+                  peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
+                  source = Some(
+                    ConsumeProto(
+                      channelHashes = wk.source.channelsHashes.map(
+                        channelHash => channelHash.toByteString
+                      ),
+                      hash = wk.source.hash.toByteString,
+                      persistent = wk.source.persistent
+                    )
+                  )
+                )
+
+              installedContinuationsMapEntries :+ StoreStateInstalledContMapEntry(key, Some(value))
+            }
+
+            cacheSnapshot.data.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map { datum =>
+                DatumProto(
+                  a = Some(datum.a),
+                  persist = datum.persist,
+                  source = Some(
+                    ProduceProto(
+                      channelHash = datum.source.channelsHash.toByteString,
+                      hash = datum.source.hash.toByteString,
+                      persistent = datum.source.persistent
+                    )
+                  )
+                )
+              }
+
+              datumsMapEntries :+ StoreStateDataMapEntry(Some(key), value)
+            }
+
+            cacheSnapshot.joins.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map(
+                join => JoinProto(join)
+              )
+
+              joinsMapEntries :+ StoreStateJoinsMapEntry(Some(key), value)
+            }
+
+            cacheSnapshot.installedJoins.map { mapEntry =>
+              val key = mapEntry._1
+              val value = mapEntry._2.map(
+                join => JoinProto(join)
+              )
+
+              installedJoinsMapEntries :+ StoreStateInstalledJoinsMapEntry(Some(key), value)
+            }
+
+            val hotStoreStateProto = HotStoreStateProto(
+              continuationsMapEntries,
+              installedContinuationsMapEntries,
+              datumsMapEntries,
+              joinsMapEntries,
+              installedJoinsMapEntries
+            )
+
+            val produceCounterMapEntries = Seq.empty
+            val produceCounterMap        = softCheckpoint.produceCounter
+
+            produceCounterMap.map { mapEntry =>
+              val produce = mapEntry._1
+              val produceProto = ProduceProto(
+                produce.channelsHash.toByteString,
+                produce.hash.toByteString,
+                produce.persistent
+              )
+
+              produceCounterMapEntries :+ ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
+            }
+
+            val logProto = softCheckpoint.log.map {
+              case comm: COMM =>
+                val consumeProto = ConsumeProto(
+                  channelHashes = comm.consume.channelsHashes.map(_.toByteString),
+                  hash = comm.consume.hash.toByteString,
+                  persistent = comm.consume.persistent
+                )
+                val producesProto = comm.produces.map { produce =>
+                  ProduceProto(
+                    channelHash = produce.channelsHash.toByteString,
+                    hash = produce.hash.toByteString,
+                    persistent = produce.persistent
+                  )
+                }
+                val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
+                val timesRepeatedProto = comm.timesRepeated.map {
+                  case (produce, count) =>
+                    val produceProto = ProduceProto(
+                      channelHash = produce.channelsHash.toByteString,
+                      hash = produce.hash.toByteString,
+                      persistent = produce.persistent
+                    )
+                    ProduceCounterMapEntry(Some(produceProto), count)
+                }.toSeq
+                EventProto(
+                  eventType = EventProto.EventType.Comm(
+                    CommProto(
+                      consume = Some(consumeProto),
+                      produces = producesProto,
+                      peeks = peeksProto,
+                      timesRepeated = timesRepeatedProto
+                    )
+                  )
+                )
+              case produce: Produce =>
+                EventProto(
+                  eventType = EventProto.EventType.IoEvent(
+                    IOEventProto(
+                      ioEventType = IOEventProto.IoEventType.Produce(
+                        ProduceProto(
+                          channelHash = produce.channelsHash.toByteString,
+                          hash = produce.hash.toByteString,
+                          persistent = produce.persistent
+                        )
+                      )
+                    )
+                  )
+                )
+              case consume: Consume =>
+                EventProto(
+                  eventType = EventProto.EventType.IoEvent(
+                    IOEventProto(
+                      ioEventType = IOEventProto.IoEventType.Consume(
+                        ConsumeProto(
+                          channelHashes = consume.channelsHashes.map(_.toByteString),
+                          hash = consume.hash.toByteString,
+                          persistent = consume.persistent
+                        )
+                      )
+                    )
+                  )
+                )
+            }
+
+            val softCheckpointProto =
+              SoftCheckpointProto(Some(hotStoreStateProto), logProto, produceCounterMapEntries)
+            val softCheckpointProtoBytes = softCheckpointProto.toByteArray
+
+            val payloadMemory = new Memory(softCheckpointProtoBytes.length.toLong)
+            payloadMemory.write(0, softCheckpointProtoBytes, 0, softCheckpointProtoBytes.length)
+
+            val _ = RHOLANG_RUST_INSTANCE.revert_to_soft_checkpoint(
+              runtimePtr,
+              payloadMemory,
+              softCheckpointProtoBytes.length
+            )
+
+            // Not sure if these lines are needed
+            // Need to figure out how to deallocate each memory instance
+            payloadMemory.clear()
+          }
+    } yield ()
 
   override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] =
-    space.getData(channel)
+    // space.getData(channel)
+    ???
 
   override def getContinuation(
       channels: Seq[Name]
   ): F[Seq[WaitingContinuation[BindPattern, TaggedContinuation]]] =
-    space.getWaitingContinuations(channels)
+    // space.getWaitingContinuations(channels)
+    ???
 
   override def getJoins(channel: Name): F[Seq[Seq[Name]]] =
-    space.getJoins(channel)
+    // space.getJoins(channel)
+    ???
 
   override def setBlockData(blockData: BlockData): F[Unit] =
     // blockDataRef.set(blockData)

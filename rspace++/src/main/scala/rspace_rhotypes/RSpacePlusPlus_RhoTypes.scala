@@ -254,112 +254,113 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
     INSTANCE.space_print(rspacePointer)
 
   def createCheckpoint(): F[Checkpoint] =
-    for {
-      result <- Sync[F].delay {
-                 //  println("\nhit scala createCheckpoint")
+    // for {
+    //   result <- Sync[F].delay {
+    //              //  println("\nhit scala createCheckpoint")
 
-                 val checkpointResultPtr = INSTANCE.create_checkpoint(
-                   rspacePointer
-                 )
+    //              val checkpointResultPtr = INSTANCE.create_checkpoint(
+    //                rspacePointer
+    //              )
 
-                 if (checkpointResultPtr != null) {
-                   val resultByteslength = checkpointResultPtr.getInt(0)
+    //              if (checkpointResultPtr != null) {
+    //                val resultByteslength = checkpointResultPtr.getInt(0)
 
-                   try {
-                     val resultBytes     = checkpointResultPtr.getByteArray(4, resultByteslength)
-                     val checkpointProto = CheckpointProto.parseFrom(resultBytes)
-                     val checkpointRoot  = checkpointProto.root
+    //                try {
+    //                  val resultBytes     = checkpointResultPtr.getByteArray(4, resultByteslength)
+    //                  val checkpointProto = CheckpointProto.parseFrom(resultBytes)
+    //                  val checkpointRoot  = checkpointProto.root
 
-                     //  println(
-                     //    "\nscala createCheckpoint root: " + Blake2b256Hash
-                     //      .fromByteArray(checkpointRoot.toByteArray)
-                     //  )
+    //                  //  println(
+    //                  //    "\nscala createCheckpoint root: " + Blake2b256Hash
+    //                  //      .fromByteArray(checkpointRoot.toByteArray)
+    //                  //  )
 
-                     val checkpointLogProto = checkpointProto.log
-                     val checkpointLog = checkpointLogProto.map {
-                       case eventProto if eventProto.eventType.isComm =>
-                         val commProto = eventProto.eventType.comm.get
-                         val consume   = commProto.consume
-                         val produces = commProto.produces.map { produceProto =>
-                           Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                         }
-                         val peeks = commProto.peeks.map(_.value).to[SortedSet]
-                         val timesRepeated = commProto.timesRepeated.map { entry =>
-                           val produceProto = entry.key.get
-                           val produce = Produce(
-                             channelsHash =
-                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
-                           )
-                           produce -> entry.value
-                         }.toMap
-                         COMM(
-                           consume = Consume(
-                             channelsHashes = consume.get.channelHashes
-                               .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
-                             hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
-                             persistent = consume.get.persistent
-                           ),
-                           produces = produces,
-                           peeks = peeks,
-                           timesRepeated = timesRepeated
-                         )
-                       case eventProto if eventProto.eventType.isIoEvent =>
-                         val ioEventProto = eventProto.eventType.ioEvent.get
-                         ioEventProto.ioEventType match {
-                           case IOEventProto.IoEventType.Produce(produceProto) =>
-                             Produce(
-                               channelsHash =
-                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
-                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
-                             )
-                           case IOEventProto.IoEventType.Consume(consumeProto) =>
-                             Consume(
-                               channelsHashes = consumeProto.channelHashes
-                                 .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
-                               hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
-                               persistent = consumeProto.persistent
-                             )
-                           case _ =>
-                             throw new RuntimeException("Unknown IOEvent type")
-                         }
-                       case _ =>
-                         throw new RuntimeException("Unknown Event type")
-                     }
+    //                  val checkpointLogProto = checkpointProto.log
+    //                  val checkpointLog = checkpointLogProto.map {
+    //                    case eventProto if eventProto.eventType.isComm =>
+    //                      val commProto = eventProto.eventType.comm.get
+    //                      val consume   = commProto.consume
+    //                      val produces = commProto.produces.map { produceProto =>
+    //                        Produce(
+    //                          channelsHash =
+    //                            Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+    //                          hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+    //                          persistent = produceProto.persistent
+    //                        )
+    //                      }
+    //                      val peeks = commProto.peeks.map(_.value).to[SortedSet]
+    //                      val timesRepeated = commProto.timesRepeated.map { entry =>
+    //                        val produceProto = entry.key.get
+    //                        val produce = Produce(
+    //                          channelsHash =
+    //                            Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+    //                          hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+    //                          persistent = produceProto.persistent
+    //                        )
+    //                        produce -> entry.value
+    //                      }.toMap
+    //                      COMM(
+    //                        consume = Consume(
+    //                          channelsHashes = consume.get.channelHashes
+    //                            .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+    //                          hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
+    //                          persistent = consume.get.persistent
+    //                        ),
+    //                        produces = produces,
+    //                        peeks = peeks,
+    //                        timesRepeated = timesRepeated
+    //                      )
+    //                    case eventProto if eventProto.eventType.isIoEvent =>
+    //                      val ioEventProto = eventProto.eventType.ioEvent.get
+    //                      ioEventProto.ioEventType match {
+    //                        case IOEventProto.IoEventType.Produce(produceProto) =>
+    //                          Produce(
+    //                            channelsHash =
+    //                              Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+    //                            hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+    //                            persistent = produceProto.persistent
+    //                          )
+    //                        case IOEventProto.IoEventType.Consume(consumeProto) =>
+    //                          Consume(
+    //                            channelsHashes = consumeProto.channelHashes
+    //                              .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+    //                            hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+    //                            persistent = consumeProto.persistent
+    //                          )
+    //                        case _ =>
+    //                          throw new RuntimeException("Unknown IOEvent type")
+    //                      }
+    //                    case _ =>
+    //                      throw new RuntimeException("Unknown Event type")
+    //                  }
 
-                     //  println("\n log: " + checkpointLog)
+    //                  //  println("\n log: " + checkpointLog)
 
-                     Checkpoint(
-                       root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
-                       log = checkpointLog
-                     )
-                     //  Checkpoint(
-                     //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
-                     //    log = Seq.empty[Event]
-                     //  )
+    //                  Checkpoint(
+    //                    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+    //                    log = checkpointLog
+    //                  )
+    //                  //  Checkpoint(
+    //                  //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+    //                  //    log = Seq.empty[Event]
+    //                  //  )
 
-                   } catch {
-                     case e: Throwable =>
-                       println("Error during scala createCheckpoint operation: " + e)
-                       throw e
-                   } finally {
-                     INSTANCE.deallocate_memory(checkpointResultPtr, resultByteslength)
-                   }
-                 } else {
-                   println(
-                     "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
-                   )
-                   throw new RuntimeException("Checkpoint pointer from rust was null")
-                 }
-               }
-    } yield result
+    //                } catch {
+    //                  case e: Throwable =>
+    //                    println("Error during scala createCheckpoint operation: " + e)
+    //                    throw e
+    //                } finally {
+    //                  INSTANCE.deallocate_memory(checkpointResultPtr, resultByteslength)
+    //                }
+    //              } else {
+    //                println(
+    //                  "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
+    //                )
+    //                throw new RuntimeException("Checkpoint pointer from rust was null")
+    //              }
+    //            }
+    // } yield result
+    ???
 
   def spawn: F[ISpacePlusPlus[F, C, P, A, K]] =
     for {

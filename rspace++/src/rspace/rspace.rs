@@ -20,7 +20,6 @@ use super::trace::event::IOEvent;
 use super::trace::event::Produce;
 use super::trace::event::COMM;
 use super::trace::Log;
-use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
@@ -165,15 +164,9 @@ where
 
         Ok(())
     }
-}
 
-impl<C, P, A, K> Tuplespace<C, P, A, K> for RSpace<C, P, A, K>
-where
-    C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
-    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-{
+    /* Tuplespace */
+
     fn consume(
         &mut self,
         channels: Vec<C>,
@@ -682,7 +675,7 @@ where
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self.install(channels, install.patterns, install.continuation);
+            self.install(channels, install.patterns, install.continuation).unwrap();
         }
     }
 

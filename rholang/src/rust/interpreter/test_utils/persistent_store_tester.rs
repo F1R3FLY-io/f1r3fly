@@ -8,7 +8,7 @@ use rspace_plus_plus::rspace::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::rust::interpreter::{
@@ -31,7 +31,7 @@ where
     let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
 
     let reducer = RholangAndScalaDispatcher::create(
-        space.clone(),
+        Arc::new(Mutex::new(Box::new(space.clone()))),
         HashMap::new(),
         HashMap::new(),
         Arc::new(RwLock::new(HashSet::new())),

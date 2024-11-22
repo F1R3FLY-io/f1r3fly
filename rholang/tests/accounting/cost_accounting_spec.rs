@@ -13,7 +13,7 @@ use rspace_plus_plus::rspace::{
         in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
     },
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> EvaluateResult {
     // let cost_log: Vec<Cost> = Vec::new();
@@ -21,7 +21,13 @@ async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> Evaluate
     let store = kvm.r_space_stores().await.unwrap();
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
+    let runtime = create_rho_runtime(
+        Arc::new(Mutex::new(Box::new(space))),
+        Par::default(),
+        false,
+        &mut Vec::new(),
+    )
+    .await;
 
     let eval_result = runtime
         .try_lock()

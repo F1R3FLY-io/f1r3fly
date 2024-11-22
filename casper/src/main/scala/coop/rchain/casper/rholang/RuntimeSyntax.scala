@@ -106,7 +106,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
       checkpoint <- runtime.createCheckpoint
       hash       = ByteString.copyFrom(checkpoint.root.bytes.toArray)
       // _          = println("\ncheckpoint root in emptyStateHash: " + checkpoint.root)
-      // _          = println("\nemptyStateHash: " + hash.toBlake2b256Hash)
+      // _ = println("\nemptyStateHash: " + hash.toBlake2b256Hash)
     } yield hash
 
   /* Compute state with deploys (genesis block) and System deploys (regular block) */

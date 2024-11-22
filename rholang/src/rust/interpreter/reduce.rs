@@ -46,13 +46,14 @@ use super::accounting::costs::{
     subtraction_cost, sum_cost, var_eval_cost,
 };
 use super::dispatch::RhoDispatch;
+use super::env::Env;
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
+use super::rho_runtime::RhoISpace;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::unwrap_option_safe;
 use super::util::GeneratedMessage;
-use super::{env::Env, rho_runtime::RhoTuplespace};
 
 /**
  * Reduce is the interface for evaluating Rholang expressions.
@@ -60,7 +61,7 @@ use super::{env::Env, rho_runtime::RhoTuplespace};
 
 #[derive(Clone)]
 pub struct DebruijnInterpreter {
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
     pub urn_map: HashMap<String, Par>,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,

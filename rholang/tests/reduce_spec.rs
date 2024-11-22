@@ -3,7 +3,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     i64,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
@@ -1465,7 +1465,7 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
     let store = kvm.r_space_stores().await.unwrap();
     let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let reducer = RholangAndScalaDispatcher::create(
-        space.clone(),
+        Arc::new(Mutex::new(Box::new(space.clone()))),
         HashMap::new(),
         urn_map,
         Arc::new(RwLock::new(HashSet::new())),

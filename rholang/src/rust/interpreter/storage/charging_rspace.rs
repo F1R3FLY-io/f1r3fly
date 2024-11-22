@@ -1,6 +1,9 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/ChargingRSpace.scala
 
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    sync::{Arc, Mutex},
+};
 
 use crate::rust::interpreter::{
     accounting::{
@@ -19,8 +22,7 @@ use models::rhoapi::{
 };
 use rspace_plus_plus::rspace::{
     errors::RSpaceError,
-    rspace_interface::{ContResult, MaybeActionResult, RSpaceResult},
-    tuplespace_interface::Tuplespace,
+    rspace_interface::{ContResult, ISpace, MaybeActionResult, RSpaceResult},
 };
 
 pub struct ChargingRSpace;
@@ -50,23 +52,19 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
 }
 
 impl ChargingRSpace {
-    pub fn charging_rspace<T>(
-        space: T,
+    pub fn charging_rspace(
+        space: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
         cost: _cost,
-    ) -> impl Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone
-    where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
-    {
+    ) -> Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>> {
         #[derive(Clone)]
-        struct ChargingRSpace<T> {
-            space: T,
+        struct ChargingRSpace {
+            space: Arc<
+                Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
+            >,
             cost: _cost,
         }
 
-        impl<T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>
-            Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>
-            for ChargingRSpace<T>
-        {
+        impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> for ChargingRSpace {
             fn consume(
                 &mut self,
                 channels: Vec<Par>,
@@ -84,7 +82,7 @@ impl ChargingRSpace {
                     continuation.clone(),
                 ))?;
 
-                let consume_res = self.space.consume(
+                let consume_res = self.space.try_lock().unwrap().consume(
                     channels.clone(),
                     patterns,
                     continuation.clone(),
@@ -116,7 +114,11 @@ impl ChargingRSpace {
             > {
                 self.cost
                     .charge(storage_cost_produce(channel.clone(), data.clone()))?;
-                let produce_res = self.space.produce(channel, data.clone(), persist)?;
+                let produce_res =
+                    self.space
+                        .try_lock()
+                        .unwrap()
+                        .produce(channel, data.clone(), persist)?;
                 handle_result(
                     produce_res.clone(),
                     TriggeredBy::Produce {
@@ -136,11 +138,96 @@ impl ChargingRSpace {
                 continuation: TaggedContinuation,
             ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, RSpaceError>
             {
-                self.space.install(channels, patterns, continuation)
+                self.space
+                    .try_lock()
+                    .unwrap()
+                    .install(channels, patterns, continuation)
+            }
+
+            fn create_checkpoint(
+                &mut self,
+            ) -> Result<rspace_plus_plus::rspace::checkpoint::Checkpoint, RSpaceError> {
+                self.space.try_lock().unwrap().create_checkpoint()
+            }
+
+            fn get_data(
+                &self,
+                channel: Par,
+            ) -> Vec<rspace_plus_plus::rspace::internal::Datum<ListParWithRandom>> {
+                self.space.try_lock().unwrap().get_data(channel)
+            }
+
+            fn get_waiting_continuations(
+                &self,
+                channels: Vec<Par>,
+            ) -> Vec<
+                rspace_plus_plus::rspace::internal::WaitingContinuation<
+                    BindPattern,
+                    TaggedContinuation,
+                >,
+            > {
+                self.space
+                    .try_lock()
+                    .unwrap()
+                    .get_waiting_continuations(channels)
+            }
+
+            fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
+                self.space.try_lock().unwrap().get_joins(channel)
+            }
+
+            fn clear(&mut self) -> Result<(), RSpaceError> {
+                self.space.try_lock().unwrap().clear()
+            }
+
+            fn reset(
+                &mut self,
+                root: rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash,
+            ) -> Result<(), RSpaceError> {
+                self.space.try_lock().unwrap().reset(root)
+            }
+
+            fn to_map(
+                &self,
+            ) -> std::collections::HashMap<
+                Vec<Par>,
+                rspace_plus_plus::rspace::internal::Row<
+                    BindPattern,
+                    ListParWithRandom,
+                    TaggedContinuation,
+                >,
+            > {
+                self.space.try_lock().unwrap().to_map()
+            }
+
+            fn create_soft_checkpoint(
+                &mut self,
+            ) -> rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
+                Par,
+                BindPattern,
+                ListParWithRandom,
+                TaggedContinuation,
+            > {
+                self.space.try_lock().unwrap().create_soft_checkpoint()
+            }
+
+            fn revert_to_soft_checkpoint(
+                &mut self,
+                checkpoint: rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
+                    Par,
+                    BindPattern,
+                    ListParWithRandom,
+                    TaggedContinuation,
+                >,
+            ) -> Result<(), RSpaceError> {
+                self.space
+                    .try_lock()
+                    .unwrap()
+                    .revert_to_soft_checkpoint(checkpoint)
             }
         }
 
-        ChargingRSpace { space, cost }
+        Arc::new(Mutex::new(Box::new(ChargingRSpace { space, cost })))
     }
 }
 

@@ -10,7 +10,7 @@ use models::rhoapi::{BindPattern, Expr, TaggedContinuation};
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
@@ -18,7 +18,7 @@ use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
 use super::pretty_printer::PrettyPrinter;
 use super::registry::registry::Registry;
-use super::rho_runtime::RhoTuplespace;
+use super::rho_runtime::RhoISpace;
 use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
 };
@@ -169,7 +169,7 @@ impl BodyRefs {
 }
 
 pub struct ProcessContext {
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
     pub block_data: Arc<RwLock<BlockData>>,
     pub invalid_blocks: InvalidBlocks,
@@ -177,17 +177,14 @@ pub struct ProcessContext {
 }
 
 impl ProcessContext {
-    pub fn create<T>(
-        space: T,
+    pub fn create(
+        space: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
         dispatcher: RhoDispatch,
         block_data: Arc<RwLock<BlockData>>,
         invalid_blocks: InvalidBlocks,
-    ) -> Self
-    where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-    {
+    ) -> Self {
         ProcessContext {
-            space: Arc::new(Mutex::new(Box::new(space.clone()))),
+            space: space.clone(),
             dispatcher: dispatcher.clone(),
             block_data,
             invalid_blocks,
@@ -280,18 +277,18 @@ impl BlockData {
 
 pub struct SystemProcesses {
     pub dispatcher: RhoDispatch,
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
-    fn create<T>(dispatcher: RhoDispatch, space: T) -> Self
-    where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
-    {
+    fn create(
+        dispatcher: RhoDispatch,
+        space: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
+    ) -> Self {
         SystemProcesses {
             dispatcher,
-            space: Arc::new(Mutex::new(Box::new(space))),
+            space,
             pretty_printer: PrettyPrinter::new(),
         }
     }

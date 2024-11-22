@@ -40,6 +40,7 @@ use super::errors::InterpreterError;
 use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
 use super::reduce::DebruijnInterpreter;
 use super::registry::registry_bootstrap::ast;
+use super::storage::charging_rspace;
 use super::storage::charging_rspace::ChargingRSpace;
 use super::system_processes::{
     Arity, BlockData, BodyRef, Definition, InvalidBlocks, Name, ProcessContext, Remainder,
@@ -240,7 +241,7 @@ pub struct RhoRuntimeImpl {
 impl RhoRuntimeImpl {
     fn new(
         reducer: DebruijnInterpreter,
-        space: impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+        space: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
         cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
@@ -248,7 +249,7 @@ impl RhoRuntimeImpl {
     ) -> Arc<Mutex<RhoRuntimeImpl>> {
         Arc::new(Mutex::new(RhoRuntimeImpl {
             reducer,
-            space: Arc::new(Mutex::new(Box::new(space))),
+            space,
             cost,
             block_data_ref,
             invalid_blocks_param,
@@ -560,13 +561,12 @@ pub type RhoHistoryRepository =
 
 pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
 
-fn introduce_system_process<T>(
-    mut spaces: Vec<&mut T>,
+fn introduce_system_process(
+    mut spaces: Vec<
+        &mut Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
+    >,
     processes: Vec<(Name, Arity, Remainder, BodyRef)>,
-) -> Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>>
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-{
+) -> Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> {
     let mut results: Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> = Vec::new();
 
     for (name, arity, remainder, body_ref) in processes {
@@ -582,7 +582,11 @@ where
         };
 
         for space in &mut spaces {
-            let result = space.install(channels.clone(), patterns.clone(), continuation.clone());
+            let result = space.try_lock().unwrap().install(
+                channels.clone(),
+                patterns.clone(),
+                continuation.clone(),
+            );
             results.push(result.map_err(|err| panic!("{}", err)).unwrap());
         }
     }
@@ -746,16 +750,13 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
     ]
 }
 
-fn dispatch_table_creator<T>(
-    space: T,
+fn dispatch_table_creator(
+    space: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
     dispatcher: RhoDispatch,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
-) -> RhoDispatchMap
-where
-    T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
     for def in std_system_processes().iter_mut().chain(
@@ -809,8 +810,10 @@ fn basic_processes() -> HashMap<String, Par> {
     map
 }
 
-fn setup_reducer<T>(
-    charging_rspace: T,
+fn setup_reducer(
+    charging_rspace: Arc<
+        Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
+    >,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
@@ -818,10 +821,7 @@ fn setup_reducer<T>(
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
     cost: _cost,
-) -> DebruijnInterpreter
-where
-    T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
@@ -878,23 +878,28 @@ fn setup_maps_and_refs(
     (block_data_ref, invalid_blocks, urn_map, proc_defs)
 }
 
-fn create_rho_env<T>(
-    mut rspace: T,
+fn create_rho_env(
+    mut rspace: Arc<
+        Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
+    >,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
     extra_system_processes: &mut Vec<Definition>,
     cost: _cost,
-) -> (DebruijnInterpreter, Arc<RwLock<BlockData>>, InvalidBlocks)
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> (
+    DebruijnInterpreter,
+    Arc<RwLock<BlockData>>,
+    InvalidBlocks,
+    Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
+) {
     let maps_and_refs = setup_maps_and_refs(&extra_system_processes);
     let (block_data_ref, invalid_blocks, urn_map, proc_defs) = maps_and_refs;
     let res = introduce_system_process(vec![&mut rspace], proc_defs);
     assert!(res.iter().all(|s| s.is_none()));
 
+    let charging_rspace = ChargingRSpace::charging_rspace(rspace, cost.clone());
     let reducer = setup_reducer(
-        ChargingRSpace::charging_rspace(rspace, cost.clone()),
+        charging_rspace.clone(),
         block_data_ref.clone(),
         invalid_blocks.clone(),
         extra_system_processes,
@@ -904,7 +909,7 @@ where
         cost,
     );
 
-    (reducer, block_data_ref, invalid_blocks)
+    (reducer, block_data_ref, invalid_blocks, charging_rspace)
 }
 
 // This is from Nassim Taleb's "Skin in the Game"
@@ -928,15 +933,12 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
-async fn create_runtime<T>(
-    rspace: T,
+async fn create_runtime(
+    rspace: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
     extra_system_processes: &mut Vec<Definition>,
     init_registry: bool,
     mergeable_tag_name: Par,
-) -> Arc<Mutex<RhoRuntimeImpl>>
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> Arc<Mutex<RhoRuntimeImpl>> {
     let cost = CostAccounting::empty_cost();
     let merge_chs = Arc::new(RwLock::new({
         let mut set = HashSet::new();
@@ -952,8 +954,15 @@ where
         cost.clone(),
     );
 
-    let (reducer, block_ref, invalid_blocks) = rho_env;
-    let runtime = RhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
+    let (reducer, block_ref, invalid_blocks, charging_rspace) = rho_env;
+    let runtime = RhoRuntimeImpl::new(
+        reducer,
+        charging_rspace,
+        cost,
+        block_ref,
+        invalid_blocks,
+        merge_chs,
+    );
 
     if init_registry {
         bootstrap_registry(runtime.clone()).await;
@@ -980,111 +989,112 @@ where
  *                use [[coop.rchain.rholang.interpreter.accounting.noOpCostLog]]
  * @return
  */
-pub async fn create_rho_runtime<T>(
-    rspace: T,
+pub async fn create_rho_runtime(
+    rspace: Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>,
     mergeable_tag_name: Par,
     init_registry: bool,
     extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<RhoRuntimeImpl>>
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> Arc<Mutex<RhoRuntimeImpl>> {
     create_runtime(
         rspace,
         extra_system_processes,
         init_registry,
         mergeable_tag_name,
-    ).await
+    )
+    .await
 }
 
-/**
- *
- * @param rspace the replay rspace which the runtime operate on it
- * @param extraSystemProcesses same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @param initRegistry same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @param costLog same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @return
- */
-pub async fn create_replay_rho_runtime<T>(
-    rspace: T,
-    mergeable_tag_name: Par,
-    init_registry: bool,
-    extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<ReplayRhoRuntimeImpl>>
-where
-    T: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
-{
-    let cost = CostAccounting::empty_cost();
-    let merge_chs = Arc::new(RwLock::new({
-        let mut set = HashSet::new();
-        set.insert(Par::default());
-        set
-    }));
+// /**
+//  *
+//  * @param rspace the replay rspace which the runtime operate on it
+//  * @param extraSystemProcesses same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
+//  * @param initRegistry same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
+//  * @param costLog same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
+//  * @return
+//  */
+// pub async fn create_replay_rho_runtime<T>(
+//     rspace: T,
+//     mergeable_tag_name: Par,
+//     init_registry: bool,
+//     extra_system_processes: &mut Vec<Definition>,
+// ) -> Arc<Mutex<ReplayRhoRuntimeImpl>>
+// where
+//     T: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+// {
+//     let cost = CostAccounting::empty_cost();
+//     let merge_chs = Arc::new(RwLock::new({
+//         let mut set = HashSet::new();
+//         set.insert(Par::default());
+//         set
+//     }));
 
-    let rho_env = create_rho_env(
-        rspace.clone(),
-        merge_chs.clone(),
-        mergeable_tag_name,
-        extra_system_processes,
-        cost.clone(),
-    );
+//     let rho_env = create_rho_env(
+//         rspace.clone(),
+//         merge_chs.clone(),
+//         mergeable_tag_name,
+//         extra_system_processes,
+//         cost.clone(),
+//     );
 
-    let (reducer, block_ref, invalid_blocks) = rho_env;
-    let runtime =
-        ReplayRhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
+//     let (reducer, block_ref, invalid_blocks) = rho_env;
+//     let runtime =
+//         ReplayRhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
-    if init_registry {
-        bootstrap_registry(runtime.clone()).await;
-        let _ = runtime.try_lock().unwrap().create_checkpoint();
-    }
+//     if init_registry {
+//         bootstrap_registry(runtime.clone()).await;
+//         let _ = runtime.try_lock().unwrap().create_checkpoint();
+//     }
 
-    runtime
-}
+//     runtime
+// }
 
-async fn create_runtimes<T, R>(
-    space: T,
-    replay_space: R,
-    init_registry: bool,
-    additional_system_processes: &mut Vec<Definition>,
-    mergeable_tag_name: Par,
-) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<ReplayRhoRuntimeImpl>>)
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-    R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
-{
-    let rho_runtime = create_rho_runtime(
-        space,
-        mergeable_tag_name.clone(),
-        init_registry,
-        additional_system_processes,
-    ).await;
+// async fn create_runtimes<T, R>(
+//     space: T,
+//     replay_space: R,
+//     init_registry: bool,
+//     additional_system_processes: &mut Vec<Definition>,
+//     mergeable_tag_name: Par,
+// ) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<ReplayRhoRuntimeImpl>>)
+// where
+//     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+//     R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+// {
+//     let rho_runtime = create_rho_runtime(
+//         space,
+//         mergeable_tag_name.clone(),
+//         init_registry,
+//         additional_system_processes,
+//     )
+//     .await;
 
-    let replay_rho_runtime = create_replay_rho_runtime(
-        replay_space,
-        mergeable_tag_name,
-        init_registry,
-        additional_system_processes,
-    ).await;
+//     let replay_rho_runtime = create_replay_rho_runtime(
+//         replay_space,
+//         mergeable_tag_name,
+//         init_registry,
+//         additional_system_processes,
+//     )
+//     .await;
 
-    (rho_runtime, replay_rho_runtime)
-}
+//     (rho_runtime, replay_rho_runtime)
+// }
 
-async fn create_runtime_from_kv_store(
-    stores: RSpaceStore,
-    mergeable_tag_name: Par,
-    init_registry: bool,
-    additional_system_processes: &mut Vec<Definition>,
-    matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
-) -> Arc<Mutex<RhoRuntimeImpl>> {
-    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-        RSpace::create(stores, matcher).unwrap();
+// async fn create_runtime_from_kv_store(
+//     stores: RSpaceStore,
+//     mergeable_tag_name: Par,
+//     init_registry: bool,
+//     additional_system_processes: &mut Vec<Definition>,
+//     matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
+// ) -> Arc<Mutex<RhoRuntimeImpl>> {
+//     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
+//         RSpace::create(stores, matcher).unwrap();
 
-    let runtime = create_rho_runtime(
-        space,
-        mergeable_tag_name,
-        init_registry,
-        additional_system_processes,
-    ).await;
+//     let runtime = create_rho_runtime(
+//         space,
+//         mergeable_tag_name,
+//         init_registry,
+//         additional_system_processes,
+//     )
+//     .await;
 
-    runtime
-}
+//     runtime
+// }
