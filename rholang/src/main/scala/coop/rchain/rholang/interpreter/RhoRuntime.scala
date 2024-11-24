@@ -48,6 +48,11 @@ import coop.rchain.models.rholang_scala_rust_types.CostProto
 import coop.rchain.models.rholang_scala_rust_types.EvaluateResultProto
 import coop.rchain.rholang.interpreter.errors.BugFoundError
 import coop.rchain.rholang.interpreter.errors.RustError
+import coop.rchain.models.rspace_plus_plus_types._
+import coop.rchain.rspace.trace.Produce
+import scala.collection.SortedSet
+import coop.rchain.rspace.trace.COMM
+import coop.rchain.rspace.trace.Consume
 
 // trait RhoRuntime[F[_]] extends HasCost[F] {
 trait RhoRuntime[F[_]] {
@@ -183,7 +188,92 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
 
   override def getHotChanges
       : F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]] =
-    space.toMap
+    // space.toMap
+    for {
+      result <- Sync[F].delay {
+                 val toMapPtr = RHOLANG_RUST_INSTANCE.get_hot_changes(runtimePtr)
+
+                 if (toMapPtr != null) {
+                   val length = toMapPtr.getInt(0)
+
+                   try {
+                     val resultBytes = toMapPtr.getByteArray(4, length)
+                     val toMapResult = StoreToMapResult.parseFrom(resultBytes)
+
+                     val map = toMapResult.mapEntries.flatMap { mapEntry =>
+                       val key = mapEntry.key
+                       mapEntry.value match {
+                         case Some(row) =>
+                           val value = Row(
+                             data = row.data.map(
+                               datum =>
+                                 Datum[ListParWithRandom](
+                                   a = datum.a.get,
+                                   persist = datum.persist,
+                                   source = datum.source match {
+                                     case Some(produceEvent) =>
+                                       Produce(
+                                         channelsHash = Blake2b256Hash.fromByteArray(
+                                           produceEvent.channelHash.toByteArray
+                                         ),
+                                         hash = Blake2b256Hash.fromByteArray(
+                                           produceEvent.hash.toByteArray
+                                         ),
+                                         persistent = produceEvent.persistent
+                                       )
+                                     case None => {
+                                       println("ProduceEvent is None")
+                                       throw new RuntimeException("ProduceEvent is None")
+                                     }
+                                   }
+                                 )
+                             ),
+                             wks = row.wks.map(
+                               wk =>
+                                 WaitingContinuation[BindPattern, TaggedContinuation](
+                                   patterns = wk.patterns,
+                                   continuation = wk.continuation.get,
+                                   persist = wk.persist,
+                                   peeks = wk.peeks.map(_.value).to[SortedSet],
+                                   source = wk.source match {
+                                     case Some(consumeEvent) =>
+                                       Consume(
+                                         channelsHashes = consumeEvent.channelHashes.map(
+                                           bs => Blake2b256Hash.fromByteArray(bs.toByteArray)
+                                         ),
+                                         hash = Blake2b256Hash.fromByteArray(
+                                           consumeEvent.hash.toByteArray
+                                         ),
+                                         persistent = consumeEvent.persistent
+                                       )
+                                     case None => {
+                                       println("ConsumeEvent is None")
+                                       throw new RuntimeException("ConsumeEvent is None")
+                                     }
+                                   }
+                                 )
+                             )
+                           )
+                           Some(key -> value)
+                         case None =>
+                           println("Row is None")
+                           None
+                       }
+                     }.toMap
+
+                     map
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala toMap operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   println("toMapPtr is null")
+                   throw new RuntimeException("toMapPtr is null")
+                 }
+
+               }
+    } yield result
 
   override def inj(par: Par, env: Env[Par] = Env[Par]())(implicit rand: Blake2b512Random): F[Unit] =
     // reducer.inj(par)
@@ -193,20 +283,12 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
       channel: Seq[Par],
       pattern: Seq[BindPattern]
   ): F[Option[(TaggedContinuation, Seq[ListParWithRandom])]] =
-    space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    // space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
+    ???
 
   override def evaluate(term: String, initialPhlo: Cost, normalizerEnv: Map[String, Name])(
       implicit rand: Blake2b512Random
   ): F[EvaluateResult] =
-    // implicit val c: _cost[F]       = cost
-    // implicit val m                 = mergeChs
-    // implicit val i: Interpreter[F] = Interpreter.newIntrepreter[F]
-    // Interpreter[F].injAttempt(
-    //   reducer,
-    //   term,
-    //   initialPhlo,
-    //   normalizerEnv
-    // )
     Sync[F].delay {
       // println("\nterm in evaluate: " + term)
       val evalParams = EvaluateParams(
@@ -249,33 +331,162 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     }
 
   override def reset(root: Blake2b256Hash): F[Unit] =
-    space.reset(root)
+    // space.reset(root)
+    for {
+      _ <- Sync[F].delay {
+            // println("\nhit scala reset, root: " + root)
+            val rootBytes = root.bytes.toArray
 
-  override def createCheckpoint: F[Checkpoint] = Span[F].withMarks("create-checkpoint") {
-    space.createCheckpoint()
-  }
+            val rootMemory = new Memory(rootBytes.length.toLong)
+            rootMemory.write(0, rootBytes, 0, rootBytes.length)
+
+            val _ = RHOLANG_RUST_INSTANCE.reset(
+              runtimePtr,
+              rootMemory,
+              rootBytes.length
+            )
+
+            // Not sure if these lines are needed
+            // Need to figure out how to deallocate each memory instance
+            rootMemory.clear()
+          }
+    } yield ()
+
+  override def createCheckpoint: F[Checkpoint] =
+    // 	Span[F].withMarks("create-checkpoint") {
+    //   space.createCheckpoint()
+    // }
+    for {
+      result <- Sync[F].delay {
+                 //  println("\nhit scala createCheckpoint")
+
+                 val checkpointResultPtr = RHOLANG_RUST_INSTANCE.create_checkpoint(
+                   runtimePtr
+                 )
+
+                 if (checkpointResultPtr != null) {
+                   val resultByteslength = checkpointResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes     = checkpointResultPtr.getByteArray(4, resultByteslength)
+                     val checkpointProto = CheckpointProto.parseFrom(resultBytes)
+                     val checkpointRoot  = checkpointProto.root
+
+                     //  println(
+                     //    "\nscala createCheckpoint root: " + Blake2b256Hash
+                     //      .fromByteArray(checkpointRoot.toByteArray)
+                     //  )
+
+                     val checkpointLogProto = checkpointProto.log
+                     val checkpointLog = checkpointLogProto.map {
+                       case eventProto if eventProto.eventType.isComm =>
+                         val commProto = eventProto.eventType.comm.get
+                         val consume   = commProto.consume
+                         val produces = commProto.produces.map { produceProto =>
+                           Produce(
+                             channelsHash =
+                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                             persistent = produceProto.persistent
+                           )
+                         }
+                         val peeks = commProto.peeks.map(_.value).to[SortedSet]
+                         val timesRepeated = commProto.timesRepeated.map { entry =>
+                           val produceProto = entry.key.get
+                           val produce = Produce(
+                             channelsHash =
+                               Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                             hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                             persistent = produceProto.persistent
+                           )
+                           produce -> entry.value
+                         }.toMap
+                         COMM(
+                           consume = Consume(
+                             channelsHashes = consume.get.channelHashes
+                               .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                             hash = Blake2b256Hash.fromByteArray(consume.get.hash.toByteArray),
+                             persistent = consume.get.persistent
+                           ),
+                           produces = produces,
+                           peeks = peeks,
+                           timesRepeated = timesRepeated
+                         )
+                       case eventProto if eventProto.eventType.isIoEvent =>
+                         val ioEventProto = eventProto.eventType.ioEvent.get
+                         ioEventProto.ioEventType match {
+                           case IOEventProto.IoEventType.Produce(produceProto) =>
+                             Produce(
+                               channelsHash =
+                                 Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
+                               hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
+                               persistent = produceProto.persistent
+                             )
+                           case IOEventProto.IoEventType.Consume(consumeProto) =>
+                             Consume(
+                               channelsHashes = consumeProto.channelHashes
+                                 .map(bs => Blake2b256Hash.fromByteArray(bs.toByteArray)),
+                               hash = Blake2b256Hash.fromByteArray(consumeProto.hash.toByteArray),
+                               persistent = consumeProto.persistent
+                             )
+                           case _ =>
+                             throw new RuntimeException("Unknown IOEvent type")
+                         }
+                       case _ =>
+                         throw new RuntimeException("Unknown Event type")
+                     }
+
+                     //  println("\n log: " + checkpointLog)
+
+                     Checkpoint(
+                       root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                       log = checkpointLog
+                     )
+                     //  Checkpoint(
+                     //    root = Blake2b256Hash.fromByteArray(checkpointRoot.toByteArray),
+                     //    log = Seq.empty[Event]
+                     //  )
+
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala createCheckpoint operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   println(
+                     "Error during createCheckpoint operation: Checkpoint pointer from rust was null"
+                   )
+                   throw new RuntimeException("Checkpoint pointer from rust was null")
+                 }
+               }
+    } yield result
 
   override def createSoftCheckpoint
       : F[SoftCheckpoint[Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
     Span[F].withMarks("create-soft-heckpoint") {
-      space.createSoftCheckpoint()
+      // space.createSoftCheckpoint()
+      ???
     }
 
   override def revertToSoftCheckpoint(
       softCheckpoint: SoftCheckpoint[Name, BindPattern, ListParWithRandom, TaggedContinuation]
   ): F[Unit] =
-    space.revertToSoftCheckpoint(softCheckpoint)
+    // space.revertToSoftCheckpoint(softCheckpoint)
+    ???
 
   override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] =
-    space.getData(channel)
+    // space.getData(channel)
+    ???
 
   override def getContinuation(
       channels: Seq[Name]
   ): F[Seq[WaitingContinuation[BindPattern, TaggedContinuation]]] =
-    space.getWaitingContinuations(channels)
+    // space.getWaitingContinuations(channels)
+    ???
 
   override def getJoins(channel: Name): F[Seq[Seq[Name]]] =
-    space.getJoins(channel)
+    // space.getJoins(channel)
+    ???
 
   override def setBlockData(blockData: BlockData): F[Unit] =
     // blockDataRef.set(blockData)
@@ -303,23 +514,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     }
 
   override def setInvalidBlocks(invalidBlocks: Map[BlockHash, Validator]): F[Unit] =
-    // val invalidBlocksPar: Par =
-    //   Par(
-    //     exprs = Seq(
-    //       Expr(
-    //         Expr.ExprInstance.EMapBody(
-    //           ParMap(SortedParMap(invalidBlocks.map {
-    //             case (validator, blockHash) =>
-    //               (
-    //                 RhoType.ByteArray(validator.toByteArray),
-    //                 RhoType.ByteArray(blockHash.toByteArray)
-    //               )
-    //           }))
-    //         )
-    //       )
-    //     )
-    //   )
-    // invalidBlocksParam.setParams(invalidBlocksPar)
     ???
 
   override def setCostToMax: F[Unit] = ???
@@ -341,10 +535,12 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
 ) extends RhoRuntimeImpl[F](space, runtimePtr)
     with ReplayRhoRuntime[F] {
   override def checkReplayData: F[Unit] =
-    space.checkReplayData()
+    // space.checkReplayData()
+    ???
 
   override def rig(log: trace.Log): F[Unit] =
-    space.rig(log)
+    // space.rig(log)
+    ???
 }
 
 object ReplayRhoRuntime {
@@ -415,19 +611,20 @@ object RhoRuntime {
     // println("\nhit introduceSystemProcesses")
     // println("spaces: " + spaces)
     // println("processes: " + processes)
-    processes.flatMap {
-      case (name, arity, remainder, ref) =>
-        val channels = List(name)
-        val patterns = List(
-          BindPattern(
-            (0 until arity).map[Par, Seq[Par]](i => EVar(FreeVar(i))),
-            remainder,
-            freeCount = arity
-          )
-        )
-        val continuation = TaggedContinuation(ScalaBodyRef(ref))
-        spaces.map(_.install(channels, patterns, continuation))
-    }.sequence
+    // processes.flatMap {
+    //   case (name, arity, remainder, ref) =>
+    //     val channels = List(name)
+    //     val patterns = List(
+    //       BindPattern(
+    //         (0 until arity).map[Par, Seq[Par]](i => EVar(FreeVar(i))),
+    //         remainder,
+    //         freeCount = arity
+    //       )
+    //     )
+    //     val continuation = TaggedContinuation(ScalaBodyRef(ref))
+    //     spaces.map(_.install(channels, patterns, continuation))
+    // }.sequence
+    ???
 
   def stdSystemProcesses[F[_]]: Seq[Definition[F]] = Seq(
     Definition[F]("rho:io:stdout", FixedChannels.STDOUT, 1, BodyRefs.STDOUT, {
@@ -546,13 +743,14 @@ object RhoRuntime {
       invalidBlocks: InvalidBlocks[F],
       extraSystemProcesses: Seq[Definition[F]]
   ): RhoDispatchMap[F] =
-    (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
-      .map(
-        _.toDispatchTable(
-          ProcessContext(space, dispatcher, blockData, invalidBlocks)
-        )
-      )
-      .toMap
+    // (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
+    //   .map(
+    //     _.toDispatchTable(
+    //       ProcessContext(space, dispatcher, blockData, invalidBlocks)
+    //     )
+    //   )
+    //   .toMap
+    ???
 
   val basicProcesses: Map[String, Par] = Map[String, Par](
     "rho:registry:lookup"          -> Bundle(FixedChannels.REG_LOOKUP, writeFlag = true),
@@ -571,40 +769,41 @@ object RhoRuntime {
       urnMap: Map[String, Par],
       mergeChs: Ref[F, Set[Par]],
       mergeableTagName: Par
-  ): Reduce[F] = {
-    lazy val replayDispatchTable: RhoDispatchMap[F] =
-      dispatchTableCreator(
-        chargingRSpace,
-        replayDispatcher,
-        blockDataRef,
-        invalidBlocks,
-        extraSystemProcesses
-      )
+  ): Reduce[F] =
+    // lazy val replayDispatchTable: RhoDispatchMap[F] =
+    //   dispatchTableCreator(
+    //     chargingRSpace,
+    //     replayDispatcher,
+    //     blockDataRef,
+    //     invalidBlocks,
+    //     extraSystemProcesses
+    //   )
 
-    lazy val (replayDispatcher, replayReducer) =
-      RholangAndScalaDispatcher(
-        chargingRSpace,
-        replayDispatchTable,
-        urnMap,
-        mergeChs,
-        mergeableTagName
-      )
-    replayReducer
-  }
+    // lazy val (replayDispatcher, replayReducer) =
+    //   RholangAndScalaDispatcher(
+    //     chargingRSpace,
+    //     replayDispatchTable,
+    //     urnMap,
+    //     mergeChs,
+    //     mergeableTagName
+    //   )
+    // replayReducer
+    ???
 
   def setupMapsAndRefs[F[_]: Sync](
       extraSystemProcesses: Seq[Definition[F]] = Seq.empty
   ): F[
     (Ref[F, BlockData], InvalidBlocks[F], Map[String, Name], Seq[(Name, Arity, Remainder, BodyRef)])
   ] =
-    for {
-      blockDataRef  <- Ref.of(BlockData.empty)
-      invalidBlocks = InvalidBlocks.unsafe[F]()
-      urnMap = basicProcesses ++ (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
-        .map(_.toUrnMap)
-      procDefs = (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
-        .map(_.toProcDefs)
-    } yield (blockDataRef, invalidBlocks, urnMap, procDefs)
+    //   for {
+    //     blockDataRef  <- Ref.of(BlockData.empty)
+    //     invalidBlocks = InvalidBlocks.unsafe[F]()
+    //     urnMap = basicProcesses ++ (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
+    //       .map(_.toUrnMap)
+    //     procDefs = (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ extraSystemProcesses)
+    //       .map(_.toProcDefs)
+    //   } yield (blockDataRef, invalidBlocks, urnMap, procDefs)
+    ???
 
   def createRhoEnv[F[_]: Concurrent: Parallel: _cost: Log: Metrics: Span](
       rspace: RhoISpace[F],
@@ -612,39 +811,24 @@ object RhoRuntime {
       mergeableTagName: Par,
       extraSystemProcesses: Seq[Definition[F]] = Seq.empty
   ): F[(Reduce[F], Ref[F, BlockData], InvalidBlocks[F])] =
-    for {
-      mapsAndRefs                                     <- setupMapsAndRefs(extraSystemProcesses)
-      (blockDataRef, invalidBlocks, urnMap, procDefs) = mapsAndRefs
-      reducer = setupReducer(
-        ChargingRSpace.chargingRSpace[F](rspace),
-        blockDataRef,
-        invalidBlocks,
-        extraSystemProcesses,
-        urnMap,
-        mergeChs,
-        mergeableTagName
-      )
-      res <- introduceSystemProcesses(rspace :: Nil, procDefs.toList)
-      _   = assert(res.forall(_.isEmpty))
-    } yield (reducer, blockDataRef, invalidBlocks)
-
-  // This is from Nassim Taleb's "Skin in the Game"
-  val bootstrapRand: Blake2b512Random = Blake2b512Random(
-    ("Decentralization is based on the simple notion that it is easier to macrobull***t than microbull***t. " +
-      "Decentralization reduces large structural asymmetries.")
-      .getBytes()
-  )
+    //   for {
+    //     mapsAndRefs                                     <- setupMapsAndRefs(extraSystemProcesses)
+    //     (blockDataRef, invalidBlocks, urnMap, procDefs) = mapsAndRefs
+    //     reducer = setupReducer(
+    //       ChargingRSpace.chargingRSpace[F](rspace),
+    //       blockDataRef,
+    //       invalidBlocks,
+    //       extraSystemProcesses,
+    //       urnMap,
+    //       mergeChs,
+    //       mergeableTagName
+    //     )
+    //     res <- introduceSystemProcesses(rspace :: Nil, procDefs.toList)
+    //     _   = assert(res.forall(_.isEmpty))
+    //   } yield (reducer, blockDataRef, invalidBlocks)
+    ???
 
   def bootstrapRegistry[F[_]: Sync](runtime: RhoRuntime[F]): F[Unit] =
-    // implicit val rand: Blake2b512Random = bootstrapRand
-    // println("\nhit bootstrapRegistry")
-    // for {
-    //   cost <- runtime.cost.get
-    //   _    <- runtime.cost.set(Cost.UNSAFE_MAX)
-    //   // _    = println("\nRegistryBootstrap.AST: " + RegistryBootstrap.AST)
-    //   _ <- runtime.inj(RegistryBootstrap.AST)
-    //   _ <- runtime.cost.set(cost)
-    // } yield ()
     Sync[F].delay {
       RHOLANG_RUST_INSTANCE.bootstrap_registry(runtime.getRuntimePtr)
     }
@@ -657,20 +841,6 @@ object RhoRuntime {
       // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
   )(): F[RhoRuntime[F]] =
     Span[F].trace(createPlayRuntime) {
-      // for {
-      //   cost <- CostAccounting.emptyCost[F]
-      //   // _        = println("\nhit createRuntime")
-      //   mergeChs <- Ref.of(Set[Par]())
-      //   rhoEnv <- {
-      //     implicit val c: _cost[F] = cost
-      //     createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
-      //   }
-      //   (reducer, blockRef, invalidBlocks) = rhoEnv
-      //   runtime                            = new RhoRuntimeImpl[F](reducer, rspace, cost, blockRef, invalidBlocks, mergeChs)
-      //   _ <- if (initRegistry) {
-      //         bootstrapRegistry(runtime) >> runtime.createCheckpoint
-      //       } else ().pure[F]
-      // } yield runtime
 
       Sync[F].delay {
         val runtimeParams = CreateRuntimeParams(
@@ -732,26 +902,6 @@ object RhoRuntime {
       // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
   )(): F[ReplayRhoRuntime[F]] =
     Span[F].trace(createReplayRuntime) {
-      //   for {
-      //     cost     <- CostAccounting.emptyCost[F]
-      //     mergeChs <- Ref.of(Set[Par]())
-      //     rhoEnv <- {
-      //       implicit val c: _cost[F] = cost
-      //       createRhoEnv(rspace, mergeChs, mergeableTagName, extraSystemProcesses)
-      //     }
-      //     (reducer, blockRef, invalidBlocks) = rhoEnv
-      //     runtime = new ReplayRhoRuntimeImpl[F](
-      //       reducer,
-      //       rspace,
-      //       cost,
-      //       blockRef,
-      //       invalidBlocks,
-      //       mergeChs
-      //     )
-      //     _ <- if (initRegistry) {
-      //           bootstrapRegistry(runtime) >> runtime.createCheckpoint
-      //         } else ().pure[F]
-      //   } yield runtime
       ???
     }
 
@@ -762,20 +912,6 @@ object RhoRuntime {
       additionalSystemProcesses: Seq[Definition[F]],
       mergeableTagName: Par
   ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] =
-    // for {
-    //   rhoRuntime <- RhoRuntime.createRhoRuntime[F](
-    //                  space,
-    //                  mergeableTagName,
-    //                  initRegistry,
-    //                  additionalSystemProcesses
-    //                )
-    //   replayRhoRuntime <- RhoRuntime.createReplayRhoRuntime[F](
-    //                        replaySpace,
-    //                        mergeableTagName,
-    //                        additionalSystemProcesses,
-    //                        initRegistry
-    //                      )
-    // } yield (rhoRuntime, replayRhoRuntime)
     ???
 
   /*
@@ -794,18 +930,19 @@ object RhoRuntime {
   ): F[RhoRuntime[F]] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
-    for {
-      // space <- RSpace
-      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-      //             stores
-      //           )
-      space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
-      runtime <- createRhoRuntime[F](
-                  space,
-                  mergeableTagName,
-                  initRegistry,
-                  additionalSystemProcesses
-                )
-    } yield runtime
+    // for {
+    //   // space <- RSpace
+    //   //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+    //   //             stores
+    //   //           )
+    //   space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
+    //   runtime <- createRhoRuntime[F](
+    //               space,
+    //               mergeableTagName,
+    //               initRegistry,
+    //               additionalSystemProcesses
+    //             )
+    // } yield runtime
+    ???
   }
 }

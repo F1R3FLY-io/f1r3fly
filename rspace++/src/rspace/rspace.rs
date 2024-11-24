@@ -73,7 +73,8 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
     fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        // println!("\nhit rspace++ create_checkpoint");
+        println!("\nhit rspace++ create_checkpoint");
+        println!("\nspace in create_checkpoint: {:?}", self.store.to_map().len());
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = Arc::new(next_history);
@@ -89,6 +90,8 @@ where
         self.create_new_hot_store(history_reader);
         self.restore_installs();
 
+        println!("\nspace after create_checkpoint: {:?}", self.store.to_map().len());
+
         Ok(Checkpoint {
             root: self.history_repository.root(),
             log,
@@ -96,7 +99,7 @@ where
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-        // println!("\nhit rspace++ reset");
+        println!("\nhit rspace++ reset, root: {:?}", root);
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = Arc::new(next_history);
 
@@ -182,7 +185,8 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit consume");
+        println!("\nHit consume");
+        println!("\nspace in consume: {:?}", self.store.to_map().len());
 
         if channels.is_empty() {
             panic!("RUST ERROR: channels can't be empty");
@@ -205,8 +209,8 @@ where
         data: A,
         persist: bool,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit produce");
-        // println!("\nto_map: {:?}", self.store.to_map());
+        println!("\nHit produce");
+        println!("\nspace in produce: {:?}", self.store.to_map().len());
         // println!("\nHit produce, data: {:?}", data);
         // println!("\n\nHit produce, channel: {:?}", channel);
 

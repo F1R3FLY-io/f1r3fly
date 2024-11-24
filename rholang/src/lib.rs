@@ -6,12 +6,17 @@ pub mod rust {
 use std::sync::{Arc, Mutex};
 
 use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
+use models::rspace_plus_plus_types::*;
 use models::{
     rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation},
     rholang_scala_rust_types::*,
 };
 use prost::Message;
-use rspace_plus_plus::rspace::rspace::RSpace;
+use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use rspace_plus_plus::rspace::{
+    rspace::RSpace,
+    trace::event::{Event, IOEvent},
+};
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -29,6 +34,74 @@ struct RhoRuntime {
 #[repr(C)]
 struct Space {
     rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
+}
+
+#[no_mangle]
+extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
+    let runtime = unsafe { (*runtime_ptr).runtime.clone() };
+    let hot_store_mapped = runtime.try_lock().unwrap().get_hot_changes();
+
+    let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
+
+    for (key, value) in hot_store_mapped {
+        let datums = value
+            .data
+            .into_iter()
+            .map(|datum| DatumProto {
+                a: Some(datum.a),
+                persist: datum.persist,
+                source: Some(ProduceProto {
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
+                    persistent: datum.source.persistent,
+                }),
+            })
+            .collect();
+
+        let wks = value
+            .wks
+            .into_iter()
+            .map(|wk| {
+                let res = WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(wk.continuation.clone()),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
+                        .collect(),
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                };
+
+                res
+            })
+            .collect();
+
+        let value = StoreToMapValue { data: datums, wks };
+        map_entries.push(StoreToMapEntry {
+            key,
+            value: Some(value),
+        });
+    }
+
+    let to_map_result = StoreToMapResult { map_entries };
+
+    let mut bytes = to_map_result.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
 #[no_mangle]
@@ -87,6 +160,133 @@ extern "C" fn evaluate(
 }
 
 #[no_mangle]
+extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
+    let runtime = unsafe { (*runtime_ptr).runtime.clone() };
+    let checkpoint = runtime.try_lock().unwrap().create_checkpoint();
+
+    let log = checkpoint.log;
+    let log_proto: Vec<EventProto> = log
+        .into_iter()
+        .map(|event| match event {
+            Event::Comm(comm) => {
+                let comm_proto = CommProto {
+                    consume: {
+                        Some(ConsumeProto {
+                            channel_hashes: comm
+                                .consume
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| hash.bytes())
+                                .collect(),
+                            hash: comm.consume.hash.bytes(),
+                            persistent: comm.consume.persistent,
+                        })
+                    },
+                    produces: {
+                        comm.produces
+                            .into_iter()
+                            .map(|produce| ProduceProto {
+                                channel_hash: produce.channel_hash.bytes(),
+                                hash: produce.hash.bytes(),
+                                persistent: produce.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm.peeks
+                            .into_iter()
+                            .map(|peek| SortedSetElement { value: peek as i32 })
+                            .collect()
+                    },
+                    times_repeated: {
+                        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
+                            Vec::new();
+                        for (key, value) in comm.times_repeated {
+                            let produce = ProduceProto {
+                                channel_hash: key.channel_hash.bytes(),
+                                hash: key.hash.bytes(),
+                                persistent: key.persistent,
+                            };
+
+                            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                                key: Some(produce),
+                                value,
+                            });
+                        }
+                        produce_counter_map_entries
+                    },
+                };
+
+                EventProto {
+                    event_type: Some(event_proto::EventType::Comm(comm_proto)),
+                }
+            }
+            Event::IoEvent(io_event) => match io_event {
+                IOEvent::Produce(produce) => {
+                    let produce_proto = ProduceProto {
+                        channel_hash: produce.channel_hash.bytes(),
+                        hash: produce.hash.bytes(),
+                        persistent: produce.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Produce(
+                                produce_proto,
+                            )),
+                        })),
+                    }
+                }
+                IOEvent::Consume(consume) => {
+                    let consume_proto = ConsumeProto {
+                        channel_hashes: consume
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: consume.hash.bytes(),
+                        persistent: consume.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Consume(
+                                consume_proto,
+                            )),
+                        })),
+                    }
+                }
+            },
+        })
+        .collect();
+
+    let checkpoint_proto = CheckpointProto {
+        root: checkpoint.root.bytes(),
+        log: log_proto,
+    };
+
+    let mut bytes = checkpoint_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+extern "C" fn reset(
+    runtime_ptr: *mut RhoRuntime,
+    root_pointer: *const u8,
+    root_bytes_len: usize,
+) -> () {
+    // println!("\nHit reset");
+
+    let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
+    let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
+
+    let runtime = unsafe { (*runtime_ptr).runtime.clone() };
+    runtime.try_lock().unwrap().reset(root);
+}
+
+#[no_mangle]
 extern "C" fn set_block_data(
     runtime_ptr: *mut RhoRuntime,
     params_ptr: *const u8,
@@ -138,6 +338,7 @@ extern "C" fn create_runtime(
     let rho_runtime = tokio_runtime.block_on(async {
         create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
     });
+
     Box::into_raw(Box::new(RhoRuntime {
         runtime: rho_runtime,
     }))

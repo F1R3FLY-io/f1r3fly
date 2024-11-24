@@ -229,12 +229,12 @@ pub trait ReplayRhoRuntime: RhoRuntime {
 
 #[derive(Clone)]
 pub struct RhoRuntimeImpl {
-    reducer: DebruijnInterpreter,
-    space: RhoISpace,
-    cost: _cost,
-    block_data_ref: Arc<RwLock<BlockData>>,
-    invalid_blocks_param: InvalidBlocks,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
+    pub reducer: DebruijnInterpreter,
+    pub space: RhoISpace,
+    pub cost: _cost,
+    pub block_data_ref: Arc<RwLock<BlockData>>,
+    pub invalid_blocks_param: InvalidBlocks,
+    pub merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
 impl RhoRuntimeImpl {
@@ -924,7 +924,15 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
     // println!("\nast: {:?}", ast());
+    println!(
+        "\nspace before inject, {:?}",
+        runtime_lock.get_hot_changes().len()
+    );
     runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
+    println!(
+        "\nspace after inject, {:?}",
+        runtime_lock.get_hot_changes().len()
+    );
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
@@ -956,8 +964,9 @@ where
     let runtime = RhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
+        println!("\ninit_registry create_runtime");
         bootstrap_registry(runtime.clone()).await;
-        let _ = runtime.try_lock().unwrap().create_checkpoint();
+        runtime.try_lock().unwrap().create_checkpoint();
     }
 
     runtime
@@ -994,7 +1003,8 @@ where
         extra_system_processes,
         init_registry,
         mergeable_tag_name,
-    ).await
+    )
+    .await
 }
 
 /**
@@ -1034,6 +1044,7 @@ where
         ReplayRhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
+        println!("\ninit_registry create_replay_rho_runtime");
         bootstrap_registry(runtime.clone()).await;
         let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
@@ -1057,14 +1068,16 @@ where
         mergeable_tag_name.clone(),
         init_registry,
         additional_system_processes,
-    ).await;
+    )
+    .await;
 
     let replay_rho_runtime = create_replay_rho_runtime(
         replay_space,
         mergeable_tag_name,
         init_registry,
         additional_system_processes,
-    ).await;
+    )
+    .await;
 
     (rho_runtime, replay_rho_runtime)
 }
@@ -1084,7 +1097,8 @@ async fn create_runtime_from_kv_store(
         mergeable_tag_name,
         init_registry,
         additional_system_processes,
-    ).await;
+    )
+    .await;
 
     runtime
 }

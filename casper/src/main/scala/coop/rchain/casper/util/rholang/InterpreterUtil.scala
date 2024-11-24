@@ -81,12 +81,12 @@ object InterpreterUtil {
                        )
                        .as(none[StateHash].asRight[BlockError])
                    } else if (rejectedDeployIds != block.body.rejectedDeploys.map(_.sig).toSet) {
-                    //  println(
-                    //    s"Computed rejected deploys " +
-                    //      s"${rejectedDeployIds.map(PrettyPrinter.buildString).mkString(",")} does not equal " +
-                    //      s"block's rejected deploy " +
-                    //      s"${block.body.rejectedDeploys.map(_.sig).map(PrettyPrinter.buildString).mkString(",")}"
-                    //  )
+                     //  println(
+                     //    s"Computed rejected deploys " +
+                     //      s"${rejectedDeployIds.map(PrettyPrinter.buildString).mkString(",")} does not equal " +
+                     //      s"block's rejected deploy " +
+                     //      s"${block.body.rejectedDeploys.map(_.sig).map(PrettyPrinter.buildString).mkString(",")}"
+                     //  )
                      Log[F]
                        .warn(
                          s"Computed rejected deploys " +
