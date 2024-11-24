@@ -3,6 +3,7 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
 use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::{
     collections::{HashMap, HashSet},
@@ -87,7 +88,7 @@ impl RholangAndScalaDispatcher {
         cost: _cost,
     ) -> (RholangAndScalaDispatcher, DebruijnInterpreter)
     where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
         // println!("\ncreate");
         let mut dispatcher = RholangAndScalaDispatcher {
@@ -117,7 +118,7 @@ impl RholangAndScalaDispatcher {
 
     pub fn create_dispatcher<T>(tuplespace: T, cost: _cost) -> RhoDispatch
     where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
         // println!("\ncreate_dispatcher");
         let mut dispatcher = RholangAndScalaDispatcher {

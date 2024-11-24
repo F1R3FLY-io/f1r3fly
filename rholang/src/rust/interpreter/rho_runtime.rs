@@ -219,6 +219,10 @@ pub trait RhoRuntime: HasCost {
     fn get_hot_changes(
         &self,
     ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>>;
+
+    fn get_reducer_hot_changes(
+        &self,
+    ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>>;
 }
 
 pub trait ReplayRhoRuntime: RhoRuntime {
@@ -240,15 +244,16 @@ pub struct RhoRuntimeImpl {
 impl RhoRuntimeImpl {
     fn new(
         reducer: DebruijnInterpreter,
-        space: impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+        _space: impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
         cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
     ) -> Arc<Mutex<RhoRuntimeImpl>> {
+        let reducer_space = reducer.clone().space;
         Arc::new(Mutex::new(RhoRuntimeImpl {
             reducer,
-            space: Arc::new(Mutex::new(Box::new(space))),
+            space: reducer_space,
             cost,
             block_data_ref,
             invalid_blocks_param,
@@ -298,7 +303,17 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 
     fn create_checkpoint(&mut self) -> Checkpoint {
-        self.space.try_lock().unwrap().create_checkpoint().unwrap()
+        // let _ = self.reducer.space.try_lock().unwrap().create_checkpoint().unwrap();
+        let checkpoint = self.space.try_lock().unwrap().create_checkpoint().unwrap();
+        println!(
+            "\nruntime space after create_checkpoint, {:?}",
+            self.get_hot_changes().len()
+        );
+        println!(
+            "\nreducer space after create_checkpoint, {:?}",
+            self.get_reducer_hot_changes().len()
+        );
+        checkpoint
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {
@@ -372,6 +387,12 @@ impl RhoRuntime for RhoRuntimeImpl {
         &self,
     ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
         self.space.try_lock().unwrap().to_map()
+    }
+
+    fn get_reducer_hot_changes(
+        &self,
+    ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
+        self.reducer.space.try_lock().unwrap().to_map()
     }
 }
 
@@ -537,6 +558,12 @@ impl RhoRuntime for ReplayRhoRuntimeImpl {
         &self,
     ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
         self.space.try_lock().unwrap().to_map()
+    }
+
+    fn get_reducer_hot_changes(
+        &self,
+    ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
+        self.reducer.space.try_lock().unwrap().to_map()
     }
 }
 
@@ -754,7 +781,7 @@ fn dispatch_table_creator<T>(
     extra_system_processes: &mut Vec<Definition>,
 ) -> RhoDispatchMap
 where
-    T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
     let mut dispatch_table = HashMap::new();
 
@@ -820,7 +847,7 @@ fn setup_reducer<T>(
     cost: _cost,
 ) -> DebruijnInterpreter
 where
-    T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
     // println!("\nsetup_reducer");
     let replay_dispatch_table = dispatch_table_creator(
@@ -925,13 +952,21 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
     // println!("\nast: {:?}", ast());
     println!(
-        "\nspace before inject, {:?}",
+        "\nruntime space before inject, {:?}",
         runtime_lock.get_hot_changes().len()
+    );
+    println!(
+        "\nreducer space before inject, {:?}",
+        runtime_lock.get_reducer_hot_changes().len()
     );
     runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
     println!(
-        "\nspace after inject, {:?}",
+        "\nruntime space after inject, {:?}",
         runtime_lock.get_hot_changes().len()
+    );
+    println!(
+        "\nreducer space after inject, {:?}",
+        runtime_lock.get_reducer_hot_changes().len()
     );
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }

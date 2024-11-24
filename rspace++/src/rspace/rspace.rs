@@ -73,8 +73,8 @@ where
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
     fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        println!("\nhit rspace++ create_checkpoint");
-        println!("\nspace in create_checkpoint: {:?}", self.store.to_map().len());
+        // println!("\nhit rspace++ create_checkpoint");
+        // println!("\nspace in create_checkpoint: {:?}", self.store.to_map().len());
         let changes = self.store.changes();
         let next_history = self.history_repository.checkpoint(&changes);
         self.history_repository = Arc::new(next_history);
@@ -90,7 +90,7 @@ where
         self.create_new_hot_store(history_reader);
         self.restore_installs();
 
-        println!("\nspace after create_checkpoint: {:?}", self.store.to_map().len());
+        // println!("\nspace after create_checkpoint: {:?}", self.store.to_map().len());
 
         Ok(Checkpoint {
             root: self.history_repository.root(),
@@ -99,7 +99,7 @@ where
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-        println!("\nhit rspace++ reset, root: {:?}", root);
+        // println!("\nhit rspace++ reset, root: {:?}", root);
         let next_history = self.history_repository.reset(&root)?;
         self.history_repository = Arc::new(next_history);
 
@@ -168,15 +168,7 @@ where
 
         Ok(())
     }
-}
 
-impl<C, P, A, K> Tuplespace<C, P, A, K> for RSpace<C, P, A, K>
-where
-    C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
-    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-{
     fn consume(
         &mut self,
         channels: Vec<C>,

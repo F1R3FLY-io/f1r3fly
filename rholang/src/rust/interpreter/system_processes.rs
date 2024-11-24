@@ -10,6 +10,7 @@ use models::rhoapi::{BindPattern, Expr, TaggedContinuation};
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
+use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
@@ -18,7 +19,7 @@ use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
 use super::pretty_printer::PrettyPrinter;
 use super::registry::registry::Registry;
-use super::rho_runtime::RhoTuplespace;
+use super::rho_runtime::{RhoISpace, RhoTuplespace};
 use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
 };
@@ -169,7 +170,7 @@ impl BodyRefs {
 }
 
 pub struct ProcessContext {
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
     pub block_data: Arc<RwLock<BlockData>>,
     pub invalid_blocks: InvalidBlocks,
@@ -184,7 +185,7 @@ impl ProcessContext {
         invalid_blocks: InvalidBlocks,
     ) -> Self
     where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
     {
         ProcessContext {
             space: Arc::new(Mutex::new(Box::new(space.clone()))),
@@ -280,14 +281,14 @@ impl BlockData {
 
 pub struct SystemProcesses {
     pub dispatcher: RhoDispatch,
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
     fn create<T>(dispatcher: RhoDispatch, space: T) -> Self
     where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
         SystemProcesses {
             dispatcher,

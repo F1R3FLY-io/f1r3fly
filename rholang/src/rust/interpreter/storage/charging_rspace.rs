@@ -19,7 +19,7 @@ use models::rhoapi::{
 };
 use rspace_plus_plus::rspace::{
     errors::RSpaceError,
-    rspace_interface::{ContResult, MaybeActionResult, RSpaceResult},
+    rspace_interface::{ContResult, ISpace, MaybeActionResult, RSpaceResult},
     tuplespace_interface::Tuplespace,
 };
 
@@ -53,9 +53,9 @@ impl ChargingRSpace {
     pub fn charging_rspace<T>(
         space: T,
         cost: _cost,
-    ) -> impl Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone
+    ) -> impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone
     where
-        T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
     {
         #[derive(Clone)]
         struct ChargingRSpace<T> {
@@ -63,9 +63,8 @@ impl ChargingRSpace {
             cost: _cost,
         }
 
-        impl<T: Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>
-            Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>
-            for ChargingRSpace<T>
+        impl<T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>
+            ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> for ChargingRSpace<T>
         {
             fn consume(
                 &mut self,
@@ -137,6 +136,82 @@ impl ChargingRSpace {
             ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, RSpaceError>
             {
                 self.space.install(channels, patterns, continuation)
+            }
+
+            fn create_checkpoint(
+                &mut self,
+            ) -> Result<rspace_plus_plus::rspace::checkpoint::Checkpoint, RSpaceError> {
+                self.space.create_checkpoint()
+            }
+
+            fn get_data(
+                &self,
+                channel: Par,
+            ) -> Vec<rspace_plus_plus::rspace::internal::Datum<ListParWithRandom>> {
+                self.space.get_data(channel)
+            }
+
+            fn get_waiting_continuations(
+                &self,
+                channels: Vec<Par>,
+            ) -> Vec<
+                rspace_plus_plus::rspace::internal::WaitingContinuation<
+                    BindPattern,
+                    TaggedContinuation,
+                >,
+            > {
+                self.space.get_waiting_continuations(channels)
+            }
+
+            fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
+                self.space.get_joins(channel)
+            }
+
+            fn clear(&mut self) -> Result<(), RSpaceError> {
+                self.space.clear()
+            }
+
+            fn reset(
+                &mut self,
+                root: rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash,
+            ) -> Result<(), RSpaceError> {
+                self.space.reset(root)
+            }
+
+            fn to_map(
+                &self,
+            ) -> std::collections::HashMap<
+                Vec<Par>,
+                rspace_plus_plus::rspace::internal::Row<
+                    BindPattern,
+                    ListParWithRandom,
+                    TaggedContinuation,
+                >,
+            > {
+                self.space.to_map()
+            }
+
+            fn create_soft_checkpoint(
+                &mut self,
+            ) -> rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
+                Par,
+                BindPattern,
+                ListParWithRandom,
+                TaggedContinuation,
+            > {
+                self.space.create_soft_checkpoint()
+            }
+
+            fn revert_to_soft_checkpoint(
+                &mut self,
+                checkpoint: rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
+                    Par,
+                    BindPattern,
+                    ListParWithRandom,
+                    TaggedContinuation,
+                >,
+            ) -> Result<(), RSpaceError> {
+                self.space.revert_to_soft_checkpoint(checkpoint)
             }
         }
 

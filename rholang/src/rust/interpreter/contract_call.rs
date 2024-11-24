@@ -1,6 +1,6 @@
 use models::rhoapi::{ListParWithRandom, Par};
 
-use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::RhoTuplespace};
+use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::{RhoISpace, RhoTuplespace}};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -23,7 +23,7 @@ use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::RhoTup
  * See rholang/src/main/scala/coop/rchain/rholang/interpreter/ContractCall.scala
  */
 pub struct ContractCall {
-    pub space: RhoTuplespace,
+    pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
 }
 

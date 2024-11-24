@@ -338,7 +338,7 @@ extern "C" fn create_runtime(
     let rho_runtime = tokio_runtime.block_on(async {
         create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
     });
-
+    
     Box::into_raw(Box::new(RhoRuntime {
         runtime: rho_runtime,
     }))

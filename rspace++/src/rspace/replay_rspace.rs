@@ -58,65 +58,6 @@ where
 {
 }
 
-impl<C, P, A, K> Tuplespace<C, P, A, K> for ReplayRSpace<C, P, A, K>
-where
-    C: Clone + Debug + Default + Serialize + Hash + Ord + Eq + 'static + Sync + Send,
-    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-{
-    fn consume(
-        &mut self,
-        channels: Vec<C>,
-        patterns: Vec<P>,
-        continuation: K,
-        persist: bool,
-        peeks: BTreeSet<i32>,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit consume");
-
-        if channels.is_empty() {
-            panic!("RUST ERROR: channels can't be empty");
-        } else if channels.len() != patterns.len() {
-            panic!("RUST ERROR: channels.length must equal patterns.length");
-        } else {
-            let consume_ref =
-                Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
-
-            let result =
-                self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
-            // println!("\nlocked_consume result: {:?}", result);
-            result
-        }
-    }
-
-    fn produce(
-        &mut self,
-        channel: C,
-        data: A,
-        persist: bool,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit produce");
-        // println!("\nto_map: {:?}", self.store.to_map());
-        // println!("\nHit produce, data: {:?}", data);
-        // println!("\n\nHit produce, channel: {:?}", channel);
-
-        let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
-        let result = self.locked_produce(channel, data, persist, produce_ref);
-        // println!("\nlocked_produce result: {:?}", result);
-        result
-    }
-
-    fn install(
-        &mut self,
-        channels: Vec<C>,
-        patterns: Vec<P>,
-        continuation: K,
-    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
-        self.locked_install(channels, patterns, continuation)
-    }
-}
-
 impl<C, P, A, K> IReplayRSpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
 where
     C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
@@ -290,6 +231,57 @@ where
         self.produce_counter = checkpoint.produce_counter;
 
         Ok(())
+    }
+
+    fn consume(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+        // println!("\nHit consume");
+
+        if channels.is_empty() {
+            panic!("RUST ERROR: channels can't be empty");
+        } else if channels.len() != patterns.len() {
+            panic!("RUST ERROR: channels.length must equal patterns.length");
+        } else {
+            let consume_ref =
+                Consume::create(channels.clone(), patterns.clone(), continuation.clone(), persist);
+
+            let result =
+                self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
+            // println!("\nlocked_consume result: {:?}", result);
+            result
+        }
+    }
+
+    fn produce(
+        &mut self,
+        channel: C,
+        data: A,
+        persist: bool,
+    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+        // println!("\nHit produce");
+        // println!("\nto_map: {:?}", self.store.to_map());
+        // println!("\nHit produce, data: {:?}", data);
+        // println!("\n\nHit produce, channel: {:?}", channel);
+
+        let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
+        let result = self.locked_produce(channel, data, persist, produce_ref);
+        // println!("\nlocked_produce result: {:?}", result);
+        result
+    }
+
+    fn install(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
+        self.locked_install(channels, patterns, continuation)
     }
 }
 

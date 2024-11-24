@@ -177,7 +177,7 @@ trait ReplayRhoRuntime[F[_]] extends RhoRuntime[F] {
 
 class RhoRuntimeImpl[F[_]: Sync: Span](
     // val reducer: Reduce[F],
-    val space: RhoISpace[F],
+    // val space: RhoISpace[F],
     // val cost: _cost[F],
     // val blockDataRef: Ref[F, BlockData],
     // val invalidBlocksParam: InvalidBlocks[F],
@@ -523,7 +523,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
 
 class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
     // override val reducer: Reduce[F],
-    override val space: RhoReplayISpace[F],
+    // override val space: RhoReplayISpace[F],
     // override val cost: _cost[F],
     // // TODO: Runtime must be immutable. Block data and invalid blocks should be supplied when Runtime is created.
     // //  This also means to unify all special names necessary to spawn a new Runtime.
@@ -532,7 +532,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
     // override val mergeChs: Ref[F, Set[Par]]
     runtimePtr: Pointer,
     replayRuntimePtr: Pointer
-) extends RhoRuntimeImpl[F](space, runtimePtr)
+) extends RhoRuntimeImpl[F](runtimePtr)
     with ReplayRhoRuntime[F] {
   override def checkReplayData: F[Unit] =
     // space.checkReplayData()
@@ -856,7 +856,7 @@ object RhoRuntime {
         val runtimePtr =
           RHOLANG_RUST_INSTANCE.create_runtime(spacePtr, paramsPtr, runtimeParamsBytes.length)
         assert(runtimePtr != null)
-        new RhoRuntimeImpl[F](rspace, runtimePtr)
+        new RhoRuntimeImpl[F](runtimePtr)
       }
     }
 
