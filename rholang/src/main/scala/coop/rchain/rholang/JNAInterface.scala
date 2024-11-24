@@ -12,6 +12,14 @@ trait JNAInterface extends Library {
 
   def create_checkpoint(runtime_ptr: Pointer): Pointer
 
+  def create_soft_checkpoint(runtime_ptr: Pointer): Pointer
+
+  def revert_to_soft_checkpoint(
+      runtime_ptr: Pointer,
+      payload_pointer: Pointer,
+      payload_bytes_len: Int
+  ): Unit
+
   def reset(
       runtime_ptr: Pointer,
       root_pointer: Pointer,

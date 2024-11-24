@@ -177,8 +177,8 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        println!("\nHit consume");
-        println!("\nspace in consume: {:?}", self.store.to_map().len());
+        // println!("\nHit consume");
+        // println!("\nspace in consume: {:?}", self.store.to_map().len());
 
         if channels.is_empty() {
             panic!("RUST ERROR: channels can't be empty");
@@ -201,8 +201,8 @@ where
         data: A,
         persist: bool,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        println!("\nHit produce");
-        println!("\nspace in produce: {:?}", self.store.to_map().len());
+        // println!("\nHit produce");
+        // println!("\nspace in produce: {:?}", self.store.to_map().len());
         // println!("\nHit produce, data: {:?}", data);
         // println!("\n\nHit produce, channel: {:?}", channel);
 

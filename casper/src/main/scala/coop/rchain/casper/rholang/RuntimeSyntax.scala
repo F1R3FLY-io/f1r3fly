@@ -171,9 +171,9 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
               BlockData(blockTime, blockNumber, PublicKey(Array[Byte]()), 0)
             )
         hotChanges <- runtime.getHotChanges
-        _ = println(
-          "\nspace in computeGenesis: " + hotChanges.size
-        )
+        // _ = println(
+        //   "\nspace in computeGenesis: " + hotChanges.size
+        // )
         genesisPreStateHash <- emptyStateHash
         // _ <- Sync[F].delay(
         //       println(

@@ -244,7 +244,6 @@ pub struct RhoRuntimeImpl {
 impl RhoRuntimeImpl {
     fn new(
         reducer: DebruijnInterpreter,
-        _space: impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
         cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
@@ -305,14 +304,14 @@ impl RhoRuntime for RhoRuntimeImpl {
     fn create_checkpoint(&mut self) -> Checkpoint {
         // let _ = self.reducer.space.try_lock().unwrap().create_checkpoint().unwrap();
         let checkpoint = self.space.try_lock().unwrap().create_checkpoint().unwrap();
-        println!(
-            "\nruntime space after create_checkpoint, {:?}",
-            self.get_hot_changes().len()
-        );
-        println!(
-            "\nreducer space after create_checkpoint, {:?}",
-            self.get_reducer_hot_changes().len()
-        );
+        // println!(
+        //     "\nruntime space after create_checkpoint, {:?}",
+        //     self.get_hot_changes().len()
+        // );
+        // println!(
+        //     "\nreducer space after create_checkpoint, {:?}",
+        //     self.get_reducer_hot_changes().len()
+        // );
         checkpoint
     }
 
@@ -420,6 +419,7 @@ impl ReplayRhoRuntimeImpl {
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
     ) -> Arc<Mutex<ReplayRhoRuntimeImpl>> {
+        // let reducer_space = reducer.clone().space;
         Arc::new(Mutex::new(ReplayRhoRuntimeImpl {
             reducer,
             space: Arc::new(Mutex::new(Box::new(space))),
@@ -951,23 +951,23 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
     // println!("\nast: {:?}", ast());
-    println!(
-        "\nruntime space before inject, {:?}",
-        runtime_lock.get_hot_changes().len()
-    );
-    println!(
-        "\nreducer space before inject, {:?}",
-        runtime_lock.get_reducer_hot_changes().len()
-    );
+    // println!(
+    //     "\nruntime space before inject, {:?}",
+    //     runtime_lock.get_hot_changes().len()
+    // );
+    // println!(
+    //     "\nreducer space before inject, {:?}",
+    //     runtime_lock.get_reducer_hot_changes().len()
+    // );
     runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
-    println!(
-        "\nruntime space after inject, {:?}",
-        runtime_lock.get_hot_changes().len()
-    );
-    println!(
-        "\nreducer space after inject, {:?}",
-        runtime_lock.get_reducer_hot_changes().len()
-    );
+    // println!(
+    //     "\nruntime space after inject, {:?}",
+    //     runtime_lock.get_hot_changes().len()
+    // );
+    // println!(
+    //     "\nreducer space after inject, {:?}",
+    //     runtime_lock.get_reducer_hot_changes().len()
+    // );
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
@@ -996,10 +996,10 @@ where
     );
 
     let (reducer, block_ref, invalid_blocks) = rho_env;
-    let runtime = RhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
+    let runtime = RhoRuntimeImpl::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
-        println!("\ninit_registry create_runtime");
+        // println!("\ninit_registry create_runtime");
         bootstrap_registry(runtime.clone()).await;
         runtime.try_lock().unwrap().create_checkpoint();
     }
@@ -1079,7 +1079,7 @@ where
         ReplayRhoRuntimeImpl::new(reducer, rspace, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
-        println!("\ninit_registry create_replay_rho_runtime");
+        // println!("\ninit_registry create_replay_rho_runtime");
         bootstrap_registry(runtime.clone()).await;
         let _ = runtime.try_lock().unwrap().create_checkpoint();
     }
