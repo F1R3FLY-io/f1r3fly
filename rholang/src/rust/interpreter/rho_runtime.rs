@@ -100,7 +100,7 @@ pub trait RhoRuntime: HasCost {
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
-        let rand = Blake2b512Random::new_from_length(128);
+        let rand = Blake2b512Random::create_from_bytes(&[0; 128]);
         let checkpoint = self.create_soft_checkpoint();
         match self
             .evaluate(term, initial_phlo, normalizer_env, rand)
@@ -269,10 +269,29 @@ impl RhoRuntime for RhoRuntimeImpl {
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
+        println!(
+            "\nspace before in evaluate: {:?}",
+            self.get_hot_changes().len()
+        );
+        // println!(
+        //     "\nreducer space before in evaluate: {:?}",
+        //     self.get_reducer_hot_changes().len()
+        // );
+        // rand.debug_str();
         let i = InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone());
         let reducer = &self.reducer;
-        i.inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
-            .await
+        let res = i
+            .inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
+            .await;
+        println!(
+            "\nspace after in evaluate: {:?}",
+            self.get_hot_changes().len()
+        );
+        // println!(
+        //     "\nreducer space after in evaluate: {:?}",
+        //     self.get_reducer_hot_changes().len()
+        // );
+        res
     }
 
     async fn inj(
@@ -937,7 +956,7 @@ where
 // This is from Nassim Taleb's "Skin in the Game"
 fn bootstrap_rand() -> Blake2b512Random {
     // println!("\nhit bootstrap_rand");
-    Blake2b512Random::new("Decentralization is based on the simple notion that it is easier to macrobull***t than microbull***t. \
+    Blake2b512Random::create_from_bytes("Decentralization is based on the simple notion that it is easier to macrobull***t than microbull***t. \
          Decentralization reduces large structural asymmetries."
          .as_bytes())
 }
@@ -945,6 +964,7 @@ fn bootstrap_rand() -> Blake2b512Random {
 pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     // println!("\nhit bootstrap_registry");
     let rand = bootstrap_rand();
+    // rand.debug_str();
     let runtime_lock = runtime.try_lock().unwrap();
     let cost = runtime_lock.cost().get();
     let _ = runtime_lock

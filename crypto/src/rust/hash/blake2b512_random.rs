@@ -1,4 +1,5 @@
 use super::blake2b512_block::Blake2b512Block;
+use byteorder::{ByteOrder, LittleEndian};
 use rand::Rng;
 
 /** Blake2b512 based splittable and mergeable random number generator
@@ -18,58 +19,76 @@ pub struct Blake2b512Random {
     digest: Blake2b512Block,
     last_block: Vec<u8>,
     path_view: Vec<u8>,
-    count_view: [u64; 2],
+    count_view: Vec<u64>,
     hash_array: [u8; 64],
-    position: usize,
+    position: i64,
+    path_position: usize,
 }
 
 impl Blake2b512Random {
-    pub fn create(init: &[u8], offset: usize, length: usize) -> Blake2b512Random {
+    fn create(init: &[u8], offset: usize, length: usize) -> Blake2b512Random {
         let mut result = Blake2b512Random {
             digest: Blake2b512Block::new(0),
             last_block: vec![0; 128],
             path_view: vec![0; 112],
-            count_view: [0; 2],
+            count_view: {
+                let len = init.len();
+                let slice = &init[offset..len];
+                let long_count = slice.len() / 8;
+                let mut long_buffer: Vec<u64> = Vec::with_capacity(long_count);
+                for i in 0..long_count {
+                    long_buffer.push(LittleEndian::read_u64(&slice[i * 8..]));
+                }
+
+                long_buffer
+            },
             hash_array: [0; 64],
             position: 0,
+            path_position: 0,
         };
 
-        if length > 127 {
-            let range: Vec<usize> = (offset..(offset + length - 127)).step_by(128).collect();
-
-            for &base in &range {
-                result.digest.update(&init, base);
-            }
-
-            let partial_base = range.last().unwrap() + 128;
-
-            // If there is any remainder:
-            if offset + length != partial_base {
-                let mut padded = vec![0; 128];
-                let remainder_length = (offset + length) - partial_base;
-                padded[..remainder_length].copy_from_slice(&init[partial_base..(partial_base + remainder_length)]);
-                result.digest.update(&padded, 0);
-            }
+        let range: Vec<usize> = if length > 127 {
+            (offset..(offset + length - 127)).step_by(128).collect()
         } else {
-            // Handle the case where length is less than or equal to 127
-            result.digest.update(&init[offset..(offset + length)], 0);
+            Vec::new()
+        };
+
+        for &base in &range {
+            result.digest.update(&init, base);
         }
 
+        // println!("\nresult.digest: {:?}", result.digest);
+        let partial_base = if range.is_empty() {
+            offset
+        } else {
+            range.last().unwrap() + 128
+        };
+
+        // If there is any remainder:
+        if offset + length != partial_base {
+            let mut padded = vec![0; 128];
+            let remainder_length = (offset + length) - partial_base;
+            padded[..remainder_length]
+                .copy_from_slice(&init[partial_base..(partial_base + remainder_length)]);
+            // println!("\npadded: {:?}", padded);
+            result.digest.update(&padded, 0);
+        }
+
+        // result.debug_str();
         result
     }
 
-    pub fn new_from_length(length: i32) -> Blake2b512Random {
+    pub fn create_from_length(length: i32) -> Blake2b512Random {
         let mut bytes = vec![0u8; length as usize];
         rand::thread_rng().fill(&mut bytes[..]);
-        Self::new(&bytes)
+        Self::create(&bytes, 0, length as usize)
     }
 
-    pub fn new(init: &[u8]) -> Blake2b512Random {
-        Blake2b512Random::create(init, 0, init.len())
+    pub fn create_from_bytes(init: &[u8]) -> Blake2b512Random {
+        Self::create(init, 0, init.len())
     }
 
     pub fn split_short(&self, index: u16) -> Blake2b512Random {
-        // println!("\nhit split_short");
         let mut split = self.clone();
         let packed = index.to_le_bytes();
         split.add_byte(packed[0]);
@@ -78,19 +97,20 @@ impl Blake2b512Random {
     }
 
     pub fn split_byte(&self, index: u8) -> Blake2b512Random {
-        // println!("\nhit split_byte");
         let mut split = self.clone();
         split.add_byte(index);
         split
     }
 
     fn add_byte(&mut self, index: u8) {
-        if self.path_view.len() == 112 {
+        if self.path_position == 112 {
             self.digest.update(&self.last_block, 0);
             self.last_block.fill(0);
+            self.path_position = 0; // Reset path_position
             self.path_view.clear();
         }
         self.path_view.push(index);
+        self.path_position += 1; // Increment path_position
     }
 
     pub fn next(&mut self) -> Vec<u8> {
@@ -99,9 +119,8 @@ impl Blake2b512Random {
             self.position = 32;
             self.hash_array[0..32].to_vec()
         } else {
-            let result = self.hash_array[32..64].to_vec();
             self.position = 0;
-            result
+            self.hash_array[32..64].to_vec()
         }
     }
 
@@ -128,7 +147,7 @@ impl Blake2b512Random {
         let mut chain_block = vec![0; 128];
 
         while children.len() > 1 {
-            let mut result = Blake2b512Random::new(&[0; 0]);
+            let mut result = Self::create_from_bytes(&[0; 0]);
             let chunks = children.chunks_mut(255).collect::<Vec<_>>();
 
             for slice in chunks {
@@ -170,5 +189,29 @@ impl Blake2b512Random {
 
     pub fn from_vec(data: Vec<u8>) -> Blake2b512Block {
         Blake2b512Block::from_vec(data)
+    }
+
+    pub fn debug_str(&self) -> () {
+        let rot_position = ((self.position - 1) & 0x3f) + 1;
+        self.digest.debug_str();
+        println!("last_block: {:?}", self.last_block);
+        println!("path_position: {:?}", self.path_position);
+        // println!("count_view: {:?}", self.count_view);
+        println!("position: {}", self.position);
+        println!("rot_position: {}", rot_position);
+        println!(
+            "remainder: {:?}",
+            &self.hash_array[rot_position as usize..64]
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bootstrap_rand() {
+        let rand = Blake2b512Random::create_from_bytes("testing".as_bytes());
     }
 }

@@ -61,7 +61,7 @@ impl Interpreter for InterpreterImpl {
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            let _ = reducer.inj(parsed, rand).await?;
+            reducer.inj(parsed, rand).await?;
             let phlos_left = self.c.get();
             let mergeable_channels = self.merge_chs.read().unwrap().clone();
 

@@ -44,12 +44,16 @@ impl RholangAndScalaDispatcher {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
                     let env = build_env(data_list.clone());
-                    let mut randoms = vec![Blake2b512Random::new(&par_with_rand.random_state)];
+                    let mut randoms = vec![Blake2b512Random::create_from_bytes(
+                        &par_with_rand.random_state,
+                    )];
                     randoms.extend(
                         data_list
                             .iter()
-                            .map(|p| Blake2b512Random::new(&p.random_state)),
+                            .map(|p| Blake2b512Random::create_from_bytes(&p.random_state)),
                     );
+
+                    // println!("\nrandoms in dispatch: {:?}", randoms);
 
                     self.reducer
                         .clone()

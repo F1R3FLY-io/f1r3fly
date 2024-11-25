@@ -53,7 +53,7 @@ use rspace_plus_plus::rspace::{
 };
 
 fn rand() -> Blake2b512Random {
-    Blake2b512Random::create(&Vec::new(), 0, 0)
+    Blake2b512Random::create_from_bytes(&Vec::new())
 }
 
 struct DataMapEntry {

@@ -43,9 +43,9 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
     //TODO: Make ScalaBodyRef-s have their own random state and merge it during its COMMs - OLD
     match unwrap_option_safe(continuation.tagged_cont)? {
         TaggedCont::ParBody(par_with_random) => {
-            Ok(Blake2b512Random::new(&par_with_random.random_state))
+            Ok(Blake2b512Random::create_from_bytes(&par_with_random.random_state))
         }
-        TaggedCont::ScalaBodyRef(value) => Ok(Blake2b512Random::new(&value.to_be_bytes())),
+        TaggedCont::ScalaBodyRef(value) => Ok(Blake2b512Random::create_from_bytes(&value.to_be_bytes())),
     }
 }
 
@@ -119,7 +119,7 @@ impl ChargingRSpace {
                 handle_result(
                     produce_res.clone(),
                     TriggeredBy::Produce {
-                        id: Blake2b512Random::new(&data.random_state),
+                        id: Blake2b512Random::create_from_bytes(&data.random_state),
                         persistent: persist,
                         channels_count: 1,
                     },
