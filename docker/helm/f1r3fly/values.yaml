@@ -108,7 +108,8 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   #tag: "latest" #local
   #tag: "test" #remote
-  tag: "latest"
+  #tag: "latest"
+  tag: "amd64_0.1"
   # nodeSelector:
   #   kubernetes.io/arch: arm64
 

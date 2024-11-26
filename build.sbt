@@ -459,8 +459,7 @@ lazy val node = (project in file("node"))
       //"linux/arm64",
       //"linux/amd64,linux/arm64",
       "-t",
-      "ghcr.io/f1r3fly-io/rnode-rspaceplusplus:amd64_0.1",
-      //"ghcr.io/f1r3fly-io/rnode-rspaceplusplus:arm64_0.1",
+      "ghcr.io/f1r3fly-io/rnode-rholang:amd64_0.1",
       "--output", "type=docker"
     ),
     dockerCommands ++= {
