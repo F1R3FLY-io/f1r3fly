@@ -185,6 +185,13 @@ object HashM extends HashMDerivation {
   implicit val ContinuationAtNameResponseV2Hash = gen[v1.ContinuationAtNameResponse]
   implicit val FindDeployResponseV2Hash         = gen[v1.FindDeployResponse]
   implicit val LastFinalizedBlockResponseV2Hash = gen[v1.LastFinalizedBlockResponse]
+
+  implicit val CostProto             = gen[rholang_scala_rust_types.CostProto]
+  implicit val BlockDataProto        = gen[rholang_scala_rust_types.BlockDataProto]
+  implicit val Blake2b512RandomProto = gen[rholang_scala_rust_types.Blake2b512RandomProto]
+  implicit val Blake2b512BlockProto  = gen[rholang_scala_rust_types.Blake2b512BlockProto]
+  implicit val UInt64Proto           = gen[rholang_scala_rust_types.UInt64Proto]
+  implicit val Int64Proto            = gen[rholang_scala_rust_types.Int64Proto]
 }
 
 trait HashMDerivation {

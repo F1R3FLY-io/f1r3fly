@@ -38,7 +38,7 @@ class ContractCall[F[_]: Concurrent: Span](
     for {
       produceResult <- space.produce(
                         ch,
-                        ListParWithRandom(values, Blake2b512Random.typeMapper.toBase(rand)),
+                        ListParWithRandom(values, rand),
                         persist = false
                       )
       // _ = println("\nhit produce in ContractCall, values: " + values)
@@ -59,7 +59,7 @@ class ContractCall[F[_]: Concurrent: Span](
             rand
           )
           ) =>
-        Some((produce(Blake2b512Random.typeMapper.toCustom(rand)), args))
+        Some((produce(rand), args))
       case _ => None
     }
 }

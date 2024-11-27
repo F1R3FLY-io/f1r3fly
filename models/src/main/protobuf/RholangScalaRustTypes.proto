@@ -11,33 +11,57 @@ option (scalapb.options) = {
 };
 
 message CreateRuntimeParams {
-	rhoapi.Par mergeableTagName = 1;
-	bool initRegistry = 2;
+  rhoapi.Par mergeableTagName = 1;
+  bool initRegistry = 2;
 }
 
-// 'timeStamp' and 'blockNumber' should be type 'int64' but, for some reason this causes an error with 'HashM'
 message BlockDataProto {
-	int32 timeStamp = 1;
-	int32 blockNumber = 2;
-	bytes publicKey = 3;
-	int32 seqNum = 4;
+  int64 timeStamp = 1;
+  int64 blockNumber = 2;
+  bytes publicKey = 3;
+  int32 seqNum = 4;
 }
 
 message EvaluateParams {
-	string term = 1;
-	CostProto initialPhlo = 2;
-	map<string, rhoapi.Par> normalizerEnv = 3;
-	bytes rand = 4;
+  string term = 1;
+  CostProto initialPhlo = 2;
+  map<string, rhoapi.Par> normalizerEnv = 3;
+  Blake2b512RandomProto randomState = 4;
 }
 
-// Again, 'value' should be type 'int64' but, this causes an error with 'HashM'
 message CostProto {
-	int32 value = 1;
-	string operation = 2;
+  int64 value = 1;
+  string operation = 2;
+}
+
+message Blake2b512RandomProto {
+  Blake2b512BlockProto digest = 1;
+  bytes last_block = 2;
+  bytes path_view = 3;
+  repeated UInt64Proto count_view = 4;
+  bytes hash_array = 5;
+  int64 position = 6;
+  int32 path_position = 7;
+}
+
+message Blake2b512BlockProto {
+  repeated Int64Proto chain_value = 1;
+  int64 t0 = 2;
+  int64 t1 = 3;
+}
+
+// This is needed because repeated primitive types (packable) are not supported
+message Int64Proto {
+  int64 value = 1;
+}
+
+// This is needed because repeated primitive types (packable) are not supported
+message UInt64Proto {
+  uint64 value = 1;
 }
 
 message EvaluateResultProto {
-	CostProto cost = 1;
-	repeated string errors = 2;
-	repeated rhoapi.Par mergeable = 3;
+  CostProto cost = 1;
+  repeated string errors = 2;
+  repeated rhoapi.Par mergeable = 3;
 }

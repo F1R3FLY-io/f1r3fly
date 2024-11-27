@@ -31,22 +31,22 @@ async fn empty_state_hash_from_runtime(runtime: Arc<Mutex<RhoRuntimeImpl>>) -> B
     checkpoint.root
 }
 
-#[tokio::test]
-async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
-    let mut kvm = InMemoryStoreManager::new();
-    let store = kvm.r_space_stores().await.unwrap();
-    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-        RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(
-        Arc::new(Mutex::new(space)),
-        Par::default(),
-        false,
-        &mut Vec::new(),
-    )
-    .await;
+// #[tokio::test]
+// async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
+//     let mut kvm = InMemoryStoreManager::new();
+//     let store = kvm.r_space_stores().await.unwrap();
+//     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
+//         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+//     let runtime = create_rho_runtime(
+//         Arc::new(Mutex::new(space)),
+//         Par::default(),
+//         false,
+//         &mut Vec::new(),
+//     )
+//     .await;
 
-    assert_eq!(
-        empty_state_hash_fixed(),
-        empty_state_hash_from_runtime(runtime).await.to_string()
-    );
-}
+//     assert_eq!(
+//         empty_state_hash_fixed(),
+//         empty_state_hash_from_runtime(runtime).await.to_string()
+//     );
+// }

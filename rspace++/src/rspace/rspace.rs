@@ -20,7 +20,6 @@ use super::trace::event::IOEvent;
 use super::trace::event::Produce;
 use super::trace::event::COMM;
 use super::trace::Log;
-use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::history::history_repository::HistoryRepositoryInstances;
@@ -177,8 +176,9 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit consume");
-        // println!("\nspace in consume: {:?}", self.store.to_map().len());
+        // println!("\nrspace consume");
+        // println!("channels: {:?}", channels);
+        // println!("space in consume before: {:?}", self.store.to_map().len());
 
         if channels.is_empty() {
             panic!("RUST ERROR: channels can't be empty");
@@ -190,7 +190,8 @@ where
 
             let result =
                 self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
-            // println!("\nlocked_consume result: {:?}", result);
+            // println!("locked_consume result: {:?}", result);
+            // println!("space in consume after: {:?}", self.store.to_map().len());
             result
         }
     }
@@ -201,8 +202,8 @@ where
         data: A,
         persist: bool,
     ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
-        // println!("\nHit produce");
-        // println!("\nspace in produce: {:?}", self.store.to_map().len());
+        // println!("\nrspace produce");
+        // println!("space in produce: {:?}", self.store.to_map().len());
         // println!("\nHit produce, data: {:?}", data);
         // println!("\n\nHit produce, channel: {:?}", channel);
 
@@ -348,7 +349,7 @@ where
             .into_iter()
             .collect();
 
-        // println!("\noptions: {:?}", options);
+        // println!("options: {:?}", options);
 
         let wk = WaitingContinuation {
             patterns,
@@ -678,7 +679,8 @@ where
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self.install(channels, install.patterns, install.continuation);
+            self.install(channels, install.patterns, install.continuation)
+                .unwrap();
         }
     }
 

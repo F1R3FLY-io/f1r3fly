@@ -35,9 +35,9 @@ https://github.com/bcgit/bc-java/blob/master/core/src/main/java/org/bouncycastle
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 class Blake2b512Block {
   import Blake2b512Block._
-  private val chainValue: Array[Long] = new Array[Long](CHAIN_VALUE_LENGTH)
-  private var t0: Long                = 0
-  private var t1: Long                = 0
+  val chainValue: Array[Long] = new Array[Long](CHAIN_VALUE_LENGTH)
+  var t0: Long                = 0
+  var t1: Long                = 0
 
   // block must be 128 bytes long
   def update(block: Array[Byte], offset: Int): Unit =
@@ -53,6 +53,8 @@ class Blake2b512Block {
   ): Unit = {
     val tempChainValue: Array[Long] = new Array[Long](8)
     compress(block, inOffset, tempChainValue, true, true, true)
+    // println(s"\ntemp_chain_value in peekFinalRoot: ${tempChainValue.mkString(", ")}")
+    // println(s"\noutput in peekFinalRoot: ${output.mkString(", ")}")
     Pack.longToLittleEndian(tempChainValue, output, outOffset)
   }
 
@@ -97,10 +99,16 @@ class Blake2b512Block {
       finalize: Boolean,
       rootFinalize: Boolean
   ): Unit = {
+    // println(s"\nhit compress")
     val internalState: Array[Long] = new Array[Long](BLOCK_LENGTH_LONGS)
     def g(m1: Long, m2: Long, posA: Int, posB: Int, posC: Int, posD: Int): Unit = {
-      def rotr64(x: Long, rot: Int): Long =
-        x >>> rot | (x << (64 - rot))
+      def rotr64(x: Long, rot: Int): Long = {
+        // println(s"\nx: ${x}")
+        // println(s"rot: ${rot}")
+        val _result = x >>> rot | (x << (64 - rot))
+        // println(s"result: ${_result}")
+        _result
+      }
       internalState(posA) = internalState(posA) + internalState(posB) + m1;
       internalState(posD) = rotr64(internalState(posD) ^ internalState(posA), 32);
       internalState(posC) = internalState(posC) + internalState(posD);
@@ -109,6 +117,8 @@ class Blake2b512Block {
       internalState(posD) = rotr64(internalState(posD) ^ internalState(posA), 16);
       internalState(posC) = internalState(posC) + internalState(posD);
       internalState(posB) = rotr64(internalState(posB) ^ internalState(posC), 63);
+
+      // println(s"\ninternal_state: ${internalState.mkString(", ")}")
     }
 
     val newT0 = t0 + BLOCK_LENGTH_BYTES
@@ -126,10 +136,16 @@ class Blake2b512Block {
     }
     init()
 
+    // println(s"\ninternal_state: ${internalState.mkString(", ")}")
+    // println(s"\nchain_value: ${chainValue.mkString(", ")}")
+    // println(s"\nmsg: ${msg.mkString(", ")}")
+
     val m: Array[Long] = new Array(BLOCK_LENGTH_LONGS)
     for (i <- 0 until BLOCK_LENGTH_LONGS) {
       m(i) = Pack.littleEndianToLong(msg, offset + i * 8)
     }
+    // println(s"\ninternal_state: ${internalState.mkString(", ")}")
+    // println(s"\nm: ${m.mkString(", ")}")
 
     for (round <- 0 until ROUNDS) {
       // columns
@@ -143,6 +159,7 @@ class Blake2b512Block {
       g(m(SIGMA(round)(12).toInt), m(SIGMA(round)(13).toInt), 2, 7, 8, 13);
       g(m(SIGMA(round)(14).toInt), m(SIGMA(round)(15).toInt), 3, 4, 9, 14);
     }
+    // println(s"\ninternal_state: ${internalState.mkString(", ")}")
     if (!peek) {
       t0 = newT0
       t1 = newT1

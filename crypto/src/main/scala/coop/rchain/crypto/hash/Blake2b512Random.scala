@@ -18,23 +18,24 @@ import scala.annotation.tailrec
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.NonUnitStatements"))
 class Blake2b512Random private (
-    private val digest: Blake2b512Block,
-    private val lastBlock: ByteBuffer
+    val digest: Blake2b512Block,
+    val lastBlock: ByteBuffer
 ) {
-  private val pathView: ByteBuffer = lastBlock.duplicate()
+  val pathView: ByteBuffer = lastBlock.duplicate()
   pathView.limit(112)
-  private val countView: LongBuffer = {
+  val countView: LongBuffer = {
     val lastDuplicate = lastBlock.duplicate()
     lastDuplicate.position(112)
     lastDuplicate.slice().order(ByteOrder.LITTLE_ENDIAN).asLongBuffer()
   }
 
-  private val hashArray: Array[Byte] = new Array[Byte](64)
-  private var position: Int          = 0
-  def getPosition: Int               = position
+  val hashArray: Array[Byte] = new Array[Byte](64)
+  var position: Int          = 0
+  def getPosition: Int       = position
 
   private def addByte(index: Byte): Unit = {
     if (pathView.position() == pathView.limit()) {
+      // println("\npathView.position() == pathView.limit()")
       digest.update(lastBlock.array(), 0)
       lastBlock.put(Blake2b512Random.BLANK_BLOCK.asReadOnlyBuffer())
       lastBlock.rewind()
@@ -49,18 +50,22 @@ class Blake2b512Random private (
     cloneBlock.rewind()
     val result = new Blake2b512Random(Blake2b512Block(digest), cloneBlock)
     result.pathView.position(pathView.position)
+    // println("\nresult in copy: " + Blake2b512Random.debugStr(result))
     result
   }
 
   private def hash(): Unit = {
+    // println("\nhashArray: ", hashArray.mkString(", "));
     digest.peekFinalRoot(lastBlock.array(), 0, hashArray, 0)
     val low = countView.get(0)
+    // println(s"\nlow: $low")
     if (low == -1) {
       val high = countView.get(1)
       countView.put(0, 0)
       countView.put(1, high + 1)
     } else {
       countView.put(0, low + 1)
+      // println(s"\ncount_view: ${(0 until countView.capacity()).map(countView.get).mkString(", ")}")
     }
   }
 
@@ -68,9 +73,11 @@ class Blake2b512Random private (
     if (position == 0) {
       hash()
       position = 32
+      // println("\nhashArray 0-32: ", hashArray.mkString(", "));
       hashArray.slice(0, 32)
     } else {
       position = 0
+      // println("\nhashArray 32-64: ", hashArray.mkString(", "));
       hashArray.slice(32, 64)
     }
 
@@ -84,6 +91,7 @@ class Blake2b512Random private (
     val split  = copy()
     val packed = new Array[Byte](2)
     Pack.shortToLittleEndian(index, packed, 0)
+    // println(s"\npacked: ${packed.mkString("[", ", ", "]")}")
     split.addByte(packed(0))
     split.addByte(packed(1))
     split
@@ -114,9 +122,11 @@ object Blake2b512Random {
   private[this] def apply(init: Array[Byte], offset: Int, length: Int): Blake2b512Random = {
     val result = new Blake2b512Random(Blake2b512Block(0.toByte), ByteBuffer.allocate(128))
     val range  = Range(offset, offset + length - 127, 128)
+    // println(s"range: $range")
     range.foreach { base =>
       result.digest.update(init, base)
     }
+    // println(s"result in apply: ${debugStr(result)}")
     val partialBase =
       if (range.isEmpty)
         offset
@@ -127,8 +137,10 @@ object Blake2b512Random {
     if (offset + length != partialBase) {
       val padded = new Array[Byte](128)
       Array.copy(init, partialBase, padded, 0, offset + length - partialBase)
+      // println("\npadded: " + padded.mkString(", "))
       result.digest.update(padded, 0)
     }
+    // println(s"result in apply: ${debugStr(result)}")
     result
   }
 
@@ -264,6 +276,7 @@ object Blake2b512Random {
       s"pathPosition: ${rand.pathView.position()}\n" +
       s"position: ${rand.position}\n" +
       s"rotPosition: ${rotPosition}\n" +
-      s"remainder: ${rand.hashArray.slice(rotPosition, 64).mkString(", ")}\n"
+      s"remainder: ${rand.hashArray.slice(rotPosition, 64).mkString(", ")}\n" +
+      s"hashArray: ${rand.hashArray.mkString(", ")}\n"
   }
 }

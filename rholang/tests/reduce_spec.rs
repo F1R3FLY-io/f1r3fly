@@ -72,7 +72,7 @@ fn map_data(
                 channel.clone(),
                 ListParWithRandom {
                     pars: entry.data.clone(),
-                    random_state: entry.rand.to_vec(),
+                    random_state: entry.rand.to_bytes(),
                 },
                 false,
             )],
@@ -456,7 +456,7 @@ async fn eval_of_single_channel_receive_should_place_something_in_the_tuplespace
         vec![bind_pattern],
         ParWithRandom {
             body: Some(Par::default()),
-            random_state: split_rand.to_vec()
+            random_state: split_rand.to_bytes()
         }
     ))
 }
@@ -505,7 +505,7 @@ async fn eval_of_single_channel_receive_should_verify_that_bundle_is_readable_if
         }],
         ParWithRandom {
             body: Some(Par::default()),
-            random_state: split_rand.to_vec()
+            random_state: split_rand.to_bytes()
         }
     ))
 }
@@ -937,7 +937,7 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         }],
         ParWithRandom {
             body: Some(Par::default()),
-            random_state: merge_rand.to_vec(),
+            random_state: merge_rand.to_bytes(),
         },
     ));
 
@@ -961,7 +961,7 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         }],
         ParWithRandom {
             body: Some(Par::default()),
-            random_state: merge_rand.to_vec(),
+            random_state: merge_rand.to_bytes(),
         },
     ));
 
@@ -1002,7 +1002,7 @@ async fn eval_of_send_of_receive_pipe_receive_should_meet_in_the_tuple_space_and
         }],
         ParWithRandom {
             body: Some(Par::default()),
-            random_state: merge_rand.to_vec(),
+            random_state: merge_rand.to_bytes(),
         },
     ));
 }
@@ -1491,7 +1491,7 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
                     pars: vec![Par::default().with_unforgeables(vec![GUnforgeable {
                         unf_instance: Some(UnfInstance::GPrivateBody(GPrivate { id: vec![42] })),
                     }])],
-                    random_state: result0_rand.to_vec(),
+                    random_state: result0_rand.to_bytes(),
                 },
                 false,
             )],
@@ -1506,9 +1506,11 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
                 channel1,
                 ListParWithRandom {
                     pars: vec![Par::default().with_unforgeables(vec![GUnforgeable {
-                        unf_instance: Some(UnfInstance::GPrivateBody(GPrivate { id: chosen_name })),
+                        unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
+                            id: chosen_name.iter().map(|&x| x as u8).collect::<Vec<u8>>(),
+                        })),
                     }])],
-                    random_state: result1_rand.to_vec(),
+                    random_state: result1_rand.to_bytes(),
                 },
                 false,
             )],
@@ -1966,7 +1968,7 @@ async fn variable_references_should_be_substituted_before_being_used() {
 
     let mut split_rand_result = rand().split_byte(3);
     let split_rand_src = rand().split_byte(3);
-    let _ = split_rand_result.next();
+    split_rand_result.next();
     let merge_rand = Blake2b512Random::merge(vec![
         split_rand_result.split_byte(1),
         split_rand_result.split_byte(0),
@@ -2023,9 +2025,11 @@ async fn variable_references_should_be_substituted_before_being_used() {
         new_gstring_par("result".to_string(), Vec::new(), false),
         (
             vec![new_gstring_par("true".to_string(), Vec::new(), false)],
-            merge_rand,
+            merge_rand.clone(),
         ),
     );
+    println!("\nmerge rand");
+    merge_rand.debug_str();
     assert_eq!(result, map_data(expected_elements));
 }
 

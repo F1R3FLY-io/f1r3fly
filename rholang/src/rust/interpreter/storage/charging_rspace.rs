@@ -244,7 +244,7 @@ fn handle_result(
             // We refund for non-persistent continuations, and for the persistent continuation triggering the comm.
             // That persistent continuation is going to be charged for (without refund) once it has no matches in TS.
             let refund_for_consume =
-                if !cont.persistent || consume_id.to_vec() == triggered_by_id.to_vec() {
+                if !cont.persistent || consume_id.to_bytes() == triggered_by_id.to_bytes() {
                     storage_cost_consume(
                         cont.channels.clone(),
                         cont.patterns.clone(),
@@ -295,7 +295,7 @@ fn refund_for_removing_produces(
         // after each iteration it matches an existing consume. We treat it as 'removed' on each such iteration.
         // It is going to be 'not removed' and charged for on the last iteration, where it doesn't match anything.
         .filter(|(data, _)| {
-            !data.persistent || data.removed_datum.random_state == triggered_id.to_vec()
+            !data.persistent || data.removed_datum.random_state == triggered_id.to_bytes()
         })
         .collect();
 

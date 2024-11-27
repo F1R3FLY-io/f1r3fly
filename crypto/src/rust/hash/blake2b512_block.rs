@@ -1,5 +1,7 @@
 /* See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Block.scala */
 
+use byteorder::{ByteOrder, LittleEndian};
+
 /**
 Block oriented Blake2b512 class.
 
@@ -26,20 +28,20 @@ https://github.com/bcgit/bc-java/blob/master/core/src/main/java/org/bouncycastle
   */
 
 // TODO: REVIEW
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Blake2b512Block {
-    chain_value: [i64; Self::CHAIN_VALUE_LENGTH],
-    t0: i64,
-    t1: i64,
+    pub chain_value: Vec<i64>,
+    pub t0: i64,
+    pub t1: i64,
 }
 
 impl Blake2b512Block {
-    pub fn new(fanout: u8) -> Blake2b512Block {
+    pub fn new_from_fanout(fanout: u8) -> Blake2b512Block {
         let param0_with_fanout: i64 = Self::PARAM_VALUE_0 | ((fanout as i64 & 0xff) << 16);
         // println!("\nparam0_with_fanout: {:?}", param0_with_fanout);
 
         let mut result = Blake2b512Block {
-            chain_value: [0; Self::CHAIN_VALUE_LENGTH],
+            chain_value: vec![0; Self::CHAIN_VALUE_LENGTH],
             t0: 0,
             t1: 0,
         };
@@ -54,50 +56,77 @@ impl Blake2b512Block {
         result
     }
 
-    pub fn update(&mut self, block: &[u8], offset: usize) {
+    pub fn new_from_src(src: Blake2b512Block) -> Blake2b512Block {
+        let mut result = Blake2b512Block {
+            chain_value: vec![0; Self::CHAIN_VALUE_LENGTH],
+            t0: 0,
+            t1: 0,
+        };
+
+        result
+            .chain_value
+            .copy_from_slice(&src.chain_value[0..Self::CHAIN_VALUE_LENGTH]);
+        result.t0 = src.t0;
+        result.t1 = src.t1;
+        result
+    }
+
+    // block must be 128 bytes long
+    pub fn update(&mut self, block: &[i8], offset: usize) {
         let cv = &mut self.chain_value.clone();
         self.compress(block, offset, cv, false, false, false);
     }
 
+    // gives the output as if block were the last block processed, but does not
+    // invalidate or modify internal state
     pub fn peek_final_root(
         &mut self,
-        block: &[u8],
+        block: &[i8],
         in_offset: usize,
-        output: &mut [u8],
+        output: &mut [i8],
         out_offset: usize,
     ) {
-        let mut temp_chain_value = [0i64; 8];
+        let mut temp_chain_value = vec![0i64; 8];
         self.compress(block, in_offset, &mut temp_chain_value, true, true, true);
-        self.long_to_little_endian(&temp_chain_value, output, out_offset);
+        // println!(
+        //     "\ntemp_chain_value in peek_final_root: {:?}",
+        //     temp_chain_value
+        // );
+        // println!("\noutput in peek_final_root: {:?}", output);
+        self.long_vec_to_little_endian(&temp_chain_value, output, out_offset);
     }
 
     pub fn finalize_internal(
         &mut self,
-        block: &[u8],
+        block: &[i8],
         in_offset: usize,
-        output: &mut [u8],
+        output: &mut [i8],
         out_offset: usize,
     ) {
-        let mut temp_chain_value = [0i64; 8];
+        let mut temp_chain_value = vec![0i64; 8];
         self.compress(block, in_offset, &mut temp_chain_value, true, true, false);
         for i in 0..4 {
-            let start = out_offset + i * 8;
-            output[start..start + 8].copy_from_slice(&temp_chain_value[i].to_le_bytes());
+            self.long_to_little_endian(temp_chain_value[i], output, out_offset + i * 8);
         }
     }
 
-    fn long_to_little_endian(&self, input: &[i64], output: &mut [u8], out_offset: usize) {
-        for (i, &value) in input.iter().enumerate() {
-            let start = out_offset + i * 8;
-            output[start..start + 8].copy_from_slice(&value.to_le_bytes());
+    fn long_to_little_endian(&self, value: i64, output: &mut [i8], offset: usize) {
+        for i in 0..8 {
+            output[offset + i] = (value >> (i * 8)) as i8;
+        }
+    }
+
+    fn long_vec_to_little_endian(&self, values: &[i64], output: &mut [i8], offset: usize) {
+        for (i, &value) in values.iter().enumerate() {
+            self.long_to_little_endian(value as i64, output, offset + i * 8);
         }
     }
 
     pub fn compress(
         &mut self,
-        msg: &[u8],
+        msg: &[i8],
         offset: usize,
-        new_chain_value: &mut [i64; 8],
+        new_chain_value: &mut Vec<i64>,
         peek: bool,
         finalize: bool,
         root_finalize: bool,
@@ -129,13 +158,18 @@ impl Blake2b512Block {
 
         // println!("\ninternal_state: {:?}", internal_state);
         // println!("\nchain_value: {:?}", self.chain_value);
+        // println!("\nmsg: {:?}", msg);
 
         let mut m = [0i64; 16];
 
-        for i in 0..16 {
+        for i in 0..Self::BLOCK_LENGTH_LONGS {
             if offset + i * 8 + 8 <= msg.len() {
                 m[i] = i64::from_le_bytes(
                     msg[offset + i * 8..offset + (i + 1) * 8]
+                        .iter()
+                        .map(|&b| b as u8)
+                        .collect::<Vec<u8>>()
+                        .as_slice()
                         .try_into()
                         .unwrap(),
                 );
@@ -145,7 +179,6 @@ impl Blake2b512Block {
         }
 
         // println!("\ninternal_state: {:?}", internal_state);
-        // println!("\nm: {:?}", m);
 
         for round in 0..Self::ROUNDS {
             // Columns
@@ -280,36 +313,6 @@ impl Blake2b512Block {
         // println!("\ninternal_state: {:?}", internal_state);
     }
 
-    pub fn to_vec(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(8 * 3); // 8 u64 for chain_value, t0, t1
-
-        for &value in &self.chain_value {
-            vec.extend_from_slice(&value.to_le_bytes());
-        }
-
-        vec.extend_from_slice(&self.t0.to_le_bytes());
-        vec.extend_from_slice(&self.t1.to_le_bytes());
-
-        vec
-    }
-
-    pub fn from_vec(data: Vec<u8>) -> Blake2b512Block {
-        let mut chain_value = [0i64; 8];
-
-        for i in 0..8 {
-            chain_value[i] = i64::from_le_bytes(data[i * 8..(i + 1) * 8].try_into().unwrap());
-        }
-
-        let t0 = i64::from_le_bytes(data[64..72].try_into().unwrap());
-        let t1 = i64::from_le_bytes(data[72..80].try_into().unwrap());
-
-        Blake2b512Block {
-            chain_value,
-            t0,
-            t1,
-        }
-    }
-
     // Produced from the square root of primes 2, 3, 5, 7, 11, 13, 17, 19.
     // The same as SHA-512 IV.
     const IV: [i64; 8] = [
@@ -354,5 +357,36 @@ impl Blake2b512Block {
             "Blake2b512Block {{\n  chain_value: {:?},\n  t0: {},\n  t1: {}\n}}",
             self.chain_value, self.t0, self.t1
         );
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(8 * 8 + 2 * 8); // 8 i64 for chain_value, 2 i64 for t0 and t1
+        for &value in &self.chain_value {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(&self.t0.to_le_bytes());
+        bytes.extend_from_slice(&self.t1.to_le_bytes());
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Blake2b512Block {
+        assert!(bytes.len() == 8 * 8 + 2 * 8, "Invalid byte length for Blake2b512Block");
+
+        let mut chain_value = Vec::with_capacity(8);
+        for i in 0..8 {
+            let start = i * 8;
+            let end = start + 8;
+            let value = i64::from_le_bytes(bytes[start..end].try_into().unwrap());
+            chain_value.push(value);
+        }
+
+        let t0 = i64::from_le_bytes(bytes[64..72].try_into().unwrap());
+        let t1 = i64::from_le_bytes(bytes[72..80].try_into().unwrap());
+
+        Blake2b512Block {
+            chain_value,
+            t0,
+            t1,
+        }
     }
 }

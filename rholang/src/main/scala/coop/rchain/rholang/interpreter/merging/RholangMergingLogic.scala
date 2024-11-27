@@ -131,8 +131,7 @@ object RholangMergingLogic {
   def decodeRnd(parWithRndEncoded: ByteVector): Blake2b512Random = {
     val parsWithRnd = codecPars.decode(parWithRndEncoded.bits).require.value
 
-    // parsWithRnd.randomState
-    Blake2b512Random.typeMapper.toCustom(parsWithRnd.randomState)
+    parsWithRnd.randomState
   }
 
   def getNumberWithRnd(parWithRnd: ListParWithRandom): (Long, Blake2b512Random) = {
@@ -142,9 +141,7 @@ object RholangMergingLogic {
 
     val Number(num) = parWithRnd.pars.head
 
-    // (num, parWithRnd.randomState)
-    (num, Blake2b512Random.typeMapper.toCustom(parWithRnd.randomState))
-
+    (num, parWithRnd.randomState)
   }
 
   def createDatumEncoded(
@@ -154,7 +151,7 @@ object RholangMergingLogic {
   ): ByteVector = {
     // Create value with random generator
     val numPar     = Number(num)
-    val parWithRnd = ListParWithRandom(Seq(numPar), Blake2b512Random.typeMapper.toBase(rnd))
+    val parWithRnd = ListParWithRandom(Seq(numPar), rnd)
     // Create hash of the data
     val dataHash = StableHashProvider.hash(channelHash.bytes, parWithRnd, persist = false)(
       storage.serializePars

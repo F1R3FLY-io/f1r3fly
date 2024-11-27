@@ -6,6 +6,7 @@ pub mod rust {
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+use crypto::rust::hash::blake2b512_block::Blake2b512Block;
 use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
 use models::rspace_plus_plus_types::*;
 use models::{
@@ -124,8 +125,37 @@ extern "C" fn evaluate(
     let cost_proto = params.initial_phlo.unwrap();
     let initial_phlo = Cost::create(cost_proto.value.into(), cost_proto.operation);
     let normalizer_env = params.normalizer_env;
-    let rand = Blake2b512Random::new(&params.rand);
-    // println!("\nrand in rust lib: {:?}", rand.to_vec());
+    let rand_proto = params.random_state.unwrap();
+    let digest_proto = rand_proto.digest.unwrap();
+    // println!(
+    //     "\nrandPathPosition in rust evaluate: {}",
+    //     rand_proto.path_position
+    // );
+    let rand = Blake2b512Random {
+        digest: Blake2b512Block {
+            chain_value: digest_proto
+                .chain_value
+                .into_iter()
+                .map(|v| v.value)
+                .collect(),
+            t0: digest_proto.t0,
+            t1: digest_proto.t1,
+        },
+        last_block: rand_proto.last_block.into_iter().map(|v| v as i8).collect(),
+        path_view: rand_proto.path_view,
+        count_view: rand_proto.count_view.into_iter().map(|v| v.value).collect(),
+        hash_array: {
+            let mut array = [0i8; 64];
+            let vec = rand_proto.hash_array;
+            let i8_slice: &[i8] = unsafe { std::mem::transmute(&vec[..64]) };
+            array.copy_from_slice(i8_slice);
+            array
+        },
+        position: rand_proto.position,
+        path_position: rand_proto.path_position as usize,
+    };
+    // println!("\nrand in rust evaluate: ");
+    // rand.debug_str();
 
     let mut rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -145,7 +175,7 @@ extern "C" fn evaluate(
 
     let eval_result_proto = EvaluateResultProto {
         cost: Some(CostProto {
-            value: eval_result.cost.value as i32,
+            value: eval_result.cost.value,
             operation: eval_result.cost.operation,
         }),
         errors: eval_result

@@ -54,6 +54,10 @@ import scala.collection.SortedSet
 import coop.rchain.rspace.trace.COMM
 import coop.rchain.rspace.trace.Consume
 import coop.rchain.rspace.trace.Event
+import coop.rchain.models.rholang_scala_rust_types.Blake2b512BlockProto
+import coop.rchain.models.rholang_scala_rust_types.Blake2b512RandomProto
+import coop.rchain.models.rholang_scala_rust_types.UInt64Proto
+import coop.rchain.models.rholang_scala_rust_types.Int64Proto
 
 // trait RhoRuntime[F[_]] extends HasCost[F] {
 trait RhoRuntime[F[_]] {
@@ -292,11 +296,33 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   ): F[EvaluateResult] =
     Sync[F].delay {
       // println("\nterm in evaluate: " + term)
+      // println("\nrand in scala evaluate: " + Blake2b512Random.debugStr(rand))
+      val pathPosition = rand.pathView.position()
+      val blake2b512BlockProto = Blake2b512BlockProto(
+        chainValue = rand.digest.chainValue.map(v => Int64Proto(v)).toSeq,
+        t0 = rand.digest.t0,
+        t1 = rand.digest.t1
+      )
+
+      val blake2b512RandomProto = Blake2b512RandomProto(
+        digest = Some(blake2b512BlockProto),
+        lastBlock = ByteString.copyFrom(rand.lastBlock),
+        pathView = ByteString.copyFrom(rand.pathView),
+        countView = {
+          val buffer    = rand.countView
+          val countList = (0 until buffer.limit()).map(buffer.get(_)).map(UInt64Proto(_))
+          countList
+        },
+        hashArray = ByteString.copyFrom(rand.hashArray),
+        position = rand.position.toLong,
+        pathPosition = pathPosition
+      )
+
       val evalParams = EvaluateParams(
         term,
-        Some(CostProto(initialPhlo.value.toInt, initialPhlo.operation)),
+        Some(CostProto(initialPhlo.value.toLong, initialPhlo.operation)),
         normalizerEnv,
-        Blake2b512Random.typeMapper.toBase(rand)
+        Some(blake2b512RandomProto)
       )
 
       val paramsBytes = evalParams.toByteArray
@@ -914,8 +940,8 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     // blockDataRef.set(blockData)
     Sync[F].delay {
       val setBlockDataParams = BlockDataProto(
-        blockData.timeStamp.toInt,
-        blockData.blockNumber.toInt,
+        blockData.timeStamp.toLong,
+        blockData.blockNumber.toLong,
         ByteString.copyFrom(blockData.sender.bytes),
         blockData.seqNum
       )

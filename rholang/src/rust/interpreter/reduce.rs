@@ -46,6 +46,7 @@ use super::accounting::costs::{
     subtraction_cost, sum_cost, var_eval_cost,
 };
 use super::dispatch::RhoDispatch;
+use super::env::Env;
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
 use super::rho_runtime::RhoISpace;
@@ -53,7 +54,6 @@ use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::unwrap_option_safe;
 use super::util::GeneratedMessage;
-use super::{env::Env, rho_runtime::RhoTuplespace};
 
 /**
  * Reduce is the interface for evaluating Rholang expressions.
@@ -224,12 +224,15 @@ impl DebruijnInterpreter {
         persistent: bool,
         peek: bool,
     ) -> Result<(), InterpreterError> {
+        // println!("\nreduce consume");
         let (patterns, sources): (Vec<BindPattern>, Vec<Par>) = binds.clone().into_iter().unzip();
 
         // Update mergeable channels
         for source in &sources {
             self.update_mergeable_channels(source);
         }
+
+        // println!("\nsources in reduce consume: {:?}", sources);
 
         // println!("Attempting to lock space for produce");
         let mut space_locked = self.space.try_lock().unwrap();
@@ -400,6 +403,7 @@ impl DebruijnInterpreter {
 
     fn update_mergeable_channels(&self, chan: &Par) -> () {
         let is_mergeable = self.is_mergeable_channel(chan);
+        // println!("\nis_mergeable: {:?}", is_mergeable);
 
         if is_mergeable {
             let mut merge_chs_write = self.merge_chs.write().unwrap();
@@ -543,11 +547,14 @@ impl DebruijnInterpreter {
         // println!("\ndata in eval_send: {:?}", data);
         // println!("\nsubst_data in eval_send: {:?}", subst_data);
 
+        // println!("\nrand in eval_send");
+        // rand.debug_str();
+
         self.produce(
             unbundled,
             ListParWithRandom {
                 pars: subst_data,
-                random_state: rand.to_vec(),
+                random_state: rand.to_bytes(),
             },
             send.persistent,
         )
@@ -560,18 +567,24 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
+        // println!("\nreceive in eval_receive: {:?}", receive);
+        // println!("\nreceive binds length: {:?}", receive.binds.len());
         self.cost.charge(receive_eval_cost())?;
         let binds = receive
             .binds
             .clone()
             .into_iter()
             .map(|rb| {
+                // println!("\nrb in eval_receive: {:?}", rb);
                 let q = self.unbundle_receive(&rb, env)?;
+                // println!("\nq in eval_receive: {:?}", q);
                 let subst_patterns = rb
                     .patterns
                     .into_iter()
                     .map(|pattern| self.substitute.substitute_and_charge(&pattern, 1, env))
                     .collect::<Result<Vec<_>, InterpreterError>>()?;
+
+                // println!("\nsubst_patterns in eval_receive: {:?}", subst_patterns);
 
                 Ok((
                     BindPattern {
@@ -594,11 +607,14 @@ impl DebruijnInterpreter {
         // println!("\nbinds in eval_receive: {:?}", binds);
         // println!("\nsubst_body in eval_receive: {:?}", subst_body);
 
+        // println!("\nrand in eval_receive");
+        // rand.debug_str();
+
         self.consume(
             binds,
             ParWithRandom {
                 body: Some(subst_body),
-                random_state: rand.to_vec(),
+                random_state: rand.to_bytes(),
             },
             receive.persistent,
             receive.peek,
@@ -729,6 +745,9 @@ impl DebruijnInterpreter {
         mut rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         // println!("\nnew in eval_new: {:?}", new);
+        // println!("\nrand in eval_new");
+        // rand.debug_str();
+        // println!("\nrand next: {:?}", rand.next());
         let mut alloc = |count: usize, urns: Vec<String>| {
             let simple_news =
                 (0..(count - urns.len()))
@@ -736,12 +755,16 @@ impl DebruijnInterpreter {
                     .fold(env.clone(), |mut _env: Env<Par>, _| {
                         let addr: Par = Par::default().with_unforgeables(vec![GUnforgeable {
                             unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
-                                id: ByteString::from(rand.next()),
+                                id: rand.next().iter().map(|&x| x as u8).collect::<Vec<u8>>(),
                             })),
                         }]);
+                        // println!("\nrand in simple_news");
+                        // rand.debug_str();
                         _env.put(addr)
                     });
 
+            // println!("\nrand in eval_new after");
+            // rand.debug_str();
             // println!("\nsimple_news in eval_new: {:?}", simple_news);
 
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
@@ -840,6 +863,8 @@ impl DebruijnInterpreter {
             ExprInstance::EVarBody(evar) => {
                 // println!("\nenv in eval_expr_to_par: {:?}", env);
                 let p = self.eval_var(&unwrap_option_safe(evar.v)?, env)?;
+                // println!("\np in eval_expr_to_par: {:?}", p);
+                // println!("\nenv in eval_expr_to_par: {:?}", env);
                 let evaled_p = self.eval_expr(&p, env)?;
                 Ok(evaled_p)
             }
@@ -3278,6 +3303,8 @@ impl DebruijnInterpreter {
             .iter()
             .map(|expr| self.eval_expr_to_par(expr, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
+        // println!("\npar in eval_expr: {:?}", par);
+        // println!("\nevaled_exprs in eval_expr: {:?}", evaled_exprs);
         // Note: the locallyFree cache in par could now be invalid, but given
         // that locallyFree is for use in the matcher, and the matcher uses
         // substitution, it will resolve in that case. AlwaysEqual makes sure
