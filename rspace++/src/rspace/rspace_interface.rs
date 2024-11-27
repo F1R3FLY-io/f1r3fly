@@ -10,7 +10,6 @@ use super::{
     errors::RSpaceError,
     hashing::blake2b256_hash::Blake2b256Hash,
     internal::{Datum, ProduceCandidate, Row, WaitingContinuation},
-    tuplespace_interface::Tuplespace,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -45,13 +44,6 @@ pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
  * @tparam K a type representing a continuation
  */
 pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
-    // fn ispace_to_tuplespace(
-    //     &self,
-    //     ispace: Box<dyn ISpace<C, P, A, K>>,
-    // ) -> Box<dyn Tuplespace<C, P, A, K>> {
-    //     ispace
-    // }
-
     /** Creates a checkpoint.
      *
      * @return A [[Checkpoint]]

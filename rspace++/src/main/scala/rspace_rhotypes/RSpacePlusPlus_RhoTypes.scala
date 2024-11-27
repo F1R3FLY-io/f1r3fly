@@ -404,10 +404,11 @@ object RSpacePlusPlus_RhoTypes {
       scheduler: ExecutionContext
   ): F[(RSpacePlusPlus_RhoTypes[F], ReplayRSpacePlusPlus[F, C, P, A, K])] =
     Sync[F].delay {
-      val rspacePointer = INSTANCE.space_new(storePath);
+      val rspacePointer       = INSTANCE.space_new(storePath);
+      val replayRspacePointer = INSTANCE.space_new_replay(rspacePointer);
       (
         new RSpacePlusPlus_RhoTypes[F](rspacePointer),
-        new ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer)
+        new ReplayRSpacePlusPlus[F, C, P, A, K](replayRspacePointer)
       )
     }
 

@@ -1077,7 +1077,7 @@ pub async fn create_replay_rho_runtime<T>(
     extra_system_processes: &mut Vec<Definition>,
 ) -> Arc<Mutex<ReplayRhoRuntimeImpl>>
 where
-    T: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+    T: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
     let cost = CostAccounting::empty_cost();
     let merge_chs = Arc::new(RwLock::new({
@@ -1116,7 +1116,7 @@ async fn create_runtimes<T, R>(
 ) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<ReplayRhoRuntimeImpl>>)
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-    R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+    R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
     let rho_runtime = create_rho_runtime(
         space,

@@ -187,7 +187,7 @@ class ReportingRuntime[F[_]: Sync: Span](
       // blockDataRef,
       // invalidBlocksParam,
       // mergeChs
-      runtimePtr,
+      // runtimePtr,
       replayRuntimePtr
     ) {
   def getReport: F[Seq[Seq[ReportingEvent]]] =

@@ -127,7 +127,10 @@ async fn creating_a_comm_event_should_replay_correctly() {
     let final_point = replay_space.create_checkpoint().unwrap();
 
     assert!(replay_result_consume.unwrap().is_none());
-    assert_eq!(replay_result_produce.clone().unwrap().unwrap().0, result_produce.clone().unwrap().unwrap().0);
+    assert_eq!(
+        replay_result_produce.clone().unwrap().unwrap().0,
+        result_produce.clone().unwrap().unwrap().0
+    );
     assert_eq!(replay_result_produce.unwrap().unwrap().1, result_produce.unwrap().unwrap().1);
     assert_eq!(final_point.root, rig_point.root);
     assert!(replay_space.replay_data.is_empty());
@@ -188,7 +191,10 @@ async fn creating_a_comm_event_with_peek_consume_first_should_replay_correctly()
     let final_point = replay_space.create_checkpoint().unwrap();
 
     assert!(replay_result_consume.unwrap().is_none());
-    assert_eq!(replay_result_produce.clone().unwrap().unwrap().0, result_produce.clone().unwrap().unwrap().0);
+    assert_eq!(
+        replay_result_produce.clone().unwrap().unwrap().0,
+        result_produce.clone().unwrap().unwrap().0
+    );
     assert_eq!(final_point.root, rig_point.root);
     assert!(replay_space.replay_data.is_empty());
 }
@@ -231,7 +237,10 @@ async fn creating_a_comm_event_with_peek_produce_first_should_replay_correctly()
     let final_point = replay_space.create_checkpoint().unwrap();
 
     assert!(replay_result_produce.unwrap().is_none());
-    assert_eq!(replay_result_consume.clone().unwrap().unwrap().0, result_consume.clone().unwrap().unwrap().0);
+    assert_eq!(
+        replay_result_consume.clone().unwrap().unwrap().0,
+        result_consume.clone().unwrap().unwrap().0
+    );
     assert_eq!(final_point.root, rig_point.root);
     assert!(replay_space.replay_data.is_empty());
 }
@@ -487,8 +496,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     let range: Vec<i32> = (n..m).collect();
 
     fn consume_many<F, G>(
-        space: &mut (impl ISpace<String, Pattern, String, String>
-                  + Tuplespace<String, Pattern, String, String>),
+        space: &mut impl ISpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channels_creator: F,
         patterns: &Vec<Pattern>,
@@ -520,8 +528,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn produce_many<F, A>(
-        space: &mut (impl ISpace<String, Pattern, String, String>
-                  + Tuplespace<String, Pattern, String, String>),
+        space: &mut impl ISpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channel_creator: F,
         datum_creator: A,
@@ -545,8 +552,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn replay_consume_many<F, G>(
-        space: &mut (impl ISpace<String, Pattern, String, String>
-                  + Tuplespace<String, Pattern, String, String>),
+        space: &mut impl ISpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channels_creator: F,
         patterns: &Vec<Pattern>,
@@ -578,8 +584,7 @@ async fn picking_n_datums_from_m_waiting_datums_should_replay_correctly() {
     }
 
     fn replay_produce_many<F, A>(
-        space: &mut (impl ISpace<String, Pattern, String, String>
-                  + Tuplespace<String, Pattern, String, String>),
+        space: &mut impl ISpace<String, Pattern, String, String>,
         range: Vec<i32>,
         channel_creator: F,
         datum_creator: A,
@@ -673,8 +678,7 @@ async fn a_matched_continuation_defined_for_multiple_channels_some_peeked_should
     produces.shuffle(&mut rng);
 
     fn consume_and_produce(
-        space: &mut (impl ISpace<String, Pattern, String, String>
-                  + Tuplespace<String, Pattern, String, String>),
+        space: &mut impl ISpace<String, Pattern, String, String>,
         channels: &Vec<String>,
         patterns: &Vec<Pattern>,
         continuation: &String,
@@ -1411,19 +1415,23 @@ async fn replay_should_not_allow_for_ambiguous_executions() {
 
     assert!(space
         .consume(key1.clone(), patterns.clone(), continuation1.clone(), false, BTreeSet::new(),)
-        .unwrap().is_some());
+        .unwrap()
+        .is_some());
 
     //continuation1 produces data1 on ch2
     assert!(space
         .produce(channel2.clone(), data1.clone(), false)
-        .unwrap().is_none());
+        .unwrap()
+        .is_none());
     assert!(space
         .consume(key1.clone(), patterns.clone(), continuation2.clone(), false, BTreeSet::default())
-        .unwrap().is_some());
+        .unwrap()
+        .is_some());
     //continuation2 produces data2 on ch2
     assert!(space
         .produce(channel2.clone(), data2.clone(), false)
-        .unwrap().is_none());
+        .unwrap()
+        .is_none());
     let after_play = space.create_checkpoint().unwrap();
 
     //rig
@@ -1431,25 +1439,36 @@ async fn replay_should_not_allow_for_ambiguous_executions() {
 
     assert!(replay_space
         .produce(channel1.clone(), data3.clone(), false)
-        .unwrap().is_none());
-    assert!(replay_space.produce(channel1, data3, false).unwrap().is_none());
+        .unwrap()
+        .is_none());
+    assert!(replay_space
+        .produce(channel1, data3, false)
+        .unwrap()
+        .is_none());
     assert!(replay_space
         .produce(channel2.clone(), data1.clone(), false)
-        .unwrap().is_none());
+        .unwrap()
+        .is_none());
     assert!(replay_space
         .consume(key1.clone(), patterns.clone(), continuation2, false, BTreeSet::default())
-        .unwrap().is_none());
+        .unwrap()
+        .is_none());
 
     assert!(replay_space
         .consume(key1, patterns, continuation1, false, BTreeSet::default())
-        .unwrap().is_some());
+        .unwrap()
+        .is_some());
 
     //continuation1 produces data1 on ch2
     assert!(replay_space
         .produce(channel2.clone(), data1, false)
-        .unwrap().is_some());
+        .unwrap()
+        .is_some());
     //continuation2 produces data2 on ch2
-    assert!(replay_space.produce(channel2, data2, false).unwrap().is_none());
+    assert!(replay_space
+        .produce(channel2, data2, false)
+        .unwrap()
+        .is_none());
 
     assert!(replay_space.replay_data.is_empty());
 }
@@ -1512,7 +1531,7 @@ async fn fixture() -> StateSetup {
     };
 
     let replay_rspace: ReplayRSpace<String, Pattern, String, String> =
-        ReplayRSpace::apply(history_repo, replay_store, Arc::new(Box::new(StringMatch)));
+        ReplayRSpace::apply(history_repo, Arc::new(replay_store), Arc::new(Box::new(StringMatch)));
 
     (rspace, replay_rspace)
 }

@@ -20,7 +20,6 @@ use super::trace::event::IOEvent;
 use super::trace::event::Produce;
 use super::trace::event::COMM;
 use super::trace::Log;
-use super::tuplespace_interface::Tuplespace;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
@@ -38,10 +37,11 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 #[repr(C)]
+#[derive(Clone)]
 pub struct ReplayRSpace<C, P, A, K> {
     pub history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
-    pub store: Box<dyn HotStore<C, P, A, K>>,
-    installs: Mutex<HashMap<Vec<C>, Install<P, K>>>,
+    pub store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+    installs: Arc<Mutex<HashMap<Vec<C>, Install<P, K>>>>,
     event_log: Log,
     produce_counter: BTreeMap<Produce, i32>,
     matcher: Arc<Box<dyn Match<P, A>>>,
@@ -226,7 +226,7 @@ where
             history_reader.base(),
         );
 
-        self.store = hot_store;
+        self.store = Arc::new(hot_store);
         self.event_log = checkpoint.log;
         self.produce_counter = checkpoint.produce_counter;
 
@@ -297,7 +297,7 @@ where
      */
     pub fn apply(
         history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
-        store: Box<dyn HotStore<C, P, A, K>>,
+        store: Arc<Box<dyn HotStore<C, P, A, K>>>,
         matcher: Arc<Box<dyn Match<P, A>>>,
     ) -> ReplayRSpace<C, P, A, K>
     where
@@ -310,7 +310,7 @@ where
             history_repository,
             store,
             matcher,
-            installs: Mutex::new(HashMap::new()),
+            installs: Arc::new(Mutex::new(HashMap::new())),
             event_log: Vec::new(),
             produce_counter: BTreeMap::new(),
             replay_data: MultisetMultiMap::empty(),
@@ -793,7 +793,7 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace = Self::apply(Arc::new(next_history), hot_store, self.matcher.clone());
+        let mut rspace = Self::apply(Arc::new(next_history), Arc::new(hot_store), self.matcher.clone());
         rspace.restore_installs();
 
         Ok(rspace)
@@ -960,7 +960,7 @@ where
         history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     ) -> () {
         let next_hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        self.store = next_hot_store;
+        self.store = Arc::new(next_hot_store);
     }
 
     fn wrap_result(

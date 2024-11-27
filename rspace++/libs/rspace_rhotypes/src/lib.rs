@@ -9,6 +9,7 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
+use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -29,6 +30,11 @@ use std::sync::{Arc, Mutex};
 #[repr(C)]
 pub struct Space {
     rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
+}
+
+#[repr(C)]
+pub struct ReplaySpace {
+    replay_space: Mutex<ReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
 }
 
 #[no_mangle]
@@ -66,6 +72,20 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 
     Box::into_raw(Box::new(Space {
         rspace: Mutex::new(rspace),
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn space_new_replay(rspace: *mut Space) -> *mut ReplaySpace {
+    let rspace = unsafe { (*rspace).rspace.lock().unwrap() };
+    let replay_space = ReplayRSpace::apply(
+        rspace.history_repository.clone(),
+        rspace.store.clone(),
+        Arc::new(Box::new(Matcher)),
+    );
+
+    Box::into_raw(Box::new(ReplaySpace {
+        replay_space: Mutex::new(replay_space),
     }))
 }
 
@@ -1135,7 +1155,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // }
 
 // /* HistoryRepo */
-
 // #[no_mangle]
 // pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
 //     let root = unsafe { (*rspace).rspace.lock().unwrap().history_repository.root() };
@@ -1152,7 +1171,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // }
 
 // /* Exporter */
-
 // // #[no_mangle]
 // // pub extern "C" fn get_nodes(
 // //     rspace: *mut Space,
@@ -1512,7 +1530,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // // }
 
 // /* Importer */
-
 // #[no_mangle]
 // pub extern "C" fn validate_state_items(
 //     rspace: *mut Space,
@@ -1694,7 +1711,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // }
 
 // /* HistoryReader */
-
 // #[no_mangle]
 // pub extern "C" fn history_reader_root(
 //     rspace: *mut Space,
@@ -1877,7 +1893,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // }
 
 // /* ReplayRSpace */
-
 // #[no_mangle]
 // pub extern "C" fn replay_produce(
 //     rspace: *mut Space,
@@ -2142,24 +2157,23 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 //     }
 // }
 
-// #[no_mangle]
-// pub extern "C" fn replay_spawn(rspace: *mut Space) -> *mut Space {
-//     let rspace = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .spawn()
-//             .expect("Rust RSpacePlusPlus Library: Failed to spawn")
-//     };
+#[no_mangle]
+pub extern "C" fn replay_spawn(replay_rspace_ptr: *mut ReplaySpace) -> *mut ReplaySpace {
+    let _replay_space = unsafe {
+        (*replay_rspace_ptr)
+            .replay_space
+            .lock()
+            .unwrap()
+            .spawn()
+            .expect("Rust RSpacePlusPlus Library: Failed to spawn")
+    };
 
-//     Box::into_raw(Box::new(Space {
-//         rspace: Mutex::new(rspace),
-//     }))
-// }
+    Box::into_raw(Box::new(ReplaySpace {
+        replay_space: Mutex::new(_replay_space),
+    }))
+}
 
 // /* IReplayRSpace */
-
 // #[no_mangle]
 // pub extern "C" fn rig(rspace: *mut Space, log_pointer: *const u8, log_bytes_len: usize) -> () {
 //     let log_slice = unsafe { std::slice::from_raw_parts(log_pointer, log_bytes_len) };
@@ -2268,7 +2282,6 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 // }
 
 // /* Helper Functions */
-
 // #[no_mangle]
 // pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: usize) -> *const u8 {
 //     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };

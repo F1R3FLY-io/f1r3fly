@@ -28,9 +28,17 @@ trait JNAInterface extends Library {
 
   def set_block_data(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Unit
 
+  def set_invalid_blocks(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Unit
+
   def bootstrap_registry(runtime_ptr: Pointer): Pointer
 
   def create_runtime(rspace_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
+
+  def create_replay_runtime(
+      replay_space_ptr: Pointer,
+      params_ptr: Pointer,
+      params_bytes_len: Int
+  ): Pointer
 }
 
 object JNAInterfaceLoader {

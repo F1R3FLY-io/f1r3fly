@@ -339,19 +339,19 @@ object ReplayRSpacePlusPlus {
   /**
     * Creates [[ReplayRSpace]] from [[HistoryRepository]] and [[HotStore]].
     */
-  def apply[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
-      storePath: String
-  )(
-      implicit
-      serializeC: Serialize[Par],
-      serializeP: Serialize[BindPattern],
-      serializeA: Serialize[ListParWithRandom],
-      serializeK: Serialize[TaggedContinuation],
-      scheduler: ExecutionContext
-  ): F[ReplayRSpacePlusPlus[F, C, P, A, K]] =
-    Sync[F].delay {
-      val rspacePointer = INSTANCE.space_new(storePath);
-      new ReplayRSpacePlusPlus[F, C, P, A, K](rspacePointer)
-    }
+  // def apply[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A, K](
+  //     storePath: String
+  // )(
+  //     implicit
+  //     serializeC: Serialize[Par],
+  //     serializeP: Serialize[BindPattern],
+  //     serializeA: Serialize[ListParWithRandom],
+  //     serializeK: Serialize[TaggedContinuation],
+  //     scheduler: ExecutionContext
+  // ): F[ReplayRSpacePlusPlus[F, C, P, A, K]] =
+  //   Sync[F].delay {
+  //     val replayRspacePointer = INSTANCE.space_new(storePath);
+  //     new ReplayRSpacePlusPlus[F, C, P, A, K](replayRspacePointer)
+  //   }
 
 }

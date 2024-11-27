@@ -23,7 +23,6 @@ use models::rust::string_ops::StringOps;
 use models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
-use models::ByteString;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
@@ -200,6 +199,8 @@ impl DebruijnInterpreter {
         persistent: bool,
     ) -> Result<(), InterpreterError> {
         // println!("\nreduce produce");
+        // println!("chan in reduce produce: {:?}", chan);
+        // println!("data in reduce produce: {:?}", data);
         self.update_mergeable_channels(&chan);
 
         // println!("Attempting to lock space for produce");
@@ -225,6 +226,8 @@ impl DebruijnInterpreter {
         peek: bool,
     ) -> Result<(), InterpreterError> {
         // println!("\nreduce consume");
+        // println!("binds in reduce consume: {:?}", binds);
+        // println!("body in reduce consume: {:?}", body);
         let (patterns, sources): (Vec<BindPattern>, Vec<Par>) = binds.clone().into_iter().unzip();
 
         // Update mergeable channels

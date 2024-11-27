@@ -7,6 +7,7 @@ use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
+use super::replay_rspace::ReplayRSpace;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
 use super::rspace_interface::MaybeActionResult;
@@ -277,6 +278,38 @@ where
         let (history_reader, store) = setup;
         let space = Self::apply(Arc::new(history_reader), store, matcher);
         Ok(space)
+    }
+
+    pub fn create_with_replay(
+        store: RSpaceStore,
+        matcher: Arc<Box<dyn Match<P, A>>>,
+    ) -> Result<(RSpace<C, P, A, K>, ReplayRSpace<C, P, A, K>), HistoryRepositoryError>
+    where
+        C: Clone
+            + Debug
+            + Default
+            + Send
+            + Sync
+            + Serialize
+            + Ord
+            + Hash
+            + for<'a> Deserialize<'a>
+            + 'static,
+        P: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        A: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+        K: Clone + Debug + Default + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    {
+        let setup = Self::create_history_repo(store).unwrap();
+        let (history_repo, store) = setup;
+        let history_repo_arc = Arc::new(history_repo);
+        // Play
+        let space = Self::apply(history_repo_arc.clone(), store, matcher.clone());
+        // Replay
+        let history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>> =
+            history_repo_arc.get_history_reader(history_repo_arc.root())?;
+        let replay_store = HotStoreInstances::create_from_hr(history_reader.base());
+        let replay = ReplayRSpace::apply(history_repo_arc.clone(), Arc::new(replay_store), matcher.clone());
+        Ok((space, replay))
     }
 
     /**

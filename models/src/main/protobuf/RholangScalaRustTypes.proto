@@ -65,3 +65,12 @@ message EvaluateResultProto {
   repeated string errors = 2;
   repeated rhoapi.Par mergeable = 3;
 }
+
+message BlockHashValidator {
+  bytes block_hash = 1;
+  bytes validator = 2;
+}
+
+message InvalidBlocksProto {
+  repeated BlockHashValidator invalidBlocks = 1;
+}

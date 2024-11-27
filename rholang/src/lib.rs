@@ -18,11 +18,13 @@ use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hot_store::{new_dashmap, HotStoreState};
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
+use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::trace::event::{Consume, Produce, COMM};
 use rspace_plus_plus::rspace::{
     rspace::RSpace,
     trace::event::{Event, IOEvent},
 };
+use rust::interpreter::rho_runtime::{create_replay_rho_runtime, ReplayRhoRuntimeImpl};
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -38,8 +40,18 @@ struct RhoRuntime {
 }
 
 #[repr(C)]
+struct ReplayRhoRuntime {
+    runtime: Arc<Mutex<ReplayRhoRuntimeImpl>>,
+}
+
+#[repr(C)]
 struct Space {
     rspace: Mutex<RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
+}
+
+#[repr(C)]
+struct ReplaySpace {
+    replay_space: Mutex<ReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>,
 }
 
 #[no_mangle]
@@ -855,6 +867,33 @@ extern "C" fn set_block_data(
 }
 
 #[no_mangle]
+extern "C" fn set_invalid_blocks(
+    runtime_ptr: *mut RhoRuntime,
+    params_ptr: *const u8,
+    params_bytes_len: usize,
+) -> () {
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let params = InvalidBlocksProto::decode(params_slice).unwrap();
+    let invalid_blocks = params
+        .invalid_blocks
+        .into_iter()
+        .map(|block| {
+            println!("\nblock.block_hash: {:?}", block.block_hash);
+            println!("\nblock.validator: {:?}", block.validator);
+            (block.block_hash, block.validator)
+        })
+        .collect();
+
+    unsafe {
+        (*runtime_ptr)
+            .runtime
+            .try_lock()
+            .unwrap()
+            .set_invalid_blocks(invalid_blocks);
+    }
+}
+
+#[no_mangle]
 extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
@@ -885,5 +924,30 @@ extern "C" fn create_runtime(
 
     Box::into_raw(Box::new(RhoRuntime {
         runtime: rho_runtime,
+    }))
+}
+
+// Note: I am defaulting 'additional_system_processes' to 'Vec::new()'
+#[no_mangle]
+extern "C" fn create_replay_runtime(
+    replay_space_ptr: *mut ReplaySpace,
+    params_ptr: *const u8,
+    params_bytes_len: usize,
+) -> *mut ReplayRhoRuntime {
+    let rspace = unsafe { (*replay_space_ptr).replay_space.try_lock().unwrap().clone() };
+
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let params = CreateRuntimeParams::decode(params_slice).unwrap();
+
+    let mergeable_tag_name = params.mergeable_tag_name.unwrap();
+    let init_registry = params.init_registry;
+
+    let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
+    let replay_rho_runtime = tokio_runtime.block_on(async {
+        create_replay_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+    });
+
+    Box::into_raw(Box::new(ReplayRhoRuntime {
+        runtime: replay_rho_runtime,
     }))
 }

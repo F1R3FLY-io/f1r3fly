@@ -1,13 +1,11 @@
 // See rspace/src/main/scala/coop/rchain/rspace/IReplaySpace.scala
 
-use std::any::Any;
-
 use super::{
     errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, rspace_interface::ISpace,
     trace::Log,
 };
 
-pub trait IReplayRSpace<C, P, A, K>: ISpace<C, P, A, K> + Any
+pub trait IReplayRSpace<C, P, A, K>: ISpace<C, P, A, K>
 where
     C: Eq + std::hash::Hash,
     P: Clone,

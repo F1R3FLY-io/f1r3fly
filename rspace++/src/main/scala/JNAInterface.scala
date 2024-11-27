@@ -10,6 +10,7 @@ import coop.rchain.models.rspace_plus_plus_types.HashProto
   */
 trait JNAInterface extends Library {
   def space_new(storePath: String): Pointer
+  def space_new_replay(rspace: Pointer): Pointer
   def space_print(rspace: Pointer): Unit
   def space_clear(rspace: Pointer): Unit
 
@@ -176,7 +177,7 @@ trait JNAInterface extends Library {
 
   def replay_clear(rspace: Pointer): Unit
 
-  def replay_spawn(rspace: Pointer): Pointer
+  def replay_spawn(replay_rspace_ptr: Pointer): Pointer
 
   /* IReplayRSpace */
 
