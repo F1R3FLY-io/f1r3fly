@@ -39,6 +39,12 @@ trait JNAInterface extends Library {
       params_ptr: Pointer,
       params_bytes_len: Int
   ): Pointer
+
+  /* IReplayRSpace */
+
+  def rig(runtime_ptr: Pointer, log_pointer: Pointer, log_bytes_len: Int): Unit
+
+  def check_replay_data(runtime_ptr: Pointer): Unit
 }
 
 object JNAInterfaceLoader {

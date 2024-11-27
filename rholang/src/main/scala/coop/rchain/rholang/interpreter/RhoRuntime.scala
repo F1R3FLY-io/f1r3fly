@@ -988,8 +988,93 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
     ???
 
   override def rig(log: trace.Log): F[Unit] =
-    // space.rig(log)
-    ???
+    for {
+      _ <- Sync[F].delay {
+            val eventProtos = log.map {
+              case comm: COMM =>
+                val consumeProto = ConsumeProto(
+                  channelHashes = comm.consume.channelsHashes.map(_.toByteString),
+                  hash = comm.consume.hash.toByteString,
+                  persistent = comm.consume.persistent
+                )
+                val producesProto = comm.produces.map { produce =>
+                  ProduceProto(
+                    channelHash = produce.channelsHash.toByteString,
+                    hash = produce.hash.toByteString,
+                    persistent = produce.persistent
+                  )
+                }
+                val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
+                val timesRepeatedProto = comm.timesRepeated.map {
+                  case (produce, count) =>
+                    val produceProto = ProduceProto(
+                      channelHash = produce.channelsHash.toByteString,
+                      hash = produce.hash.toByteString,
+                      persistent = produce.persistent
+                    )
+                    ProduceCounterMapEntry(Some(produceProto), count)
+                }.toSeq
+                EventProto(
+                  eventType = EventProto.EventType.Comm(
+                    CommProto(
+                      consume = Some(consumeProto),
+                      produces = producesProto,
+                      peeks = peeksProto,
+                      timesRepeated = timesRepeatedProto
+                    )
+                  )
+                )
+              case produce: Produce =>
+                EventProto(
+                  eventType = EventProto.EventType.IoEvent(
+                    IOEventProto(
+                      ioEventType = IOEventProto.IoEventType.Produce(
+                        ProduceProto(
+                          channelHash = produce.channelsHash.toByteString,
+                          hash = produce.hash.toByteString,
+                          persistent = produce.persistent
+                        )
+                      )
+                    )
+                  )
+                )
+              case consume: Consume =>
+                EventProto(
+                  eventType = EventProto.EventType.IoEvent(
+                    IOEventProto(
+                      ioEventType = IOEventProto.IoEventType.Consume(
+                        ConsumeProto(
+                          channelHashes = consume.channelsHashes.map(_.toByteString),
+                          hash = consume.hash.toByteString,
+                          persistent = consume.persistent
+                        )
+                      )
+                    )
+                  )
+                )
+            }
+
+            val logProto      = LogProto(eventProtos)
+            val logProtoBytes = logProto.toByteArray
+
+            if (!logProtoBytes.isEmpty) {
+              val payloadMemory = new Memory(logProtoBytes.length.toLong)
+              payloadMemory.write(0, logProtoBytes, 0, logProtoBytes.length)
+
+              val _ = RHOLANG_RUST_INSTANCE.rig(
+                runtimePtr,
+                payloadMemory,
+                logProtoBytes.length
+              )
+
+              // Not sure if these lines are needed
+              // Need to figure out how to deallocate each memory instance
+              payloadMemory.clear()
+            } else {
+              println("\nlog is empty in rig")
+            }
+          }
+    } yield ()
 
   private val emptyContinuation = TaggedContinuation()
 

@@ -511,8 +511,8 @@ where
                     .collect::<Vec<_>>()
             });
 
-        println!("\nreplay_data in replay_produce: {:?}", self.replay_data);
-        println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
+        // println!("\nreplay_data in replay_produce: {:?}", self.replay_data);
+        // println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
 
         match comms_option {
             None => Ok(self.store_data(channel, data, persist, produce_ref)),

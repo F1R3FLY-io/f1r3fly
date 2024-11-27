@@ -258,8 +258,10 @@ object RuntimeManager {
     */
   // val emptyStateHashFixed: StateHash =
   //   "9619d9a34bdaf56d5de8cfb7c2304d63cd9e469a0bfc5600fd2f5b9808e290f1".unsafeHexToByteString
+  // val emptyStateHashFixed: StateHash =
+  //   "575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508".unsafeHexToByteString
   val emptyStateHashFixed: StateHash =
-    "575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508".unsafeHexToByteString
+    "cb75e7f94e8eac21f95c524a07590f2583fbdaba6fb59291cf52fa16a14c784d".unsafeHexToByteString
 
   def apply[F[_]](implicit F: RuntimeManager[F]): F.type = F
 

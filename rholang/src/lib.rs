@@ -24,7 +24,9 @@ use rspace_plus_plus::rspace::{
     rspace::RSpace,
     trace::event::{Event, IOEvent},
 };
-use rust::interpreter::rho_runtime::{create_replay_rho_runtime, ReplayRhoRuntimeImpl};
+use rust::interpreter::rho_runtime::{
+    create_replay_rho_runtime, ReplayRhoRuntime as ReplayRhoRuntimeTrait, ReplayRhoRuntimeImpl,
+};
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -900,6 +902,110 @@ extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
     tokio_runtime.block_on(async {
         bootstrap_registry_internal(runtime).await;
     });
+}
+
+#[no_mangle]
+extern "C" fn rig(
+    runtime_ptr: *mut ReplayRhoRuntime,
+    log_pointer: *const u8,
+    log_bytes_len: usize,
+) -> () {
+    let log_slice = unsafe { std::slice::from_raw_parts(log_pointer, log_bytes_len) };
+    let log_proto = LogProto::decode(log_slice).unwrap();
+
+    let log: Vec<Event> = log_proto
+        .log
+        .into_iter()
+        .map(|log_entry| match log_entry.event_type.unwrap() {
+            event_proto::EventType::Comm(comm_proto) => {
+                let consume_proto = comm_proto.consume.unwrap();
+                let comm = COMM {
+                    consume: {
+                        Consume {
+                            channel_hashes: {
+                                consume_proto
+                                    .channel_hashes
+                                    .iter()
+                                    .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                    .collect()
+                            },
+                            hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                            persistent: consume_proto.persistent,
+                        }
+                    },
+                    produces: {
+                        comm_proto
+                            .produces
+                            .into_iter()
+                            .map(|produce_proto| Produce {
+                                channel_hash: Blake2b256Hash::from_bytes(
+                                    produce_proto.channel_hash,
+                                ),
+                                hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                                persistent: produce_proto.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm_proto
+                            .peeks
+                            .iter()
+                            .map(|element| element.value)
+                            .collect()
+                    },
+                    times_repeated: {
+                        comm_proto
+                            .times_repeated
+                            .into_iter()
+                            .map(|map_entry| {
+                                let key_proto = map_entry.key.unwrap();
+                                let produce = Produce {
+                                    channel_hash: Blake2b256Hash::from_bytes(
+                                        key_proto.channel_hash,
+                                    ),
+                                    hash: Blake2b256Hash::from_bytes(key_proto.hash),
+                                    persistent: key_proto.persistent,
+                                };
+
+                                let value = map_entry.value;
+
+                                (produce, value)
+                            })
+                            .collect()
+                    },
+                };
+                Event::Comm(comm)
+            }
+            event_proto::EventType::IoEvent(io_event) => match io_event.io_event_type.unwrap() {
+                io_event_proto::IoEventType::Produce(produce_proto) => {
+                    let produce = Produce {
+                        channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
+                        hash: Blake2b256Hash::from_bytes(produce_proto.hash),
+                        persistent: produce_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Produce(produce))
+                }
+                io_event_proto::IoEventType::Consume(consume_proto) => {
+                    let consume = Consume {
+                        channel_hashes: {
+                            consume_proto
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| Blake2b256Hash::from_bytes(hash.clone()))
+                                .collect()
+                        },
+                        hash: Blake2b256Hash::from_bytes(consume_proto.hash),
+                        persistent: consume_proto.persistent,
+                    };
+                    Event::IoEvent(IOEvent::Consume(consume))
+                }
+            },
+        })
+        .collect();
+
+    unsafe {
+        (*runtime_ptr).runtime.try_lock().unwrap().rig(log);
+    }
 }
 
 // Note: I am defaulting 'additional_system_processes' to 'Vec::new()'

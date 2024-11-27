@@ -178,24 +178,36 @@ object InterpreterUtil {
               )
               .asLeft[Option[StateHash]]
               .pure
-          case ReplayStatusMismatch(replayFailed, initialFailed) =>
+          case ReplayStatusMismatch(replayFailed, initialFailed) => {
+            println(
+              s"Found replay status mismatch; replay failure is $replayFailed and orig failure is $initialFailed"
+            )
             Log[F]
               .warn(
                 s"Found replay status mismatch; replay failure is $replayFailed and orig failure is $initialFailed"
               )
               .as(none[StateHash].asRight[BlockError])
-          case UnusedCOMMEvent(replayException) =>
+          }
+          case UnusedCOMMEvent(replayException) => {
+            println(
+              s"Found replay exception: ${replayException.getMessage}"
+            )
             Log[F]
               .warn(
                 s"Found replay exception: ${replayException.getMessage}"
               )
               .as(none[StateHash].asRight[BlockError])
-          case ReplayCostMismatch(initialCost, replayCost) =>
+          }
+          case ReplayCostMismatch(initialCost, replayCost) => {
+            println(
+              s"Found replay cost mismatch: initial deploy cost = $initialCost, replay deploy cost = $replayCost"
+            )
             Log[F]
               .warn(
                 s"Found replay cost mismatch: initial deploy cost = $initialCost, replay deploy cost = $replayCost"
               )
               .as(none[StateHash].asRight[BlockError])
+          }
           // Restructure errors so that this case is unnecessary
           case SystemDeployErrorMismatch(playMsg, replayMsg) =>
             Log[F]
