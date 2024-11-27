@@ -289,7 +289,7 @@ lazy val casper = (project in file("casper"))
     ),
     javaOptions in Test ++= Seq(
       "-Xss32m",
-      "-Djna.library.path=../rust_libraries"
+      "-Djna.library.path=../rust_libraries/debug"
     )
   )
   .dependsOn(
@@ -376,7 +376,7 @@ lazy val node = (project in file("node"))
     // Universal / javaOptions ++= Seq("-J-Xmx2g"),
     runCargoBuildDocker := {
       import scala.sys.process._
-      val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
+      val exitCode = Seq("./scripts/build_rust_libraries_docker.sh").!
       if (exitCode != 0) {
         throw new Exception("Rust build script failed with exit code " + exitCode)
       }
@@ -460,7 +460,8 @@ lazy val node = (project in file("node"))
       //"linux/amd64,linux/arm64",
       "-t",
       "ghcr.io/f1r3fly-io/rnode-rholang:amd64_0.1",
-      "--output", "type=docker"
+      "--output",
+      "type=docker"
     ),
     dockerCommands ++= {
       Seq(
@@ -494,7 +495,8 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-Djna.library.path=/opt/docker/arm64:opt/docker/amd64"
+      // "-Djna.library.path=/opt/docker/arm64:opt/docker/amd64"
+			"-Djna.library.path=/opt/docker/amd64"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
@@ -503,8 +505,10 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    mappings in Docker += file("rspace++/target/docker/arm64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/arm64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rspace++/target/docker/amd64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/amd64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/arm64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/arm64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/amd64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/amd64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/arm64/debug/librholang.so") -> "opt/docker/arm64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/amd64/debug/librholang.so") -> "opt/docker/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
@@ -578,7 +582,7 @@ lazy val rholang = (project in file("rholang"))
       "-Xss1m",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      "-Djna.library.path=../rust_libraries"
+      "-Djna.library.path=../rust_libraries/debug"
     )
     // runCargoBuild := {
     //   import scala.sys.process._

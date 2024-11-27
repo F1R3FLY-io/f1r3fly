@@ -1,7 +1,7 @@
 version: "3.4"
 
 x-rnode: &default-rnode
-  image: ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest
+  image: ghcr.io/f1r3fly-io/rnode-rholang:amd64_0.1
   user: root
   networks:
     - f1r3fly
