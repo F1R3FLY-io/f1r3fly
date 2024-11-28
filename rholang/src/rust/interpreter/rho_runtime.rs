@@ -643,7 +643,12 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stdout(),
             arity: 1,
             body_ref: BodyRefs::STDOUT,
-            handler: Box::new(|mut ctx| Box::new(move |args| ctx.system_processes.std_out(args))),
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().std_out(args).await })
+                })
+            }),
             remainder: None,
         },
         Definition {
@@ -651,8 +656,11 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stdout_ack(),
             arity: 2,
             body_ref: BodyRefs::STDOUT_ACK,
-            handler: Box::new(|mut ctx| {
-                Box::new(move |args| ctx.system_processes.std_out_ack(args))
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().std_out_ack(args).await })
+                })
             }),
             remainder: None,
         },
@@ -661,7 +669,12 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stderr(),
             arity: 1,
             body_ref: BodyRefs::STDERR,
-            handler: Box::new(|mut ctx| Box::new(move |args| ctx.system_processes.std_err(args))),
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().std_err(args).await })
+                })
+            }),
             remainder: None,
         },
         Definition {
@@ -669,8 +682,11 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::stderr_ack(),
             arity: 2,
             body_ref: BodyRefs::STDERR_ACK,
-            handler: Box::new(|mut ctx| {
-                Box::new(move |args| ctx.system_processes.std_err_ack(args))
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().std_err_ack(args).await })
+                })
             }),
             remainder: None,
         },
@@ -681,8 +697,13 @@ fn std_system_processes() -> Vec<Definition> {
             body_ref: BodyRefs::GET_BLOCK_DATA,
             handler: Box::new(|ctx| {
                 Box::new(move |args| {
-                    ctx.system_processes
-                        .get_block_data(args, ctx.block_data.clone())
+                    let ctx = ctx.clone();
+                    Box::pin(async move {
+                        ctx.system_processes
+                            .clone()
+                            .get_block_data(args, ctx.block_data.clone())
+                            .await
+                    })
                 })
             }),
             remainder: None,
@@ -694,8 +715,13 @@ fn std_system_processes() -> Vec<Definition> {
             body_ref: BodyRefs::GET_INVALID_BLOCKS,
             handler: Box::new(|ctx| {
                 Box::new(move |args| {
-                    ctx.system_processes
-                        .invalid_blocks(args, &ctx.invalid_blocks)
+                    let ctx = ctx.clone();
+                    Box::pin(async move {
+                        ctx.system_processes
+                            .clone()
+                            .invalid_blocks(args, &ctx.invalid_blocks)
+                            .await
+                    })
                 })
             }),
             remainder: None,
@@ -705,7 +731,12 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::rev_address(),
             arity: 3,
             body_ref: BodyRefs::REV_ADDRESS,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.rev_address(args))),
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().rev_address(args).await })
+                })
+            }),
             remainder: None,
         },
         Definition {
@@ -714,7 +745,12 @@ fn std_system_processes() -> Vec<Definition> {
             arity: 3,
             body_ref: BodyRefs::DEPLOYER_ID_OPS,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.deployer_id_ops(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().deployer_id_ops(args).await },
+                    )
+                })
             }),
             remainder: None,
         },
@@ -723,7 +759,12 @@ fn std_system_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::reg_ops(),
             arity: 3,
             body_ref: BodyRefs::REG_OPS,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.registry_ops(args))),
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().registry_ops(args).await })
+                })
+            }),
             remainder: None,
         },
         Definition {
@@ -732,7 +773,12 @@ fn std_system_processes() -> Vec<Definition> {
             arity: 3,
             body_ref: BodyRefs::SYS_AUTHTOKEN_OPS,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.sys_auth_token_ops(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().sys_auth_token_ops(args).await },
+                    )
+                })
             }),
             remainder: None,
         },
@@ -747,7 +793,12 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
             arity: 4,
             body_ref: BodyRefs::SECP256K1_VERIFY,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.secp256k1_verify(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().secp256k1_verify(args).await },
+                    )
+                })
             }),
             remainder: None,
         },
@@ -757,7 +808,12 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
             arity: 2,
             body_ref: BodyRefs::BLAKE2B256_HASH,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.blake2b256_hash(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().blake2b256_hash(args).await },
+                    )
+                })
             }),
             remainder: None,
         },
@@ -767,7 +823,10 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
             arity: 2,
             body_ref: BodyRefs::KECCAK256_HASH,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.keccak256_hash(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().keccak256_hash(args).await })
+                })
             }),
             remainder: None,
         },
@@ -776,7 +835,12 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
             fixed_channel: FixedChannels::sha256_hash(),
             arity: 2,
             body_ref: BodyRefs::SHA256_HASH,
-            handler: Box::new(|ctx| Box::new(move |args| ctx.system_processes.sha256_hash(args))),
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().sha256_hash(args).await })
+                })
+            }),
             remainder: None,
         },
         Definition {
@@ -785,7 +849,10 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
             arity: 4,
             body_ref: BodyRefs::ED25519_VERIFY,
             handler: Box::new(|ctx| {
-                Box::new(move |args| ctx.system_processes.ed25519_verify(args))
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().ed25519_verify(args).await })
+                })
             }),
             remainder: None,
         },

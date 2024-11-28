@@ -11,15 +11,16 @@ use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
 use super::pretty_printer::PrettyPrinter;
 use super::registry::registry::Registry;
-use super::rho_runtime::{RhoISpace, RhoTuplespace};
+use super::rho_runtime::RhoISpace;
 use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
 };
@@ -27,7 +28,8 @@ use super::util::rev_address::RevAddress;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
-pub type RhoSysFunction = Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>;
+pub type RhoSysFunction =
+    Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>;
 pub type RhoDispatchMap = HashMap<i64, RhoSysFunction>;
 pub type Name = Par;
 pub type Arity = i32;
@@ -169,6 +171,7 @@ impl BodyRefs {
     pub const SYS_AUTHTOKEN_OPS: i64 = 16;
 }
 
+#[derive(Clone)]
 pub struct ProcessContext {
     pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
@@ -202,7 +205,13 @@ pub struct Definition {
     pub fixed_channel: Name,
     pub arity: Arity,
     pub body_ref: BodyRef,
-    pub handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
+    // pub handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
+    pub handler: Box<
+        dyn FnMut(
+            ProcessContext,
+        )
+            -> Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+    >,
     pub remainder: Remainder,
 }
 
@@ -212,7 +221,13 @@ impl Definition {
         fixed_channel: Name,
         arity: Arity,
         body_ref: BodyRef,
-        handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
+        handler: Box<
+            dyn FnMut(
+                ProcessContext,
+            ) -> Box<
+                dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>,
+            >,
+        >,
         remainder: Remainder,
     ) -> Self {
         Definition {
@@ -228,7 +243,10 @@ impl Definition {
     pub fn to_dispatch_table(
         &mut self,
         context: ProcessContext,
-    ) -> (BodyRef, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>) {
+    ) -> (
+        BodyRef,
+        Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+    ) {
         (self.body_ref, (self.handler)(context))
     }
 
@@ -279,6 +297,7 @@ impl BlockData {
     }
 }
 
+#[derive(Clone)]
 pub struct SystemProcesses {
     pub dispatcher: RhoDispatch,
     pub space: RhoISpace,
@@ -304,7 +323,7 @@ impl SystemProcesses {
         }
     }
 
-    fn verify_signature_contract(
+    async fn verify_signature_contract(
         &self,
         contract_args: Vec<ListParWithRandom>,
         name: &str,
@@ -322,10 +341,14 @@ impl SystemProcesses {
                     if !verified {
                         panic!("SystemProcesses: Failed to verify contract")
                     }
-                    let _ = produce(
+                    if let Err(e) = produce(
                         vec![Par::default().with_exprs(vec![RhoBoolean::create_expr(verified)])],
                         ack.clone(),
-                    );
+                    )
+                    .await
+                    {
+                        eprintln!("Error producing result: {:?}", e);
+                    }
                 } else {
                     panic!("{} expects data, signature, public key (all as byte arrays), and an acknowledgement channel", name)
                 }
@@ -337,7 +360,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn hash_contract(
+    async fn hash_contract(
         &self,
         contract_args: Vec<ListParWithRandom>,
         name: &str,
@@ -349,7 +372,10 @@ impl SystemProcesses {
                     (vec.get(0).and_then(RhoByteArray::unapply), vec.get(1))
                 {
                     let hash = algorithm(input);
-                    let _ = produce(vec![RhoByteArray::create_par(hash)], ack.clone());
+                    if let Err(e) = produce(vec![RhoByteArray::create_par(hash)], ack.clone()).await
+                    {
+                        eprintln!("Error producing result: {:?}", e);
+                    }
                 } else {
                     panic!("{} expects a byte array and return channel", name)
                 }
@@ -369,7 +395,7 @@ impl SystemProcesses {
         println!("STD ERROR: {}", s);
     }
 
-    pub fn std_out(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn std_out(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
                 let str = self.pretty_printer.build_string_from_message(&args[0]);
@@ -382,12 +408,14 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_out_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn std_out_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
                 let str = self.pretty_printer.build_string_from_message(arg);
                 self.print_std_out(&str);
-                let _ = produce(vec![Par::default()], ack.clone());
+                if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
+                    eprintln!("Error producing result: {:?}", e);
+                }
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());
             }
@@ -396,7 +424,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_err(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn std_err(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg] = &vec[..] {
                 let str = self.pretty_printer.build_string_from_message(arg);
@@ -409,12 +437,14 @@ impl SystemProcesses {
         }
     }
 
-    pub fn std_err_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn std_err_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
                 let str = self.pretty_printer.build_string_from_message(arg);
                 self.print_std_err(&str);
-                let _ = produce(vec![Par::default()], ack.clone());
+                if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
+                    eprintln!("Error producing result: {:?}", e);
+                }
             } else {
                 panic!("Expected exactly two arguments, but got {}", vec.len());
             }
@@ -423,7 +453,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn rev_address(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn rev_address(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
             match args.as_slice() {
                 [first_par, second_par, ack] => {
@@ -442,7 +472,9 @@ impl SystemProcesses {
                             Err(str) => RhoString::create_par(str),
                         };
 
-                        let _ = produce(vec![error_message], ack.clone());
+                        if let Err(e) = produce(vec![error_message], ack.clone()).await {
+                            eprintln!("Error producing result: {:?}", e);
+                        }
                     } else {
                         // TODO: Invalid type for address should throw error! - OLD
                         if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
@@ -452,7 +484,9 @@ impl SystemProcesses {
                                 None
                             }
                         }) {
-                            let _ = produce(vec![Par::default()], ack.clone());
+                            if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
+                                eprintln!("Error producing result: {:?}", e);
+                            }
                         } else {
                             if let (Some(_), Some(public_key)) = (
                                 RhoString::unapply(first_par).and_then(|str| {
@@ -471,7 +505,9 @@ impl SystemProcesses {
                                     None => Par::default(),
                                 };
 
-                                let _ = produce(vec![response], ack.clone());
+                                if let Err(e) = produce(vec![response], ack.clone()).await {
+                                    eprintln!("Error producing response: {:?}", e);
+                                }
                             } else {
                                 if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
                                     if str == "fromPublicKey".to_string() {
@@ -480,7 +516,10 @@ impl SystemProcesses {
                                         None
                                     }
                                 }) {
-                                    let _ = produce(vec![Par::default()], ack.clone());
+                                    if let Err(e) = produce(vec![Par::default()], ack.clone()).await
+                                    {
+                                        eprintln!("Error producing result: {:?}", e);
+                                    }
                                 } else {
                                     if let (Some(_), Some(id)) = (
                                         RhoString::unapply(first_par).and_then(|str| {
@@ -497,7 +536,9 @@ impl SystemProcesses {
                                             None => Par::default(),
                                         };
 
-                                        let _ = produce(vec![response], ack.clone());
+                                        if let Err(e) = produce(vec![response], ack.clone()).await {
+                                            eprintln!("Error producing response: {:?}", e);
+                                        }
                                     } else {
                                         if let Some(_) =
                                             RhoString::unapply(first_par).and_then(|str| {
@@ -508,7 +549,11 @@ impl SystemProcesses {
                                                 }
                                             })
                                         {
-                                            let _ = produce(vec![Par::default()], ack.clone());
+                                            if let Err(e) =
+                                                produce(vec![Par::default()], ack.clone()).await
+                                            {
+                                                eprintln!("Error producing result: {:?}", e);
+                                            }
                                         } else {
                                             if let Some(_) =
                                                 RhoString::unapply(first_par).and_then(|str| {
@@ -530,7 +575,11 @@ impl SystemProcesses {
                                                     Par::default()
                                                 };
 
-                                                let _ = produce(vec![response], ack.clone());
+                                                if let Err(e) =
+                                                    produce(vec![response], ack.clone()).await
+                                                {
+                                                    eprintln!("Error producing response: {:?}", e);
+                                                }
                                             } else {
                                                 if let Some(_) = RhoString::unapply(first_par)
                                                     .and_then(|str| {
@@ -541,8 +590,15 @@ impl SystemProcesses {
                                                         }
                                                     })
                                                 {
-                                                    let _ =
-                                                        produce(vec![Par::default()], ack.clone());
+                                                    if let Err(e) =
+                                                        produce(vec![Par::default()], ack.clone())
+                                                            .await
+                                                    {
+                                                        eprintln!(
+                                                            "Error producing result: {:?}",
+                                                            e
+                                                        );
+                                                    }
                                                 } else {
                                                     panic!("Expected args did not match any case");
                                                 }
@@ -561,7 +617,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn deployer_id_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn deployer_id_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
             match args.as_slice() {
                 [first_par, second_par, ack] => {
@@ -575,7 +631,11 @@ impl SystemProcesses {
                         }),
                         RhoDeployerId::unapply(second_par),
                     ) {
-                        let _ = produce(vec![RhoByteArray::create_par(public_key)], ack.clone());
+                        if let Err(e) =
+                            produce(vec![RhoByteArray::create_par(public_key)], ack.clone()).await
+                        {
+                            eprintln!("Error producing response: {:?}", e);
+                        }
                     } else {
                         if let Some(_) = RhoString::unapply(first_par).and_then(|str| {
                             if str == "pubKeyBytes".to_string() {
@@ -584,7 +644,9 @@ impl SystemProcesses {
                                 None
                             }
                         }) {
-                            let _ = produce(vec![Par::default()], ack.clone());
+                            if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
+                                eprintln!("Error producing result: {:?}", e);
+                            }
                         } else {
                             panic!("Expected args did not match any case");
                         }
@@ -598,7 +660,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn registry_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn registry_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
             match args.as_slice() {
                 [first_par, argument, ack] => {
@@ -615,7 +677,9 @@ impl SystemProcesses {
                         } else {
                             Par::default()
                         };
-                        let _ = produce(vec![response], ack.clone());
+                        if let Err(e) = produce(vec![response], ack.clone()).await {
+                            eprintln!("Error producing response: {:?}", e);
+                        }
                     } else {
                         panic!("Expected args did not match any case");
                     }
@@ -628,7 +692,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn sys_auth_token_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn sys_auth_token_ops(&self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
             match args.as_slice() {
                 [first_par, argument, ack] => {
@@ -644,8 +708,13 @@ impl SystemProcesses {
                         } else {
                             RhoBoolean::create_expr(false)
                         };
-                        let _ =
-                            produce(vec![Par::default().with_exprs(vec![response])], ack.clone());
+
+                        if let Err(e) =
+                            produce(vec![Par::default().with_exprs(vec![response])], ack.clone())
+                                .await
+                        {
+                            eprintln!("Error producing response: {:?}", e);
+                        }
                     } else {
                         panic!("Expected args did not match any case");
                     }
@@ -658,27 +727,32 @@ impl SystemProcesses {
         }
     }
 
-    pub fn secp256k1_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn secp256k1_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
         self.verify_signature_contract(contract_args, "secp256k1Verify", Box::new(Secp256k1))
+            .await
     }
 
-    pub fn ed25519_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn ed25519_verify(&self, contract_args: Vec<ListParWithRandom>) -> () {
         self.verify_signature_contract(contract_args, "ed25519Verify", Box::new(Ed25519))
+            .await
     }
 
-    pub fn sha256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn sha256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
         self.hash_contract(contract_args, "sha256Hash", Box::new(Sha256Hasher::hash))
+            .await
     }
 
-    pub fn keccak256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn keccak256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
         self.hash_contract(contract_args, "keccak256Hash", Box::new(Keccak256::hash))
+            .await
     }
 
-    pub fn blake2b256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
+    pub async fn blake2b256_hash(&self, contract_args: Vec<ListParWithRandom>) -> () {
         self.hash_contract(contract_args, "blake2b256Hash", Box::new(Blake2b256::hash))
+            .await
     }
 
-    pub fn get_block_data(
+    pub async fn get_block_data(
         &self,
         contract_args: Vec<ListParWithRandom>,
         block_data: Arc<RwLock<BlockData>>,
@@ -686,14 +760,19 @@ impl SystemProcesses {
         if let Some((produce, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
                 let data = block_data.read().unwrap();
-                let _ = produce(
+                match produce(
                     vec![
                         Par::default().with_exprs(vec![RhoNumber::create_expr(data.block_number)]),
                         Par::default().with_exprs(vec![RhoNumber::create_expr(data.time_stamp)]),
                         RhoByteArray::create_par(data.sender.bytes.clone()),
                     ],
                     args[0].clone(),
-                );
+                )
+                .await
+                {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("Error producing block data: {:?}", e),
+                };
             } else {
                 panic!("blockData expects only a return channel");
             }
@@ -702,7 +781,7 @@ impl SystemProcesses {
         }
     }
 
-    pub fn invalid_blocks(
+    pub async fn invalid_blocks(
         &self,
         contract_args: Vec<ListParWithRandom>,
         invalid_blocks: &InvalidBlocks,
@@ -711,7 +790,9 @@ impl SystemProcesses {
             if args.len() == 1 {
                 let invalid_blocks: Par = invalid_blocks.invalid_blocks.read().unwrap().clone();
 
-                let _ = produce(vec![invalid_blocks], args[0].clone());
+                if let Err(e) = produce(vec![invalid_blocks], args[0].clone()).await {
+                    eprintln!("Error producing invalid blocks: {:?}", e);
+                }
             } else {
                 panic!("invalidBlocks expects only a return channel");
             }

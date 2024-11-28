@@ -16,6 +16,7 @@ use shared::rust::{printer::Printer, string_ops::wrap_with_braces};
 
 use super::errors::InterpreterError;
 
+#[derive(Clone)]
 pub struct PrettyPrinter {
     pub free_shift: i32,
     pub bound_shift: i32,

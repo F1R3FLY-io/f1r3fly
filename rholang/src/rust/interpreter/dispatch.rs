@@ -1,12 +1,12 @@
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/dispatch.scala
-
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
 use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
+use std::future::Future;
 use std::{
     collections::{HashMap, HashSet},
+    pin::Pin,
     sync::{Arc, RwLock},
 };
 
@@ -28,8 +28,14 @@ pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
 
 #[derive(Clone)]
 pub struct RholangAndScalaDispatcher {
-    pub _dispatch_table:
-        Arc<std::sync::Mutex<HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>>>,
+    pub _dispatch_table: Arc<
+        std::sync::Mutex<
+            HashMap<
+                i64,
+                Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+            >,
+        >,
+    >,
     pub reducer: Option<DebruijnInterpreter>,
 }
 
@@ -39,7 +45,6 @@ impl RholangAndScalaDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
-        // println!("\ndispatch");
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
@@ -51,8 +56,6 @@ impl RholangAndScalaDispatcher {
                             .iter()
                             .map(|p| Blake2b512Random::from_bytes(&p.random_state)),
                     );
-
-                    // println!("\nrandoms in dispatch: {:?}", randoms);
 
                     self.reducer
                         .clone()
@@ -66,7 +69,7 @@ impl RholangAndScalaDispatcher {
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
                     match self._dispatch_table.try_lock().unwrap().get_mut(&_ref) {
-                        Some(f) => Ok(f(data_list)),
+                        Some(f) => Ok(f(data_list).await),
                         None => Err(InterpreterError::BugFoundError(format!(
                             "dispatch: no function for {}",
                             _ref,
@@ -84,7 +87,10 @@ pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
 impl RholangAndScalaDispatcher {
     pub fn create<T>(
         tuplespace: T,
-        dispatch_table: HashMap<i64, Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
+        dispatch_table: HashMap<
+            i64,
+            Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+        >,
         urn_map: HashMap<String, Par>,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
         mergeable_tag_name: Par,
@@ -93,7 +99,6 @@ impl RholangAndScalaDispatcher {
     where
         T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
-        // println!("\ncreate");
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(std::sync::Mutex::new(dispatch_table)),
             reducer: None,
@@ -123,7 +128,6 @@ impl RholangAndScalaDispatcher {
     where
         T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
-        // println!("\ncreate_dispatcher");
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(std::sync::Mutex::new(HashMap::new())),
             reducer: None,

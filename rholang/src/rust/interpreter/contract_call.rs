@@ -1,6 +1,12 @@
+use std::pin::Pin;
+
 use models::rhoapi::{ListParWithRandom, Par};
 
-use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::{RhoISpace, RhoTuplespace}};
+use super::{
+    dispatch::RhoDispatch,
+    errors::InterpreterError,
+    rho_runtime::{RhoISpace, RhoTuplespace},
+};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -28,12 +34,15 @@ pub struct ContractCall {
 }
 
 pub type Producer = Box<
-    dyn FnOnce(Vec<Par>, Par) -> Box<dyn futures::Future<Output = Result<(), InterpreterError>>>,
+    dyn FnOnce(
+        Vec<Par>,
+        Par,
+    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
 >;
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
-        // println!("\ncontract_call unapply");
+        println!("\ncontract_call unapply");
         if contract_args.len() == 1 {
             let (args, rand) = (
                 contract_args[0].pars.clone(),
@@ -45,8 +54,9 @@ impl ContractCall {
             let produce = Box::new(move |values: Vec<Par>, ch: Par| {
                 let space = space.clone();
                 let rand = rand.clone();
-                Box::new(async move {
+                Box::pin(async move {
                     let mut space_lock = space.try_lock().unwrap();
+                    println!("hit produce in contract_call, values: {:?}", values);
                     let produce_result = space_lock.produce(
                         ch,
                         ListParWithRandom {
@@ -73,7 +83,7 @@ impl ContractCall {
                         None => Ok(()),
                     }
                 })
-                    as Box<dyn futures::Future<Output = Result<(), InterpreterError>>>
+                    as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
             });
 
             Some((produce, args.clone()))
