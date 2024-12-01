@@ -1,6 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/ChargingRSpace.scala
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::rust::interpreter::{
     accounting::{
@@ -18,9 +18,12 @@ use models::rhoapi::{
     tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, TaggedContinuation,
 };
 use rspace_plus_plus::rspace::{
+    checkpoint::{Checkpoint, SoftCheckpoint},
     errors::RSpaceError,
+    hashing::blake2b256_hash::Blake2b256Hash,
+    internal::{Datum, Row, WaitingContinuation},
     rspace_interface::{ContResult, ISpace, MaybeActionResult, RSpaceResult},
-    tuplespace_interface::Tuplespace,
+    trace::Log,
 };
 
 pub struct ChargingRSpace;
@@ -42,10 +45,12 @@ pub enum TriggeredBy {
 fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, InterpreterError> {
     //TODO: Make ScalaBodyRef-s have their own random state and merge it during its COMMs - OLD
     match unwrap_option_safe(continuation.tagged_cont)? {
-        TaggedCont::ParBody(par_with_random) => {
-            Ok(Blake2b512Random::create_from_bytes(&par_with_random.random_state))
+        TaggedCont::ParBody(par_with_random) => Ok(Blake2b512Random::create_from_bytes(
+            &par_with_random.random_state,
+        )),
+        TaggedCont::ScalaBodyRef(value) => {
+            Ok(Blake2b512Random::create_from_bytes(&value.to_be_bytes()))
         }
-        TaggedCont::ScalaBodyRef(value) => Ok(Blake2b512Random::create_from_bytes(&value.to_be_bytes())),
     }
 }
 
@@ -138,28 +143,18 @@ impl ChargingRSpace {
                 self.space.install(channels, patterns, continuation)
             }
 
-            fn create_checkpoint(
-                &mut self,
-            ) -> Result<rspace_plus_plus::rspace::checkpoint::Checkpoint, RSpaceError> {
+            fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
                 self.space.create_checkpoint()
             }
 
-            fn get_data(
-                &self,
-                channel: Par,
-            ) -> Vec<rspace_plus_plus::rspace::internal::Datum<ListParWithRandom>> {
+            fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
                 self.space.get_data(channel)
             }
 
             fn get_waiting_continuations(
                 &self,
                 channels: Vec<Par>,
-            ) -> Vec<
-                rspace_plus_plus::rspace::internal::WaitingContinuation<
-                    BindPattern,
-                    TaggedContinuation,
-                >,
-            > {
+            ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
                 self.space.get_waiting_continuations(channels)
             }
 
@@ -171,47 +166,45 @@ impl ChargingRSpace {
                 self.space.clear()
             }
 
-            fn reset(
-                &mut self,
-                root: rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash,
-            ) -> Result<(), RSpaceError> {
+            fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
                 self.space.reset(root)
             }
 
             fn to_map(
                 &self,
-            ) -> std::collections::HashMap<
-                Vec<Par>,
-                rspace_plus_plus::rspace::internal::Row<
-                    BindPattern,
-                    ListParWithRandom,
-                    TaggedContinuation,
-                >,
-            > {
+            ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>>
+            {
                 self.space.to_map()
             }
 
             fn create_soft_checkpoint(
                 &mut self,
-            ) -> rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
-                Par,
-                BindPattern,
-                ListParWithRandom,
-                TaggedContinuation,
-            > {
+            ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>
+            {
                 self.space.create_soft_checkpoint()
             }
 
             fn revert_to_soft_checkpoint(
                 &mut self,
-                checkpoint: rspace_plus_plus::rspace::checkpoint::SoftCheckpoint<
-                    Par,
-                    BindPattern,
-                    ListParWithRandom,
-                    TaggedContinuation,
-                >,
+                checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
             ) -> Result<(), RSpaceError> {
                 self.space.revert_to_soft_checkpoint(checkpoint)
+            }
+
+            fn rig_and_reset(
+                &mut self,
+                start_root: Blake2b256Hash,
+                log: Log,
+            ) -> Result<(), RSpaceError> {
+                self.space.rig_and_reset(start_root, log)
+            }
+
+            fn rig(&self, log: Log) -> Result<(), RSpaceError> {
+                self.space.rig(log)
+            }
+
+            fn check_replay_data(&self) -> Result<(), RSpaceError> {
+                self.space.check_replay_data()
             }
         }
 

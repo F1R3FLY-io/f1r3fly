@@ -2,7 +2,6 @@ use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
 use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::future::Future;
 use std::{
     collections::{HashMap, HashSet},

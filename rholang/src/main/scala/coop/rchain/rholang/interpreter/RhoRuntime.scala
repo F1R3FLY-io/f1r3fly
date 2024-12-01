@@ -1083,7 +1083,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
     // space.toMap
     for {
       result <- Sync[F].delay {
-                 val toMapPtr = RHOLANG_RUST_INSTANCE.get_hot_changes(runtimePtr)
+                 val toMapPtr = RHOLANG_RUST_INSTANCE.replay_get_hot_changes(runtimePtr)
 
                  if (toMapPtr != null) {
                    val length = toMapPtr.getInt(0)
@@ -1216,7 +1216,8 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
       val paramsPtr   = new Memory(paramsBytes.length.toLong)
       paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
 
-      val evalResultPtr = RHOLANG_RUST_INSTANCE.evaluate(runtimePtr, paramsPtr, paramsBytes.length)
+      val evalResultPtr =
+        RHOLANG_RUST_INSTANCE.replay_evaluate(runtimePtr, paramsPtr, paramsBytes.length)
       assert(evalResultPtr != null)
 
       try {
@@ -1254,7 +1255,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
             val rootMemory = new Memory(rootBytes.length.toLong)
             rootMemory.write(0, rootBytes, 0, rootBytes.length)
 
-            val _ = RHOLANG_RUST_INSTANCE.reset(
+            val _ = RHOLANG_RUST_INSTANCE.replay_reset(
               runtimePtr,
               rootMemory,
               rootBytes.length
@@ -1274,7 +1275,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
       result <- Sync[F].delay {
                  //  println("\nhit scala createCheckpoint")
 
-                 val checkpointResultPtr = RHOLANG_RUST_INSTANCE.create_checkpoint(
+                 val checkpointResultPtr = RHOLANG_RUST_INSTANCE.replay_create_checkpoint(
                    runtimePtr
                  )
 
@@ -1383,7 +1384,9 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
     for {
       result <- Sync[F].delay {
                  //  println("\nhit scala createSoftCheckpoint")
-                 val softCheckpointPtr = RHOLANG_RUST_INSTANCE.create_soft_checkpoint(runtimePtr)
+                 val softCheckpointPtr = RHOLANG_RUST_INSTANCE.replay_create_soft_checkpoint(
+                   runtimePtr
+                 )
 
                  if (softCheckpointPtr != null) {
                    val length = softCheckpointPtr.getInt(0)
@@ -1797,7 +1800,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
             val payloadMemory = new Memory(softCheckpointProtoBytes.length.toLong)
             payloadMemory.write(0, softCheckpointProtoBytes, 0, softCheckpointProtoBytes.length)
 
-            val _ = RHOLANG_RUST_INSTANCE.revert_to_soft_checkpoint(
+            val _ = RHOLANG_RUST_INSTANCE.replay_revert_to_soft_checkpoint(
               runtimePtr,
               payloadMemory,
               softCheckpointProtoBytes.length
@@ -1844,7 +1847,7 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
         val paramsPtr = new Memory(paramsBytes.length.toLong)
         paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
 
-        RHOLANG_RUST_INSTANCE.set_block_data(runtimePtr, paramsPtr, paramsBytes.length)
+        RHOLANG_RUST_INSTANCE.replay_set_block_data(runtimePtr, paramsPtr, paramsBytes.length)
       } else {
         println("\nparamsBytes.length is 0, not calling Rust set_block_data")
       }
@@ -1872,9 +1875,9 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
         val paramsPtr = new Memory(paramsBytes.length.toLong)
         paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
 
-        RHOLANG_RUST_INSTANCE.set_invalid_blocks(runtimePtr, paramsPtr, paramsBytes.length)
+        RHOLANG_RUST_INSTANCE.replay_set_invalid_blocks(runtimePtr, paramsPtr, paramsBytes.length)
       } else {
-        println("\nparamsBytes.length is 0, not calling Rust set_invalid_blocks")
+        println("\nparamsBytes.length is 0, not calling Rust replay_set_invalid_blocks")
       }
     }
 
@@ -2181,6 +2184,7 @@ object RhoRuntime {
       // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
   )(): F[RhoRuntime[F]] =
     Span[F].trace(createPlayRuntime) {
+      // println("\nscala createRuntime")
       if (extraSystemProcesses.nonEmpty) {
         println(s"extra system processes was nonEmpty, size: ${extraSystemProcesses.size}")
       }
@@ -2245,6 +2249,7 @@ object RhoRuntime {
       // removed 'implicit costLog: FunctorTell[F, Chain[Cost]]'
   )(): F[ReplayRhoRuntime[F]] =
     Span[F].trace(createReplayRuntime) {
+      // println("\nscala createReplayRuntime")
       if (extraSystemProcesses.nonEmpty) {
         println(s"extra system processes was nonEmpty, size: ${extraSystemProcesses.size}")
       }

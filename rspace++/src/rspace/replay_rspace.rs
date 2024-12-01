@@ -6,7 +6,6 @@ use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
-use super::replay_rspace_interface::IReplayRSpace;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
 use super::rspace_interface::MaybeActionResult;
@@ -56,80 +55,6 @@ where
     A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
     K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
 {
-}
-
-impl<C, P, A, K> IReplayRSpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
-where
-    C: Clone + Debug + Default + Serialize + std::hash::Hash + Ord + Eq + 'static + Sync + Send,
-    P: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    A: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-    K: Clone + Debug + Default + Serialize + 'static + Sync + Send,
-{
-    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
-        self.rig(log)?;
-        self.reset(start_root)
-    }
-
-    fn rig(&self, log: Log) -> Result<(), RSpaceError> {
-        // println!("\nlog len in rust rig: {:?}", log.len());
-        let (io_events, comm_events): (Vec<_>, Vec<_>) =
-            log.iter().partition(|event| match event {
-                Event::IoEvent(IOEvent::Produce(_)) => true,
-                Event::IoEvent(IOEvent::Consume(_)) => true,
-                Event::Comm(_) => false,
-            });
-
-        // Create a set of the "new" IOEvents
-        let new_stuff: HashSet<_> = io_events.into_iter().collect();
-
-        // Create and prepare the ReplayData table
-        self.replay_data.clear();
-
-        for event in comm_events {
-            match event {
-                Event::Comm(comm) => {
-                    let comm_cloned = comm.clone();
-                    let (consume, produces) = (comm_cloned.consume, comm_cloned.produces);
-                    let produce_io_events: Vec<IOEvent> = produces
-                        .into_iter()
-                        .map(|produce| IOEvent::Produce(produce))
-                        .collect();
-
-                    let mut io_events = produce_io_events.clone();
-                    io_events.insert(0, IOEvent::Consume(consume));
-
-                    for io_event in io_events {
-                        let io_event_converted: Event = match io_event {
-                            IOEvent::Produce(ref p) => Event::IoEvent(IOEvent::Produce(p.clone())),
-                            IOEvent::Consume(ref c) => Event::IoEvent(IOEvent::Consume(c.clone())),
-                        };
-
-                        if new_stuff.contains(&io_event_converted) {
-                            // println!("\nadd_binding in rig");
-                            self.replay_data.add_binding(io_event, comm.clone());
-                        }
-                    }
-                    Ok(())
-                }
-                _ => Err(RSpaceError::BugFoundError(
-                    "BUG FOUND: only COMM events are expected here".to_string(),
-                )),
-            }?
-        }
-
-        Ok(())
-    }
-
-    fn check_replay_data(&self) -> Result<(), RSpaceError> {
-        if self.replay_data.is_empty() {
-            Ok(())
-        } else {
-            Err(RSpaceError::BugFoundError(format!(
-                "Unused COMM event: replayData multimap has {} elements left",
-                self.replay_data.map.len()
-            )))
-        }
-    }
 }
 
 impl<C, P, A, K> ISpace<C, P, A, K> for ReplayRSpace<C, P, A, K>
@@ -282,6 +207,72 @@ where
         continuation: K,
     ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         self.locked_install(channels, patterns, continuation)
+    }
+
+    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
+        self.rig(log)?;
+        self.reset(start_root)
+    }
+
+    fn rig(&self, log: Log) -> Result<(), RSpaceError> {
+        // println!("\nlog len in rust rig: {:?}", log.len());
+        let (io_events, comm_events): (Vec<_>, Vec<_>) =
+            log.iter().partition(|event| match event {
+                Event::IoEvent(IOEvent::Produce(_)) => true,
+                Event::IoEvent(IOEvent::Consume(_)) => true,
+                Event::Comm(_) => false,
+            });
+
+        // Create a set of the "new" IOEvents
+        let new_stuff: HashSet<_> = io_events.into_iter().collect();
+
+        // Create and prepare the ReplayData table
+        self.replay_data.clear();
+
+        for event in comm_events {
+            match event {
+                Event::Comm(comm) => {
+                    let comm_cloned = comm.clone();
+                    let (consume, produces) = (comm_cloned.consume, comm_cloned.produces);
+                    let produce_io_events: Vec<IOEvent> = produces
+                        .into_iter()
+                        .map(|produce| IOEvent::Produce(produce))
+                        .collect();
+
+                    let mut io_events = produce_io_events.clone();
+                    io_events.insert(0, IOEvent::Consume(consume));
+
+                    for io_event in io_events {
+                        let io_event_converted: Event = match io_event {
+                            IOEvent::Produce(ref p) => Event::IoEvent(IOEvent::Produce(p.clone())),
+                            IOEvent::Consume(ref c) => Event::IoEvent(IOEvent::Consume(c.clone())),
+                        };
+
+                        if new_stuff.contains(&io_event_converted) {
+                            // println!("\nadd_binding in rig");
+                            self.replay_data.add_binding(io_event, comm.clone());
+                        }
+                    }
+                    Ok(())
+                }
+                _ => Err(RSpaceError::BugFoundError(
+                    "BUG FOUND: only COMM events are expected here".to_string(),
+                )),
+            }?
+        }
+
+        Ok(())
+    }
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError> {
+        if self.replay_data.is_empty() {
+            Ok(())
+        } else {
+            Err(RSpaceError::BugFoundError(format!(
+                "Unused COMM event: replayData multimap has {} elements left",
+                self.replay_data.map.len()
+            )))
+        }
     }
 }
 
@@ -793,7 +784,8 @@ where
         let next_history = history_repo.reset(&history_repo.root())?;
         let history_reader = next_history.get_history_reader(next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let mut rspace = Self::apply(Arc::new(next_history), Arc::new(hot_store), self.matcher.clone());
+        let mut rspace =
+            Self::apply(Arc::new(next_history), Arc::new(hot_store), self.matcher.clone());
         rspace.restore_installs();
 
         Ok(rspace)

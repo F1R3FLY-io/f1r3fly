@@ -222,6 +222,21 @@ where
     ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
         self.locked_install(channels, patterns, continuation)
     }
+
+    fn rig_and_reset(&mut self, _start_root: Blake2b256Hash, _log: Log) -> Result<(), RSpaceError> {
+        println!("\nWARNING: RSpace rig_and_reset should not be called");
+        Ok(())
+    }
+
+    fn rig(&self, _log: Log) -> Result<(), RSpaceError> {
+        println!("\nWARNING: RSpace rig should not be called");
+        Ok(())
+    }
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError> {
+        println!("\nWARNING: RSpace check_replay_data should not be called");
+        Ok(())
+    }
 }
 
 impl<C, P, A, K> RSpace<C, P, A, K>
@@ -308,7 +323,8 @@ where
         let history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>> =
             history_repo_arc.get_history_reader(history_repo_arc.root())?;
         let replay_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let replay = ReplayRSpace::apply(history_repo_arc.clone(), Arc::new(replay_store), matcher.clone());
+        let replay =
+            ReplayRSpace::apply(history_repo_arc.clone(), Arc::new(replay_store), matcher.clone());
         Ok((space, replay))
     }
 

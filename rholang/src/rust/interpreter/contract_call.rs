@@ -2,11 +2,7 @@ use std::pin::Pin;
 
 use models::rhoapi::{ListParWithRandom, Par};
 
-use super::{
-    dispatch::RhoDispatch,
-    errors::InterpreterError,
-    rho_runtime::{RhoISpace, RhoTuplespace},
-};
+use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::RhoISpace};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -42,7 +38,7 @@ pub type Producer = Box<
 
 impl ContractCall {
     pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
-        println!("\ncontract_call unapply");
+        // println!("\ncontract_call unapply");
         if contract_args.len() == 1 {
             let (args, rand) = (
                 contract_args[0].pars.clone(),
@@ -56,7 +52,7 @@ impl ContractCall {
                 let rand = rand.clone();
                 Box::pin(async move {
                     let mut space_lock = space.try_lock().unwrap();
-                    println!("hit produce in contract_call, values: {:?}", values);
+                    // println!("\nhit produce in contract_call, values: {:?}", values);
                     let produce_result = space_lock.produce(
                         ch,
                         ListParWithRandom {

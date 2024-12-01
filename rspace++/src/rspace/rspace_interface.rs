@@ -6,10 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 use crate::rspace::checkpoint::SoftCheckpoint;
 
 use super::{
-    checkpoint::Checkpoint,
-    errors::RSpaceError,
-    hashing::blake2b256_hash::Blake2b256Hash,
-    internal::{Datum, ProduceCandidate, Row, WaitingContinuation},
+    checkpoint::Checkpoint, errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::{Datum, ProduceCandidate, Row, WaitingContinuation}, trace::Log, tuplespace_interface::Tuplespace
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -84,6 +81,8 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
         checkpoint: SoftCheckpoint<C, P, A, K>,
     ) -> Result<(), RSpaceError>;
 
+    /* TUPLESPACE */
+
     /** Searches the store for data matching all the given patterns at the given channels.
      *
      * If no match is found, then the continuation and patterns are put in the store at the given
@@ -152,4 +151,12 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
         patterns: Vec<P>,
         continuation: K,
     ) -> Result<Option<(K, Vec<A>)>, RSpaceError>;
+
+    /* REPLAY */
+
+    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError>;
+
+    fn rig(&self, log: Log) -> Result<(), RSpaceError>;
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError>;
 }
