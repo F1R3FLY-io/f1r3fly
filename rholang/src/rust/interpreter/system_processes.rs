@@ -191,7 +191,18 @@ impl ProcessContext {
         T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
     {
         ProcessContext {
-            space: Arc::new(Mutex::new(Box::new(space.clone()))),
+            // Here I am trying to use the same instance of space that the dispatcher uses
+            space: {
+                let space = dispatcher
+                    .read()
+                    .unwrap()
+                    .reducer
+                    .as_ref()
+                    .unwrap()
+                    .space
+                    .clone();
+                space
+            },
             dispatcher: dispatcher.clone(),
             block_data,
             invalid_blocks,
@@ -310,8 +321,19 @@ impl SystemProcesses {
         T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
     {
         SystemProcesses {
-            dispatcher,
-            space: Arc::new(Mutex::new(Box::new(space))),
+            dispatcher: dispatcher.clone(),
+            // Here I am trying to use the same instance of space that the dispatcher uses
+            space: {
+                let space = dispatcher
+                    .read()
+                    .unwrap()
+                    .reducer
+                    .as_ref()
+                    .unwrap()
+                    .space
+                    .clone();
+                space
+            },
             pretty_printer: PrettyPrinter::new(),
         }
     }
@@ -398,6 +420,7 @@ impl SystemProcesses {
     pub async fn std_out(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
+                // println!("args: {:?}", args);
                 let str = self.pretty_printer.build_string_from_message(&args[0]);
                 self.print_std_out(&str);
             } else {
@@ -411,6 +434,8 @@ impl SystemProcesses {
     pub async fn std_out_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
+                // println!("args: {:?}", arg);
+
                 let str = self.pretty_printer.build_string_from_message(arg);
                 self.print_std_out(&str);
                 if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
