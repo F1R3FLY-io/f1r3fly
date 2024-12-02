@@ -18,7 +18,6 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
@@ -89,222 +88,222 @@ pub extern "C" fn space_new_replay(rspace: *mut Space) -> *mut ReplaySpace {
     }))
 }
 
-// #[no_mangle]
-// pub extern "C" fn space_print(rspace: *mut Space) -> () {
-//     unsafe { (*rspace).rspace.lock().unwrap().store.print() }
-// }
+#[no_mangle]
+pub extern "C" fn space_print(rspace: *mut Space) -> () {
+    unsafe { (*rspace).rspace.lock().unwrap().store.print() }
+}
 
-// #[no_mangle]
-// pub extern "C" fn space_clear(rspace: *mut Space) -> () {
-//     unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .clear()
-//             .expect("Rust RSpacePlusPlus Library: Failed to clear");
-//     }
-// }
+#[no_mangle]
+pub extern "C" fn space_clear(rspace: *mut Space) -> () {
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .clear()
+            .expect("Rust RSpacePlusPlus Library: Failed to clear");
+    }
+}
 
-// #[no_mangle]
-// pub extern "C" fn spatial_match_result(
-//     payload_pointer: *const u8,
-//     target_bytes_len: usize,
-//     pattern_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe {
-//         std::slice::from_raw_parts(payload_pointer, target_bytes_len + pattern_bytes_len)
-//     };
-//     let (target_slice, pattern_slice) = payload_slice.split_at(target_bytes_len);
+#[no_mangle]
+pub extern "C" fn spatial_match_result(
+    payload_pointer: *const u8,
+    target_bytes_len: usize,
+    pattern_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, target_bytes_len + pattern_bytes_len)
+    };
+    let (target_slice, pattern_slice) = payload_slice.split_at(target_bytes_len);
 
-//     let target = Par::decode(target_slice).unwrap();
-//     let pattern = Par::decode(pattern_slice).unwrap();
+    let target = Par::decode(target_slice).unwrap();
+    let pattern = Par::decode(pattern_slice).unwrap();
 
-//     let mut spatial_matcher = SpatialMatcherContext::new();
-//     let result_option = spatial_matcher.spatial_match_result(target, pattern);
+    let mut spatial_matcher = SpatialMatcherContext::new();
+    let result_option = spatial_matcher.spatial_match_result(target, pattern);
 
-//     match result_option {
-//         Some(free_map) => {
-//             let free_map_proto = FreeMapProto {
-//                 entries: free_map.clone(),
-//             };
+    match result_option {
+        Some(free_map) => {
+            let free_map_proto = FreeMapProto {
+                entries: free_map.clone(),
+            };
 
-//             let mut bytes = free_map_proto.encode_to_vec();
-//             let len = bytes.len() as u32;
-//             let len_bytes = len.to_le_bytes().to_vec();
-//             let mut result = len_bytes;
-//             result.append(&mut bytes);
-//             Box::leak(result.into_boxed_slice()).as_ptr()
-//         }
-//         None => std::ptr::null(),
-//     }
-// }
+            let mut bytes = free_map_proto.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => std::ptr::null(),
+    }
+}
 
-// #[no_mangle]
-// pub extern "C" fn produce(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     channel_bytes_len: usize,
-//     data_bytes_len: usize,
-//     persist: bool,
-// ) -> *const u8 {
-//     // println!("\nHit produce");
+#[no_mangle]
+pub extern "C" fn produce(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    channel_bytes_len: usize,
+    data_bytes_len: usize,
+    persist: bool,
+) -> *const u8 {
+    // println!("\nHit produce");
 
-//     let payload_slice =
-//         unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
-//     let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
+    let payload_slice =
+        unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
+    let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
 
-//     let channel = Par::decode(channel_slice).unwrap();
-//     let data = ListParWithRandom::decode(data_slice).unwrap();
+    let channel = Par::decode(channel_slice).unwrap();
+    let data = ListParWithRandom::decode(data_slice).unwrap();
 
-//     let result_option = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .produce(channel, data, persist)
-//     }
-//     .unwrap();
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .produce(channel, data, persist)
+    }
+    .unwrap();
 
-//     match result_option {
-//         Some((cont_result, rspace_results)) => {
-//             let protobuf_cont_result = ContResultProto {
-//                 continuation: Some(cont_result.continuation.clone()),
-//                 persistent: cont_result.persistent,
-//                 channels: cont_result.channels,
-//                 patterns: cont_result.patterns,
-//                 peek: cont_result.peek,
-//             };
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
 
-//             let protobuf_results = rspace_results
-//                 .into_iter()
-//                 .map(|result| RSpaceResultProto {
-//                     channel: Some(result.channel),
-//                     matched_datum: Some(result.matched_datum),
-//                     removed_datum: Some(result.removed_datum),
-//                     persistent: result.persistent,
-//                 })
-//                 .collect();
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
 
-//             let maybe_action_result = ActionResult {
-//                 cont_result: Some(protobuf_cont_result),
-//                 results: protobuf_results,
-//             };
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
 
-//             let mut bytes = maybe_action_result.encode_to_vec();
-//             let len = bytes.len() as u32;
-//             let len_bytes = len.to_le_bytes().to_vec();
-//             let mut result = len_bytes;
-//             result.append(&mut bytes);
-//             Box::leak(result.into_boxed_slice()).as_ptr()
-//         }
-//         None => std::ptr::null(),
-//     }
-// }
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => std::ptr::null(),
+    }
+}
 
-// #[no_mangle]
-// pub extern "C" fn consume(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> *const u8 {
-//     // println!("\nHit rust consume");
+#[no_mangle]
+pub extern "C" fn consume(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    // println!("\nHit rust consume");
 
-//     // let thread_id = thread::current().id();
-//     // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    // let thread_id = thread::current().id();
+    // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-//     // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
+    // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
 
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let consume_params = ConsumeParams::decode(payload_slice).unwrap();
 
-//     let channels = consume_params.channels;
-//     let patterns = consume_params.patterns;
-//     let continuation = consume_params.continuation.unwrap();
-//     let persist = consume_params.persist;
-//     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+    let channels = consume_params.channels;
+    let patterns = consume_params.patterns;
+    let continuation = consume_params.continuation.unwrap();
+    let persist = consume_params.persist;
+    let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
 
-//     let result_option = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .consume(channels, patterns, continuation, persist, peeks)
-//     }
-//     .unwrap();
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .consume(channels, patterns, continuation, persist, peeks)
+    }
+    .unwrap();
 
-//     match result_option {
-//         Some((cont_result, rspace_results)) => {
-//             let protobuf_cont_result = ContResultProto {
-//                 continuation: Some(cont_result.continuation.clone()),
-//                 persistent: cont_result.persistent,
-//                 channels: cont_result.channels,
-//                 patterns: cont_result.patterns,
-//                 peek: cont_result.peek,
-//             };
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
 
-//             let protobuf_results = rspace_results
-//                 .into_iter()
-//                 .map(|result| RSpaceResultProto {
-//                     channel: Some(result.channel),
-//                     matched_datum: Some(result.matched_datum),
-//                     removed_datum: Some(result.removed_datum),
-//                     persistent: result.persistent,
-//                 })
-//                 .collect();
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
 
-//             let maybe_action_result = ActionResult {
-//                 cont_result: Some(protobuf_cont_result),
-//                 results: protobuf_results,
-//             };
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
 
-//             let mut bytes = maybe_action_result.encode_to_vec();
-//             let len = bytes.len() as u32;
-//             let len_bytes = len.to_le_bytes().to_vec();
-//             let mut result = len_bytes;
-//             result.append(&mut bytes);
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
 
-//             // println!("\nlen: {:?}", len);
-//             Box::leak(result.into_boxed_slice()).as_ptr()
-//         }
-//         None => {
-//             // println!("\nnone in rust consume");
-//             std::ptr::null()
-//         }
-//     }
-// }
+            // println!("\nlen: {:?}", len);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => {
+            // println!("\nnone in rust consume");
+            std::ptr::null()
+        }
+    }
+}
 
-// #[no_mangle]
-// pub extern "C" fn install(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> *const u8 {
-//     // println!("\nHit install");
+#[no_mangle]
+pub extern "C" fn install(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    // println!("\nHit install");
 
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let consume_params = InstallParams::decode(payload_slice).unwrap();
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let consume_params = InstallParams::decode(payload_slice).unwrap();
 
-//     let channels = consume_params.channels;
-//     let patterns = consume_params.patterns;
-//     let continuation = consume_params.continuation.unwrap();
+    let channels = consume_params.channels;
+    let patterns = consume_params.patterns;
+    let continuation = consume_params.continuation.unwrap();
 
-//     let result_option = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .install(channels, patterns, continuation)
-//     }
-//     .unwrap();
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .install(channels, patterns, continuation)
+    }
+    .unwrap();
 
-//     match result_option {
-//         None => std::ptr::null(),
-//         Some(_) => {
-//             panic!("RUST ERROR: Installing can be done only on startup")
-//         }
-//     }
-// }
+    match result_option {
+        None => std::ptr::null(),
+        Some(_) => {
+            panic!("RUST ERROR: Installing can be done only on startup")
+        }
+    }
+}
 
 // #[no_mangle]
 // pub extern "C" fn create_checkpoint(rspace: *mut Space) -> *const u8 {
@@ -560,72 +559,72 @@ pub extern "C" fn space_new_replay(rspace: *mut Space) -> *mut ReplaySpace {
 //     Box::leak(result.into_boxed_slice()).as_ptr()
 // }
 
-// #[no_mangle]
-// pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
-//     let hot_store_mapped = unsafe { (*rspace).rspace.lock().unwrap().store.to_map() };
+#[no_mangle]
+pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
+    let hot_store_mapped = unsafe { (*rspace).rspace.lock().unwrap().store.to_map() };
 
-//     let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
+    let mut map_entries: Vec<StoreToMapEntry> = Vec::new();
 
-//     for (key, value) in hot_store_mapped {
-//         let datums = value
-//             .data
-//             .into_iter()
-//             .map(|datum| DatumProto {
-//                 a: Some(datum.a),
-//                 persist: datum.persist,
-//                 source: Some(ProduceProto {
-//                     channel_hash: datum.source.channel_hash.bytes(),
-//                     hash: datum.source.hash.bytes(),
-//                     persistent: datum.source.persistent,
-//                 }),
-//             })
-//             .collect();
+    for (key, value) in hot_store_mapped {
+        let datums = value
+            .data
+            .into_iter()
+            .map(|datum| DatumProto {
+                a: Some(datum.a),
+                persist: datum.persist,
+                source: Some(ProduceProto {
+                    channel_hash: datum.source.channel_hash.bytes(),
+                    hash: datum.source.hash.bytes(),
+                    persistent: datum.source.persistent,
+                }),
+            })
+            .collect();
 
-//         let wks = value
-//             .wks
-//             .into_iter()
-//             .map(|wk| {
-//                 let res = WaitingContinuationProto {
-//                     patterns: wk.patterns,
-//                     continuation: Some(wk.continuation.clone()),
-//                     persist: wk.persist,
-//                     peeks: wk
-//                         .peeks
-//                         .into_iter()
-//                         .map(|peek| SortedSetElement { value: peek as i32 })
-//                         .collect(),
-//                     source: Some(ConsumeProto {
-//                         channel_hashes: wk
-//                             .source
-//                             .channel_hashes
-//                             .iter()
-//                             .map(|hash| hash.bytes())
-//                             .collect(),
-//                         hash: wk.source.hash.bytes(),
-//                         persistent: wk.source.persistent,
-//                     }),
-//                 };
+        let wks = value
+            .wks
+            .into_iter()
+            .map(|wk| {
+                let res = WaitingContinuationProto {
+                    patterns: wk.patterns,
+                    continuation: Some(wk.continuation.clone()),
+                    persist: wk.persist,
+                    peeks: wk
+                        .peeks
+                        .into_iter()
+                        .map(|peek| SortedSetElement { value: peek as i32 })
+                        .collect(),
+                    source: Some(ConsumeProto {
+                        channel_hashes: wk
+                            .source
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: wk.source.hash.bytes(),
+                        persistent: wk.source.persistent,
+                    }),
+                };
 
-//                 res
-//             })
-//             .collect();
+                res
+            })
+            .collect();
 
-//         let value = StoreToMapValue { data: datums, wks };
-//         map_entries.push(StoreToMapEntry {
-//             key,
-//             value: Some(value),
-//         });
-//     }
+        let value = StoreToMapValue { data: datums, wks };
+        map_entries.push(StoreToMapEntry {
+            key,
+            value: Some(value),
+        });
+    }
 
-//     let to_map_result = StoreToMapResult { map_entries };
+    let to_map_result = StoreToMapResult { map_entries };
 
-//     let mut bytes = to_map_result.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
+    let mut bytes = to_map_result.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
 
 #[no_mangle]
 pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
@@ -1154,187 +1153,26 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 //     }
 // }
 
-// /* HistoryRepo */
+/* HistoryRepo */
+
+#[no_mangle]
+pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
+    let root = unsafe { (*rspace).rspace.lock().unwrap().history_repository.root() };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+/* Exporter */
 // #[no_mangle]
-// pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
-//     let root = unsafe { (*rspace).rspace.lock().unwrap().history_repository.root() };
-
-//     let hash = hash(&root);
-//     let hash_proto = HashProto { hash: hash.bytes() };
-
-//     let mut bytes = hash_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// /* Exporter */
-// // #[no_mangle]
-// // pub extern "C" fn get_nodes(
-// //     rspace: *mut Space,
-// //     payload_pointer: *const u8,
-// //     payload_bytes_len: usize,
-// // ) -> *const u8 {
-// //     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-// //     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
-
-// //     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
-// //         .start_path
-// //         .into_iter()
-// //         .map(|path_proto| {
-// //             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
-// //             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
-// //                 Some(path_proto.optional_byte[0])
-// //             } else {
-// //                 None
-// //             };
-
-// //             (key_hash, value)
-// //         })
-// //         .collect();
-
-// //     let nodes = unsafe {
-// //         let space = (*rspace).rspace.lock().unwrap();
-// //         space
-// //             .history_repository
-// //             .exporter()
-// //             .lock()
-// //             .unwrap()
-// //             .get_nodes(
-// //                 start_path,
-// //                 exporter_params.skip.try_into().unwrap(),
-// //                 exporter_params.take.try_into().unwrap(),
-// //             )
-// //     };
-
-// //     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
-// //         .into_iter()
-// //         .map(|node| TrieNodeProto {
-// //             hash: node.hash.bytes(),
-// //             is_leaf: node.is_leaf,
-// //             path: node
-// //                 .path
-// //                 .into_iter()
-// //                 .map(|path| PathProto {
-// //                     key_hash: path.0.bytes(),
-// //                     optional_byte: if path.1.is_some() {
-// //                         vec![path.1.unwrap()]
-// //                     } else {
-// //                         Vec::new()
-// //                     },
-// //                 })
-// //                 .collect(),
-// //         })
-// //         .collect();
-
-// //     let trie_nodes_proto_vec = TrieNodesProto {
-// //         nodes: trie_nodes_proto_vec,
-// //     };
-
-// //     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
-// //     let len = bytes.len() as u32;
-// //     let len_bytes = len.to_le_bytes().to_vec();
-// //     let mut result = len_bytes;
-// //     result.append(&mut bytes);
-// //     Box::leak(result.into_boxed_slice()).as_ptr()
-// // }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_items(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let keys_proto = KeysProto::decode(payload_slice).unwrap();
-
-//     let keys = keys_proto
-//         .keys
-//         .into_iter()
-//         .map(|key| Blake2b256Hash::from_bytes(key.hash))
-//         .collect();
-
-//     let history_items = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .exporter()
-//             .lock()
-//             .unwrap()
-//             .get_history_items(keys)
-//             .unwrap()
-//     };
-
-//     let history_items_proto = ItemsProto {
-//         items: history_items
-//             .into_iter()
-//             .map(|history_item| ItemProto {
-//                 key_hash: history_item.0.bytes(),
-//                 value: history_item.1,
-//             })
-//             .collect(),
-//     };
-
-//     let mut bytes = history_items_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_data_items(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let keys_proto = KeysProto::decode(payload_slice).unwrap();
-
-//     let keys = keys_proto
-//         .keys
-//         .into_iter()
-//         .map(|key| Blake2b256Hash::from_bytes(key.hash))
-//         .collect();
-
-//     let data_items = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .exporter()
-//             .lock()
-//             .unwrap()
-//             .get_data_items(keys)
-//             .unwrap()
-//     };
-
-//     let data_items_proto = ItemsProto {
-//         items: data_items
-//             .into_iter()
-//             .map(|data_item| ItemProto {
-//                 key_hash: data_item.0.bytes(),
-//                 value: data_item.1,
-//             })
-//             .collect(),
-//     };
-
-//     let mut bytes = data_items_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_and_data(
+// pub extern "C" fn get_nodes(
 //     rspace: *mut Space,
 //     payload_pointer: *const u8,
 //     payload_bytes_len: usize,
@@ -1342,802 +1180,348 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 //     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
 //     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
 
-//     let start_path: Vec<(Blake2b256Hash, Option<u8>)> = exporter_params
-//         .path
-//         .into_iter()
-//         .map(|path_element| {
-//             (
-//                 Blake2b256Hash::from_bytes(path_element.key_hash),
-//                 if path_element.optional_byte.len() > 0 {
-//                     Some(path_element.optional_byte[0])
-//                 } else {
-//                     None
-//                 },
-//             )
-//         })
-//         .collect();
-
-//     let exporter = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .exporter()
-//     };
-
-//     let history_and_data_items = RSpaceExporterItems::get_history_and_data(
-//         exporter,
-//         start_path,
-//         exporter_params.skip,
-//         exporter_params.take,
-//     );
-
-//     let history_items_proto = StoreItemsProto {
-//         items: history_and_data_items
-//             .0
-//             .items
-//             .into_iter()
-//             .map(|history_item| ItemProto {
-//                 key_hash: history_item.0.bytes(),
-//                 value: history_item.1,
-//             })
-//             .collect(),
-//         last_path: history_and_data_items
-//             .0
-//             .last_path
-//             .into_iter()
-//             .map(|path| PathElement {
-//                 key_hash: path.0.bytes(),
-//                 optional_byte: {
-//                     if path.1.is_some() {
-//                         vec![path.1.unwrap()]
-//                     } else {
-//                         Vec::new()
-//                     }
-//                 },
-//             })
-//             .collect(),
-//     };
-
-//     let data_items_proto = StoreItemsProto {
-//         items: history_and_data_items
-//             .1
-//             .items
-//             .into_iter()
-//             .map(|data_item| ItemProto {
-//                 key_hash: data_item.0.bytes(),
-//                 value: data_item.1,
-//             })
-//             .collect(),
-//         last_path: history_and_data_items
-//             .1
-//             .last_path
-//             .into_iter()
-//             .map(|path| PathElement {
-//                 key_hash: path.0.bytes(),
-//                 optional_byte: {
-//                     if path.1.is_some() {
-//                         vec![path.1.unwrap()]
-//                     } else {
-//                         Vec::new()
-//                     }
-//                 },
-//             })
-//             .collect(),
-//     };
-
-//     let history_and_data_items_proto = HistoryAndDataItems {
-//         history_items: Some(history_items_proto),
-//         data_items: Some(data_items_proto),
-//     };
-
-//     let mut bytes = history_and_data_items_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_exporter_root(rspace: *mut Space) -> *const u8 {
-//     let root = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .exporter()
-//             .lock()
-//             .unwrap()
-//             .get_root()
-//             .unwrap()
-//     };
-
-//     let hash = hash(&root);
-//     let hash_proto = HashProto { hash: hash.bytes() };
-
-//     let mut bytes = hash_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// // #[no_mangle]
-// // pub extern "C" fn traverse_history(
-// //     rspace: *mut Space,
-// //     payload_pointer: *const u8,
-// //     payload_bytes_len: usize,
-// // ) -> *const u8 {
-// //     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-// //     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
-
-// //     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
-// //         .start_path
-// //         .into_iter()
-// //         .map(|path_proto| {
-// //             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
-// //             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
-// //                 Some(path_proto.optional_byte[0])
-// //             } else {
-// //                 None
-// //             };
-
-// //             (key_hash, value)
-// //         })
-// //         .collect();
-
-// //     let nodes = RSpaceExporterInstance::traverse_history(
-// //         start_path,
-// //         exporter_params.skip.try_into().unwrap(),
-// //         exporter_params.take.try_into().unwrap(),
-// //         get_from_history,
-// //     );
-
-// //     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
-// //         .into_iter()
-// //         .map(|node| TrieNodeProto {
-// //             hash: node.hash.bytes(),
-// //             is_leaf: node.is_leaf,
-// //             path: node
-// //                 .path
-// //                 .into_iter()
-// //                 .map(|path| PathProto {
-// //                     key_hash: path.0.bytes(),
-// //                     optional_byte: if path.1.is_some() {
-// //                         vec![path.1.unwrap()]
-// //                     } else {
-// //                         Vec::new()
-// //                     },
-// //                 })
-// //                 .collect(),
-// //         })
-// //         .collect();
-
-// //     let trie_nodes_proto_vec = TrieNodesProto {
-// //         nodes: trie_nodes_proto_vec,
-// //     };
-
-// //     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
-// //     let len = bytes.len() as u32;
-// //     let len_bytes = len.to_le_bytes().to_vec();
-// //     let mut result = len_bytes;
-// //     result.append(&mut bytes);
-// //     Box::leak(result.into_boxed_slice()).as_ptr()
-// // }
-
-// /* Importer */
-// #[no_mangle]
-// pub extern "C" fn validate_state_items(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> () {
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let params = ValidateStateParams::decode(payload_slice).unwrap();
-
-//     let history_items: Vec<(Blake2b256Hash, ByteVector)> = params
-//         .history_items
-//         .into_iter()
-//         .map(|history_item_proto| {
-//             (Blake2b256Hash::from_bytes(history_item_proto.key_hash), history_item_proto.value)
-//         })
-//         .collect();
-
-//     let data_items: Vec<(Blake2b256Hash, ByteVector)> = params
-//         .data_items
-//         .into_iter()
-//         .map(|data_item_proto| {
-//             (Blake2b256Hash::from_bytes(data_item_proto.key_hash), data_item_proto.value)
-//         })
-//         .collect();
-
-//     let start_path: Vec<(Blake2b256Hash, Option<u8>)> = params
+//     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
 //         .start_path
 //         .into_iter()
-//         .map(|path_element| {
-//             (
-//                 Blake2b256Hash::from_bytes(path_element.key_hash),
-//                 if path_element.optional_byte.len() > 0 {
-//                     Some(path_element.optional_byte[0])
-//                 } else {
-//                     None
-//                 },
+//         .map(|path_proto| {
+//             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
+//             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
+//                 Some(path_proto.optional_byte[0])
+//             } else {
+//                 None
+//             };
+
+//             (key_hash, value)
+//         })
+//         .collect();
+
+//     let nodes = unsafe {
+//         let space = (*rspace).rspace.lock().unwrap();
+//         space
+//             .history_repository
+//             .exporter()
+//             .lock()
+//             .unwrap()
+//             .get_nodes(
+//                 start_path,
+//                 exporter_params.skip.try_into().unwrap(),
+//                 exporter_params.take.try_into().unwrap(),
 //             )
+//     };
+
+//     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
+//         .into_iter()
+//         .map(|node| TrieNodeProto {
+//             hash: node.hash.bytes(),
+//             is_leaf: node.is_leaf,
+//             path: node
+//                 .path
+//                 .into_iter()
+//                 .map(|path| PathProto {
+//                     key_hash: path.0.bytes(),
+//                     optional_byte: if path.1.is_some() {
+//                         vec![path.1.unwrap()]
+//                     } else {
+//                         Vec::new()
+//                     },
+//                 })
+//                 .collect(),
 //         })
 //         .collect();
 
-//     let importer = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .importer()
+//     let trie_nodes_proto_vec = TrieNodesProto {
+//         nodes: trie_nodes_proto_vec,
 //     };
 
-//     let _ = RSpaceImporterInstance::validate_state_items(
-//         history_items,
-//         data_items,
+//     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
+//     let len = bytes.len() as u32;
+//     let len_bytes = len.to_le_bytes().to_vec();
+//     let mut result = len_bytes;
+//     result.append(&mut bytes);
+//     Box::leak(result.into_boxed_slice()).as_ptr()
+// }
+
+#[no_mangle]
+pub extern "C" fn get_history_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let keys_proto = KeysProto::decode(payload_slice).unwrap();
+
+    let keys = keys_proto
+        .keys
+        .into_iter()
+        .map(|key| Blake2b256Hash::from_bytes(key.hash))
+        .collect();
+
+    let history_items = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+            .lock()
+            .unwrap()
+            .get_history_items(keys)
+            .unwrap()
+    };
+
+    let history_items_proto = ItemsProto {
+        items: history_items
+            .into_iter()
+            .map(|history_item| ItemProto {
+                key_hash: history_item.0.bytes(),
+                value: history_item.1,
+            })
+            .collect(),
+    };
+
+    let mut bytes = history_items_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_data_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let keys_proto = KeysProto::decode(payload_slice).unwrap();
+
+    let keys = keys_proto
+        .keys
+        .into_iter()
+        .map(|key| Blake2b256Hash::from_bytes(key.hash))
+        .collect();
+
+    let data_items = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+            .lock()
+            .unwrap()
+            .get_data_items(keys)
+            .unwrap()
+    };
+
+    let data_items_proto = ItemsProto {
+        items: data_items
+            .into_iter()
+            .map(|data_item| ItemProto {
+                key_hash: data_item.0.bytes(),
+                value: data_item.1,
+            })
+            .collect(),
+    };
+
+    let mut bytes = data_items_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_and_data(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let exporter_params = ExporterParams::decode(payload_slice).unwrap();
+
+    let start_path: Vec<(Blake2b256Hash, Option<u8>)> = exporter_params
+        .path
+        .into_iter()
+        .map(|path_element| {
+            (
+                Blake2b256Hash::from_bytes(path_element.key_hash),
+                if path_element.optional_byte.len() > 0 {
+                    Some(path_element.optional_byte[0])
+                } else {
+                    None
+                },
+            )
+        })
+        .collect();
+
+    let exporter = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+    };
+
+    let history_and_data_items = RSpaceExporterItems::get_history_and_data(
+        exporter,
+        start_path,
+        exporter_params.skip,
+        exporter_params.take,
+    );
+
+    let history_items_proto = StoreItemsProto {
+        items: history_and_data_items
+            .0
+            .items
+            .into_iter()
+            .map(|history_item| ItemProto {
+                key_hash: history_item.0.bytes(),
+                value: history_item.1,
+            })
+            .collect(),
+        last_path: history_and_data_items
+            .0
+            .last_path
+            .into_iter()
+            .map(|path| PathElement {
+                key_hash: path.0.bytes(),
+                optional_byte: {
+                    if path.1.is_some() {
+                        vec![path.1.unwrap()]
+                    } else {
+                        Vec::new()
+                    }
+                },
+            })
+            .collect(),
+    };
+
+    let data_items_proto = StoreItemsProto {
+        items: history_and_data_items
+            .1
+            .items
+            .into_iter()
+            .map(|data_item| ItemProto {
+                key_hash: data_item.0.bytes(),
+                value: data_item.1,
+            })
+            .collect(),
+        last_path: history_and_data_items
+            .1
+            .last_path
+            .into_iter()
+            .map(|path| PathElement {
+                key_hash: path.0.bytes(),
+                optional_byte: {
+                    if path.1.is_some() {
+                        vec![path.1.unwrap()]
+                    } else {
+                        Vec::new()
+                    }
+                },
+            })
+            .collect(),
+    };
+
+    let history_and_data_items_proto = HistoryAndDataItems {
+        history_items: Some(history_items_proto),
+        data_items: Some(data_items_proto),
+    };
+
+    let mut bytes = history_and_data_items_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_exporter_root(rspace: *mut Space) -> *const u8 {
+    let root = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .exporter()
+            .lock()
+            .unwrap()
+            .get_root()
+            .unwrap()
+    };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+// #[no_mangle]
+// pub extern "C" fn traverse_history(
+//     rspace: *mut Space,
+//     payload_pointer: *const u8,
+//     payload_bytes_len: usize,
+// ) -> *const u8 {
+//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+//     let exporter_params = ExporterParams::decode(payload_slice).unwrap();
+
+//     let start_path: Vec<(Blake2b256Hash, Option<Byte>)> = exporter_params
+//         .start_path
+//         .into_iter()
+//         .map(|path_proto| {
+//             let key_hash = Blake2b256Hash::from_bytes(path_proto.key_hash);
+//             let value: Option<Byte> = if path_proto.optional_byte.len() > 0 {
+//                 Some(path_proto.optional_byte[0])
+//             } else {
+//                 None
+//             };
+
+//             (key_hash, value)
+//         })
+//         .collect();
+
+//     let nodes = RSpaceExporterInstance::traverse_history(
 //         start_path,
-//         params.chunk_size,
-//         params.skip,
-//         move |hash: Blake2b256Hash| importer.lock().unwrap().get_history_item(hash),
+//         exporter_params.skip.try_into().unwrap(),
+//         exporter_params.take.try_into().unwrap(),
+//         get_from_history,
 //     );
-// }
 
-// #[no_mangle]
-// pub extern "C" fn set_history_items(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> () {
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let items_proto = ItemsProto::decode(payload_slice).unwrap();
-
-//     let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
-//         .items
+//     let trie_nodes_proto_vec: Vec<TrieNodeProto> = nodes
 //         .into_iter()
-//         .map(|item| {
-//             let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
-//             let value: ByteVector = item.value;
-
-//             (key_hash, value)
-//         })
-//         .collect();
-
-//     let _ = unsafe {
-//         let space = (*rspace).rspace.lock().unwrap();
-//         space
-//             .history_repository
-//             .importer()
-//             .lock()
-//             .unwrap()
-//             .set_history_items(data)
-//     };
-// }
-
-// #[no_mangle]
-// pub extern "C" fn set_data_items(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> () {
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let items_proto = ItemsProto::decode(payload_slice).unwrap();
-
-//     let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
-//         .items
-//         .into_iter()
-//         .map(|item| {
-//             let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
-//             let value: ByteVector = item.value;
-
-//             (key_hash, value)
-//         })
-//         .collect();
-
-//     let _ = unsafe {
-//         let space = (*rspace).rspace.lock().unwrap();
-//         space
-//             .history_repository
-//             .importer()
-//             .lock()
-//             .unwrap()
-//             .set_data_items(data)
-//     };
-// }
-
-// #[no_mangle]
-// pub extern "C" fn set_root(
-//     rspace: *mut Space,
-//     root_pointer: *const u8,
-//     root_bytes_len: usize,
-// ) -> () {
-//     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
-//     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
-
-//     unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .importer()
-//             .lock()
-//             .unwrap()
-//             .set_root(&root)
-//     }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_item(
-//     rspace: *mut Space,
-//     hash_pointer: *const u8,
-//     hash_bytes_len: usize,
-// ) -> *const u8 {
-//     let hash_slice = unsafe { std::slice::from_raw_parts(hash_pointer, hash_bytes_len) };
-//     let hash = Blake2b256Hash::from_bytes(hash_slice.to_vec());
-
-//     let history_item = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .importer()
-//             .lock()
-//             .unwrap()
-//             .get_history_item(hash)
-//     };
-
-//     if history_item.is_some() {
-//         let history_item_proto = ByteVectorProto {
-//             byte_vector: history_item.unwrap(),
-//         };
-
-//         let mut bytes = history_item_proto.encode_to_vec();
-//         let len = bytes.len() as u32;
-//         let len_bytes = len.to_le_bytes().to_vec();
-//         let mut result = len_bytes;
-//         result.append(&mut bytes);
-//         Box::leak(result.into_boxed_slice()).as_ptr()
-//     } else {
-//         std::ptr::null()
-//     }
-// }
-
-// /* HistoryReader */
-// #[no_mangle]
-// pub extern "C" fn history_reader_root(
-//     rspace: *mut Space,
-//     state_hash_pointer: *const u8,
-//     state_hash_bytes_len: usize,
-// ) -> *const u8 {
-//     let state_hash_slice =
-//         unsafe { std::slice::from_raw_parts(state_hash_pointer, state_hash_bytes_len) };
-//     let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-
-//     let root = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .history_repository
-//             .get_history_reader(state_hash)
-//             .unwrap()
-//             .root()
-//     };
-
-//     let hash = hash(&root);
-//     let hash_proto = HashProto { hash: hash.bytes() };
-
-//     let mut bytes = hash_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_data(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     state_hash_bytes_len: usize,
-//     key_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe {
-//         std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-//     };
-//     let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-//     let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-//     let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-//     let datums = unsafe {
-//         let space = (*rspace).rspace.lock().unwrap();
-//         space
-//             .history_repository
-//             .get_history_reader(state_hash)
-//             .unwrap()
-//             .get_data(&key)
-//             .unwrap()
-//     };
-
-//     let datums_protos: Vec<DatumProto> = datums
-//         .into_iter()
-//         .map(|datum| DatumProto {
-//             a: Some(datum.a),
-//             persist: datum.persist,
-//             source: Some(ProduceProto {
-//                 channel_hash: datum.source.channel_hash.bytes(),
-//                 hash: datum.source.hash.bytes(),
-//                 persistent: datum.source.persistent,
-//             }),
-//         })
-//         .collect();
-
-//     let datums_proto = DatumsProto {
-//         datums: datums_protos,
-//     };
-
-//     let mut bytes = datums_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_waiting_continuations(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     state_hash_bytes_len: usize,
-//     key_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe {
-//         std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-//     };
-//     let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-//     let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-//     let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-//     let wks = unsafe {
-//         let space = (*rspace).rspace.lock().unwrap();
-//         space
-//             .history_repository
-//             .get_history_reader(state_hash)
-//             .unwrap()
-//             .get_continuations(&key)
-//             .unwrap()
-//     };
-
-//     let wks_protos: Vec<WaitingContinuationProto> = wks
-//         .into_iter()
-//         .map(|wk| {
-//             let res = WaitingContinuationProto {
-//                 patterns: wk.patterns,
-//                 continuation: Some(wk.continuation.clone()),
-//                 persist: wk.persist,
-//                 peeks: wk
-//                     .peeks
-//                     .into_iter()
-//                     .map(|peek| SortedSetElement { value: peek as i32 })
-//                     .collect(),
-//                 source: Some(ConsumeProto {
-//                     channel_hashes: wk
-//                         .source
-//                         .channel_hashes
-//                         .iter()
-//                         .map(|hash| hash.bytes())
-//                         .collect(),
-//                     hash: wk.source.hash.bytes(),
-//                     persistent: wk.source.persistent,
-//                 }),
-//             };
-
-//             res
-//         })
-//         .collect();
-
-//     let wks_proto = WaitingContinuationsProto { wks: wks_protos };
-
-//     let mut bytes = wks_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn get_history_joins(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     state_hash_bytes_len: usize,
-//     key_bytes_len: usize,
-// ) -> *const u8 {
-//     let payload_slice = unsafe {
-//         std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
-//     };
-//     let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
-
-//     let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
-//     let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
-
-//     let joins = unsafe {
-//         let space = (*rspace).rspace.lock().unwrap();
-//         space
-//             .history_repository
-//             .get_history_reader(state_hash)
-//             .unwrap()
-//             .get_joins(&key)
-//             .unwrap()
-//     };
-
-//     let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
-//     let joins_proto = JoinsProto { joins: vec_join };
-
-//     let mut bytes = joins_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// /* ReplayRSpace */
-// #[no_mangle]
-// pub extern "C" fn replay_produce(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     channel_bytes_len: usize,
-//     data_bytes_len: usize,
-//     persist: bool,
-// ) -> *const u8 {
-//     // println!("\nHit produce");
-
-//     let payload_slice =
-//         unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
-//     let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
-
-//     let channel = Par::decode(channel_slice).unwrap();
-//     let data = ListParWithRandom::decode(data_slice).unwrap();
-
-//     let result_option = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .produce(channel, data, persist)
-//     }
-//     .unwrap();
-
-//     match result_option {
-//         Some((cont_result, rspace_results)) => {
-//             let protobuf_cont_result = ContResultProto {
-//                 continuation: Some(cont_result.continuation.clone()),
-//                 persistent: cont_result.persistent,
-//                 channels: cont_result.channels,
-//                 patterns: cont_result.patterns,
-//                 peek: cont_result.peek,
-//             };
-
-//             let protobuf_results = rspace_results
+//         .map(|node| TrieNodeProto {
+//             hash: node.hash.bytes(),
+//             is_leaf: node.is_leaf,
+//             path: node
+//                 .path
 //                 .into_iter()
-//                 .map(|result| RSpaceResultProto {
-//                     channel: Some(result.channel),
-//                     matched_datum: Some(result.matched_datum),
-//                     removed_datum: Some(result.removed_datum),
-//                     persistent: result.persistent,
+//                 .map(|path| PathProto {
+//                     key_hash: path.0.bytes(),
+//                     optional_byte: if path.1.is_some() {
+//                         vec![path.1.unwrap()]
+//                     } else {
+//                         Vec::new()
+//                     },
 //                 })
-//                 .collect();
-
-//             let maybe_action_result = ActionResult {
-//                 cont_result: Some(protobuf_cont_result),
-//                 results: protobuf_results,
-//             };
-
-//             let mut bytes = maybe_action_result.encode_to_vec();
-//             let len = bytes.len() as u32;
-//             let len_bytes = len.to_le_bytes().to_vec();
-//             let mut result = len_bytes;
-//             result.append(&mut bytes);
-//             Box::leak(result.into_boxed_slice()).as_ptr()
-//         }
-//         None => std::ptr::null(),
-//     }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn replay_consume(
-//     rspace: *mut Space,
-//     payload_pointer: *const u8,
-//     payload_bytes_len: usize,
-// ) -> *const u8 {
-//     // println!("\nHit rust consume");
-
-//     // let thread_id = thread::current().id();
-//     // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-
-//     // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
-
-//     let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
-//     let consume_params = ConsumeParams::decode(payload_slice).unwrap();
-
-//     let channels = consume_params.channels;
-//     let patterns = consume_params.patterns;
-//     let continuation = consume_params.continuation.unwrap();
-//     let persist = consume_params.persist;
-//     let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
-
-//     let result_option = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .consume(channels, patterns, continuation, persist, peeks)
-//     }
-//     .unwrap();
-
-//     match result_option {
-//         Some((cont_result, rspace_results)) => {
-//             let protobuf_cont_result = ContResultProto {
-//                 continuation: Some(cont_result.continuation.clone()),
-//                 persistent: cont_result.persistent,
-//                 channels: cont_result.channels,
-//                 patterns: cont_result.patterns,
-//                 peek: cont_result.peek,
-//             };
-
-//             let protobuf_results = rspace_results
-//                 .into_iter()
-//                 .map(|result| RSpaceResultProto {
-//                     channel: Some(result.channel),
-//                     matched_datum: Some(result.matched_datum),
-//                     removed_datum: Some(result.removed_datum),
-//                     persistent: result.persistent,
-//                 })
-//                 .collect();
-
-//             let maybe_action_result = ActionResult {
-//                 cont_result: Some(protobuf_cont_result),
-//                 results: protobuf_results,
-//             };
-
-//             let mut bytes = maybe_action_result.encode_to_vec();
-//             let len = bytes.len() as u32;
-//             let len_bytes = len.to_le_bytes().to_vec();
-//             let mut result = len_bytes;
-//             result.append(&mut bytes);
-
-//             // println!("\nlen: {:?}", len);
-//             Box::leak(result.into_boxed_slice()).as_ptr()
-//         }
-//         None => {
-//             // println!("\nnone in rust consume");
-//             std::ptr::null()
-//         }
-//     }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
-//     let checkpoint = unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .create_checkpoint()
-//             .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
-//     };
-
-//     let log = checkpoint.log;
-//     let log_proto: Vec<EventProto> = log
-//         .into_iter()
-//         .map(|event| match event {
-//             Event::Comm(comm) => {
-//                 let comm_proto = CommProto {
-//                     consume: {
-//                         Some(ConsumeProto {
-//                             channel_hashes: comm
-//                                 .consume
-//                                 .channel_hashes
-//                                 .iter()
-//                                 .map(|hash| hash.bytes())
-//                                 .collect(),
-//                             hash: comm.consume.hash.bytes(),
-//                             persistent: comm.consume.persistent,
-//                         })
-//                     },
-//                     produces: {
-//                         comm.produces
-//                             .into_iter()
-//                             .map(|produce| ProduceProto {
-//                                 channel_hash: produce.channel_hash.bytes(),
-//                                 hash: produce.hash.bytes(),
-//                                 persistent: produce.persistent,
-//                             })
-//                             .collect()
-//                     },
-//                     peeks: {
-//                         comm.peeks
-//                             .into_iter()
-//                             .map(|peek| SortedSetElement { value: peek as i32 })
-//                             .collect()
-//                     },
-//                     times_repeated: {
-//                         let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
-//                             Vec::new();
-//                         for (key, value) in comm.times_repeated {
-//                             let produce = ProduceProto {
-//                                 channel_hash: key.channel_hash.bytes(),
-//                                 hash: key.hash.bytes(),
-//                                 persistent: key.persistent,
-//                             };
-
-//                             produce_counter_map_entries.push(ProduceCounterMapEntry {
-//                                 key: Some(produce),
-//                                 value,
-//                             });
-//                         }
-//                         produce_counter_map_entries
-//                     },
-//                 };
-
-//                 EventProto {
-//                     event_type: Some(event_proto::EventType::Comm(comm_proto)),
-//                 }
-//             }
-//             Event::IoEvent(io_event) => match io_event {
-//                 IOEvent::Produce(produce) => {
-//                     let produce_proto = ProduceProto {
-//                         channel_hash: produce.channel_hash.bytes(),
-//                         hash: produce.hash.bytes(),
-//                         persistent: produce.persistent,
-//                     };
-//                     EventProto {
-//                         event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
-//                             io_event_type: Some(io_event_proto::IoEventType::Produce(
-//                                 produce_proto,
-//                             )),
-//                         })),
-//                     }
-//                 }
-//                 IOEvent::Consume(consume) => {
-//                     let consume_proto = ConsumeProto {
-//                         channel_hashes: consume
-//                             .channel_hashes
-//                             .iter()
-//                             .map(|hash| hash.bytes())
-//                             .collect(),
-//                         hash: consume.hash.bytes(),
-//                         persistent: consume.persistent,
-//                     };
-//                     EventProto {
-//                         event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
-//                             io_event_type: Some(io_event_proto::IoEventType::Consume(
-//                                 consume_proto,
-//                             )),
-//                         })),
-//                     }
-//                 }
-//             },
+//                 .collect(),
 //         })
 //         .collect();
 
-//     let checkpoint_proto = CheckpointProto {
-//         root: checkpoint.root.bytes(),
-//         log: log_proto,
+//     let trie_nodes_proto_vec = TrieNodesProto {
+//         nodes: trie_nodes_proto_vec,
 //     };
 
-//     let mut bytes = checkpoint_proto.encode_to_vec();
+//     let mut bytes = trie_nodes_proto_vec.encode_to_vec();
 //     let len = bytes.len() as u32;
 //     let len_bytes = len.to_le_bytes().to_vec();
 //     let mut result = len_bytes;
@@ -2145,17 +1529,635 @@ pub extern "C" fn spawn(rspace: *mut Space) -> *mut Space {
 //     Box::leak(result.into_boxed_slice()).as_ptr()
 // }
 
-// #[no_mangle]
-// pub extern "C" fn replay_clear(rspace: *mut Space) -> () {
-//     unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .clear()
-//             .expect("Rust RSpacePlusPlus Library: Failed to clear");
-//     }
-// }
+/* Importer */
+
+#[no_mangle]
+pub extern "C" fn validate_state_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let params = ValidateStateParams::decode(payload_slice).unwrap();
+
+    let history_items: Vec<(Blake2b256Hash, ByteVector)> = params
+        .history_items
+        .into_iter()
+        .map(|history_item_proto| {
+            (Blake2b256Hash::from_bytes(history_item_proto.key_hash), history_item_proto.value)
+        })
+        .collect();
+
+    let data_items: Vec<(Blake2b256Hash, ByteVector)> = params
+        .data_items
+        .into_iter()
+        .map(|data_item_proto| {
+            (Blake2b256Hash::from_bytes(data_item_proto.key_hash), data_item_proto.value)
+        })
+        .collect();
+
+    let start_path: Vec<(Blake2b256Hash, Option<u8>)> = params
+        .start_path
+        .into_iter()
+        .map(|path_element| {
+            (
+                Blake2b256Hash::from_bytes(path_element.key_hash),
+                if path_element.optional_byte.len() > 0 {
+                    Some(path_element.optional_byte[0])
+                } else {
+                    None
+                },
+            )
+        })
+        .collect();
+
+    let importer = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+    };
+
+    let _ = RSpaceImporterInstance::validate_state_items(
+        history_items,
+        data_items,
+        start_path,
+        params.chunk_size,
+        params.skip,
+        move |hash: Blake2b256Hash| importer.lock().unwrap().get_history_item(hash),
+    );
+}
+
+#[no_mangle]
+pub extern "C" fn set_history_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let items_proto = ItemsProto::decode(payload_slice).unwrap();
+
+    let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
+        .items
+        .into_iter()
+        .map(|item| {
+            let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
+            let value: ByteVector = item.value;
+
+            (key_hash, value)
+        })
+        .collect();
+
+    let _ = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_history_items(data)
+    };
+}
+
+#[no_mangle]
+pub extern "C" fn set_data_items(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> () {
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let items_proto = ItemsProto::decode(payload_slice).unwrap();
+
+    let data: Vec<(Blake2b256Hash, ByteVector)> = items_proto
+        .items
+        .into_iter()
+        .map(|item| {
+            let key_hash = Blake2b256Hash::from_bytes(item.key_hash);
+            let value: ByteVector = item.value;
+
+            (key_hash, value)
+        })
+        .collect();
+
+    let _ = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_data_items(data)
+    };
+}
+
+#[no_mangle]
+pub extern "C" fn set_root(
+    rspace: *mut Space,
+    root_pointer: *const u8,
+    root_bytes_len: usize,
+) -> () {
+    let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
+    let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
+
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .set_root(&root)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_item(
+    rspace: *mut Space,
+    hash_pointer: *const u8,
+    hash_bytes_len: usize,
+) -> *const u8 {
+    let hash_slice = unsafe { std::slice::from_raw_parts(hash_pointer, hash_bytes_len) };
+    let hash = Blake2b256Hash::from_bytes(hash_slice.to_vec());
+
+    let history_item = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .importer()
+            .lock()
+            .unwrap()
+            .get_history_item(hash)
+    };
+
+    if history_item.is_some() {
+        let history_item_proto = ByteVectorProto {
+            byte_vector: history_item.unwrap(),
+        };
+
+        let mut bytes = history_item_proto.encode_to_vec();
+        let len = bytes.len() as u32;
+        let len_bytes = len.to_le_bytes().to_vec();
+        let mut result = len_bytes;
+        result.append(&mut bytes);
+        Box::leak(result.into_boxed_slice()).as_ptr()
+    } else {
+        std::ptr::null()
+    }
+}
+
+/* HistoryReader */
+#[no_mangle]
+pub extern "C" fn history_reader_root(
+    rspace: *mut Space,
+    state_hash_pointer: *const u8,
+    state_hash_bytes_len: usize,
+) -> *const u8 {
+    let state_hash_slice =
+        unsafe { std::slice::from_raw_parts(state_hash_pointer, state_hash_bytes_len) };
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+
+    let root = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .root()
+    };
+
+    let hash = hash(&root);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_data(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let datums = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_data(&key)
+            .unwrap()
+    };
+
+    let datums_protos: Vec<DatumProto> = datums
+        .into_iter()
+        .map(|datum| DatumProto {
+            a: Some(datum.a),
+            persist: datum.persist,
+            source: Some(ProduceProto {
+                channel_hash: datum.source.channel_hash.bytes(),
+                hash: datum.source.hash.bytes(),
+                persistent: datum.source.persistent,
+            }),
+        })
+        .collect();
+
+    let datums_proto = DatumsProto {
+        datums: datums_protos,
+    };
+
+    let mut bytes = datums_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_waiting_continuations(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let wks = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_continuations(&key)
+            .unwrap()
+    };
+
+    let wks_protos: Vec<WaitingContinuationProto> = wks
+        .into_iter()
+        .map(|wk| {
+            let res = WaitingContinuationProto {
+                patterns: wk.patterns,
+                continuation: Some(wk.continuation.clone()),
+                persist: wk.persist,
+                peeks: wk
+                    .peeks
+                    .into_iter()
+                    .map(|peek| SortedSetElement { value: peek as i32 })
+                    .collect(),
+                source: Some(ConsumeProto {
+                    channel_hashes: wk
+                        .source
+                        .channel_hashes
+                        .iter()
+                        .map(|hash| hash.bytes())
+                        .collect(),
+                    hash: wk.source.hash.bytes(),
+                    persistent: wk.source.persistent,
+                }),
+            };
+
+            res
+        })
+        .collect();
+
+    let wks_proto = WaitingContinuationsProto { wks: wks_protos };
+
+    let mut bytes = wks_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_history_joins(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    state_hash_bytes_len: usize,
+    key_bytes_len: usize,
+) -> *const u8 {
+    let payload_slice = unsafe {
+        std::slice::from_raw_parts(payload_pointer, state_hash_bytes_len + key_bytes_len)
+    };
+    let (state_hash_slice, key_slice) = payload_slice.split_at(state_hash_bytes_len);
+
+    let state_hash = Blake2b256Hash::from_bytes(state_hash_slice.to_vec());
+    let key = Blake2b256Hash::from_bytes(key_slice.to_vec());
+
+    let joins = unsafe {
+        let space = (*rspace).rspace.lock().unwrap();
+        space
+            .history_repository
+            .get_history_reader(state_hash)
+            .unwrap()
+            .get_joins(&key)
+            .unwrap()
+    };
+
+    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+    let joins_proto = JoinsProto { joins: vec_join };
+
+    let mut bytes = joins_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+/* ReplayRSpace */
+
+#[no_mangle]
+pub extern "C" fn replay_produce(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    channel_bytes_len: usize,
+    data_bytes_len: usize,
+    persist: bool,
+) -> *const u8 {
+    // println!("\nHit produce");
+
+    let payload_slice =
+        unsafe { std::slice::from_raw_parts(payload_pointer, channel_bytes_len + data_bytes_len) };
+    let (channel_slice, data_slice) = payload_slice.split_at(channel_bytes_len);
+
+    let channel = Par::decode(channel_slice).unwrap();
+    let data = ListParWithRandom::decode(data_slice).unwrap();
+
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .produce(channel, data, persist)
+    }
+    .unwrap();
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => std::ptr::null(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn replay_consume(
+    rspace: *mut Space,
+    payload_pointer: *const u8,
+    payload_bytes_len: usize,
+) -> *const u8 {
+    // println!("\nHit rust consume");
+
+    // let thread_id = thread::current().id();
+    // let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // println!("Thread ID: {:?}, Current Time: {}", thread_id, current_time);
+
+    let payload_slice = unsafe { std::slice::from_raw_parts(payload_pointer, payload_bytes_len) };
+    let consume_params = ConsumeParams::decode(payload_slice).unwrap();
+
+    let channels = consume_params.channels;
+    let patterns = consume_params.patterns;
+    let continuation = consume_params.continuation.unwrap();
+    let persist = consume_params.persist;
+    let peeks = consume_params.peeks.into_iter().map(|e| e.value).collect();
+
+    let result_option = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .consume(channels, patterns, continuation, persist, peeks)
+    }
+    .unwrap();
+
+    match result_option {
+        Some((cont_result, rspace_results)) => {
+            let protobuf_cont_result = ContResultProto {
+                continuation: Some(cont_result.continuation.clone()),
+                persistent: cont_result.persistent,
+                channels: cont_result.channels,
+                patterns: cont_result.patterns,
+                peek: cont_result.peek,
+            };
+
+            let protobuf_results = rspace_results
+                .into_iter()
+                .map(|result| RSpaceResultProto {
+                    channel: Some(result.channel),
+                    matched_datum: Some(result.matched_datum),
+                    removed_datum: Some(result.removed_datum),
+                    persistent: result.persistent,
+                })
+                .collect();
+
+            let maybe_action_result = ActionResult {
+                cont_result: Some(protobuf_cont_result),
+                results: protobuf_results,
+            };
+
+            let mut bytes = maybe_action_result.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+
+            // println!("\nlen: {:?}", len);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+        None => {
+            // println!("\nnone in rust consume");
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
+    let checkpoint = unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .create_checkpoint()
+            .expect("Rust RSpacePlusPlus Library: Failed to create checkpoint")
+    };
+
+    let log = checkpoint.log;
+    let log_proto: Vec<EventProto> = log
+        .into_iter()
+        .map(|event| match event {
+            Event::Comm(comm) => {
+                let comm_proto = CommProto {
+                    consume: {
+                        Some(ConsumeProto {
+                            channel_hashes: comm
+                                .consume
+                                .channel_hashes
+                                .iter()
+                                .map(|hash| hash.bytes())
+                                .collect(),
+                            hash: comm.consume.hash.bytes(),
+                            persistent: comm.consume.persistent,
+                        })
+                    },
+                    produces: {
+                        comm.produces
+                            .into_iter()
+                            .map(|produce| ProduceProto {
+                                channel_hash: produce.channel_hash.bytes(),
+                                hash: produce.hash.bytes(),
+                                persistent: produce.persistent,
+                            })
+                            .collect()
+                    },
+                    peeks: {
+                        comm.peeks
+                            .into_iter()
+                            .map(|peek| SortedSetElement { value: peek as i32 })
+                            .collect()
+                    },
+                    times_repeated: {
+                        let mut produce_counter_map_entries: Vec<ProduceCounterMapEntry> =
+                            Vec::new();
+                        for (key, value) in comm.times_repeated {
+                            let produce = ProduceProto {
+                                channel_hash: key.channel_hash.bytes(),
+                                hash: key.hash.bytes(),
+                                persistent: key.persistent,
+                            };
+
+                            produce_counter_map_entries.push(ProduceCounterMapEntry {
+                                key: Some(produce),
+                                value,
+                            });
+                        }
+                        produce_counter_map_entries
+                    },
+                };
+
+                EventProto {
+                    event_type: Some(event_proto::EventType::Comm(comm_proto)),
+                }
+            }
+            Event::IoEvent(io_event) => match io_event {
+                IOEvent::Produce(produce) => {
+                    let produce_proto = ProduceProto {
+                        channel_hash: produce.channel_hash.bytes(),
+                        hash: produce.hash.bytes(),
+                        persistent: produce.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Produce(
+                                produce_proto,
+                            )),
+                        })),
+                    }
+                }
+                IOEvent::Consume(consume) => {
+                    let consume_proto = ConsumeProto {
+                        channel_hashes: consume
+                            .channel_hashes
+                            .iter()
+                            .map(|hash| hash.bytes())
+                            .collect(),
+                        hash: consume.hash.bytes(),
+                        persistent: consume.persistent,
+                    };
+                    EventProto {
+                        event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
+                            io_event_type: Some(io_event_proto::IoEventType::Consume(
+                                consume_proto,
+                            )),
+                        })),
+                    }
+                }
+            },
+        })
+        .collect();
+
+    let checkpoint_proto = CheckpointProto {
+        root: checkpoint.root.bytes(),
+        log: log_proto,
+    };
+
+    let mut bytes = checkpoint_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn replay_clear(rspace: *mut Space) -> () {
+    unsafe {
+        (*rspace)
+            .rspace
+            .lock()
+            .unwrap()
+            .clear()
+            .expect("Rust RSpacePlusPlus Library: Failed to clear");
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn replay_spawn(replay_rspace_ptr: *mut ReplaySpace) -> *mut ReplaySpace {
@@ -2173,7 +2175,8 @@ pub extern "C" fn replay_spawn(replay_rspace_ptr: *mut ReplaySpace) -> *mut Repl
     }))
 }
 
-// /* IReplayRSpace */
+/* IReplayRSpace */
+
 // #[no_mangle]
 // pub extern "C" fn rig(rspace: *mut Space, log_pointer: *const u8, log_bytes_len: usize) -> () {
 //     let log_slice = unsafe { std::slice::from_raw_parts(log_pointer, log_bytes_len) };
@@ -2269,62 +2272,67 @@ pub extern "C" fn replay_spawn(replay_rspace_ptr: *mut ReplaySpace) -> *mut Repl
 //         })
 //         .collect();
 
-//     // unsafe {
-//     //     (*rspace).rspace.lock().unwrap().rig(log);
-//     // }
+//     unsafe {
+//         (*rspace).rspace.lock().unwrap().rig(log).unwrap();
+//     }
 // }
 
 // #[no_mangle]
 // pub extern "C" fn check_replay_data(rspace: *mut Space) -> () {
-//     // unsafe {
-//     //     (*rspace).rspace.lock().unwrap().check_replay_data();
-//     // }
-// }
-
-// /* Helper Functions */
-// #[no_mangle]
-// pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: usize) -> *const u8 {
-//     let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
-//     let channel = Par::decode(channel_slice).unwrap();
-
-//     let hash = hash(&channel);
-//     let hash_proto = HashProto { hash: hash.bytes() };
-
-//     let mut bytes = hash_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn hash_channels(
-//     channels_pointer: *const u8,
-//     channels_bytes_len: usize,
-// ) -> *const u8 {
-//     let channels_slice =
-//         unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
-//     let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
-
-//     let hash = hash_from_vec(&channels_proto.channels);
-//     let hash_proto = HashProto { hash: hash.bytes() };
-
-//     let mut bytes = hash_proto.encode_to_vec();
-//     let len = bytes.len() as u32;
-//     let len_bytes = len.to_le_bytes().to_vec();
-//     let mut result = len_bytes;
-//     result.append(&mut bytes);
-//     Box::leak(result.into_boxed_slice()).as_ptr()
-// }
-
-// #[no_mangle]
-// pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
-//     // SAFETY: The caller must guarantee that `ptr` is a valid pointer to a memory block
-//     // allocated by Rust, and that `len` is the correct size of the block.
 //     unsafe {
-//         // Convert the raw pointer back to a Box to allow Rust to deallocate the memory.
-//         let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));
-//         // The Box goes out of scope here, and Rust automatically deallocates the memory.
+//         (*rspace)
+//             .rspace
+//             .lock()
+//             .unwrap()
+//             .check_replay_data()
+//             .unwrap();
 //     }
 // }
+
+/* Helper Functions */
+#[no_mangle]
+pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: usize) -> *const u8 {
+    let channel_slice = unsafe { std::slice::from_raw_parts(channel_pointer, channel_bytes_len) };
+    let channel = Par::decode(channel_slice).unwrap();
+
+    let hash = hash(&channel);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn hash_channels(
+    channels_pointer: *const u8,
+    channels_bytes_len: usize,
+) -> *const u8 {
+    let channels_slice =
+        unsafe { std::slice::from_raw_parts(channels_pointer, channels_bytes_len) };
+    let channels_proto = ChannelsProto::decode(channels_slice).unwrap();
+
+    let hash = hash_from_vec(&channels_proto.channels);
+    let hash_proto = HashProto { hash: hash.bytes() };
+
+    let mut bytes = hash_proto.encode_to_vec();
+    let len = bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+    let mut result = len_bytes;
+    result.append(&mut bytes);
+    Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
+    // SAFETY: The caller must guarantee that `ptr` is a valid pointer to a memory block
+    // allocated by Rust, and that `len` is the correct size of the block.
+    unsafe {
+        // Convert the raw pointer back to a Box to allow Rust to deallocate the memory.
+        let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));
+        // The Box goes out of scope here, and Rust automatically deallocates the memory.
+    }
+}

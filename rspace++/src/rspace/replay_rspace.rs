@@ -868,7 +868,7 @@ where
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self.install(channels, install.patterns, install.continuation);
+            self.install(channels, install.patterns, install.continuation).unwrap();
         }
     }
 

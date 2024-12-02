@@ -16,7 +16,10 @@ use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
+use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::replay_rspace_interface::IReplayRSpace;
+use rspace_plus_plus::rspace::rspace::RSpace;
+use rspace_plus_plus::rspace::rspace::RSpaceStore;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::trace::Log;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
@@ -44,6 +47,9 @@ use super::system_processes::{
 };
 use models::rhoapi::expr::ExprInstance::GByteArray;
 
+/*
+ * This trait has been combined with the 'ReplayRhoRuntime' trait
+*/
 pub trait RhoRuntime: HasCost {
     /**
      * Parse the rholang term into [[coop.rchain.models.Par]] and execute it with provided initial phlo.
@@ -194,7 +200,7 @@ pub trait RhoRuntime: HasCost {
      *
      * This function would not change the state in the runtime
      */
-    fn get_continuation(
+    fn get_continuations(
         &self,
         channels: Vec<Par>,
     ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>>;
@@ -224,6 +230,9 @@ pub trait RhoRuntime: HasCost {
     fn check_replay_data(&self) -> Result<(), InterpreterError>;
 }
 
+/*
+ * We use this struct for both normal and replay RhoRuntime instances
+*/
 #[derive(Clone)]
 pub struct RhoRuntimeImpl {
     pub reducer: DebruijnInterpreter,
@@ -356,7 +365,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         self.reducer.space.try_lock().unwrap().get_joins(channel)
     }
 
-    fn get_continuation(
+    fn get_continuations(
         &self,
         channels: Vec<Par>,
     ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
@@ -983,53 +992,53 @@ where
     .await
 }
 
-// async fn create_runtimes<T, R>(
-//     space: T,
-//     replay_space: R,
-//     init_registry: bool,
-//     additional_system_processes: &mut Vec<Definition>,
-//     mergeable_tag_name: Par,
-// ) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<ReplayRhoRuntimeImpl>>)
-// where
-//     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-//     R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-// {
-//     let rho_runtime = create_rho_runtime(
-//         space,
-//         mergeable_tag_name.clone(),
-//         init_registry,
-//         additional_system_processes,
-//     )
-//     .await;
+async fn create_runtimes<T, R>(
+    space: T,
+    replay_space: R,
+    init_registry: bool,
+    additional_system_processes: &mut Vec<Definition>,
+    mergeable_tag_name: Par,
+) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<RhoRuntimeImpl>>)
+where
+    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+{
+    let rho_runtime = create_rho_runtime(
+        space,
+        mergeable_tag_name.clone(),
+        init_registry,
+        additional_system_processes,
+    )
+    .await;
 
-//     let replay_rho_runtime = create_replay_rho_runtime(
-//         replay_space,
-//         mergeable_tag_name,
-//         init_registry,
-//         additional_system_processes,
-//     )
-//     .await;
+    let replay_rho_runtime = create_replay_rho_runtime(
+        replay_space,
+        mergeable_tag_name,
+        init_registry,
+        additional_system_processes,
+    )
+    .await;
 
-//     (rho_runtime, replay_rho_runtime)
-// }
+    (rho_runtime, replay_rho_runtime)
+}
 
-// async fn create_runtime_from_kv_store(
-//     stores: RSpaceStore,
-//     mergeable_tag_name: Par,
-//     init_registry: bool,
-//     additional_system_processes: &mut Vec<Definition>,
-//     matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
-// ) -> Arc<Mutex<RhoRuntimeImpl>> {
-//     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-//         RSpace::create(stores, matcher).unwrap();
+async fn create_runtime_from_kv_store(
+    stores: RSpaceStore,
+    mergeable_tag_name: Par,
+    init_registry: bool,
+    additional_system_processes: &mut Vec<Definition>,
+    matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
+) -> Arc<Mutex<RhoRuntimeImpl>> {
+    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
+        RSpace::create(stores, matcher).unwrap();
 
-//     let runtime = create_rho_runtime(
-//         space,
-//         mergeable_tag_name,
-//         init_registry,
-//         additional_system_processes,
-//     )
-//     .await;
+    let runtime = create_rho_runtime(
+        space,
+        mergeable_tag_name,
+        init_registry,
+        additional_system_processes,
+    )
+    .await;
 
-//     runtime
-// }
+    runtime
+}

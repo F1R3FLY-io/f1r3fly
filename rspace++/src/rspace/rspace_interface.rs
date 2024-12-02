@@ -6,7 +6,11 @@ use std::collections::{BTreeSet, HashMap};
 use crate::rspace::checkpoint::SoftCheckpoint;
 
 use super::{
-    checkpoint::Checkpoint, errors::RSpaceError, hashing::blake2b256_hash::Blake2b256Hash, internal::{Datum, ProduceCandidate, Row, WaitingContinuation}, trace::Log, tuplespace_interface::Tuplespace
+    checkpoint::Checkpoint,
+    errors::RSpaceError,
+    hashing::blake2b256_hash::Blake2b256Hash,
+    internal::{Datum, ProduceCandidate, Row, WaitingContinuation},
+    trace::Log,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -39,6 +43,9 @@ pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
  * @tparam P a type representing a pattern
  * @tparam A a type representing an arbitrary piece of data and match result
  * @tparam K a type representing a continuation
+ *
+ * The traits 'Tuplespace' and 'IReplayRSpace' have been combined into this trait
+ *
  */
 pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
     /** Creates a checkpoint.
