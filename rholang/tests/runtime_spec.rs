@@ -1,9 +1,14 @@
 // See casper/src/test/scala/coop/rchain/casper/util/rholang/RuntimeSpec.scala
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rholang::rust::interpreter::{
+    accounting::costs::Cost,
     matcher::r#match::Matcher,
     rho_runtime::{bootstrap_registry, create_rho_runtime, RhoRuntime, RhoRuntimeImpl},
 };
@@ -17,7 +22,7 @@ use rspace_plus_plus::rspace::{
 };
 
 fn empty_state_hash_fixed() -> String {
-    "Blake2b256Hash(575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508)".to_string()
+    "Blake2b256Hash(cb75e7f94e8eac21f95c524a07590f2583fbdaba6fb59291cf52fa16a14c784d)".to_string()
 }
 
 async fn empty_state_hash_from_runtime(runtime: Arc<Mutex<RhoRuntimeImpl>>) -> Blake2b256Hash {
@@ -31,22 +36,55 @@ async fn empty_state_hash_from_runtime(runtime: Arc<Mutex<RhoRuntimeImpl>>) -> B
     checkpoint.root
 }
 
-// #[tokio::test]
-// async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
-//     let mut kvm = InMemoryStoreManager::new();
-//     let store = kvm.r_space_stores().await.unwrap();
-//     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-//         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-//     let runtime = create_rho_runtime(
-//         Arc::new(Mutex::new(space)),
-//         Par::default(),
-//         false,
-//         &mut Vec::new(),
-//     )
-//     .await;
+#[tokio::test]
+async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
+    let mut kvm = InMemoryStoreManager::new();
+    let store = kvm.r_space_stores().await.unwrap();
+    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
+        RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
 
-//     assert_eq!(
-//         empty_state_hash_fixed(),
-//         empty_state_hash_from_runtime(runtime).await.to_string()
-//     );
-// }
+    assert_eq!(
+        empty_state_hash_fixed(),
+        empty_state_hash_from_runtime(runtime).await.to_string()
+    );
+}
+
+#[tokio::test]
+async fn runtime_should_evaluate_successfully() {
+    let mut kvm = InMemoryStoreManager::new();
+    let store = kvm.r_space_stores().await.unwrap();
+    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
+        RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
+
+    let rholang_code = r#"
+new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
+  contract helloWorld(@name) = {
+    new ack in {
+      stdoutAck!("Hello, ", *ack) |
+      for (_ <- ack) {
+        stdoutAck!(name, *ack) |
+        for (_ <- ack) {
+          stdout!("\n")
+        }
+      }
+    }
+  } |
+  helloWorld!("Joe")
+}
+    "#;
+
+    let eval_result = runtime
+        .try_lock()
+        .unwrap()
+        .evaluate(
+            rholang_code.to_string(),
+            Cost::unsafe_max(),
+            HashMap::new(),
+            Blake2b512Random::create_from_bytes(&[]),
+        )
+        .await;
+    assert!(eval_result.is_ok());
+    assert!(eval_result.clone().unwrap().errors.is_empty());
+}
