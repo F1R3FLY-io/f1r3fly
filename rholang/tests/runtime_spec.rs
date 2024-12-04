@@ -59,19 +59,18 @@ async fn runtime_should_evaluate_successfully() {
     let runtime = create_rho_runtime(space, Par::default(), true, &mut Vec::new()).await;
 
     let rholang_code = r#"
-        new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
-  contract helloWorld(@name) = {
-    new ack in {
-      stdoutAck!("Hello, ", *ack) |
-      for (_ <- ack) {
-        stdoutAck!(name, *ack) |
-        for (_ <- ack) {
-          stdout!("\n")
+new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in {
+    x!(@"name"!("Joe") | @"age"!(40)) |  // (1)
+        for (@r <- x) {
+            //hashing channel expect byte array as input, this is true for all 3 channels:
+            //keccak256Hash, sha256Hash and blake2b256Hash
+            keccak256Hash!(r.toByteArray(), *y) // hash the program from (1)
+        } |
+        for (@h <- y) {
+            // the h here is hash of the rholang term we sent to the hash channel
+            // we can do anything we want with it but we choose to just print it
+            stdout!(h)  // print out the keccak256 hash
         }
-      }
-    }
-  } |
-  helloWorld!("Joe")
 }
     "#;
 

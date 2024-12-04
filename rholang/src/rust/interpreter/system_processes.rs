@@ -6,15 +6,14 @@ use crypto::rust::signatures::ed25519::Ed25519;
 use crypto::rust::signatures::secp256k1::Secp256k1;
 use crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
-use models::rhoapi::{BindPattern, Expr, TaggedContinuation};
+use models::rhoapi::Expr;
 use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::Byte;
-use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
@@ -320,7 +319,6 @@ impl SystemProcesses {
         &self,
         contract_args: Vec<ListParWithRandom>,
         name: &str,
-        // algorithm: Box<dyn Fn(Vec<u8>, Vec<u8>, Vec<u8>) -> bool>,
         algorithm: Box<dyn SignaturesAlg>,
     ) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
@@ -367,7 +365,7 @@ impl SystemProcesses {
                     let hash = algorithm(input);
                     if let Err(e) = produce(vec![RhoByteArray::create_par(hash)], ack.clone()).await
                     {
-                        eprintln!("Error producing result: {:?}", e);
+                        panic!("Error producing result named {}: {:?}", name, e);
                     }
                 } else {
                     panic!("{} expects a byte array and return channel", name)
