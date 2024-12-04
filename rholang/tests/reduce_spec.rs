@@ -3,7 +3,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     i64,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
@@ -36,12 +36,7 @@ use models::{
     rust::utils::{new_eplus_par_gint, new_gint_expr, new_gint_par},
 };
 use rholang::rust::interpreter::{
-    accounting::{cost_accounting::CostAccounting, costs::Cost},
-    dispatch::RholangAndScalaDispatcher,
-    env::Env,
-    errors::InterpreterError,
-    matcher::r#match::Matcher,
-    test_utils::persistent_store_tester::create_test_space,
+    accounting::{cost_accounting::CostAccounting, costs::Cost}, dispatch::RholangAndScalaDispatcher, env::Env, errors::InterpreterError, matcher::r#match::Matcher, rho_runtime::RhoISpace, test_utils::persistent_store_tester::create_test_space
 };
 use rspace_plus_plus::rspace::{
     internal::{Datum, Row, WaitingContinuation},
@@ -1464,8 +1459,9 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
     let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
+    let rspace: RhoISpace = Arc::new(Mutex::new(Box::new(space.clone())));
     let reducer = RholangAndScalaDispatcher::create(
-        space.clone(),
+        rspace,
         HashMap::new(),
         urn_map,
         Arc::new(RwLock::new(HashSet::new())),

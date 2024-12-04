@@ -1,7 +1,6 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
-use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
-use rspace_plus_plus::rspace::rspace_interface::ISpace;
+use models::rhoapi::{ListParWithRandom, TaggedContinuation};
 use std::future::Future;
 use std::{
     collections::{HashMap, HashSet},
@@ -9,6 +8,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use super::rho_runtime::RhoISpace;
 use super::{
     accounting::_cost, env::Env, errors::InterpreterError, reduce::DebruijnInterpreter,
     substitute::Substitute, unwrap_option_safe,
@@ -44,6 +44,8 @@ impl RholangAndScalaDispatcher {
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
+        // println!("\ndispatcher dispatch");
+        // println!("continuation: {:?}", continuation);
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
@@ -84,8 +86,8 @@ impl RholangAndScalaDispatcher {
 pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
 
 impl RholangAndScalaDispatcher {
-    pub fn create<T>(
-        tuplespace: T,
+    pub fn create(
+        space: RhoISpace,
         dispatch_table: HashMap<
             i64,
             Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
@@ -94,17 +96,14 @@ impl RholangAndScalaDispatcher {
         merge_chs: Arc<RwLock<HashSet<Par>>>,
         mergeable_tag_name: Par,
         cost: _cost,
-    ) -> (RholangAndScalaDispatcher, DebruijnInterpreter)
-    where
-        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
-    {
+    ) -> (RholangAndScalaDispatcher, DebruijnInterpreter) {
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(std::sync::Mutex::new(dispatch_table)),
             reducer: None,
         };
 
         let mut reducer = DebruijnInterpreter {
-            space: Arc::new(std::sync::Mutex::new(Box::new(tuplespace))),
+            space,
             dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
             urn_map,
             merge_chs,
@@ -123,17 +122,14 @@ impl RholangAndScalaDispatcher {
         (dispatcher, reducer)
     }
 
-    pub fn create_dispatcher<T>(tuplespace: T, cost: _cost) -> RhoDispatch
-    where
-        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
-    {
+    pub fn create_dispatcher(space: RhoISpace, cost: _cost) -> RhoDispatch {
         let mut dispatcher = RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(std::sync::Mutex::new(HashMap::new())),
             reducer: None,
         };
 
         let mut reducer = DebruijnInterpreter {
-            space: Arc::new(std::sync::Mutex::new(Box::new(tuplespace))),
+            space,
             dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
             urn_map: HashMap::new(),
             merge_chs: Arc::new(RwLock::new(HashSet::new())),

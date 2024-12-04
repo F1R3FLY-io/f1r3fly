@@ -56,10 +56,10 @@ async fn runtime_should_evaluate_successfully() {
     let store = kvm.r_space_stores().await.unwrap();
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
         RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
+    let runtime = create_rho_runtime(space, Par::default(), true, &mut Vec::new()).await;
 
     let rholang_code = r#"
-new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
+        new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
   contract helloWorld(@name) = {
     new ack in {
       stdoutAck!("Hello, ", *ack) |

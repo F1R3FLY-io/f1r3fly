@@ -24,7 +24,7 @@ import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.Validator.Validator
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.RholangMetricsSource
-import coop.rchain.rholang.interpreter.RhoRuntime.{bootstrapRegistry, createRhoEnv}
+import coop.rchain.rholang.interpreter.RhoRuntime.{bootstrapRegistry}
 import coop.rchain.rholang.interpreter.SystemProcesses.{BlockData, Definition, InvalidBlocks}
 import coop.rchain.rholang.interpreter.accounting.{_cost, CostAccounting}
 import coop.rchain.rholang.interpreter.{Reduce, ReplayRhoRuntimeImpl}

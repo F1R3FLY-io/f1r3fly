@@ -695,16 +695,13 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
     ]
 }
 
-fn dispatch_table_creator<T>(
-    space: T,
+fn dispatch_table_creator(
+    space: RhoISpace,
     dispatcher: RhoDispatch,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
-) -> RhoDispatchMap
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
     for def in std_system_processes().iter_mut().chain(
@@ -721,6 +718,8 @@ where
 
         dispatch_table.insert(tuple.0, tuple.1);
     }
+
+    // println!("\ndispatch_table length: {:?}", dispatch_table.len());
 
     dispatch_table
 }
@@ -758,8 +757,8 @@ fn basic_processes() -> HashMap<String, Par> {
     map
 }
 
-fn setup_reducer<T>(
-    charging_rspace: T,
+fn setup_reducer(
+    charging_rspace: RhoISpace,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
@@ -767,10 +766,7 @@ fn setup_reducer<T>(
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
     cost: _cost,
-) -> DebruijnInterpreter
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
+) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
@@ -819,10 +815,14 @@ fn setup_maps_and_refs(
             urn_map.insert(key, value);
         });
 
+    // println!("\nurn_map length: {:?}", urn_map.len());
+
     let proc_defs: Vec<(Par, i32, Option<Var>, i64)> = combined_processes
         .iter()
         .map(|process| process.to_proc_defs())
         .collect();
+
+    // println!("\nproc_defs length: {:?}", proc_defs.len());
 
     (block_data_ref, invalid_blocks, urn_map, proc_defs)
 }
@@ -842,8 +842,11 @@ where
     let res = introduce_system_process(vec![&mut rspace], proc_defs);
     assert!(res.iter().all(|s| s.is_none()));
 
-    let reducer = setup_reducer(
+    let charging_rspace: RhoISpace = Arc::new(Mutex::new(Box::new(
         ChargingRSpace::charging_rspace(rspace, cost.clone()),
+    )));
+    let reducer = setup_reducer(
+        charging_rspace,
         block_data_ref.clone(),
         invalid_blocks.clone(),
         extra_system_processes,
@@ -878,18 +881,10 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     //     "\nruntime space before inject, {:?}",
     //     runtime_lock.get_hot_changes().len()
     // );
-    // println!(
-    //     "\nreducer space before inject, {:?}",
-    //     runtime_lock.get_reducer_hot_changes().len()
-    // );
     runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
     // println!(
     //     "\nruntime space after inject, {:?}",
     //     runtime_lock.get_hot_changes().len()
-    // );
-    // println!(
-    //     "\nreducer space after inject, {:?}",
-    //     runtime_lock.get_reducer_hot_changes().len()
     // );
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
@@ -912,7 +907,7 @@ where
     }));
 
     let rho_env = create_rho_env(
-        rspace.clone(),
+        rspace,
         merge_chs.clone(),
         mergeable_tag_name,
         extra_system_processes,
@@ -923,7 +918,7 @@ where
     let runtime = RhoRuntimeImpl::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
-        // println!("\ninit_registry create_runtime");
+        // println!("\ninit_registry");
         bootstrap_registry(runtime.clone()).await;
         runtime.try_lock().unwrap().create_checkpoint();
     }

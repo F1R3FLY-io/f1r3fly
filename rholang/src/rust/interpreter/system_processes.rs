@@ -181,28 +181,14 @@ pub struct ProcessContext {
 }
 
 impl ProcessContext {
-    pub fn create<T>(
-        space: T,
+    pub fn create(
+        space: RhoISpace,
         dispatcher: RhoDispatch,
         block_data: Arc<RwLock<BlockData>>,
         invalid_blocks: InvalidBlocks,
-    ) -> Self
-    where
-        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-    {
+    ) -> Self {
         ProcessContext {
-            // Here I am trying to use the same instance of space that the dispatcher uses
-            space: {
-                let space = dispatcher
-                    .read()
-                    .unwrap()
-                    .reducer
-                    .as_ref()
-                    .unwrap()
-                    .space
-                    .clone();
-                space
-            },
+            space: space.clone(),
             dispatcher: dispatcher.clone(),
             block_data,
             invalid_blocks,
@@ -216,7 +202,6 @@ pub struct Definition {
     pub fixed_channel: Name,
     pub arity: Arity,
     pub body_ref: BodyRef,
-    // pub handler: Box<dyn FnMut(ProcessContext) -> Box<dyn FnMut(Vec<ListParWithRandom>) -> ()>>,
     pub handler: Box<
         dyn FnMut(
             ProcessContext,
@@ -316,24 +301,10 @@ pub struct SystemProcesses {
 }
 
 impl SystemProcesses {
-    fn create<T>(dispatcher: RhoDispatch, space: T) -> Self
-    where
-        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + 'static,
-    {
+    fn create(dispatcher: RhoDispatch, space: RhoISpace) -> Self {
         SystemProcesses {
             dispatcher: dispatcher.clone(),
-            // Here I am trying to use the same instance of space that the dispatcher uses
-            space: {
-                let space = dispatcher
-                    .read()
-                    .unwrap()
-                    .reducer
-                    .as_ref()
-                    .unwrap()
-                    .space
-                    .clone();
-                space
-            },
+            space,
             pretty_printer: PrettyPrinter::new(),
         }
     }
@@ -434,10 +405,15 @@ impl SystemProcesses {
     pub async fn std_out_ack(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((produce, vec)) = self.is_contract_call().unapply(contract_args) {
             if let [arg, ack] = &vec[..] {
-                // println!("args: {:?}", arg);
+                // Debug print to verify the argument
+                // println!("stdoutAck received arg: {:?}", arg);
 
                 let str = self.pretty_printer.build_string_from_message(arg);
                 self.print_std_out(&str);
+
+                // Debug print before sending acknowledgment
+                // println!("Sending acknowledgment on ack channel");
+
                 if let Err(e) = produce(vec![Par::default()], ack.clone()).await {
                     eprintln!("Error producing result: {:?}", e);
                 }
