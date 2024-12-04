@@ -1458,19 +1458,18 @@ object RhoRuntime {
   ): F[RhoRuntime[F]] = {
     import coop.rchain.rholang.interpreter.storage._
     // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
-    // for {
-    //   // space <- RSpace
-    //   //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-    //   //             stores
-    //   //           )
-    //   space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
-    //   runtime <- createRhoRuntime[F](
-    //               space,
-    //               mergeableTagName,
-    //               initRegistry,
-    //               additionalSystemProcesses
-    //             )
-    // } yield runtime
-    ???
+    for {
+      // space <- RSpace
+      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //             stores
+      //           )
+      space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
+      runtime <- createRhoRuntime[F](
+                  space,
+                  mergeableTagName,
+                  initRegistry,
+                  additionalSystemProcesses
+                )
+    } yield runtime
   }
 }

@@ -48,7 +48,7 @@ Now edit `~/.rnode/genesis/bonds.txt`, and copy and paste the public key above. 
 
 Now run the node as described above, not specifying `data-dir` explicitly and providing the above private key:
 
-`$ java -Djna.library.path=./rspace++/target/debug/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-1.0.0-SNAPSHOT.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key f004ccc5955cef0b7ae52953d861f749bbc8e18b1484217209777af1b4fced4c`
+`$ java -Djna.library.path=./rust_libraries --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-1.0.0-SNAPSHOT.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0 --validator-private-key f004ccc5955cef0b7ae52953d861f749bbc8e18b1484217209777af1b4fced4c`
 
 The logs should include:
 
