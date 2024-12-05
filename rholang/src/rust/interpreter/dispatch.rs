@@ -29,10 +29,7 @@ pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
 pub struct RholangAndScalaDispatcher {
     pub _dispatch_table: Arc<
         std::sync::Mutex<
-            HashMap<
-                i64,
-                Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
-            >,
+            HashMap<i64, Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>>,
         >,
     >,
     pub reducer: Option<DebruijnInterpreter>,
@@ -69,7 +66,13 @@ impl RholangAndScalaDispatcher {
                         .await
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
-                    match self._dispatch_table.try_lock().unwrap().get_mut(&_ref) {
+                    // println!("self {:p}", self);
+                    let dispatch_table = &self._dispatch_table.try_lock().unwrap();
+                    // println!(
+                    //     "dispatch_table at ScalaBodyRef: {:?}",
+                    //     dispatch_table.keys()
+                    // );
+                    match dispatch_table.get(&_ref) {
                         Some(f) => Ok(f(data_list).await),
                         None => Err(InterpreterError::BugFoundError(format!(
                             "dispatch: no function for {}",
@@ -90,7 +93,7 @@ impl RholangAndScalaDispatcher {
         space: RhoISpace,
         dispatch_table: HashMap<
             i64,
-            Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+            Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
         >,
         urn_map: HashMap<String, Par>,
         merge_chs: Arc<RwLock<HashSet<Par>>>,

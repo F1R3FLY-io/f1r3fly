@@ -719,8 +719,6 @@ fn dispatch_table_creator(
         dispatch_table.insert(tuple.0, tuple.1);
     }
 
-    // println!("\ndispatch_table length: {:?}", dispatch_table.len());
-
     dispatch_table
 }
 

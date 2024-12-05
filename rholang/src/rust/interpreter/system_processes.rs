@@ -27,8 +27,7 @@ use super::util::rev_address::RevAddress;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
-pub type RhoSysFunction =
-    Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>;
+pub type RhoSysFunction = Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>;
 pub type RhoDispatchMap = HashMap<i64, RhoSysFunction>;
 pub type Name = Par;
 pub type Arity = i32;
@@ -205,7 +204,7 @@ pub struct Definition {
         dyn FnMut(
             ProcessContext,
         )
-            -> Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+            -> Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
     >,
     pub remainder: Remainder,
 }
@@ -219,9 +218,8 @@ impl Definition {
         handler: Box<
             dyn FnMut(
                 ProcessContext,
-            ) -> Box<
-                dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>,
-            >,
+            )
+                -> Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
         >,
         remainder: Remainder,
     ) -> Self {
@@ -240,7 +238,7 @@ impl Definition {
         context: ProcessContext,
     ) -> (
         BodyRef,
-        Box<dyn FnMut(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
+        Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
     ) {
         (self.body_ref, (self.handler)(context))
     }

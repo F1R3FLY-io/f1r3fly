@@ -375,16 +375,14 @@ impl DebruijnInterpreter {
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Result<(), InterpreterError> {
         // println!("\nreduce dispatch");
-        let dispatcher_lock = self.dispatcher.try_read().unwrap();
+        let dispatcher_lock = &self.dispatcher.try_read().unwrap();
         // println!("Dispatcher lock acquired");
-        let res = dispatcher_lock
+        dispatcher_lock
             .dispatch(
                 continuation,
                 data_list.into_iter().map(|tuple| tuple.1).collect(),
             )
-            .await;
-        drop(dispatcher_lock);
-        res
+            .await
     }
 
     async fn produce_peeks(
