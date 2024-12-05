@@ -1,18 +1,10 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{tagged_continuation::TaggedCont, Par};
 use models::rhoapi::{ListParWithRandom, TaggedContinuation};
-use std::future::Future;
-use std::{
-    collections::{HashMap, HashSet},
-    pin::Pin,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
-use super::rho_runtime::RhoISpace;
-use super::{
-    accounting::_cost, env::Env, errors::InterpreterError, reduce::DebruijnInterpreter,
-    substitute::Substitute, unwrap_option_safe,
-};
+use super::system_processes::RhoDispatchMap;
+use super::{env::Env, errors::InterpreterError, reduce::DebruijnInterpreter, unwrap_option_safe};
 
 pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
     let pars: Vec<Par> = data_list.into_iter().flat_map(|list| list.pars).collect();
@@ -27,13 +19,11 @@ pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
 
 #[derive(Clone)]
 pub struct RholangAndScalaDispatcher {
-    pub _dispatch_table: Arc<
-        std::sync::Mutex<
-            HashMap<i64, Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>>,
-        >,
-    >,
+    pub _dispatch_table: RhoDispatchMap,
     pub reducer: Option<DebruijnInterpreter>,
 }
+
+pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
 
 impl RholangAndScalaDispatcher {
     pub async fn dispatch(
@@ -67,7 +57,7 @@ impl RholangAndScalaDispatcher {
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
                     // println!("self {:p}", self);
-                    let dispatch_table = &self._dispatch_table.try_lock().unwrap();
+                    let dispatch_table = &self._dispatch_table.try_read().unwrap();
                     // println!(
                     //     "dispatch_table at ScalaBodyRef: {:?}",
                     //     dispatch_table.keys()
@@ -83,71 +73,5 @@ impl RholangAndScalaDispatcher {
             },
             None => Ok(()),
         }
-    }
-}
-
-pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
-
-impl RholangAndScalaDispatcher {
-    pub fn create(
-        space: RhoISpace,
-        dispatch_table: HashMap<
-            i64,
-            Box<dyn Fn(Vec<ListParWithRandom>) -> Pin<Box<dyn Future<Output = ()>>>>,
-        >,
-        urn_map: HashMap<String, Par>,
-        merge_chs: Arc<RwLock<HashSet<Par>>>,
-        mergeable_tag_name: Par,
-        cost: _cost,
-    ) -> (RholangAndScalaDispatcher, DebruijnInterpreter) {
-        let mut dispatcher = RholangAndScalaDispatcher {
-            _dispatch_table: Arc::new(std::sync::Mutex::new(dispatch_table)),
-            reducer: None,
-        };
-
-        let mut reducer = DebruijnInterpreter {
-            space,
-            dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
-            urn_map,
-            merge_chs,
-            mergeable_tag_name,
-            cost: cost.clone(),
-            substitute: Substitute { cost },
-        };
-
-        dispatcher.reducer = Some(reducer.clone());
-        let dispatcher_arc = Arc::new(RwLock::new(dispatcher.clone()));
-        reducer.dispatcher = dispatcher_arc.clone();
-        let mut dispatcher_locked = dispatcher_arc.try_write().unwrap();
-        dispatcher_locked.reducer = Some(reducer.clone());
-        drop(dispatcher_locked);
-
-        (dispatcher, reducer)
-    }
-
-    pub fn create_dispatcher(space: RhoISpace, cost: _cost) -> RhoDispatch {
-        let mut dispatcher = RholangAndScalaDispatcher {
-            _dispatch_table: Arc::new(std::sync::Mutex::new(HashMap::new())),
-            reducer: None,
-        };
-
-        let mut reducer = DebruijnInterpreter {
-            space,
-            dispatcher: Arc::new(RwLock::new(dispatcher.clone())),
-            urn_map: HashMap::new(),
-            merge_chs: Arc::new(RwLock::new(HashSet::new())),
-            mergeable_tag_name: Par::default(),
-            cost: cost.clone(),
-            substitute: Substitute { cost },
-        };
-
-        dispatcher.reducer = Some(reducer.clone());
-        let dispatcher_arc = Arc::new(RwLock::new(dispatcher.clone()));
-        reducer.dispatcher = dispatcher_arc.clone();
-        let mut dispatcher_locked = dispatcher_arc.try_write().unwrap();
-        dispatcher_locked.reducer = Some(reducer.clone());
-        drop(dispatcher_locked);
-
-        Arc::new(RwLock::new(dispatcher))
     }
 }

@@ -41,6 +41,7 @@ use super::interpreter::{EvaluateResult, Interpreter, InterpreterImpl};
 use super::reduce::DebruijnInterpreter;
 use super::registry::registry_bootstrap::ast;
 use super::storage::charging_rspace::ChargingRSpace;
+use super::substitute::Substitute;
 use super::system_processes::{
     Arity, BlockData, BodyRef, Definition, InvalidBlocks, Name, ProcessContext, Remainder,
     RhoDispatchMap,
@@ -719,7 +720,7 @@ fn dispatch_table_creator(
         dispatch_table.insert(tuple.0, tuple.1);
     }
 
-    dispatch_table
+    Arc::new(RwLock::new(dispatch_table))
 }
 
 fn basic_processes() -> HashMap<String, Par> {
@@ -766,24 +767,34 @@ fn setup_reducer(
     cost: _cost,
 ) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
+
+    let dispatcher = Arc::new(RwLock::new(RholangAndScalaDispatcher {
+        _dispatch_table: Arc::new(RwLock::new(HashMap::new())),
+        reducer: None,
+    }));
+
+    let reducer = DebruijnInterpreter {
+        space: charging_rspace.clone(),
+        dispatcher: dispatcher.clone(),
+        urn_map,
+        merge_chs,
+        mergeable_tag_name,
+        cost: cost.clone(),
+        substitute: Substitute { cost: cost.clone() },
+    };
+
+    dispatcher.try_write().unwrap().reducer = Some(reducer.clone());
+
     let replay_dispatch_table = dispatch_table_creator(
         charging_rspace.clone(),
-        RholangAndScalaDispatcher::create_dispatcher(charging_rspace.clone(), cost.clone()),
+        dispatcher.clone(),
         block_data_ref,
         invalid_blocks,
         extra_system_processes,
     );
 
-    let (_, replay_reducer) = RholangAndScalaDispatcher::create(
-        charging_rspace.clone(),
-        replay_dispatch_table,
-        urn_map,
-        merge_chs,
-        mergeable_tag_name,
-        cost,
-    );
-
-    replay_reducer
+    dispatcher.try_write().unwrap()._dispatch_table = replay_dispatch_table;
+    reducer
 }
 
 fn setup_maps_and_refs(

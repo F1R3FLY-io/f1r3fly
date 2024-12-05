@@ -36,7 +36,13 @@ use models::{
     rust::utils::{new_eplus_par_gint, new_gint_expr, new_gint_par},
 };
 use rholang::rust::interpreter::{
-    accounting::{cost_accounting::CostAccounting, costs::Cost}, dispatch::RholangAndScalaDispatcher, env::Env, errors::InterpreterError, matcher::r#match::Matcher, rho_runtime::RhoISpace, test_utils::persistent_store_tester::create_test_space
+    accounting::{cost_accounting::CostAccounting, costs::Cost},
+    env::Env,
+    errors::InterpreterError,
+    matcher::r#match::Matcher,
+    reduce::DebruijnInterpreter,
+    rho_runtime::RhoISpace,
+    test_utils::persistent_store_tester::create_test_space,
 };
 use rspace_plus_plus::rspace::{
     internal::{Datum, Row, WaitingContinuation},
@@ -1460,15 +1466,13 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
     let store = kvm.r_space_stores().await.unwrap();
     let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let rspace: RhoISpace = Arc::new(Mutex::new(Box::new(space.clone())));
-    let reducer = RholangAndScalaDispatcher::create(
+    let reducer = DebruijnInterpreter::new(
         rspace,
-        HashMap::new(),
         urn_map,
         Arc::new(RwLock::new(HashSet::new())),
         Par::default(),
         cost.clone(),
-    )
-    .1;
+    );
     cost.set(Cost::unsafe_max());
     let env = Env::new();
     assert!(reducer.eval(new, &env, split_rand).await.is_ok());

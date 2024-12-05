@@ -13,7 +13,6 @@ use std::{
 
 use crate::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
-    dispatch::RholangAndScalaDispatcher,
     matcher::r#match::Matcher,
     reduce::DebruijnInterpreter,
     rho_runtime::RhoISpace,
@@ -32,15 +31,13 @@ where
     let space = RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
     let rspace: RhoISpace = Arc::new(Mutex::new(Box::new(space.clone())));
 
-    let reducer = RholangAndScalaDispatcher::create(
+    let reducer = DebruijnInterpreter::new(
         rspace,
-        HashMap::new(),
         HashMap::new(),
         Arc::new(RwLock::new(HashSet::new())),
         Par::default(),
         cost.clone(),
-    )
-    .1;
+    );
 
     cost.set(Cost::create(
         i64::MAX,

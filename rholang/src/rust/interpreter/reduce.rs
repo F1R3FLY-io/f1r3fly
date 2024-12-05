@@ -44,7 +44,7 @@ use super::accounting::costs::{
     new_bindings_cost, op_call_cost, receive_eval_cost, send_eval_cost, string_append_cost,
     subtraction_cost, sum_cost, var_eval_cost,
 };
-use super::dispatch::RhoDispatch;
+use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
 use super::env::Env;
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
@@ -3318,6 +3318,32 @@ impl DebruijnInterpreter {
             });
 
         Ok(result)
+    }
+
+    pub fn new(
+        space: RhoISpace,
+        urn_map: HashMap<String, Par>,
+        merge_chs: Arc<RwLock<HashSet<Par>>>,
+        mergeable_tag_name: Par,
+        cost: _cost,
+    ) -> Self {
+        let dispatcher = Arc::new(RwLock::new(RholangAndScalaDispatcher {
+            _dispatch_table: Arc::new(RwLock::new(HashMap::new())),
+            reducer: None,
+        }));
+
+        let reducer = DebruijnInterpreter {
+            space,
+            dispatcher: dispatcher.clone(),
+            urn_map,
+            merge_chs,
+            mergeable_tag_name,
+            cost: cost.clone(),
+            substitute: Substitute { cost: cost.clone() },
+        };
+
+        dispatcher.try_write().unwrap().reducer = Some(reducer.clone());
+        reducer
     }
 }
 
