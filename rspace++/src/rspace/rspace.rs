@@ -192,7 +192,7 @@ where
             let result =
                 self.locked_consume(channels, patterns, continuation, persist, peeks, consume_ref);
             // println!("locked_consume result: {:?}", result);
-            // println!("space in consume after: {:?}", self.store.to_map().len());
+            // println!("\nspace in consume after: {:?}", self.store.to_map().len());
             result
         }
     }
@@ -211,6 +211,7 @@ where
         let produce_ref = Produce::create(channel.clone(), data.clone(), persist);
         let result = self.locked_produce(channel, data, persist, produce_ref);
         // println!("\nlocked_produce result: {:?}", result);
+        // println!("\nspace in produce: {:?}", self.store.to_map().len());
         result
     }
 

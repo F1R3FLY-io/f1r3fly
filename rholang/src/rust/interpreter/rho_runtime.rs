@@ -270,7 +270,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         println!(
-            "\nspace before in RhoRuntimeImpl evaluate: {:?}",
+            "\nspace before in evaluate: {:?}",
             self.get_hot_changes().len()
         );
         // rand.debug_str();
@@ -280,7 +280,7 @@ impl RhoRuntime for RhoRuntimeImpl {
             .inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
             .await;
         println!(
-            "\nspace after in RhoRuntimeImpl evaluate: {:?}",
+            "\nspace after in evaluate: {:?}",
             self.get_hot_changes().len()
         );
         println!("\nevaluate result: {:?}", res);
