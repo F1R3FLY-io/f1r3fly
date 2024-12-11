@@ -53,7 +53,7 @@ impl Interpreter for InterpreterImpl {
 
             // println!("\nterm: {:#?}", term);
             let parsed = Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env)?;
-            // println!("\nparsed: {:?}", parsed);
+            // println!("\nparsed: {:#?}", parsed);
             // let phlos_left_after_adt = self.c.get();
 
             // Empty mergeable channels

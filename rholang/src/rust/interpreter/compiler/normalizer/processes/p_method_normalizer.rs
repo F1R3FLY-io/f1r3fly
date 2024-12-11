@@ -42,7 +42,7 @@ pub fn normalize_p_method(
     for arg in &args.procs {
         let proc_match_result = normalize_match_proc(&arg, acc.1.clone(), env)?;
 
-        acc.0.insert(0, proc_match_result.par.clone());
+        acc.0.push(proc_match_result.par.clone());
         acc.1 = ProcVisitInputs {
             par: Par::default(),
             bound_map_chain: input.bound_map_chain.clone(),
