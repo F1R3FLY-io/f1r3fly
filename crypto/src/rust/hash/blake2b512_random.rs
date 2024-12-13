@@ -266,7 +266,13 @@ impl Blake2b512Random {
         }
 
         // Serialize hash_array
-        bytes.extend_from_slice(&self.hash_array.iter().map(|&x| x as u8).collect::<Vec<u8>>());
+        bytes.extend_from_slice(
+            &self
+                .hash_array
+                .iter()
+                .map(|&x| x as u8)
+                .collect::<Vec<u8>>(),
+        );
 
         // Serialize position
         bytes.extend_from_slice(&self.position.to_le_bytes());
@@ -285,19 +291,25 @@ impl Blake2b512Random {
         offset += 80;
 
         // Deserialize last_block
-        let last_block_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let last_block_len =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
         offset += 4;
-        let last_block = bytes[offset..offset + last_block_len].iter().map(|&x| x as i8).collect();
+        let last_block = bytes[offset..offset + last_block_len]
+            .iter()
+            .map(|&x| x as i8)
+            .collect();
         offset += last_block_len;
 
         // Deserialize path_view
-        let path_view_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let path_view_len =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
         offset += 4;
         let path_view = bytes[offset..offset + path_view_len].to_vec();
         offset += path_view_len;
 
         // Deserialize count_view
-        let count_view_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let count_view_len =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
         offset += 4;
         let mut count_view = Vec::with_capacity(count_view_len);
         for _ in 0..count_view_len {
@@ -307,7 +319,12 @@ impl Blake2b512Random {
         }
 
         // Deserialize hash_array
-        let hash_array = bytes[offset..offset + 64].iter().map(|&x| x as i8).collect::<Vec<i8>>().try_into().unwrap();
+        let hash_array = bytes[offset..offset + 64]
+            .iter()
+            .map(|&x| x as i8)
+            .collect::<Vec<i8>>()
+            .try_into()
+            .unwrap();
         offset += 64;
 
         // Deserialize position
@@ -315,7 +332,8 @@ impl Blake2b512Random {
         offset += 8;
 
         // Deserialize path_position
-        let path_position = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let path_position =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
 
         Blake2b512Random {
             digest,

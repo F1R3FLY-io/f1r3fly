@@ -19,3 +19,5 @@ tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 typenum = "1.17.0"
 ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
 rand_core = "0.6"
+yasna = { version = "0.5.2", features = ["num-bigint"] }
+num-bigint = "0.4.6"
