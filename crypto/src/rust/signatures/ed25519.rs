@@ -92,9 +92,10 @@ fn parse_signing_key(secret: &[u8]) -> Result<SigningKey, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::Ed25519;
+    use crate::rust::hash::keccak256::Keccak256;
     use crate::rust::private_key::PrivateKey;
     use crate::rust::signatures::signatures_alg::SignaturesAlg;
-    use hex::decode;
+    use hex::{decode, encode};
 
     #[test]
     fn computes_public_key_from_secret_key() {
@@ -134,5 +135,57 @@ mod tests {
         let sig = ed25519.sign(&data, &sec);
 
         assert_eq!(sig, expected_sig);
+    }
+
+    //See rholang/examples/tut-verify-channel.md
+    #[test]
+    fn test_ed25519_integration_with_keccak256() {
+        let ed25519 = Ed25519;
+
+        // 1. Get hash
+        let program = r#"
+        new x, y, stdout(`rho:io:stdout`) in { 
+           x!(@"name"!("Joe") | @"age"!(40)) |
+           for (@r <- x) { @"keccak256Hash"!(r.toByteArray(), *y) } |
+           for (@h <- y) { stdout!(h) }
+        }
+    "#;
+
+        let hash = Keccak256::hash(program.as_bytes().to_vec());
+        let hash_hex = encode(&hash);
+        println!("Program hash: {}", hash_hex);
+
+        // 2. Generate keys
+        let (private_key, public_key) = ed25519.new_key_pair();
+        println!("Private Key: {}", encode(&private_key.bytes));
+        println!("Public Key: {}", encode(&public_key.bytes));
+
+        // 3. Signing the hash
+        let signature = ed25519.sign(&hash, &private_key.bytes);
+        let signature_hex = encode(&signature);
+        println!("Signature: {}", signature_hex);
+
+        // Hash length parity check
+        assert_eq!(hash_hex.len() % 2, 0, "Hash length must be even");
+        assert_eq!(signature_hex.len() % 2, 0, "Signature length must be even");
+
+        // 4. Signature verification
+        let is_valid = ed25519.verify(&hash, &signature, public_key.bytes.clone());
+        assert!(is_valid, "The signature should be valid");
+
+        // 5. Validation with incorrect hash
+        let corrupted_hash_hex = "a6da46a1dc7ed615d4cd6472a736249a4d11142d160dbef9f20ae493de908c4e";
+        assert_eq!(
+            corrupted_hash_hex.len() % 2,
+            0,
+            "Corrupted hash length must be even"
+        );
+        let corrupted_hash = decode(corrupted_hash_hex).expect("Failed to decode corrupted hash");
+        let corrupted_is_valid =
+            ed25519.verify(&corrupted_hash, &signature, public_key.bytes.clone());
+        assert!(
+            !corrupted_is_valid,
+            "The signature should be invalid for corrupted hash"
+        );
     }
 }
