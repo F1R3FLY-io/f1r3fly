@@ -1,6 +1,4 @@
-use crypto::rust::signatures::signed::Signed;
-
-use crate::{rhoapi::PCost, ByteString};
+use crate::ByteString;
 
 // See models/src/main/scala/coop/rchain/casper/protocol/CasperMessage.scala
 pub struct BlockMessage {
@@ -25,12 +23,12 @@ pub struct Header {
 
 pub struct Body {
     pub state: F1r3flyState,
-    deploys: Vec<ProcessedDeploy>,
+    // deploys: Vec<ProcessedDeploy>,
 }
 
 pub struct Justification {
-    validator: ByteString,
-    latest_block_hash: ByteString,
+    // validator: ByteString,
+    // latest_block_hash: ByteString,
 }
 
 pub struct F1r3flyState {
@@ -41,24 +39,24 @@ pub struct F1r3flyState {
 }
 
 pub struct ProcessedDeploy {
-    deploy: Signed<DeployData>,
-    cost: PCost,
-    deploy_log: Vec<Event>,
-    is_failed: bool,
-    system_deploy_error: Option<String>,
+    // deploy: Signed<DeployData>,
+    // cost: PCost,
+    // deploy_log: Vec<Event>,
+    // is_failed: bool,
+    // system_deploy_error: Option<String>,
 }
 
 pub struct DeployData {
-    term: String,
-    time_stamp: i64,
-    plo_price: i64,
-    plo_limit: i64,
-    valid_after_block_number: i64,
-    shard_id: String,
+    // term: String,
+    // time_stamp: i64,
+    // plo_price: i64,
+    // plo_limit: i64,
+    // valid_after_block_number: i64,
+    // shard_id: String,
 }
 
 pub struct Peek {
-    channel_index: i32,
+    // channel_index: i32,
 }
 
 pub enum Event {
@@ -87,6 +85,6 @@ pub struct CommEvent {
 }
 
 pub struct Bond {
-    validator: ByteString,
-    stake: i64,
+    // validator: ByteString,
+    // stake: i64,
 }

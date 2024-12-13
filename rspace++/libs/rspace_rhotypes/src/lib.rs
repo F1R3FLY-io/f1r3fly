@@ -1,14 +1,10 @@
-use dashmap::DashMap;
 use models::rspace_plus_plus_types::*;
 use models::{rhoapi::*, ByteVector};
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
-use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
-use rspace_plus_plus::rspace::hot_store::HotStoreState;
-use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
@@ -17,8 +13,7 @@ use rspace_plus_plus::rspace::shared::lmdb_dir_store_manager::GB;
 use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_manager;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
-use rspace_plus_plus::rspace::trace::event::{Consume, Event, IOEvent, Produce, COMM};
-use std::collections::BTreeMap;
+use rspace_plus_plus::rspace::trace::event::{Event, IOEvent};
 use std::ffi::{c_char, CStr};
 use std::sync::{Arc, Mutex};
 

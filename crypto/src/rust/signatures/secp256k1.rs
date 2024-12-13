@@ -9,18 +9,11 @@ use k256::{
 
 use typenum::U32;
 
-use k256::elliptic_curve::Field;
 use k256::elliptic_curve::{sec1::ToEncodedPoint, SecretKey};
 use rand::rngs::OsRng;
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Secp256k1.scala
 pub struct Secp256k1;
-
-impl Secp256k1 {
-    fn sec_key_verify(&self, seckey: &[u8]) -> bool {
-        seckey.len() == 32 && SigningKey::from_bytes(GenericArray::from_slice(seckey)).is_ok()
-    }
-}
 
 impl SignaturesAlg for Secp256k1 {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: Vec<u8>) -> bool {
@@ -78,6 +71,10 @@ impl SignaturesAlg for Secp256k1 {
 mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
+
+    fn sec_key_verify(seckey: &[u8]) -> bool {
+        seckey.len() == 32 && SigningKey::from_bytes(GenericArray::from_slice(seckey)).is_ok()
+    }
 
     //crypto/src/test/scala/coop/rchain/crypto/signatures/Secp256k1Spec.scala
     #[test]
@@ -150,14 +147,12 @@ mod tests {
 
     #[test]
     fn verify_returns_true_if_valid_false_if_invalid() {
-        let secp256k1 = Secp256k1;
-
         let valid_private_key =
             hex::decode("75468aa68961817b41d7fc2350ae705a7d773ea0d6609f5c25c2aee8e0adced6")
                 .expect("Failed to decode valid private key");
 
         assert!(
-            secp256k1.sec_key_verify(&valid_private_key),
+            sec_key_verify(&valid_private_key),
             "Valid private key verification failed"
         );
     }

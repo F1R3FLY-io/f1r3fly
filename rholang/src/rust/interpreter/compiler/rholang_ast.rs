@@ -954,7 +954,7 @@ pub struct LinearBind {
 }
 
 impl LinearBind {
-    pub(crate) fn new_linear_bind(names: Names, source: Source) -> LinearBind {
+    pub fn new_linear_bind(names: Names, source: Source) -> LinearBind {
         LinearBind {
             names,
             input: source,

@@ -187,11 +187,7 @@ pub fn normalize_match_proc(
         } => normalize_p_match(expression, cases, input, env),
 
         // I don't think the previous scala developers implemented a normalize function for this
-        Proc::Choice {
-            branches,
-            line_num,
-            col_num,
-        } => todo!(),
+        Proc::Choice { .. } => todo!(),
 
         Proc::Contract {
             name,
@@ -554,10 +550,6 @@ mod tests {
             col_num: 0,
         };
         let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
-
-        // Формуємо очікуваний результат за допомогою хелперів
-        let p1 = new_boundvar_par(1, vec![1], false);
-        let p2 = new_boundvar_par(0, vec![0], false);
 
         let expected_result = prepend_expr(
             inputs.par.clone(),

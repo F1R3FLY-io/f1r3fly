@@ -92,8 +92,8 @@ fn parse_signing_key(secret: &[u8]) -> Result<SigningKey, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::Ed25519;
+    use crate::rust::private_key::PrivateKey;
     use crate::rust::signatures::signatures_alg::SignaturesAlg;
-    use crate::rust::{private_key::PrivateKey, public_key::PublicKey as RPublicKey};
     use hex::decode;
 
     #[test]

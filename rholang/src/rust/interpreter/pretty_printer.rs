@@ -1106,7 +1106,7 @@ mod tests {
     use crate::rust::interpreter::errors::InterpreterError;
     use crate::rust::interpreter::pretty_printer::PrettyPrinter;
     use crate::rust::interpreter::test_utils::utils::collection_proc_visit_inputs_and_env;
-    use pretty_assertions;
+    use pretty_assertions::assert_eq;
 
     //ground tests
     #[test]

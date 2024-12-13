@@ -17,6 +17,7 @@ pub struct EvaluateResult {
     pub mergeable: HashSet<Par>,
 }
 
+#[allow(async_fn_in_trait)]
 pub trait Interpreter {
     async fn inj_attempt(
         &self,

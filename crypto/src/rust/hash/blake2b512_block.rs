@@ -1,7 +1,5 @@
 /* See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Block.scala */
 
-use byteorder::{ByteOrder, LittleEndian};
-
 /**
 Block oriented Blake2b512 class.
 
@@ -16,7 +14,7 @@ I've (not spreston8, old dev) checked that we should be fine against the criteri
 See: "Sufficient conditions for sound tree and sequential hashing modes" by
 Guido Bertoni, Joan Daemen, Michaël Peeters, and Gilles Van Assche
 
-    We also have data at every level, so we're using the fanout parameter to
+We also have data at every level, so we're using the fanout parameter to
 distinguish child-hashes from data. To make it convenient for block-orientation,
 we will null-pad an odd number of child hashes. This means that the fanout varies per-node
 rather than being set for the whole instance. Where applicable, we are setting
@@ -27,7 +25,6 @@ This class is an abbreviated version of Blake2bDigest.java from BouncyCastle
 https://github.com/bcgit/bc-java/blob/master/core/src/main/java/org/bouncycastle/crypto/digests/Blake2bDigest.java
   */
 
-// TODO: REVIEW
 #[derive(Clone, Debug, PartialEq)]
 pub struct Blake2b512Block {
     pub chain_value: Vec<i64>,
@@ -346,7 +343,6 @@ impl Blake2b512Block {
     const CHAIN_VALUE_LENGTH: usize = 8;
     const BLOCK_LENGTH_BYTES: i64 = 128;
     const BLOCK_LENGTH_LONGS: usize = 16;
-    const DIGEST_LENGTH_BYTES: usize = 64;
     // Depth = 255, Fanout = ??, Keylength = 0, Digest length = 64 bytes
     const PARAM_VALUE_0: i64 = 0xFF000040;
     // Inner length = 32 bytes
@@ -370,7 +366,10 @@ impl Blake2b512Block {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Blake2b512Block {
-        assert!(bytes.len() == 8 * 8 + 2 * 8, "Invalid byte length for Blake2b512Block");
+        assert!(
+            bytes.len() == 8 * 8 + 2 * 8,
+            "Invalid byte length for Blake2b512Block"
+        );
 
         let mut chain_value = Vec::with_capacity(8);
         for i in 0..8 {

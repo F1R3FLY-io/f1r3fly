@@ -51,6 +51,7 @@ use models::rhoapi::expr::ExprInstance::GByteArray;
 /*
  * This trait has been combined with the 'ReplayRhoRuntime' trait
 */
+#[allow(async_fn_in_trait)]
 pub trait RhoRuntime: HasCost {
     /**
      * Parse the rholang term into [[coop.rchain.models.Par]] and execute it with provided initial phlo.
@@ -996,7 +997,7 @@ where
     .await
 }
 
-async fn create_runtimes<T, R>(
+async fn _create_runtimes<T, R>(
     space: T,
     replay_space: R,
     init_registry: bool,
@@ -1026,7 +1027,7 @@ where
     (rho_runtime, replay_rho_runtime)
 }
 
-async fn create_runtime_from_kv_store(
+async fn _create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,

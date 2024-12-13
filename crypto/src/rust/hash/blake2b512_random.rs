@@ -9,7 +9,6 @@ use rand::Rng;
  * Blake2b512.merge uses online tree hashing to merge two random generator
  * states.
  *
- * TODO: REVIEW
  */
 
 // See crypto/src/main/scala/coop/rchain/crypto/hash/Blake2b512Random.scala
@@ -317,7 +316,6 @@ impl Blake2b512Random {
 
         // Deserialize path_position
         let path_position = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
-        offset += 4;
 
         Blake2b512Random {
             digest,
