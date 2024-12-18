@@ -107,7 +107,7 @@ object CostAccountingPropertyTest {
     val prefix = "cost-accounting-property-test"
     mkRuntime[Task](prefix).use { runtime =>
       for {
-        // _    <- runtime.cost.set(Cost.UNSAFE_MAX)
+        _    <- runtime.setCostToMax
         cost <- CostAccounting.emptyCost[Task]
         res <- {
           procs.toStream

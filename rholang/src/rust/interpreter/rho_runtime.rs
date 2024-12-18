@@ -284,7 +284,7 @@ impl RhoRuntime for RhoRuntimeImpl {
             "\nspace after in evaluate: {:?}",
             self.get_hot_changes().len()
         );
-        println!("\nevaluate result: {:?}", res);
+        // println!("\nevaluate result: {:?}", res);
         res
     }
 

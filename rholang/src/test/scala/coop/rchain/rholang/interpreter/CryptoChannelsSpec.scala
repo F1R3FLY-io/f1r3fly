@@ -224,7 +224,7 @@ class CryptoChannelsSpec
       // spaces                   <- Resources.createRuntimes[Task](store)
       spaces                      <- Resources.createRuntimes[Task](dbDir.toString())
       (runtime, replayRuntime, _) = spaces
-      // _                           <- runtime.cost.set(Cost.UNSAFE_MAX)
+      _                           <- runtime.setCostToMax
     } yield runtime).unsafeRunSync
 
     try {

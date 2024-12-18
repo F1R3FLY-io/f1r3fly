@@ -172,12 +172,6 @@ trait ReplayRhoRuntime[F[_]] extends RhoRuntime[F] {
 }
 
 class RhoRuntimeImpl[F[_]: Sync: Span](
-    // val reducer: Reduce[F],
-    // val space: RhoISpace[F],
-    // val cost: _cost[F],
-    // val blockDataRef: Ref[F, BlockData],
-    // val invalidBlocksParam: InvalidBlocks[F],
-    // val mergeChs: Ref[F, Set[Par]]
     runtimePtr: Pointer
 ) extends RhoRuntime[F] {
   private val emptyContinuation = TaggedContinuation()
@@ -249,14 +243,51 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     }
 
   override def inj(par: Par, env: Env[Par] = Env[Par]())(implicit rand: Blake2b512Random): F[Unit] =
-    // reducer.inj(par)
-    ???
+    Sync[F].delay {
+      // println("\nterm in evaluate: " + term)
+      // println("\nrand in scala evaluate: " + Blake2b512Random.debugStr(rand))
+      val pathPosition = rand.pathView.position()
+      val blake2b512BlockProto = Blake2b512BlockProto(
+        chainValue = rand.digest.chainValue.map(v => Int64Proto(v)).toSeq,
+        t0 = rand.digest.t0,
+        t1 = rand.digest.t1
+      )
+
+      val blake2b512RandomProto = Blake2b512RandomProto(
+        digest = Some(blake2b512BlockProto),
+        lastBlock = ByteString.copyFrom(rand.lastBlock),
+        pathView = ByteString.copyFrom(rand.pathView),
+        countView = {
+          val buffer    = rand.countView
+          val countList = (0 until buffer.limit()).map(buffer.get(_)).map(UInt64Proto(_))
+          countList
+        },
+        hashArray = ByteString.copyFrom(rand.hashArray),
+        position = rand.position.toLong,
+        pathPosition = pathPosition
+      )
+
+      val injParams = InjParams(
+        Some(par),
+        Some(
+          EnvProto(
+            envMap = env.envMap.map(entry => (entry._1, entry._2)).toMap,
+            level = env.level,
+            shift = env.shift
+          )
+        ),
+        Some(blake2b512RandomProto)
+      )
+
+      val paramsBytes = injParams.toByteArray
+      val paramsPtr   = new Memory(paramsBytes.length.toLong)
+      paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
+
+      RHOLANG_RUST_INSTANCE.inj(runtimePtr, paramsPtr, paramsBytes.length)
+    }
 
   override def createSoftCheckpoint
       : F[SoftCheckpoint[Par, BindPattern, ListParWithRandom, TaggedContinuation]] =
-    // Span[F].withMarks("create-soft-heckpoint") {
-    //   space.createSoftCheckpoint()
-    // }
     for {
       result <- Sync[F].delay {
                  //  println("\nhit scala createSoftCheckpoint")
@@ -687,9 +718,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     } yield ()
 
   override def createCheckpoint: F[Checkpoint] =
-    // 	Span[F].withMarks("create-checkpoint") {
-    //   space.createCheckpoint()
-    // }
     for {
       result <- Sync[F].delay {
                  //  println("\nhit scala createCheckpoint")
@@ -796,7 +824,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     } yield result
 
   override def reset(root: Blake2b256Hash): F[Unit] =
-    // space.reset(root)
     for {
       _ <- Sync[F].delay {
             // println("\nhit scala reset, root: " + root)
@@ -825,7 +852,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     ???
 
   override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] =
-    // space.getData(channel)
     for {
       result <- Sync[F].delay {
                  val channelBytes = channel.toByteArray
@@ -889,7 +915,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     } yield result
 
   override def getJoins(channel: Par): F[Seq[Seq[Par]]] =
-    // space.getJoins(channel)
     for {
       result <- Sync[F].delay {
                  val channelBytes = channel.toByteArray
@@ -937,7 +962,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   override def getContinuation(
       channels: Seq[Name]
   ): F[Seq[WaitingContinuation[BindPattern, TaggedContinuation]]] =
-    // space.getWaitingContinuations(channels)
     for {
       result <- Sync[F].delay {
                  val channelsProto = ChannelsProto(channels)
@@ -1006,7 +1030,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
     } yield result
 
   override def setBlockData(blockData: BlockData): F[Unit] =
-    // blockDataRef.set(blockData)
     Sync[F].delay {
       val setBlockDataParams = BlockDataProto(
         blockData.timeStamp.toLong,
@@ -1060,7 +1083,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
 
   override def getHotChanges
       : F[Map[Seq[Par], Row[BindPattern, ListParWithRandom, TaggedContinuation]]] =
-    // space.toMap
     for {
       result <- Sync[F].delay {
                  val toMapPtr = RHOLANG_RUST_INSTANCE.get_hot_changes(runtimePtr)
@@ -1147,26 +1169,19 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                }
     } yield result
 
-  override def setCostToMax: F[Unit] = ???
+  override def setCostToMax: F[Unit] =
+    Sync[F].delay {
+      RHOLANG_RUST_INSTANCE.set_cost_to_max(runtimePtr)
+    }
 
   override def getRuntimePtr: Pointer = runtimePtr
 }
 
 class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
-    // override val reducer: Reduce[F],
-    // override val space: RhoReplayISpace[F],
-    // override val cost: _cost[F],
-    // // TODO: Runtime must be immutable. Block data and invalid blocks should be supplied when Runtime is created.
-    // //  This also means to unify all special names necessary to spawn a new Runtime.
-    // override val blockDataRef: Ref[F, BlockData],
-    // override val invalidBlocksParam: InvalidBlocks[F],
-    // override val mergeChs: Ref[F, Set[Par]]
-    // runtimePtr: Pointer,
     runtimePtr: Pointer
 ) extends RhoRuntimeImpl[F](runtimePtr)
     with ReplayRhoRuntime[F] {
   override def checkReplayData: F[Unit] =
-    // space.checkReplayData()
     for {
       _ <- Sync[F].delay {
             val _ = RHOLANG_RUST_INSTANCE.check_replay_data(
@@ -1440,7 +1455,20 @@ object RhoRuntime {
       additionalSystemProcesses: Seq[Definition[F]],
       mergeableTagName: Par
   ): F[(RhoRuntime[F], ReplayRhoRuntime[F])] =
-    ???
+    for {
+      rhoRuntime <- RhoRuntime.createRhoRuntime[F](
+                     space,
+                     mergeableTagName,
+                     initRegistry,
+                     additionalSystemProcesses
+                   )
+      replayRhoRuntime <- RhoRuntime.createReplayRhoRuntime[F](
+                           replaySpace,
+                           mergeableTagName,
+                           additionalSystemProcesses,
+                           initRegistry
+                         )
+    } yield (rhoRuntime, replayRhoRuntime)
 
   /*
    * Create from KeyValueStore's

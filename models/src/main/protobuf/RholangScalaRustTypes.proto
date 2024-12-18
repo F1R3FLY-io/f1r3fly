@@ -74,3 +74,15 @@ message BlockHashValidator {
 message InvalidBlocksProto {
   repeated BlockHashValidator invalidBlocks = 1;
 }
+
+message EnvProto {
+  map<int32, rhoapi.Par> envMap = 1;
+  int32 level = 2;
+  int32 shift = 3;
+}
+
+message InjParams {
+  rhoapi.Par par = 1;
+  EnvProto env = 2;
+	Blake2b512RandomProto rand = 3;
+}

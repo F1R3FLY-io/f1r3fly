@@ -11,6 +11,8 @@ trait JNAInterface extends Library {
 
   def evaluate(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
 
+  def inj(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Unit
+
   def create_soft_checkpoint(runtime_ptr: Pointer): Pointer
 
   def revert_to_soft_checkpoint(
@@ -50,6 +52,8 @@ trait JNAInterface extends Library {
   def set_invalid_blocks(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Unit
 
   def get_hot_changes(runtime_ptr: Pointer): Pointer
+
+  def set_cost_to_max(runtime_ptr: Pointer): Unit
 
   /* REPLAY RHO RUNTIME */
 

@@ -31,7 +31,6 @@ object VaultBalanceGetter {
 
   def getBalanceFromVaultPar[F[_]: Sync](vaultPar: Par, runtime: RhoRuntime[F]): F[Option[Long]] =
     for {
-      // _             <- runtime.cost.set(Cost.UNSAFE_MAX)
       _             <- runtime.setCostToMax
       ret           = VaultBalanceGetter.newReturnName
       getBalancePar = VaultBalanceGetter.getBalancePar(vaultPar, ret)

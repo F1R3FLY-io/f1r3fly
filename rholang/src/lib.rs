@@ -24,6 +24,7 @@ use rspace_plus_plus::rspace::{
     rspace::RSpace,
     trace::event::{Event, IOEvent},
 };
+use rust::interpreter::env::Env;
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -137,6 +138,54 @@ extern "C" fn evaluate(
     let mut result = len_bytes;
     result.append(&mut bytes);
     Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+extern "C" fn inj(
+    runtime_ptr: *mut RhoRuntime,
+    params_ptr: *const u8,
+    params_bytes_len: usize,
+) -> () {
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let params = InjParams::decode(params_slice).unwrap();
+
+    let par = params.par.unwrap();
+    let env_proto = params.env.unwrap();
+    let env = Env {
+        env_map: env_proto.env_map.into_iter().collect(),
+        level: env_proto.level,
+        shift: env_proto.shift,
+    };
+
+    let rand_proto = params.rand.unwrap();
+    let digest_proto = rand_proto.digest.unwrap();
+    let rand = Blake2b512Random {
+        digest: Blake2b512Block {
+            chain_value: digest_proto
+                .chain_value
+                .into_iter()
+                .map(|v| v.value)
+                .collect(),
+            t0: digest_proto.t0,
+            t1: digest_proto.t1,
+        },
+        last_block: rand_proto.last_block.into_iter().map(|v| v as i8).collect(),
+        path_view: rand_proto.path_view,
+        count_view: rand_proto.count_view.into_iter().map(|v| v.value).collect(),
+        hash_array: {
+            let mut array = [0i8; 64];
+            let vec = rand_proto.hash_array;
+            let i8_slice: &[i8] = unsafe { std::mem::transmute(&vec[..64]) };
+            array.copy_from_slice(i8_slice);
+            array
+        },
+        position: rand_proto.position,
+        path_position: rand_proto.path_position as usize,
+    };
+
+    let rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async { rho_runtime.inj(par, env, rand).await.unwrap() })
 }
 
 #[no_mangle]
@@ -997,6 +1046,18 @@ extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
     let mut result = len_bytes;
     result.append(&mut bytes);
     Box::leak(result.into_boxed_slice()).as_ptr()
+}
+
+#[no_mangle]
+extern "C" fn set_cost_to_max(runtime_ptr: *mut RhoRuntime) -> () {
+    unsafe {
+        (*runtime_ptr)
+            .runtime
+            .try_lock()
+            .unwrap()
+            .cost
+            .set(Cost::unsafe_max());
+    }
 }
 
 /* REPLAY RHO RUNTIME */

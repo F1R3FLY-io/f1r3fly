@@ -28,7 +28,7 @@ object TestUtil {
       runtime: RhoRuntime[F]
   )(implicit rand: Blake2b512Random): F[Unit] =
     for {
-      // _ <- runtime.cost.set(Cost.UNSAFE_MAX)
+      _ <- runtime.setCostToMax
       _ <- runtime.inj(term)
     } yield ()
 }
