@@ -7,8 +7,8 @@ use rand::rngs::OsRng;
 pub struct Ed25519;
 
 impl SignaturesAlg for Ed25519 {
-    fn verify(&self, data: &[u8], signature: &[u8], pub_key: Vec<u8>) -> bool {
-        let public_key = match parse_public_key(&pub_key) {
+    fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {
+        let public_key = match parse_public_key(pub_key) {
             Ok(key) => key,
             Err(err) => {
                 eprintln!("{}", err);
@@ -120,7 +120,7 @@ mod tests {
         let pub_key =
             decode("77f48b59caeda77751ed138b0ec667ff50f8768c25d48309a8f386a2bad187fb").unwrap();
 
-        assert!(ed25519.verify(&data, &sig, pub_key));
+        assert!(ed25519.verify(&data, &sig, &pub_key));
     }
 
     #[test]
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(signature_hex.len() % 2, 0, "Signature length must be even");
 
         // 4. Signature verification
-        let is_valid = ed25519.verify(&hash, &signature, public_key.bytes.clone());
+        let is_valid = ed25519.verify(&hash, &signature, &public_key.bytes);
         assert!(is_valid, "The signature should be valid");
 
         // 5. Validation with incorrect hash
@@ -182,7 +182,7 @@ mod tests {
         );
         let corrupted_hash = decode(corrupted_hash_hex).expect("Failed to decode corrupted hash");
         let corrupted_is_valid =
-            ed25519.verify(&corrupted_hash, &signature, public_key.bytes.clone());
+            ed25519.verify(&corrupted_hash, &signature, &public_key.bytes);
         assert!(
             !corrupted_is_valid,
             "The signature should be invalid for corrupted hash"

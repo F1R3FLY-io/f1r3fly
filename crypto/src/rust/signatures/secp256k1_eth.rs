@@ -9,7 +9,7 @@ pub struct Secp256k1Eth;
 
 //TODO need review
 impl SignaturesAlg for Secp256k1Eth {
-    fn verify(&self, data: &[u8], signature: &[u8], pub_key: Vec<u8>) -> bool {
+    fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {
         if let Ok(signature_der) = encode_signature_rs_to_der(signature) {
             Secp256k1.verify(data, &signature_der, pub_key)
         } else {

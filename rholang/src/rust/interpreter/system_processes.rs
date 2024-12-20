@@ -326,7 +326,7 @@ impl SystemProcesses {
                     RhoByteArray::unapply(&signature),
                     RhoByteArray::unapply(&pub_key),
                 ) {
-                    let verified = algorithm.verify(&data_bytes, &signature_bytes, pub_key_bytes);
+                    let verified = algorithm.verify(&data_bytes, &signature_bytes, &pub_key_bytes);
                     if !verified {
                         panic!("SystemProcesses: Failed to verify contract")
                     }

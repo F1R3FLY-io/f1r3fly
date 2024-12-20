@@ -16,7 +16,7 @@ use rand::rngs::OsRng;
 pub struct Secp256k1;
 
 impl SignaturesAlg for Secp256k1 {
-    fn verify(&self, data: &[u8], signature: &[u8], pub_key: Vec<u8>) -> bool {
+    fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {
         VerifyingKey::from_sec1_bytes(&pub_key)
             .and_then(|vk| Signature::from_der(signature).map(|sig| vk.verify(data, &sig)))
             .is_ok()
@@ -100,7 +100,7 @@ mod tests {
         let data = Sha256::digest(b"testing");
 
         let signature = secp256k1.sign(&data, &private_key.bytes);
-        let is_valid = secp256k1.verify(&data, &signature, public_key.bytes);
+        let is_valid = secp256k1.verify(&data, &signature, &public_key.bytes);
 
         assert!(is_valid, "Signature is not valid for the generated keypair");
     }
@@ -119,7 +119,7 @@ mod tests {
         let signature = hex::decode("3045022100acb2ec6a831ef053de04b55ad26fb5288204969f6c8eaabb52d75f4942be293e02205016a682d3111e9d13b744362807c9039f455c5457dea240f6b442f341ece7bd")
         .expect("Failed to decode signature");
 
-        let is_valid = secp256k1.verify(&data, &signature, public_key.clone());
+        let is_valid = secp256k1.verify(&data, &signature, &public_key);
 
         assert!(is_valid, "Static signature verification failed");
     }
