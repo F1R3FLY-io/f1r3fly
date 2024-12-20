@@ -13,6 +13,7 @@ option (scalapb.options) = {
 message CreateRuntimeParams {
   rhoapi.Par mergeableTagName = 1;
   bool initRegistry = 2;
+	bool RhoSpecSystemProcesses = 3;
 }
 
 message BlockDataProto {

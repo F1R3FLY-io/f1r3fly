@@ -245,7 +245,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   override def inj(par: Par, env: Env[Par] = Env[Par]())(implicit rand: Blake2b512Random): F[Unit] =
     Sync[F].delay {
       // println("\nterm in evaluate: " + term)
-      // println("\nrand in scala evaluate: " + Blake2b512Random.debugStr(rand))
+      // println("\nrand in scala inj: " + Blake2b512Random.debugStr(rand))
       val pathPosition = rand.pathView.position()
       val blake2b512BlockProto = Blake2b512BlockProto(
         chainValue = rand.digest.chainValue.map(v => Int64Proto(v)).toSeq,
@@ -1357,14 +1357,12 @@ object RhoRuntime {
   )(): F[RhoRuntime[F]] =
     Span[F].trace(createPlayRuntime) {
       // println("\nscala createRuntime")
-      if (extraSystemProcesses.nonEmpty) {
-        println(s"extra system processes was nonEmpty, size: ${extraSystemProcesses.size}")
-      }
 
       Sync[F].delay {
         val runtimeParams = CreateRuntimeParams(
           Some(mergeableTagName),
-          initRegistry
+          initRegistry,
+          extraSystemProcesses.nonEmpty
         )
 
         val runtimeParamsBytes = runtimeParams.toByteArray
@@ -1422,14 +1420,12 @@ object RhoRuntime {
   )(): F[ReplayRhoRuntime[F]] =
     Span[F].trace(createReplayRuntime) {
       // println("\nscala createReplayRuntime")
-      if (extraSystemProcesses.nonEmpty) {
-        println(s"extra system processes was nonEmpty, size: ${extraSystemProcesses.size}")
-      }
 
       Sync[F].delay {
         val runtimeParams = CreateRuntimeParams(
           Some(mergeableTagName),
-          initRegistry
+          initRegistry,
+          extraSystemProcesses.nonEmpty
         )
 
         val runtimeParamsBytes = runtimeParams.toByteArray

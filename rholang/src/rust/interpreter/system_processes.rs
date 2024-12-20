@@ -797,4 +797,50 @@ impl SystemProcesses {
             panic!("SystemProcesses: is_contract_call failed");
         }
     }
+
+    /* Rho Spec Test Framework Contracts */
+
+    pub async fn std_log(&mut self, message: Vec<ListParWithRandom>) -> () {
+        if let Some((_, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [log_level_par, par] => {
+                    if let Some(log_level) = RhoString::unapply(log_level_par) {
+                        let msg = self.pretty_printer.build_string_from_message(par);
+
+                        match log_level.as_str() {
+                            "trace" => println!("trace: {}", msg),
+                            "debug" => println!("debug: {}", msg),
+                            "info" => println!("info: {}", msg),
+                            "warn" => println!("warn: {}", msg),
+                            "error" => println!("error: {}", msg),
+                            _ => (),
+                        }
+                    } else {
+                        ()
+                    }
+                }
+                _ => (),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
+}
+
+// See casper/src/test/scala/coop/rchain/casper/helper/RhoSpec.scala
+
+pub fn test_framework_contracts() -> Vec<Definition> {
+    vec![Definition {
+        urn: "rho:io:stdlog".to_string(),
+        fixed_channel: byte_name(103),
+        arity: 2,
+        body_ref: 103,
+        handler: Box::new(|ctx| {
+            Box::new(move |args| {
+                let ctx = ctx.clone();
+                Box::pin(async move { ctx.system_processes.clone().std_log(args).await })
+            })
+        }),
+        remainder: None,
+    }]
 }

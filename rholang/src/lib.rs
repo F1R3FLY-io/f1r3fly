@@ -25,6 +25,7 @@ use rspace_plus_plus::rspace::{
     trace::event::{Event, IOEvent},
 };
 use rust::interpreter::env::Env;
+use rust::interpreter::system_processes::test_framework_contracts;
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -182,6 +183,9 @@ extern "C" fn inj(
         position: rand_proto.position,
         path_position: rand_proto.path_position as usize,
     };
+
+    // println!("\nrand in rust inj: ");
+    // rand.debug_str();
 
     let rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -1198,10 +1202,21 @@ extern "C" fn create_runtime(
 
     let mergeable_tag_name = params.mergeable_tag_name.unwrap();
     let init_registry = params.init_registry;
+    let mut extra_system_processes = if params.rho_spec_system_processes {
+        test_framework_contracts()
+    } else {
+        Vec::new()
+    };
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let rho_runtime = tokio_runtime.block_on(async {
-        create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+        create_rho_runtime(
+            rspace,
+            mergeable_tag_name,
+            init_registry,
+            &mut extra_system_processes,
+        )
+        .await
     });
 
     Box::into_raw(Box::new(RhoRuntime {
@@ -1222,10 +1237,21 @@ extern "C" fn create_replay_runtime(
 
     let mergeable_tag_name = params.mergeable_tag_name.unwrap();
     let init_registry = params.init_registry;
+    let mut extra_system_processes = if params.rho_spec_system_processes {
+        test_framework_contracts()
+    } else {
+        Vec::new()
+    };
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let replay_rho_runtime = tokio_runtime.block_on(async {
-        create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+        create_rho_runtime(
+            rspace,
+            mergeable_tag_name,
+            init_registry,
+            &mut extra_system_processes,
+        )
+        .await
     });
 
     Box::into_raw(Box::new(ReplayRhoRuntime {

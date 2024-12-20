@@ -3306,6 +3306,7 @@ impl DebruijnInterpreter {
             .collect::<Result<Vec<_>, InterpreterError>>()?;
         // println!("\npar in eval_expr: {:?}", par);
         // println!("\nevaled_exprs in eval_expr: {:?}", evaled_exprs);
+
         // Note: the locallyFree cache in par could now be invalid, but given
         // that locallyFree is for use in the matcher, and the matcher uses
         // substitution, it will resolve in that case. AlwaysEqual makes sure
