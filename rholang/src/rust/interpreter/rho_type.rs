@@ -60,8 +60,8 @@ impl RhoBoolean {
         }
     }
 
-    pub fn unapply(p: Par) -> Option<bool> {
-        if let Some(expr) = single_expr(&p) {
+    pub fn unapply(p: &Par) -> Option<bool> {
+        if let Some(expr) = single_expr(p) {
             if let Expr {
                 expr_instance: Some(ExprInstance::GBool(b)),
             } = expr
@@ -82,7 +82,7 @@ impl RhoNumber {
         }
     }
 
-    pub fn unapply(p: Par) -> Option<i64> {
+    pub fn unapply(p: &Par) -> Option<i64> {
         if let Some(expr) = single_expr(&p) {
             if let Expr {
                 expr_instance: Some(ExprInstance::GInt(v)),
