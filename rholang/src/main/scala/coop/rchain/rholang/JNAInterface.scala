@@ -73,6 +73,7 @@ trait JNAInterface extends Library {
       params_bytes_len: Int
   ): Pointer
 
+  def source_to_adt(params_ptr: Pointer, params_bytes_len: Int): Pointer
 }
 
 object JNAInterfaceLoader {

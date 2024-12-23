@@ -87,3 +87,8 @@ message InjParams {
   EnvProto env = 2;
 	Blake2b512RandomProto rand = 3;
 }
+
+message SourceToAdtParams {
+  string source = 1;
+  map<string, rhoapi.Par> normalizerEnv = 2;
+}

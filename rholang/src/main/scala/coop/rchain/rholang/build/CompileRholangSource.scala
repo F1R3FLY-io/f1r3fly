@@ -1,9 +1,11 @@
 package coop.rchain.rholang.build
+import com.sun.jna.Memory
 import coop.rchain.models.NormalizerEnv.ToEnvMap
 import coop.rchain.models.{NormalizerEnv, Par}
-import coop.rchain.rholang.interpreter.compiler.Compiler
-import monix.eval.Coeval
 import shapeless.HNil
+import coop.rchain.models.rholang_scala_rust_types.SourceToAdtParams
+import coop.rchain.rholang.JNAInterfaceLoader.RHOLANG_RUST_INSTANCE
+import coop.rchain.rholang.build.CompiledRholangSource.sourceToAdt
 
 import scala.io.Source
 
@@ -12,8 +14,12 @@ abstract class CompiledRholangSource[Env](val code: String, val normalizerEnv: N
     implicit ev: ToEnvMap[Env]
 ) {
   val path: String
-  val term: Par = Compiler[Coeval].sourceToADT(code, normalizerEnv.toEnv).value()
-  final def env = normalizerEnv.toEnv
+  val term: Par = {
+    val params = SourceToAdtParams(code, normalizerEnv.toEnv)
+    sourceToAdt(params)
+  }
+
+  final def env: Map[String, Par] = normalizerEnv.toEnv
 }
 
 object CompiledRholangSource {
@@ -31,6 +37,28 @@ object CompiledRholangSource {
   ): CompiledRholangSource[Env] = new CompiledRholangSource[Env](loadSource(classpath), env) {
     override val path: String = classpath
   }
+
+  def sourceToAdt(params: SourceToAdtParams): Par = {
+    // serialize the Protobuf parameters into a byte array
+    val paramsBytes = params.toByteArray
+    val paramsPtr   = new Memory(paramsBytes.length.toLong)
+    paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
+
+    //  call the `source_to_adt` function through JNA
+    val resultPtr = RHOLANG_RUST_INSTANCE.source_to_adt(paramsPtr, paramsBytes.length)
+    assert(resultPtr != null, "Rust function returned null pointer")
+
+    try {
+      // Decode the result
+      val resultBytesLength = resultPtr.getInt(0)
+      val resultBytes       = resultPtr.getByteArray(4, resultBytesLength)
+      Par.parseFrom(resultBytes) // Return the `Par' object
+    } catch {
+      case e: Throwable =>
+        throw new RuntimeException("Error parsing result from Rust", e)
+    }
+  }
+
 }
 
 /**

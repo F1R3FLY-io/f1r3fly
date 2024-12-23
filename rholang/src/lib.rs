@@ -6,6 +6,7 @@ pub mod rust {
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+use crate::rust::interpreter::compiler::compiler::Compiler;
 use crypto::rust::hash::blake2b512_block::Blake2b512Block;
 use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
 use models::rspace_plus_plus_types::*;
@@ -1266,4 +1267,32 @@ extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
     tokio_runtime.block_on(async {
         bootstrap_registry_internal(runtime).await;
     });
+}
+
+#[no_mangle]
+extern "C" fn source_to_adt(params_ptr: *const u8, params_bytes_len: usize) -> *const u8 {
+    // Deserialization of parameters
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let params = SourceToAdtParams::decode(params_slice).unwrap();
+
+    // Execution of transformation logic
+    let result = match Compiler::source_to_adt(&params.source) {
+        Ok(par) => par,
+        Err(error) => {
+            println!("source_to_adt rust side error {:?}", error);
+            return std::ptr::null();
+        }
+    };
+
+    // Serialization of the result in `Par`
+    let mut result_bytes = result.encode_to_vec();
+    let len = result_bytes.len() as u32;
+    let len_bytes = len.to_le_bytes().to_vec();
+
+    // Add the length of the result at the beginning of the byte array
+    let mut full_result = len_bytes;
+    full_result.append(&mut result_bytes);
+
+    // Return a pointer to the serialized result
+    Box::leak(full_result.into_boxed_slice()).as_ptr()
 }
