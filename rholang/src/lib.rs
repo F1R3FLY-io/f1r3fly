@@ -1276,7 +1276,10 @@ extern "C" fn source_to_adt(params_ptr: *const u8, params_bytes_len: usize) -> *
     let params = SourceToAdtParams::decode(params_slice).unwrap();
 
     // Execution of transformation logic
-    let result = match Compiler::source_to_adt(&params.source) {
+    let result = match Compiler::source_to_adt_with_normalizer_env(
+        &params.source,
+        params.normalizer_env.into_iter().collect(),
+    ) {
         Ok(par) => par,
         Err(error) => {
             println!("source_to_adt rust side error {:?}", error);
