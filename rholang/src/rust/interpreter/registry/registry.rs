@@ -8,7 +8,7 @@ impl Registry {
         full_key[..32].copy_from_slice(&arr[..32]);
         let crc = CRC14::compute(&full_key[..32]);
         full_key[32] = (crc & 0xff) as u8;
-        full_key[33] = ((crc & 0xff00) >> 8) as u8;
+        full_key[33] = ((crc & 0xff00) >> 6) as u8;
         format!("rho:id:{}", encode(&full_key, 270))
     }
 }
