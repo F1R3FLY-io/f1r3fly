@@ -196,6 +196,7 @@ class RhoSpec(
   ): F[Unit] = {
     import coop.rchain.models.rholang.implicits._
     val rand = Tools.unforgeableNameRng(deploy.pk, deploy.data.timestamp)
+    println("\nhit evalDeploy, evaluating RhoSpecContract.rho")
     eval(deploy.data.term, runtime, NormalizerEnv(deploy).toEnv)(Sync[F], rand)
   }
 

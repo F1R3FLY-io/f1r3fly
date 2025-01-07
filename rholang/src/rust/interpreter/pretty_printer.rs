@@ -633,7 +633,7 @@ impl PrettyPrinter {
             let body_str = self.build_string_from_message(
                 r.body
                     .as_ref()
-                    .expect("body field on receive was None, should be Soem"),
+                    .expect("body field on receive was None, should be Some"),
             );
 
             if !body_str.is_empty() {

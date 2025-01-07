@@ -294,7 +294,18 @@ impl RhoRuntime for RhoRuntimeImpl {
         _env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.reducer.inj(par, rand).await
+        println!(
+            "\nspace before in inj: {:?}",
+            self.get_hot_changes().len()
+        );
+        // println!("\nenv in inj: {:?}", _env);
+        // println!("\npar in inj: {:?}", par);
+        let res = self.reducer.inj(par, rand).await;
+        println!(
+            "\nspace after in inj: {:?}",
+            self.get_hot_changes().len()
+        );
+        res
     }
 
     fn create_soft_checkpoint(

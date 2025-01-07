@@ -74,6 +74,8 @@ impl SortedParMap {
     }
 
     pub fn get_or_else(&self, key: Par, default: Par) -> Par {
+        // println!("\nsorted_map in get_or_else: {:?}", self.sorted_map);
+        // println!("\nkey in get_or_else: {:?}", key);
         match self.sorted_map.get(&SortedParMap::sort(&key)) {
             Some(value) => value.clone(),
             None => default,

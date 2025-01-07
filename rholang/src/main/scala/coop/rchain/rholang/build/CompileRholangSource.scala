@@ -7,6 +7,9 @@ import coop.rchain.models.rholang_scala_rust_types.SourceToAdtParams
 import coop.rchain.rholang.JNAInterfaceLoader.RHOLANG_RUST_INSTANCE
 import coop.rchain.rholang.build.CompiledRholangSource.sourceToAdt
 
+import coop.rchain.rholang.interpreter.compiler.Compiler
+import monix.eval.Coeval
+
 import scala.io.Source
 
 /** TODO: Currently all calls to this class use empty environment. See [[NormalizerEnv]]. */
@@ -18,6 +21,7 @@ abstract class CompiledRholangSource[Env](val code: String, val normalizerEnv: N
     val params = SourceToAdtParams(code, normalizerEnv.toEnv)
     sourceToAdt(params)
   }
+  // val term: Par = Compiler[Coeval].sourceToADT(code, normalizerEnv.toEnv).value()
 
   final def env: Map[String, Par] = normalizerEnv.toEnv
 }

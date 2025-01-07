@@ -9,6 +9,7 @@ import coop.rchain.rholang.build.CompiledRholangSource
 import coop.rchain.rholang.interpreter.accounting.Cost
 import coop.rchain.rholang.interpreter.RhoRuntime
 import coop.rchain.rholang.interpreter.compiler.Compiler
+import coop.rchain.models.rholang_scala_rust_types.SourceToAdtParams
 
 object TestUtil {
   def eval[F[_]: Sync, Env](
@@ -20,8 +21,21 @@ object TestUtil {
       code: String,
       runtime: RhoRuntime[F],
       normalizerEnv: Map[String, Par]
-  )(implicit rand: Blake2b512Random): F[Unit] =
-    Compiler[F].sourceToADT(code, normalizerEnv) >>= (evalTerm(_, runtime))
+  )(implicit rand: Blake2b512Random): F[Unit] = {
+    val params = SourceToAdtParams(code, normalizerEnv)
+    // println(s"\nhit eval, normalizerEnv: $normalizerEnv")
+    val par = CompiledRholangSource.sourceToAdt(params)
+    // println(s"\nhit eval, normalized par: $par")
+    evalTerm(par, runtime)
+
+    // for {
+    //   term <- Compiler[F].sourceToADT(code, normalizerEnv)
+    //   // _    = println(s"\nhit eval, normalizerEnv: $normalizerEnv")
+    //   // _ = println(s"\nhit eval, normalized par: $term")
+    //   _ <- evalTerm(term, runtime)
+    // } yield ()
+
+  }
 
   private def evalTerm[F[_]: FlatMap](
       term: Par,

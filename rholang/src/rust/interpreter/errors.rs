@@ -6,11 +6,11 @@ use rspace_plus_plus::rspace::errors::RSpaceError;
 use super::compiler::exports::SourcePosition;
 
 // PartialEq here is needed for testing purposes
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum InterpreterError {
     RSpaceError(RSpaceError),
     BugFoundError(String),
-    UndefinedRequiredProtobufFieldError,
+    UndefinedRequiredProtobufFieldError(String),
     NormalizerError(String),
     SyntaxError(String),
     LexerError(String),
@@ -86,8 +86,8 @@ impl fmt::Display for InterpreterError {
 
             InterpreterError::RSpaceError(msg) => write!(f, "RSpace Error: {}", msg),
 
-            InterpreterError::UndefinedRequiredProtobufFieldError => {
-                write!(f, "A parsed Protobuf field was None, should be Some",)
+            InterpreterError::UndefinedRequiredProtobufFieldError(field_name) => {
+                write!(f, "A parsed Protobuf field was None, should be Some: {}", field_name)
             }
 
             InterpreterError::NormalizerError(msg) => write!(f, "Normalizer error: {}", msg),
@@ -268,4 +268,4 @@ impl From<InterpreterError> for RSpaceError {
     }
 }
 
-impl std::error::Error for InterpreterError {}
+// impl std::error::Error for InterpreterError {}

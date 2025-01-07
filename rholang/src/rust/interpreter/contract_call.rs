@@ -63,6 +63,8 @@ impl ContractCall {
                     )?;
                     drop(space_lock);
 
+                    // println!("\nproduce_result in contract_call: {:?}", produce_result);
+
                     match produce_result {
                         Some((cont, channels)) => {
                             let dispatcher_lock = dispatcher.try_read().unwrap();

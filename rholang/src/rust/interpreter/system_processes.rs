@@ -390,7 +390,7 @@ impl SystemProcesses {
     pub async fn std_out(&mut self, contract_args: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(contract_args) {
             if args.len() == 1 {
-                // println!("args: {:?}", args);
+                // println!("\nhit std_out, arg: {:?}", args[0]);
                 let str = self.pretty_printer.build_string_from_message(&args[0]);
                 self.print_std_out(&str);
             } else {
@@ -677,6 +677,8 @@ impl SystemProcesses {
                         } else {
                             Par::default()
                         };
+                        // println!("\nresponse in registry_ops: {:?}", response);
+                        // println!("\nack in registry_ops: {:?}", ack);
                         if let Err(e) = produce(vec![response], ack.clone()).await {
                             eprintln!("Error producing response: {:?}", e);
                         }

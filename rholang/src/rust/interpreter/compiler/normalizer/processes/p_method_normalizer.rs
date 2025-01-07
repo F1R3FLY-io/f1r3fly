@@ -28,7 +28,7 @@ pub fn normalize_p_method(
 
     let target = target_result.par;
 
-    let mut acc = (
+    let init_acc = (
         Vec::new(),
         ProcVisitInputs {
             par: Par::default(),
@@ -39,28 +39,34 @@ pub fn normalize_p_method(
         false,
     );
 
-    for arg in &args.procs {
-        let proc_match_result = normalize_match_proc(&arg, acc.1.clone(), env)?;
-
-        acc.0.push(proc_match_result.par.clone());
-        acc.1 = ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: input.bound_map_chain.clone(),
-            free_map: proc_match_result.free_map.clone(),
-        };
-        acc.2 = union(acc.2.clone(), proc_match_result.par.locally_free.clone());
-        acc.3 = acc.3 || proc_match_result.par.connective_used;
-    }
+    let arg_results = args.procs.iter().rev().try_fold(init_acc, |acc, arg| {
+        normalize_match_proc(&arg, acc.1.clone(), env).map(|proc_match_result| {
+            (
+                {
+                    let mut acc_0 = acc.0.clone();
+                    acc_0.insert(0, proc_match_result.par.clone());
+                    acc_0
+                },
+                ProcVisitInputs {
+                    par: Par::default(),
+                    bound_map_chain: input.bound_map_chain.clone(),
+                    free_map: proc_match_result.free_map.clone(),
+                },
+                union(acc.2.clone(), proc_match_result.par.locally_free.clone()),
+                acc.3 || proc_match_result.par.connective_used,
+            )
+        })
+    })?;
 
     let method = EMethod {
         method_name: name_var.name.clone(),
         target: Some(target.clone()),
-        arguments: acc.0,
+        arguments: arg_results.0,
         locally_free: union(
             target.locally_free(target.clone(), input.bound_map_chain.depth() as i32),
-            acc.2,
+            arg_results.2,
         ),
-        connective_used: target.connective_used(target.clone()) || acc.3,
+        connective_used: target.connective_used(target.clone()) || arg_results.3,
     };
 
     let updated_par = prepend_expr(
@@ -73,7 +79,7 @@ pub fn normalize_p_method(
 
     Ok(ProcVisitOutputs {
         par: updated_par,
-        free_map: acc.1.free_map,
+        free_map: arg_results.1.free_map,
     })
 }
 
