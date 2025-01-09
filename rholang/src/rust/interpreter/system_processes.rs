@@ -16,7 +16,7 @@ use models::Byte;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
@@ -56,7 +56,7 @@ impl InvalidBlocks {
     }
 }
 
-fn byte_name(b: Byte) -> Par {
+pub fn byte_name(b: Byte) -> Par {
     Par::default().with_unforgeables(vec![GUnforgeable {
         unf_instance: Some(GPrivateBody(GPrivate { id: vec![b] })),
     }])
@@ -803,15 +803,22 @@ impl SystemProcesses {
         }
     }
 
-    /* Rho Spec Test Framework Contracts */
+    /*
+     * The following functions below can be removed once rust-casper calls create_rho_runtime.
+     * Until then, they must remain in the rholang directory to avoid circular dependencies.
+     */
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/TestResultCollector.scala
 
     pub async fn handle_message(
         &self,
         message: Vec<ListParWithRandom>,
-        // _result: TestResult,
+        test_result_collector: Arc<TestResultCollector>,
     ) -> () {
+        println!("\nhit handle_message");
+
         if let Some((produce, assert_par)) = self.is_contract_call().unapply(message) {
-            if let Some((test_name, _attempt, assertion, clue, ack_channel)) =
+            if let Some((test_name, attempt, assertion, clue, ack_channel)) =
                 IsAssert::unapply(assert_par.clone())
             {
                 if let Some((expected_or_unexpected, equals_or_not_equals_str, actual)) =
@@ -825,6 +832,11 @@ impl SystemProcesses {
                             clue,
                         };
                         println!("\nassertion: {:?}", assertion);
+
+                        let curr_test_result = test_result_collector.get_result();
+                        let new_test_result =
+                            curr_test_result.add_assertion(attempt, assertion.clone());
+                        test_result_collector.update(new_test_result);
 
                         if let Err(e) = produce(
                             vec![new_gbool_par(assertion.is_success(), Vec::new(), false)],
@@ -843,6 +855,11 @@ impl SystemProcesses {
                         };
                         println!("\nassertion: {:?}", assertion);
 
+                        let curr_test_result = test_result_collector.get_result();
+                        let new_test_result =
+                            curr_test_result.add_assertion(attempt, assertion.clone());
+                        test_result_collector.update(new_test_result);
+
                         if let Err(e) = produce(
                             vec![new_gbool_par(assertion.is_success(), Vec::new(), false)],
                             ack_channel.clone(),
@@ -852,10 +869,22 @@ impl SystemProcesses {
                             eprintln!("Error producing result: {:?}", e);
                         }
                     } else {
+                        println!("\nreturning Unit");
                         ()
                     }
                 } else if let Some(condition) = RhoBoolean::unapply(&assertion) {
                     println!("\ncondition: {:?}", condition);
+
+                    let curr_test_result = test_result_collector.get_result();
+                    let new_test_result = curr_test_result.add_assertion(
+                        attempt,
+                        RhoTestAssertion::RhoAssertTrue {
+                            test_name,
+                            is_success: condition,
+                            clue,
+                        },
+                    );
+                    test_result_collector.update(new_test_result);
 
                     if let Err(e) = produce(
                         vec![new_gbool_par(condition, Vec::new(), false)],
@@ -868,6 +897,17 @@ impl SystemProcesses {
                 } else {
                     println!("\nfailed to evaluate assertion: {:?}", assertion);
 
+                    let curr_test_result = test_result_collector.get_result();
+                    let new_test_result = curr_test_result.add_assertion(
+                        attempt,
+                        RhoTestAssertion::RhoAssertTrue {
+                            test_name,
+                            is_success: false,
+                            clue: format!("Failed to evaluate assertion: {:?}", assertion),
+                        },
+                    );
+                    test_result_collector.update(new_test_result);
+
                     if let Err(e) = produce(
                         vec![new_gbool_par(false, Vec::new(), false)],
                         ack_channel.clone(),
@@ -879,13 +919,20 @@ impl SystemProcesses {
                 }
             } else if let Some(has_finished) = IsSetFinished::unapply(assert_par) {
                 println!("\nhas_finished: {}", has_finished);
+
+                let curr_test_result = test_result_collector.get_result();
+                let new_test_result = curr_test_result.set_finished(has_finished);
+                test_result_collector.update(new_test_result);
             } else {
+                println!("\nreturning Unit");
                 ()
             }
         } else {
             panic!("SystemProcesses: is_contract_call failed");
         }
     }
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/RhoLoggerContract.scala
 
     pub async fn std_log(&mut self, message: Vec<ListParWithRandom>) -> () {
         if let Some((_, args)) = self.is_contract_call().unapply(message) {
@@ -916,19 +963,31 @@ impl SystemProcesses {
 
 // See casper/src/test/scala/coop/rchain/casper/helper/RhoSpec.scala
 
-pub fn test_framework_contracts() -> Vec<Definition> {
+pub fn test_framework_contracts(
+    test_result_collector: Arc<TestResultCollector>,
+) -> Vec<Definition> {
     vec![
         Definition {
             urn: "rho:test:assertAck".to_string(),
             fixed_channel: byte_name(101),
             arity: 5,
             body_ref: 101,
-            handler: Box::new(|ctx| {
-                Box::new(move |args| {
-                    let ctx = ctx.clone();
-                    Box::pin(async move { ctx.system_processes.clone().handle_message(args).await })
+            handler: {
+                let collector = Arc::clone(&test_result_collector);
+                Box::new(move |ctx| {
+                    let collector = Arc::clone(&collector);
+                    Box::new(move |args| {
+                        let collector = Arc::clone(&collector);
+                        let ctx = ctx.clone();
+                        Box::pin(async move {
+                            ctx.system_processes
+                                .clone()
+                                .handle_message(args, collector)
+                                .await
+                        })
+                    })
                 })
-            }),
+            },
             remainder: None,
         },
         Definition {
@@ -936,12 +995,22 @@ pub fn test_framework_contracts() -> Vec<Definition> {
             fixed_channel: byte_name(102),
             arity: 1,
             body_ref: 102,
-            handler: Box::new(|ctx| {
-                Box::new(move |args| {
-                    let ctx = ctx.clone();
-                    Box::pin(async move { ctx.system_processes.clone().handle_message(args).await })
+            handler: {
+                let collector = Arc::clone(&test_result_collector);
+                Box::new(move |ctx| {
+                    let collector = Arc::clone(&collector);
+                    Box::new(move |args| {
+                        let collector = Arc::clone(&collector);
+                        let ctx = ctx.clone();
+                        Box::pin(async move {
+                            ctx.system_processes
+                                .clone()
+                                .handle_message(args, collector)
+                                .await
+                        })
+                    })
                 })
-            }),
+            },
             remainder: None,
         },
         Definition {
@@ -1084,6 +1153,7 @@ impl RhoTestAssertion {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct TestResult {
     assertions: HashMap<String, HashMap<i64, Vec<RhoTestAssertion>>>,
     has_finished: bool,
@@ -1131,5 +1201,28 @@ impl TestResult {
             assertions: self.assertions.clone(),
             has_finished,
         }
+    }
+}
+
+pub struct TestResultCollector {
+    result: Mutex<TestResult>,
+}
+
+impl TestResultCollector {
+    pub fn new() -> Self {
+        Self {
+            result: Mutex::new(TestResult {
+                assertions: HashMap::new(),
+                has_finished: false,
+            }),
+        }
+    }
+
+    pub fn get_result(&self) -> TestResult {
+        self.result.try_lock().unwrap().clone()
+    }
+
+    pub fn update(&self, test_result: TestResult) {
+        self.result.lock().unwrap().clone_from(&test_result);
     }
 }

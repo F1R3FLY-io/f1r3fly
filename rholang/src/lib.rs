@@ -26,7 +26,7 @@ use rspace_plus_plus::rspace::{
     trace::event::{Event, IOEvent},
 };
 use rust::interpreter::env::Env;
-use rust::interpreter::system_processes::test_framework_contracts;
+use rust::interpreter::system_processes::{test_framework_contracts, TestResultCollector};
 use rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::{
@@ -1186,7 +1186,8 @@ extern "C" fn check_replay_data(runtime_ptr: *mut ReplayRhoRuntime) -> () {
 /*
  * ADDITIONAL
  *
- * Note: I am defaulting 'additional_system_processes' to 'Vec::new()' in both 'create' methods
+ * Note: If 'additional_system_processes' is not empty, then the 'create_runtime' method will
+ *       use the 'test_framework_contracts' function to add the system processes to the runtime.
  *
 */
 
@@ -1204,7 +1205,7 @@ extern "C" fn create_runtime(
     let mergeable_tag_name = params.mergeable_tag_name.unwrap();
     let init_registry = params.init_registry;
     let mut extra_system_processes = if params.rho_spec_system_processes {
-        test_framework_contracts()
+        test_framework_contracts(Arc::new(TestResultCollector::new()))
     } else {
         Vec::new()
     };
@@ -1239,7 +1240,7 @@ extern "C" fn create_replay_runtime(
     let mergeable_tag_name = params.mergeable_tag_name.unwrap();
     let init_registry = params.init_registry;
     let mut extra_system_processes = if params.rho_spec_system_processes {
-        test_framework_contracts()
+        test_framework_contracts(Arc::new(TestResultCollector::new()))
     } else {
         Vec::new()
     };
@@ -1283,7 +1284,7 @@ extern "C" fn source_to_adt(params_ptr: *const u8, params_bytes_len: usize) -> *
         Ok(par) => {
             // println!("\npar in source_to_adt: {:?}", par);
             par
-        },
+        }
         Err(error) => {
             println!("source_to_adt rust side error {:?}", error);
             return std::ptr::null();

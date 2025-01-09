@@ -1,38 +1,38 @@
 new
   rl(`rho:registry:lookup`), RhoSpecCh,
   stdlog(`rho:io:stdlog`),
-  test_get_before_set,
-  test_get_after_set,
-  test_get_after_update_nil,
-  test_get_after_update,
-  test_fast_unsafe_get_after_set,
-  test_contains_before_set,
-  test_contains_after_set,
-  test_get_after_set_to_nil,
-  test_contains_after_set_to_nil,
-  test_contention
+  testGetBeforeSet,
+  testGetAfterSet,
+  testGetAfterUpdateNil,
+  testGetAfterUpdate,
+  testFastUnsafeGetAfterSet,
+  testContainsBeforeSet,
+  testContainsAfterSet,
+  testGetAfterSetToNil,
+  testContainsAfterSetToNil,
+  testContention
 in {
   rl!(`rho:id:zphjgsfy13h1k85isc8rtwtgt3t9zzt5pjd5ihykfmyapfc4wt3x5h`, *RhoSpecCh) |
   for(@(_, RhoSpec) <- RhoSpecCh) {
     @RhoSpec!("testSuite",
       [
-        ("Get before set returns Nil", *test_get_before_set),
-        ("Get after set returns the new value", *test_get_after_set),
-        ("Get after updating a nonexistent key should return Nil", *test_get_after_update_nil),
-        ("Get after updating an existing key should return the right value", *test_get_after_update),
-        ("Fast unsafe get after set returns the new value", *test_fast_unsafe_get_after_set),
-        ("Contains before set returns false", *test_contains_before_set),
-        ("Contains after set returns true", *test_contains_after_set),
-        ("Get after set to Nil returns Nil", *test_get_after_set_to_nil),
-        ("Contains after set to Nil returns true", *test_contains_after_set_to_nil),
-        ("Works under contention", *test_contention)
+        ("Get before set returns Nil", *testGetBeforeSet),
+        ("Get after set returns the new value", *testGetAfterSet),
+        ("Get after updating a nonexistent key should return Nil", *testGetAfterUpdateNil),
+        ("Get after updating an existing key should return the right value", *testGetAfterUpdate),
+        ("Fast unsafe get after set returns the new value", *testFastUnsafeGetAfterSet),
+        ("Contains before set returns false", *testContainsBeforeSet),
+        ("Contains after set returns true", *testContainsAfterSet),
+        ("Get after set to Nil returns Nil", *testGetAfterSetToNil),
+        ("Contains after set to Nil returns true", *testContainsAfterSetToNil),
+        ("Works under contention", *testContention)
       ])
   } |
 
   new TreeHashMapCh in {
     rl!(`rho:lang:treeHashMap`, *TreeHashMapCh) |
     for(TreeHashMap <- TreeHashMapCh) {
-      contract test_get_before_set(rhoSpec, _, ackCh) = {
+      contract testGetBeforeSet(rhoSpec, _, ackCh) = {
         new ret, ch in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -45,7 +45,7 @@ in {
         }
       } |
 
-      contract test_get_after_update_nil(rhoSpec, _, ackCh) = {
+      contract testGetAfterUpdateNil(rhoSpec, _, ackCh) = {
         new thmCh, ack, ch, update in {
           TreeHashMap!("init", 3, *thmCh) |
           contract update(@val, ret) = {
@@ -64,7 +64,7 @@ in {
         }
       } |
 
-      contract test_get_after_update(rhoSpec, _, ackCh) = {
+      contract testGetAfterUpdate(rhoSpec, _, ackCh) = {
         new thmCh, ack1, ack2, ch, update in {
           TreeHashMap!("init", 3, *thmCh) |
           contract update(@val, ret) = {
@@ -86,7 +86,7 @@ in {
         }
       } |
 
-      contract test_get_after_set(rhoSpec, _, ackCh) = {
+      contract testGetAfterSet(rhoSpec, _, ackCh) = {
         new ret, ch1, ch2 in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -104,7 +104,7 @@ in {
         }
       } |
 
-      contract test_fast_unsafe_get_after_set(rhoSpec, _, ackCh) = {
+      contract testFastUnsafeGetAfterSet(rhoSpec, _, ackCh) = {
         new ret, ch1, ch2 in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -120,7 +120,7 @@ in {
         }
       } |
 
-      contract test_contains_before_set(rhoSpec, _, ackCh) = {
+      contract testContainsBeforeSet(rhoSpec, _, ackCh) = {
         new ret, ch in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -133,7 +133,7 @@ in {
         }
       } |
 
-      contract test_contains_after_set(rhoSpec, _, ackCh) = {
+      contract testContainsAfterSet(rhoSpec, _, ackCh) = {
         new ret, ch1, ch2, ch3 in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -151,7 +151,7 @@ in {
         }
       } |
 
-      contract test_get_after_set_to_nil(rhoSpec, _, ackCh) = {
+      contract testGetAfterSetToNil(rhoSpec, _, ackCh) = {
         new ret, ch1, ch2 in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -167,7 +167,7 @@ in {
         }
       } |
 
-      contract test_contains_after_set_to_nil(rhoSpec, _, ackCh) = {
+      contract testContainsAfterSetToNil(rhoSpec, _, ackCh) = {
         new ret, ch1, ch2, ch3 in {
           TreeHashMap!("init", 3, *ret) |
           for (@thm <- ret) {
@@ -185,7 +185,7 @@ in {
         }
       } |
 
-      contract test_contention(rhoSpec, _, ackCh) = {
+      contract testContention(rhoSpec, _, ackCh) = {
         new tryIt in {
           contract tryIt(@n, @flag) = {
             new out(`rho:io:stdlog`), mapCh in {

@@ -1,0 +1,18 @@
+[package]
+name = "casper"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+debug = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crypto = { path = "../crypto" }
+models = { path = "../models" }
+rholang = { path = "../rholang" }
+rspace_plus_plus = { path = "../rspace++" }
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
