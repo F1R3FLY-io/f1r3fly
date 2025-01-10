@@ -14,7 +14,7 @@
  9.  | 4,         | registry           | uri = rho:id:6fzorimqngeedepkrizgiqms6zjt76zjeciktt1eifequy4osz35ks
  ----+------------+--------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------
  */
-new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
+new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:stdout`) in {
   contract ListOps(@"prepend", @head, @tail, return) = {
     return!([head] ++ tail)
   } |
@@ -314,6 +314,7 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
       }
     } |
     contract ListOps(@"range", @start, @end, return) = {
+      stdout!("Generating range from ") |
       loop!(start, end - 1, [], *return)
     }
   } |
