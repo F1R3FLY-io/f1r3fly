@@ -75,7 +75,25 @@ impl SortedParHashSet {
         self.sorted_ps.len()
     }
 
-    fn sort(par: &Par) -> Par {
+    pub fn sort(par: &Par) -> Par {
         ParSortMatcher::sort_match(&par).term.clone()
+    }
+}
+
+impl PartialEq for SortedParHashSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.sorted_pars == other.sorted_pars
+    }
+}
+
+use std::fmt;
+
+impl fmt::Debug for SortedParHashSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SortedParHashSet")
+            .field("ps", &self.ps)
+            .field("sorted_pars", &self.sorted_pars)
+            .field("sorted_ps", &self.sorted_ps)
+            .finish()
     }
 }
