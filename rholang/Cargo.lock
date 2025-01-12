@@ -953,6 +953,9 @@ version = "0.1.0"
 dependencies = [
  "crypto",
  "hex",
+ "itertools 0.12.1",
+ "proptest",
+ "proptest-derive",
  "prost",
  "prost-build",
  "serde",

@@ -86,7 +86,7 @@ class ScoredTermSpec extends FlatSpec with PropertyChecks with Matchers {
 
     match1 == match2 shouldBe sort(match1).score == sort(match2).score
   }
-
+  //2
   it should "sort so that whenever scores or result terms differ then the initial terms differ and the other way around" in {
     def check[A: Sortable: Arbitrary]: Unit =
       forAllSimilarA[A] { (x, y) =>
