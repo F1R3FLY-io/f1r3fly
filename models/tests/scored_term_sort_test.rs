@@ -34,6 +34,14 @@ use models::{
     },
 };
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
+
+fn global_proptest_config() -> ProptestConfig {
+    ProptestConfig {
+        failure_persistence: Some(Box::new(FileFailurePersistence::WithSource("regressions"))),
+        ..ProptestConfig::default()
+    }
+}
 
 #[test]
 fn scored_term_should_sort_so_that_shorter_nodes_come_first() {
@@ -167,7 +175,7 @@ fn scored_term_should_sort_so_that_whenever_scores_differ_then_result_terms_have
         T: Clone + PartialEq + std::fmt::Debug,
         F: Fn(&T) -> T,
     {
-        proptest!(|(values in generator)| {
+        proptest!(global_proptest_config(), |(values in generator)| {
             for x in &values {
                 for y in &values {
                     let x_sorted = sort_fn(x);
@@ -230,7 +238,7 @@ fn scored_term_should_sort_so_that_whenever_scores_or_result_terms_differ_then_t
         T: Clone + PartialEq + std::fmt::Debug,
         F: Fn(&T) -> T,
     {
-        proptest!(|(values in generator)| {
+        proptest!(global_proptest_config(), |(values in generator)| {
             for x in &values {
                 for y in &values {
                     let x_sorted = sort_fn(x);
@@ -298,7 +306,7 @@ fn scored_term_should_sort_so_that_unequal_terms_have_unequal_scores_and_the_oth
         T: Clone + PartialEq + std::fmt::Debug,
         F: Fn(&T) -> T,
     {
-        proptest!(|(values in generator)| {
+        proptest!(global_proptest_config(), |(values in generator)| {
             for x in &values {
                 for y in &values {
                     if x != y {
