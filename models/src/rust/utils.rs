@@ -2,18 +2,18 @@ use expr::ExprInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::par_map::ParMap;
+use super::par_map_type_mapper::ParMapTypeMapper;
+use super::par_set::ParSet;
+use super::par_set_type_mapper::ParSetTypeMapper;
+use super::rholang::implicits::vector_par;
+use crate::rust::sorted_par_hash_set::SortedParHashSet;
 use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
 use crate::rust::utils::expr::ExprInstance::*;
 use crate::rust::utils::var::VarInstance::{BoundVar, FreeVar, Wildcard};
 use crate::rust::utils::var::WildcardMsg;
 use crate::{create_bit_vector, rhoapi::*};
-
-use super::par_map::ParMap;
-use super::par_map_type_mapper::ParMapTypeMapper;
-use super::par_set::ParSet;
-use super::par_set_type_mapper::ParSetTypeMapper;
-use super::rholang::implicits::vector_par;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionResult<A, K> {
@@ -910,5 +910,21 @@ pub fn new_emethod_expr(
             locally_free,
             connective_used: false,
         })),
+    }
+}
+
+pub fn new_par_from_par_set(
+    elements: Vec<Par>,
+    locally_free: Vec<u8>,
+    connective_used: bool,
+    remainder: Option<Var>,
+) -> Par {
+    let par_set = ParSet::new(elements, connective_used, locally_free, remainder);
+
+    Par {
+        exprs: vec![Expr {
+            expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(par_set))),
+        }],
+        ..Default::default()
     }
 }

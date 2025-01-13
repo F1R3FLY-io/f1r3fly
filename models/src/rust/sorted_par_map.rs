@@ -65,6 +65,10 @@ impl SortedParMap {
         Self::create_from_map(self.sorted_map.clone())
     }
 
+    pub fn apply(&self, key: Par) -> Option<Par> {
+        self.sorted_map.get(&Self::sort(&key)).cloned()
+    }
+
     pub fn contains(&self, par: Par) -> bool {
         self.sorted_map.contains_key(&SortedParMap::sort(&par))
     }
@@ -121,5 +125,11 @@ impl IntoIterator for SortedParMap {
 
     fn into_iter(self) -> Self::IntoIter {
         self.sorted_list.into_iter()
+    }
+}
+
+impl PartialEq for SortedParMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.sorted_list == other.sorted_list
     }
 }
