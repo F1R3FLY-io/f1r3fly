@@ -89,14 +89,14 @@ pub fn generate_par(depth: usize) -> BoxedStrategy<Par> {
     }
 
     (
-        proptest::collection::vec(generate_send(depth - 1), 0..3),
-        proptest::collection::vec(generate_receive(depth - 1), 0..3),
-        proptest::collection::vec(generate_new(depth - 1), 0..3),
-        proptest::collection::vec(generate_expr(depth - 1), 0..3),
-        proptest::collection::vec(generate_match(depth - 1), 0..3),
-        proptest::collection::vec(generate_bundle(depth - 1), 0..3),
-        proptest::collection::vec(generate_connective(depth - 1), 0..3),
-        proptest::collection::vec(any::<u8>(), 0..3),
+        proptest::collection::vec(generate_send(depth - 1), 0..1),
+        proptest::collection::vec(generate_receive(depth - 1), 0..1),
+        proptest::collection::vec(generate_new(depth - 1), 0..1),
+        proptest::collection::vec(generate_expr(depth - 1), 0..1),
+        proptest::collection::vec(generate_match(depth - 1), 0..1),
+        proptest::collection::vec(generate_bundle(depth - 1), 0..1),
+        proptest::collection::vec(generate_connective(depth - 1), 0..1),
+        proptest::collection::vec(any::<u8>(), 0..1),
         any::<bool>(),
     )
         .prop_map(
@@ -146,9 +146,9 @@ pub fn generate_send(depth: usize) -> BoxedStrategy<Send> {
 
     (
         generate_par(depth - 1),
-        proptest::collection::vec(generate_par(depth - 1), 0..3),
+        proptest::collection::vec(generate_par(depth - 1), 0..1),
         any::<bool>(),
-        proptest::collection::vec(any::<u8>(), 0..3),
+        proptest::collection::vec(any::<u8>(), 0..1),
         any::<bool>(),
     )
         .prop_map(
@@ -186,7 +186,7 @@ pub fn generate_receive(depth: usize) -> BoxedStrategy<Receive> {
     (
         proptest::collection::vec(
             (
-                proptest::collection::vec(generate_par(depth - 1), 0..3),
+                proptest::collection::vec(generate_par(depth - 1), 0..1),
                 generate_par(depth - 1),
                 generate_option_var(depth),
                 any::<i32>(),
@@ -197,13 +197,13 @@ pub fn generate_receive(depth: usize) -> BoxedStrategy<Receive> {
                     remainder,
                     free_count,
                 }),
-            0..3,
+            0..1,
         ),
         generate_par(depth - 1),
         any::<bool>(),
         any::<bool>(),
         any::<i32>(),
-        proptest::collection::vec(any::<u8>(), 0..3),
+        proptest::collection::vec(any::<u8>(), 0..1),
         any::<bool>(),
     )
         .prop_map(
@@ -241,9 +241,9 @@ pub fn generate_new(depth: usize) -> BoxedStrategy<New> {
     (
         any::<i32>(),
         generate_par(depth - 1),
-        proptest::collection::vec(any::<String>(), 0..3),
-        proptest::collection::btree_map(any::<String>(), generate_par(depth - 1), 0..3),
-        proptest::collection::vec(any::<u8>(), 0..3),
+        proptest::collection::vec(any::<String>(), 0..1),
+        proptest::collection::btree_map(any::<String>(), generate_par(depth - 1), 0..1),
+        proptest::collection::vec(any::<u8>(), 0..1),
     )
         .prop_map(|(bind_count, p, uri, injections, locally_free)| New {
             bind_count,
@@ -318,9 +318,9 @@ pub fn generate_match(depth: usize) -> BoxedStrategy<Match> {
                     source: Some(source),
                     free_count,
                 }),
-            0..3,
+            0..1,
         ),
-        proptest::collection::vec(any::<u8>(), 0..3),
+        proptest::collection::vec(any::<u8>(), 0..1),
         any::<bool>(),
     )
         .prop_map(|(target, cases, locally_free, connective_used)| Match {

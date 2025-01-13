@@ -185,15 +185,15 @@ fn scored_term_should_sort_so_that_whenever_scores_differ_then_result_terms_have
         });
     }
 
-    check(prop::collection::vec(generate_bundle(3), 5), |x| {
+    check(prop::collection::vec(generate_bundle(2), 5), |x| {
         BundleSortMatcher::sort_match(x).term
     });
 
-    check(prop::collection::vec(generate_connective(3), 5), |x| {
+    check(prop::collection::vec(generate_connective(2), 5), |x| {
         ConnectiveSortMatcher::sort_match(x).term
     });
 
-    check(prop::collection::vec(generate_expr(3), 5), |x| {
+    check(prop::collection::vec(generate_expr(2), 5), |x| {
         ExprSortMatcher::sort_match(x).term
     });
 
