@@ -43,6 +43,7 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
       }
     } | 
     contract ListOps(@"partialFold", @list, @start, combinatorAndCondition, return) = {
+			stdout!("hit partialFold") |
       loop!(start, list, *combinatorAndCondition, *return)
     }
   } |
@@ -72,6 +73,7 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
   } |
 
   contract ListOps(@"fold", @list, @start, combinator, return) = {
+		stdout!("hit fold") |
     new combinatorAndCondition in {
       contract combinatorAndCondition(@head, @accumulatedValue, return) = {
         new result in {
@@ -252,10 +254,24 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
     }
   } |
 
+	/* 
+ 	 * It defines a contract ListOps that takes four parameters: @list (the list to iterate over), 
+	 * proc (the process to apply to each element), 
+	 * and isDone (a channel to signal when the iteration is complete).
+	 */
   contract ListOps(@"foreach", @list, proc, isDone) = {
+		stdout!("hit foreach") |
     new combinator, nilReturn in {
+			/* 
+			 * It defines a contract combinator that takes three parameters: @head (the current element), 
+			 * @accumulatedValue (the accumulated value), and return (a channel to return the result).
+			 */
       contract combinator(@head, @accumulatedValue, return) = {
-        //Need return flag from `proc` in order to guarantee execution order
+				/* 
+				 * Within combinator, it creates a new channel isDone and calls the proc process with the current element head. 
+				 * It waits for a signal on isDone and then returns Nil through the return channel.
+				*/
+        // Need return flag from `proc` in order to guarantee execution order
         new isDone in { proc!(head, *isDone) | for(_ <- isDone){ return!(Nil) } }
       } |
       ListOps!("fold", list, Nil, *combinator, *nilReturn) | for(_ <- nilReturn){ isDone!(true) }
@@ -306,6 +322,7 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
   } |
 
   new loop in {
+		// stdout!("Generating range from") |
     contract loop(@start, @i, @list, return) = {
       if(i < start) {
         return!(list)
@@ -314,7 +331,7 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
       }
     } |
     contract ListOps(@"range", @start, @end, return) = {
-      stdout!("Generating range from ") |
+      stdout!("Generating range from") |
       loop!(start, end - 1, [], *return)
     }
   } |
@@ -419,6 +436,17 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
             }
           }
         }
+      }
+    }
+  } |
+
+	contract ListOps(@"head", @list, return) = {
+  	match list {
+      [head ...tail] => {
+        return!(head)
+      }
+      _ => {
+        return!(Nil)
       }
     }
   } |

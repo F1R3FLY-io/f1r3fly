@@ -15,7 +15,8 @@ use crate::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
     matcher::r#match::Matcher,
     reduce::DebruijnInterpreter,
-    rho_runtime::RhoISpace,
+    rho_runtime::{create_runtime_from_kv_store, RhoISpace, RhoRuntimeImpl},
+    system_processes::{test_framework_contracts, TestResultCollector},
 };
 
 pub async fn create_test_space<T>() -> (
@@ -46,3 +47,32 @@ where
 
     (space, reducer)
 }
+
+pub async fn create_test_runtime_with_genesis_contracts() -> Arc<Mutex<RhoRuntimeImpl>> {
+    let mut kvm = InMemoryStoreManager::new();
+    let store = kvm.r_space_stores().await.unwrap();
+    let runtime = create_runtime_from_kv_store(
+        store,
+        Par::default(),
+        true,
+        &mut test_framework_contracts(Arc::new(TestResultCollector::new())),
+        Arc::new(Box::new(Matcher)),
+    )
+    .await;
+
+    // {
+    //     let registry_contract = read_file_contents("src/main/resources/Registry.rho").unwrap();
+    //     let _ = runtime
+    //         .try_lock()
+    //         .unwrap()
+    //         .evaluate(registry_contract, env, rand)
+    //         .await
+    //         .unwrap();
+    // }
+
+    runtime
+}
+
+// fn read_file_contents(file_path: &str) -> Result<String, std::io::Error> {
+//     fs::read_to_string(file_path)
+// }

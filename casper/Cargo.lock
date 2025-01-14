@@ -1542,6 +1542,7 @@ dependencies = [
 name = "rholang"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "cc",
  "crypto",

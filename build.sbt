@@ -288,7 +288,8 @@ lazy val casper = (project in file("casper"))
       "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
     javaOptions in Test ++= Seq(
-      "-Xss32m",
+      "-Xss256m",
+			"-Xmx256m",
       "-Djna.library.path=../rust_libraries"
     )
   )

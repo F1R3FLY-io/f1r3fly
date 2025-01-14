@@ -139,6 +139,7 @@ in {
               runTestOnce!((testName, testBody), attempt, *retCh)
             } |
 
+            stdlog!("info", "Calling range") |
             @ListOps!("range", 1, attempts + 1, *retCh) | // Uses the ListOps contract to generate a range of numbers from 1 to attempts + 1 and sends it to retCh.
             for(@range <- retCh) {
               stdlog!("info", "Calling foreach") |
@@ -147,7 +148,24 @@ in {
           }
         } |
 
+				// How does one know which 'runTest' contract is being called?
         @ListOps!("foreach", tests, *runTest, *retCh) | // Iterates over all tests, calling runTest for each one.
+
+				// new headCh in {
+        //   @ListOps!("head", tests, *headCh) |
+        //   for (@firstTest <- headCh) {
+        //     match firstTest {
+				// 			test => {
+        //         // stdlog!("info", {"Running test": testName}) |
+        //         runTest!(test, *retCh)
+        //       }
+        //       Nil => {
+        //         stdlog!("error", "No tests available to run.")
+        //       }
+        //     }
+        //   }
+        // } |
+
         for (@v <- retCh) {
           testSuiteCompleted!(true) // Once all tests are completed, it sends a signal to testSuiteCompleted indicating that the test suite has finished running.
         }

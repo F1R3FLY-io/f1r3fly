@@ -3,9 +3,9 @@ import coop.rchain.casper.helper.RhoSpec
 import coop.rchain.models.NormalizerEnv
 import coop.rchain.rholang.build.CompiledRholangSource
 
-class TreeHashMapStdoutSpec
+class SandboxSpec
     extends RhoSpec(
-      CompiledRholangSource("TreeHashMapStdoutTest.rho", NormalizerEnv.Empty),
+      CompiledRholangSource("SandboxTest.rho", NormalizerEnv.Empty),
       Seq.empty,
       GENESIS_TEST_TIMEOUT
     )

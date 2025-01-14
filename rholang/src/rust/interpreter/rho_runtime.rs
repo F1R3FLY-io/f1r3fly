@@ -1038,7 +1038,7 @@ where
     (rho_runtime, replay_rho_runtime)
 }
 
-async fn _create_runtime_from_kv_store(
+pub async fn create_runtime_from_kv_store(
     stores: RSpaceStore,
     mergeable_tag_name: Par,
     init_registry: bool,
