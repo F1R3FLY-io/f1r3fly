@@ -1,41 +1,16 @@
-use crate::rhoapi::var::WildcardMsg;
 use crate::rhoapi::{
-    connective, expr, var, Bundle, Connective, EList, EMethod, ENot, Match, MatchCase, New, Par,
-    Receive, ReceiveBind, Send,
+    connective, expr, var, Bundle, Connective, ENot, Match, MatchCase, New, Par, Receive,
+    ReceiveBind, Send,
 };
-use crate::rust::par_map::ParMap;
-use crate::rust::par_map_type_mapper::ParMapTypeMapper;
-use crate::rust::rholang::sorter::bundle_sort_matcher::BundleSortMatcher;
-use crate::rust::rholang::sorter::connective_sort_matcher::ConnectiveSortMatcher;
-use crate::rust::rholang::sorter::match_sort_matcher::MatchSortMatcher;
-use crate::rust::rholang::sorter::new_sort_matcher::NewSortMatcher;
+use crate::rhoapi::{Expr, Var};
 use crate::rust::rholang::sorter::par_sort_matcher::ParSortMatcher;
-use crate::rust::rholang::sorter::receive_sort_matcher::ReceiveSortMatcher;
-use crate::rust::rholang::sorter::send_sort_matcher::SendSortMatcher;
 use crate::rust::rholang::sorter::sortable::Sortable;
-use crate::rust::rholang::sorter::unforgeable_sort_matcher::UnforgeableSortMatcher;
-use crate::rust::rholang::sorter::var_sort_matcher::VarSortMatcher;
-use crate::{
-    rhoapi::{expr::ExprInstance, Expr, Var},
-    rust::{
-        par_set::ParSet,
-        par_set_type_mapper::ParSetTypeMapper,
-        rholang::sorter::{
-            expr_sort_matcher::ExprSortMatcher,
-            score_tree::{ScoreAtom, ScoredTerm, Tree},
-        },
-        sorted_par_hash_set::SortedParHashSet,
-    },
-};
-use itertools::Itertools;
 use proptest::prelude::*;
 
 // models/src/test/scala/coop/rchain/models/testUtils/TestUtils.scala
 pub fn sort(par: &Par) -> Par {
     ParSortMatcher::sort_match(par).term
 }
-
-use proptest::prelude::*;
 
 pub fn for_all_similar_a<A: Clone + std::fmt::Debug>(
     generator: BoxedStrategy<A>,

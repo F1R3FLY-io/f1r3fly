@@ -7,7 +7,6 @@ use super::par_map_type_mapper::ParMapTypeMapper;
 use super::par_set::ParSet;
 use super::par_set_type_mapper::ParSetTypeMapper;
 use super::rholang::implicits::vector_par;
-use crate::rust::sorted_par_hash_set::SortedParHashSet;
 use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
 use crate::rust::utils::expr::ExprInstance::*;
