@@ -27,12 +27,8 @@ new
   testSuiteCompleted(`rho:test:testSuiteCompleted`),
   uriOut
 in {
-  stdlog!("debug", "Loading RhoSpec") |
   rl!(`rho:lang:listOps`, *ListOpsCh) |
   for(@(_, ListOps) <- ListOpsCh) {
-
-		stdlog!("debug", ("ListOps loaded: ", ListOps)) |
-
     contract RhoSpec(@"testSuite", @tests) = {
       new dummySetup in {
         contract dummySetup(_, returnCh) = {
