@@ -14,7 +14,7 @@
  9.  | 4,         | registry           | uri = rho:id:6fzorimqngeedepkrizgiqms6zjt76zjeciktt1eifequy4osz35ks
  ----+------------+--------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------
  */
-new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:stdout`) in {
+new ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:stdout`) in {
   contract ListOps(@"prepend", @head, @tail, return) = {
     return!([head] ++ tail)
   } |
@@ -73,7 +73,6 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
   } |
 
   contract ListOps(@"fold", @list, @start, combinator, return) = {
-		stdout!("hit fold") |
     new combinatorAndCondition in {
       contract combinatorAndCondition(@head, @accumulatedValue, return) = {
         new result in {
@@ -260,7 +259,6 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
 	 * and isDone (a channel to signal when the iteration is complete).
 	 */
   contract ListOps(@"foreach", @list, proc, isDone) = {
-		stdout!("hit foreach") |
     new combinator, nilReturn in {
 			/* 
 			 * It defines a contract combinator that takes three parameters: @head (the current element), 
@@ -322,7 +320,6 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
   } |
 
   new loop in {
-		// stdout!("Generating range from") |
     contract loop(@start, @i, @list, return) = {
       if(i < start) {
         return!(list)
@@ -331,7 +328,6 @@ new  ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:
       }
     } |
     contract ListOps(@"range", @start, @end, return) = {
-      stdout!("Generating range from") |
       loop!(start, end - 1, [], *return)
     }
   } |

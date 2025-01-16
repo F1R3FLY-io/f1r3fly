@@ -1,0 +1,18 @@
+new stdout(`rho:io:stdout`), loop, ListOps, resultCh in {
+	contract loop(@start, @i, @list, return) = {
+    if(i < start) {
+			stdout!(list) |
+      return!(list)
+    } else {
+      loop!(start, i - 1, [i] ++ list, *return)
+    }
+  } |
+
+  contract ListOps(@"range", @start, @end, return) = {
+    stdout!("hit range") |
+		stdout!(end - 1) |
+    loop!(start, end - 1, [], *return)
+  } |
+
+	ListOps!("range", 5, 10, *resultCh)
+}

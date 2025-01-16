@@ -543,6 +543,7 @@ impl SubstituteTrait<Match> for Substitute {
         let cases_sub = term
             .cases
             .iter()
+            .filter(|case| case.pattern.is_some() && case.source.is_some())
             .map(
                 |MatchCase {
                      pattern,
@@ -806,9 +807,9 @@ impl SubstituteTrait<Expr> for Substitute {
                 let _pattern = self.substitute(unwrap_option_safe(pattern)?, depth, env)?;
 
                 Ok(Expr {
-                    expr_instance: Some(ExprInstance::ELtBody(ELt {
-                        p1: Some(_target),
-                        p2: Some(_pattern),
+                    expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                        target: Some(_target),
+                        pattern: Some(_pattern),
                     })),
                 })
             }
@@ -1019,7 +1020,7 @@ impl SubstituteTrait<Expr> for Substitute {
                 let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
 
                 Ok(Expr {
-                    expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+                    expr_instance: Some(ExprInstance::EMinusBody(EMinus {
                         p1: Some(_p1),
                         p2: Some(_p2),
                     })),
@@ -1151,9 +1152,9 @@ impl SubstituteTrait<Expr> for Substitute {
                 let _pattern = self.substitute_no_sort(unwrap_option_safe(pattern)?, depth, env)?;
 
                 Ok(Expr {
-                    expr_instance: Some(ExprInstance::ELtBody(ELt {
-                        p1: Some(_target),
-                        p2: Some(_pattern),
+                    expr_instance: Some(ExprInstance::EMatchesBody(EMatches {
+                        target: Some(_target),
+                        pattern: Some(_pattern),
                     })),
                 })
             }

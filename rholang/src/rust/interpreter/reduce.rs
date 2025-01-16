@@ -407,7 +407,7 @@ impl DebruijnInterpreter {
         // println!("\nis_mergeable: {:?}", is_mergeable);
 
         if is_mergeable {
-            let mut merge_chs_write = self.merge_chs.write().unwrap();
+            let mut merge_chs_write = self.merge_chs.try_write().unwrap();
             merge_chs_write.insert(chan.clone());
         }
     }

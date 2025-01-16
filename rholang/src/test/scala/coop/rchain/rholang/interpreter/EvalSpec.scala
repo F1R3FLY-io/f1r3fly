@@ -19,8 +19,8 @@ class EvalSpec extends FlatSpec with Matchers {
   implicit val noopMetrics: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
 
-  "sandbox" should "work" in {
-    val rhoScript = loadScript("examples/SandboxTest.rho")
+  "EvalTest" should "work" in {
+    val rhoScript = loadScript("examples/EvalTest.rho")
     execute(rhoScript)
   }
 
