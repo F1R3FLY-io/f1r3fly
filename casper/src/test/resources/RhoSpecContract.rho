@@ -126,14 +126,11 @@ in {
 
 
         contract runTest(@(testName, testBody), ackCh) = {
-          stdlog!("info", "Running test: " ++ testName) |
           runTest!((testName, testBody, 1), *ackCh)
         } |
 
         // This contract takes a tuple containing the test name, test body, and the number of attempts, along with an acknowledgment channel ackCh.
         contract runTest(@(testName, testBody, attempts), ackCh) = {
-          stdlog!("info", "Calling runTest") |
-
           new retCh, runTestImpl in {
             contract runTestImpl(@attempt, retCh) = {
               runTestOnce!((testName, testBody), attempt, *retCh)

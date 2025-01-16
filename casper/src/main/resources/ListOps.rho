@@ -43,7 +43,6 @@ new ListOps, rs(`rho:registry:insertSigned:secp256k1`), uriOut, stdout(`rho:io:s
       }
     } | 
     contract ListOps(@"partialFold", @list, @start, combinatorAndCondition, return) = {
-			stdout!("hit partialFold") |
       loop!(start, list, *combinatorAndCondition, *return)
     }
   } |

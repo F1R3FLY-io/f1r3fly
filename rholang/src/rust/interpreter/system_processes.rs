@@ -815,7 +815,7 @@ impl SystemProcesses {
         message: Vec<ListParWithRandom>,
         test_result_collector: Arc<TestResultCollector>,
     ) -> () {
-        println!("\nhit handle_message");
+        // println!("\nhit handle_message");
 
         if let Some((produce, assert_par)) = self.is_contract_call().unapply(message) {
             if let Some((test_name, attempt, assertion, clue, ack_channel)) =
