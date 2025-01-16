@@ -2,18 +2,18 @@ use expr::ExprInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::par_map::ParMap;
+use super::par_map_type_mapper::ParMapTypeMapper;
+use super::par_set::ParSet;
+use super::par_set_type_mapper::ParSetTypeMapper;
+use super::rholang::implicits::vector_par;
+use crate::rust::sorted_par_hash_set::SortedParHashSet;
 use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
 use crate::rust::utils::expr::ExprInstance::*;
 use crate::rust::utils::var::VarInstance::{BoundVar, FreeVar, Wildcard};
 use crate::rust::utils::var::WildcardMsg;
 use crate::{create_bit_vector, rhoapi::*};
-
-use super::par_map::ParMap;
-use super::par_map_type_mapper::ParMapTypeMapper;
-use super::par_set::ParSet;
-use super::par_set_type_mapper::ParSetTypeMapper;
-use super::rholang::implicits::vector_par;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionResult<A, K> {
@@ -535,8 +535,11 @@ pub fn new_wildcard_var() -> Var {
 }
 
 pub fn new_boundvar_par(value: i32, _locally_free_par: Vec<u8>, _connective_used_par: bool) -> Par {
-    vector_par(create_bit_vector(&vec![value as usize]), _connective_used_par)
-        .with_exprs(vec![new_boundvar_expr(value)])
+    vector_par(
+        create_bit_vector(&vec![value as usize]),
+        _connective_used_par,
+    )
+    .with_exprs(vec![new_boundvar_expr(value)])
 }
 
 pub fn new_boundvar_expr(value: i32) -> Expr {
@@ -662,4 +665,266 @@ pub fn new_bundle_par(body: Par, write_flag: bool, read_flag: bool) -> Par {
         write_flag,
         read_flag,
     }])
+}
+
+pub fn new_eminus_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EMinusBody(EMinus {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_ediv_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EDivBody(EDiv {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_eplus_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EPlusBody(EPlus {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_emult_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EMultBody(EMult {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_eeq_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EEqBody(EEq {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_eneq_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(ENeqBody(ENeq {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_elt_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(ELtBody(ELt {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_elte_expr_gint(
+    lhs_value: i64,
+    rhs_value: i64,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(ELteBody(ELte {
+            p1: Some(new_gint_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gint_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_egt_expr_gbool(
+    lhs_value: bool,
+    rhs_value: bool,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EGtBody(EGt {
+            p1: Some(new_gbool_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gbool_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_egte_expr_gbool(
+    lhs_value: bool,
+    rhs_value: bool,
+    locally_free_par: Vec<u8>,
+    connective_used_par: bool,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EGteBody(EGte {
+            p1: Some(new_gbool_par(
+                lhs_value,
+                locally_free_par.clone(),
+                connective_used_par,
+            )),
+            p2: Some(new_gbool_par(
+                rhs_value,
+                locally_free_par,
+                connective_used_par,
+            )),
+        })),
+    }
+}
+
+pub fn new_eor_expr(lhs: Par, rhs: Par) -> Expr {
+    Expr {
+        expr_instance: Some(EOrBody(EOr {
+            p1: Some(lhs),
+            p2: Some(rhs),
+        })),
+    }
+}
+
+pub fn new_emethod_expr(
+    method_name: String,
+    target: Par,
+    arguments: Vec<Par>,
+    locally_free: Vec<u8>,
+) -> Expr {
+    Expr {
+        expr_instance: Some(EMethodBody(EMethod {
+            method_name,
+            target: Some(target),
+            arguments,
+            locally_free,
+            connective_used: false,
+        })),
+    }
+}
+
+pub fn new_par_from_par_set(
+    elements: Vec<Par>,
+    locally_free: Vec<u8>,
+    connective_used: bool,
+    remainder: Option<Var>,
+) -> Par {
+    let par_set = ParSet::new(elements, connective_used, locally_free, remainder);
+
+    Par {
+        exprs: vec![Expr {
+            expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(par_set))),
+        }],
+        ..Default::default()
+    }
 }
