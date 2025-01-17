@@ -13,7 +13,7 @@ import coop.rchain.rspace.examples.StringExamples._
 import coop.rchain.rspace.examples.StringExamples.implicits._
 import coop.rchain.rspace.history.HistoryRepositoryInstances
 import coop.rchain.rspace.test._
-import coop.rchain.rspace.trace.Consume
+import coop.rchain.rspace.trace.{Consume, Produce}
 import coop.rchain.rspace.util.ReplayException
 import coop.rchain.shared.{Log, Serialize}
 import coop.rchain.store.InMemoryStoreManager
@@ -70,7 +70,7 @@ trait ReplayRSpaceTests extends ReplayRSpaceTestsBase[String, Pattern, String, S
       channelCreator: Int => C,
       datumCreator: Int => A,
       persist: Boolean
-  ): Task[List[Option[(ContResult[C, P, K], Seq[Result[C, A]])]]] =
+  ): Task[List[Option[(ContResult[C, P, K], Seq[Result[C, A]], Produce)]]] =
     shuffle(range).toList.parTraverse { i: Int =>
       logger.debug("Started produce {}", i)
       space.produce(channelCreator(i), datumCreator(i), persist).map { r =>

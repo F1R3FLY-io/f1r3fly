@@ -29,36 +29,42 @@ class ContractCall[F[_]: Concurrent: Span](
     space: RhoTuplespace[F],
     dispatcher: Dispatch[F, ListParWithRandom, TaggedContinuation]
 ) {
-  type Producer[M[_]] = (Seq[Par], Par) => M[Unit]
+  type Producer[M[_]] = (Seq[Par], Par) => M[Seq[Par]]
 
   // TODO: pass _cost[F] as an implicit parameter
   private def produce(
       rand: Blake2b512Random
-  )(values: Seq[Par], ch: Par): F[Unit] =
+  )(values: Seq[Par], ch: Par): F[Seq[Par]] =
     for {
       produceResult <- space.produce(
                         ch,
                         ListParWithRandom(values, rand),
                         persist = false
                       )
-      _ <- produceResult.fold(Sync[F].unit) {
-            case (cont, channels) =>
+      dispatchResult <- produceResult.fold(Sync[F].delay[Dispatch.DispatchType](Dispatch.Skip)) {
+            case (cont, channels, produce) =>
               dispatcher.dispatch(
                 cont.continuation,
-                channels.map(_.matchedDatum)
+                channels.map(_.matchedDatum),
+                space.isReplay,
+                produce.outputValue.map(raw => Par.parseFrom(raw))
               )
           }
-    } yield ()
+    } yield dispatchResult match {
+      case Dispatch.DeterministicCall => Seq.empty
+      case Dispatch.NonDeterministicCall(output) => output.map(Par.parseFrom)
+      case Dispatch.Skip => Seq.empty
+    }
 
-  def unapply(contractArgs: Seq[ListParWithRandom]): Option[(Producer[F], Seq[Par])] =
+  def unapply(contractArgs: (Seq[ListParWithRandom], Boolean, Seq[Par])): Option[(Producer[F], Boolean, Seq[Par], Seq[Par])] =
     contractArgs match {
-      case Seq(
+      case (Seq(
           ListParWithRandom(
             args,
             rand
           )
-          ) =>
-        Some((produce(rand), args))
+          ), isReplay, previous) =>
+        Some((produce(rand), isReplay, previous, args))
       case _ => None
     }
 }
