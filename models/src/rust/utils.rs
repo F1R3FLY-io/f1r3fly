@@ -7,6 +7,7 @@ use super::par_map_type_mapper::ParMapTypeMapper;
 use super::par_set::ParSet;
 use super::par_set_type_mapper::ParSetTypeMapper;
 use super::rholang::implicits::vector_par;
+use crate::rhoapi::g_unforgeable::UnfInstance;
 use crate::rust::utils::connective::ConnectiveInstance::*;
 use crate::rust::utils::expr::ExprInstance::EVarBody;
 use crate::rust::utils::expr::ExprInstance::*;
@@ -924,6 +925,28 @@ pub fn new_par_from_par_set(
         exprs: vec![Expr {
             expr_instance: Some(ESetBody(ParSetTypeMapper::par_set_to_eset(par_set))),
         }],
+        ..Default::default()
+    }
+}
+
+pub fn new_gbytearray_par(bytes: Vec<u8>, locally_free: Vec<u8>, connective_used: bool) -> Par {
+    Par {
+        exprs: vec![Expr {
+            expr_instance: Some(GByteArray(bytes)),
+        }],
+        locally_free,
+        connective_used,
+        ..Default::default()
+    }
+}
+
+pub fn new_gsys_auth_token_par(locally_free: Vec<u8>, connective_used: bool) -> Par {
+    Par {
+        unforgeables: vec![GUnforgeable {
+            unf_instance: Some(UnfInstance::GSysAuthTokenBody(GSysAuthToken {})),
+        }],
+        locally_free,
+        connective_used,
         ..Default::default()
     }
 }

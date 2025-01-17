@@ -1,23 +1,3 @@
-use crypto::rust::hash::blake2b256::Blake2b256;
-use crypto::rust::hash::keccak256::Keccak256;
-use crypto::rust::hash::sha_256::Sha256Hasher;
-use crypto::rust::public_key::PublicKey;
-use crypto::rust::signatures::ed25519::Ed25519;
-use crypto::rust::signatures::secp256k1::Secp256k1;
-use crypto::rust::signatures::signatures_alg::SignaturesAlg;
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
-use models::rhoapi::Expr;
-use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
-use models::rust::casper::protocol::casper_message::BlockMessage;
-use models::rust::rholang::implicits::single_expr;
-use models::rust::utils::new_gbool_par;
-use models::Byte;
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
-
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
 use super::pretty_printer::PrettyPrinter;
@@ -27,6 +7,29 @@ use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
 };
 use super::util::rev_address::RevAddress;
+use crypto::rust::hash::blake2b256::Blake2b256;
+use crypto::rust::hash::keccak256::Keccak256;
+use crypto::rust::hash::sha_256::Sha256Hasher;
+use crypto::rust::public_key::PublicKey;
+use crypto::rust::signatures::ed25519::Ed25519;
+use crypto::rust::signatures::secp256k1::Secp256k1;
+use crypto::rust::signatures::signatures_alg::SignaturesAlg;
+use k256::{
+    ecdsa::{signature::Signer, Signature, SigningKey},
+    elliptic_curve::generic_array::GenericArray,
+};
+use models::rhoapi::expr::ExprInstance;
+use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
+use models::rhoapi::Expr;
+use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
+use models::rust::casper::protocol::casper_message::BlockMessage;
+use models::rust::rholang::implicits::single_expr;
+use models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
+use models::Byte;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
@@ -191,9 +194,9 @@ impl ProcessContext {
         ProcessContext {
             space: space.clone(),
             dispatcher: dispatcher.clone(),
-            block_data,
+            block_data: block_data.clone(),
             invalid_blocks,
-            system_processes: SystemProcesses::create(dispatcher, space),
+            system_processes: SystemProcesses::create(dispatcher, space, block_data),
         }
     }
 }
@@ -297,14 +300,20 @@ impl BlockData {
 pub struct SystemProcesses {
     pub dispatcher: RhoDispatch,
     pub space: RhoISpace,
+    pub block_data: Arc<RwLock<BlockData>>,
     pretty_printer: PrettyPrinter,
 }
 
 impl SystemProcesses {
-    fn create(dispatcher: RhoDispatch, space: RhoISpace) -> Self {
+    fn create(
+        dispatcher: RhoDispatch,
+        space: RhoISpace,
+        block_data: Arc<RwLock<BlockData>>,
+    ) -> Self {
         SystemProcesses {
             dispatcher: dispatcher.clone(),
             space,
+            block_data,
             pretty_printer: PrettyPrinter::new(),
         }
     }
@@ -948,6 +957,178 @@ impl SystemProcesses {
             panic!("SystemProcesses: is_contract_call failed");
         }
     }
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/DeployerIdContract.scala
+
+    pub async fn deployer_id_make(&mut self, message: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [deployer_id_par, key_par, ack_channel] => {
+                    if let (Some(_), Some(public_key)) = (
+                        RhoString::unapply(deployer_id_par),
+                        RhoByteArray::unapply(key_par),
+                    ) {
+                        let result_par = new_gbytearray_par(public_key.clone(), Vec::new(), false);
+
+                        if let Err(e) = produce(vec![result_par], ack_channel.clone()).await {
+                            eprintln!("Error producing DeployerId: {:?}", e);
+                        }
+                    } else {
+                        panic!("Invalid arguments for deployerId:make");
+                    }
+                }
+                _ => panic!("Invalid argument structure for deployerId:make"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/Secp256k1SignContract.scala
+
+    pub async fn secp256k1_sign(&mut self, message: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [hash_par, sk_par, ack_channel] => {
+                    if let (Some(hash), Some(secret_key)) = (
+                        RhoByteArray::unapply(hash_par),
+                        RhoByteArray::unapply(sk_par),
+                    ) {
+                        if secret_key.len() != 32 {
+                            panic!("Invalid private key length: must be 32 bytes");
+                        }
+
+                        let key_bytes = GenericArray::clone_from_slice(&secret_key);
+                        let signing_key =
+                            SigningKey::from_bytes(&key_bytes).expect("Invalid private key");
+
+                        let signature: Signature = signing_key.sign(&hash);
+
+                        let result_par = new_gbytearray_par(
+                            signature.to_der().as_bytes().to_vec(),
+                            Vec::new(),
+                            false,
+                        );
+
+                        if let Err(e) = produce(vec![result_par], ack_channel.clone()).await {
+                            eprintln!("Error producing Secp256k1 signature: {:?}", e);
+                        }
+                    } else {
+                        panic!("Invalid arguments for secp256k1Sign");
+                    }
+                }
+                _ => panic!("Invalid argument structure for secp256k1Sign"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/SysAuthTokenContract.scala
+
+    pub async fn sys_auth_token_make(&mut self, message: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [ack_channel] => {
+                    let auth_token = new_gsys_auth_token_par(Vec::new(), false);
+
+                    if let Err(e) = produce(vec![auth_token], ack_channel.clone()).await {
+                        eprintln!("Error producing SysAuthToken: {:?}", e);
+                    }
+                }
+                _ => panic!("Invalid argument structure for sys:test:authToken:make"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
+
+    //See casper/src/test/scala/coop/rchain/casper/helper/BlockDataContract.scala
+
+    pub async fn block_data_set(&mut self, message: Vec<ListParWithRandom>) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [key_par, value_par, ack_channel] => {
+                    if let Some(key) = RhoString::unapply(key_par) {
+                        match key.as_str() {
+                            "sender" => {
+                                if let Some(public_key_bytes) = RhoByteArray::unapply(value_par) {
+                                    let mut block_data = self.block_data.write().unwrap();
+                                    block_data.sender = PublicKey {
+                                        bytes: public_key_bytes.clone(),
+                                    };
+
+                                    let result_par = Par::default();
+                                    if let Err(e) =
+                                        produce(vec![result_par], ack_channel.clone()).await
+                                    {
+                                        eprintln!(
+                                            "Error producing response for sender update: {:?}",
+                                            e
+                                        );
+                                    }
+                                } else {
+                                    panic!("Invalid value for sender");
+                                }
+                            }
+                            "blockNumber" => {
+                                if let Some(block_number) = RhoNumber::unapply(value_par) {
+                                    let mut block_data = self.block_data.write().unwrap();
+                                    block_data.block_number = block_number;
+
+                                    let result_par = Par::default();
+                                    if let Err(e) =
+                                        produce(vec![result_par], ack_channel.clone()).await
+                                    {
+                                        eprintln!(
+                                            "Error producing response for blockNumber update: {:?}",
+                                            e
+                                        );
+                                    }
+                                } else {
+                                    panic!("Invalid value for blockNumber");
+                                }
+                            }
+                            _ => panic!("Unsupported key for block data update"),
+                        }
+                    } else {
+                        panic!("Invalid key type for block data set");
+                    }
+                }
+                _ => panic!("Invalid argument structure for block_data_set"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
+
+    // See casper/src/test/scala/coop/rchain/casper/helper/CasperInvalidBlocksContract.scala
+
+    pub async fn casper_invalid_blocks_set(
+        &self,
+        message: Vec<ListParWithRandom>,
+        invalid_blocks: &InvalidBlocks,
+    ) -> () {
+        if let Some((produce, args)) = self.is_contract_call().unapply(message) {
+            match args.as_slice() {
+                [new_invalid_blocks_par, ack_channel] => {
+                    let mut invalid_blocks_lock = invalid_blocks.invalid_blocks.write().unwrap();
+                    *invalid_blocks_lock = new_invalid_blocks_par.clone();
+
+                    let result_par = Par::default();
+                    if let Err(e) = produce(vec![result_par], ack_channel.clone()).await {
+                        eprintln!(
+                            "Error producing response for invalid blocks update: {:?}",
+                            e
+                        );
+                    }
+                }
+                _ => panic!("Invalid argument structure for casper_invalid_blocks_set"),
+            }
+        } else {
+            panic!("SystemProcesses: is_contract_call failed");
+        }
+    }
 }
 
 // See casper/src/test/scala/coop/rchain/casper/helper/RhoSpec.scala
@@ -993,6 +1174,81 @@ pub fn test_framework_contracts() -> Vec<Definition> {
                 Box::new(move |args| {
                     let ctx = ctx.clone();
                     Box::pin(async move { ctx.system_processes.clone().std_log(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:test:deployerId:make".to_string(),
+            fixed_channel: byte_name(104),
+            arity: 3,
+            body_ref: 104,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().deployer_id_make(args).await },
+                    )
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:test:crypto:secp256k1Sign".to_string(),
+            fixed_channel: byte_name(105),
+            arity: 3,
+            body_ref: 105,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().secp256k1_sign(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "sys:test:authToken:make".to_string(),
+            fixed_channel: byte_name(106),
+            arity: 1,
+            body_ref: 106,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(
+                        async move { ctx.system_processes.clone().sys_auth_token_make(args).await },
+                    )
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:test:block:data:set".to_string(),
+            fixed_channel: byte_name(107),
+            arity: 3,
+            body_ref: 107,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().block_data_set(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:test:casper:invalidBlocks:set".to_string(),
+            fixed_channel: byte_name(108),
+            arity: 2,
+            body_ref: 108,
+            handler: Box::new(|ctx| {
+                let invalid_blocks = ctx.invalid_blocks.clone();
+                Box::new(move |args| {
+                    let invalid_blocks = invalid_blocks.clone();
+                    let ctx = ctx.clone();
+                    Box::pin(async move {
+                        ctx.system_processes
+                            .casper_invalid_blocks_set(args, &invalid_blocks)
+                            .await
+                    })
                 })
             }),
             remainder: None,
