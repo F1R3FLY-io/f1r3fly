@@ -67,6 +67,12 @@ trait JNAInterface extends Library {
 
   def create_runtime(rspace_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
 
+  def create_runtime_with_test_framework(
+      rspace_ptr: Pointer,
+      params_ptr: Pointer,
+      params_bytes_len: Int
+  ): Pointer
+
   def create_replay_runtime(
       replay_space_ptr: Pointer,
       params_ptr: Pointer,

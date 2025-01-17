@@ -16,7 +16,7 @@ use models::Byte;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use super::contract_call::ContractCall;
 use super::dispatch::RhoDispatch;
@@ -810,12 +810,13 @@ impl SystemProcesses {
 
     // See casper/src/test/scala/coop/rchain/casper/helper/TestResultCollector.scala
 
-    pub async fn handle_message(
-        &self,
-        message: Vec<ListParWithRandom>,
-        test_result_collector: Arc<TestResultCollector>,
-    ) -> () {
+    pub async fn handle_message(&self, message: Vec<ListParWithRandom>) -> () {
         // println!("\nhit handle_message");
+        let mut printer = PrettyPrinter::new();
+
+        fn clue_msg(clue: String, attempt: i64) -> String {
+            format!("{} (test attempt: {})", clue, attempt)
+        }
 
         if let Some((produce, assert_par)) = self.is_contract_call().unapply(message) {
             if let Some((test_name, attempt, assertion, clue, ack_channel)) =
@@ -827,16 +828,10 @@ impl SystemProcesses {
                     if equals_or_not_equals_str == "==" {
                         let assertion = RhoTestAssertion::RhoAssertEquals {
                             test_name,
-                            expected: expected_or_unexpected,
-                            actual,
-                            clue,
+                            expected: expected_or_unexpected.clone(),
+                            actual: actual.clone(),
+                            clue: clue.clone(),
                         };
-                        println!("\nassertion: {:?}", assertion);
-
-                        let curr_test_result = test_result_collector.get_result();
-                        let new_test_result =
-                            curr_test_result.add_assertion(attempt, assertion.clone());
-                        test_result_collector.update(new_test_result);
 
                         if let Err(e) = produce(
                             vec![new_gbool_par(assertion.is_success(), Vec::new(), false)],
@@ -846,19 +841,27 @@ impl SystemProcesses {
                         {
                             eprintln!("Error producing result: {:?}", e);
                         }
+
+                        assert_eq!(
+                            printer.build_string_from_message(&actual),
+                            printer.build_string_from_message(&expected_or_unexpected),
+                            "{}",
+                            clue_msg(clue, attempt)
+                        );
+
+                        assert_eq!(
+                            actual,
+                            expected_or_unexpected,
+                            "{}",
+                            clue_msg(clue, attempt)
+                        );
                     } else if equals_or_not_equals_str == "!=" {
                         let assertion = RhoTestAssertion::RhoAssertNotEquals {
                             test_name,
-                            unexpected: expected_or_unexpected,
-                            actual,
-                            clue,
+                            unexpected: expected_or_unexpected.clone(),
+                            actual: actual.clone(),
+                            clue: clue.clone(),
                         };
-                        println!("\nassertion: {:?}", assertion);
-
-                        let curr_test_result = test_result_collector.get_result();
-                        let new_test_result =
-                            curr_test_result.add_assertion(attempt, assertion.clone());
-                        test_result_collector.update(new_test_result);
 
                         if let Err(e) = produce(
                             vec![new_gbool_par(assertion.is_success(), Vec::new(), false)],
@@ -868,24 +871,24 @@ impl SystemProcesses {
                         {
                             eprintln!("Error producing result: {:?}", e);
                         }
+
+                        assert_ne!(
+                            printer.build_string_from_message(&actual),
+                            printer.build_string_from_message(&expected_or_unexpected),
+                            "{}",
+                            clue_msg(clue, attempt)
+                        );
+
+                        assert_ne!(
+                            actual,
+                            expected_or_unexpected,
+                            "{}",
+                            clue_msg(clue, attempt)
+                        );
                     } else {
-                        println!("\nreturning Unit");
-                        ()
+                        panic!("\nERROR: Expected args did not match any case");
                     }
                 } else if let Some(condition) = RhoBoolean::unapply(&assertion) {
-                    println!("\ncondition: {:?}", condition);
-
-                    let curr_test_result = test_result_collector.get_result();
-                    let new_test_result = curr_test_result.add_assertion(
-                        attempt,
-                        RhoTestAssertion::RhoAssertTrue {
-                            test_name,
-                            is_success: condition,
-                            clue,
-                        },
-                    );
-                    test_result_collector.update(new_test_result);
-
                     if let Err(e) = produce(
                         vec![new_gbool_par(condition, Vec::new(), false)],
                         ack_channel.clone(),
@@ -894,20 +897,9 @@ impl SystemProcesses {
                     {
                         eprintln!("Error producing result: {:?}", e);
                     }
+
+                    assert_eq!(condition, true, "{}", clue_msg(clue, attempt));
                 } else {
-                    println!("\nfailed to evaluate assertion: {:?}", assertion);
-
-                    let curr_test_result = test_result_collector.get_result();
-                    let new_test_result = curr_test_result.add_assertion(
-                        attempt,
-                        RhoTestAssertion::RhoAssertTrue {
-                            test_name,
-                            is_success: false,
-                            clue: format!("Failed to evaluate assertion: {:?}", assertion),
-                        },
-                    );
-                    test_result_collector.update(new_test_result);
-
                     if let Err(e) = produce(
                         vec![new_gbool_par(false, Vec::new(), false)],
                         ack_channel.clone(),
@@ -916,16 +908,13 @@ impl SystemProcesses {
                     {
                         eprintln!("Error producing result: {:?}", e);
                     }
-                }
-            } else if let Some(has_finished) = IsSetFinished::unapply(assert_par) {
-                println!("\nhas_finished: {}", has_finished);
 
-                let curr_test_result = test_result_collector.get_result();
-                let new_test_result = curr_test_result.set_finished(has_finished);
-                test_result_collector.update(new_test_result);
+                    panic!("\nFailed to evaluate assertion: {:?}", assertion);
+                }
+            } else if let Some(_) = IsSetFinished::unapply(assert_par) {
+                // println!("\nhas_finished: {}", has_finished);
             } else {
-                println!("\nreturning Unit");
-                ()
+                panic!("\nERROR: Expected args did not match any case");
             }
         } else {
             panic!("SystemProcesses: is_contract_call failed");
@@ -963,9 +952,7 @@ impl SystemProcesses {
 
 // See casper/src/test/scala/coop/rchain/casper/helper/RhoSpec.scala
 
-pub fn test_framework_contracts(
-    test_result_collector: Arc<TestResultCollector>,
-) -> Vec<Definition> {
+pub fn test_framework_contracts() -> Vec<Definition> {
     vec![
         Definition {
             urn: "rho:test:assertAck".to_string(),
@@ -973,18 +960,12 @@ pub fn test_framework_contracts(
             arity: 5,
             body_ref: 101,
             handler: {
-                let collector = Arc::clone(&test_result_collector);
-                Box::new(move |ctx| {
-                    let collector = Arc::clone(&collector);
+                Box::new(|ctx| {
                     Box::new(move |args| {
-                        let collector = Arc::clone(&collector);
                         let ctx = ctx.clone();
-                        Box::pin(async move {
-                            ctx.system_processes
-                                .clone()
-                                .handle_message(args, collector)
-                                .await
-                        })
+                        Box::pin(
+                            async move { ctx.system_processes.clone().handle_message(args).await },
+                        )
                     })
                 })
             },
@@ -995,22 +976,12 @@ pub fn test_framework_contracts(
             fixed_channel: byte_name(102),
             arity: 1,
             body_ref: 102,
-            handler: {
-                let collector = Arc::clone(&test_result_collector);
-                Box::new(move |ctx| {
-                    let collector = Arc::clone(&collector);
-                    Box::new(move |args| {
-                        let collector = Arc::clone(&collector);
-                        let ctx = ctx.clone();
-                        Box::pin(async move {
-                            ctx.system_processes
-                                .clone()
-                                .handle_message(args, collector)
-                                .await
-                        })
-                    })
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().handle_message(args).await })
                 })
-            },
+            }),
             remainder: None,
         },
         Definition {
@@ -1065,7 +1036,7 @@ impl IsComparison {
         if let Some(expr) = single_expr(&p) {
             match expr.expr_instance.unwrap() {
                 ExprInstance::ETupleBody(etuple) => match etuple.ps.as_slice() {
-                    [expected_par, operator_par, actual_par, _, _] => {
+                    [expected_par, operator_par, actual_par] => {
                         if let Some(operator) = RhoString::unapply(operator_par) {
                             Some((expected_par.clone(), operator, actual_par.clone()))
                         } else {
@@ -1124,22 +1095,6 @@ pub enum RhoTestAssertion {
 }
 
 impl RhoTestAssertion {
-    pub fn test_name(&self) -> &str {
-        match self {
-            RhoTestAssertion::RhoAssertTrue { test_name, .. } => test_name,
-            RhoTestAssertion::RhoAssertEquals { test_name, .. } => test_name,
-            RhoTestAssertion::RhoAssertNotEquals { test_name, .. } => test_name,
-        }
-    }
-
-    pub fn clue(&self) -> &str {
-        match self {
-            RhoTestAssertion::RhoAssertTrue { clue, .. } => clue,
-            RhoTestAssertion::RhoAssertEquals { clue, .. } => clue,
-            RhoTestAssertion::RhoAssertNotEquals { clue, .. } => clue,
-        }
-    }
-
     pub fn is_success(&self) -> bool {
         match self {
             RhoTestAssertion::RhoAssertTrue { is_success, .. } => *is_success,
@@ -1150,79 +1105,5 @@ impl RhoTestAssertion {
                 unexpected, actual, ..
             } => actual != unexpected,
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct TestResult {
-    assertions: HashMap<String, HashMap<i64, Vec<RhoTestAssertion>>>,
-    has_finished: bool,
-}
-
-impl TestResult {
-    pub fn add_assertion(&self, attempt: i64, assertion: RhoTestAssertion) -> Self {
-        let current_attempt_assertions = self
-            .assertions
-            .get(assertion.test_name())
-            .cloned()
-            .unwrap_or_else(|| HashMap::new());
-
-        let new_assertion = (attempt, {
-            let mut new_assertions = current_attempt_assertions
-                .get(&attempt)
-                .cloned()
-                .unwrap_or_else(|| Vec::new());
-
-            new_assertions.insert(0, assertion.clone());
-            new_assertions
-        });
-
-        let new_current_attempt_assertions = {
-            let mut new_assertions_map = current_attempt_assertions.clone();
-            new_assertions_map.insert(new_assertion.0, new_assertion.1.clone());
-            new_assertions_map
-        };
-
-        Self {
-            assertions: {
-                let mut new_assertions = self.assertions.clone();
-                new_assertions.insert(
-                    assertion.test_name().to_string(),
-                    new_current_attempt_assertions,
-                );
-                new_assertions
-            },
-            has_finished: self.has_finished,
-        }
-    }
-
-    pub fn set_finished(&self, has_finished: bool) -> Self {
-        Self {
-            assertions: self.assertions.clone(),
-            has_finished,
-        }
-    }
-}
-
-pub struct TestResultCollector {
-    result: Mutex<TestResult>,
-}
-
-impl TestResultCollector {
-    pub fn new() -> Self {
-        Self {
-            result: Mutex::new(TestResult {
-                assertions: HashMap::new(),
-                has_finished: false,
-            }),
-        }
-    }
-
-    pub fn get_result(&self) -> TestResult {
-        self.result.try_lock().unwrap().clone()
-    }
-
-    pub fn update(&self, test_result: TestResult) {
-        self.result.lock().unwrap().clone_from(&test_result);
     }
 }

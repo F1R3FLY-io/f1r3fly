@@ -16,7 +16,7 @@ use crate::rust::interpreter::{
     matcher::r#match::Matcher,
     reduce::DebruijnInterpreter,
     rho_runtime::{create_runtime_from_kv_store, RhoISpace, RhoRuntimeImpl},
-    system_processes::{test_framework_contracts, TestResultCollector},
+    system_processes::test_framework_contracts,
 };
 
 pub async fn create_test_space<T>() -> (
@@ -55,7 +55,7 @@ pub async fn create_test_runtime_with_genesis_contracts() -> Arc<Mutex<RhoRuntim
         store,
         Par::default(),
         true,
-        &mut test_framework_contracts(Arc::new(TestResultCollector::new())),
+        &mut test_framework_contracts(),
         Arc::new(Box::new(Matcher)),
     )
     .await;

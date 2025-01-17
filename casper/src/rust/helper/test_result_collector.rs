@@ -46,7 +46,7 @@ impl IsComparison {
         if let Some(expr) = single_expr(&p) {
             match expr.expr_instance.unwrap() {
                 ExprInstance::ETupleBody(etuple) => match etuple.ps.as_slice() {
-                    [expected_par, operator_par, actual_par, _, _] => {
+                    [expected_par, operator_par, actual_par] => {
                         if let Some(operator) = RhoString::unapply(operator_par) {
                             Some((expected_par.clone(), operator, actual_par.clone()))
                         } else {

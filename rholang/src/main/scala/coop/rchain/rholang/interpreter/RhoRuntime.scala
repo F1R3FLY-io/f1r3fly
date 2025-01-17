@@ -1496,4 +1496,45 @@ object RhoRuntime {
                 )
     } yield runtime
   }
+
+  def createRuntimeWithTestFramework[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
+      // stores: RSpaceStore[F],
+      storePath: String,
+      mergeableTagName: Par,
+      initRegistry: Boolean = false,
+      additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
+  )(
+      implicit scheduler: Scheduler
+  ): F[RhoRuntime[F]] = {
+    import coop.rchain.rholang.interpreter.storage._
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    for {
+      // space <- RSpace
+      //           .create[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //             stores
+      //           )
+      space <- RSpacePlusPlus_RhoTypes.create[F](storePath)
+      runtime <- Sync[F].delay {
+                  val runtimeParams = CreateRuntimeParams(
+                    Some(mergeableTagName),
+                    initRegistry,
+                    additionalSystemProcesses.nonEmpty
+                  )
+
+                  val runtimeParamsBytes = runtimeParams.toByteArray
+                  val paramsPtr          = new Memory(runtimeParamsBytes.length.toLong)
+                  paramsPtr.write(0, runtimeParamsBytes, 0, runtimeParamsBytes.length)
+
+                  val spacePtr = space.getRspacePointer
+                  val runtimePtr =
+                    RHOLANG_RUST_INSTANCE.create_runtime_with_test_framework(
+                      spacePtr,
+                      paramsPtr,
+                      runtimeParamsBytes.length
+                    )
+                  assert(runtimePtr != null)
+                  new RhoRuntimeImpl[F](runtimePtr)
+                }
+    } yield runtime
+  }
 }
