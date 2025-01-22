@@ -24,30 +24,30 @@ match (
     sign(`rho:test:crypto:secp256k1Sign`),
     secpVerify(`rho:crypto:secp256k1Verify`),
     blake2b256(`rho:crypto:blake2b256Hash`),
-    test_secp,
-    test_insertSignedAndLookup,
-    test_insertArbitraryAndLookup,
-    test_insertSignedValidNonce,
-    test_insertSignedInvalidNonce,
-    test_insertSignedInvalidSig,
-    test_unknownLookup,
+    testSecp,
+    testInsertSignedAndLookup,
+    testInsertArbitraryAndLookup,
+    testInsertSignedValidNonce,
+    testInsertSignedInvalidNonce,
+    testInsertSignedInvalidSig,
+    testUnknownLookup,
     insertSignedHelper
   in {
     lookup!(`rho:id:zphjgsfy13h1k85isc8rtwtgt3t9zzt5pjd5ihykfmyapfc4wt3x5h`, *RhoSpecCh) |
     for(@(_, RhoSpec) <- RhoSpecCh) {
       @RhoSpec!("testSuite",
         [
-          ("Verifying a signature should work", *test_secp),
-          ("InsertSigned and lookup should work", *test_insertSignedAndLookup),
-          ("InsertArbitrary and lookup should work", *test_insertArbitraryAndLookup),
-          ("InsertArbitrary should work with increased nonce", *test_insertSignedValidNonce),
-          ("InsertArbitrary should return Nil for invalid nonce", *test_insertSignedInvalidNonce),
-          ("InsertArbitrary should return Nil for invalid signature", *test_insertSignedInvalidSig),
-          ("Lookup should return Nil for unknown uri", *test_unknownLookup)
+          ("Verifying a signature should work", *testSecp),
+          ("InsertSigned and lookup should work", *testInsertSignedAndLookup),
+          ("InsertArbitrary and lookup should work", *testInsertArbitraryAndLookup),
+          ("InsertArbitrary should work with increased nonce", *testInsertSignedValidNonce),
+          ("InsertArbitrary should return Nil for invalid nonce", *testInsertSignedInvalidNonce),
+          ("InsertArbitrary should return Nil for invalid signature", *testInsertSignedInvalidSig),
+          ("Lookup should return Nil for unknown uri", *testUnknownLookup)
         ])
     } |
 
-    contract test_secp(rhoSpec, _, ackCh) = {
+    contract testSecp(rhoSpec, _, ackCh) = {
       new signCh, retCh, hashCh in {
         blake2b256!("foo".toByteArray(), *hashCh) |
         for (@hash <- hashCh) {
@@ -60,14 +60,14 @@ match (
       }
     } |
 
-    contract test_unknownLookup(rhoSpec, _, ackCh) = {
+    contract testUnknownLookup(rhoSpec, _, ackCh) = {
       new retCh in {
         lookup!(`rho:id:unknown`, *retCh) |
         rhoSpec!("assert", (Nil, "== <-", *retCh), "Expecting Nil", *ackCh)
       }
     } |
 
-    contract test_insertSignedAndLookup(rhoSpec, _, ackCh) = {
+    contract testInsertSignedAndLookup(rhoSpec, _, ackCh) = {
       new uriCh, valueCh in {
         insertSignedHelper!(1, "foo", pk1, sk1, *uriCh) |
         for (@uri <- uriCh) {
@@ -77,7 +77,7 @@ match (
       }
     } |
 
-    contract test_insertArbitraryAndLookup(rhoSpec, _, ackCh) = {
+    contract testInsertArbitraryAndLookup(rhoSpec, _, ackCh) = {
       new uriCh, valueCh in {
         insertArbitrary!("foo", *uriCh) |
         for (@uri <- uriCh) {
@@ -87,7 +87,7 @@ match (
       }
     } |
 
-    contract test_insertSignedValidNonce(rhoSpec, _, ackCh) = {
+    contract testInsertSignedValidNonce(rhoSpec, _, ackCh) = {
       new uriCh, retCh in {
         insertSignedHelper!(42, "foo", pk2, sk2, *uriCh) |
         for (@uri <- uriCh) {
@@ -97,7 +97,7 @@ match (
       }
     } |
 
-    contract test_insertSignedInvalidNonce(rhoSpec, _, ackCh) = {
+    contract testInsertSignedInvalidNonce(rhoSpec, _, ackCh) = {
       new uriCh, retCh in {
         insertSignedHelper!(42, "foo", pk3, sk3, *uriCh) |
         for (@uri <- uriCh) {
@@ -107,14 +107,14 @@ match (
       }
     } |
 
-    contract test_insertSignedInvalidSig(rhoSpec, _, ackCh) = {
+    contract testInsertSignedInvalidSig(rhoSpec, _, ackCh) = {
       new retCh in {
         insertSigned!(pk3, (1, "foo"), "foo".toByteArray(), *retCh) |
         rhoSpec!("assert", (Nil, "== <-", *retCh), "Expecting Nil", *ackCh)
       }
     } |
 
-    contract test_unknownLookup(rhoSpec, _, ackCh) = {
+    contract testUnknownLookup(rhoSpec, _, ackCh) = {
       new retCh in {
         lookup!(`rho:id:unknown`, *retCh) |
         rhoSpec!("assert", (Nil, "== <-", *retCh), "Expecting Nil", *ackCh)
