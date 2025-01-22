@@ -1,0 +1,24 @@
+=======
+Genesis Ceremony
+=======
+
+     for(@(_, RhoSpec) <- RhoSpecCh) {
+            Nil
+     }
+
+---
+
+(source_file
+  (input
+    formals: (receipts
+      (linear_bind
+        names: (names
+          (quote
+            (collection
+              (tuple
+                (wildcard)
+                (var)))))
+        input: (simple_source
+          (var))))
+    proc: (block
+      body: (nil))))
