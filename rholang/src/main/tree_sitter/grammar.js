@@ -291,8 +291,7 @@ module.exports = grammar({
         ),
 
         _proc_list: $ => seq('(', commaSep($._proc), ')'),
-        var: $ => token(/((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\')+))/),
-
+        var: $ => token(/(([a-zA-Z]|')([a-zA-Z0-9_']*)|(_[a-zA-Z0-9_']+))/),
         _line_comment: $ => token(seq('//', /[^\n]*/)),
         _block_comment: $ => token(seq(
             '/*',
