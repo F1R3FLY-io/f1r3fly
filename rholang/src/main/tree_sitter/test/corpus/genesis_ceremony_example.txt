@@ -1,5 +1,5 @@
 =======
-Genesis Ceremony (RegistryTest.rho)
+Genesis Ceremony (EitherTest.rho)
 =======
 
 //scalapackage coop.rchain.rholang.collection
