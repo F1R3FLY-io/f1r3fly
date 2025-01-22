@@ -17,16 +17,18 @@ object TestUtil {
       runtime: RhoRuntime[F]
   )(implicit rand: Blake2b512Random): F[Unit] = eval(source.code, runtime, source.env)
 
+  // There is a problem in the deserialization when calling rust code to get the normalized par in scala and passing that back to rust side for inj.
+  // So, instead I directly call evaluate which generates the normalized par on the rust side to avoid the extra scala to rust step.
   def eval[F[_]: Sync](
       code: String,
       runtime: RhoRuntime[F],
       normalizerEnv: Map[String, Par]
-  )(implicit rand: Blake2b512Random): F[Unit] = {
-    val params = SourceToAdtParams(code, normalizerEnv)
+  )(implicit rand: Blake2b512Random): F[Unit] =
+    // val params = SourceToAdtParams(code, normalizerEnv)
     // println(s"\nhit eval, normalizerEnv: $normalizerEnv")
-    val par = CompiledRholangSource.sourceToAdt(params)
+    // val par = CompiledRholangSource.sourceToAdt(params)
     // println(s"\nhit eval, normalized par: $par")
-    evalTerm(par, runtime)
+    // evalTerm(par, runtime)
 
     // for {
     //   term <- Compiler[F].sourceToADT(code, normalizerEnv)
@@ -34,8 +36,9 @@ object TestUtil {
     //   // _ = println(s"\nhit eval, normalized par: $term")
     //   _ <- evalTerm(term, runtime)
     // } yield ()
-
-  }
+    for {
+      _ <- runtime.evaluate(code, Cost.UNSAFE_MAX, normalizerEnv)
+    } yield ()
 
   private def evalTerm[F[_]: FlatMap](
       term: Par,

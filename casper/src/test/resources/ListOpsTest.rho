@@ -4,37 +4,37 @@ new
   rl(`rho:registry:lookup`), ListOpsCh, RhoSpecCh,
   greaterThan1,
   greaterThan,
-  test_sum,
-  test_forall, test_forall_shortcircuit,
-  test_exists, test_exists_shortcircuit,
-  test_filter,
-  test_partial_fold_clean,
-  test_forall_clean, test_forall_clean_shortcircuit,
-  test_exists_clean, test_exists_clean_shortcircuit,
-  test_filter_clean
+  testSum,
+  testForall, testForallShortcircuit,
+  testExists, testExistsShortcircuit,
+  testFilter,
+  testPartialFoldClean,
+  testForallClean, testForallCleanShortcircuit,
+  testExistsClean, testExistsCleanShortcircuit,
+  testFilterClean
 in {
   rl!(`rho:id:zphjgsfy13h1k85isc8rtwtgt3t9zzt5pjd5ihykfmyapfc4wt3x5h`, *RhoSpecCh) |
   for(@(_, RhoSpec) <- RhoSpecCh) {
     @RhoSpec!("testSuite",
       [
-        ("ListOps.sum works", *test_sum),
-        ("ListOps.forall works", *test_forall),
-        ("ListOps.forall shortcircuit", *test_forall_shortcircuit),
-        ("ListOps.exists works", *test_exists),
-        ("ListOps.exists shortcircuit", *test_exists_shortcircuit),
-        ("ListOps.filter works", *test_filter),
-        ("ListOps.partialFoldClean works", *test_partial_fold_clean),
-        ("ListOps.forallClean works", *test_forall_clean),
-        ("ListOps.forallClean shortcircuit", *test_forall_clean_shortcircuit),
-        ("ListOps.existsClean works", *test_exists_clean),
-        ("ListOps.existsClean shortcircuit", *test_exists_clean_shortcircuit),
-        ("ListOps.filterClean works", *test_filter_clean),
+        ("ListOps.sum works", *testSum),
+        ("ListOps.forall works", *testForall),
+        ("ListOps.forall shortcircuit", *testForallShortcircuit),
+        ("ListOps.exists works", *testExists),
+        ("ListOps.exists shortcircuit", *testExistsShortcircuit),
+        ("ListOps.filter works", *testFilter),
+        ("ListOps.partialFoldClean works", *testPartialFoldClean),
+        ("ListOps.forallClean works", *testForallClean),
+        ("ListOps.forallClean shortcircuit", *testForallCleanShortcircuit),
+        ("ListOps.existsClean works", *testExistsClean),
+        ("ListOps.existsClean shortcircuit", *testExistsCleanShortcircuit),
+        ("ListOps.filterClean works", *testFilterClean),
       ])
   } |
   rl!(`rho:lang:listOps`, *ListOpsCh) |
   for(@(_, ListOps) <- ListOpsCh) {
 
-    contract test_sum(rhoSpec, _, ackCh) = {
+    contract testSum(rhoSpec, _, ackCh) = {
       new ch0, ch1 in {
         @ListOps!("sum", [], *ch0) |
         @ListOps!("sum", [1, 2], *ch1) |
@@ -47,7 +47,7 @@ in {
       }
     } |
 
-    contract test_forall(rhoSpec, _, ackCh) = {
+    contract testForall(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2, ch3, ch4 in {
 
         @ListOps!("forall", [], *greaterThan1, *ch0) |
@@ -67,7 +67,7 @@ in {
       }
     } |
 
-    contract test_forall_shortcircuit(rhoSpec, _, ackCh) = {
+    contract testForallShortcircuit(rhoSpec, _, ackCh) = {
       new callCountCh, greaterThan1WithCount, resultCh in {
         callCountCh!(0) |
         contract greaterThan1WithCount(@x, returnCh) = {
@@ -89,7 +89,7 @@ in {
       }
     } |
 
-    contract test_exists(rhoSpec, _, ackCh) = {
+    contract testExists(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2, ch3, ch4 in {
 
         @ListOps!("exists", [], *greaterThan1, *ch0) |
@@ -109,7 +109,7 @@ in {
       }
     } |
 
-    contract test_exists_shortcircuit(rhoSpec, _, ackCh) = {
+    contract testExistsShortcircuit(rhoSpec, _, ackCh) = {
       new callCountCh, greaterThan1WithCount, resultCh in {
         callCountCh!(0) |
         contract greaterThan1WithCount(@x, returnCh) = {
@@ -131,7 +131,7 @@ in {
       }
     } |
 
-    contract test_filter(rhoSpec, _, ackCh) = {
+    contract testFilter(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2 in {
         @ListOps!("filter", [], *greaterThan1, *ch0) |
         @ListOps!("filter", [2, 3], *greaterThan1, *ch1) |
@@ -146,7 +146,7 @@ in {
       }
     } |
 
-    contract test_partial_fold_clean(rhoSpec, _, ackCh) = {
+    contract testPartialFoldClean(rhoSpec, _, ackCh) = {
       new combinatorAndCondition, ret, ret2 in {
         // Add up numbers less than state
         contract combinatorAndCondition(@state, @head, @accumulatedValue, result) = {
@@ -167,7 +167,7 @@ in {
       }
     } |
 
-    contract test_forall_clean(rhoSpec, _, ackCh) = {
+    contract testForallClean(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2, ch3, ch4 in {
 
         @ListOps!("forallClean", [], *greaterThan, 1, *ch0) |
@@ -187,7 +187,7 @@ in {
       }
     } |
 
-    contract test_forall_clean_shortcircuit(rhoSpec, _, ackCh) = {
+    contract testForallCleanShortcircuit(rhoSpec, _, ackCh) = {
       new callCountCh, greaterThanWithCount, resultCh in {
         callCountCh!(0) |
         contract greaterThanWithCount(@bound, @x, returnCh) = {
@@ -209,7 +209,7 @@ in {
       }
     } |
 
-    contract test_exists_clean(rhoSpec, _, ackCh) = {
+    contract testExistsClean(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2, ch3, ch4 in {
 
         @ListOps!("existsClean", [], *greaterThan, 1, *ch0) |
@@ -229,7 +229,7 @@ in {
       }
     } |
 
-    contract test_exists_clean_shortcircuit(rhoSpec, _, ackCh) = {
+    contract testExistsCleanShortcircuit(rhoSpec, _, ackCh) = {
       new callCountCh, greaterThanWithCount, resultCh in {
         callCountCh!(0) |
         contract greaterThanWithCount(@bound, @x, returnCh) = {
@@ -251,7 +251,7 @@ in {
       }
     } |
 
-    contract test_filter_clean(rhoSpec, _, ackCh) = {
+    contract testFilterClean(rhoSpec, _, ackCh) = {
       new ch0, ch1, ch2 in {
         @ListOps!("filterClean", [], *greaterThan, 1, *ch0) |
         @ListOps!("filterClean", [2, 3], *greaterThan, 1, *ch1) |

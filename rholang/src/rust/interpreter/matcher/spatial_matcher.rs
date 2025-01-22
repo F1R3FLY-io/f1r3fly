@@ -339,7 +339,7 @@ impl SpatialMatcher<Par, Par> for SpatialMatcherContext {
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - bundleSpatialMatcherInstance
-// Apparently this code is never reached accoriding to Scala code comment
+// Apparently this code is never reached according to Scala code comment
 impl SpatialMatcher<Bundle, Bundle> for SpatialMatcherContext {
     fn spatial_match(&mut self, target: Bundle, pattern: Bundle) -> Option<()> {
         // println!("\nHit Bundle, Bundle");
@@ -391,7 +391,6 @@ impl SpatialMatcher<New, New> for SpatialMatcherContext {
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - exprSpatialMatcherInstance
-// PARTIALLY IMPLEMENTED
 impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
     fn spatial_match(&mut self, target: Expr, pattern: Expr) -> Option<()> {
         // println!("\nHit Expr, Expr");
