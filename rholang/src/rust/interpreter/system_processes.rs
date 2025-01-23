@@ -339,9 +339,6 @@ impl SystemProcesses {
                     RhoByteArray::unapply(&pub_key),
                 ) {
                     let verified = algorithm.verify(&data_bytes, &signature_bytes, &pub_key_bytes);
-                    if !verified {
-                        panic!("SystemProcesses: Failed to verify contract")
-                    }
                     if let Err(e) = produce(
                         vec![Par::default().with_exprs(vec![RhoBoolean::create_expr(verified)])],
                         ack.clone(),
