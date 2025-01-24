@@ -25,6 +25,7 @@ impl Address {
     }
 }
 
+#[derive(Debug)]
 pub struct AddressTools {
     pub prefix: Vec<u8>,
     pub key_length: usize,
@@ -45,11 +46,8 @@ impl AddressTools {
      */
     pub fn from_public_key(&self, pk: &PublicKey) -> Option<Address> {
         if self.key_length == pk.bytes.len() {
-            let eth_address = hex::encode(Keccak256::hash(pk.bytes[1..].to_vec()))
-                .chars()
-                .rev()
-                .take(40)
-                .collect::<String>();
+            let encoded = hex::encode(Keccak256::hash(pk.bytes[1..].to_vec()));
+            let eth_address = encoded[encoded.len() - 40..].to_string();
 
             self.from_eth_address(&eth_address)
         } else {
@@ -109,7 +107,7 @@ impl AddressTools {
         }
 
         // validateChecksum
-        let (payload, checksum) = decoded_address.split_at(self.prefix.len() + checksum_start);
+        let (payload, checksum) = decoded_address.split_at(checksum_start);
         let computed_checksum = self.compute_checksum(payload);
 
         if computed_checksum != checksum {

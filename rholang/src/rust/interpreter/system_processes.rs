@@ -45,6 +45,7 @@ pub type Contract = dyn Fn(Vec<ListParWithRandom>) -> ();
 pub struct InvalidBlocks {
     pub invalid_blocks: Arc<RwLock<Par>>,
 }
+
 impl InvalidBlocks {
     pub fn new() -> Self {
         InvalidBlocks {
