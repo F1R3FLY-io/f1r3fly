@@ -285,7 +285,11 @@ fn parse_proc(node: &Node, source: &str) -> Result<Proc, InterpreterError> {
         }
 
         "match" => {
-            let expression_node = get_child_by_field_name(node, "expression")?;
+            let mut expression_node = get_child_by_field_name(node, "expression")?;
+            if expression_node.kind() == "(" {
+                expression_node = expression_node.next_sibling().unwrap();
+            };
+
             let expression_proc = parse_proc(&expression_node, source)?;
 
             let cases_node = get_child_by_field_name(node, "cases")?;

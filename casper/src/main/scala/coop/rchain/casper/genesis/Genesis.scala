@@ -67,12 +67,6 @@ object Genesis {
       StandardDeploys.multiSigRevVault(shardId) +:
       vaultDeploys :+
       StandardDeploys.poSGenerator(posParams, shardId)
-
-    // Seq(
-    //   StandardDeploys.registry(shardId),
-    //   StandardDeploys.listOps(shardId)
-    //   // StandardDeploys.either(shardId)
-    // )
   }
 
   def createGenesisBlock[F[_]: Concurrent](
