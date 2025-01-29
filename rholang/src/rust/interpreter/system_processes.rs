@@ -962,14 +962,21 @@ impl SystemProcesses {
         if let Some((produce, args)) = self.is_contract_call().unapply(message) {
             match args.as_slice() {
                 [deployer_id_par, key_par, ack_channel] => {
-                    if let (Some(_), Some(public_key)) = (
+                    if let (Some(deployer_id_str), Some(public_key)) = (
                         RhoString::unapply(deployer_id_par),
                         RhoByteArray::unapply(key_par),
                     ) {
-                        let result_par = new_gbytearray_par(public_key.clone(), Vec::new(), false);
-
-                        if let Err(e) = produce(vec![result_par], ack_channel.clone()).await {
-                            eprintln!("Error producing DeployerId: {:?}", e);
+                        if deployer_id_str == "deployerId" {
+                            if let Err(e) = produce(
+                                vec![RhoDeployerId::create_par(public_key.clone())],
+                                ack_channel.clone(),
+                            )
+                            .await
+                            {
+                                eprintln!("Error producing DeployerId: {:?}", e);
+                            }
+                        } else {
+                            panic!("Invalid deployerId call: {}", deployer_id_str);
                         }
                     } else {
                         panic!("Invalid arguments for deployerId:make");
