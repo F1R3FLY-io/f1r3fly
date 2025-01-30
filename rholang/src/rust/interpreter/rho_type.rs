@@ -1,3 +1,5 @@
+// See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoType.scala
+
 use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::ETuple;
 use models::rhoapi::GPrivate;
@@ -6,7 +8,6 @@ use models::rhoapi::GUnforgeable;
 use models::rhoapi::{expr::ExprInstance, Expr, GDeployerId, Par};
 use models::rust::rholang::implicits::{single_expr, single_unforgeable};
 
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoType.scala
 pub struct RhoByteArray;
 
 impl RhoByteArray {
