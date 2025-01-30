@@ -1109,8 +1109,16 @@ fn parse_proc_list(node: &Node, source: &str) -> Result<ProcList, InterpreterErr
 }
 
 fn parse_linear_bind(node: &Node, source: &str) -> Result<LinearBind, InterpreterError> {
-    let names_node = get_child_by_field_name(&node, "names")?;
-    let names_proc = parse_names(&names_node, source)?;
+    let names_proc = if let Ok(names_node) = get_child_by_field_name(&node, "names") {
+        parse_names(&names_node, source)?
+    } else {
+        Names {
+            names: Vec::new(),
+            cont: None,
+            line_num: node.start_position().row,
+            col_num: node.start_position().column,
+        }
+    };
 
     let input_node = get_child_by_field_name(&node, "input")?;
     let input_node_line_num = input_node.start_position().row;

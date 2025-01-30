@@ -44,9 +44,9 @@ in {
           // REV vault initialization in genesis is done in batches.
           // In the last batch `initContinue` channel will not receive
           // anything so further access to `RevVault(@"init", _)` is impossible.
-          initContinue!(Nil) | // TODO: This should work: `initContinue!()` but does not with rust interpreter
+          initContinue!() |
           contract RevVault(@"init", ret) = {
-            for (_ <- initContinue) { // // TODO: This should work: `for (<- initContinue)` but does not with rust interpreter
+            for (<- initContinue) {
               ret!(*TreeHashMap, vaultMap, *initVault, *initContinue)
             }
           }

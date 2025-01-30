@@ -1829,12 +1829,20 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "FIELD",
-          "name": "names",
-          "content": {
-            "type": "SYMBOL",
-            "name": "names"
-          }
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "names",
+              "content": {
+                "type": "SYMBOL",
+                "name": "names"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",

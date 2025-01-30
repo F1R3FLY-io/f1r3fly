@@ -203,7 +203,7 @@ module.exports = grammar({
 
         // receipts
         linear_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<-',
             field('input', $._source)
         ),
