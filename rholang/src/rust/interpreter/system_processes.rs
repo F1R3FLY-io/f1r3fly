@@ -4,7 +4,7 @@ use super::pretty_printer::PrettyPrinter;
 use super::registry::registry::Registry;
 use super::rho_runtime::RhoISpace;
 use super::rho_type::{
-    RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoUri,
+    RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoSysAuthToken, RhoUri,
 };
 use super::util::rev_address::RevAddress;
 use crypto::rust::hash::blake2b256::Blake2b256;
@@ -712,7 +712,7 @@ impl SystemProcesses {
                             None
                         }
                     }) {
-                        let response: Expr = if let Some(_) = RhoByteArray::unapply(&argument) {
+                        let response: Expr = if let Some(_) = RhoSysAuthToken::unapply(&argument) {
                             RhoBoolean::create_expr(true)
                         } else {
                             RhoBoolean::create_expr(false)
@@ -1058,10 +1058,11 @@ impl SystemProcesses {
                         match key.as_str() {
                             "sender" => {
                                 if let Some(public_key_bytes) = RhoByteArray::unapply(value_par) {
-                                    let mut block_data = self.block_data.write().unwrap();
+                                    let mut block_data = self.block_data.try_write().unwrap();
                                     block_data.sender = PublicKey {
                                         bytes: public_key_bytes.clone(),
                                     };
+                                    drop(block_data);
 
                                     let result_par = Par::default();
                                     if let Err(e) =
@@ -1078,8 +1079,9 @@ impl SystemProcesses {
                             }
                             "blockNumber" => {
                                 if let Some(block_number) = RhoNumber::unapply(value_par) {
-                                    let mut block_data = self.block_data.write().unwrap();
+                                    let mut block_data = self.block_data.try_write().unwrap();
                                     block_data.block_number = block_number;
+                                    drop(block_data);
 
                                     let result_par = Par::default();
                                     if let Err(e) =
