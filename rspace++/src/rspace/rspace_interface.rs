@@ -70,6 +70,12 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
      */
     fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError>;
 
+    fn consume_result(
+        &mut self,
+        channel: Vec<C>,
+        pattern: Vec<P>,
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError>;
+
     // TODO: this should not be exposed - OLD
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>>;
 

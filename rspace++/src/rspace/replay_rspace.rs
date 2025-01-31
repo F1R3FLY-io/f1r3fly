@@ -101,6 +101,14 @@ where
         Ok(())
     }
 
+    fn consume_result(
+        &mut self,
+        _channel: Vec<C>,
+        _pattern: Vec<P>,
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
+        panic!("\nERROR: ReplayRSpace consume_result should not be called here");
+    }
+
     fn get_data(&self, channel: C) -> Vec<Datum<A>> {
         self.store.get_data(&channel)
     }
@@ -868,7 +876,8 @@ where
         let installs = self.installs.lock().unwrap().clone();
         // println!("\ninstalls: {:?}", installs);
         for (channels, install) in installs {
-            self.install(channels, install.patterns, install.continuation).unwrap();
+            self.install(channels, install.patterns, install.continuation)
+                .unwrap();
         }
     }
 

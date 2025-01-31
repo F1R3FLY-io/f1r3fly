@@ -11,7 +11,6 @@ use crate::rust::interpreter::{
         },
     },
     errors::InterpreterError,
-    unwrap_option_safe,
 };
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{
@@ -24,6 +23,7 @@ use rspace_plus_plus::rspace::{
     internal::{Datum, Row, WaitingContinuation},
     rspace_interface::{ContResult, ISpace, MaybeActionResult, RSpaceResult},
     trace::Log,
+    util::unpack_option,
 };
 
 pub struct ChargingRSpace;
@@ -168,6 +168,22 @@ impl ChargingRSpace {
 
             fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
                 self.space.reset(root)
+            }
+
+            fn consume_result(
+                &mut self,
+                channel: Vec<Par>,
+                pattern: Vec<BindPattern>,
+            ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, RSpaceError>
+            {
+                let consume_res = self.space.consume(
+                    channel,
+                    pattern,
+                    TaggedContinuation::default(),
+                    false,
+                    BTreeSet::new(),
+                )?;
+                Ok(unpack_option(&consume_res))
             }
 
             fn to_map(

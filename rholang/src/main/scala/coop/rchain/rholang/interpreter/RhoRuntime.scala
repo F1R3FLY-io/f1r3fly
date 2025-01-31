@@ -850,7 +850,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   ): F[Option[(TaggedContinuation, Seq[ListParWithRandom])]] =
     for {
       result <- Sync[F].delay {
-                 println("\nhit scala consumeResult")
                  val consumeResultParams = ConsumeResultParams(
                    channel,
                    pattern

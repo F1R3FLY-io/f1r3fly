@@ -113,6 +113,14 @@ where
         Ok(())
     }
 
+    fn consume_result(
+        &mut self,
+        _channel: Vec<C>,
+        _pattern: Vec<P>,
+    ) -> Result<Option<(K, Vec<A>)>, RSpaceError> {
+        panic!("\nERROR: RSpace consume_result should not be called here");
+    }
+
     fn get_data(&self, channel: C) -> Vec<Datum<A>> {
         self.store.get_data(&channel)
     }
@@ -225,18 +233,15 @@ where
     }
 
     fn rig_and_reset(&mut self, _start_root: Blake2b256Hash, _log: Log) -> Result<(), RSpaceError> {
-        println!("\nWARNING: RSpace rig_and_reset should not be called");
-        Ok(())
+        panic!("\nERROR: RSpace rig_and_reset should not be called here");
     }
 
     fn rig(&self, _log: Log) -> Result<(), RSpaceError> {
-        println!("\nWARNING: RSpace rig should not be called");
-        Ok(())
+        panic!("\nERROR: RSpace rig should not be called here");
     }
 
     fn check_replay_data(&self) -> Result<(), RSpaceError> {
-        println!("\nWARNING: RSpace check_replay_data should not be called");
-        Ok(())
+        panic!("\nERROR: RSpace check_replay_data should not be called here");
     }
 }
 

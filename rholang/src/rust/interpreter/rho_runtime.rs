@@ -23,8 +23,7 @@ use rspace_plus_plus::rspace::rspace::RSpaceStore;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::trace::Log;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
-use rspace_plus_plus::rspace::util::unpack_option;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{ HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::rust::interpreter::system_processes::{BodyRefs, FixedChannels};
@@ -359,15 +358,12 @@ impl RhoRuntime for RhoRuntimeImpl {
         channel: Vec<Par>,
         pattern: Vec<BindPattern>,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, InterpreterError> {
-        let v = self.reducer.space.try_lock().unwrap().consume(
-            channel,
-            pattern,
-            TaggedContinuation::default(),
-            false,
-            BTreeSet::new(),
-        )?;
-
-        Ok(unpack_option(&v))
+        Ok(self
+            .reducer
+            .space
+            .try_lock()
+            .unwrap()
+            .consume_result(channel, pattern)?)
     }
 
     fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
