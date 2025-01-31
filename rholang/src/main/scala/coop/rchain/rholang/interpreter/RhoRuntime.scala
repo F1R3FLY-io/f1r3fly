@@ -848,8 +848,51 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
       channel: Seq[Par],
       pattern: Seq[BindPattern]
   ): F[Option[(TaggedContinuation, Seq[ListParWithRandom])]] =
-    // space.consume(channel, pattern, emptyContinuation, persist = false).map(unpackOption)
-    ???
+    for {
+      result <- Sync[F].delay {
+                 println("\nhit scala consumeResult")
+                 val consumeResultParams = ConsumeResultParams(
+                   channel,
+                   pattern
+                 )
+                 val consumeResultParamsBytes = consumeResultParams.toByteArray
+
+                 val payloadMemory = new Memory(consumeResultParamsBytes.length.toLong)
+                 payloadMemory.write(
+                   0,
+                   consumeResultParamsBytes,
+                   0,
+                   consumeResultParamsBytes.length
+                 )
+
+                 val consumeResultPtr = RHOLANG_RUST_INSTANCE.consume_result(
+                   runtimePtr,
+                   payloadMemory,
+                   consumeResultParamsBytes.length
+                 )
+
+                 // Not sure if these lines are needed
+                 // Need to figure out how to deallocate each memory instance
+                 payloadMemory.clear()
+
+                 if (consumeResultPtr != null) {
+                   val resultByteslength = consumeResultPtr.getInt(0)
+
+                   try {
+                     val resultBytes         = consumeResultPtr.getByteArray(4, resultByteslength)
+                     val consumeResultReturn = ConsumeResultReturn.parseFrom(resultBytes)
+
+                     Some((consumeResultReturn.taggedCont.get, consumeResultReturn.datums))
+                   } catch {
+                     case e: Throwable =>
+                       println("Error during scala consumeResult operation: " + e)
+                       throw e
+                   }
+                 } else {
+                   None
+                 }
+               }
+    } yield result
 
   override def getData(channel: Par): F[Seq[Datum[ListParWithRandom]]] =
     for {

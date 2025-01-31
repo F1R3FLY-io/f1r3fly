@@ -23,6 +23,8 @@ trait JNAInterface extends Library {
 
   def create_checkpoint(runtime_ptr: Pointer): Pointer
 
+  def consume_result(runtime_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
+
   def reset(
       runtime_ptr: Pointer,
       root_pointer: Pointer,

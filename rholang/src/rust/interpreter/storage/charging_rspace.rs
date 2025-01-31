@@ -44,7 +44,7 @@ pub enum TriggeredBy {
 
 fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, InterpreterError> {
     //TODO: Make ScalaBodyRef-s have their own random state and merge it during its COMMs - OLD
-    match unwrap_option_safe(continuation.tagged_cont)? {
+    match continuation.tagged_cont.unwrap() {
         TaggedCont::ParBody(par_with_random) => Ok(Blake2b512Random::create_from_bytes(
             &par_with_random.random_state,
         )),

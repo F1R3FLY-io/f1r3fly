@@ -795,6 +795,45 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
 }
 
 #[no_mangle]
+extern "C" fn consume_result(
+    runtime_ptr: *mut RhoRuntime,
+    params_ptr: *const u8,
+    params_bytes_len: usize,
+) -> *const u8 {
+    let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
+    let consume_result_params = ConsumeResultParams::decode(params_slice).unwrap();
+
+    let channel = consume_result_params.channel;
+    let pattern = consume_result_params.pattern;
+
+    let consume_result_return = unsafe {
+        (*runtime_ptr)
+            .runtime
+            .try_lock()
+            .unwrap()
+            .consume_result(channel, pattern)
+            .unwrap()
+    };
+
+    match consume_result_return {
+        None => std::ptr::null(),
+        Some((tagged_cont, datums)) => {
+            let consume_result_return_proto = ConsumeResultReturn {
+                tagged_cont: Some(tagged_cont),
+                datums,
+            };
+
+            let mut bytes = consume_result_return_proto.encode_to_vec();
+            let len = bytes.len() as u32;
+            let len_bytes = len.to_le_bytes().to_vec();
+            let mut result = len_bytes;
+            result.append(&mut bytes);
+            Box::leak(result.into_boxed_slice()).as_ptr()
+        }
+    }
+}
+
+#[no_mangle]
 extern "C" fn reset(
     runtime_ptr: *mut RhoRuntime,
     root_pointer: *const u8,

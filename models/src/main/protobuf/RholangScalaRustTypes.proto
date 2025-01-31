@@ -92,3 +92,13 @@ message SourceToAdtParams {
   string source = 1;
   map<string, rhoapi.Par> normalizerEnv = 2;
 }
+
+message ConsumeResultParams {
+	repeated rhoapi.Par channel = 1;
+	repeated rhoapi.BindPattern pattern = 2;
+}
+
+message ConsumeResultReturn {
+	rhoapi.TaggedContinuation tagged_cont = 1;
+	repeated rhoapi.ListParWithRandom datums = 2;
+}
