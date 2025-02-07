@@ -1,7 +1,5 @@
-version: "3.4"
-
 x-rnode: &default-rnode
-  image: ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest
+  image: ghcr.io/f1r3fly-io/rnode-rholang-rust:latest
   user: root
   networks:
     - f1r3fly
@@ -28,9 +26,6 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/bootstrap.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      # - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
-    # environment:
-      # - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator1:
     <<: *default-rnode
@@ -53,9 +48,6 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator1.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      # - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
-    # environment:
-      # - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator2:
     <<: *default-rnode
@@ -78,9 +70,6 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator2.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      # - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
-    # environment:
-      # - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
   validator3:
     <<: *default-rnode
@@ -103,9 +92,6 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator3.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
-      # - "../rspace++/target/docker/debug:/var/lib/rnode/rspace++/target/docker/debug"
-    # environment:
-      # - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/debug
 
 networks:
   f1r3fly:

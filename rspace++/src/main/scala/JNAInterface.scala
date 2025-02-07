@@ -200,8 +200,15 @@ trait ByteArrayConvertible {
 
 object JNAInterfaceLoader {
   val INSTANCE: JNAInterface =
-    Native
-      .load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+    try {
+      Native.load("rspace_plus_plus_rhotypes", classOf[JNAInterface])
+    } catch {
+      case e: UnsatisfiedLinkError =>
+        throw new RuntimeException(
+          s"Failed to load library 'rspace_plus_plus_rhotypes' from path '${System.getProperty("jna.library.path")}'",
+          e
+        )
+    }
 
   def hashChannel[C](channel: C): Blake2b256Hash =
     channel match {

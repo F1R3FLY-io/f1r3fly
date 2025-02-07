@@ -26,7 +26,7 @@ rnodePattern="rnode:"
 
 baseParams="--add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED"
 jarParam="-jar ${rnode}"
-jnaParam="-Djna.library.path=./rust_libraries"
+jnaParam="-Djna.library.path=./rust_libraries/debug"
 
 syncrhonyParam="--synchrony-constraint-threshold=0.0"
 # jar file execution configuration:

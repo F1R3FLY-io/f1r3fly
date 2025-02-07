@@ -86,6 +86,13 @@ trait JNAInterface extends Library {
 
 object JNAInterfaceLoader {
   val RHOLANG_RUST_INSTANCE: JNAInterface =
-    Native
-      .load("rholang", classOf[JNAInterface])
+    try {
+      Native.load("rholang", classOf[JNAInterface])
+    } catch {
+      case e: UnsatisfiedLinkError =>
+        throw new RuntimeException(
+          s"Failed to load library 'rholang' from path '${System.getProperty("jna.library.path")}'",
+          e
+        )
+    }
 }

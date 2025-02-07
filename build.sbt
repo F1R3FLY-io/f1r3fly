@@ -144,7 +144,7 @@ lazy val projectSettings = Seq(
     case _                        => MergeStrategy.first
   }
 ) ++
-// skip api doc generation if SKIP_DOC env variable is defined
+  // skip api doc generation if SKIP_DOC env variable is defined
   Seq(sys.env.get("SKIP_DOC")).flatMap { _ =>
     Seq(
       publishArtifact in (Compile, packageDoc) := false,
@@ -289,8 +289,8 @@ lazy val casper = (project in file("casper"))
     ),
     javaOptions in Test ++= Seq(
       "-Xss256m",
-			"-Xmx256m",
-      "-Djna.library.path=../rust_libraries"
+      "-Xmx256m",
+      "-Djna.library.path=../rust_libraries/debug/"
     )
   )
   .dependsOn(
@@ -375,14 +375,14 @@ lazy val node = (project in file("node"))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(
     // Universal / javaOptions ++= Seq("-J-Xmx2g"),
-    // runCargoBuildDocker := {
-    //   import scala.sys.process._
-    //   val exitCode = Seq("./scripts/build_rspace++_docker.sh").!
-    //   if (exitCode != 0) {
-    //     throw new Exception("Rust build script failed with exit code " + exitCode)
-    //   }
-    // },
-    // (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
+    runCargoBuildDocker := {
+      import scala.sys.process._
+      val exitCode = Seq("./scripts/build_rust_libraries_docker.sh").!
+      if (exitCode != 0) {
+        throw new Exception("Rust build script failed with exit code " + exitCode)
+      }
+    },
+    (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
     version := git.gitDescribedVersion.value.getOrElse({
       val v = "0.0.0-unknown"
       System.err.println("Could not get version from `git describe`.")
@@ -439,7 +439,7 @@ lazy val node = (project in file("node"))
         .get("DRONE_BUILD_NUMBER")
         .toSeq
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
-    dockerAlias := dockerAlias.value.withName("rnode-rspaceplusplus"),
+    dockerAlias := dockerAlias.value.withName("rnode-rholang-rust"),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
     // dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
     dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless", // Using this image because resolves error of GLIB_C version for rspace++
@@ -451,30 +451,19 @@ lazy val node = (project in file("node"))
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
-    dockerBuildOptions := Seq(
-      "--builder",
-      "default",
-      "--platform",
-      "linux/amd64,linux/arm64",
-      "-t",
-      "ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"
-    ),
+    // dockerBuildOptions := Seq(
+    // 	"--builder",
+    // 	"default",
+    // 	"--platform",
+    // 	"linux/amd64,linux/arm64",
+    // 	"-t",
+    // 	"ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"
+    // ),
     dockerCommands ++= {
       Seq(
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
         Cmd("USER", "root"),
-        // Cmd(
-        //   "RUN",
-        //   """export ARCH=$(uname -m | sed 's/aarch64/arm64/') \
-        //               microdnf update && \
-        //               microdnf install jq gzip && \
-        //               curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-        //               tar -xzf grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-        //               rm -fr LICENSE grpcurl_1.8.9_linux_$ARCH.tar.gz && \
-        //               chmod a+x grpcurl && \
-        //               mv grpcurl /usr/local/bin"""
-        // ),
         Cmd("USER", (Docker / daemonUser).value),
         Cmd(
           "HEALTHCHECK CMD",
@@ -491,7 +480,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-Djna.library.path=/opt/docker/arm64:opt/docker/amd64"
+      s"-Djna.library.path=rust_libraries/debug/arm64/"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
@@ -500,8 +489,10 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    mappings in Docker += file("rspace++/target/docker/arm64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/arm64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rspace++/target/docker/amd64/debug/librspace_plus_plus_rhotypes.so") -> "opt/docker/amd64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/debug/arm64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/arm64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/debug/amd64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/amd64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/debug/arm64/librholang.so") -> "opt/docker/rust_libraries/debug/arm64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so") -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
@@ -575,16 +566,8 @@ lazy val rholang = (project in file("rholang"))
       "-Xss1m",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      "-Djna.library.path=../rust_libraries"
+      s"-Djna.library.path=../rust_libraries/debug/"
     )
-    // runCargoBuild := {
-    //   import scala.sys.process._
-    //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
-    //   if (exitCode != 0) {
-    //     throw new Exception("Rust build script failed with exit code " + exitCode)
-    //   }
-    // },
-    // (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(
     models % "compile->compile;test->test",
@@ -651,14 +634,6 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
     )
-    // runCargoBuild := {
-    //   import scala.sys.process._
-    //   val exitCode = Seq("./scripts/build_rust_libraries.sh").!
-    //   if (exitCode != 0) {
-    //     throw new Exception("Rust build script failed with exit code " + exitCode)
-    //   }
-    // },
-    // (compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
   )
   .dependsOn(models, rspace)
 
@@ -668,7 +643,7 @@ lazy val rspace = (project in file("rspace"))
   .settings(commonSettings: _*)
   .settings(
     scalacOptions ++= Seq(
-//      "-Xfatal-warnings"
+      //      "-Xfatal-warnings"
     ),
     Defaults.itSettings,
     name := "rspace",
@@ -716,7 +691,6 @@ lazy val rspaceBench = (project in file("rspace-bench"))
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail),
     compile in Jmh := (compile in Jmh).dependsOn(compile in Test).value,
     run in Jmh := (run in Jmh).dependsOn(Keys.compile in Jmh).evaluated
-    // javaOptions in Jmh += "-Djna.library.path=../rspace++/target/debug/"
   )
   .enablePlugins(JmhPlugin)
   .dependsOn(rspace % "test->test", rholang % "test->test", models % "test->test", rspacePlusPlus)
