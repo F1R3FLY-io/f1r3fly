@@ -23,6 +23,17 @@ Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
 
+val dockerJnaLibraryPath = {
+  val arch = System.getProperty("os.arch")
+  if (arch == "amd64") {
+    "-Djna.library.path=rust_libraries/debug/amd64/"
+  } else if (arch == "arm64") {
+    "-Djna.library.path=rust_libraries/debug/arm64/"
+  } else {
+    sys.error(s"Unsupported architecture: $arch")
+  }
+}
+
 inThisBuild(
   List(
     publish / skip := true,
@@ -480,7 +491,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      s"-Djna.library.path=rust_libraries/debug/arm64/"
+      dockerJnaLibraryPath
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
@@ -491,8 +502,8 @@ lazy val node = (project in file("node"))
     },
     mappings in Docker += file("rust_libraries/docker/debug/arm64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/arm64/librspace_plus_plus_rhotypes.so",
     mappings in Docker += file("rust_libraries/docker/debug/amd64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/amd64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rust_libraries/docker/debug/arm64/librholang.so") -> "opt/docker/rust_libraries/debug/arm64/librholang.so",
-    mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so") -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/debug/arm64/librholang.so")                   -> "opt/docker/rust_libraries/debug/arm64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so")                   -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
