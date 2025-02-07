@@ -27,8 +27,8 @@ val dockerJnaLibraryPath = {
   val arch = System.getProperty("os.arch")
   if (arch == "amd64") {
     "-Djna.library.path=rust_libraries/debug/amd64/"
-  } else if (arch == "arm64") {
-    "-Djna.library.path=rust_libraries/debug/arm64/"
+  } else if (arch == "aarch64") {
+    "-Djna.library.path=rust_libraries/debug/aarch64/"
   } else {
     sys.error(s"Unsupported architecture: $arch")
   }
@@ -500,9 +500,9 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    mappings in Docker += file("rust_libraries/docker/debug/arm64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/arm64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/aarch64/librspace_plus_plus_rhotypes.so",
     mappings in Docker += file("rust_libraries/docker/debug/amd64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/amd64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rust_libraries/docker/debug/arm64/librholang.so")                   -> "opt/docker/rust_libraries/debug/arm64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librholang.so")                   -> "opt/docker/rust_libraries/debug/aarch64/librholang.so",
     mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so")                   -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
