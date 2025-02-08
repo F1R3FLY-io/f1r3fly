@@ -491,6 +491,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
+      "-J-Xms4G -J-Xmx6G -J-Xss128m -J-XX:MaxMetaspaceSize=2G",
       dockerJnaLibraryPath
     ),
     // Replace unsupported character `+`
@@ -500,9 +501,11 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
-    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/aarch64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file(
+      "rust_libraries/docker/debug/aarch64/librspace_plus_plus_rhotypes.so"
+    )                                                                                               -> "opt/docker/rust_libraries/debug/aarch64/librspace_plus_plus_rhotypes.so",
     mappings in Docker += file("rust_libraries/docker/debug/amd64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/amd64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librholang.so")                   -> "opt/docker/rust_libraries/debug/aarch64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librholang.so")                 -> "opt/docker/rust_libraries/debug/aarch64/librholang.so",
     mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so")                   -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
