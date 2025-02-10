@@ -2,7 +2,11 @@
 
 __Note__ Successfully building from source requires attending to all of the prerequisites shown below. When users experience errors, it is typically related to failure to assure all prerequisites are met. Work is in progress to improve this experience.
 
-Setup using _nix_ can be found in the [nix](./nix) directory.
+### Prerequisites
+
+* [Environment set up](README.md#installation).
+
+<!-- Setup using _nix_ can be found in the [nix](./nix) directory.
 
 ### Prerequisites
 * Java Development Kit (JDK), version 10. We recommend using the OpenJDK
@@ -62,7 +66,7 @@ sudo pacman -S cabal-install ghc # for building BNFC
 cabal update
 cabal install alex happy
 cabal install BNFC
-```
+``` -->
 
 ### Compile all projects and generate executable
 
@@ -93,11 +97,15 @@ export SBT_OPTS="-Xmx4g -Xss2m -Dsbt.supershell=false"
 
 ### IDE support
 
+#### IntelliJ IDEA
+
 For working with the project in **IntelliJ Idea IDE** it's enough to compile the project in terminal and open it in IDE which will start sbt import.
 
 If multiple versions of the JVM are installed on the system, manual selection of the default SDK may be required.
 
 ![image](https://user-images.githubusercontent.com/5306205/121373119-1b1dea00-c93f-11eb-83a7-54dcb9fc6c4e.png)
+
+#### VSCode
 
 With _Scala (Metals)_ extension and `bloop` compiler, **VSCode editor** can also be used to work on the project.
 
@@ -134,16 +142,16 @@ $ sbt rspace/clean rspace/compile rspace/test
 
 The build is organized into several, mostly autonomous projects. These projects may be built (and used!) on their own, or they may be combined together to form the full node package. The build process in any case is contained in and controlled by a single, top-level `build.sbt` file. This process is able to produce several different kinds of artifacts, including JAR files (for Scala) and Docker images.
 
-The most up-to-date code is found in the `dev` branch. This brilliant, cutting-edge source is periodically merged into `master`, which branch should represent a more stable, tested version.
+The most up-to-date code is found in the `main` branch. This brilliant, cutting-edge source is periodically merged into `main`, which branch should represent a more stable, tested version.
 
-#### Compile only Rholang with parser generator
+<!-- #### Compile only Rholang with parser generator
 
 Inside `rholang`  project is BNFC grammar specification as a source for parser generator. It will run as part of build compile step but it can be run separately, for example to clean and generate parser:  
 ```sh
 $ sbt rholang/clean bnfc:generate
 # or
 $ sbt rholang/clean rchain/compile
-```
+``` -->
 
 #### Packaging
 To publish a docker image to your local repo run:
@@ -193,7 +201,7 @@ Otherwise the StackSafetySpec is going to be veeery slow and will most likely fa
 
 You can make the above options default by editing the ScalaTest Template in `Run > Edit configurations > Templates`.  
 
-### Cross-developing for Linux (e.g. Ubuntu) on a Mac
+<!-- ### Cross-developing for Linux (e.g. Ubuntu) on a Mac
 You will need a virtual machine running the appropriate version of Linux.
 1. Install [VirtualBox]( https://www.virtualbox.org/wiki/Downloads)
 2. Install the Linux distribution you need (e.g. [Ubuntu](http://releases.ubuntu.com/16.04/ubuntu-16.04.4-server-amd64.iso))
@@ -201,7 +209,7 @@ You will need a virtual machine running the appropriate version of Linux.
 4. Boot your virtual machine using the Linux distribution ISO installed in step 2.
 5. Configure your Linux VM as desired. You may need to install additional tools sucah as g++, g++-multilib, make, git, etc.
 
-For a more convenient experience, you can share a folder on your Mac with the virtual machine. To do this you will need to install the VirtualBox Guest Additions. Unfortunately there are some gotchas with this. You may need to utilize one of these [solutions](https://askubuntu.com/questions/573596/unable-to-install-guest-additions-cd-image-on-virtual-box).
+For a more convenient experience, you can share a folder on your Mac with the virtual machine. To do this you will need to install the VirtualBox Guest Additions. Unfortunately there are some gotchas with this. You may need to utilize one of these [solutions](https://askubuntu.com/questions/573596/unable-to-install-guest-additions-cd-image-on-virtual-box). -->
 
 ## Description of subprojects
 

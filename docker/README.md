@@ -1,6 +1,5 @@
 ### Quickstart:
 ```
-docker context use default
 sbt ";clean ;compile ;project node ;Docker/publishLocal"
 cd docker
 docker compose -f ./shard.yml up # to start shard
@@ -19,4 +18,4 @@ Should see something like this:
 }
 ```
 
-(Optional) Run this command to ensure nodes preform genesis ceremony: `./delete_data.sh`
+(Optional) Run this command to ensure nodes preform genesis ceremony: `scripts/delete_data.sh`

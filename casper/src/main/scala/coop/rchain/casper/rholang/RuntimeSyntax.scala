@@ -182,7 +182,7 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
         //           .buildString(genesisPreStateHash)
         //       )
         //     )
-        _                             = println("\ncalling computeGenesis")
+        // _                             = println("\ncalling computeGenesis")
         playResult                    <- playDeploys(genesisPreStateHash, terms, processDeployWithMergeableData)
         (stateHash, processedDeploys) = playResult
         // _ = println(

@@ -269,20 +269,20 @@ impl RhoRuntime for RhoRuntimeImpl {
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
-        println!(
-            "\nspace hot store size before in evaluate: {:?}",
-            self.get_hot_changes().len()
-        );
+        // println!(
+        //     "\nspace hot store size before in evaluate: {:?}",
+        //     self.get_hot_changes().len()
+        // );
         // rand.debug_str();
         let i = InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone());
         let reducer = &self.reducer;
         let res = i
             .inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
             .await;
-        println!(
-            "space hot store size after in evaluate: {:?}",
-            self.get_hot_changes().len()
-        );
+        // println!(
+        //     "space hot store size after in evaluate: {:?}",
+        //     self.get_hot_changes().len()
+        // );
         // println!("\nevaluate result: {:?}", res);
         res
     }
@@ -293,17 +293,17 @@ impl RhoRuntime for RhoRuntimeImpl {
         _env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        println!(
-            "\nspace hot store size before in inj: {:?}",
-            self.get_hot_changes().len()
-        );
+        // println!(
+        //     "\nspace hot store size before in inj: {:?}",
+        //     self.get_hot_changes().len()
+        // );
         // println!("\nenv in inj: {:?}", _env);
         // println!("\npar in inj: {:?}", par);
         let res = self.reducer.inj(par, rand).await;
-        println!(
-            "space hot store size after in inj: {:?}",
-            self.get_hot_changes().len()
-        );
+        // println!(
+        //     "space hot store size after in inj: {:?}",
+        //     self.get_hot_changes().len()
+        // );
         res
     }
 
@@ -885,7 +885,7 @@ fn bootstrap_rand() -> Blake2b512Random {
 }
 
 pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
-    println!("\ncalling bootstrap_registry");
+    // println!("\ncalling bootstrap_registry");
     let rand = bootstrap_rand();
     // rand.debug_str();
     let runtime_lock = runtime.try_lock().unwrap();

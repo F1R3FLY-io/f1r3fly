@@ -1,46 +1,47 @@
 # F1r3fly
+[![Build Status](https://github.com/rchain/rchain/workflows/CI/badge.svg)](https://github.com/rchain/rchain/actions?query=workflow%3ACI+branch%3Astaging)
+[![codecov](https://codecov.io/gh/rchain/rchain/branch/master/graph/badge.svg)](https://codecov.io/gh/rchain/rchain)
 
 ### [What is F1r3fly?]([#what-is-this-project?])
 - A decentralized, economic, censorship-resistant, public compute infrastructure and blockchain.
 - Hosts and executes programs popularly referred to as "smart contracts".
 - Trustworthy, scalable, concurrent, with proof-of-stake consensus and content delivery.
 ### How to get F1r3fly
-- Access the F1r3fly Developer portal for tutorials, documentation, and project information.
-- Run the public testnet to explore F1r3fly's capabilities.
-### [Installation instructions](#Installation)
-- Install F1r3fly using Docker, Debian/Ubuntu, RedHat/Fedora, or macOS.
-- Run F1r3fly using Docker commands or as a standalone process.
-### Running F1r3fly with multiple nodes
-Connect multiple Docker RNodes to a user-defined network bridge for peer-to-peer communication and REPL capabilities.
+- Install locally using `nix` and `direnv` to setup a [development environment](#installation).
+- Refer to the [F1r3fly Discord](https://discord.gg/NN59aFdAHM) for project-related tutorials, documentation, and information.
+- Run the public testnet to explore F1r3fly's capabilities (Coming Soon).
+<!-- ### [Installation instructions](#Installation)
+- This version of F1r3fly can only be installed locally using `nix` and `direnv` to setup a development environment. -->
+<!-- ### Running F1r3fly standalone or with multiple nodes
+Connect multiple Docker or local RNodes to a user-defined network bridge for peer-to-peer communication and REPL capabilities.
 ### Using the REPL
-- Invoke the REPL using the provided Docker command and interact with F1r3fly using Rholang language.
-- Validate F1r3fly's functionality by executing a command in the REPL and observing the output on the rnode0 node.
+- Invoke the REPL using the respective command and interact with F1r3fly using Rholang language.
+- Validate F1r3fly's functionality by executing a command in the REPL and observing the output on the rnode0 (bootstrap) node.
 ### Peer node configuration
-- Start a peer node using the specified Docker command and provide the bootstrap address of rnode0.
+- Start a peer node using the respective command and provide the bootstrap address of rnode0.
 - Observe the successful communication between the main node and the peer node in the output of both nodes.
 ### Obtaining command options
-- Use the --help option to get a comprehensive list of command-line options for RNode.
-### Configuration file
+- Use the --help option to get a comprehensive list of command-line options for RNode. -->
+<!-- ### Configuration file
 - Specify RNode configuration parameters through a configuration file in HOCON format.
-- View the example configuration file for a detailed explanation of each parameter.
+- View the [configuration file](node/src/main/resources/defaults.conf) for a detailed explanation of each parameter.
 ### Development environment
 - Compile the F1r3fly project using the provided command.
 - Run the compiled binary using the specified command.
 ### Developer resources
-- Refer to the developer guide for more in-depth instructions and documentation.
+- Refer to the developer guide for more in-depth instructions and documentation. -->
 ### Known issues
-- Be aware of the known issues listed in the provided GitHub link.
+- Be aware of the known issues listed in the GitHub issues.
 ### Reporting issues
 - File any issues you encounter in the GitHub repository issue tracker.
 ### Acknowledgments
 - Express gratitude to YourKit for their support of open-source projects.
 ### License information
-- Generate a summary of licenses used by F1r3fly's dependencies using the provided command.
+<!-- - Generate a summary of licenses used by F1r3fly's dependencies using the provided command. -->
 
 
-## What is this project?
-[![Build Status](https://github.com/rchain/rchain/workflows/CI/badge.svg)](https://github.com/rchain/rchain/actions?query=workflow%3ACI+branch%3Astaging)
-[![codecov](https://codecov.io/gh/rchain/rchain/branch/master/graph/badge.svg)](https://codecov.io/gh/rchain/rchain)
+<!-- ## What is this project?
+
 
 The open-source F1r3fly project is building a decentralized, economic,
 censorship-resistant, public compute infrastructure and blockchain. It will
@@ -48,41 +49,81 @@ host and execute programs popularly referred to as “smart contracts”. It wil
 be trustworthy, scalable, concurrent, with proof-of-stake consensus and
 content delivery.
 
-[F1r3fly Developer](https://developer.rchain.coop/) features project-related
+[F1r3fly Discord](https://discord.gg/NN59aFdAHM) features project-related
 tutorials and documentation, project planning information, events calendar,
-and information for how to engage with this project.
+and information for how to engage with this project. -->
 
 ## Note on the use of this software
 This code has not yet completed a security review. We strongly recommend that you do not use it in production or to transfer items of material value. We take no responsibility for any loss you may incur through the use of this code.
 
-## Use the public testnet
-The F1r3fly Cooperative maintains a public testnet running the latest version of RNode. Learn more at [F1r3fly public testnet information](https://rchain.atlassian.net/wiki/spaces/CORE/pages/678756429/RChain+public+testnet+information).
-
-## How 
 ## Installation
 
+### Source
+
+1. Install Nix: https://nixos.org/download/
+   - For more information about Nix and how it works see: https://nixos.org/guides/how-nix-works/
+
+2. Install direnv: https://direnv.net/#basic-installation
+   - For more information about direnv and how it works see: https://direnv.net/
+  
+3. Install protobuf compiler: https://grpc.io/docs/protoc-installation/
+
+3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+   - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
+   
 ### Docker
 
-`$ docker pull rchain/rnode:latest`
+(Coming Soon)
 
 ### Debian/Ubuntu
 
-1. Download a `.deb` package from the [releases page](https://github.com/rchain/rchain/releases/)
-2. `$ sudo apt install ./rnode_<VERSION>.deb`, where `<VERSION>` is something like `0.9.18`
+(Coming Soon)
 
 ### RedHat/Fedora
 
-1. Download a `.rpm` package from the [releases page](https://github.com/rchain/rchain/releases/)
-2. `$ sudo rpm -U ./rnode_<VERSION>.noarch.rpm`, where `<VERSION>` is something like `0.9.18`
+(Coming Soon)
 
 ### macOS
 
-1. Install Homebrew by following steps at the [Homebrew homepage](https://brew.sh/)
-2. `$ brew install rchain/rchain/rnode`
+(Coming Soon)
+
+## Building
+
+Prerequisites: [Environment set up](#installation).
+
+1. `sbt ";compile ;project node ;Docker/publishLocal ;project rchain"` will compile the project and create a docker image. 
+   - It is recommended to have a terminal window open just for `sbt` to run various commands. 
+2. `sbt ";compile ;project node ;assembly ;project rchain"` will compile the project and create a fat jar. You can use this to run locally without docker.
+3. `sbt "clean"` will clean the project.
 
 ## Running
 
-Docker will be used in the examples port portability reasons, but running the
+### Docker
+
+Starting a shard after generating the docker image is as simple as:
+
+```sh
+docker compose -f docker/shard.yml up
+```
+
+- Running: `./scripts/delete_data.sh` will delete the data directory and ensure a fresh start (performs genesis ceremony).
+
+### Local
+
+To run a standalone node locally, you can use the following command after generating the fat jar:
+
+```sh
+java -Djna.library.path=./rust_libraries/debug --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0
+```
+
+- Running: `rm -rf ~/.rnode/` will delete the data directory and ensure a fresh start (performs genesis ceremony).
+
+### F1r3flyFS
+
+Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs) project for a simple, easy-to-use, and fast file system built on top of F1r3fly.
+
+
+<!-- Docker will be used in the examples port portability reasons, but running the
 node as a standalone process is very similar.
 
 To fetch the latest version of RNode from the remote Docker hub and run it (exit with `C-c`):
@@ -153,13 +194,13 @@ The above command should result in (`rnode0` output):
 15:57:37.023 [INFO ] [node-runner-42      ] [coop.rchain.comm.rp.Connect$ ] - Peers: 1
 15:57:46.530 [INFO ] [node-runner-43      ] [c.r.casper.engine.Running$   ] - ApprovedBlock sent to rnode://e80faf589973c2c1b9b8441790d34a9a0ffdd3ce@rnode1?protocol=40400&discovery=40404
 15:57:48.283 [INFO ] [node-runner-43      ] [c.r.casper.engine.Running$   ] - Store items sent to rnode://e80faf589973c2c1b9b8441790d34a9a0ffdd3ce@rnode1?protocol=40400&discovery=40404
-```
+``` -->
 
-To get a full list of options rnode accepts, use the `--help` option:
+<!-- To get a full list of options rnode accepts, use the `--help` option:
 
 ```sh
 $ docker run -it --rm rchain/rnode:latest --help
-```
+``` -->
 
 ### Configuration file
 
@@ -231,11 +272,11 @@ $ sbt clean compile
 $ sbt clean compile stage docker:publishLocal
 ```
 
-Run the resulting binary with:
+<!-- Run the resulting binary with:
 
 ```bash
 $ ./node/target/universal/stage/bin/rnode
-```
+``` -->
 
 For more detailed instructions, see the [developer guide](DEVELOPER.md).
 
@@ -243,11 +284,11 @@ For more detailed instructions, see the [developer guide](DEVELOPER.md).
 
 ### Caveats
 
-During this pre-release phase of the F1r3fly software, there are some [known issues](https://github.com/rchain/rchain/issues?q=is%3Aopen+is%3Aissue+label%3Abug).
+During this pre-release phase of the F1r3fly software, there are some [known issues](https://github.com/rchain/rchain/issues?q=is%3Aopen+is%3Aissue+label%3Abug) and some [other issues](https://github.com/F1R3FLY-io/f1r3fly/issues).
 
 ### Filing Issues
 
-File issues in GitHub repository issue tracker: [File a bug](https://github.com/rchain/rchain/issues/new/choose).
+File issues in GitHub repository issue tracker: [File a bug](https://github.com/F1R3FLY-io/f1r3fly/issues).
 
 ## Acknowledgements
 
