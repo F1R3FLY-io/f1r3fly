@@ -38,7 +38,7 @@ trait BlockDagStorageFixture extends BeforeAndAfter { self: Suite =>
         blocks     <- KeyValueBlockStore[Task](kvm)
         dag        <- BlockDagKeyValueStorage.create[Task](kvm)
         indexedDag <- IndexedBlockDagStorage.create[Task](dag)
-        runtime    <- Resources.mkRuntimeManagerAt[Task](kvm)
+        runtime    <- Resources.mkRuntimeManagerAt[Task](dir, kvm)
       } yield (blocks, indexedDag, runtime)
 
     Resources

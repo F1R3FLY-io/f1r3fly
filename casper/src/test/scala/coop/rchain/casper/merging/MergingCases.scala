@@ -30,7 +30,7 @@ class MergingCases extends FlatSpec with Matchers {
   val runtimeManagerResource: Resource[Task, RuntimeManager[Task]] = for {
     dir <- Resources.copyStorage[Task](genesisContext.storageDirectory)
     kvm <- Resource.eval(Resources.mkTestRNodeStoreManager[Task](dir))
-    rm  <- Resource.eval(Resources.mkRuntimeManagerAt[Task](kvm))
+    rm  <- Resource.eval(Resources.mkRuntimeManagerAt[Task](dir, kvm))
   } yield rm
 
   /**

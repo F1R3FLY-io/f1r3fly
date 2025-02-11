@@ -65,7 +65,7 @@ class RuntimeManagerTest extends FlatSpec with Matchers {
     Resources
       .copyStorage[Task](genesisContext.storageDirectory)
       .evalMap(Resources.mkTestRNodeStoreManager[Task])
-      .evalMap(Resources.mkRuntimeManagerAt[Task](_))
+      .evalMap(Resources.mkRuntimeManagerAt[Task](genesisContext.storageDirectory, _))
 
   private def computeState[F[_]: Functor](
       runtimeManager: RuntimeManager[F],

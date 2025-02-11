@@ -48,13 +48,16 @@ object Resources {
       prefix: String,
       mergeableTagName: Par = Genesis.NonNegativeMergeableTagName
   )(implicit scheduler: Scheduler): Resource[F, RuntimeManager[F]] =
-    mkTempDir[F](prefix)
-      .evalMap(mkTestRNodeStoreManager[F])
-      .evalMap(mkRuntimeManagerAt[F](_, mergeableTagName))
+    mkTempDir[F](prefix).evalMap { dir =>
+      mkTestRNodeStoreManager[F](dir).flatMap { kvm =>
+        mkRuntimeManagerAt[F](dir, kvm, mergeableTagName)
+      }
+    }
 
   // TODO: This is confusing to create another instances for Log, Metrics and Span.
   //   Investigate if it can be removed or define it as parameters. Similar for [[mkRuntimeManagerWithHistoryAt]].
   def mkRuntimeManagerAt[F[_]: Concurrent: Parallel: ContextShift](
+      dirPath: Path,
       kvm: KeyValueStoreManager[F],
       mergeableTagName: Par = Genesis.NonNegativeMergeableTagName
   )(
@@ -68,11 +71,12 @@ object Resources {
       // rStore         <- kvm.rSpaceStores
       mStore <- RuntimeManager.mergeableStore(kvm)
       // runtimeManager <- RuntimeManager(rStore, mStore, mergeableTagName)
-      runtimeManager <- RuntimeManager("casper-resources-", mStore, mergeableTagName)
+      runtimeManager <- RuntimeManager(dirPath.toString(), mStore, mergeableTagName)
     } yield runtimeManager
   }
 
   def mkRuntimeManagerWithHistoryAt[F[_]: Concurrent: Parallel: ContextShift](
+      dirPath: Path,
       kvm: KeyValueStoreManager[F]
   )(
       implicit scheduler: Scheduler
@@ -90,7 +94,7 @@ object Resources {
       //                               Genesis.NonNegativeMergeableTagName
       //                             )
       runtimeManagerWithHistory <- RuntimeManager.createWithHistory(
-                                    "casper-resources-",
+                                    dirPath.toString(),
                                     mStore,
                                     Genesis.NonNegativeMergeableTagName
                                   )
