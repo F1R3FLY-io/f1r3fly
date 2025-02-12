@@ -113,7 +113,7 @@ docker compose -f docker/shard.yml up
 To run a standalone node locally, you can use the following command after generating the fat jar:
 
 ```sh
-java -Djna.library.path=./rust_libraries/debug --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0
+java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0
 ```
 
 - Running: `rm -rf ~/.rnode/` will delete the data directory and ensure a fresh start (performs genesis ceremony).

@@ -1,12 +1,13 @@
 use crate::rspace::errors::RadixTreeError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::Either;
+use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use dashmap::DashMap;
 use itertools::Itertools;
 use models::Byte;
 use models::ByteVector;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -1500,7 +1501,9 @@ impl RadixTreeImpl {
         // If we have 1 action in group.
         // We can't parallel next and we should use sequential traversing with help update() or delete().
         let process_one_action: Box<
-            dyn Fn(HistoryAction, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
+            dyn Fn(HistoryAction, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>
+                + Send
+                + Sync,
         > = Box::new(|action: HistoryAction, item: Item, item_idx: i32| {
             // println!("\nhit process_one_action");
             let new_item = match action {
@@ -1558,7 +1561,9 @@ impl RadixTreeImpl {
         }
 
         let process_non_empty_actions: Box<
-            dyn Fn(Vec<HistoryAction>, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
+            dyn Fn(Vec<HistoryAction>, i32) -> Result<(i32, Option<Item>), RadixTreeError>
+                + Send
+                + Sync,
         > = Box::new(|actions: Vec<HistoryAction>, item_idx: i32| {
             // println!("\nactions in process_non_empty_actions: {:?}", actions);
             // println!("item_idx in process_non_empty_actions: {:?}", item_idx);
@@ -1589,7 +1594,9 @@ impl RadixTreeImpl {
 
         // If we have more than 1 action. We can create more parallel processes.
         let process_several_actions: Box<
-            dyn Fn(Vec<HistoryAction>, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>,
+            dyn Fn(Vec<HistoryAction>, Item, i32) -> Result<(i32, Option<Item>), RadixTreeError>
+                + Send
+                + Sync,
         > = Box::new(|actions: Vec<HistoryAction>, item: Item, item_idx: i32| {
             let cleared_actions = clearing_delete_actions(actions, item);
             if cleared_actions.is_empty() {
@@ -1607,7 +1614,7 @@ impl RadixTreeImpl {
             ) -> Vec<Result<(i32, Option<Item>), RadixTreeError>>,
         > = Box::new(|grouped_actions: Vec<(Byte, Vec<HistoryAction>)>, curr_node: Node| {
             grouped_actions
-                .iter()
+                .par_iter()
                 .map(|grouped_action| match grouped_action {
                     (group_idx, actions_in_group) => {
                         let item_idx = byte_to_int(*group_idx);

@@ -23,12 +23,13 @@ Global / PB.protocVersion := "3.24.3"
 
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
 
+val releaseJnaLibraryPath = "rust_libraries/release/"
 val dockerJnaLibraryPath = {
   val arch = System.getProperty("os.arch")
   if (arch == "amd64") {
-    "-Djna.library.path=rust_libraries/debug/amd64/"
+    "-Djna.library.path=rust_libraries/release/amd64/"
   } else if (arch == "aarch64") {
-    "-Djna.library.path=rust_libraries/debug/aarch64/"
+    "-Djna.library.path=rust_libraries/release/aarch64/"
   } else {
     sys.error(s"Unsupported architecture: $arch")
   }
@@ -301,7 +302,7 @@ lazy val casper = (project in file("casper"))
     javaOptions in Test ++= Seq(
       "-Xss256m",
       "-Xmx256m",
-      "-Djna.library.path=../rust_libraries/debug/"
+      s"-Djna.library.path=../$releaseJnaLibraryPath"
     )
   )
   .dependsOn(
@@ -502,11 +503,13 @@ lazy val node = (project in file("node"))
         .map { case (f, p) => f -> s"$base/$p" }
     },
     mappings in Docker += file(
-      "rust_libraries/docker/debug/aarch64/librspace_plus_plus_rhotypes.so"
-    )                                                                                               -> "opt/docker/rust_libraries/debug/aarch64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rust_libraries/docker/debug/amd64/librspace_plus_plus_rhotypes.so") -> "opt/docker/rust_libraries/debug/amd64/librspace_plus_plus_rhotypes.so",
-    mappings in Docker += file("rust_libraries/docker/debug/aarch64/librholang.so")                 -> "opt/docker/rust_libraries/debug/aarch64/librholang.so",
-    mappings in Docker += file("rust_libraries/docker/debug/amd64/librholang.so")                   -> "opt/docker/rust_libraries/debug/amd64/librholang.so",
+      "rust_libraries/docker/release/aarch64/librspace_plus_plus_rhotypes.so"
+    ) -> "opt/docker/rust_libraries/release/aarch64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file(
+      "rust_libraries/docker/release/amd64/librspace_plus_plus_rhotypes.so"
+    )                                                                                 -> "opt/docker/rust_libraries/release/amd64/librspace_plus_plus_rhotypes.so",
+    mappings in Docker += file("rust_libraries/docker/release/aarch64/librholang.so") -> "opt/docker/rust_libraries/release/aarch64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/release/amd64/librholang.so")   -> "opt/docker/rust_libraries/release/amd64/librholang.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
@@ -580,7 +583,7 @@ lazy val rholang = (project in file("rholang"))
       "-Xss1m",
       "-XX:MaxJavaStackTraceDepth=10000",
       "-Xmx128m",
-      s"-Djna.library.path=../rust_libraries/debug/"
+      s"-Djna.library.path=../$releaseJnaLibraryPath"
     )
   )
   .dependsOn(
