@@ -73,6 +73,7 @@ import coop.rchain.metrics.implicits._
 import coop.rchain.models.syntax.modelsSyntaxByteString
 import coop.rchain.rholang.interpreter.merging.RholangMergingLogic
 import coop.rchain.rspace.merger.MergingLogic.NumberChannelsEndVal
+import rspacePlusPlus.JNAInterfaceLoader
 
 trait RuntimeSyntax {
   implicit final def casperSyntaxRholangRuntime[F[_]: Sync: Span: Log](
@@ -365,7 +366,8 @@ final class RuntimeOps[F[_]: Sync: Span: Log](
               numPar = chValues.head.a
 
               (num, _) = RholangMergingLogic.getNumberWithRnd(numPar)
-              chHash   = StableHashProvider.hash(chan)(storage.serializePar)
+              // chHash   = StableHashProvider.hash(chan)(storage.serializePar)
+              chHash = JNAInterfaceLoader.hashChannel(chan)
             } yield (chHash, num).some
           }
     } yield r
