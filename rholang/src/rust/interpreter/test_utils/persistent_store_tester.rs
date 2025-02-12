@@ -60,19 +60,5 @@ pub async fn create_test_runtime_with_genesis_contracts() -> Arc<Mutex<RhoRuntim
     )
     .await;
 
-    // {
-    //     let registry_contract = read_file_contents("src/main/resources/Registry.rho").unwrap();
-    //     let _ = runtime
-    //         .try_lock()
-    //         .unwrap()
-    //         .evaluate(registry_contract, env, rand)
-    //         .await
-    //         .unwrap();
-    // }
-
     runtime
 }
-
-// fn read_file_contents(file_path: &str) -> Result<String, std::io::Error> {
-//     fs::read_to_string(file_path)
-// }
