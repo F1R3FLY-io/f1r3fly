@@ -162,7 +162,7 @@ data:
 
       # Some of API methods are loading blocks into memory, which can lead to memory exhaustion.
       # This puts upper bound on number of blocks that can be loaded via single API call.
-      max-blocks-limit = 50
+      max-blocks-limit = 5000
 
       # Enable reporting API
       enable-reporting = false

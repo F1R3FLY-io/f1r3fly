@@ -5,7 +5,7 @@ Helm Chart for deploying F1r3fly nodes. Currently Helm Chart generate separate S
 ## Installing Helm chart
 - boot plus 4 validators
 ```sh
-helm upgrade --install f1r3fly-4nodes ./f1r3fly -n f1r3fly-4nodes --create-namespace --set replicaCount=5
+helm upgrade --install f1r3fly-asi-dev ./f1r3fly -n f1r3fly-asi-dev --create-namespace --set replicaCount=1
 ```
 - boot plus 8 validators:
 ```sh
@@ -43,3 +43,9 @@ kubectl delete ns f1r3fly-16nodes
 helm uninstall f1r3fly-32nodes -n f1r3fly-32nodes
 kubectl delete ns f1r3fly-32nodes
 ```
+
+# ASI project:
+
+- dev
+```sh
+helm upgrade --install f1r3fly-asi-dev ./f1r3fly -n f1r3fly-asi-dev --create-namespace --set replicaCount=1
