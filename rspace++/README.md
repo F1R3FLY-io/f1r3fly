@@ -16,7 +16,8 @@ The **R**Chain Tuple **Space** in **Rust**
 
 ### Building
 
-To build the `rspace++` library, run `cargo build --profile dev -p rspace_plus_plus_rhotypes`.
+To build the `rspace++` library, run `cargo build --release -p rspace_plus_plus_rhotypes`.
+  - `cargo build --profile dev -p rspace_plus_plus_rhotypes` will build the library in debug mode.
 
 ### Testing
 

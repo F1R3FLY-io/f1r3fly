@@ -9,30 +9,36 @@ fn main() {
     prost_build.btree_map(&["."]);
 
     prost_build.message_attribute(
-        ".",
+        ".rhoapi",
         "#[derive(serde::Serialize, serde::Deserialize, Eq, Ord, PartialOrd)]",
     );
-    prost_build.message_attribute(".", "#[repr(C)]");
+    prost_build.message_attribute(".rhoapi", "#[repr(C)]");
 
     prost_build.enum_attribute(
-        ".",
+        ".rhoapi",
         "#[derive(serde::Serialize, serde::Deserialize, Eq, Ord, PartialOrd)]",
     );
-    prost_build.enum_attribute(".", "#[repr(C)]");
+    prost_build.enum_attribute(".rhoapi", "#[repr(C)]");
 
     prost_build
         .compile_protos(
             &[
-                "scalapb/scalapb.proto",
+                "CasperMessage.proto",
+                "DeployServiceCommon.proto",
+                "DeployServiceV1.proto",
+                "ProposeServiceCommon.proto",
+                "ProposeServiceV1.proto",
+                "RholangScalaRustTypes.proto",
                 "RhoTypes.proto",
                 "RSpacePlusPlusTypes.proto",
-                "RholangScalaRustTypes.proto",
+                "ServiceError.proto",
+                "scalapb/scalapb.proto",
             ],
-            &["src/main/protobuf/", "src/"],
+            &["src/", "src/main/protobuf/"],
         )
         .unwrap();
 
-    // Remove PartialEq from specific generated structs
+    // Remove PartialEq from specific generated structs from rhoapi.rs
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let file_path = format!("{}/rhoapi.rs", out_dir);
     let content = fs::read_to_string(&file_path).expect("Unable to read file");

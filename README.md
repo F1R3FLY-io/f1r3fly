@@ -68,7 +68,7 @@ This code has not yet completed a security review. We strongly recommend that yo
   
 3. Install protobuf compiler: https://grpc.io/docs/protoc-installation/
 
-3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+4. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
    - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
    
 ### Docker
