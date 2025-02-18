@@ -11,4 +11,4 @@ debug = true
 [dependencies]
 models = { path = "../models" }
 crypto = { path = "../crypto" }
-prost = "0.12.4"
+prost = "0.13.5"

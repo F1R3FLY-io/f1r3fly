@@ -3,7 +3,7 @@ pub mod rust;
 pub mod casper {
     include!(concat!(env!("OUT_DIR"), "/casper.rs"));
     pub mod v1 {
-        include!(concat!(env!("OUT_DIR"), "/casper.v1.rs"));
+        tonic::include_proto!("casper.v1");
     }
 }
 

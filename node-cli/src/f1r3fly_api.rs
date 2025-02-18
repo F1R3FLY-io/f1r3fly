@@ -4,6 +4,7 @@ use crypto::rust::{
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
 use models::casper::DeployDataProto;
+use models::casper::v1::deploy_service_client::DeployServiceClient;
 use prost::Message;
 
 pub struct F1r3flyApi {

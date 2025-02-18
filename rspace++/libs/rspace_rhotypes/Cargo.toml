@@ -10,12 +10,11 @@ crate-type = ["cdylib", "rlib"]
 rspace_plus_plus = { path = "../../../rspace++" }
 models = { path = "../../../models" }
 rholang = { path = "../../../rholang" }
-prost = "0.12.4"
+prost = "0.13.5"
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 dashmap = "5.4.0"
 rand = "0.8.5"
-prost-types = "0.12.4"
 serde = "1.0.197"
 bincode = "1.3.3"
 chrono = "0.4.38"

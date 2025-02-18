@@ -1,26 +1,21 @@
-extern crate prost_build;
+extern crate tonic_build;
 
 // https://docs.rs/prost-build/latest/prost_build/struct.Config.html
+// https://docs.rs/tonic-build/latest/tonic_build/struct.Builder.html#
 
 use std::fs;
 
 fn main() {
-    let mut prost_build: prost_build::Config = prost_build::Config::new();
-    prost_build.btree_map(&["."]);
-
-    prost_build.message_attribute(
-        ".rhoapi",
-        "#[derive(serde::Serialize, serde::Deserialize, Eq, Ord, PartialOrd)]",
-    );
-    prost_build.message_attribute(".rhoapi", "#[repr(C)]");
-
-    prost_build.enum_attribute(
-        ".rhoapi",
-        "#[derive(serde::Serialize, serde::Deserialize, Eq, Ord, PartialOrd)]",
-    );
-    prost_build.enum_attribute(".rhoapi", "#[repr(C)]");
-
-    prost_build
+    tonic_build::configure()
+        .build_client(true)
+        .build_server(false)
+        .btree_map(&["."])
+        .message_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .message_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")
+        .message_attribute(".rhoapi", "#[repr(C)]")
+        .enum_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .enum_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")
+        .enum_attribute(".rhoapi", "#[repr(C)]")
         .compile_protos(
             &[
                 "CasperMessage.proto",
@@ -36,7 +31,7 @@ fn main() {
             ],
             &["src/", "src/main/protobuf/"],
         )
-        .unwrap();
+        .expect("Failed to compile proto files");
 
     // Remove PartialEq from specific generated structs from rhoapi.rs
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -48,6 +43,8 @@ fn main() {
         .map(|line| {
             if line.contains("#[derive(Clone, PartialEq, ::prost::Message)]")
                 || line.contains("#[derive(Clone, PartialEq, ::prost::Oneof)]")
+                || line.contains("#[derive(Clone, Copy, PartialEq, ::prost::Message)]")
+                || line.contains("#[derive(Clone, Copy, PartialEq, ::prost::Oneof)]")
             {
                 line.replace("PartialEq,", "")
             } else {
