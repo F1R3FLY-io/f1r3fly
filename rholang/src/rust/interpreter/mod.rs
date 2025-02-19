@@ -18,6 +18,7 @@ pub mod substitute;
 pub mod system_processes;
 pub mod test_utils;
 pub mod util;
+pub mod openai_service;
 
 pub fn unwrap_option_safe<A: Clone + std::fmt::Debug>(
     opt: Option<A>,

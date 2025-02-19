@@ -77,6 +77,7 @@ pub enum InterpreterError {
         line: usize,
         col: usize,
     },
+    OpenAIError(String),
 }
 
 impl fmt::Display for InterpreterError {
@@ -87,7 +88,11 @@ impl fmt::Display for InterpreterError {
             InterpreterError::RSpaceError(msg) => write!(f, "RSpace Error: {}", msg),
 
             InterpreterError::UndefinedRequiredProtobufFieldError(field_name) => {
-                write!(f, "A parsed Protobuf field was None, should be Some: {}", field_name)
+                write!(
+                    f,
+                    "A parsed Protobuf field was None, should be Some: {}",
+                    field_name
+                )
             }
 
             InterpreterError::NormalizerError(msg) => write!(f, "Normalizer error: {}", msg),
@@ -252,6 +257,8 @@ impl fmt::Display for InterpreterError {
                     line, col
                 )
             }
+
+            InterpreterError::OpenAIError(msg) => write!(f, "OpenAI error: {}", msg),
         }
     }
 }
@@ -268,4 +275,8 @@ impl From<InterpreterError> for RSpaceError {
     }
 }
 
-// impl std::error::Error for InterpreterError {}
+impl From<openai_api_rs::v1::error::APIError> for InterpreterError {
+    fn from(error: openai_api_rs::v1::error::APIError) -> Self {
+        InterpreterError::OpenAIError(error.to_string())
+    }
+}
