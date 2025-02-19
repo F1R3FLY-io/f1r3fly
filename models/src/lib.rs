@@ -42,13 +42,15 @@ pub fn create_bit_vector(indices: &[usize]) -> BitSet {
 use crate::connective::ConnectiveInstance;
 use crate::expr::ExprInstance;
 use crate::rhoapi::*;
+use crate::servicemodelapi::ServiceError;
 use crate::var::VarInstance;
 use g_unforgeable::UnfInstance;
 use tagged_continuation::TaggedCont;
 use var::WildcardMsg;
 
-use std::hash::Hash;
-use std::hash::Hasher;
+use std::error::Error;
+use std::fmt;
+use std::hash::{Hash, Hasher};
 
 // See models/src/main/scala/coop/rchain/models/AlwaysEqual.scala
 
@@ -965,3 +967,12 @@ impl Hash for GSysAuthToken {
         // No fields to hash
     }
 }
+
+impl fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ServiceError: {:#?}", self.messages)
+    }
+}
+
+// Implement the Error trait
+impl Error for ServiceError {}

@@ -3,33 +3,25 @@ use crypto::rust::{
     private_key::PrivateKey,
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
-use models::casper::DeployDataProto;
+use models::casper::v1::deploy_response::Message as DeployResponseMessage;
 use models::casper::v1::deploy_service_client::DeployServiceClient;
+use models::casper::DeployDataProto;
 use prost::Message;
 
-pub struct F1r3flyApi {
+pub struct F1r3flyApi<'a> {
     signing_key: PrivateKey,
-    // deploy_service: DeployServiceClient,
-    //  propose_service: ProposeServiceClient<Channel>,
+    node_host: &'a str,
+    grpc_port: u16,
 }
 
-impl F1r3flyApi {
-    //  pub async fn new(signing_key: Vec<u8>, node_host: &str, grpc_port: u16) -> Result<Self, Box<dyn std::error::Error>> {
-    //      let channel = Channel::from_shared(format!("http://{}:{}", node_host, grpc_port))?
-    //          .connect()
-    //          .await?;
-
-    //      let deploy_service = DeployServiceClient::new(channel.clone());
-    //      let propose_service = ProposeServiceClient::new(channel);
-
-    //      let signing_key = SecretKey::from_slice(&signing_key)?;
-
-    //      Ok(F1r3flyApi {
-    //          signing_key,
-    //          deploy_service,
-    //          propose_service,
-    //      })
-    //  }
+impl<'a> F1r3flyApi<'a> {
+    pub fn new(signing_key: Vec<u8>, node_host: &'a str, grpc_port: u16) -> Self {
+        F1r3flyApi {
+            signing_key: PrivateKey::new(signing_key),
+            node_host,
+            grpc_port,
+        }
+    }
 
     pub async fn deploy(
         &self,
@@ -58,7 +50,25 @@ impl F1r3flyApi {
 
         self.sign_deploy(&mut deployment)?;
 
-        //  let deploy_response = self.deploy_service.do_deploy(Request::new(signed)).await?;
+        let mut deploy_service_client =
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port)).await?;
+
+        let deploy_response = deploy_service_client.do_deploy(deployment).await?;
+        let deploy_message: &DeployResponseMessage = deploy_response
+            .get_ref()
+            .message
+            .as_ref()
+            .expect("Deploy result not found");
+
+        let deploy_result = match deploy_message {
+            DeployResponseMessage::Error(service_error) => {
+                return Err(Box::new(service_error.clone()));
+            }
+            DeployResponseMessage::Result(result) => result,
+        };
+
+        Ok(deploy_result.clone())
+
         //  if let Some(error) = deploy_response.get_ref().error.as_ref() {
         //      return Err(Box::new(ServiceError::new(error.clone())));
         //  }
@@ -86,8 +96,6 @@ impl F1r3flyApi {
         //  }
 
         //  Ok(block_hash.clone())
-
-        todo!()
     }
 
     //  pub async fn find_data_by_name(&self, expr: &str) -> Result<Vec<RhoTypesPar>, Box<dyn std::error::Error>> {

@@ -1,1 +1,1 @@
-mod f1r3fly_api;
+pub mod f1r3fly_api;

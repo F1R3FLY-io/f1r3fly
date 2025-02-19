@@ -12,3 +12,5 @@ debug = true
 models = { path = "../models" }
 crypto = { path = "../crypto" }
 prost = "0.13.5"
+tokio = { version = "1", features = ["full"] }
+hex = "0.4.3"

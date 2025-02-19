@@ -1,3 +1,41 @@
-fn main() {
-    println!("Hello from node-cli!");
+use node_cli::f1r3fly_api::F1r3flyApi;
+
+#[tokio::main]
+async fn main() {
+    let rholang_code = r#"
+    new gptAnswer, audio, dalle3Answer,
+    gpt3(`rho:ai:gpt3`),
+    gpt4(`rho:ai:gpt4`),
+    dalle3(`rho:ai:dalle3`),
+    textToAudio(`rho:ai:textToAudio`),
+    dumpFile(`rho:ai:dumpFile`),  // temporary
+    stdout(`rho:io:stdout`) in {
+
+  gpt3!("Describe an appearance of human-like robot: ", *gptAnswer) |
+  for(@answer <- gptAnswer) {
+    stdout!(["GTP3 created a prompt", answer]) |
+
+    dalle3!(answer, *dalle3Answer) |
+    for(@dalle3Answer <- dalle3Answer) {
+      stdout!(["Dall-e-3 created an image", dalle3Answer])
+    }
+  } |
+
+  textToAudio!("Hello, I am a robot. Rholang give me a voice!", *audio) |
+
+  for(@bytes <- audio) {
+    dumpFile!("text-to-audio.mp3", bytes)
+  }
+}
+    "#;
+
+    let private_key =
+        hex::decode("f9854c5199bc86237206c75b25c6aeca024dccc0f55df3a553131111fd25dd85")
+            .expect("Failed to decode private key");
+
+    let f1r3fly_api = F1r3flyApi::new(private_key, "localhost", 40402);
+
+    let deploy_result = f1r3fly_api.deploy(rholang_code, false, "rholang").await;
+
+    println!("Deploy result: {:#?}", deploy_result);
 }

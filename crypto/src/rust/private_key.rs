@@ -1,7 +1,9 @@
+// See crypto/src/main/scala/coop/rchain/crypto/PrivateKey.scala
+
 use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
 
-// See crypto/src/main/scala/coop/rchain/crypto/PrivateKey.scala
+// TODO: Update to use reference & lifetime
 #[derive(Debug, Clone)]
 pub struct PrivateKey {
     pub bytes: Vec<u8>,
