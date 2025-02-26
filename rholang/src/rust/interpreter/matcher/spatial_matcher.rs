@@ -1,3 +1,5 @@
+// See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - trait SpatialMatcher
+
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::par_set_type_mapper::ParSetTypeMapper;
 use models::rust::rholang::implicits::single_expr;
@@ -13,7 +15,19 @@ use super::par_count::ParCount;
 use super::sub_pars::sub_pars;
 use crate::list_match;
 
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - trait SpatialMatcher
+list_match!(
+    Par,
+    (Par, Par),
+    Send,
+    Receive,
+    New,
+    Expr,
+    Match,
+    Bundle,
+    GUnforgeable,
+    ReceiveBind
+);
+
 pub trait SpatialMatcher<T, P> {
     fn spatial_match(&mut self, target: T, pattern: P) -> Option<()>;
 }
@@ -271,8 +285,6 @@ impl SpatialMatcher<Par, Par> for SpatialMatcherContext {
             )?;
             // println!("\nRemainder: {:?}", remainder);
 
-            list_match!(Send, Receive, New, Expr, Match, Bundle, GUnforgeable);
-
             self.list_match_single_(
                 remainder.sends,
                 pattern.sends,
@@ -374,7 +386,6 @@ impl SpatialMatcher<Send, Send> for SpatialMatcherContext {
 impl SpatialMatcher<Receive, Receive> for SpatialMatcherContext {
     fn spatial_match(&mut self, target: Receive, pattern: Receive) -> Option<()> {
         // println!("\nHit Receive, Receive");
-        list_match!(ReceiveBind);
         guard(target.persistent == pattern.persistent)
             .and_then(|_| self.list_match_single(target.binds, pattern.binds))
             .and_then(|_| self.spatial_match(target.body.unwrap(), pattern.body.unwrap()))
@@ -487,7 +498,6 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
                     p.with_exprs(vec![new_eset_expr(r, Vec::new(), false, None)])
                 };
 
-                list_match!(Par);
                 // println!("\ncalling list_match_single_ in ESetBody");
                 self.list_match_single_(
                     tlist.sorted_pars,
@@ -547,7 +557,6 @@ impl SpatialMatcher<Expr, Expr> for SpatialMatcherContext {
                     )])
                 };
 
-                list_match!((Par, Par));
                 // println!("\ncalling list_match_single_ in EMapBody");
                 self.list_match_single_(
                     tlist.sorted_list,
