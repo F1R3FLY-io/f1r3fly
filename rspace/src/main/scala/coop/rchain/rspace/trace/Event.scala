@@ -79,9 +79,11 @@ object Produce {
   def fromHash(
       channelsHash: Blake2b256Hash,
       hash: Blake2b256Hash,
-      persistent: Boolean
+      persistent: Boolean,
+      isDeterministic: Boolean,
+      outputValue: Seq[Array[Byte]]
   ): Produce =
-    new Produce(channelsHash, hash, persistent)
+    new Produce(channelsHash, hash, persistent, isDeterministic, outputValue)
 }
 
 final case class Consume private (

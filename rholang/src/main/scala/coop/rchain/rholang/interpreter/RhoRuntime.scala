@@ -585,7 +585,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                     ProduceProto(
                       channelHash = datum.source.channelsHash.toByteString,
                       hash = datum.source.hash.toByteString,
-                      persistent = datum.source.persistent
+                      persistent = datum.source.persistent,
+                      isDeterministic = datum.source.isDeterministic,
+                      outputValue = datum.source.outputValue.map(ByteString.copyFrom)
                     )
                   )
                 )
@@ -628,7 +630,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
               val produceProto = ProduceProto(
                 produce.channelsHash.toByteString,
                 produce.hash.toByteString,
-                produce.persistent
+                produce.persistent,
+                produce.isDeterministic,
+                produce.outputValue.map(ByteString.copyFrom)
               )
 
               produceCounterMapEntries :+ ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
@@ -645,7 +649,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                   ProduceProto(
                     channelHash = produce.channelsHash.toByteString,
                     hash = produce.hash.toByteString,
-                    persistent = produce.persistent
+                    persistent = produce.persistent,
+                    isDeterministic = produce.isDeterministic,
+                    outputValue = produce.outputValue.map(ByteString.copyFrom)
                   )
                 }
                 val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
@@ -654,7 +660,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                     val produceProto = ProduceProto(
                       channelHash = produce.channelsHash.toByteString,
                       hash = produce.hash.toByteString,
-                      persistent = produce.persistent
+                      persistent = produce.persistent,
+                      isDeterministic = produce.isDeterministic,
+                      outputValue = produce.outputValue.map(ByteString.copyFrom)
                     )
                     ProduceCounterMapEntry(Some(produceProto), count)
                 }.toSeq
@@ -676,7 +684,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                         ProduceProto(
                           channelHash = produce.channelsHash.toByteString,
                           hash = produce.hash.toByteString,
-                          persistent = produce.persistent
+                          persistent = produce.persistent,
+                          isDeterministic = produce.isDeterministic,
+                          outputValue = produce.outputValue.map(ByteString.copyFrom)
                         )
                       )
                     )
@@ -1246,7 +1256,9 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
                   ProduceProto(
                     channelHash = produce.channelsHash.toByteString,
                     hash = produce.hash.toByteString,
-                    persistent = produce.persistent
+                    persistent = produce.persistent,
+                    isDeterministic = produce.isDeterministic,
+                    outputValue = produce.outputValue.map(ByteString.copyFrom)
                   )
                 }
                 val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
@@ -1255,7 +1267,9 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
                     val produceProto = ProduceProto(
                       channelHash = produce.channelsHash.toByteString,
                       hash = produce.hash.toByteString,
-                      persistent = produce.persistent
+                      persistent = produce.persistent,
+                      isDeterministic = produce.isDeterministic,
+                      outputValue = produce.outputValue.map(ByteString.copyFrom)
                     )
                     ProduceCounterMapEntry(Some(produceProto), count)
                 }.toSeq
@@ -1277,7 +1291,9 @@ class ReplayRhoRuntimeImpl[F[_]: Sync: Span](
                         ProduceProto(
                           channelHash = produce.channelsHash.toByteString,
                           hash = produce.hash.toByteString,
-                          persistent = produce.persistent
+                          persistent = produce.persistent,
+                          isDeterministic = produce.isDeterministic,
+                          outputValue = produce.outputValue.map(ByteString.copyFrom)
                         )
                       )
                     )

@@ -19,6 +19,7 @@ import coop.rchain.models.rspace_plus_plus_types.{
   SortedSetElement
 }
 import coop.rchain.models.rspace_plus_plus_types.LogProto
+import com.google.protobuf.ByteString
 
 trait IReplaySpacePlusPlus[F[_], C, P, A, K] extends ISpacePlusPlus[F, C, P, A, K] {
 
@@ -53,7 +54,9 @@ trait IReplaySpacePlusPlus[F[_], C, P, A, K] extends ISpacePlusPlus[F, C, P, A, 
                   ProduceProto(
                     channelHash = produce.channelsHash.toByteString,
                     hash = produce.hash.toByteString,
-                    persistent = produce.persistent
+                    persistent = produce.persistent,
+                    isDeterministic = produce.isDeterministic,
+                    outputValue = produce.outputValue.map(ByteString.copyFrom)
                   )
                 }
                 val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
@@ -62,7 +65,9 @@ trait IReplaySpacePlusPlus[F[_], C, P, A, K] extends ISpacePlusPlus[F, C, P, A, 
                     val produceProto = ProduceProto(
                       channelHash = produce.channelsHash.toByteString,
                       hash = produce.hash.toByteString,
-                      persistent = produce.persistent
+                      persistent = produce.persistent,
+                      isDeterministic = produce.isDeterministic,
+                      outputValue = produce.outputValue.map(ByteString.copyFrom)
                     )
                     ProduceCounterMapEntry(Some(produceProto), count)
                 }.toSeq
@@ -84,7 +89,9 @@ trait IReplaySpacePlusPlus[F[_], C, P, A, K] extends ISpacePlusPlus[F, C, P, A, 
                         ProduceProto(
                           channelHash = produce.channelsHash.toByteString,
                           hash = produce.hash.toByteString,
-                          persistent = produce.persistent
+                          persistent = produce.persistent,
+                          isDeterministic = produce.isDeterministic,
+                          outputValue = produce.outputValue.map(ByteString.copyFrom)
                         )
                       )
                     )
