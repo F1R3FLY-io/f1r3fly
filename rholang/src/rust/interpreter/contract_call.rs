@@ -1,8 +1,12 @@
+use models::rhoapi::{ListParWithRandom, Par};
+use prost::Message;
 use std::pin::Pin;
 
-use models::rhoapi::{ListParWithRandom, Par};
-
-use super::{dispatch::RhoDispatch, errors::InterpreterError, rho_runtime::RhoISpace};
+use super::{
+    dispatch::{DispatchType, RhoDispatch},
+    errors::InterpreterError,
+    rho_runtime::RhoISpace,
+};
 
 /**
  * This is a tool for unapplying the messages sent to the system contracts.
@@ -33,16 +37,21 @@ pub type Producer = Box<
     dyn FnOnce(
         Vec<Par>,
         Par,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>,
+    ) -> Pin<Box<dyn futures::Future<Output = Result<Vec<Par>, InterpreterError>>>>,
 >;
 
 impl ContractCall {
-    pub fn unapply(&self, contract_args: Vec<ListParWithRandom>) -> Option<(Producer, Vec<Par>)> {
+    pub fn unapply(
+        &self,
+        contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
+    ) -> Option<(Producer, bool, Vec<Par>, Vec<Par>)> {
         // println!("\ncontract_call unapply");
-        if contract_args.len() == 1 {
-            let (args, rand) = (
-                contract_args[0].pars.clone(),
-                contract_args[0].random_state.clone(),
+        if contract_args.0.len() == 1 {
+            let (args, rand, is_replay, previous) = (
+                contract_args.0[0].pars.clone(),
+                contract_args.0[0].random_state.clone(),
+                contract_args.1,
+                contract_args.2,
             );
 
             let space = self.space.clone();
@@ -61,30 +70,57 @@ impl ContractCall {
                         },
                         false,
                     )?;
+
+                    let is_replay = space_lock.is_replay();
                     drop(space_lock);
 
                     // println!("\nproduce_result in contract_call: {:?}", produce_result);
 
-                    match produce_result {
-                        Some((cont, channels)) => {
+                    let dispatch_result = match produce_result {
+                        Some((cont, channels, produce)) => {
                             let dispatcher_lock = dispatcher.try_read().unwrap();
                             let res = dispatcher_lock
                                 .dispatch(
                                     cont.continuation,
                                     channels.iter().map(|c| c.matched_datum.clone()).collect(),
+                                    is_replay,
+                                    produce
+                                        .output_value
+                                        .iter()
+                                        .map(|p| {
+                                            Par::decode(&p[..]).map_err(|e| {
+                                                InterpreterError::DecodeError(e.to_string())
+                                            })
+                                        })
+                                        .collect::<Result<Vec<_>, _>>()?,
                                 )
                                 .await;
                             drop(dispatcher_lock);
                             res
                         }
 
-                        None => Ok(()),
+                        None => Ok(DispatchType::Skip),
+                    };
+
+                    match dispatch_result {
+                        Ok(dispatch_type) => match dispatch_type {
+                            DispatchType::NonDeterministicCall(items) => items
+                                .iter()
+                                .map(|p| {
+                                    Par::decode(&p[..])
+                                        .map_err(|e| InterpreterError::DecodeError(e.to_string()))
+                                })
+                                .collect::<Result<Vec<_>, _>>(),
+                            DispatchType::DeterministicCall => Ok(Vec::new()),
+                            DispatchType::Skip => Ok(Vec::new()),
+                        },
+                        Err(e) => Err(e),
                     }
                 })
-                    as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
+                    as Pin<Box<dyn futures::Future<Output = Result<Vec<Par>, InterpreterError>>>>
             });
 
-            Some((produce, args.clone()))
+            Some((produce, is_replay, previous, args))
         } else {
             None
         }

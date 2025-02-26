@@ -2,7 +2,7 @@ package rspacePlusPlus
 
 import cats.Applicative
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
-import coop.rchain.models.rspace_plus_plus_types.{ActionResult}
+import coop.rchain.models.rspace_plus_plus_types.{ConsumeResult, ProduceResult}
 import coop.rchain.shared.Log
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
@@ -48,7 +48,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
       persist: Boolean,
       peeks: SortedSet[Int],
       consumeRef: Consume
-  ): F[MaybeActionResult] =
+  ): F[MaybeConsumeResult] =
     for {
       result <- Sync[F].delay {
                  // println(s"\nhit consume in scala ${}");
@@ -86,12 +86,12 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                      // println("\nresultByteslength: " + resultByteslength)
                      val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
                      // println("resultBytes length: " + resultBytes.length)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
+                     val consumeResult = ConsumeResult.parseFrom(resultBytes)
 
                      //  val actionResult = ActionResult.parseFrom(jsonString.getBytes())
 
-                     val contResult = actionResult.contResult.get
-                     val results    = actionResult.results
+                     val contResult = consumeResult.contResult.get
+                     val results    = consumeResult.results
 
                      Some(
                        (
@@ -132,7 +132,7 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
       data: A,
       persist: Boolean,
       produceRef: Produce
-  ): F[MaybeActionResult] =
+  ): F[MaybeProduceResult] =
     for {
       result <- Sync[F].delay {
                  //  println("\nHit scala produce, data: " + data)
@@ -163,10 +163,11 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                    val resultByteslength = produceResultPtr.getInt(0)
 
                    try {
-                     val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult   = actionResult.contResult.get
-                     val results      = actionResult.results
+                     val resultBytes   = produceResultPtr.getByteArray(4, resultByteslength)
+                     val produceResult = ProduceResult.parseFrom(resultBytes)
+                     val contResult    = produceResult.contResult.get
+                     val results       = produceResult.results
+                     val produce       = produceResult.produce.get
 
                      Some(
                        (
@@ -185,6 +186,14 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                                removedDatum = r.removedDatum.get,
                                persistent = r.persistent
                              )
+                         ),
+                         Produce(
+                           channelsHash =
+                             Blake2b256Hash.fromByteArray(produce.channelHash.toByteArray),
+                           hash = Blake2b256Hash.fromByteArray(produce.hash.toByteArray),
+                           persistent = produce.persistent,
+                           isDeterministic = produce.isDeterministic,
+                           outputValue = produce.outputValue.map(_.toByteArray)
                          )
                        )
                      )
@@ -234,7 +243,9 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                              channelsHash =
                                Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                              hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
+                             persistent = produceProto.persistent,
+                             isDeterministic = produceProto.isDeterministic,
+                             outputValue = produceProto.outputValue.map(_.toByteArray)
                            )
                          }
                          val peeks = commProto.peeks.map(_.value).to[SortedSet]
@@ -244,7 +255,9 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                              channelsHash =
                                Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                              hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
+                             persistent = produceProto.persistent,
+                             isDeterministic = produceProto.isDeterministic,
+                             outputValue = produceProto.outputValue.map(_.toByteArray)
                            )
                            produce -> entry.value
                          }.toMap
@@ -267,7 +280,9 @@ class ReplayRSpacePlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics, C, P, A
                                channelsHash =
                                  Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                                hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
+                               persistent = produceProto.persistent,
+                               isDeterministic = produceProto.isDeterministic,
+                               outputValue = produceProto.outputValue.map(_.toByteArray)
                              )
                            case IOEventProto.IoEventType.Consume(consumeProto) =>
                              Consume(

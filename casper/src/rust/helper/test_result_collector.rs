@@ -210,7 +210,7 @@ impl TestResultCollector {
     pub async fn handle_message(
         &self,
         ctx: ProcessContext,
-        message: Vec<ListParWithRandom>,
+        message: (Vec<ListParWithRandom>, bool, Vec<Par>),
         test_result_collector: TestResultCollector,
     ) -> () {
         let is_contract_call = ContractCall {
@@ -220,7 +220,7 @@ impl TestResultCollector {
 
         // println!("\nhit handle_message");
 
-        if let Some((produce, assert_par)) = is_contract_call.unapply(message) {
+        if let Some((produce, _, _, assert_par)) = is_contract_call.unapply(message) {
             if let Some((test_name, attempt, assertion, clue, ack_channel)) =
                 IsAssert::unapply(assert_par.clone())
             {

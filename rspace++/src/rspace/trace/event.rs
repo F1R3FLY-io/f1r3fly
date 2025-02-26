@@ -105,6 +105,8 @@ pub struct Produce {
     pub channel_hash: Blake2b256Hash,
     pub hash: Blake2b256Hash,
     pub persistent: bool,
+    pub is_deterministic: bool,
+    pub output_value: Vec<Vec<u8>>,
 }
 
 impl Produce {
@@ -115,6 +117,26 @@ impl Produce {
             channel_hash,
             hash,
             persistent,
+            is_deterministic: true,
+            output_value: vec![],
+        }
+    }
+
+    pub fn new(channel_hash: Blake2b256Hash, hash: Blake2b256Hash, persistent: bool) -> Produce {
+        Produce {
+            channel_hash,
+            hash,
+            persistent,
+            is_deterministic: true,
+            output_value: vec![],
+        }
+    }
+
+    pub fn mark_as_non_deterministic(self, previous: Vec<Vec<u8>>) -> Self {
+        Produce {
+            is_deterministic: false,
+            output_value: previous,
+            ..self
         }
     }
 }

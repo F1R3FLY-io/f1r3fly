@@ -1,20 +1,28 @@
-use models::ByteVector;
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
+
+use models::ByteVector;
 use rand::prelude::SliceRandom;
 use rspace_plus_plus::rspace::{
-    errors::{HistoryError, RootError}, hashing::blake2b256_hash::Blake2b256Hash, history::{
+    errors::{HistoryError, RootError},
+    hashing::blake2b256_hash::Blake2b256Hash,
+    history::{
         history::HistoryInstances, history_repository::HistoryRepository,
         history_repository_impl::HistoryRepositoryImpl, instances::radix_history::RadixHistory,
         root_repository::RootRepository, roots_store::RootsStore,
-    }, hot_store_action::{
+    },
+    hot_store_action::{
         DeleteAction, DeleteContinuations, DeleteData, DeleteJoins, HotStoreAction, InsertAction,
         InsertContinuations, InsertData, InsertJoins,
-    }, internal::{Datum, WaitingContinuation}, shared::{
+    },
+    internal::{Datum, WaitingContinuation},
+    shared::{
         in_mem_key_value_store::InMemoryKeyValueStore,
         key_value_store::{KeyValueStore, KvStoreError},
         trie_exporter::{KeyHash, NodePath, TrieExporter, TrieNode, Value},
         trie_importer::TrieImporter,
-    }, state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter}, trace::event::{Consume, Produce}
+    },
+    state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
+    trace::event::{Consume, Produce},
 };
 use std::{
     collections::{BTreeSet, HashSet},
@@ -240,22 +248,26 @@ async fn history_repository_should_process_insert_and_delete_of_thirty_mixed_ele
         .iter()
         .map(|c| deleted_reader.get_continuations(&c.channels))
         .collect();
-    assert!(fetched_conts
-        .iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .is_empty());
+    assert!(
+        fetched_conts
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
 
     let fetched_joins: Vec<Vec<Vec<String>>> = joins
         .1
         .iter()
         .map(|j| deleted_reader.get_joins(&j.channel))
         .collect();
-    assert!(fetched_joins
-        .iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .is_empty());
+    assert!(
+        fetched_joins
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -332,10 +344,10 @@ fn insert_continuation(
 }
 
 fn join(s: i32) -> Vec<Vec<String>> {
-    vec![
-        vec![format!("abc{}", s), format!("def{}", s)],
-        vec![format!("wer{}", s), format!("tre{}", s)],
-    ]
+    vec![vec![format!("abc{}", s), format!("def{}", s)], vec![
+        format!("wer{}", s),
+        format!("tre{}", s),
+    ]]
 }
 
 fn continuation(s: i32) -> WaitingContinuation<String, String> {
@@ -360,6 +372,8 @@ fn datum(s: i32) -> Datum<String> {
             channel_hash: random_blake(),
             hash: random_blake(),
             persistent: false,
+            is_deterministic: true,
+            output_value: vec![],
         },
     }
 }

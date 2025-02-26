@@ -42,13 +42,13 @@ class ContractCall[F[_]: Concurrent: Span](
                         persist = false
                       )
       // _ = println("\nhit produce in ContractCall, values: " + values)
-      _ <- produceResult.fold(Sync[F].unit) {
-            case (cont, channels) =>
-              dispatcher.dispatch(
-                cont.continuation,
-                channels.map(_.matchedDatum)
-              )
-          }
+      // _ <- produceResult.fold(Sync[F].unit) {
+      //       case (cont, channels) =>
+      //         dispatcher.dispatch(
+      //           cont.continuation,
+      //           channels.map(_.matchedDatum)
+      //         )
+      //     }
     } yield ()
 
   def unapply(contractArgs: Seq[ListParWithRandom]): Option[(Producer[F], Seq[Par])] =

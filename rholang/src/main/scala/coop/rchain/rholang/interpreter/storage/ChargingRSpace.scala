@@ -15,6 +15,7 @@ import coop.rchain.rholang.interpreter.errors.BugFoundError
 import coop.rchain.rspace.{ContResult, Result, Match => StorageMatch}
 
 import scala.collection.SortedSet
+import rspacePlusPlus.Tuplespace.ProduceResult
 
 object ChargingRSpace {
 
@@ -87,9 +88,7 @@ object ChargingRSpace {
           data: ListParWithRandom,
           persist: Boolean
       ): F[
-        Option[
-          (ContResult[Par, BindPattern, TaggedContinuation], Seq[Result[Par, ListParWithRandom]])
-        ]
+        Option[ProduceResult[Par, BindPattern, ListParWithRandom, TaggedContinuation]]
       ] =
         for {
           _       <- charge[F](storageCostProduce(channel, data).copy(operation = "produces storage"))

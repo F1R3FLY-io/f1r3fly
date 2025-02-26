@@ -4,9 +4,9 @@ The **R**Chain Tuple **Space** in **Rust**
 
 ### Overview
 
-`rspace++` is a direct port of the `rspace` scala library to Rust. See [rspace documentation](../rspace/README.md) for more information about rspace and how to use the scala library.
+`rspace++` is a direct port of the `rspace` Scala library to Rust. See [rspace documentation](../rspace/README.md) for more information about rspace and how to use the Scala library.
 
-`JNA` is used to load the `rspace++` library into the scala project.
+`JNA` is used to load the `rspace++` Rust library into the Scala project.
 
 ## Development
 
@@ -16,18 +16,24 @@ The **R**Chain Tuple **Space** in **Rust**
 
 ### Building
 
-To build the `rspace++` library, run `cargo build --release -p rspace_plus_plus_rhotypes`.
-  - `cargo build --profile dev -p rspace_plus_plus_rhotypes` will build the library in debug mode.
+To build the `rspace++` Rust library, run `cargo build --release -p rspace_plus_plus_rhotypes`
+  - `cargo build --profile dev -p rspace_plus_plus_rhotypes` will build the library in debug mode
 
-### Testing
+## Testing
 
-#### Rust
+### Rust
 
-Run all tests: `cargo test`.
+Run all tests: `cargo test`
 
-#### Scala
+Run all tests in release mode: `cargo test --release`
+  
+Run specific test file: `cargo test --test <test_file_name>`
 
-The following tests all use `rspace++`:
+Run specific test file in specific folder: `cargo test --test <test_folder_name>::<test_file_name>`
+
+### Scala
+
+The following tests all use `rspace++` and must be run at root project directory:
 
 - Run basic RSpace-Bench Benchmark: `sbt "rspaceBench/jmh:run -i 10 -wi 10 -f1 -t1 .BasicBench."`
 - Run Casper Genesis tests: `sbt "casper/testOnly coop.rchain.casper.genesis.GenesisTest"`

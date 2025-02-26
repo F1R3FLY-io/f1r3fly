@@ -10,7 +10,7 @@ use super::{
     errors::RSpaceError,
     hashing::blake2b256_hash::Blake2b256Hash,
     internal::{Datum, ProduceCandidate, Row, WaitingContinuation},
-    trace::Log,
+    trace::{Log, event::Produce},
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -32,7 +32,9 @@ pub struct ContResult<C, P, K> {
 }
 
 pub type MaybeProduceCandidate<C, P, A, K> = Option<ProduceCandidate<C, P, A, K>>;
-pub type MaybeActionResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
+pub type MaybeConsumeResult<C, P, A, K> = Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>)>;
+pub type MaybeProduceResult<C, P, A, K> =
+    Option<(ContResult<C, P, K>, Vec<RSpaceResult<C, A>>, Produce)>;
 
 pub const CONSUME_COMM_LABEL: &str = "comm.consume";
 pub const PRODUCE_COMM_LABEL: &str = "comm.produce";
@@ -126,7 +128,7 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
         continuation: K,
         persist: bool,
         peeks: BTreeSet<i32>,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError>;
+    ) -> Result<MaybeConsumeResult<C, P, A, K>, RSpaceError>;
 
     /** Searches the store for a continuation that has patterns that match the given data at the
      * given channel.
@@ -156,7 +158,7 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
         channel: C,
         data: A,
         persist: bool,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError>;
+    ) -> Result<MaybeProduceResult<C, P, A, K>, RSpaceError>;
 
     fn install(
         &mut self,
@@ -172,4 +174,8 @@ pub trait ISpace<C: Eq + std::hash::Hash, P: Clone, A: Clone, K: Clone> {
     fn rig(&self, log: Log) -> Result<(), RSpaceError>;
 
     fn check_replay_data(&self) -> Result<(), RSpaceError>;
+
+    fn is_replay(&self) -> bool;
+
+    fn update_produce(&mut self, produce: Produce) -> ();
 }

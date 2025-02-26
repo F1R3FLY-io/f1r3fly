@@ -1,5 +1,5 @@
 use models::rspace_plus_plus_types::*;
-use models::{rhoapi::*, ByteVector};
+use models::{ByteVector, rhoapi::*};
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
@@ -14,7 +14,7 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Event, IOEvent};
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 use std::sync::{Arc, Mutex};
 
 /*
@@ -161,7 +161,7 @@ pub extern "C" fn produce(
     .unwrap();
 
     match result_option {
-        Some((cont_result, rspace_results)) => {
+        Some((cont_result, rspace_results, produce_event)) => {
             let protobuf_cont_result = ContResultProto {
                 continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
@@ -180,9 +180,18 @@ pub extern "C" fn produce(
                 })
                 .collect();
 
-            let maybe_action_result = ActionResult {
+            let protobuf_produce = ProduceProto {
+                channel_hash: produce_event.channel_hash.bytes(),
+                hash: produce_event.hash.bytes(),
+                persistent: produce_event.persistent,
+                is_deterministic: produce_event.is_deterministic,
+                output_value: produce_event.output_value,
+            };
+
+            let maybe_action_result = ProduceResult {
                 cont_result: Some(protobuf_cont_result),
                 results: protobuf_results,
+                produce: Some(protobuf_produce),
             };
 
             let mut bytes = maybe_action_result.encode_to_vec();
@@ -247,7 +256,7 @@ pub extern "C" fn consume(
                 })
                 .collect();
 
-            let maybe_action_result = ActionResult {
+            let maybe_action_result = ConsumeResult {
                 cont_result: Some(protobuf_cont_result),
                 results: protobuf_results,
             };
@@ -571,6 +580,8 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
                     channel_hash: datum.source.channel_hash.bytes(),
                     hash: datum.source.hash.bytes(),
                     persistent: datum.source.persistent,
+                    is_deterministic: datum.source.is_deterministic,
+                    output_value: datum.source.output_value,
                 }),
             })
             .collect();
@@ -1773,6 +1784,8 @@ pub extern "C" fn get_history_data(
                 channel_hash: datum.source.channel_hash.bytes(),
                 hash: datum.source.hash.bytes(),
                 persistent: datum.source.persistent,
+                is_deterministic: datum.source.is_deterministic,
+                output_value: datum.source.output_value,
             }),
         })
         .collect();
@@ -1917,7 +1930,7 @@ pub extern "C" fn replay_produce(
     .unwrap();
 
     match result_option {
-        Some((cont_result, rspace_results)) => {
+        Some((cont_result, rspace_results, produce_event)) => {
             let protobuf_cont_result = ContResultProto {
                 continuation: Some(cont_result.continuation.clone()),
                 persistent: cont_result.persistent,
@@ -1936,9 +1949,18 @@ pub extern "C" fn replay_produce(
                 })
                 .collect();
 
-            let maybe_action_result = ActionResult {
+            let protobuf_produce = ProduceProto {
+                channel_hash: produce_event.channel_hash.bytes(),
+                hash: produce_event.hash.bytes(),
+                persistent: produce_event.persistent,
+                is_deterministic: produce_event.is_deterministic,
+                output_value: produce_event.output_value,
+            };
+
+            let maybe_action_result = ProduceResult {
                 cont_result: Some(protobuf_cont_result),
                 results: protobuf_results,
+                produce: Some(protobuf_produce),
             };
 
             let mut bytes = maybe_action_result.encode_to_vec();
@@ -2003,7 +2025,7 @@ pub extern "C" fn replay_consume(
                 })
                 .collect();
 
-            let maybe_action_result = ActionResult {
+            let maybe_action_result = ConsumeResult {
                 cont_result: Some(protobuf_cont_result),
                 results: protobuf_results,
             };
@@ -2060,6 +2082,8 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
                                 channel_hash: produce.channel_hash.bytes(),
                                 hash: produce.hash.bytes(),
                                 persistent: produce.persistent,
+                                is_deterministic: produce.is_deterministic,
+                                output_value: produce.output_value,
                             })
                             .collect()
                     },
@@ -2077,6 +2101,8 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
                                 channel_hash: key.channel_hash.bytes(),
                                 hash: key.hash.bytes(),
                                 persistent: key.persistent,
+                                is_deterministic: key.is_deterministic,
+                                output_value: key.output_value,
                             };
 
                             produce_counter_map_entries.push(ProduceCounterMapEntry {
@@ -2098,6 +2124,8 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
                         channel_hash: produce.channel_hash.bytes(),
                         hash: produce.hash.bytes(),
                         persistent: produce.persistent,
+                        is_deterministic: produce.is_deterministic,
+                        output_value: produce.output_value,
                     };
                     EventProto {
                         event_type: Some(event_proto::EventType::IoEvent(IoEventProto {

@@ -4,10 +4,10 @@ import cats.Applicative
 import cats.implicits._
 import com.sun.jna.{Memory, Native, Pointer}
 import coop.rchain.models.rspace_plus_plus_types.{
-  ActionResult,
   ChannelsProto,
   ConsumeParams,
   ConsumeProto,
+  ConsumeResult,
   DatumProto,
   DatumsProto,
   FreeMapProto,
@@ -16,7 +16,7 @@ import coop.rchain.models.rspace_plus_plus_types.{
   JoinProto,
   JoinsProto,
   ProduceCounterMapEntry,
-  ProduceProto,
+  ProduceResult,
   SoftCheckpointProto,
   SortedSetElement,
   StoreStateContMapEntry,
@@ -98,7 +98,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
       persist: Boolean,
       peeks: SortedSet[Int],
       consumeRef: Consume
-  ): F[MaybeActionResult] =
+  ): F[MaybeConsumeResult] =
     for {
       result <- Sync[F].delay {
                  // println(s"\nhit consume in scala ${}");
@@ -136,12 +136,12 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                      // println("\nresultByteslength: " + resultByteslength)
                      val resultBytes = consumeResultPtr.getByteArray(4, resultByteslength)
                      // println("resultBytes length: " + resultBytes.length)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
+                     val consumeResult = ConsumeResult.parseFrom(resultBytes)
 
                      //  val actionResult = ActionResult.parseFrom(jsonString.getBytes())
 
-                     val contResult = actionResult.contResult.get
-                     val results    = actionResult.results
+                     val contResult = consumeResult.contResult.get
+                     val results    = consumeResult.results
 
                      Some(
                        (
@@ -181,7 +181,7 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
       data: A,
       persist: Boolean,
       produceRef: Produce
-  ): F[MaybeActionResult] =
+  ): F[MaybeProduceResult] =
     for {
       result <- Sync[F].delay {
                  //  println("\nHit scala produce, data: " + data)
@@ -212,10 +212,11 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                    val resultByteslength = produceResultPtr.getInt(0)
 
                    try {
-                     val resultBytes  = produceResultPtr.getByteArray(4, resultByteslength)
-                     val actionResult = ActionResult.parseFrom(resultBytes)
-                     val contResult   = actionResult.contResult.get
-                     val results      = actionResult.results
+                     val resultBytes   = produceResultPtr.getByteArray(4, resultByteslength)
+                     val produceResult = ProduceResult.parseFrom(resultBytes)
+                     val contResult    = produceResult.contResult.get
+                     val results       = produceResult.results
+                     val produce       = produceResult.produce.get
 
                      Some(
                        (
@@ -234,6 +235,14 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                                removedDatum = r.removedDatum.get,
                                persistent = r.persistent
                              )
+                         ),
+                         Produce(
+                           channelsHash =
+                             Blake2b256Hash.fromByteArray(produce.channelHash.toByteArray),
+                           hash = Blake2b256Hash.fromByteArray(produce.hash.toByteArray),
+                           persistent = produce.persistent,
+                           isDeterministic = produce.isDeterministic,
+                           outputValue = produce.outputValue.map(_.toByteArray)
                          )
                        )
                      )
@@ -285,7 +294,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              channelsHash =
                                Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                              hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
+                             persistent = produceProto.persistent,
+                             isDeterministic = produceProto.isDeterministic,
+                             outputValue = produceProto.outputValue.map(_.toByteArray)
                            )
                          }
                          val peeks = commProto.peeks.map(_.value).to[SortedSet]
@@ -295,7 +306,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                              channelsHash =
                                Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                              hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                             persistent = produceProto.persistent
+                             persistent = produceProto.persistent,
+                             isDeterministic = produceProto.isDeterministic,
+                             outputValue = produceProto.outputValue.map(_.toByteArray)
                            )
                            produce -> entry.value
                          }.toMap
@@ -318,7 +331,9 @@ class RSpacePlusPlus_RhoTypes[F[_]: Concurrent: ContextShift: Log: Metrics](rspa
                                channelsHash =
                                  Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                                hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
+                               persistent = produceProto.persistent,
+                               isDeterministic = produceProto.isDeterministic,
+                               outputValue = produceProto.outputValue.map(_.toByteArray)
                              )
                            case IOEventProto.IoEventType.Consume(consumeProto) =>
                              Consume(

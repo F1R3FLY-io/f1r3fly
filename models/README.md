@@ -36,9 +36,19 @@ The HTML version of the generated report is located at:
  
  ## Rust
 
-Within models directory, `cargo build --profile dev -p models` to build `models` library. Outputs to `models/target/debug/`.
+Parts of this directory are ported to Rust.
 
-### Test
+### Building
 
-To run ScoredTermSortTest: `cargo test --test scored_term_sort_test`
-To run ParSortMatcherTest: `cargo test --test par_sort_matcher_test`
+To build the `models` Rust library, run `cargo build --release -p models`
+  - `cargo build --profile dev -p models` will build the library in debug mode
+
+### Testing
+
+To run all tests: `cargo test`
+
+Run all tests in release mode: `cargo test --release`
+
+To run specific test file: `cargo test --test <test_file_name>`
+
+To run specific test in specific folder: `cargo test --test <test_folder_name>::<test_file_name>`

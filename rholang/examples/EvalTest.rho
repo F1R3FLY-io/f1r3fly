@@ -1,20 +1,21 @@
-new stdout(`rho:io:stdout`), MatchNilTest, resultCh in {
-  contract MatchNilTest(@term, return) = {
-    match term {
-      "testing" => {
-				return!("Handled SomePattern")
-      }
-      Nil => {
-				return!("Handled Nil")
-      }
-      _ => {
-				return!("Handled default case")
-      }
+new gptAnswer, audio, dalle3Answer,
+    gpt4(`rho:ai:gpt4`),
+    dalle3(`rho:ai:dalle3`),
+    textToAudio(`rho:ai:textToAudio`),
+    stdout(`rho:io:stdout`) in {
+			
+  gpt4!("Describe an appearance of human-like robot: ", *gptAnswer) |
+  for(@answer <- gptAnswer) {
+    stdout!(["GTP4 created a prompt", answer]) |
+
+    dalle3!(answer, *dalle3Answer) |
+    for(@dalle3Answer <- dalle3Answer) {
+      stdout!(["Dall-e-3 created an image", dalle3Answer])
     }
   } |
 
-	MatchNilTest!("testing123", *resultCh) |
-	for (@result <- resultCh) {
-		stdout!(result != Nil)
-	}
+  textToAudio!("Hello, I am a robot. Rholang give me a voice!", *audio) |
+  for(@audio <- audio) {
+    stdout!("Text to audio created")
+  }
 }

@@ -31,12 +31,12 @@ impl OpenAIService {
 
     pub async fn create_audio_speech(
         &self,
-        prompt: &str,
+        input: &str,
         output_path: &str,
     ) -> Result<(), InterpreterError> {
         let request = AudioSpeechRequest::new(
             TTS_1.to_string(),
-            prompt.to_string(),
+            input.to_string(),
             audio::VOICE_SHIMMER.to_string(),
             output_path.to_string(),
         );

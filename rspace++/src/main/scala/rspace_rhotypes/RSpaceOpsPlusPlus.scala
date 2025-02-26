@@ -4,7 +4,6 @@ import cats.Applicative
 import cats.implicits._
 import com.sun.jna.{Memory, Native, Pointer}
 import coop.rchain.models.rspace_plus_plus_types.{
-  ActionResult,
   ChannelsProto,
   ConsumeParams,
   ConsumeProto,
@@ -103,7 +102,8 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   type A = ListParWithRandom;
   type K = TaggedContinuation;
 
-  type MaybeActionResult = Option[(ContResult[C, P, K], Seq[Result[C, A]])]
+  type MaybeConsumeResult = Option[(ContResult[C, P, K], Seq[Result[C, A]])]
+  type MaybeProduceResult = Option[(ContResult[C, P, K], Seq[Result[C, A]], Produce)]
 
   protected[this] val dataLogger: Logger =
     Logger("rspacePlusPlus")
@@ -821,7 +821,11 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                                              hash = Blake2b256Hash.fromByteArray(
                                                                produceEvent.hash.toByteArray
                                                              ),
-                                                             persistent = produceEvent.persistent
+                                                             persistent = produceEvent.persistent,
+                                                             isDeterministic =
+                                                               produceEvent.isDeterministic,
+                                                             outputValue = produceEvent.outputValue
+                                                               .map(_.toByteArray)
                                                            )
                                                          case None => {
                                                            println("ProduceEvent is None");
@@ -1104,7 +1108,13 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                                                      produceEvent.hash.toByteArray
                                                                    ),
                                                                  persistent =
-                                                                   produceEvent.persistent
+                                                                   produceEvent.persistent,
+                                                                 isDeterministic =
+                                                                   produceEvent.isDeterministic,
+                                                                 outputValue =
+                                                                   produceEvent.outputValue.map(
+                                                                     _.toByteArray
+                                                                   )
                                                                )
                                                              case None => {
                                                                println("ProduceEvent is None");
@@ -1410,7 +1420,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                    ),
                                    hash =
                                      Blake2b256Hash.fromByteArray(produceEvent.hash.toByteArray),
-                                   persistent = produceEvent.persistent
+                                   persistent = produceEvent.persistent,
+                                   isDeterministic = produceEvent.isDeterministic,
+                                   outputValue = produceEvent.outputValue.map(_.toByteArray)
                                  )
                                case None => {
                                  println("ProduceEvent is None");
@@ -1558,7 +1570,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
       persist: Boolean,
       peeks: SortedSet[Int] = SortedSet.empty
       // peeks: SortedSet[Int]
-  ): F[MaybeActionResult] =
+  ): F[MaybeConsumeResult] =
     ContextShift[F].evalOn(scheduler) {
       for {
         // result <- consumeLockF(channels) {
@@ -1575,9 +1587,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
       persist: Boolean,
       peeks: SortedSet[Int],
       consumeRef: Consume
-  ): F[MaybeActionResult]
+  ): F[MaybeConsumeResult]
 
-  override def produce(channel: C, data: A, persist: Boolean): F[MaybeActionResult] =
+  override def produce(channel: C, data: A, persist: Boolean): F[MaybeProduceResult] =
     ContextShift[F].evalOn(scheduler) {
       for {
         // result <- produceLockF(channel) {
@@ -1593,7 +1605,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
       data: A,
       persist: Boolean,
       produceRef: Produce
-  ): F[MaybeActionResult]
+  ): F[MaybeProduceResult]
 
   override def install(
       channels: Seq[C],
@@ -1667,7 +1679,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                          hash = Blake2b256Hash.fromByteArray(
                                            produceEvent.hash.toByteArray
                                          ),
-                                         persistent = produceEvent.persistent
+                                         persistent = produceEvent.persistent,
+                                         isDeterministic = produceEvent.isDeterministic,
+                                         outputValue = produceEvent.outputValue.map(_.toByteArray)
                                        )
                                      case None => {
                                        println("ProduceEvent is None");
@@ -1844,7 +1858,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                    ),
                                    hash =
                                      Blake2b256Hash.fromByteArray(produceEvent.hash.toByteArray),
-                                   persistent = produceEvent.persistent
+                                   persistent = produceEvent.persistent,
+                                   isDeterministic = produceEvent.isDeterministic,
+                                   outputValue = produceEvent.outputValue.map(_.toByteArray)
                                  )
                                case None => {
                                  println("ProduceEvent is None")
@@ -1885,7 +1901,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                channelsHash =
                                  Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                                hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
+                               persistent = produceProto.persistent,
+                               isDeterministic = produceProto.isDeterministic,
+                               outputValue = produceProto.outputValue.map(_.toByteArray)
                              )
                            }
                            val peeks = commProto.peeks.map(_.value).to[SortedSet]
@@ -1895,7 +1913,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                channelsHash =
                                  Blake2b256Hash.fromByteArray(produceProto.channelHash.toByteArray),
                                hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                               persistent = produceProto.persistent
+                               persistent = produceProto.persistent,
+                               isDeterministic = produceProto.isDeterministic,
+                               outputValue = produceProto.outputValue.map(_.toByteArray)
                              )
                              produce -> entry.value
                            }.toMap
@@ -1920,7 +1940,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                    produceProto.channelHash.toByteArray
                                  ),
                                  hash = Blake2b256Hash.fromByteArray(produceProto.hash.toByteArray),
-                                 persistent = produceProto.persistent
+                                 persistent = produceProto.persistent,
+                                 isDeterministic = produceProto.isDeterministic,
+                                 outputValue = produceProto.outputValue.map(_.toByteArray)
                                )
                              }
 
@@ -1946,7 +1968,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                          channelsHash =
                            Blake2b256Hash.fromByteArray(keyProto.channelHash.toByteArray),
                          hash = Blake2b256Hash.fromByteArray(keyProto.hash.toByteArray),
-                         persistent = keyProto.persistent
+                         persistent = keyProto.persistent,
+                         isDeterministic = keyProto.isDeterministic,
+                         outputValue = keyProto.outputValue.map(_.toByteArray)
                        )
 
                        val value = mapEntry.value
@@ -2047,7 +2071,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                     ProduceProto(
                       channelHash = datum.source.channelsHash.toByteString,
                       hash = datum.source.hash.toByteString,
-                      persistent = datum.source.persistent
+                      persistent = datum.source.persistent,
+                      isDeterministic = datum.source.isDeterministic,
+                      outputValue = datum.source.outputValue.map(ByteString.copyFrom)
                     )
                   )
                 )
@@ -2090,7 +2116,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
               val produceProto = ProduceProto(
                 produce.channelsHash.toByteString,
                 produce.hash.toByteString,
-                produce.persistent
+                produce.persistent,
+                produce.isDeterministic,
+                produce.outputValue.map(ByteString.copyFrom)
               )
 
               produceCounterMapEntries :+ ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
@@ -2107,7 +2135,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                   ProduceProto(
                     channelHash = produce.channelsHash.toByteString,
                     hash = produce.hash.toByteString,
-                    persistent = produce.persistent
+                    persistent = produce.persistent,
+                    isDeterministic = produce.isDeterministic,
+                    produce.outputValue.map(ByteString.copyFrom)
                   )
                 }
                 val peeksProto = comm.peeks.map(SortedSetElement(_)).toSeq
@@ -2116,7 +2146,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                     val produceProto = ProduceProto(
                       channelHash = produce.channelsHash.toByteString,
                       hash = produce.hash.toByteString,
-                      persistent = produce.persistent
+                      persistent = produce.persistent,
+                      isDeterministic = produce.isDeterministic,
+                      produce.outputValue.map(ByteString.copyFrom)
                     )
                     ProduceCounterMapEntry(Some(produceProto), count)
                 }.toSeq
@@ -2138,7 +2170,9 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                         ProduceProto(
                           channelHash = produce.channelsHash.toByteString,
                           hash = produce.hash.toByteString,
-                          persistent = produce.persistent
+                          persistent = produce.persistent,
+                          isDeterministic = produce.isDeterministic,
+                          produce.outputValue.map(ByteString.copyFrom)
                         )
                       )
                     )

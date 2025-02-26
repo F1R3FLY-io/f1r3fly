@@ -6,19 +6,20 @@ use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
+use super::rspace_interface::CONSUME_COMM_LABEL;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
-use super::rspace_interface::MaybeActionResult;
+use super::rspace_interface::MaybeConsumeResult;
 use super::rspace_interface::MaybeProduceCandidate;
-use super::rspace_interface::RSpaceResult;
-use super::rspace_interface::CONSUME_COMM_LABEL;
+use super::rspace_interface::MaybeProduceResult;
 use super::rspace_interface::PRODUCE_COMM_LABEL;
+use super::rspace_interface::RSpaceResult;
+use super::trace::Log;
+use super::trace::event::COMM;
 use super::trace::event::Consume;
 use super::trace::event::Event;
 use super::trace::event::IOEvent;
 use super::trace::event::Produce;
-use super::trace::event::COMM;
-use super::trace::Log;
 use crate::rspace::checkpoint::Checkpoint;
 use crate::rspace::history::history_repository::HistoryRepository;
 use crate::rspace::hot_store::{HotStore, HotStoreInstances};
@@ -173,7 +174,7 @@ where
         continuation: K,
         persist: bool,
         peeks: BTreeSet<i32>,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+    ) -> Result<MaybeConsumeResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit consume");
 
         if channels.is_empty() {
@@ -196,7 +197,7 @@ where
         channel: C,
         data: A,
         persist: bool,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+    ) -> Result<MaybeProduceResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit produce");
         // println!("\nto_map: {:?}", self.store.to_map());
         // println!("\nHit produce, data: {:?}", data);
@@ -282,6 +283,58 @@ where
             )))
         }
     }
+
+    fn is_replay(&self) -> bool {
+        false
+    }
+
+    fn update_produce(&mut self, produce_ref: Produce) -> () {
+        for event in self.event_log.iter_mut() {
+            match event {
+                Event::IoEvent(IOEvent::Produce(produce)) => {
+                    if produce.hash == produce_ref.hash {
+                        *produce = produce_ref.clone();
+                    }
+                }
+
+                Event::Comm(comm) => {
+                    let COMM {
+                        produces: _produces,
+                        times_repeated: _times_repeated,
+                        ..
+                    } = comm;
+
+                    let updated_comm = COMM {
+                        produces: _produces
+                            .iter()
+                            .map(|p| {
+                                if p.hash == produce_ref.hash {
+                                    produce_ref.clone()
+                                } else {
+                                    p.clone()
+                                }
+                            })
+                            .collect(),
+                        times_repeated: _times_repeated
+                            .iter()
+                            .map(|(k, v)| {
+                                if k.hash == produce_ref.hash {
+                                    (produce_ref.clone(), v.clone())
+                                } else {
+                                    (k.clone(), v.clone())
+                                }
+                            })
+                            .collect(),
+                        ..comm.clone()
+                    };
+
+                    *comm = updated_comm;
+                }
+
+                _ => continue,
+            }
+        }
+    }
 }
 
 impl<C, P, A, K> ReplayRSpace<C, P, A, K>
@@ -331,7 +384,7 @@ where
         persist: bool,
         peeks: BTreeSet<i32>,
         consume_ref: Consume,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+    ) -> Result<MaybeConsumeResult<C, P, A, K>, RSpaceError> {
         // println!(
         //     "consume: searching for data matching <patterns: {:?}> at <channels: {:?}>",
         //     patterns, channels
@@ -489,7 +542,7 @@ where
         data: A,
         persist: bool,
         produce_ref: Produce,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError> {
+    ) -> Result<MaybeProduceResult<C, P, A, K>, RSpaceError> {
         // println!("\nHit replay_locked_produce");
 
         let grouped_channels = self.store.get_joins(channel.clone());
@@ -499,32 +552,42 @@ where
         // );
         let _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
 
-        let comms_option = self
+        let io_event_and_comm = self
             .replay_data
             .map
-            .get(&IOEvent::Produce(produce_ref.clone()))
-            .map(|comms| {
-                comms
-                    .iter()
-                    .map(|tuple| tuple.0.clone())
-                    .collect::<Vec<_>>()
+            .clone()
+            .into_iter()
+            .find(|(io_event, _)| match io_event {
+                IOEvent::Produce(p) => p.hash == produce_ref.hash,
+                _ => false,
             });
 
         // println!("\nreplay_data in replay_produce: {:?}", self.replay_data);
         // println!("\ncomms_options in replay_produce Some?: {:?}", comms_option.is_some());
 
-        match comms_option {
+        match io_event_and_comm {
             None => Ok(self.store_data(channel, data, persist, produce_ref)),
-            Some(comms_list) => {
+            Some((_, comms_list)) => {
+                let comms = comms_list
+                    .iter()
+                    .map(|tuple| tuple.0.clone())
+                    .collect::<Vec<_>>();
+
                 match self.get_comm_or_produce_candidate(
                     channel.clone(),
                     data.clone(),
                     persist,
-                    comms_list.clone(),
+                    comms.clone(),
                     produce_ref.clone(),
                     grouped_channels,
                 ) {
-                    Some((_, pc)) => Ok(self.handle_match(pc, comms_list)),
+                    Some((comm, pc)) => Ok(self.handle_match(pc, comms).map(|consume_result| {
+                        let p = comm
+                            .produces
+                            .into_iter()
+                            .find(|p| p.hash == produce_ref.hash);
+                        (consume_result.0, consume_result.1, p.unwrap_or_else(|| produce_ref))
+                    })),
                     None => {
                         // println!("\nwas none");
                         Ok(self.store_data(channel, data, persist, produce_ref))
@@ -639,7 +702,7 @@ where
         &mut self,
         pc: ProduceCandidate<C, P, A, K>,
         comms: Vec<COMM>,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> MaybeConsumeResult<C, P, A, K> {
         // println!("\nhit handle_match");
 
         let ProduceCandidate {
@@ -805,7 +868,7 @@ where
         &self,
         channels: Vec<C>,
         wc: WaitingContinuation<P, K>,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> MaybeConsumeResult<C, P, A, K> {
         // println!("\nHit store_waiting_continuation");
         self.store.put_continuation(channels.clone(), wc);
         for channel in channels.iter() {
@@ -821,17 +884,14 @@ where
         data: A,
         persist: bool,
         produce_ref: Produce,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> MaybeProduceResult<C, P, A, K> {
         // println!("\nHit store_data");
         // println!("\nHit store_data, data: {:?}", data);
-        self.store.put_datum(
-            channel,
-            Datum {
-                a: data,
-                persist,
-                source: produce_ref,
-            },
-        );
+        self.store.put_datum(channel, Datum {
+            a: data,
+            persist,
+            source: produce_ref,
+        });
         // println!(
         //     "produce: persisted <data: {:?}> at <channel: {:?}>",
         //     data, channel
@@ -920,24 +980,22 @@ where
 
             match options {
                 None => {
-                    self.installs.lock().unwrap().insert(
-                        channels.clone(),
-                        Install {
+                    self.installs
+                        .lock()
+                        .unwrap()
+                        .insert(channels.clone(), Install {
                             patterns: patterns.clone(),
                             continuation: continuation.clone(),
-                        },
-                    );
+                        });
 
-                    self.store.install_continuation(
-                        channels.clone(),
-                        WaitingContinuation {
+                    self.store
+                        .install_continuation(channels.clone(), WaitingContinuation {
                             patterns,
                             continuation,
                             persist: true,
                             peeks: BTreeSet::default(),
                             source: consume_ref,
-                        },
-                    );
+                        });
 
                     for channel in channels.iter() {
                         self.store.install_join(channel.clone(), channels.clone());
@@ -970,7 +1028,7 @@ where
         wk: WaitingContinuation<P, K>,
         _consume_ref: Consume,
         data_candidates: Vec<ConsumeCandidate<C, A>>,
-    ) -> MaybeActionResult<C, P, A, K> {
+    ) -> MaybeConsumeResult<C, P, A, K> {
         // println!("\nhit wrap_result");
 
         let cont_result = ContResult {

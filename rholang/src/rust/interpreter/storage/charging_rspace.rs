@@ -21,8 +21,8 @@ use rspace_plus_plus::rspace::{
     errors::RSpaceError,
     hashing::blake2b256_hash::Blake2b256Hash,
     internal::{Datum, Row, WaitingContinuation},
-    rspace_interface::{ContResult, ISpace, MaybeActionResult, RSpaceResult},
-    trace::Log,
+    rspace_interface::{ContResult, ISpace, MaybeConsumeResult, MaybeProduceResult, RSpaceResult},
+    trace::{event::Produce, Log},
     util::unpack_option,
 };
 
@@ -79,7 +79,7 @@ impl ChargingRSpace {
                 persist: bool,
                 peeks: BTreeSet<i32>,
             ) -> Result<
-                MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+                MaybeConsumeResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
                 RSpaceError,
             > {
                 self.cost.charge(storage_cost_consume(
@@ -115,14 +115,17 @@ impl ChargingRSpace {
                 data: ListParWithRandom,
                 persist: bool,
             ) -> Result<
-                MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+                MaybeProduceResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
                 RSpaceError,
             > {
                 self.cost
                     .charge(storage_cost_produce(channel.clone(), data.clone()))?;
                 let produce_res = self.space.produce(channel, data.clone(), persist)?;
+                let common_result = produce_res
+                    .clone()
+                    .map(|(cont, data_list, _)| (cont, data_list));
                 handle_result(
-                    produce_res.clone(),
+                    common_result,
                     TriggeredBy::Produce {
                         id: Blake2b512Random::create_from_bytes(&data.random_state),
                         persistent: persist,
@@ -222,6 +225,14 @@ impl ChargingRSpace {
             fn check_replay_data(&self) -> Result<(), RSpaceError> {
                 self.space.check_replay_data()
             }
+
+            fn is_replay(&self) -> bool {
+                self.space.is_replay()
+            }
+
+            fn update_produce(&mut self, produce: Produce) -> () {
+                self.space.update_produce(produce)
+            }
         }
 
         ChargingRSpace { space, cost }
@@ -229,7 +240,7 @@ impl ChargingRSpace {
 }
 
 fn handle_result(
-    result: MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    result: MaybeConsumeResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
     triggered_by: TriggeredBy,
     cost: _cost,
 ) -> Result<(), InterpreterError> {

@@ -79,7 +79,8 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
         //   println("channel: " + chan)
         // } *>
         continue(
-          unpackOptionWithPeek(produceResult),
+          // unpackOptionWithPeek(produceResult),
+          None,
           produce(chan, data, persistent),
           persistent
         )

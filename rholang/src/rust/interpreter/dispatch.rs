@@ -1,9 +1,9 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::{tagged_continuation::TaggedCont, Par};
-use models::rhoapi::{ListParWithRandom, TaggedContinuation};
+use models::rhoapi::{tagged_continuation::TaggedCont, ListParWithRandom, Par, TaggedContinuation};
+use prost::Message;
 use std::sync::{Arc, RwLock};
 
-use super::system_processes::RhoDispatchMap;
+use super::system_processes::{non_deterministic_ops, RhoDispatchMap};
 use super::{env::Env, errors::InterpreterError, reduce::DebruijnInterpreter, unwrap_option_safe};
 
 pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
@@ -25,12 +25,20 @@ pub struct RholangAndScalaDispatcher {
 
 pub type RhoDispatch = Arc<RwLock<RholangAndScalaDispatcher>>;
 
+pub enum DispatchType {
+    NonDeterministicCall(Vec<Vec<u8>>),
+    DeterministicCall,
+    Skip,
+}
+
 impl RholangAndScalaDispatcher {
     pub async fn dispatch(
         &self,
         continuation: TaggedContinuation,
         data_list: Vec<ListParWithRandom>,
-    ) -> Result<(), InterpreterError> {
+        is_replay: bool,
+        previous_output: Vec<Par>,
+    ) -> Result<DispatchType, InterpreterError> {
         // println!("\ndispatcher dispatch");
         // println!("continuation: {:?}", continuation);
         match continuation.tagged_cont {
@@ -53,9 +61,12 @@ impl RholangAndScalaDispatcher {
                             &env,
                             Blake2b512Random::merge(randoms),
                         )
-                        .await
+                        .await?;
+
+                    Ok(DispatchType::DeterministicCall)
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
+                    let is_non_deterministic = non_deterministic_ops().contains(&_ref);
                     // println!("self {:p}", self);
                     let dispatch_table = &self._dispatch_table.try_read().unwrap();
                     // println!(
@@ -63,7 +74,10 @@ impl RholangAndScalaDispatcher {
                     //     dispatch_table.keys()
                     // );
                     match dispatch_table.get(&_ref) {
-                        Some(f) => Ok(f(data_list).await),
+                        Some(f) => {
+                            let output = f((data_list, is_replay, previous_output)).await?;
+                            RholangAndScalaDispatcher::dispatch_type(is_non_deterministic, output)
+                        }
                         None => Err(InterpreterError::BugFoundError(format!(
                             "dispatch: no function for {}",
                             _ref,
@@ -71,7 +85,20 @@ impl RholangAndScalaDispatcher {
                     }
                 }
             },
-            None => Ok(()),
+            None => Ok(DispatchType::Skip),
+        }
+    }
+
+    fn dispatch_type(
+        is_non_deterministic: bool,
+        output: Vec<Par>,
+    ) -> Result<DispatchType, InterpreterError> {
+        if is_non_deterministic {
+            Ok(DispatchType::NonDeterministicCall(
+                output.iter().map(|p| p.encode_to_vec()).collect(),
+            ))
+        } else {
+            Ok(DispatchType::DeterministicCall)
         }
     }
 }

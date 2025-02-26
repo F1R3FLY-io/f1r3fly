@@ -41,7 +41,9 @@ sealed trait IOEvent extends Event
 final case class Produce private (
     channelsHash: Blake2b256Hash,
     hash: Blake2b256Hash,
-    persistent: Boolean
+    persistent: Boolean,
+    isDeterministic: Boolean = true,
+    outputValue: Seq[Array[Byte]] = Seq.empty
 ) extends IOEvent {
 
   override def equals(obj: scala.Any): Boolean = obj match {
@@ -49,10 +51,13 @@ final case class Produce private (
     case _                => false
   }
 
+  def markAsNonDeterministic(previous: Seq[Array[Byte]]): Produce =
+    copy(isDeterministic = false, outputValue = previous)
+
   override def hashCode(): Int = hash.hashCode() * 47
 
   override def toString: String =
-    s"Produce(channels: ${channelsHash.toString}, hash: ${hash.toString})"
+    s"Produce(channels: ${channelsHash.toString}, hash: ${hash.toString}, isDeterministic: $isDeterministic, outputHash: $outputValue)"
 
 }
 

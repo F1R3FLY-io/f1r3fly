@@ -40,11 +40,20 @@ message RSpaceResultProto {
 }
 
 /**
- * This is the tuple that is returned from the Consume/Produce functions
+ * This is the tuple that is returned from the Consume function
  */
-message ActionResult {
+message ConsumeResult {
   ContResultProto contResult = 1;
   repeated RSpaceResultProto results = 2;
+}
+
+/**
+ * This is the tuple that is returned from the Produce function
+ */
+ message ProduceResult {
+  ContResultProto contResult = 1;
+  repeated RSpaceResultProto results = 2;
+  ProduceProto produce = 3;
 }
 
 /**
@@ -90,6 +99,8 @@ message ProduceProto {
   bytes channelHash = 1;
   bytes hash = 2;
   bool persistent = 3;
+  bool isDeterministic = 4;
+  repeated bytes outputValue = 5;
 }
 
 /**

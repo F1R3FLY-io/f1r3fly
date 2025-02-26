@@ -2,7 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use super::{errors::RSpaceError, rspace_interface::MaybeActionResult};
+use super::{
+    errors::RSpaceError,
+    rspace_interface::{MaybeConsumeResult, MaybeProduceResult},
+};
 
 pub trait Tuplespace<C, P, A, K> {
     /** Searches the store for data matching all the given patterns at the given channels.
@@ -35,7 +38,7 @@ pub trait Tuplespace<C, P, A, K> {
         continuation: K,
         persist: bool,
         peeks: BTreeSet<i32>,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError>;
+    ) -> Result<MaybeConsumeResult<C, P, A, K>, RSpaceError>;
 
     /** Searches the store for a continuation that has patterns that match the given data at the
      * given channel.
@@ -65,7 +68,7 @@ pub trait Tuplespace<C, P, A, K> {
         channel: C,
         data: A,
         persist: bool,
-    ) -> Result<MaybeActionResult<C, P, A, K>, RSpaceError>;
+    ) -> Result<MaybeProduceResult<C, P, A, K>, RSpaceError>;
 
     fn install(
         &mut self,

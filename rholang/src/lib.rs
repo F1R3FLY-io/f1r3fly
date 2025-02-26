@@ -277,6 +277,8 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
                     channel_hash: datum.source.channel_hash.bytes(),
                     hash: datum.source.hash.bytes(),
                     persistent: datum.source.persistent,
+                    is_deterministic: datum.source.is_deterministic,
+                    output_value: datum.source.output_value,
                 }),
             })
             .collect();
@@ -338,6 +340,8 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
                                 channel_hash: produce.channel_hash.bytes(),
                                 hash: produce.hash.bytes(),
                                 persistent: produce.persistent,
+                                is_deterministic: produce.is_deterministic,
+                                output_value: produce.output_value,
                             })
                             .collect()
                     },
@@ -355,6 +359,8 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
                                 channel_hash: key.channel_hash.bytes(),
                                 hash: key.hash.bytes(),
                                 persistent: key.persistent,
+                                is_deterministic: key.is_deterministic,
+                                output_value: key.output_value,
                             };
 
                             produce_counter_map_entries.push(ProduceCounterMapEntry {
@@ -376,6 +382,8 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
                         channel_hash: produce.channel_hash.bytes(),
                         hash: produce.hash.bytes(),
                         persistent: produce.persistent,
+                        is_deterministic: produce.is_deterministic,
+                        output_value: produce.output_value,
                     };
                     EventProto {
                         event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
@@ -415,6 +423,8 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
             channel_hash: key.channel_hash.bytes(),
             hash: key.hash.bytes(),
             persistent: key.persistent,
+            is_deterministic: key.is_deterministic,
+            output_value: key.output_value,
         };
 
         produce_counter_map_entries.push(ProduceCounterMapEntry {
@@ -521,6 +531,8 @@ extern "C" fn revert_to_soft_checkpoint(
                         channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
                         hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                         persistent: produce_proto.persistent,
+                        is_deterministic: produce_proto.is_deterministic,
+                        output_value: produce_proto.output_value,
                     }
                 },
             })
@@ -583,6 +595,8 @@ extern "C" fn revert_to_soft_checkpoint(
                                 ),
                                 hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                                 persistent: produce_proto.persistent,
+                                is_deterministic: produce_proto.is_deterministic,
+                                output_value: produce_proto.output_value,
                             })
                             .collect()
                     },
@@ -605,6 +619,8 @@ extern "C" fn revert_to_soft_checkpoint(
                                     ),
                                     hash: Blake2b256Hash::from_bytes(key_proto.hash),
                                     persistent: key_proto.persistent,
+                                    is_deterministic: key_proto.is_deterministic,
+                                    output_value: key_proto.output_value,
                                 };
 
                                 let value = map_entry.value;
@@ -622,6 +638,8 @@ extern "C" fn revert_to_soft_checkpoint(
                         channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
                         hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                         persistent: produce_proto.persistent,
+                        is_deterministic: produce_proto.is_deterministic,
+                        output_value: produce_proto.output_value,
                     };
                     Event::IoEvent(IOEvent::Produce(produce))
                 }
@@ -652,6 +670,8 @@ extern "C" fn revert_to_soft_checkpoint(
                 channel_hash: Blake2b256Hash::from_bytes(key_proto.channel_hash),
                 hash: Blake2b256Hash::from_bytes(key_proto.hash),
                 persistent: key_proto.persistent,
+                is_deterministic: key_proto.is_deterministic,
+                output_value: key_proto.output_value,
             };
 
             let value = map_entry.value;
@@ -712,6 +732,8 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
                                 channel_hash: produce.channel_hash.bytes(),
                                 hash: produce.hash.bytes(),
                                 persistent: produce.persistent,
+                                is_deterministic: produce.is_deterministic,
+                                output_value: produce.output_value,
                             })
                             .collect()
                     },
@@ -729,6 +751,8 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
                                 channel_hash: key.channel_hash.bytes(),
                                 hash: key.hash.bytes(),
                                 persistent: key.persistent,
+                                is_deterministic: key.is_deterministic,
+                                output_value: key.output_value,
                             };
 
                             produce_counter_map_entries.push(ProduceCounterMapEntry {
@@ -750,6 +774,8 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
                         channel_hash: produce.channel_hash.bytes(),
                         hash: produce.hash.bytes(),
                         persistent: produce.persistent,
+                        is_deterministic: produce.is_deterministic,
+                        output_value: produce.output_value,
                     };
                     EventProto {
                         event_type: Some(event_proto::EventType::IoEvent(IoEventProto {
@@ -873,6 +899,8 @@ extern "C" fn get_data(
                 channel_hash: datum.source.channel_hash.bytes(),
                 hash: datum.source.hash.bytes(),
                 persistent: datum.source.persistent,
+                is_deterministic: datum.source.is_deterministic,
+                output_value: datum.source.output_value,
             }),
         })
         .collect();
@@ -1042,6 +1070,8 @@ extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
                     channel_hash: datum.source.channel_hash.bytes(),
                     hash: datum.source.hash.bytes(),
                     persistent: datum.source.persistent,
+                    is_deterministic: datum.source.is_deterministic,
+                    output_value: datum.source.output_value,
                 }),
             })
             .collect();
@@ -1145,6 +1175,8 @@ extern "C" fn rig(
                                 ),
                                 hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                                 persistent: produce_proto.persistent,
+                                is_deterministic: produce_proto.is_deterministic,
+                                output_value: produce_proto.output_value,
                             })
                             .collect()
                     },
@@ -1167,6 +1199,8 @@ extern "C" fn rig(
                                     ),
                                     hash: Blake2b256Hash::from_bytes(key_proto.hash),
                                     persistent: key_proto.persistent,
+                                    is_deterministic: key_proto.is_deterministic,
+                                    output_value: key_proto.output_value,
                                 };
 
                                 let value = map_entry.value;
@@ -1184,6 +1218,8 @@ extern "C" fn rig(
                         channel_hash: Blake2b256Hash::from_bytes(produce_proto.channel_hash),
                         hash: Blake2b256Hash::from_bytes(produce_proto.hash),
                         persistent: produce_proto.persistent,
+                        is_deterministic: produce_proto.is_deterministic,
+                        output_value: produce_proto.output_value,
                     };
                     Event::IoEvent(IOEvent::Produce(produce))
                 }

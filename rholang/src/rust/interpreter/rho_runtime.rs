@@ -23,9 +23,10 @@ use rspace_plus_plus::rspace::rspace::RSpaceStore;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::trace::Log;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
-use std::collections::{ HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
 
+use crate::rust::interpreter::openai_service::OpenAIService;
 use crate::rust::interpreter::system_processes::{BodyRefs, FixedChannels};
 
 use super::accounting::_cost;
@@ -704,25 +705,73 @@ fn std_rho_crypto_processes() -> Vec<Definition> {
     ]
 }
 
+fn std_rho_ai_processes() -> Vec<Definition> {
+    vec![
+        Definition {
+            urn: "rho:ai:gpt4".to_string(),
+            fixed_channel: FixedChannels::gpt4(),
+            arity: 2,
+            body_ref: BodyRefs::GPT4,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().gpt4(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:ai:dalle3".to_string(),
+            fixed_channel: FixedChannels::dalle3(),
+            arity: 2,
+            body_ref: BodyRefs::DALLE3,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().dalle3(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:ai:textToAudio".to_string(),
+            fixed_channel: FixedChannels::text_to_audio(),
+            arity: 2,
+            body_ref: BodyRefs::TEXT_TO_AUDIO,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().text_to_audio(args).await })
+                })
+            }),
+            remainder: None,
+        },
+    ]
+}
+
 fn dispatch_table_creator(
     space: RhoISpace,
     dispatcher: RhoDispatch,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
+    openai_service: Arc<OpenAIService>,
 ) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
     for def in std_system_processes().iter_mut().chain(
         std_rho_crypto_processes()
             .iter_mut()
+            .chain(std_rho_ai_processes().iter_mut())
             .chain(extra_system_processes.iter_mut()),
     ) {
+        // TODO: Remove cloning every time
         let tuple = def.to_dispatch_table(ProcessContext::create(
             space.clone(),
             dispatcher.clone(),
             block_data.clone(),
             invalid_blocks.clone(),
+            openai_service.clone(),
         ));
 
         dispatch_table.insert(tuple.0, tuple.1);
@@ -772,6 +821,7 @@ fn setup_reducer(
     urn_map: HashMap<String, Par>,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
+    openai_service: Arc<OpenAIService>,
     cost: _cost,
 ) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
@@ -799,6 +849,7 @@ fn setup_reducer(
         block_data_ref,
         invalid_blocks,
         extra_system_processes,
+        openai_service,
     );
 
     dispatcher.try_write().unwrap()._dispatch_table = replay_dispatch_table;
@@ -818,9 +869,11 @@ fn setup_maps_and_refs(
 
     let system_binding = std_system_processes();
     let rho_crypto_binding = std_rho_crypto_processes();
+    let rho_ai_binding = std_rho_ai_processes();
     let combined_processes = system_binding
         .iter()
         .chain(rho_crypto_binding.iter())
+        .chain(rho_ai_binding.iter())
         .chain(extra_system_processes.iter())
         .collect::<Vec<&Definition>>();
 
@@ -862,6 +915,8 @@ where
     let charging_rspace: RhoISpace = Arc::new(Mutex::new(Box::new(
         ChargingRSpace::charging_rspace(rspace, cost.clone()),
     )));
+
+    let openai_service = Arc::new(OpenAIService::new());
     let reducer = setup_reducer(
         charging_rspace,
         block_data_ref.clone(),
@@ -870,6 +925,7 @@ where
         urn_map,
         merge_chs,
         mergeable_tag_name,
+        openai_service,
         cost,
     );
 

@@ -4,21 +4,28 @@ Rholang is a concurrent programming language, with a focus on message-passing an
 
 The language is still in the early stages of development. Currently we have a working interpreter for the language. It should be considered an early preview of the language.
 
-This is a direct port of the `rholang` scala library to Rust. The original scala library code can be found [here](https://github.com/rchain/rchain/tree/dev/rholang).
+This is a direct port of the `rholang` Scala library to Rust. The original Scala library code can be found [here](https://github.com/rchain/rchain/tree/dev/rholang).
 
 ## Development
 
-To build the `rholang` library, run `cargo build --profile dev -p rholang`.
+To build the `rholang` Rust library, run `cargo build --release -p rholang`
+  - `cargo build --profile dev -p rholang` will build the library in debug mode
 
 ### Testing
 
 #### Rust
 
-To run all tests, run `cargo test`.
+To run all tests: `cargo test`
+
+Run all tests in release mode: `cargo test --release`
+
+To run specific test file: `cargo test --test <test_file_name>`
+
+To run specific test in specific folder: `cargo test --test <test_folder_name>::<test_file_name>`
 
 #### Scala
 
-The following tests all use `rholang-rust`:
+The following tests all use `rholang-rust` and must be run at root project directory:
 
 - Run Casper Genesis tests: `sbt "compile ;casper/testOnly coop.rchain.casper.genesis.*"`
 - Run Casper Rholang tests: `sbt ";casper/testOnly coop.rchain.casper.batch1.MultiParentCasperRholangSpec"`

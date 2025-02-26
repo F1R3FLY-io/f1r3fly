@@ -15,6 +15,8 @@ pub enum InterpreterError {
     SyntaxError(String),
     LexerError(String),
     ParserError(String),
+    EncodeError(String),
+    DecodeError(String),
     UnboundVariableRef {
         var_name: String,
         line: usize,
@@ -78,6 +80,11 @@ pub enum InterpreterError {
         col: usize,
     },
     OpenAIError(String),
+    IllegalArgumentError(String),
+}
+
+pub fn illegal_argument_error(method_name: &str) -> InterpreterError {
+    InterpreterError::IllegalArgumentError(format!("Incorrect arguments for {}", method_name))
 }
 
 impl fmt::Display for InterpreterError {
@@ -102,6 +109,10 @@ impl fmt::Display for InterpreterError {
             InterpreterError::LexerError(msg) => write!(f, "Lexer error: {}", msg),
 
             InterpreterError::ParserError(msg) => write!(f, "Parser error: {}", msg),
+
+            InterpreterError::EncodeError(msg) => write!(f, "Encode error: {}", msg),
+
+            InterpreterError::DecodeError(msg) => write!(f, "Decode error: {}", msg),
 
             InterpreterError::UnboundVariableRef {
                 var_name,
@@ -259,6 +270,8 @@ impl fmt::Display for InterpreterError {
             }
 
             InterpreterError::OpenAIError(msg) => write!(f, "OpenAI error: {}", msg),
+
+            InterpreterError::IllegalArgumentError(msg) => write!(f, "Illegal argument: {}", msg),
         }
     }
 }
