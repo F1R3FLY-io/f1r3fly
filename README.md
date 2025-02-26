@@ -118,9 +118,27 @@ java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.secur
 
 - Running: `rm -rf ~/.rnode/` will delete the data directory and ensure a fresh start (performs genesis ceremony).
 
+## Usage
+
+### Evaluating Rholang contracts
+
+Prerequisites: [Running node](#running).
+
+Build node into executable:
+
+```sh
+sbt ";compile ;stage"
+```
+
+Evaluate a contract:
+
+```sh
+./node/target/universal/stage/bin/rnode -Djna.library.path=./rust_libraries/release eval ./rholang/examples/tut-ai.rho
+```
+
 ### F1r3flyFS
 
-Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs) project for a simple, easy-to-use, and fast file system built on top of F1r3fly.
+Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) project for a simple, easy-to-use, and fast file system built on top of F1r3fly.
 
 
 <!-- Docker will be used in the examples port portability reasons, but running the
