@@ -1,46 +1,38 @@
 // See casper/src/test/scala/coop/rchain/casper/util/rholang/RuntimeSpec.scala
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
+use casper::rust::util::rholang::runtime_manager;
+use casper::rust::{genesis::genesis::Genesis, rholang::runtime_syntax::RuntimeOps};
 use rholang::rust::interpreter::{
-    matcher::r#match::Matcher,
-    rho_runtime::{bootstrap_registry, create_rho_runtime, RhoRuntime, RhoRuntimeImpl},
+    matcher::r#match::Matcher, rho_runtime::create_runtime_from_kv_store,
 };
 use rspace_plus_plus::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
-    history::instances::radix_history::RadixHistory,
-    rspace::RSpace,
     shared::{
         in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
     },
 };
 
-fn empty_state_hash_fixed() -> String {
-    "Blake2b256Hash(cb75e7f94e8eac21f95c524a07590f2583fbdaba6fb59291cf52fa16a14c784d)".to_string()
-}
-
-async fn empty_state_hash_from_runtime(runtime: Arc<Mutex<RhoRuntimeImpl>>) -> Blake2b256Hash {
-    let mut runtime_lock = runtime.lock().unwrap();
-    let _ = runtime_lock.reset(RadixHistory::empty_root_node_hash());
-    drop(runtime_lock);
-    let _ = bootstrap_registry(runtime.clone()).await;
-
-    let mut runtime_lock = runtime.lock().unwrap();
-    let checkpoint = runtime_lock.create_checkpoint();
-    checkpoint.root
-}
-
 #[tokio::test]
 async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
     let mut kvm = InMemoryStoreManager::new();
     let store = kvm.r_space_stores().await.unwrap();
-    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-        RSpace::create(store, Arc::new(Box::new(Matcher))).unwrap();
-    let runtime = create_rho_runtime(space, Par::default(), false, &mut Vec::new()).await;
+    let runtime = create_runtime_from_kv_store(
+        store,
+        Genesis::non_negative_mergeable_tag_name(),
+        false,
+        &mut Vec::new(),
+        Arc::new(Box::new(Matcher)),
+    )
+    .await;
+    let runtime_ops = RuntimeOps::new(runtime);
 
-    assert_eq!(
-        empty_state_hash_fixed(),
-        empty_state_hash_from_runtime(runtime).await.to_string()
-    );
+    let hard_coded_hash = runtime_manager::empty_state_hash_fixed();
+    let empty_root_hash = runtime_ops.empty_state_hash().await.unwrap();
+
+    let empty_hash_hard_coded = Blake2b256Hash::from_bytes(hard_coded_hash.to_vec());
+    let empty_hash = Blake2b256Hash::from_bytes(empty_root_hash.to_vec());
+
+    assert_eq!(empty_hash_hard_coded, empty_hash);
 }

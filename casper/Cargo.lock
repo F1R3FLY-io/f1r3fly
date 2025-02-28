@@ -289,9 +289,13 @@ name = "casper"
 version = "0.1.0"
 dependencies = [
  "crypto",
+ "hex",
+ "lazy_static",
  "models",
+ "prost",
  "rholang",
  "rspace_plus_plus",
+ "shared",
  "tokio",
 ]
 
