@@ -571,7 +571,8 @@ object RadixTree {
       def cacheMiss =
         for {
           storeNodeOpt <- loadNodeFromStore(nodePtr)
-          _            = storeNodeOpt.map(cacheR.update(nodePtr, _)).getOrElse(errorMsg())
+          // _            = println("\nstoreNode in loadNode: " + storeNodeOpt)
+          _ = storeNodeOpt.map(cacheR.update(nodePtr, _)).getOrElse(errorMsg())
         } yield storeNodeOpt.getOrElse(emptyNode)
       for {
         cacheNodeOpt <- Sync[F].delay(cacheR.get(nodePtr))
@@ -621,16 +622,25 @@ object RadixTree {
           s"${collisions.length} collisions in KVDB (first collision with key = ${collisions.head._1.toHex})."
         ).raiseError
       for {
-        kvPairs           <- Sync[F].delay(cacheW.toList)
-        ifAbsent          <- store.contains(kvPairs.map(_._1))
-        kvIfAbsent        = kvPairs zip ifAbsent
-        kvExist           = kvIfAbsent.filter(_._2).map(_._1)
+        kvPairs <- Sync[F].delay(cacheW.toList)
+        // _                 = println("\nnew commit calll")
+        // _                 = println("\ncacheW: " + cacheW)
+        // _          = println("\nkvPairs: " + kvPairs)
+        storeMap <- store.toMap
+        // _          = println("\nstore: " + storeMap)
+        ifAbsent <- store.contains(kvPairs.map(_._1))
+        // _          = println("\nifAbsent: " + ifAbsent)
+        kvIfAbsent = kvPairs zip ifAbsent
+        // _          = println("\nkvIfAbsent: " + kvIfAbsent)
+        kvExist = kvIfAbsent.filter(_._2).map(_._1)
+        // _                 = println("\nkvExist: " + kvExist)
         valueExistInStore <- store.get(kvExist.map(_._1))
-        kvvExist          = kvExist zip valueExistInStore.map(_.getOrElse(ByteVector.empty))
-        kvCollision       = kvvExist.filter(kvv => !(kvv._1._2 == kvv._2)).map(_._1)
-        _                 <- if (kvCollision.nonEmpty) collisionException(kvCollision) else ().pure
-        kvAbsent          = kvIfAbsent.filterNot(_._2).map(_._1)
-        _                 <- store.put(kvAbsent)
+        // _                 = println("\nvalueExistInStore: " + valueExistInStore)
+        kvvExist    = kvExist zip valueExistInStore.map(_.getOrElse(ByteVector.empty))
+        kvCollision = kvvExist.filter(kvv => !(kvv._1._2 == kvv._2)).map(_._1)
+        _           <- if (kvCollision.nonEmpty) collisionException(kvCollision) else ().pure
+        kvAbsent    = kvIfAbsent.filterNot(_._2).map(_._1)
+        _           <- store.put(kvAbsent)
       } yield ()
     }
 
@@ -661,6 +671,10 @@ object RadixTree {
                 else Option.empty[ByteVector].asRight[Params].pure                        // Not found
             }
         }
+
+      // println("\nstartNode: " + startNode)
+      // println("\nstartPrefix: " + startPrefix)
+
       (startNode, startPrefix).tailRecM(loop)
     }
 
@@ -766,6 +780,7 @@ object RadixTree {
               val newNode = emptyNode
                 .updated(byteToInt(leafPrefixRest.head), Leaf(leafPrefixRest.tail, leafValue))
                 .updated(byteToInt(insPrefixRest.head), Leaf(insPrefixRest.tail, insValue))
+              // println("\nnewNode in update: " + newNode.length)
               saveNodeAndCreateItem(newNode, commPrefix, compaction = false).some.pure
             }
 
@@ -839,6 +854,7 @@ object RadixTree {
                       case InsertAction(key, hash) => update(item, ByteVector(key).tail, hash.bytes)
                       case DeleteAction(key)       => delete(item, ByteVector(key).tail)
                     }
+          // _ = println("\nhit processOneAction")
         } yield (itemIdx, newItem)
 
       def clearingDeleteActions(actions: List[HistoryAction], item: Item) = {
@@ -855,9 +871,14 @@ object RadixTree {
       def processNonEmptyActions(actions: List[HistoryAction], itemIdx: Int) =
         for {
           createdNode <- constructNodeFromItem(curNode(itemIdx))
-          newActions  = trimKeys(actions)
-          newNodeOpt  <- makeActions(createdNode, newActions)
-          newItem     = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
+          // _           = println("\ncreatedNode in processNonEmptyActions: " + createdNode)
+          // _ = println("\ncurrNode: " + curNode)
+          // _          = println("\nitemIdx: " + itemIdx)
+          newActions = trimKeys(actions)
+          newNodeOpt <- makeActions(createdNode, newActions)
+          // _          = println("\nnewNodeOpt in processNonEmptyActions: " + newNodeOpt.get.length)
+          newItem = newNodeOpt.map(saveNodeAndCreateItem(_, ByteVector.empty))
+          // _          = println("\nnewItem: " + newItem)
         } yield (itemIdx, newItem)
 
       // If we have more than 1 action. We can create more parallel processes.
@@ -895,8 +916,12 @@ object RadixTree {
       for {
         // Group the actions by the first byte of the prefix.
         groupedActions <- Sync[F].delay(grouping(actions))
+        // _              = println("\ngroupedActions: " + groupedActions)
         // Process actions within each group.
         newGroupItems <- processGroupedActions(groupedActions, curNode).parSequence
+        // newGroupItems <- Sync[F].delay(processGroupedActions(groupedActions, curNode))
+
+        // _ = println("\nnewGroupItems: " + newGroupItems)
         // Update all changed items in current node.
         newCurNode = newGroupItems.foldLeft(curNode) {
           case (tempNode, (index, newItemOpt)) =>

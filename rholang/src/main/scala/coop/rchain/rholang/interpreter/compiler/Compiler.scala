@@ -9,6 +9,8 @@ import coop.rchain.models.rholang.sorter.Sortable
 import coop.rchain.rholang.ast.rholang_mercury.Absyn.Proc
 import coop.rchain.rholang.ast.rholang_mercury.{parser, Yylex}
 import coop.rchain.rholang.interpreter.errors._
+import java.io.BufferedReader
+import java.io.StringReader
 
 import java.io.{Reader, StringReader}
 
@@ -42,6 +44,18 @@ object Compiler {
   def apply[F[_]](implicit compiler: Compiler[F]): Compiler[F] = compiler
 
   implicit def parBuilder[F[_]](implicit F: Sync[F]): Compiler[F] = new Compiler[F] {
+
+    // def sourceToADT(reader: Reader, normalizerEnv: Map[String, Par]): F[Par] = {
+    //   val content = new BufferedReader(reader).lines().toArray().mkString("\n")
+    //   // println(s"Starting sourceToADT function content: \n$content")
+    //   for {
+    //     proc <- sourceToAST(new StringReader(content))
+    //     par  <- astToADT(proc, normalizerEnv)
+    //   } yield {
+    //     // println("Completed sourceToADT function.")
+    //     par
+    //   }
+    // }
 
     def sourceToADT(reader: Reader, normalizerEnv: Map[String, Par]): F[Par] =
       for {

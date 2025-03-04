@@ -1,78 +1,27 @@
-use rspace_plus_plus::{rtypes::rtypes::OptionResult, setup::Setup};
+// use blake2::{digest::consts::U32, Blake2b, Digest};
+// use hex::ToHex;
+use rspace_plus_plus::rspace::{
+    hashing::blake2b256_hash::Blake2b256Hash,
+    history::radix_tree::{empty_node, hash_node},
+};
 use std::error::Error;
 
-mod diskconc;
-mod diskseq;
-mod memconc;
-mod memseq;
-mod rtypes;
-
-fn run_k(ks: Vec<OptionResult>) {
-    for k in ks {
-        println!(
-            "\nRunning continuation for {:?}...",
-            k.data.unwrap().name.unwrap()
-        );
-
-        println!("\n{:?}", k.continuation);
-    }
-}
+// fn blake2b256_hash(data: &[u8]) -> Vec<u8> {
+//     let mut hasher = Blake2b::<U32>::new();
+//     hasher.update(b"hello world");
+//     let hash = hasher.finalize();
+//     hash.to_vec()
+// }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let setup = Setup::new();
-    let rspace = setup.rspace;
+    // let node_bytes = encode(&empty_node());
 
-    println!("\n**** Example 1 ****");
+    // let hash = blake2b256_hash(&node_bytes);
+    // let hex_hash = hash.encode_hex::<String>();
 
-    let commit1 = Setup::create_commit(
-        vec![String::from("friends")],
-        vec![setup.city_match_case],
-        String::from("I am the continuation, for now..."),
-    );
-    let _cres1 = rspace.put_once_durable_sequential(commit1);
+    let (node_hash_bytes, _node_bytes) = hash_node(&empty_node());
 
-    let _ = rspace.print_store("friends");
-
-    let retrieve1 = Setup::create_retrieve(
-        String::from("friends"),
-        setup.alice.clone(),
-        Setup::get_city_field(setup.alice),
-    );
-    let pres1 = rspace.get_once_durable_sequential(retrieve1);
-    if pres1.is_some() {
-        run_k(vec![pres1.unwrap()]);
-    }
-    let _ = rspace.print_store("friends");
-
-    println!("\n**** Example 2 ****");
-
-    let retrieve2 = Setup::create_retrieve(
-        String::from("colleagues"),
-        setup.dan.clone(),
-        Setup::get_state_field(setup.dan),
-    );
-    let _pres2 = rspace.get_once_durable_concurrent(retrieve2);
-
-    let retrieve3 = Setup::create_retrieve(
-        String::from("friends"),
-        setup.bob.clone(),
-        Setup::get_state_field(setup.bob),
-    );
-    let _pres3 = rspace.get_once_durable_concurrent(retrieve3);
-
-    let commit2 = Setup::create_commit(
-        vec![String::from("friends"), String::from("colleagues")],
-        vec![setup.state_match_case.clone(), setup.state_match_case],
-        String::from("I am the continuation, for now..."),
-    );
-    let cres2 = rspace.put_once_durable_concurrent(commit2);
-    if cres2.is_some() {
-        run_k(cres2.unwrap());
-    }
-    let _ = rspace.print_store("friends");
-
-    let _ = rspace.clear_store();
-    assert!(rspace.is_empty());
+    println!("\nNode Hash: {}", Blake2b256Hash::from_bytes(node_hash_bytes));
 
     Ok(())
 }

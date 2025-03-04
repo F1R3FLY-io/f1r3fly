@@ -22,7 +22,6 @@ final case class NodeConf(
     metrics: Metrics,
     devMode: Boolean,
     dev: DevConf,
-    rspacePlusPlus: Boolean,
     // This field is dynamic and computed according to profile and is not used directly in client code.
     // But it is required in the model because of how Pureconfig works and how config file is structured (there are
     // references to this key in `defaults.conf`).
@@ -99,8 +98,9 @@ final case class DevConf(
 )
 
 sealed trait Command
-final case class Eval(files: List[String], printUnmatchedSendsOnly: Boolean) extends Command
-final case object Repl                                                       extends Command
+final case class Eval(files: List[String], printUnmatchedSendsOnly: Boolean, language: String)
+    extends Command
+final case object Repl extends Command
 final case class Deploy(
     phloLimit: Long,
     phloPrice: Long,

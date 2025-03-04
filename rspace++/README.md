@@ -1,61 +1,82 @@
-## Notes: Rust + Scala
+# RSpace++
 
-- Using `jna`, `prost`, `heed`, `dashmap`
+On branch `rhotypes` using `nix` and `direnv`
 
 ## Quickstart
 
-1. `cd rspace++` & run `cargo build && cargo build --release`
-2. `cd ..` to be in root directory and run `sbt rspacePlusPlus/run`. &nbsp; `rspacePlusPlus/run` if already in sbt shell
-3. Run Scala tests: In root directory run `sbt rspacePlusPlus/test`. &nbsp; `rspacePlusPlus/test` if already in sbt shell
+- For setting up `nix` and `direnv`, see [project overview](../docs/paul_brain_dump.md)
+- Make sure you have [protobuf](https://grpc.io/docs/protoc-installation/) installed
 
-## Scala
+Starting standalone node using RSpace++
+1. `sbt ";clean ;compile ;stage"`
+2. `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release  run --standalone` in one terminal
+3. In a another terminal, execute rholang: `./node/target/universal/stage/bin/rnode -Djna.library.path=./rspace++/target/release eval rholang/examples/stdout.rho`
 
-- Run `sbt rspacePlusPlus/run` to run `example.scala` file in `rspace++/src/main/scala`
-- Run `sbt rsapcePlusPlus/compile` to compile rspace++ subproject. Build corresponding `.proto` file for Scala. Outputs to `rspace++/target/scala-2.12/src_managed/`
-  
-- `scalac <path_to_file>` to compile scala package. Ex: `scalac rspace++/src/main/scala/package.scala` - creates `rspacePlusPlus` directory at root
-- `scala <path_to_file>` to run scala file. Ex: `scala rspace++/src/main/scala/example.scala`
+Standing up network using RSpace++
+1. `sbt ";clean ;compile ;project node ;assembly"`
+2. `java -Djna.library.path=./rspace++/target/release/ --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upn`
+3. (Optional) Run this command to ensure node performs genesis ceremony: `rm -rf ~/.rnode/casperbuffer/ ~/.rnode/dagstorage/ ~/.rnode/deploystorage/ ~/.rnode/blockstorage/ ~/.rnode/rnode.log ~/.rnode/rspace++/`
 
-- Added CLI arg called `rspace-plus-plus`. When called, like `rnode run --standalone --rspace-plus-plus`, prints message that says using rspace++. When not provided, defaults to using rspace.
+Standing up network using RSpace++ (Under Docker)
+1. `sbt ";clean ;compile ;project node ;Docker/publishLocal"` (Currently not working within Nix shell)
+2. `docker compose -f docker/shard.yml up`
 
-- `sbt <project_name>/<command>` to compile, stage, run, clean single project. For example: `node/compile node/stage` will compile and stage only node project directory.
+### Working Rholang Contracts using RSpace++ (under standalone node)
 
-- `sbt compile` will compile entire project, also builds Rust library in `rspace++/target/release/`. This is where JNA pulls library 
+I have classified these as "working" if the output and deployment cost matches that of the old RSpace code.
 
-- Integrating new rspace++ into rnode setup, I think, will happen in `node/src/main/scala/coop/rchain/node/runtime/Setup.scala`
+- `block-data.rho`
+- `dupe.rho`
+- `hello_world_again.rho`
+- `longfast.rho`
+- `longslow.rho`
+- `shortfast.rho`
+- `shortslow.rho`
+- `stderr.rho`
+- `stderrAck.rho`
+- `stdout.rho`
+- `stdoutAck.rho`
+- `tut-bytearray-methods.rho`
+- `tut-hash-functions.rho`
+- `tut-hello-again.rho`
+- `tut-hello.rho`
+- `tut-lists-methods.rho`
+- `tut-maps-methods.rho`
+- `tut-parens.rho`
+- `tut-philosophers.rho`
+- `tut-prime.rho`
+- `tut-rcon-or.rho`
+- `tut-rcon.rho`
+- `tut-registry.rho` (Apparently this doesn't work with the old RSpace code)
+- `tut-sets-methods.rho`
+- `tut-strings-methods.rho`
+- `tut-tuples-methods.rho`
 
-- `scalafmt <file_path>` to format `.scala` file
+### Testing Scala (using RSpace++)
+
+- Run Rholang Reduce tests: `sbt "rholang/testOnly coop.rchain.rholang.interpreter.ReduceSpec"`
+- Run basic RSpace-Bench Benchmark: `sbt "rspaceBench/jmh:run -i 10 -wi 10 -f1 -t1 .BasicBench."`
+- Run Casper Genesis tests: `sbt "casper/testOnly coop.rchain.casper.genesis.GenesisTest"`
+
+### Testing Rust (within rspace++ directory)
+
+Run all tests: `cargo test`
+
+- Run Spatial Matcher Tests: `cargo test matcher::match_test -- --test-threads=1`
+- Run Storage Actions Tests: `cargo test --test storage_actions_test`
+- Run History Action Tests: `cargo test history::history_action_tests`
+- Run History Repository Tests: `cargo test history::history_repository_tests`
+
+(`--test-threads=1` runs them sequentially)<br>
+(`--nocapture` prints output during tests)
+
+Run Scala tests for calling Rust functions (from root directory): `sbt "rspacePlusPlus/testOnly"`
+
+## Scala and Rust Notes
+
+- Using Scala: `jna`; Rust: `prost`, `heed`, `dashmap`, `blake3`, `serde`. See `Cargo.toml` for complete list of crates.
 
 ## Rust
 
-- Run sample code: `cargo run` within `rspace++` directory
-- `rustc <path_to_file>` to compile single rust file
-- `cargo build --release` to build `rspace_plus_plus` library. Outputs to `rspace++/target/release/`. Scala code pulls from here.
-- `cargo build` to build corresponding `.proto` file for Rust. Outputs to `rspace++/target/debug/`
+- Within rspace++ directory, `cargo build --release -p rspace_plus_plus_rhotypes` to build `rspace_plus_plus` library. Outputs to `rspace++/target/release/`. Scala code pulls from here.
 
-<br>
-
-- Run tests sequentially: `cargo test -- --test-threads=1` within `rspace++` directory.
-- Run specific test file sequentially: `cargo test --test my_test_file -- --test-threads=1` within `rspace++` directory.
-- `cargo test --test my_test_file -- --test-threads=1` tests all the functions in a single file
-
-## Backlog
-
-1. Wire in RSpace++ into existing RSpace and Rholang tests
-2. Handle continuation data type. Currently string. See RhoTypes.proto. See original code and tutorial. Talk to Greg
-3. Revist core database code and reduce cloning? Utilize references?
-4. Re-implement concurrency and sequential testing in `rspace_test.rs` 
-5. `space_print` function in `lib.rs` should not require channel parameter
-6. Create proto message and function to handle rholang processes
-7. Add changelog. See `changelog` branch
-8. Remove console logs throughout database code?
-9. Implement common syntax for all crate imports
-
-## Completed
-
-- Rename cityMatchCase to getCityField and cityPattern to cityMatchCase (plus other two cases)
-- Refactor "Setup" code in Rust test files to be one shared file throughout
-- Create convenient name schema for proto messages throught Rust, Scala and test code
-- Optimize loops marked with TODO: in memory databases
-- Get working correct return types from Rust functions in Scala
-- Rewrite Rust rspace unit tests to match current API

@@ -32,6 +32,8 @@ import org.scalatest.{AppendedClues, Assertion, FlatSpec, Matchers}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with AppendedClues {
 
   private[this] def evaluateWithCostLog(
@@ -44,9 +46,10 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val kvm                       = InMemoryStoreManager[Task]
 
     val resources = for {
-      costLog         <- costLog[Task]()
-      store           <- kvm.rSpaceStores
-      spaces          <- createRuntimesWithCostLog[Task](store, costLog)
+      costLog <- costLog[Task]()
+      // store           <- kvm.rSpaceStores
+      // spaces          <- createRuntimesWithCostLog[Task](store, costLog)
+      spaces          <- createRuntimesWithCostLog[Task]("./cost-accounting-spec-", costLog)
       (runtime, _, _) = spaces
     } yield (runtime, costLog)
 
@@ -61,19 +64,24 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
   }
 
   private def createRuntimesWithCostLog[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
-      stores: RSpaceStore[F],
+      // stores: RSpaceStore[F],
+      storePath: String,
       costLog: FunctorTell[F, Chain[Cost]],
       initRegistry: Boolean = false,
       additionalSystemProcesses: Seq[Definition[F]] = Seq.empty
   ): F[(RhoRuntime[F], ReplayRhoRuntime[F], RhoHistoryRepository[F])] = {
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // implicit val m: Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     // TODO: Shadows global (dummy) implicit which should be removed.
     implicit val noOpCostLog: FunctorTell[F, Chain[Cost]] = costLog
     for {
-      hrstores <- RSpace
+      // hrstores <- RSpace
+      //              .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
+      //                stores
+      //              )
+      hrstores <- RSpacePlusPlus_RhoTypes
                    .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](
-                     stores
+                     storePath
                    )
       (space, replay) = hrstores
       rhoRuntime <- RhoRuntime
@@ -99,10 +107,11 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val kvm                       = InMemoryStoreManager[Task]
 
     val evaluaResult = for {
-      costLog                     <- costLog[Task]()
-      cost                        <- CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms)
-      store                       <- kvm.rSpaceStores
-      spaces                      <- Resources.createRuntimes[Task](store)
+      costLog <- costLog[Task]()
+      cost    <- CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms)
+      // store                    <- kvm.rSpaceStores
+      // spaces                   <- Resources.createRuntimes[Task](store)
+      spaces                      <- Resources.createRuntimes[Task]("cost-accounting-spec-")
       (runtime, replayRuntime, _) = spaces
       result <- {
         implicit def rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])

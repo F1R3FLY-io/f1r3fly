@@ -35,6 +35,7 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       newHistory      <- emptyHistory.process(data)
       historyOneReset <- emptyHistory.reset(newHistory.root)
       readValue       <- historyOneReset.read(_zeros)
+      _               = println("\ninsert bytes: " + data.head.hash.bytes.some)
       _               = readValue shouldBe data.head.hash.bytes.some
     } yield ()
   }
@@ -161,14 +162,15 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
       val deleteOneAndTwo = deleteOne ::: deleteTwo
 
       for {
-        emptyHistory <- emptyHistoryF
-
+        emptyHistory     <- emptyHistoryF
         historyOne       <- emptyHistory.process(insertOne)
         historyTwo       <- emptyHistory.process(insertTwo)
         historyOneAndTwo <- emptyHistory.process(insertOneAndTwo)
 
         historyOneAndTwoAnotherWay <- historyOne.process(insertTwo)
-        _                          = historyOneAndTwo.root shouldBe historyOneAndTwoAnotherWay.root
+        historyOneAndTwo           <- emptyHistory.process(insertOneAndTwo)
+
+        _ = historyOneAndTwo.root shouldBe historyOneAndTwoAnotherWay.root
 
         historyOneAnotherWay <- historyOneAndTwo.process(deleteTwo)
         _                    = historyOne.root shouldBe historyOneAnotherWay.root
@@ -197,6 +199,7 @@ class HistoryActionTests extends FlatSpec with Matchers with InMemoryHistoryTest
         _                = historyOneSize shouldBe historyTwoSize
       } yield ()
   }
+
 // TODO: Don't works for MergingHistory
   "collision detecting in KVDB" should "works" in withEmptyHistoryAndStore {
     (emptyHistoryF, inMemoStore) =>
