@@ -418,6 +418,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 name = "crypto"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "blake2",
  "byteorder",
  "ed25519-dalek",
@@ -426,6 +427,7 @@ dependencies = [
  "num-bigint",
  "rand",
  "rand_core",
+ "serde",
  "sha2",
  "tiny-keccak",
  "typenum",
@@ -1443,6 +1445,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "prost",
+ "rspace_plus_plus",
  "serde",
  "tonic",
  "tonic-build",
@@ -2073,7 +2076,6 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "log",
- "models",
  "monadic",
  "multiset",
  "once_cell",

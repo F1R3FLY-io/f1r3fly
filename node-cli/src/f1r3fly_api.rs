@@ -51,7 +51,8 @@ impl<'a> F1r3flyApi<'a> {
         self.sign_deploy(&mut deployment)?;
 
         let mut deploy_service_client =
-            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port)).await?;
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
 
         let deploy_response = deploy_service_client.do_deploy(deployment).await?;
         let deploy_message: &DeployResponseMessage = deploy_response
@@ -156,8 +157,9 @@ impl<'a> F1r3flyApi<'a> {
         let pub_key = secp256k1.to_public(&self.signing_key);
 
         deploy.sig_algorithm = "secp256k1".to_string();
-        deploy.sig = signature;
-        deploy.deployer = pub_key.bytes;
+        // TODO: Remove into() once models crate is updated
+        deploy.sig = signature.into();
+        deploy.deployer = pub_key.bytes.into();
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use models::ByteVector;
+use crate::ByteVector;
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPoolBuilder,

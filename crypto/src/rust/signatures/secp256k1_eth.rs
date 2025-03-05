@@ -7,6 +7,12 @@ use num_bigint::BigUint;
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Secp256k1Eth.scala
 pub struct Secp256k1Eth;
 
+impl Secp256k1Eth {
+    pub fn name() -> String {
+        format!("{}:eth", Secp256k1::name())
+    }
+}
+
 //TODO need review
 impl SignaturesAlg for Secp256k1Eth {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {

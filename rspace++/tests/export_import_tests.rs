@@ -1,4 +1,4 @@
-use models::{Byte, ByteVector};
+use rspace_plus_plus::{Byte, ByteVector};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store::HotStoreInstances;
@@ -6,7 +6,6 @@ use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use rspace_plus_plus::rspace::{
     history::history_repository::HistoryRepositoryInstances,
     hot_store::HotStoreState,
@@ -60,7 +59,8 @@ async fn export_and_import_of_one_page_should_works_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        let res = space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        assert!(res.is_ok());
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -100,13 +100,14 @@ async fn export_and_import_of_one_page_should_works_correctly() {
 
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
-        space2.consume(
+        let res = space2.consume(
             vec![format!("ch{}", i)],
             pattern.clone(),
             continuation.clone(),
             false,
             BTreeSet::new(),
         );
+        assert!(res.is_ok());
     }
 
     // println!("\nspace2: {:?}", space2.to_map());
@@ -180,7 +181,8 @@ async fn multipage_export_should_work_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        let res = space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        assert!(res.is_ok());
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -214,13 +216,14 @@ async fn multipage_export_should_work_correctly() {
 
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
-        space2.consume(
+        let res = space2.consume(
             vec![format!("ch{}", i)],
             pattern.clone(),
             continuation.clone(),
             false,
             BTreeSet::new(),
         );
+        assert!(res.is_ok());
     }
     let end_point = space2.create_checkpoint().unwrap();
     assert_eq!(end_point.root, RadixHistory::empty_root_node_hash())
@@ -294,7 +297,8 @@ async fn multipage_export_with_skip_should_work_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        let res = space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        assert!(res.is_ok());
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -328,13 +332,14 @@ async fn multipage_export_with_skip_should_work_correctly() {
 
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
-        space2.consume(
+        let res = space2.consume(
             vec![format!("ch{}", i)],
             pattern.clone(),
             continuation.clone(),
             false,
             BTreeSet::new(),
         );
+        assert!(res.is_ok());
     }
     let end_point = space2.create_checkpoint().unwrap();
     assert_eq!(end_point.root, RadixHistory::empty_root_node_hash())

@@ -1,3 +1,7 @@
+// See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
+
+use crate::Byte;
+use crate::ByteVector;
 use crate::rspace::errors::RadixTreeError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::Either;
@@ -5,8 +9,6 @@ use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use dashmap::DashMap;
 use itertools::Itertools;
-use models::Byte;
-use models::ByteVector;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -17,7 +19,6 @@ use super::history_action::DeleteAction;
 use super::history_action::HistoryAction;
 use super::history_action::InsertAction;
 
-// See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub enum Item {
     EmptyItem,
@@ -1066,7 +1067,7 @@ impl RadixTreeImpl {
 
         let kv_collision: Vec<(ByteVector, ByteVector)> = kvv_exist
             .into_iter()
-            .filter(|kvv| !(kvv.0 .1 == kvv.1))
+            .filter(|kvv| !(kvv.0.1 == kvv.1))
             .map(|(kv, _)| kv)
             .collect();
 
@@ -1650,7 +1651,7 @@ impl RadixTreeImpl {
                         return Err(RadixTreeError::PrefixError(
                             "The length of all prefixes in the subtree must be the same."
                                 .to_string(),
-                        ))
+                        ));
                     }
                 };
                 groups

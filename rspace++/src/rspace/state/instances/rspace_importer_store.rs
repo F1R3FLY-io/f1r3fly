@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use models::ByteVector;
+use crate::ByteVector;
 
 use crate::rspace::{
     history::roots_store::{RootsStore, RootsStoreInstances},

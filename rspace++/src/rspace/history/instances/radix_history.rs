@@ -1,18 +1,18 @@
-use models::ByteVector;
+// See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
 
+use crate::ByteVector;
 use crate::rspace::errors::HistoryError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::history::History;
 use crate::rspace::history::history_action::HistoryAction;
 use crate::rspace::history::history_action::HistoryActionTrait;
 use crate::rspace::history::radix_tree::empty_node;
-use crate::rspace::history::radix_tree::{hash_node, Node, RadixTreeImpl};
+use crate::rspace::history::radix_tree::{Node, RadixTreeImpl, hash_node};
 use crate::rspace::shared::key_value_store::KeyValueStore;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-// See rspace/src/main/scala/coop/rchain/rspace/history/instances/RadixHistory.scala
 pub struct RadixHistory {
     root_hash: Blake2b256Hash,
     root_node: Node,

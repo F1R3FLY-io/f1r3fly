@@ -15,6 +15,12 @@ use rand::rngs::OsRng;
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Secp256k1.scala
 pub struct Secp256k1;
 
+impl Secp256k1 {
+    pub fn name() -> String {
+        "secp256k1".to_string()
+    }
+}
+
 // TODO: Remove self in these methods
 impl SignaturesAlg for Secp256k1 {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {

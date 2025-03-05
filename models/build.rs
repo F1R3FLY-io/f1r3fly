@@ -10,12 +10,13 @@ fn main() {
         .build_client(true)
         .build_server(false)
         .btree_map(&["."])
-        .message_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .message_attribute(".rhoapi", "#[derive(serde::Serialize, serde::Deserialize)]")
         .message_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")
         .message_attribute(".rhoapi", "#[repr(C)]")
-        .enum_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .enum_attribute(".rhoapi", "#[derive(serde::Serialize, serde::Deserialize)]")
         .enum_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")
         .enum_attribute(".rhoapi", "#[repr(C)]")
+        .bytes(&[".casper"])
         .compile_protos(
             &[
                 "CasperMessage.proto",

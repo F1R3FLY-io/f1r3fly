@@ -1,11 +1,76 @@
-use crate::rust::public_key::PublicKey;
+use crate::rust::{
+    hash::{blake2b256::Blake2b256, keccak256::Keccak256},
+    private_key::PrivateKey,
+    public_key::PublicKey,
+};
 
-use super::signatures_alg::SignaturesAlg;
+use super::{secp256k1_eth::Secp256k1Eth, signatures_alg::SignaturesAlg};
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Signed.scala
 pub struct Signed<A> {
     pub data: A,
     pub pk: PublicKey,
-    pub sig: Vec<u8>, // Type ByteString
+    pub sig: Vec<u8>, // TODO: Convert to ByteString
     pub sig_algorithm: Box<dyn SignaturesAlg>,
+}
+
+impl<A: serde::Serialize> Signed<A> {
+    pub fn create(
+        data: A,
+        sig_algorithm: Box<dyn SignaturesAlg>,
+        sk: PrivateKey,
+    ) -> Result<Self, String> {
+        let serialized_data =
+            bincode::serialize(&data).map_err(|e| format!("Failed to serialize data: {}", e))?;
+        let hash = Signed::<A>::signature_hash(&sig_algorithm.name(), serialized_data);
+        let sig = sig_algorithm.sign(&hash, &sk.bytes);
+
+        Ok(Self {
+            data,
+            pk: sig_algorithm.to_public(&sk),
+            sig,
+            sig_algorithm,
+        })
+    }
+
+    pub fn from_signed_data(
+        data: A,
+        pk: PublicKey,
+        sig: Vec<u8>,
+        sig_algorithm: Box<dyn SignaturesAlg>,
+    ) -> Result<Option<Self>, String> {
+        let serialized_data =
+            bincode::serialize(&data).map_err(|e| format!("Failed to serialize data: {}", e))?;
+        let hash = Signed::<A>::signature_hash(&sig_algorithm.name(), serialized_data);
+
+        if sig_algorithm.verify(&hash, &sig, &pk.bytes) {
+            Ok(Some(Self {
+                data,
+                pk,
+                sig,
+                sig_algorithm,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn signature_hash(sig_alg_name: &str, serialized_data: Vec<u8>) -> Vec<u8> {
+        match sig_alg_name {
+            name if name == Secp256k1Eth::name() => {
+                let prefix = Signed::<A>::eth_prefix(serialized_data.len());
+                let mut combined = prefix;
+                combined.extend(serialized_data);
+                Keccak256::hash(combined)
+            }
+
+            _ => Blake2b256::hash(serialized_data),
+        }
+    }
+
+    fn eth_prefix(msg_length: usize) -> Vec<u8> {
+        format!("\u{0019}Ethereum Signed Message:\n{}", msg_length)
+            .as_bytes()
+            .to_vec()
+    }
 }
