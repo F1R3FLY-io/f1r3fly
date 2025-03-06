@@ -396,7 +396,7 @@ lazy val node = (project in file("node"))
     },
     (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
     version := git.gitDescribedVersion.value.getOrElse({
-      val v = "0.0.0-unknown"
+      val v = "1.0.0-SNAPSHOT"
       System.err.println("Could not get version from `git describe`.")
       System.err.println("Using the fallback version: " + v)
       v
