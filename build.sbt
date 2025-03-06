@@ -492,7 +492,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-J-Xms4G -J-Xmx6G -J-Xss128m -J-XX:MaxMetaspaceSize=2G",
+      "-J-Xms4G -J-Xmx6G -J-Xss4m -J-XX:MaxMetaspaceSize=2G",
       dockerJnaLibraryPath
     ),
     // Replace unsupported character `+`
