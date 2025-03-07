@@ -140,6 +140,16 @@ Evaluate a contract:
 
 Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) project for a simple, easy-to-use, and fast file system built on top of F1r3fly.
 
+### Troubleshooting
+
+If you encounter any errors regarding `ssl`, try the following branch:
+
+```sh
+git checkout ssl-linux
+```
+
+
+
 
 <!-- Docker will be used in the examples port portability reasons, but running the
 node as a standalone process is very similar.
