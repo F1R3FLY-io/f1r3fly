@@ -2,6 +2,7 @@
 
 use rholang::rust::interpreter::util::rev_address::RevAddress;
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct Vault {
     pub rev_address: RevAddress,
     pub initial_balance: u64,

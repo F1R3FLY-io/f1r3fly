@@ -81,7 +81,6 @@ async fn state_hash_after_fixed_rholang_term_execution_should_be_hash_fixed_with
         )
         .await;
 
-    println!("r: {:?}", r);
     assert!(r.is_ok());
     assert!(r.unwrap().errors.is_empty());
 

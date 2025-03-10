@@ -4,7 +4,7 @@ use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
 
 // TODO: Update to use reference & lifetime
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct PrivateKey {
     pub bytes: Vec<u8>,
 }

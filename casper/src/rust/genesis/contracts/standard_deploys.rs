@@ -1,11 +1,12 @@
 // See casper/src/main/scala/coop/rchain/casper/genesis/contracts/StandardDeploys.scala
 
+use lazy_static::lazy_static;
+
 use crypto::rust::{
     private_key::PrivateKey,
     public_key::PublicKey,
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
-use lazy_static::lazy_static;
 
 // Private keys used to sign blessed (standard) contracts
 pub const REGISTRY_PK: &str = "5a0bde2f5857124b1379c78535b07a278e3b9cefbcacc02e62ab3294c02765a1";

@@ -2,7 +2,7 @@ use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
 
 // See crypto/src/main/scala/coop/rchain/crypto/PublicKey.scala
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct PublicKey {
     pub bytes: Vec<u8>,
 }
