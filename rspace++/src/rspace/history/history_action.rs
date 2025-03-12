@@ -1,6 +1,7 @@
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryAction.scala
 
-use crate::{Byte, rspace::hashing::blake2b256_hash::Blake2b256Hash};
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use shared::rust::Byte;
 
 pub type KeyPath = Vec<Byte>;
 

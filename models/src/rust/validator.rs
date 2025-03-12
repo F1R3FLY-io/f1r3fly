@@ -1,4 +1,4 @@
-use crate::ByteString;
+use shared::rust::ByteString;
 
 // See models/src/main/scala/coop/rchain/models/Validator.scala
 pub type Validator = ByteString;

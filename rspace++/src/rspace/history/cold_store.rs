@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::rspace::shared::key_value_store::KeyValueStore;
+use shared::rust::store::key_value_store::KeyValueStore;
 use serde::{Deserialize, Serialize};
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/ColdStore.scala

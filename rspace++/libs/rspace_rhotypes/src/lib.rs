@@ -1,5 +1,5 @@
+use models::rhoapi::*;
 use models::rspace_plus_plus_types::*;
-use models::{ByteVector, rhoapi::*};
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
@@ -14,6 +14,7 @@ use rspace_plus_plus::rspace::shared::rspace_store_manager::mk_rspace_store_mana
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
 use rspace_plus_plus::rspace::trace::event::{Event, IOEvent};
+use shared::rust::ByteVector;
 use std::ffi::{CStr, c_char};
 use std::sync::{Arc, Mutex};
 

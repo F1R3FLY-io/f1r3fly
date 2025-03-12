@@ -3,7 +3,22 @@
 set -e
 
 cd rspace++/
-cargo test
+cargo test --release
 
 cd ../rholang
-cargo test
+cargo test --release
+
+cd ../casper
+cargo test --release
+
+cd ../models
+cargo test --release
+
+cd ../crypto
+cargo test --release
+
+cd ../shared
+cargo test --release
+
+
+

@@ -20,12 +20,12 @@ use crate::rspace::hot_store_trie_action::{
 use crate::rspace::serializers::serializers::{
     encode_binary, encode_continuations, encode_datums, encode_joins,
 };
-use crate::rspace::shared::key_value_store::KeyValueStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use log::debug;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use shared::rust::store::key_value_store::KeyValueStore;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 

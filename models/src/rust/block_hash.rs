@@ -1,4 +1,4 @@
-use crate::ByteString;
+use shared::rust::ByteString;
 
 // See models/src/main/scala/coop/rchain/models/BlockHash.scala
 pub type BlockHash = ByteString;

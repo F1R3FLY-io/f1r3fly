@@ -1,11 +1,10 @@
 use std::sync::{Arc, Mutex};
 
-use crate::ByteVector;
+use shared::rust::{ByteVector, store::key_value_store::KeyValueStore};
 
 use crate::rspace::{
     history::roots_store::{RootsStore, RootsStoreInstances},
     shared::{
-        key_value_store::KeyValueStore,
         trie_exporter::{KeyHash, Value},
         trie_importer::TrieImporter,
     },

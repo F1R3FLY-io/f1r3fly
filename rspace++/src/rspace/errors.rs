@@ -1,6 +1,6 @@
-use super::shared::key_value_store::KvStoreError;
-
 /* RSpace Error */
+
+use shared::rust::store::key_value_store::KvStoreError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RSpaceError {

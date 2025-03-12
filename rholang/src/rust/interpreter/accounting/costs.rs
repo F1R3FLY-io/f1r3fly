@@ -1,11 +1,9 @@
-use models::{
-    rhoapi::{
-        tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
-        TaggedContinuation,
-    },
-    ByteString,
+use models::rhoapi::{
+    tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
+    TaggedContinuation,
 };
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
+use shared::rust::ByteString;
 use std::ops::{Add, Mul, Sub};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala

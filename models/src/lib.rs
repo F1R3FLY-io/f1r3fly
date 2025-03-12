@@ -23,12 +23,7 @@ pub mod servicemodelapi {
     include!(concat!(env!("OUT_DIR"), "/servicemodelapi.rs"));
 }
 
-// These should correspond to the types in rspace++
-pub type ByteVector = Vec<u8>;
-pub type ByteBuffer = Vec<u8>;
-pub type Byte = u8;
-pub type ByteString = Vec<u8>;
-pub type BitSet = Vec<u8>;
+use shared::rust::BitSet;
 
 pub fn create_bit_vector(indices: &[usize]) -> BitSet {
     let max_index = *indices.iter().max().unwrap_or(&0);

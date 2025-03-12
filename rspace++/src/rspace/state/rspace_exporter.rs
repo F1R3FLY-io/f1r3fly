@@ -1,6 +1,6 @@
 // See rspace/src/main/scala/coop/rchain/rspace/state/RSpaceExporter.scala
 
-use crate::{Byte, ByteVector};
+use shared::rust::{Byte, ByteVector};
 
 use crate::rspace::{
     errors::RootError,

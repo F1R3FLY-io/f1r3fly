@@ -26,7 +26,7 @@ use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::rust::rholang::implicits::single_expr;
 use models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
-use models::Byte;
+use shared::rust::Byte;
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;

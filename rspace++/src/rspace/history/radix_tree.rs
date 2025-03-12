@@ -1,16 +1,16 @@
 // See rspace/src/main/scala/coop/rchain/rspace/history/RadixTree.scala
 
-use crate::Byte;
-use crate::ByteVector;
 use crate::rspace::errors::RadixTreeError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::history::Either;
 use crate::rspace::history::history_action::HistoryActionTrait;
-use crate::rspace::shared::key_value_store::KeyValueStore;
 use dashmap::DashMap;
 use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use shared::rust::Byte;
+use shared::rust::ByteVector;
+use shared::rust::store::key_value_store::KeyValueStore;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::Mutex;

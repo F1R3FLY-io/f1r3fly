@@ -1,9 +1,11 @@
-use super::key_value_store::{KeyValueStore, KvStoreError};
-use crate::ByteBuffer;
 use heed::types::SerdeBincode;
 use heed::{Database, Env};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+
+use crate::rust::ByteBuffer;
+
+use super::key_value_store::{KeyValueStore, KvStoreError};
 
 pub struct LmdbKeyValueStore {
     pub env: Arc<Env>,
@@ -102,7 +104,11 @@ impl KeyValueStore for LmdbKeyValueStore {
         let kv_store_map = self.to_map().unwrap();
 
         for (key, value) in &kv_store_map {
-            println!("Key: {:?}, Value: {:?}", hex::encode(key), hex::encode(value));
+            println!(
+                "Key: {:?}, Value: {:?}",
+                hex::encode(key),
+                hex::encode(value)
+            );
         }
     }
 }

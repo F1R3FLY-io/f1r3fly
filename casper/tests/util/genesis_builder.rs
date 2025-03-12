@@ -4,13 +4,18 @@ use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use tempfile::Builder;
 
 use casper::rust::{
+    errors::CasperError,
     genesis::{
         contracts::{proof_of_stake::ProofOfStake, validator::Validator, vault::Vault},
         genesis::Genesis,
     },
-    util::construct_deploy::{DEFAULT_PUB, DEFAULT_PUB2, DEFAULT_SEC, DEFAULT_SEC2},
+    util::{
+        construct_deploy::{DEFAULT_PUB, DEFAULT_PUB2, DEFAULT_SEC, DEFAULT_SEC2},
+        rholang::runtime_manager,
+    },
 };
 use crypto::rust::{
     private_key::PrivateKey,
@@ -18,6 +23,8 @@ use crypto::rust::{
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
 use models::rust::casper::protocol::casper_message::BlockMessage;
+
+use crate::util::rholang::resources::mk_test_rnode_store_manager;
 
 type GenesisParameters = (
     Vec<(PrivateKey, PublicKey)>,
@@ -69,8 +76,9 @@ impl GenessisBuilder {
             .collect()
     }
 
-    pub fn create_genesis(&mut self) -> Arc<BlockMessage> {
-        self.build_genesis_with_parameters(None).genesis_block
+    pub async fn create_genesis(&mut self) -> Result<Arc<BlockMessage>, CasperError> {
+        let context = self.build_genesis_with_parameters(None).await?;
+        Ok(context.genesis_block)
     }
 
     pub fn build_genesis_parameters_with_defaults(
@@ -197,37 +205,60 @@ impl GenessisBuilder {
         }
     }
 
-    pub fn build_genesis_with_parameters(
+    pub async fn build_genesis_with_parameters(
         &mut self,
         parameters: Option<GenesisParameters>,
-    ) -> GenesisContext {
+    ) -> Result<GenesisContext, CasperError> {
         let parameters =
             parameters.unwrap_or(Self::build_genesis_parameters_with_defaults(None, None));
         self.cache_accesses += 1;
-        match self.genesis_cache.get(&parameters) {
-            Some(context) => context.clone(),
-            None => {
-                let context = self.do_build_genesis(&parameters);
-                self.genesis_cache.insert(parameters, context.clone());
-                context
-            }
+
+        if self.genesis_cache.contains_key(&parameters) {
+            Ok(self.genesis_cache.get(&parameters).unwrap().value().clone())
+        } else {
+            let context = self.do_build_genesis(&parameters).await?;
+            self.genesis_cache.insert(parameters, context.clone());
+            Ok(context)
         }
     }
 
-    pub fn build_genesis_with_validators_num(&mut self, validators_num: usize) -> GenesisContext {
-        self.cache_accesses += 1;
+    pub async fn build_genesis_with_validators_num(
+        &mut self,
+        validators_num: usize,
+    ) -> Result<GenesisContext, CasperError> {
         let parameters = Self::build_genesis_parameters_with_random(None, Some(validators_num));
-        match self.genesis_cache.get(&parameters) {
-            Some(context) => context.clone(),
-            None => {
-                let context = self.do_build_genesis(&parameters);
-                self.genesis_cache.insert(parameters, context.clone());
-                context
-            }
+        self.cache_accesses += 1;
+
+        if self.genesis_cache.contains_key(&parameters) {
+            Ok(self.genesis_cache.get(&parameters).unwrap().value().clone())
+        } else {
+            let context = self.do_build_genesis(&parameters).await?;
+            self.genesis_cache.insert(parameters, context.clone());
+            Ok(context)
         }
     }
 
-    fn do_build_genesis(&self, parameters: &GenesisParameters) -> GenesisContext {
+    async fn do_build_genesis(
+        &mut self,
+        parameters: &GenesisParameters,
+    ) -> Result<GenesisContext, CasperError> {
+        self.cache_misses += 1;
+        println!(
+            "Genesis block cache miss, building a new genesis. Cache misses: {} / {} ({}%) cache accesses.",
+            self.cache_misses,
+            self.cache_accesses,
+            (self.cache_misses / self.cache_accesses) as f64 * 100.0
+        );
+
+        let (validator_key_pairs, genesis_vaults, genesis_parameters) = parameters;
+        let storage_directory = Builder::new()
+            .prefix("hash-set-casper-test-genesis-")
+            .tempdir()
+            .expect("Failed to create temporary directory");
+
+        let mut kvs_manager = mk_test_rnode_store_manager(storage_directory.path().to_path_buf());
+        let m_store = runtime_manager::mergeable_store(&mut kvs_manager).await?;
+
         todo!()
     }
 }

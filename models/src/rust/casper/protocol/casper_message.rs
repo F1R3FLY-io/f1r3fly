@@ -8,12 +8,12 @@ use prost::Message;
 use rspace_plus_plus::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash, state::rspace_exporter::RSpaceExporterInstance,
 };
+use shared::rust::{Byte, ByteVector};
 
 use crate::{
     casper::{system_deploy_data_proto::SystemDeploy, *},
     rhoapi::PCost,
     rust::casper::pretty_printer::PrettyPrinter,
-    Byte, ByteVector,
 };
 
 // TODO: Use type ByteString from models crate

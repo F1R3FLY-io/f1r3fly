@@ -2,9 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::{ByteBuffer, ByteVector};
-
-use super::key_value_store::{KeyValueStore, KvStoreError};
+use shared::rust::store::key_value_store::{KeyValueStore, KvStoreError};
+use shared::rust::{ByteBuffer, ByteVector};
 
 #[derive(Clone)]
 pub struct InMemoryKeyValueStore {

@@ -6,7 +6,7 @@ use crate::rust::util::rholang::tools::Tools;
 
 use super::contracts::{proof_of_stake::ProofOfStake, standard_deploys, vault::Vault};
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Genesis {
     pub shard_id: String,
     pub timestamp: i64,

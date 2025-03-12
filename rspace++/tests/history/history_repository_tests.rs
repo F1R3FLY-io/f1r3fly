@@ -1,6 +1,5 @@
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 
-use rspace_plus_plus::ByteVector;
 use rand::prelude::SliceRandom;
 use rspace_plus_plus::rspace::{
     errors::{HistoryError, RootError},
@@ -17,13 +16,13 @@ use rspace_plus_plus::rspace::{
     internal::{Datum, WaitingContinuation},
     shared::{
         in_mem_key_value_store::InMemoryKeyValueStore,
-        key_value_store::{KeyValueStore, KvStoreError},
         trie_exporter::{KeyHash, NodePath, TrieExporter, TrieNode, Value},
         trie_importer::TrieImporter,
     },
     state::{rspace_exporter::RSpaceExporter, rspace_importer::RSpaceImporter},
     trace::event::{Consume, Produce},
 };
+use shared::rust::{store::key_value_store::{KeyValueStore, KvStoreError}, ByteVector};
 use std::{
     collections::{BTreeSet, HashSet},
     sync::{Arc, Mutex},

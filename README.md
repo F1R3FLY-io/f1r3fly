@@ -296,6 +296,10 @@ $ sbt clean compile stage docker:publishLocal
 $ ./node/target/universal/stage/bin/rnode
 ``` -->
 
+### Testing 
+
+Run all Rust tests: `./scripts/run_rust_tests.sh`
+
 For more detailed instructions, see the [developer guide](DEVELOPER.md).
 
 ## Caveats and filing issues

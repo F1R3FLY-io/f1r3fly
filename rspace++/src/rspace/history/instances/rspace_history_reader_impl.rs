@@ -1,16 +1,21 @@
 use crate::rspace::{
-    errors::HistoryError, hashing::{
+    errors::HistoryError,
+    hashing::{
         blake2b256_hash::Blake2b256Hash,
         stable_hash_provider::{hash, hash_from_vec},
-    }, history::{
+    },
+    history::{
         cold_store::PersistedData,
         history::History,
         history_reader::{HistoryReader, HistoryReaderBase},
         history_repository::{PREFIX_DATUM, PREFIX_JOINS, PREFIX_KONT},
         history_repository_impl::prepend_bytes,
-    }, internal::{Datum, WaitingContinuation}, serializers::serializers::{decode_continuations, decode_datums, decode_joins}, shared::key_value_store::KeyValueStore
+    },
+    internal::{Datum, WaitingContinuation},
+    serializers::serializers::{decode_continuations, decode_datums, decode_joins},
 };
 use serde::{Deserialize, Serialize};
+use shared::rust::store::key_value_store::KeyValueStore;
 use std::{
     marker::PhantomData,
     sync::{Arc, Mutex},

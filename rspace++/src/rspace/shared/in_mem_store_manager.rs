@@ -1,9 +1,9 @@
 use super::{
-    in_mem_key_value_store::InMemoryKeyValueStore, key_value_store::KeyValueStore,
-    key_value_store_manager::KeyValueStoreManager,
+    in_mem_key_value_store::InMemoryKeyValueStore, key_value_store_manager::KeyValueStoreManager,
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
+use shared::rust::store::key_value_store::KeyValueStore;
 
 // See shared/src/main/scala/coop/rchain/store/InMemoryStoreManager.scala
 // Simple in-memory key value store manager
