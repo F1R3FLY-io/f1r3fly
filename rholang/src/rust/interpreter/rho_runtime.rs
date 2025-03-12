@@ -14,7 +14,7 @@ use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
+use rspace_plus_plus::rspace::history::history_repository::HistoryRepository;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::replay_rspace_interface::IReplayRSpace;
@@ -438,6 +438,7 @@ impl HasCost for RhoRuntimeImpl {
     }
 }
 
+// TODO: Fix these types
 pub type RhoTuplespace =
     Arc<Mutex<Box<dyn Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
 
@@ -448,7 +449,7 @@ pub type RhoReplayISpace =
     Arc<Mutex<Box<dyn IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
 
 pub type RhoHistoryRepository =
-    HistoryRepositoryImpl<Par, BindPattern, ListParWithRandom, TaggedContinuation>;
+    Arc<Box<dyn HistoryRepository<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>;
 
 pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
 

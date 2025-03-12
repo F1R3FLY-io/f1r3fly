@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use casper::rust::util::rholang::runtime_manager;
+use casper::rust::util::rholang::runtime_manager::RuntimeManager;
 use casper::rust::util::rholang::tools::Tools;
 use casper::rust::{genesis::genesis::Genesis, rholang::runtime_syntax::RuntimeOps};
 use rholang::rust::interpreter::accounting::costs::Cost;
@@ -32,7 +32,7 @@ async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
     .await;
     let runtime_ops = RuntimeOps::new(runtime);
 
-    let hard_coded_hash = runtime_manager::empty_state_hash_fixed();
+    let hard_coded_hash = RuntimeManager::empty_state_hash_fixed();
     let empty_root_hash = runtime_ops.empty_state_hash().await.unwrap();
 
     let empty_hash_hard_coded = Blake2b256Hash::from_bytes(hard_coded_hash.to_vec());

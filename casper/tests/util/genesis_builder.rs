@@ -3,6 +3,7 @@
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
+use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tempfile::Builder;
 
@@ -14,7 +15,7 @@ use casper::rust::{
     },
     util::{
         construct_deploy::{DEFAULT_PUB, DEFAULT_PUB2, DEFAULT_SEC, DEFAULT_SEC2},
-        rholang::runtime_manager,
+        rholang::runtime_manager::RuntimeManager,
     },
 };
 use crypto::rust::{
@@ -257,7 +258,17 @@ impl GenessisBuilder {
             .expect("Failed to create temporary directory");
 
         let mut kvs_manager = mk_test_rnode_store_manager(storage_directory.path().to_path_buf());
-        let m_store = runtime_manager::mergeable_store(&mut kvs_manager).await?;
+        let r_store = kvs_manager
+            .r_space_stores()
+            .await
+            .expect("Failed to create RSpaceStore");
+
+        let m_store = RuntimeManager::mergeable_store(&mut kvs_manager).await?;
+        let runtime_manager = RuntimeManager::create_with_store(
+            r_store,
+            m_store,
+            Genesis::non_negative_mergeable_tag_name(),
+        );
 
         todo!()
     }
