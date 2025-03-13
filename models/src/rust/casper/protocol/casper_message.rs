@@ -1,5 +1,7 @@
 // See models/src/main/scala/coop/rchain/casper/protocol/CasperMessage.scala
 
+use std::sync::Arc;
+
 use crypto::rust::{
     public_key::PublicKey,
     signatures::{signatures_alg::SignaturesAlgFactory, signed::Signed},
@@ -332,16 +334,17 @@ impl Header {
         }
     }
 
-    pub fn to_proto(self) -> HeaderProto {
+    pub fn to_proto(&self) -> HeaderProto {
         HeaderProto {
-            parents_hash_list: self.parents_hash_list,
+            parents_hash_list: self.parents_hash_list.clone(),
             timestamp: self.timestamp,
             version: self.version,
-            extra_bytes: self.extra_bytes,
+            extra_bytes: self.extra_bytes.clone(),
         }
     }
 }
 
+#[derive(Clone)]
 pub struct RejectedDeploy {
     pub sig: ByteString,
 }
@@ -391,21 +394,28 @@ impl Body {
         })
     }
 
-    pub fn to_proto(self) -> BodyProto {
+    pub fn to_proto(&self) -> BodyProto {
         BodyProto {
             state: Some(self.state.to_proto()),
-            deploys: self.deploys.into_iter().map(|d| d.to_proto()).collect(),
+            deploys: self
+                .deploys
+                .clone()
+                .into_iter()
+                .map(|d| d.to_proto())
+                .collect(),
             rejected_deploys: self
                 .rejected_deploys
+                .clone()
                 .into_iter()
                 .map(|r| r.to_proto())
                 .collect(),
             system_deploys: self
                 .system_deploys
+                .clone()
                 .into_iter()
                 .map(|s| s.to_proto())
                 .collect(),
-            extra_bytes: self.extra_bytes,
+            extra_bytes: self.extra_bytes.clone(),
         }
     }
 }
@@ -450,18 +460,24 @@ impl F1r3flyState {
         }
     }
 
-    pub fn to_proto(self) -> RChainStateProto {
+    pub fn to_proto(&self) -> RChainStateProto {
         RChainStateProto {
-            pre_state_hash: self.pre_state_hash,
-            post_state_hash: self.post_state_hash,
-            bonds: self.bonds.into_iter().map(|b| Bond::to_proto(b)).collect(),
+            pre_state_hash: self.pre_state_hash.clone(),
+            post_state_hash: self.post_state_hash.clone(),
+            bonds: self
+                .bonds
+                .clone()
+                .into_iter()
+                .map(|b| Bond::to_proto(b))
+                .collect(),
             block_number: self.block_number,
         }
     }
 }
 
+#[derive(Clone)]
 pub struct ProcessedDeploy {
-    pub deploy: Signed<DeployData>,
+    pub deploy: Arc<Signed<DeployData>>,
     pub cost: PCost,
     pub deploy_log: Vec<Event>,
     pub is_failed: bool,
@@ -475,7 +491,7 @@ impl ProcessedDeploy {
 
     pub fn empty(deploy: Signed<DeployData>) -> Self {
         Self {
-            deploy,
+            deploy: Arc::new(deploy),
             cost: PCost { cost: 0 },
             deploy_log: Vec::new(),
             is_failed: false,
@@ -486,7 +502,7 @@ impl ProcessedDeploy {
     pub fn to_deploy_info(self) -> DeployInfo {
         DeployInfo {
             deployer: PrettyPrinter::build_string_no_limit(&self.deploy.pk.bytes),
-            term: self.deploy.data.term,
+            term: self.deploy.data.term.clone(),
             timestamp: self.deploy.data.time_stamp,
             sig: PrettyPrinter::build_string_no_limit(&self.deploy.sig),
             sig_algorithm: self.deploy.sig_algorithm.name(),
@@ -501,11 +517,11 @@ impl ProcessedDeploy {
 
     pub fn from_proto(proto: ProcessedDeployProto) -> Result<Self, String> {
         Ok(Self {
-            deploy: DeployData::from_proto(
+            deploy: Arc::new(DeployData::from_proto(
                 proto
                     .deploy
                     .ok_or_else(|| "Missing deploy field".to_string())?,
-            )?,
+            )?),
             cost: proto.cost.ok_or_else(|| "Missing cost field".to_string())?,
             deploy_log: proto
                 .deploy_log
@@ -534,6 +550,7 @@ impl ProcessedDeploy {
     }
 }
 
+#[derive(Clone)]
 pub enum SystemDeployData {
     Slash {
         invalid_block_hash: ByteString,
@@ -599,6 +616,7 @@ impl SystemDeployData {
     }
 }
 
+#[derive(Clone)]
 pub enum ProcessedSystemDeploy {
     Succeeded {
         event_list: Vec<Event>,
@@ -668,7 +686,10 @@ impl ProcessedSystemDeploy {
                 system_deploy,
             } => ProcessedSystemDeployProto {
                 system_deploy: Some(SystemDeployData::to_proto(system_deploy)),
-                deploy_log: event_list.into_iter().map(Event::to_proto).collect(),
+                deploy_log: event_list
+                    .into_iter()
+                    .map(|arg0: Event| Event::to_proto(&arg0))
+                    .collect(),
                 error_msg: "".to_string(),
             },
             ProcessedSystemDeploy::Failed {
@@ -676,7 +697,10 @@ impl ProcessedSystemDeploy {
                 error_msg,
             } => ProcessedSystemDeployProto {
                 system_deploy: None,
-                deploy_log: event_list.into_iter().map(Event::to_proto).collect(),
+                deploy_log: event_list
+                    .into_iter()
+                    .map(|arg0: Event| Event::to_proto(&arg0))
+                    .collect(),
                 error_msg,
             },
         }
@@ -748,22 +772,23 @@ impl DeployData {
         }
     }
 
-    pub fn to_proto(dd: Signed<DeployData>) -> DeployDataProto {
+    pub fn to_proto(dd: Arc<Signed<DeployData>>) -> DeployDataProto {
         DeployDataProto {
-            term: dd.data.term,
+            term: dd.data.term.clone(),
             timestamp: dd.data.time_stamp,
             phlo_price: dd.data.phlo_price,
             phlo_limit: dd.data.phlo_limit,
             valid_after_block_number: dd.data.valid_after_block_number,
-            shard_id: dd.data.shard_id,
-            deployer: dd.pk.bytes.into(),
-            sig: dd.sig.into(),
+            shard_id: dd.data.shard_id.clone(),
+            deployer: dd.pk.bytes.clone().into(),
+            sig: dd.sig.clone().into(),
             sig_algorithm: dd.sig_algorithm.name(),
-            language: dd.data.language,
+            language: dd.data.language.clone(),
         }
     }
 }
 
+#[derive(Clone)]
 pub struct Peek {
     pub channel_index: i32,
 }
@@ -782,12 +807,14 @@ impl Peek {
     }
 }
 
+#[derive(Clone)]
 pub enum Event {
     Produce(ProduceEvent),
     Consume(ConsumeEvent),
     Comm(CommEvent),
 }
 
+#[derive(Clone)]
 pub struct ProduceEvent {
     pub channels_hash: ByteString,
     pub hash: ByteString,
@@ -797,12 +824,14 @@ pub struct ProduceEvent {
     pub output_value: Vec<ByteString>,
 }
 
+#[derive(Clone)]
 pub struct ConsumeEvent {
     pub channels_hashes: Vec<ByteString>,
     pub hash: ByteString,
     pub persistent: bool,
 }
 
+#[derive(Clone)]
 pub struct CommEvent {
     pub consume: ConsumeEvent,
     pub produces: Vec<ProduceEvent>,
@@ -834,16 +863,16 @@ impl Event {
         }
     }
 
-    pub fn to_proto(self) -> EventProto {
+    pub fn to_proto(&self) -> EventProto {
         match self {
             Event::Produce(pe) => EventProto {
-                event_instance: Some(event_proto::EventInstance::Produce(pe.to_proto())),
+                event_instance: Some(event_proto::EventInstance::Produce(pe.clone().to_proto())),
             },
             Event::Consume(ce) => EventProto {
-                event_instance: Some(event_proto::EventInstance::Consume(ce.to_proto())),
+                event_instance: Some(event_proto::EventInstance::Consume(ce.clone().to_proto())),
             },
             Event::Comm(cme) => EventProto {
-                event_instance: Some(event_proto::EventInstance::Comm(cme.to_proto())),
+                event_instance: Some(event_proto::EventInstance::Comm(cme.clone().to_proto())),
             },
         }
     }
@@ -913,6 +942,7 @@ impl CommEvent {
     }
 }
 
+#[derive(Clone)]
 pub struct Bond {
     pub validator: ByteString,
     pub stake: i64,

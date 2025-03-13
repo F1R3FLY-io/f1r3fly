@@ -194,6 +194,7 @@ impl GenessisBuilder {
                 vaults,
                 supply: i64::MAX,
                 block_number: 0,
+                version: 1,
             },
         )
     }
@@ -269,6 +270,8 @@ impl GenessisBuilder {
             m_store,
             Genesis::non_negative_mergeable_tag_name(),
         );
+
+        let genesis = Genesis::create_genesis_block(runtime_manager, genesis_parameters)?;
 
         todo!()
     }

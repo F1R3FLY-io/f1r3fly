@@ -1,30 +1,140 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManager.scala
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use models::rhoapi::Par;
+use crypto::rust::signatures::signed::Signed;
+use models::casper::system_deploy_data_proto::SystemDeploy;
+use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::block::state_hash::StateHash;
+use models::rust::block_hash::BlockHash;
+use models::rust::casper::protocol::casper_message::{
+    Bond, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
+};
+use models::rust::validator::Validator;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::merging::rholang_merging_logic::DeployMergeableData;
-use rholang::rust::interpreter::rho_runtime::{RhoHistoryRepository, RhoISpace};
+use rholang::rust::interpreter::rho_runtime::{self, RhoHistoryRepository, RhoRuntimeImpl};
+use rholang::rust::interpreter::system_processes::BlockData;
+use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use shared::rust::store::key_value_store::KvStoreError;
 use shared::rust::store::key_value_types_store_impl::KeyValueTypedStoreImpl;
 use shared::rust::ByteVector;
 
+use crate::rust::errors::CasperError;
+
+use super::replay_failure::ReplayFailure;
+
 type MergeableStore = KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>;
 
-// TODO: 'replay_rspace' should be type 'RhoReplayISpace'
 pub struct RuntimeManager {
-    pub space: RhoISpace,
-    pub replay_space: RhoISpace,
+    pub space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    pub replay_space: ReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
     pub history_repo: RhoHistoryRepository,
     pub mergeable_store: MergeableStore,
     pub mergeable_tag_name: Par,
 }
 
 impl RuntimeManager {
+    pub async fn spawn_runtime(self) -> Arc<Mutex<RhoRuntimeImpl>> {
+        let new_space = self.space.spawn().expect("Failed to spawn RSpace");
+        let runtime = rho_runtime::create_rho_runtime(
+            new_space,
+            self.mergeable_tag_name,
+            false,
+            &mut Vec::new(),
+        )
+        .await;
+
+        runtime
+    }
+
+    pub async fn spawn_replay_runtime(self) -> Arc<Mutex<RhoRuntimeImpl>> {
+        let new_replay_space = self
+            .replay_space
+            .spawn()
+            .expect("Failed to spawn ReplayRSpace");
+
+        let runtime = rho_runtime::create_replay_rho_runtime(
+            new_replay_space,
+            self.mergeable_tag_name,
+            false,
+            &mut Vec::new(),
+        )
+        .await;
+
+        runtime
+    }
+
+    pub fn compute_state(
+        &self,
+        start_hash: StateHash,
+        terms: Vec<Signed<DeployData>>,
+        system_deploys: Vec<SystemDeploy>,
+        block_data: BlockData,
+        invalid_blocks: Option<HashMap<BlockHash, Validator>>,
+    ) -> Result<(StateHash, Vec<ProcessedDeploy>, Vec<ProcessedSystemDeploy>), CasperError> {
+        let invalid_blocks = invalid_blocks.unwrap_or_default();
+        todo!()
+    }
+
+    pub fn compute_genesis(
+        &self,
+        terms: Vec<Signed<DeployData>>,
+        block_time: i64,
+        block_number: i64,
+    ) -> Result<(StateHash, StateHash, Vec<ProcessedDeploy>), CasperError> {
+        todo!()
+    }
+
+    pub fn replay_compute_state(
+        &self,
+        start_hash: StateHash,
+        terms: Vec<ProcessedDeploy>,
+        system_deploys: Vec<ProcessedSystemDeploy>,
+        block_data: BlockData,
+    ) -> Result<StateHash, ReplayFailure> {
+        todo!()
+    }
+
+    pub fn capture_results(
+        &self,
+        start: StateHash,
+        deploy: Signed<DeployData>,
+    ) -> Result<Vec<Par>, CasperError> {
+        todo!()
+    }
+
+    pub fn get_active_validators(start_hash: StateHash) -> Result<Vec<Validator>, CasperError> {
+        todo!()
+    }
+
+    pub fn compute_bonds(hash: StateHash) -> Result<Vec<Bond>, CasperError> {
+        todo!()
+    }
+
+    pub fn play_exploratory_deploy(term: String, hash: StateHash) -> Result<Vec<Par>, CasperError> {
+        todo!()
+    }
+
+    pub fn get_data(hash: StateHash) -> Result<Vec<Par>, CasperError> {
+        todo!()
+    }
+
+    pub fn get_continuation(hash: StateHash) -> Result<Vec<Par>, CasperError> {
+        todo!()
+    }
+
+    pub fn get_history_repo(self) -> RhoHistoryRepository {
+        self.history_repo
+    }
+
+    pub fn get_mergeable_store(self) -> MergeableStore {
+        self.mergeable_store
+    }
+
     /**
      * This is a hard-coded value for `emptyStateHash` which is calculated by
      * [[coop.rchain.casper.rholang.RuntimeOps.emptyStateHash]].
@@ -38,8 +148,8 @@ impl RuntimeManager {
     }
 
     pub fn create_with_space(
-        rspace: RhoISpace,
-        replay_rspace: RhoISpace,
+        rspace: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+        replay_rspace: ReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
         history_repo: RhoHistoryRepository,
         mergeable_store: MergeableStore,
         mergeable_tag_name: Par,
@@ -74,8 +184,8 @@ impl RuntimeManager {
         let history_repo = rspace.history_repository.clone();
 
         let runtime_manager = RuntimeManager::create_with_space(
-            Arc::new(Mutex::new(Box::new(rspace))),
-            Arc::new(Mutex::new(Box::new(replay_rspace))),
+            rspace,
+            replay_rspace,
             history_repo.clone(),
             mergeable_store,
             mergeable_tag_name,

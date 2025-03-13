@@ -168,7 +168,7 @@ pub fn multi_sig_rev_vault(shard_id: &str) -> Signed<DeployData> {
     )
 }
 
-pub fn pos_generator(pos: ProofOfStake, shard_id: &str) -> Signed<DeployData> {
+pub fn pos_generator(pos: &ProofOfStake, shard_id: &str) -> Signed<DeployData> {
     assert!(pos.minimum_bond <= pos.maximum_bond);
     assert!(pos.validators.len() > 0);
 
