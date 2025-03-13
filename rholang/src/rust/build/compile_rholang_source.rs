@@ -74,14 +74,11 @@ impl CompiledRholangTemplate {
     pub fn new(
         classpath: &str,
         normalizer_env: HashMap<String, Par>,
-        // macros: &[(&str, &str)],
-    ) -> Result<Self, InterpreterError> {
-        // let content = Self::load_template(classpath, macros)?;
-        Ok(CompiledRholangTemplate {
-            classpath: classpath.to_string(),
-            normalizer_env,
-            path: classpath.to_string(),
-        })
+        macros: &[(&str, &str)],
+    ) -> CompiledRholangSource {
+        let code = Self::load_template(classpath, macros).expect("Failed to load template");
+        CompiledRholangSource::new(code, normalizer_env, classpath.to_string())
+            .expect("Failed to compile template")
     }
 
     pub fn load_template(

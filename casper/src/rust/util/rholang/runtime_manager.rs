@@ -15,7 +15,7 @@ use shared::rust::ByteVector;
 
 type MergeableStore = KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>;
 
-// TODO: 'replay_rspace' should be RhoReplayISpace
+// TODO: 'replay_rspace' should be type 'RhoReplayISpace'
 pub struct RuntimeManager {
     pub space: RhoISpace,
     pub replay_space: RhoISpace,
