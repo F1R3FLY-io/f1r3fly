@@ -1,0 +1,26 @@
+# Overides for ASI over the base values.yaml in docker/helm/f1r3fly
+
+shardConfig:
+  # Configure a number of deployable nodes. Bootstrap will be 1th node (value can't be not 0)
+  deployableReplicas: 1
+
+  # Configure a number of read-only nodes excluding deployable nodes
+  readOnlyReplicas: 1
+
+image:
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode
+  tag: "asi"
+
+resources:
+  limits:
+    # for ASI project, we will have only 2 nodes for each dev, stg, prod env 
+    # on Oracle we had 2 OCPU and 6 memory for each cluster
+    # dev;stg;prod; environments
+    cpu: 1
+    memory: 1G
+
+persistence:
+  storageClassName: "oci"
+
+imagePullSecrets:
+  - name: k8s-secret
