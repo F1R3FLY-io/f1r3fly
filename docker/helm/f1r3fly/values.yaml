@@ -112,8 +112,9 @@ nodeKeys: # TODO: Remove it for non-test env
     privateKey: d584a35257491a26f26389f6cc5cc551b66060910d6aed529d3005b27fc0edb4
 
 image:
-  #repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #f1r3fly-dev
-  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #f1r3fly-asi
+  #repository: ghcr.io/f1r3fly-io/rnode #local
+  # repository: eu-frankfurt-1.ocir.io/frqbavregu95/random/rnode #remote
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode #remote
   #pullPolicy: Never # Use `IfNotPresent` at Cloud Provider
   pullPolicy: IfNotPresent # Use `IfNotPresent` at Cloud Provider
   #tag: "latest" #local
@@ -202,12 +203,6 @@ resources:
     # additional node resources kubernetes uses for internal resources (pods)
     #cpu: 1
     #memory: 3.2G
-
-    #for ASI project, we will have only one single node for each dev, stg, prod env, at least as a start point, without validators
-    #on Oracle we had 2 OCPU and 6 memory for each cluster
-    #dev;stg;prod; environments
-    cpu: 1
-    memory: 4G
 
     # for cluster with boot + 8 nodes
     # our cluster had 10 OCPU and 34 memory, 10-9=1additional OCPU and 34-32(3.5*9) = 2 additional memory
