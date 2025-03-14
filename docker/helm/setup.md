@@ -43,20 +43,3 @@ kubectl delete ns f1r3fly-16nodes
 helm uninstall f1r3fly-32nodes -n f1r3fly-32nodes
 kubectl delete ns f1r3fly-32nodes
 ```
-
-# ASI project:
-
-- dev
-```sh
-helm upgrade --install f1r3fly-asi-dev ./f1r3fly -n f1r3fly-asi-dev --create-namespace --set replicaCount=1
-```
-
-- stg
-```sh
-helm upgrade --install f1r3fly-asi-stg ./f1r3fly -n f1r3fly-asi-stg --create-namespace --set replicaCount=1
-```
-
-- prod
-```sh
-helm upgrade --install f1r3fly-asi-prod ./f1r3fly -n f1r3fly-asi-prod --create-namespace --set replicaCount=1
-```
