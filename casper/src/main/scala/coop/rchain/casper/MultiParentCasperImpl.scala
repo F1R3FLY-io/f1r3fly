@@ -448,7 +448,7 @@ object MultiParentCasperImpl {
   // Size of deploy safety range.
   // Validators will try to put deploy in a block only for next `deployLifespan` blocks.
   // Required to enable protection from re-submitting duplicate deploys
-  val deployLifespan = 50
+  val deployLifespan = 500
 
   def addedEvent(block: BlockMessage): RChainEvent = {
     val (blockHash, parents, justifications, deployIds, creator, seqNum) = blockEvent(block)
