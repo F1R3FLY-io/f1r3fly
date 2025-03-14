@@ -208,8 +208,8 @@ resources:
     # for cluster with boot + 16 nodes
     # our cluster had 18 OCPU and 66 memory, 18-17=1additional OCPU and 66-64(3.76*17) = 2 additional memory
     # additional node resources kubernetes uses for internal resources (pods)
-#    cpu: 1
-#    memory: 3.7G
+    cpu: 1
+    memory: 3.7G
 
 livenessProbe:
   httpGet:
