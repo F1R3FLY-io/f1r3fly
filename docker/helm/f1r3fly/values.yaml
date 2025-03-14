@@ -203,12 +203,6 @@ resources:
     #cpu: 1
     #memory: 3.2G
 
-    #for ASI project, we will have only one single node for each dev, stg, prod env, at least as a start point, without validators
-    #on Oracle we had 2 OCPU and 6 memory for each cluster
-    #dev;stg;prod; environments
-    cpu: 1
-    memory: 4G
-
     # for cluster with boot + 8 nodes
     # our cluster had 10 OCPU and 34 memory, 10-9=1additional OCPU and 34-32(3.5*9) = 2 additional memory
     # additional node resources kubernetes uses for internal resources (pods)
