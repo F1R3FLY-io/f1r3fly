@@ -9,7 +9,7 @@ helm upgrade --install f1r3fly-4nodes ./f1r3fly -n f1r3fly-4nodes --create-names
 ```
 - boot plus 8 validators:
 ```sh
-helm upgrade --install f1r3fly-8nodes ./f1r3fly -n f1r3fly-8nodes --create-namespace --set shardConfig.deployableReplicas=I 9
+helm upgrade --install f1r3fly-8nodes ./f1r3fly -n f1r3fly-8nodes --create-namespace --set shardConfig.deployableReplicas=9
 ```
 - boot plus 16 validators:
 ```sh
