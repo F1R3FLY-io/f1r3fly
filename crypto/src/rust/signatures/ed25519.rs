@@ -4,6 +4,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Ed25519.scala
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ed25519;
 
 impl SignaturesAlg for Ed25519 {
@@ -64,6 +65,10 @@ impl SignaturesAlg for Ed25519 {
 
     fn sig_length(&self) -> usize {
         64
+    }
+
+    fn eq(&self, other: &dyn SignaturesAlg) -> bool {
+        self.name() == other.name()
     }
 }
 
@@ -181,8 +186,7 @@ mod tests {
             "Corrupted hash length must be even"
         );
         let corrupted_hash = decode(corrupted_hash_hex).expect("Failed to decode corrupted hash");
-        let corrupted_is_valid =
-            ed25519.verify(&corrupted_hash, &signature, &public_key.bytes);
+        let corrupted_is_valid = ed25519.verify(&corrupted_hash, &signature, &public_key.bytes);
         assert!(
             !corrupted_is_valid,
             "The signature should be invalid for corrupted hash"

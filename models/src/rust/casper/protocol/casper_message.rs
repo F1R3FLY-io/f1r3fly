@@ -90,6 +90,7 @@ impl ForkChoiceTipRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ApprovedBlockCandidate {
     pub block: BlockMessage,
     pub required_sigs: i32,
@@ -168,6 +169,7 @@ impl BlockApproval {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ApprovedBlock {
     pub candidate: ApprovedBlockCandidate,
     pub sigs: Vec<Signature>,
@@ -256,6 +258,7 @@ impl BlockHashMessage {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct BlockMessage {
     pub block_hash: ByteString,
     pub header: Header,
@@ -317,6 +320,7 @@ impl BlockMessage {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Header {
     pub parents_hash_list: Vec<ByteString>,
     pub timestamp: i64,
@@ -344,7 +348,7 @@ impl Header {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RejectedDeploy {
     pub sig: ByteString,
 }
@@ -359,6 +363,7 @@ impl RejectedDeploy {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Body {
     pub state: F1r3flyState,
     pub deploys: Vec<ProcessedDeploy>,
@@ -419,9 +424,11 @@ impl Body {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Justification {
-    validator: ByteString,
-    latest_block_hash: ByteString,
+    pub validator: ByteString,
+    pub latest_block_hash: ByteString,
 }
 
 impl Justification {
@@ -439,6 +446,8 @@ impl Justification {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct F1r3flyState {
     pub pre_state_hash: ByteString,
     pub post_state_hash: ByteString,
@@ -475,7 +484,7 @@ impl F1r3flyState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProcessedDeploy {
     pub deploy: Arc<Signed<DeployData>>,
     pub cost: PCost,
@@ -550,7 +559,7 @@ impl ProcessedDeploy {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemDeployData {
     Slash {
         invalid_block_hash: ByteString,
@@ -616,7 +625,7 @@ impl SystemDeployData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProcessedSystemDeploy {
     Succeeded {
         event_list: Vec<Event>,
@@ -707,7 +716,7 @@ impl ProcessedSystemDeploy {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Serialize)]
 pub struct DeployData {
     pub term: String,
     pub time_stamp: i64,
@@ -788,7 +797,7 @@ impl DeployData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Peek {
     pub channel_index: i32,
 }
@@ -807,14 +816,14 @@ impl Peek {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Produce(ProduceEvent),
     Consume(ConsumeEvent),
     Comm(CommEvent),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProduceEvent {
     pub channels_hash: ByteString,
     pub hash: ByteString,
@@ -824,14 +833,14 @@ pub struct ProduceEvent {
     pub output_value: Vec<ByteString>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ConsumeEvent {
     pub channels_hashes: Vec<ByteString>,
     pub hash: ByteString,
     pub persistent: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommEvent {
     pub consume: ConsumeEvent,
     pub produces: Vec<ProduceEvent>,
@@ -942,7 +951,7 @@ impl CommEvent {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bond {
     pub validator: ByteString,
     pub stake: i64,

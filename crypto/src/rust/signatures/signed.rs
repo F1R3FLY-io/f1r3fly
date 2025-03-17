@@ -7,6 +7,7 @@ use crate::rust::{
 use super::{secp256k1_eth::Secp256k1Eth, signatures_alg::SignaturesAlg};
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Signed.scala
+#[derive(Debug)]
 pub struct Signed<A> {
     pub data: A,
     pub pk: PublicKey,
@@ -14,7 +15,7 @@ pub struct Signed<A> {
     pub sig_algorithm: Box<dyn SignaturesAlg>,
 }
 
-impl<A: serde::Serialize> Signed<A> {
+impl<A: std::fmt::Debug + serde::Serialize> Signed<A> {
     pub fn create(
         data: A,
         sig_algorithm: Box<dyn SignaturesAlg>,
@@ -72,5 +73,14 @@ impl<A: serde::Serialize> Signed<A> {
         format!("\u{0019}Ethereum Signed Message:\n{}", msg_length)
             .as_bytes()
             .to_vec()
+    }
+}
+
+impl<A: PartialEq> PartialEq for Signed<A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+            && self.pk == other.pk
+            && self.sig == other.sig
+            && self.sig_algorithm.eq(&other.sig_algorithm)
     }
 }

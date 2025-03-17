@@ -1,0 +1,19 @@
+[package]
+name = "block-storage"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+debug = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+shared = { path = "../shared" }
+rspace_plus_plus = { path = "../rspace++" }
+models = { path = "../models" }
+lz4_flex = "0.11.3"
+prost = "0.13.5"
+proptest = "1.6.0"
+
+[build-dependencies]

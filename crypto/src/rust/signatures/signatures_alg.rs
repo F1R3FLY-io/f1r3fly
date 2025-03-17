@@ -5,7 +5,7 @@ use crate::rust::{private_key::PrivateKey, public_key::PublicKey};
 use super::{secp256k1::Secp256k1, secp256k1_eth::Secp256k1Eth};
 
 // TODO: refactor to use PublicKey and PrivateKey instead of [u8]
-pub trait SignaturesAlg {
+pub trait SignaturesAlg: std::fmt::Debug {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool;
 
     fn sign(&self, data: &[u8], sec: &[u8]) -> Vec<u8>;
@@ -25,6 +25,14 @@ pub trait SignaturesAlg {
     }
 
     fn sig_length(&self) -> usize;
+
+    fn eq(&self, other: &dyn SignaturesAlg) -> bool;
+}
+
+impl PartialEq for Box<dyn SignaturesAlg> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name()
+    }
 }
 
 pub struct SignaturesAlgFactory;

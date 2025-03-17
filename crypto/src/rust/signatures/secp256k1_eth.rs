@@ -5,6 +5,7 @@ use crate::rust::signatures::signatures_alg::SignaturesAlg;
 use num_bigint::BigUint;
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Secp256k1Eth.scala
+#[derive(Clone, Debug, PartialEq)]
 pub struct Secp256k1Eth;
 
 impl Secp256k1Eth {
@@ -44,6 +45,10 @@ impl SignaturesAlg for Secp256k1Eth {
 
     fn sig_length(&self) -> usize {
         Secp256k1.sig_length()
+    }
+
+    fn eq(&self, other: &dyn SignaturesAlg) -> bool {
+        self.name() == other.name()
     }
 }
 

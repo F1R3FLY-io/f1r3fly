@@ -1,5 +1,6 @@
 // See casper/src/test/scala/coop/rchain/casper/util/GenesisBuilder.scala
 
+use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
@@ -253,6 +254,7 @@ impl GenessisBuilder {
         );
 
         let (validator_key_pairs, genesis_vaults, genesis_parameters) = parameters;
+
         let storage_directory = Builder::new()
             .prefix("hash-set-casper-test-genesis-")
             .tempdir()
@@ -272,6 +274,8 @@ impl GenessisBuilder {
         );
 
         let genesis = Genesis::create_genesis_block(runtime_manager, genesis_parameters)?;
+        let mut block_store = KeyValueBlockStore::create_from_kvm(&mut kvs_manager).await?;
+        block_store.put(genesis.block_hash.to_vec(), genesis)?;
 
         todo!()
     }

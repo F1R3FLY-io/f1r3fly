@@ -13,6 +13,7 @@ crypto = { path = "../crypto" }
 models = { path = "../models" }
 rholang = { path = "../rholang" }
 rspace_plus_plus = { path = "../rspace++" }
+block-storage = { path = "../block-storage" }
 shared = { path = "../shared" }
 tokio = { version = "1", features = ["full"] }
 prost = "0.13.5"

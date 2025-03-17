@@ -13,6 +13,7 @@ use k256::elliptic_curve::{sec1::ToEncodedPoint, SecretKey};
 use rand::rngs::OsRng;
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Secp256k1.scala
+#[derive(Clone, Debug, PartialEq)]
 pub struct Secp256k1;
 
 impl Secp256k1 {
@@ -71,6 +72,10 @@ impl SignaturesAlg for Secp256k1 {
 
     fn sig_length(&self) -> usize {
         32
+    }
+
+    fn eq(&self, other: &dyn SignaturesAlg) -> bool {
+        self.name() == other.name()
     }
 }
 
