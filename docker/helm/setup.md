@@ -1,6 +1,6 @@
 # Helm handbook
 
-Helm Chart for deploying F1r3fly nodes. Currently Helm Chart generate separate StatefulSets for each node. It supports up to 1000 nodes (limited by Service template now. It can be fixed if we can use 50000-60000 NodePorts or others)
+# Usages
 
 ## Installing Helm chart
 - boot plus 4 validators

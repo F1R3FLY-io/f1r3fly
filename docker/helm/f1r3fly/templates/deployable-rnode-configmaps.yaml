@@ -44,7 +44,7 @@ data:
       # Node shall only accept messages with this `network-id`.
       # This is not Casper construct so it is not in `casper` section.
       # This is used to filter out messages originated from different networks to lower down the load.
-      network-id = "testnet"
+      network-id = "{{ $.Values.shardConfig.network.id }}"
 
       # Host name or IP address of this node. Will be used by peers to reach this node, so by default have to be public
       # address.
@@ -221,7 +221,7 @@ data:
     casper {
       # Block is considered as finalized if its fault tolerance is bigger than this value. For more info
       # https://github.com/rchain/rchain/blob/dev/casper/src/main/scala/coop/rchain/casper/SafetyOracle.scala
-      fault-tolerance-threshold = 0.0
+      fault-tolerance-threshold = {{ $.Values.shardConfig.network.faultToleranceThreshold }}
 
       # Base16 encoding of the public key to use for signing a proposed blocks.
       # Can be inferred from the private key for some signature algorithms.

@@ -26,7 +26,7 @@ data:
       # Node shall only accept messages with this `network-id`.
       # This is not Casper construct so it is not in `casper` section.
       # This is used to filter out messages originated from different networks to lower down the load.
-      network-id = "testnet"
+      network-id = "{{ $.Values.shardConfig.network.id }}"
 
       # Host name or IP address of this node. Will be used by peers to reach this node, so by default have to be public
       # address.
@@ -199,7 +199,7 @@ data:
     casper {
       # Block is considered as finalized if its fault tolerance is bigger than this value. For more info
       # https://github.com/rchain/rchain/blob/dev/casper/src/main/scala/coop/rchain/casper/SafetyOracle.scala
-      fault-tolerance-threshold = 0.0
+      fault-tolerance-threshold = {{ $.Values.shardConfig.network.faultToleranceThreshold }}
 
       # Base16 encoding of the public key to use for signing a proposed blocks.
       # Can be inferred from the private key for some signature algorithms.
@@ -214,8 +214,8 @@ data:
       # Path to the base16 encoded private key to use for signing a proposed blocks.
       # validator-private-key-path =
 
-      # Shard name written into PoS contract during genesis.
-      shard-name = root
+      # Shard name configuration
+      shard-name = {{ $.Values.shardConfig.shardName }}
 
       # ID of the parent shard. For root shard it's `/`. ID of the shard is `{parent-shard-id}/{shard-name}`.
       # So for root named `root` shard ID is `/root`, for its child shard `rootchild` shard ID is `/root/rootchild`.
