@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use super::key_value_store::KvStoreError;
 
 pub trait KeyValueTypedStore<K, V> {
-    fn get(&self, keys: Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
+    fn get(&self, keys: &Vec<K>) -> Result<Vec<Option<V>>, KvStoreError>;
 
     fn put(&mut self, kv_pairs: Vec<(K, V)>) -> Result<(), KvStoreError>;
 
@@ -20,7 +20,7 @@ pub trait KeyValueTypedStore<K, V> {
      */
     fn collect<F, T>(&self, f: F) -> Result<Vec<T>, KvStoreError>
     where
-        F: FnMut((&K, Box<dyn FnOnce() -> V>)) -> Option<T>;
+        F: FnMut((&K, &V)) -> Option<T>;
 
     fn to_map(&self) -> Result<HashMap<K, V>, KvStoreError>;
 }

@@ -14,3 +14,4 @@ pub mod utils;
 pub mod validator;
 pub mod block;
 pub mod block_implicits;
+pub mod block_metadata;

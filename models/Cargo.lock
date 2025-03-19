@@ -2016,6 +2016,8 @@ dependencies = [
  "bincode",
  "heed",
  "hex",
+ "proptest",
+ "prost",
  "serde",
 ]
 

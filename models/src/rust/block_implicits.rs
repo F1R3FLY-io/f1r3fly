@@ -45,7 +45,7 @@ fn justification_gen() -> impl Strategy<Value = Justification> {
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec));
     let block_hash_gen = block_hash_gen();
     (validator_gen, block_hash_gen).prop_map(|(validator, latest_block_hash)| Justification {
-        validator,
+        validator: validator.into(),
         latest_block_hash: latest_block_hash.into(),
     })
 }
