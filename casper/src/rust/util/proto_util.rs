@@ -48,7 +48,7 @@ pub fn unsigned_block_proto(
 pub fn hash_block(block: &BlockMessage) -> BlockHash {
     use prost::Message;
 
-    let bytes = block
+    let bytes: Vec<u8> = block
         .header
         .to_proto()
         .encode_to_vec()
@@ -61,5 +61,5 @@ pub fn hash_block(block: &BlockMessage) -> BlockHash {
         .chain(block.extra_bytes.clone().into_iter())
         .collect();
 
-    Blake2b256::hash(bytes)
+    Blake2b256::hash(bytes).into()
 }

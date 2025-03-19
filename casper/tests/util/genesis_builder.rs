@@ -275,7 +275,7 @@ impl GenessisBuilder {
 
         let genesis = Genesis::create_genesis_block(runtime_manager, genesis_parameters)?;
         let mut block_store = KeyValueBlockStore::create_from_kvm(&mut kvs_manager).await?;
-        block_store.put(genesis.block_hash.to_vec(), genesis)?;
+        block_store.put(genesis.block_hash.clone(), genesis)?;
 
         todo!()
     }

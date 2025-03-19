@@ -22,6 +22,7 @@ use super::{
 
 fn block_hash_gen() -> impl Strategy<Value = BlockHash> {
     prop::collection::vec(any::<u8>(), block_hash::LENGTH)
+        .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec))
 }
 
 fn state_hash_gen() -> impl Strategy<Value = StateHash> {

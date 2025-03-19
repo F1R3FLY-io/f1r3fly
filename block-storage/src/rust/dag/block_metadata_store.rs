@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use models::rust::block_hash::BlockHashWrapper;
+use models::rust::block_hash::{BlockHash, BlockHashSerde};
 use models::rust::block_metadata::BlockMetadata;
 use models::rust::casper::pretty_printer::PrettyPrinter;
 use shared::rust::store::key_value_store::KvStoreError;
@@ -10,26 +10,26 @@ use shared::rust::store::key_value_typed_store::KeyValueTypedStore;
 use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
 
 pub struct BlockMetadataStore {
-    store: KeyValueTypedStoreImpl<BlockHashWrapper, BlockMetadata>,
+    store: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata>,
     dag_state: DagState,
 }
 
 #[derive(Default)]
 struct DagState {
-    dag_set: HashSet<BlockHashWrapper>,
-    child_map: HashMap<BlockHashWrapper, HashSet<BlockHashWrapper>>,
-    height_map: BTreeMap<i64, HashSet<BlockHashWrapper>>,
+    dag_set: HashSet<BlockHash>,
+    child_map: HashMap<BlockHash, HashSet<BlockHash>>,
+    height_map: BTreeMap<i64, HashSet<BlockHash>>,
     // In general - at least genesis should be LFB.
     // But dagstate can be empty, as it is initialized before genesis is inserted.
     // Also lots of tests do not have genesis properly initialised, so fixing all this is pain.
     // So this is Option.
-    last_finalized_block: Option<(BlockHashWrapper, i64)>,
-    finalized_block_set: HashSet<BlockHashWrapper>,
+    last_finalized_block: Option<(BlockHash, i64)>,
+    finalized_block_set: HashSet<BlockHash>,
 }
 
 struct BlockInfo {
-    hash: BlockHashWrapper,
-    parents: HashSet<BlockHashWrapper>,
+    hash: BlockHash,
+    parents: HashSet<BlockHash>,
     block_num: i64,
     is_invalid: bool,
     is_directly_finalized: bool,
@@ -38,11 +38,14 @@ struct BlockInfo {
 
 impl BlockMetadataStore {
     pub fn new(
-        block_metadata_store: KeyValueTypedStoreImpl<BlockHashWrapper, BlockMetadata>,
+        block_metadata_store: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata>,
     ) -> Self {
         let blocks_info_result = block_metadata_store
             .collect(|(hash, metadata)| {
-                Some((hash.clone(), Self::block_metadata_to_info(&hash, metadata)))
+                Some((
+                    hash.0.clone(),
+                    Self::block_metadata_to_info(&hash.0, metadata),
+                ))
             })
             .expect("Failed to collect block metadata");
 
@@ -55,10 +58,7 @@ impl BlockMetadataStore {
         }
     }
 
-    fn block_metadata_to_info(
-        hash: &BlockHashWrapper,
-        block_metadata: &BlockMetadata,
-    ) -> BlockInfo {
+    fn block_metadata_to_info(hash: &BlockHash, block_metadata: &BlockMetadata) -> BlockInfo {
         let mut parents = HashSet::with_capacity(block_metadata.parents.len());
         parents.extend(block_metadata.parents.iter().cloned());
 
@@ -81,7 +81,8 @@ impl BlockMetadataStore {
             Self::validate_dag_state(Self::add_block_to_dag_state(current_state, block_info));
 
         // Update persistent block metadata store
-        self.store.put_one(block_hash, block_metadata)?;
+        self.store
+            .put_one(BlockHashSerde(block_hash), block_metadata)?;
 
         Ok(())
     }
@@ -90,25 +91,25 @@ impl BlockMetadataStore {
      * indirectly finalized are new LFB ancestors. */
     pub fn record_finalized(
         &mut self,
-        directly: BlockHashWrapper,
-        indirectly: HashSet<BlockHashWrapper>,
+        directly: BlockHash,
+        indirectly: HashSet<BlockHash>,
     ) -> Result<(), KvStoreError> {
         // read current values
-        let cur_meta_for_df = self.store.get_unsafe(&directly)?;
+        let cur_meta_for_df = self.store.get_unsafe(&BlockHashSerde(directly.clone()))?;
         let cur_metas_for_if = self
             .store
-            .get_batch(&indirectly.clone().into_iter().collect())?;
+            .get_batch(&indirectly.clone().into_iter().map(BlockHashSerde).collect())?;
 
         // new values to persist
         let mut new_meta_for_df = cur_meta_for_df.clone();
         new_meta_for_df.finalized = true;
         new_meta_for_df.directly_finalized = true;
 
-        let new_metas_for_if: Vec<(BlockHashWrapper, BlockMetadata)> = cur_metas_for_if
+        let new_metas_for_if: Vec<(BlockHashSerde, BlockMetadata)> = cur_metas_for_if
             .into_iter()
             .map(|mut v| {
                 v.finalized = true;
-                (v.block_hash.clone(), v)
+                (BlockHashSerde(v.block_hash.clone()), v)
             })
             .collect();
 
@@ -130,43 +131,43 @@ impl BlockMetadataStore {
 
         // persist new values all at once
         let mut new_values = Vec::with_capacity(1 + new_metas_for_if.len());
-        new_values.push((directly, new_meta_for_df));
+        new_values.push((BlockHashSerde(directly), new_meta_for_df));
         new_values.extend(new_metas_for_if);
         self.store.put(new_values)?;
 
         Ok(())
     }
 
-    pub fn get(&self, hash: &BlockHashWrapper) -> Result<Option<BlockMetadata>, KvStoreError> {
-        self.store.get_one(hash)
+    pub fn get(&self, hash: &BlockHash) -> Result<Option<BlockMetadata>, KvStoreError> {
+        self.store.get_one(&BlockHashSerde(hash.clone()))
     }
 
-    pub fn get_unsafe(&self, hash: &BlockHashWrapper) -> Result<BlockMetadata, KvStoreError> {
+    pub fn get_unsafe(&self, hash: &BlockHash) -> Result<BlockMetadata, KvStoreError> {
         self.get(hash)?.ok_or(KvStoreError::KeyNotFound(format!(
             "BlockMetadataStore is missing key {}",
-            PrettyPrinter::build_string_bytes(&hash.into_bytes().to_vec())
+            PrettyPrinter::build_string_bytes(&hash.to_vec())
         )))
     }
 
     // DAG state operations
 
-    pub fn dag_set(&self) -> HashSet<BlockHashWrapper> {
+    pub fn dag_set(&self) -> HashSet<BlockHash> {
         self.dag_state.dag_set.clone()
     }
 
-    pub fn contains(&self, hash: &BlockHashWrapper) -> bool {
+    pub fn contains(&self, hash: &BlockHash) -> bool {
         self.dag_state.dag_set.contains(hash)
     }
 
-    pub fn child_map(&self) -> HashMap<BlockHashWrapper, HashSet<BlockHashWrapper>> {
+    pub fn child_map(&self) -> HashMap<BlockHash, HashSet<BlockHash>> {
         self.dag_state.child_map.clone()
     }
 
-    pub fn height_map(&self) -> BTreeMap<i64, HashSet<BlockHashWrapper>> {
+    pub fn height_map(&self) -> BTreeMap<i64, HashSet<BlockHash>> {
         self.dag_state.height_map.clone()
     }
 
-    pub fn last_finalized_block(&self) -> BlockHashWrapper {
+    pub fn last_finalized_block(&self) -> BlockHash {
         self.dag_state
             .last_finalized_block
             .as_ref()
@@ -175,7 +176,7 @@ impl BlockMetadataStore {
             .clone()
     }
 
-    pub fn finalized_block_set(&self) -> HashSet<BlockHashWrapper> {
+    pub fn finalized_block_set(&self) -> HashSet<BlockHash> {
         self.dag_state.finalized_block_set.clone()
     }
 
@@ -241,7 +242,7 @@ impl BlockMetadataStore {
         dag_state
     }
 
-    fn recreate_in_memory_state(blocks_info_map: HashMap<BlockHashWrapper, BlockInfo>) -> DagState {
+    fn recreate_in_memory_state(blocks_info_map: HashMap<BlockHash, BlockInfo>) -> DagState {
         let empty_state = DagState::default();
 
         // Add blocks to DAG state

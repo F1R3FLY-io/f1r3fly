@@ -1,9 +1,7 @@
 // See models/src/main/scala/coop/rchain/models/BlockMetadata.scala
 
-use prost::Message;
+use prost::{bytes::Bytes, Message};
 use std::{cmp::Ordering, collections::HashMap};
-
-use shared::rust::BytesWrapper;
 
 use crate::casper::{BlockMetadataInternal, BondProto};
 
@@ -11,11 +9,15 @@ use super::casper::protocol::casper_message::{BlockMessage, F1r3flyState, Justif
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct BlockMetadata {
-    pub block_hash: BytesWrapper,
-    pub parents: Vec<BytesWrapper>,
-    pub sender: BytesWrapper,
+    #[serde(with = "shared::rust::serde_bytes")]
+    pub block_hash: Bytes,
+    #[serde(with = "shared::rust::serde_vec_bytes")]
+    pub parents: Vec<Bytes>,
+    #[serde(with = "shared::rust::serde_bytes")]
+    pub sender: Bytes,
     pub justifications: Vec<Justification>,
-    pub weight_map: HashMap<BytesWrapper, i64>,
+    #[serde(with = "shared::rust::serde_hashmap_bytes_i64")]
+    pub weight_map: HashMap<Bytes, i64>,
     pub block_number: i64,
     pub sequence_number: i32,
     pub invalid: bool,
@@ -26,9 +28,9 @@ pub struct BlockMetadata {
 impl BlockMetadata {
     pub fn from_proto(proto: BlockMetadataInternal) -> Self {
         BlockMetadata {
-            block_hash: proto.block_hash.into(),
-            parents: proto.parents.into_iter().map(Into::into).collect(),
-            sender: proto.sender.into(),
+            block_hash: proto.block_hash,
+            parents: proto.parents,
+            sender: proto.sender,
             justifications: proto
                 .justifications
                 .into_iter()
@@ -49,15 +51,15 @@ impl BlockMetadata {
 
     pub fn to_proto(&self) -> BlockMetadataInternal {
         BlockMetadataInternal {
-            block_hash: self.block_hash.into_bytes(),
-            parents: self.parents.iter().map(|b| b.into_bytes()).collect(),
-            sender: self.sender.into_bytes(),
+            block_hash: self.block_hash.clone(),
+            parents: self.parents.clone(),
+            sender: self.sender.clone(),
             justifications: self.justifications.iter().map(|j| j.to_proto()).collect(),
             bonds: self
                 .weight_map
                 .iter()
                 .map(|(v, s)| BondProto {
-                    validator: v.into_bytes(),
+                    validator: v.clone(),
                     stake: *s,
                 })
                 .collect(),
@@ -79,8 +81,8 @@ impl BlockMetadata {
         Self::from_proto(proto)
     }
 
-    fn bytes_ordering(left: &BytesWrapper, right: &BytesWrapper) -> Ordering {
-        left.0.iter().cmp(right.0.iter())
+    fn bytes_ordering(left: &Bytes, right: &Bytes) -> Ordering {
+        left.iter().cmp(right.iter())
     }
 
     pub fn ordering_by_num(left: &BlockMetadata, right: &BlockMetadata) -> Ordering {
@@ -90,11 +92,11 @@ impl BlockMetadata {
         }
     }
 
-    fn weight_map(state: &F1r3flyState) -> HashMap<BytesWrapper, i64> {
+    fn weight_map(state: &F1r3flyState) -> HashMap<Bytes, i64> {
         state
             .bonds
             .iter()
-            .map(|b| (b.validator.clone().into(), b.stake))
+            .map(|b| (b.validator.clone(), b.stake))
             .collect()
     }
 
@@ -107,14 +109,9 @@ impl BlockMetadata {
         let directly_finalized = directly_finalized.unwrap_or(false);
         let finalized = finalized.unwrap_or(false);
         Self {
-            block_hash: b.block_hash.into(),
-            parents: b
-                .header
-                .parents_hash_list
-                .into_iter()
-                .map(Into::into)
-                .collect(),
-            sender: b.sender.into(),
+            block_hash: b.block_hash,
+            parents: b.header.parents_hash_list,
+            sender: b.sender,
             justifications: b.justifications,
             weight_map: Self::weight_map(&b.body.state),
             block_number: b.body.state.block_number,

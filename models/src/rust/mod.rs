@@ -1,6 +1,10 @@
+pub mod block;
 pub mod block_hash;
+pub mod block_implicits;
+pub mod block_metadata;
 pub mod bundle_ops;
 pub mod casper;
+pub mod equivocation_record;
 pub mod par_map;
 pub mod par_map_type_mapper;
 pub mod par_set;
@@ -12,6 +16,3 @@ pub mod string_ops;
 pub mod test_utils;
 pub mod utils;
 pub mod validator;
-pub mod block;
-pub mod block_implicits;
-pub mod block_metadata;

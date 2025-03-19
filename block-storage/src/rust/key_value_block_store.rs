@@ -41,7 +41,7 @@ impl KeyValueBlockStore {
     }
 
     pub fn get(&self, block_hash: BlockHash) -> Result<Option<BlockMessage>, KvStoreError> {
-        let bytes = self.store.get_one(&block_hash)?;
+        let bytes = self.store.get_one(&block_hash.to_vec())?;
         if bytes.is_none() {
             return Ok(None);
         }
@@ -60,11 +60,11 @@ impl KeyValueBlockStore {
     pub fn put(&mut self, block_hash: BlockHash, block: BlockMessage) -> Result<(), KvStoreError> {
         let block_proto = block.to_proto();
         let bytes = Self::block_proto_to_bytes(&block_proto);
-        self.store.put_one(block_hash, bytes)
+        self.store.put_one(block_hash.to_vec(), bytes)
     }
 
     pub fn put_block_message(&mut self, block: BlockMessage) -> Result<(), KvStoreError> {
-        self.put(block.block_hash.to_vec(), block)
+        self.put(block.block_hash.clone(), block)
     }
 
     fn error_approved_block(cause: String) -> String {
@@ -276,7 +276,7 @@ mod tests {
           let bs = KeyValueBlockStore::new(Box::new(kv), Box::new(NotImplementedKV));
 
           let key = key_string.into_bytes();
-          let result = bs.get(key.clone());
+          let result = bs.get(key.clone().into());
           assert!(result.is_ok());
           assert_eq!(*input_keys.lock().unwrap(), vec![key]);
           assert_eq!(result.unwrap(), Some(block));
@@ -287,7 +287,7 @@ mod tests {
           let kv = MockKeyValueStore::new(None);
           let bs = KeyValueBlockStore::new(Box::new(kv), Box::new(NotImplementedKV));
           let key = key_string.into_bytes();
-          let result = bs.get(key);
+          let result = bs.get(key.into());
           assert!(result.is_ok());
           assert_eq!(result.unwrap(), None);
       }

@@ -1036,7 +1036,7 @@ extern "C" fn set_invalid_blocks(
     let invalid_blocks = params
         .invalid_blocks
         .into_iter()
-        .map(|block| (block.block_hash, block.validator))
+        .map(|block| (block.block_hash.into(), block.validator))
         .collect();
 
     unsafe {

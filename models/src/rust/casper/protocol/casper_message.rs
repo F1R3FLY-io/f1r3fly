@@ -10,7 +10,7 @@ use prost::Message;
 use rspace_plus_plus::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash, state::rspace_exporter::RSpaceExporterInstance,
 };
-use shared::rust::{Byte, ByteVector, BytesWrapper};
+use shared::rust::{Byte, ByteVector};
 
 use crate::{
     casper::{system_deploy_data_proto::SystemDeploy, *},
@@ -427,22 +427,24 @@ impl Body {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Justification {
-    pub validator: BytesWrapper,
-    pub latest_block_hash: BytesWrapper,
+    #[serde(with = "shared::rust::serde_bytes")]
+    pub validator: ByteString,
+    #[serde(with = "shared::rust::serde_bytes")]
+    pub latest_block_hash: ByteString,
 }
 
 impl Justification {
     pub fn from_proto(proto: JustificationProto) -> Self {
         Self {
-            validator: proto.validator.into(),
-            latest_block_hash: proto.latest_block_hash.into(),
+            validator: proto.validator,
+            latest_block_hash: proto.latest_block_hash,
         }
     }
 
     pub fn to_proto(&self) -> JustificationProto {
         JustificationProto {
-            validator: self.validator.into_bytes(),
-            latest_block_hash: self.latest_block_hash.into_bytes(),
+            validator: self.validator.clone(),
+            latest_block_hash: self.latest_block_hash.clone(),
         }
     }
 }

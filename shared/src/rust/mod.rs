@@ -8,57 +8,112 @@ pub type ByteString = Vec<u8>;
 pub type BitSet = Vec<u8>;
 pub type BitVector = Vec<u8>;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+pub mod serde_bytes {
+    use prost::bytes::Bytes;
+    use serde::{Deserializer, Serializer};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct BytesWrapper(pub prost::bytes::Bytes);
-
-impl BytesWrapper {
-    pub fn into_bytes(&self) -> prost::bytes::Bytes {
-        self.0.clone()
-    }
-}
-
-impl From<prost::bytes::Bytes> for BytesWrapper {
-    fn from(bytes: prost::bytes::Bytes) -> Self {
-        BytesWrapper(bytes)
-    }
-}
-
-impl From<Vec<u8>> for BytesWrapper {
-    fn from(bytes: Vec<u8>) -> Self {
-        BytesWrapper(prost::bytes::Bytes::from(bytes))
-    }
-}
-
-impl Serialize for BytesWrapper {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(bytes: &Bytes, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(self.0.as_ref())
+        // Convert Bytes to &[u8] and serialize with serde_bytes
+        ::serde_bytes::serialize(bytes.as_ref(), serializer)
     }
-}
 
-impl<'de> Deserialize<'de> for BytesWrapper {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
-        Ok(BytesWrapper(prost::bytes::Bytes::from(bytes)))
+        // Deserialize to Vec<u8> and then convert to Bytes
+        let bytes: Vec<u8> = ::serde_bytes::deserialize(deserializer)?;
+        Ok(Bytes::from(bytes))
     }
 }
 
-impl proptest::arbitrary::Arbitrary for BytesWrapper {
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+pub mod serde_vec_bytes {
+    use prost::bytes::Bytes;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        use proptest::prelude::*;
+    pub fn serialize<S>(bytes_vec: &Vec<Bytes>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Convert Vec<Bytes> to Vec<Vec<u8>> for serialization
+        let vec_u8: Vec<Vec<u8>> = bytes_vec.iter().map(|b| b.to_vec()).collect();
+        vec_u8.serialize(serializer)
+    }
 
-        proptest::collection::vec(any::<u8>(), 32)
-            .prop_map(|v| BytesWrapper(prost::bytes::Bytes::from(v)))
-            .boxed()
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bytes>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as Vec<Vec<u8>> and convert to Vec<Bytes>
+        let vec_u8: Vec<Vec<u8>> = Vec::deserialize(deserializer)?;
+        let bytes_vec = vec_u8.into_iter().map(Bytes::from).collect();
+        Ok(bytes_vec)
+    }
+}
+
+pub mod serde_hashmap_bytes_i64 {
+    use prost::bytes::Bytes;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+    use std::hash::Hash;
+
+    // Helper struct for serializing Bytes as keys
+    #[derive(Eq)]
+    struct BytesKey(Bytes);
+
+    impl Hash for BytesKey {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.0.as_ref().hash(state);
+        }
+    }
+
+    impl PartialEq for BytesKey {
+        fn eq(&self, other: &Self) -> bool {
+            self.0.as_ref() == other.0.as_ref()
+        }
+    }
+
+    impl Serialize for BytesKey {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            ::serde_bytes::serialize(self.0.as_ref(), serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for BytesKey {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let bytes: Vec<u8> = ::serde_bytes::deserialize(deserializer)?;
+            Ok(BytesKey(Bytes::from(bytes)))
+        }
+    }
+
+    pub fn serialize<S>(map: &HashMap<Bytes, i64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Convert HashMap<Bytes, i64> to HashMap<BytesKey, i64> for serialization
+        let transformed_map: HashMap<BytesKey, i64> =
+            map.iter().map(|(k, v)| (BytesKey(k.clone()), *v)).collect();
+
+        transformed_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<Bytes, i64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as HashMap<BytesKey, i64> and convert to HashMap<Bytes, i64>
+        let transformed_map: HashMap<BytesKey, i64> = HashMap::deserialize(deserializer)?;
+        let map = transformed_map.into_iter().map(|(k, v)| (k.0, v)).collect();
+
+        Ok(map)
     }
 }
