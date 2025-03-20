@@ -257,3 +257,6 @@ affinity: {}
 
 persistence:
   storageClassName: oci
+
+metrics:
+  enablePrometheus: false

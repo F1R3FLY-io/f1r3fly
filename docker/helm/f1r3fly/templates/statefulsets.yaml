@@ -109,7 +109,7 @@ spec:
         {{- if $isBootstrapNode }}
         - name: {{ include "f1r3fly.fullname" $ }}-tls-certs
           secret:
-            secretName: {{ include "f1r3fly.fullname" $ }}-tls-certs
+            secretName: {{ $.Values.shardConfig.bootstrap.tls.secret.name }}
         {{- end }}
       {{- with $.Values.nodeSelector }}
       nodeSelector:

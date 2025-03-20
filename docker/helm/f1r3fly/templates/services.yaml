@@ -13,7 +13,7 @@ spec:
   type: {{ $.Values.service.type }}
   ports:
     {{- range $port := $.Values.service.ports }}
-    - name: {{ $port.containerPort }}-{{ $index }}
+    - name: {{ $port.containerPort | quote }}
       targetPort: {{ $port.containerPort | toString }}
       port: {{ $port.containerPort }}
       protocol: TCP
