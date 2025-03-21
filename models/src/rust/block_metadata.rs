@@ -7,7 +7,7 @@ use crate::casper::{BlockMetadataInternal, BondProto};
 
 use super::casper::protocol::casper_message::{BlockMessage, F1r3flyState, Justification};
 
-#[derive(Clone, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct BlockMetadata {
     #[serde(with = "shared::rust::serde_bytes")]
     pub block_hash: Bytes,

@@ -268,11 +268,13 @@ dependencies = [
  "hex",
  "lz4_flex",
  "models",
+ "once_cell",
  "proptest",
  "prost",
  "rayon",
  "rspace_plus_plus",
  "shared",
+ "tokio",
 ]
 
 [[package]]

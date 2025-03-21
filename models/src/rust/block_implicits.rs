@@ -20,29 +20,29 @@ use super::{
     validator::{self, Validator},
 };
 
-fn block_hash_gen() -> impl Strategy<Value = BlockHash> {
+pub fn block_hash_gen() -> impl Strategy<Value = BlockHash> {
     prop::collection::vec(any::<u8>(), block_hash::LENGTH)
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec))
 }
 
-fn state_hash_gen() -> impl Strategy<Value = StateHash> {
+pub fn state_hash_gen() -> impl Strategy<Value = StateHash> {
     prop::collection::vec(any::<u8>(), state_hash::LENGTH)
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec))
 }
 
-fn validator_gen() -> impl Strategy<Value = Validator> {
+pub fn validator_gen() -> impl Strategy<Value = Validator> {
     prop::collection::vec(any::<u8>(), validator::LENGTH)
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec))
 }
 
-fn bond_gen() -> impl Strategy<Value = Bond> {
+pub fn bond_gen() -> impl Strategy<Value = Bond> {
     let validator_gen = prop::collection::vec(any::<u8>(), validator::LENGTH)
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec));
     let stake_gen = 1i64..=1024i64;
     (validator_gen, stake_gen).prop_map(|(validator, stake)| Bond { validator, stake })
 }
 
-fn justification_gen() -> impl Strategy<Value = Justification> {
+pub fn justification_gen() -> impl Strategy<Value = Justification> {
     let validator_gen = prop::collection::vec(any::<u8>(), validator::LENGTH)
         .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec));
     let block_hash_gen = block_hash_gen();
@@ -52,7 +52,7 @@ fn justification_gen() -> impl Strategy<Value = Justification> {
     })
 }
 
-fn signed_deploy_data_gen() -> impl Strategy<Value = Signed<DeployData>> {
+pub fn signed_deploy_data_gen() -> impl Strategy<Value = Signed<DeployData>> {
     let term_length = 32..=1024;
     let term = prop::collection::vec(
         any::<char>().prop_filter("Must be alphanumeric", |c| c.is_alphanumeric()),
@@ -81,7 +81,7 @@ fn signed_deploy_data_gen() -> impl Strategy<Value = Signed<DeployData>> {
     })
 }
 
-fn processed_deploy_gen() -> impl Strategy<Value = ProcessedDeploy> {
+pub fn processed_deploy_gen() -> impl Strategy<Value = ProcessedDeploy> {
     let deploy_data_gen = signed_deploy_data_gen();
     deploy_data_gen.prop_map(|deploy_data| ProcessedDeploy {
         deploy: Arc::new(deploy_data),
@@ -236,12 +236,14 @@ pub fn block_element_gen(
         )
 }
 
-fn block_elements_with_parents_gen(
+pub fn block_elements_with_parents_gen(
     genesis: BlockMessage,
+    min_size: usize,
+    max_size: usize,
 ) -> impl Strategy<Value = Vec<BlockMessage>> {
     let bonds = genesis.body.state.bonds.clone();
 
-    prop::collection::vec(any::<u8>(), 0..10).prop_flat_map(move |_| {
+    prop::collection::vec(any::<u8>(), min_size..max_size).prop_flat_map(move |_| {
         let bonds = bonds.clone();
         let blocks: Vec<BlockMessage> = Vec::new();
 
@@ -288,7 +290,7 @@ fn block_elements_with_parents_gen(
     })
 }
 
-fn block_with_new_hashes_gen(
+pub fn block_with_new_hashes_gen(
     block_elements: Vec<BlockMessage>,
 ) -> impl Strategy<Value = Vec<BlockMessage>> {
     prop::collection::vec(block_hash_gen(), block_elements.len()).prop_map(move |new_hashes| {

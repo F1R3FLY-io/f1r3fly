@@ -39,7 +39,7 @@ pub struct KeyValueDagRepresentation {
 }
 
 impl KeyValueDagRepresentation {
-    fn lookup(&self, block_hash: &BlockHash) -> Result<Option<BlockMetadata>, KvStoreError> {
+    pub fn lookup(&self, block_hash: &BlockHash) -> Result<Option<BlockMetadata>, KvStoreError> {
         if self.dag_set.contains(block_hash) {
             let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
             block_metadata_index_guard.get(block_hash)
@@ -48,36 +48,36 @@ impl KeyValueDagRepresentation {
         }
     }
 
-    fn contains(&self, block_hash: &BlockHash) -> bool {
+    pub fn contains(&self, block_hash: &BlockHash) -> bool {
         block_hash.len() == block_hash::LENGTH && self.dag_set.contains(block_hash)
     }
 
-    fn children(&self, block_hash: &BlockHash) -> Option<Arc<DashSet<BlockHash>>> {
+    pub fn children(&self, block_hash: &BlockHash) -> Option<Arc<DashSet<BlockHash>>> {
         self.child_map.get(block_hash).map(|v| v.value().clone())
     }
 
-    fn latest_message_hash(&self, validator: &Validator) -> Option<BlockHash> {
+    pub fn latest_message_hash(&self, validator: &Validator) -> Option<BlockHash> {
         self.latest_messages_map
             .get(validator)
             .map(|v| v.value().clone())
     }
 
-    fn latest_message_hashes(&self) -> Arc<DashMap<Validator, BlockHash>> {
+    pub fn latest_message_hashes(&self) -> Arc<DashMap<Validator, BlockHash>> {
         self.latest_messages_map.clone()
     }
 
-    fn invalid_blocks(&self) -> Arc<DashSet<BlockMetadata>> {
+    pub fn invalid_blocks(&self) -> Arc<DashSet<BlockMetadata>> {
         self.invalid_blocks_set.clone()
     }
 
-    fn last_finalized_block(&self) -> BlockHash {
+    pub fn last_finalized_block(&self) -> BlockHash {
         self.last_finalized_block_hash.clone()
     }
 
     // latestBlockNumber, topoSort and lookupByDeployId are only used in BlockAPI.
     // Do they need to be part of the DAG current state or they can be moved to DAG storage directly?
 
-    fn get_max_height(&self) -> i64 {
+    pub fn get_max_height(&self) -> i64 {
         let height_map_guard = self.height_map.read().unwrap();
         if height_map_guard.is_empty() {
             0
@@ -90,15 +90,15 @@ impl KeyValueDagRepresentation {
         }
     }
 
-    fn latest_block_number(&self) -> i64 {
+    pub fn latest_block_number(&self) -> i64 {
         self.get_max_height()
     }
 
-    fn is_finalized(&self, block_hash: &BlockHash) -> bool {
+    pub fn is_finalized(&self, block_hash: &BlockHash) -> bool {
         self.finalized_blocks_set.contains(block_hash)
     }
 
-    fn find(&self, truncated_hash: &str) -> Option<BlockHash> {
+    pub fn find(&self, truncated_hash: &str) -> Option<BlockHash> {
         if truncated_hash.len() % 2 == 0 {
             let truncated_bytes = hex::decode(truncated_hash).expect("invalid truncated hash");
             self.dag_set
@@ -119,7 +119,7 @@ impl KeyValueDagRepresentation {
         }
     }
 
-    fn topo_sort(
+    pub fn topo_sort(
         &self,
         start_block_number: i64,
         maybe_end_block_number: Option<i64>,
@@ -146,7 +146,10 @@ impl KeyValueDagRepresentation {
         }
     }
 
-    fn lookup_by_deploy_id(&self, deploy_id: &DeployId) -> Result<Option<BlockHash>, KvStoreError> {
+    pub fn lookup_by_deploy_id(
+        &self,
+        deploy_id: &DeployId,
+    ) -> Result<Option<BlockHash>, KvStoreError> {
         let deploy_index_guard = self.deploy_index.read().unwrap();
         deploy_index_guard
             .get_one(deploy_id)
@@ -197,12 +200,12 @@ impl BlockDagKeyValueStorage {
         })
     }
 
-    fn equivocation_records(&self) -> Result<HashSet<EquivocationRecord>, KvStoreError> {
+    pub fn equivocation_records(&self) -> Result<HashSet<EquivocationRecord>, KvStoreError> {
         let equivocation_tracker_index_guard = self.equivocation_tracker_index.read().unwrap();
         equivocation_tracker_index_guard.data()
     }
 
-    fn insert_equivocation_record(
+    pub fn insert_equivocation_record(
         &mut self,
         record: EquivocationRecord,
     ) -> Result<(), KvStoreError> {
@@ -210,7 +213,7 @@ impl BlockDagKeyValueStorage {
         equivocation_tracker_index_guard.add(record)
     }
 
-    fn update_equivocation_record(
+    pub fn update_equivocation_record(
         &mut self,
         mut record: EquivocationRecord,
         block_hash: BlockHash,
@@ -266,7 +269,7 @@ impl BlockDagKeyValueStorage {
         block: &BlockMessage,
         invalid: bool,
         approved: bool,
-    ) -> Result<(), KvStoreError> {
+    ) -> Result<KeyValueDagRepresentation, KvStoreError> {
         let sender_is_empty = block.sender.is_empty();
         let sender_has_invalid_format =
             !sender_is_empty && (block.sender.len() != validator::LENGTH);
@@ -332,18 +335,20 @@ impl BlockDagKeyValueStorage {
             let block_hash = block.block_hash.clone();
             let block_hash_is_invalid = !(block_hash.len() == block_hash::LENGTH);
 
-            assert!(
-                sender_has_invalid_format,
-                "Block sender is malformed., Block: {:?}",
-                block
-            );
+            if sender_has_invalid_format {
+                return Err(KvStoreError::InvalidArgument(format!(
+                    "Block sender is malformed., Block: {:?}",
+                    block
+                )));
+            }
             // TODO: should we have special error type for block hash error also?
             //  Should this be checked before calling insert? Is DAG storage responsible for that? - OLD
-            assert!(
-                block_hash_is_invalid,
-                "Block hash {} is not correct length.",
-                PrettyPrinter::build_string_bytes(&block_hash)
-            );
+            if block_hash_is_invalid {
+                return Err(KvStoreError::InvalidArgument(format!(
+                    "Block hash {} is not correct length.",
+                    PrettyPrinter::build_string_bytes(&block_hash)
+                )));
+            }
 
             if sender_is_empty {
                 println!("{}", log_empty_sender);
@@ -403,17 +408,23 @@ impl BlockDagKeyValueStorage {
             Ok(())
         };
 
-        let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
-        if block_metadata_index_guard.contains(&block.block_hash) {
+        let block_exists = {
+            let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
+            let exists = block_metadata_index_guard.contains(&block.block_hash);
+            exists
+        };
+
+        if block_exists {
             println!("{}", log_already_stored);
-            Ok(())
         } else {
-            do_insert()
-        }
+            do_insert()?
+        };
+
+        Ok(self.get_representation())
     }
 
     /** Record that some hash is directly finalized (detected by finalizer and becomes LFB). */
-    pub fn record_finalized(
+    pub fn record_directly_finalized(
         &self,
         directly_finalized_hash: BlockHash,
         finalization_effect: impl Fn(&HashSet<BlockHash>) -> Result<(), KvStoreError>,
@@ -426,12 +437,14 @@ impl BlockDagKeyValueStorage {
             )));
         }
 
-        let mut indirectly_finalized = self.ancestors(directly_finalized_hash.clone(), |hash| {
+        let indirectly_finalized = self.ancestors(directly_finalized_hash.clone(), |hash| {
             !dag.is_finalized(&hash)
         })?;
 
-        indirectly_finalized.insert(directly_finalized_hash.clone());
-        finalization_effect(&indirectly_finalized)?;
+        let mut all_finalized = indirectly_finalized.clone();
+        all_finalized.insert(directly_finalized_hash.clone());
+
+        finalization_effect(&all_finalized)?;
 
         let mut block_metadata_index_guard = self.block_metadata_index.write().unwrap();
         block_metadata_index_guard

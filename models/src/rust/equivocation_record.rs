@@ -36,7 +36,7 @@ pub enum EquivocationDiscoveryStatus {
     EquivocationOblivious,
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EquivocationRecord {
     pub equivocator: Validator,
     pub equivocation_base_block_seq_num: SequenceNumber,
