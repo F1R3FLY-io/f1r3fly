@@ -296,22 +296,23 @@ impl BlockMessage {
         })
     }
 
-    pub fn to_proto(self) -> BlockMessageProto {
+    pub fn to_proto(&self) -> BlockMessageProto {
         BlockMessageProto {
-            block_hash: self.block_hash,
+            block_hash: self.block_hash.clone(),
             header: Some(self.header.to_proto()),
             body: Some(self.body.to_proto()),
             justifications: self
                 .justifications
+                .clone()
                 .into_iter()
                 .map(|j| j.to_proto())
                 .collect(),
-            sender: self.sender,
+            sender: self.sender.clone(),
             seq_num: self.seq_num,
-            sig: self.sig,
-            sig_algorithm: self.sig_algorithm,
-            shard_id: self.shard_id,
-            extra_bytes: self.extra_bytes,
+            sig: self.sig.clone(),
+            sig_algorithm: self.sig_algorithm.clone(),
+            shard_id: self.shard_id.clone(),
+            extra_bytes: self.extra_bytes.clone(),
         }
     }
 

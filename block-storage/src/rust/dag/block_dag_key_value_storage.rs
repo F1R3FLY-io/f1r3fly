@@ -263,7 +263,7 @@ impl BlockDagKeyValueStorage {
 
     pub fn insert(
         &mut self,
-        block: BlockMessage,
+        block: &BlockMessage,
         invalid: bool,
         approved: bool,
     ) -> Result<(), KvStoreError> {

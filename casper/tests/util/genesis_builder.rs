@@ -1,11 +1,14 @@
 // See casper/src/test/scala/coop/rchain/casper/util/GenesisBuilder.scala
 
-use block_storage::rust::key_value_block_store::KeyValueBlockStore;
+use block_storage::rust::{
+    dag::block_dag_key_value_storage::BlockDagKeyValueStorage,
+    key_value_block_store::KeyValueBlockStore,
+};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf};
 use tempfile::Builder;
 
 use casper::rust::{
@@ -78,7 +81,7 @@ impl GenessisBuilder {
             .collect()
     }
 
-    pub async fn create_genesis(&mut self) -> Result<Arc<BlockMessage>, CasperError> {
+    pub async fn create_genesis(&mut self) -> Result<BlockMessage, CasperError> {
         let context = self.build_genesis_with_parameters(None).await?;
         Ok(context.genesis_block)
     }
@@ -275,15 +278,23 @@ impl GenessisBuilder {
 
         let genesis = Genesis::create_genesis_block(runtime_manager, genesis_parameters)?;
         let mut block_store = KeyValueBlockStore::create_from_kvm(&mut kvs_manager).await?;
-        block_store.put(genesis.block_hash.clone(), genesis)?;
+        block_store.put(genesis.block_hash.clone(), &genesis)?;
 
-        todo!()
+        let mut block_dag_storage = BlockDagKeyValueStorage::new(&mut kvs_manager).await?;
+        block_dag_storage.insert(&genesis, false, true)?;
+
+        Ok(GenesisContext {
+            genesis_block: genesis,
+            validator_key_pairs: validator_key_pairs.clone(),
+            genesis_vaults: genesis_vaults.clone(),
+            storage_directory: storage_directory.path().to_path_buf(),
+        })
     }
 }
 
 #[derive(Clone)]
 pub struct GenesisContext {
-    pub genesis_block: Arc<BlockMessage>,
+    pub genesis_block: BlockMessage,
     pub validator_key_pairs: Vec<(PrivateKey, PublicKey)>,
     pub genesis_vaults: Vec<(PrivateKey, PublicKey)>,
     pub storage_directory: PathBuf,

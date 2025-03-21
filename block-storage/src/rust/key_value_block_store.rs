@@ -57,13 +57,13 @@ impl KeyValueBlockStore {
         }
     }
 
-    pub fn put(&mut self, block_hash: BlockHash, block: BlockMessage) -> Result<(), KvStoreError> {
+    pub fn put(&mut self, block_hash: BlockHash, block: &BlockMessage) -> Result<(), KvStoreError> {
         let block_proto = block.to_proto();
         let bytes = Self::block_proto_to_bytes(&block_proto);
         self.store.put_one(block_hash.to_vec(), bytes)
     }
 
-    pub fn put_block_message(&mut self, block: BlockMessage) -> Result<(), KvStoreError> {
+    pub fn put_block_message(&mut self, block: &BlockMessage) -> Result<(), KvStoreError> {
         self.put(block.block_hash.clone(), block)
     }
 
@@ -300,7 +300,7 @@ mod tests {
           let input_puts = Arc::clone(&kv.input_puts);
           let mut bs = KeyValueBlockStore::new(Box::new(kv), Box::new(NotImplementedKV));
 
-          let result = bs.put_block_message(block.clone());
+          let result = bs.put_block_message(&block);
           assert!(result.is_ok());
           assert_eq!(*input_keys.lock().unwrap(), vec![block.block_hash.to_vec()]);
           assert_eq!(*input_puts.lock().unwrap(), vec![block_bytes]);
