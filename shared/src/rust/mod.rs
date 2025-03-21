@@ -54,14 +54,14 @@ pub mod serde_vec_bytes {
     }
 }
 
-pub mod serde_hashmap_bytes_i64 {
+pub mod serde_btreemap_bytes_i64 {
     use prost::bytes::Bytes;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::hash::Hash;
 
     // Helper struct for serializing Bytes as keys
-    #[derive(Eq)]
+    #[derive(Eq, Ord, PartialOrd)]
     struct BytesKey(Bytes);
 
     impl Hash for BytesKey {
@@ -95,23 +95,23 @@ pub mod serde_hashmap_bytes_i64 {
         }
     }
 
-    pub fn serialize<S>(map: &HashMap<Bytes, i64>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(map: &BTreeMap<Bytes, i64>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        // Convert HashMap<Bytes, i64> to HashMap<BytesKey, i64> for serialization
-        let transformed_map: HashMap<BytesKey, i64> =
+        // Convert BTreeMap<Bytes, i64> to BTreeMap<BytesKey, i64> for serialization
+        let transformed_map: BTreeMap<BytesKey, i64> =
             map.iter().map(|(k, v)| (BytesKey(k.clone()), *v)).collect();
 
         transformed_map.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<Bytes, i64>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BTreeMap<Bytes, i64>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        // Deserialize as HashMap<BytesKey, i64> and convert to HashMap<Bytes, i64>
-        let transformed_map: HashMap<BytesKey, i64> = HashMap::deserialize(deserializer)?;
+        // Deserialize as BTreeMap<BytesKey, i64> and convert to BTreeMap<Bytes, i64>
+        let transformed_map: BTreeMap<BytesKey, i64> = BTreeMap::deserialize(deserializer)?;
         let map = transformed_map.into_iter().map(|(k, v)| (k.0, v)).collect();
 
         Ok(map)

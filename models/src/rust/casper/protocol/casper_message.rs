@@ -425,7 +425,7 @@ impl Body {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize, Hash)]
 pub struct Justification {
     #[serde(with = "shared::rust::serde_bytes")]
     pub validator: ByteString,

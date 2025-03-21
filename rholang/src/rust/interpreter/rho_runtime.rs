@@ -403,7 +403,7 @@ impl RhoRuntime for RhoRuntimeImpl {
                                     expr_instance: Some(GByteArray(validator.into())),
                                 }]),
                                 Par::default().with_exprs(vec![Expr {
-                                    expr_instance: Some(GByteArray(block_hash)),
+                                    expr_instance: Some(GByteArray(block_hash.into())),
                                 }]),
                             )
                         })

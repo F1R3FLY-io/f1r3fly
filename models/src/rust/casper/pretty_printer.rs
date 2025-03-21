@@ -23,7 +23,7 @@ impl PrettyPrinter {
         }
     }
 
-    fn build_string_block_message(b: &BlockMessage, short: bool) -> String {
+    pub fn build_string_block_message(b: &BlockMessage, short: bool) -> String {
         match b.header.parents_hash_list.first() {
             None => format!(
                 "Block #{} ({}) with empty parents (supposedly genesis)",

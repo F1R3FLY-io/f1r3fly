@@ -1,13 +1,13 @@
 // See models/src/main/scala/coop/rchain/models/BlockMetadata.scala
 
 use prost::{bytes::Bytes, Message};
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use crate::casper::{BlockMetadataInternal, BondProto};
 
 use super::casper::protocol::casper_message::{BlockMessage, F1r3flyState, Justification};
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct BlockMetadata {
     #[serde(with = "shared::rust::serde_bytes")]
     pub block_hash: Bytes,
@@ -16,8 +16,8 @@ pub struct BlockMetadata {
     #[serde(with = "shared::rust::serde_bytes")]
     pub sender: Bytes,
     pub justifications: Vec<Justification>,
-    #[serde(with = "shared::rust::serde_hashmap_bytes_i64")]
-    pub weight_map: HashMap<Bytes, i64>,
+    #[serde(with = "shared::rust::serde_btreemap_bytes_i64")]
+    pub weight_map: BTreeMap<Bytes, i64>,
     pub block_number: i64,
     pub sequence_number: i32,
     pub invalid: bool,
@@ -92,7 +92,7 @@ impl BlockMetadata {
         }
     }
 
-    fn weight_map(state: &F1r3flyState) -> HashMap<Bytes, i64> {
+    fn weight_map(state: &F1r3flyState) -> BTreeMap<Bytes, i64> {
         state
             .bonds
             .iter()
@@ -101,7 +101,7 @@ impl BlockMetadata {
     }
 
     pub fn from_block(
-        b: BlockMessage,
+        b: &BlockMessage,
         invalid: bool,
         directly_finalized: Option<bool>,
         finalized: Option<bool>,
@@ -109,10 +109,10 @@ impl BlockMetadata {
         let directly_finalized = directly_finalized.unwrap_or(false);
         let finalized = finalized.unwrap_or(false);
         Self {
-            block_hash: b.block_hash,
-            parents: b.header.parents_hash_list,
-            sender: b.sender,
-            justifications: b.justifications,
+            block_hash: b.block_hash.clone(),
+            parents: b.header.parents_hash_list.clone(),
+            sender: b.sender.clone(),
+            justifications: b.justifications.clone(),
             weight_map: Self::weight_map(&b.body.state),
             block_number: b.body.state.block_number,
             sequence_number: b.seq_num,

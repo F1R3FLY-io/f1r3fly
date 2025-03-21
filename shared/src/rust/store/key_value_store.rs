@@ -85,6 +85,8 @@ pub enum KvStoreError {
     KeyNotFound(String),
     IoError(String),
     SerializationError(String),
+    InvalidArgument(String),
+    LockError(String),
 }
 
 impl std::fmt::Display for KvStoreError {
@@ -93,6 +95,8 @@ impl std::fmt::Display for KvStoreError {
             KvStoreError::KeyNotFound(key) => write!(f, "Key not found: {}", key),
             KvStoreError::IoError(e) => write!(f, "I/O error: {}", e),
             KvStoreError::SerializationError(e) => write!(f, "SerializationError error: {}", e),
+            KvStoreError::InvalidArgument(e) => write!(f, "Invalid argument: {}", e),
+            KvStoreError::LockError(e) => write!(f, "Lock error: {}", e),
         }
     }
 }

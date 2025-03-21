@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashSet};
 use models::rust::{
     block_hash::BlockHashSerde,
     equivocation_record::{EquivocationRecord, SequenceNumber},
-    validator::Validator,
+    validator::ValidatorSerde,
 };
 use shared::rust::store::{
     key_value_store::KvStoreError, key_value_typed_store::KeyValueTypedStore,
@@ -13,19 +13,22 @@ use shared::rust::store::{
 };
 
 pub struct EquivocationTrackerStore {
-    pub store: KeyValueTypedStoreImpl<(Validator, SequenceNumber), BTreeSet<BlockHashSerde>>,
+    pub store: KeyValueTypedStoreImpl<(ValidatorSerde, SequenceNumber), BTreeSet<BlockHashSerde>>,
 }
 
 impl EquivocationTrackerStore {
     pub fn new(
-        store: KeyValueTypedStoreImpl<(Validator, SequenceNumber), BTreeSet<BlockHashSerde>>,
+        store: KeyValueTypedStoreImpl<(ValidatorSerde, SequenceNumber), BTreeSet<BlockHashSerde>>,
     ) -> Self {
         Self { store }
     }
 
     pub fn add(&mut self, record: EquivocationRecord) -> Result<(), KvStoreError> {
         self.store.put_one(
-            (record.equivocator, record.equivocation_base_block_seq_num),
+            (
+                ValidatorSerde(record.equivocator),
+                record.equivocation_base_block_seq_num,
+            ),
             record
                 .equivocation_detected_block_hashes
                 .into_iter()
@@ -40,7 +43,10 @@ impl EquivocationTrackerStore {
                 .into_iter()
                 .map(|record| {
                     (
-                        (record.equivocator, record.equivocation_base_block_seq_num),
+                        (
+                            ValidatorSerde(record.equivocator),
+                            record.equivocation_base_block_seq_num,
+                        ),
                         record
                             .equivocation_detected_block_hashes
                             .into_iter()
@@ -61,7 +67,7 @@ impl EquivocationTrackerStore {
                         equivocation_detected_block_hashes,
                     )| {
                         EquivocationRecord::new(
-                            equivocator,
+                            equivocator.into(),
                             equivocation_base_block_seq_num,
                             equivocation_detected_block_hashes
                                 .into_iter()

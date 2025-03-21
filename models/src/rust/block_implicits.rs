@@ -32,6 +32,7 @@ fn state_hash_gen() -> impl Strategy<Value = StateHash> {
 
 fn validator_gen() -> impl Strategy<Value = Validator> {
     prop::collection::vec(any::<u8>(), validator::LENGTH)
+        .prop_map(|byte_vec| prost::bytes::Bytes::from(byte_vec))
 }
 
 fn bond_gen() -> impl Strategy<Value = Bond> {
@@ -147,14 +148,13 @@ pub fn block_element_gen(
                 bonds
                     .choose(&mut rng)
                     .map(|bond| bond.validator.clone())
-                    .map(|b| b.to_vec())
+                    .map(|b| b)
                     .unwrap_or_else(|| {
                         validator_gen()
                             .boxed()
                             .new_tree(&mut TestRunner::default())
                             .unwrap()
                             .current()
-                            .to_vec()
                     })
             })
             .boxed(),

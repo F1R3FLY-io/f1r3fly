@@ -264,10 +264,13 @@ dependencies = [
 name = "block-storage"
 version = "0.1.0"
 dependencies = [
+ "dashmap 6.1.0",
+ "hex",
  "lz4_flex",
  "models",
  "proptest",
  "prost",
+ "rayon",
  "rspace_plus_plus",
  "shared",
 ]
