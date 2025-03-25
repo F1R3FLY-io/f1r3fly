@@ -1,4 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManager.scala
+// See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManagerSyntax.scala
+// See casper/src/main/scala/coop/rchain/casper/rholang/RuntimeSyntax.scala
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -16,6 +18,8 @@ use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::merging::rholang_merging_logic::DeployMergeableData;
 use rholang::rust::interpreter::rho_runtime::{self, RhoHistoryRepository, RhoRuntimeImpl};
 use rholang::rust::interpreter::system_processes::BlockData;
+use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use rspace_plus_plus::rspace::merger::merging_logic::NumberChannelsEndVal;
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -38,11 +42,11 @@ pub struct RuntimeManager {
 }
 
 impl RuntimeManager {
-    pub async fn spawn_runtime(self) -> Arc<Mutex<RhoRuntimeImpl>> {
+    pub async fn spawn_runtime(&self) -> Arc<Mutex<RhoRuntimeImpl>> {
         let new_space = self.space.spawn().expect("Failed to spawn RSpace");
         let runtime = rho_runtime::create_rho_runtime(
             new_space,
-            self.mergeable_tag_name,
+            self.mergeable_tag_name.clone(),
             false,
             &mut Vec::new(),
         )
@@ -68,7 +72,7 @@ impl RuntimeManager {
         runtime
     }
 
-    pub fn compute_state(
+    pub async fn compute_state(
         &self,
         start_hash: StateHash,
         terms: Vec<Signed<DeployData>>,
@@ -77,6 +81,63 @@ impl RuntimeManager {
         invalid_blocks: Option<HashMap<BlockHash, Validator>>,
     ) -> Result<(StateHash, Vec<ProcessedDeploy>, Vec<ProcessedSystemDeploy>), CasperError> {
         let invalid_blocks = invalid_blocks.unwrap_or_default();
+        let runtime = self.spawn_runtime().await;
+
+        // Block data used for mergeable key
+        let sender = block_data.sender.clone();
+        let seq_num = block_data.seq_num;
+
+        let computed = Self::compute_state_inner(
+            runtime,
+            start_hash.clone(),
+            terms,
+            system_deploys,
+            block_data,
+            invalid_blocks,
+        );
+
+        let (state_hash, usr_deploy_res, sys_deploy_res) = computed;
+        let (usr_processed, usr_mergeable): (Vec<ProcessedDeploy>, Vec<NumberChannelsEndVal>) =
+            usr_deploy_res.into_iter().unzip();
+        let (sys_processed, sys_mergeable): (
+            Vec<ProcessedSystemDeploy>,
+            Vec<NumberChannelsEndVal>,
+        ) = sys_deploy_res.into_iter().unzip();
+
+        // Concat user and system deploys mergeable channel maps
+        let mergeable_chs = usr_mergeable
+            .into_iter()
+            .chain(sys_mergeable.into_iter())
+            .collect();
+
+        // Convert from final to diff values and persist mergeable (number) channels for post-state hash
+        let pre_state_hash = Blake2b256Hash::from_bytes_prost(&start_hash);
+        let post_state_hash = Blake2b256Hash::from_bytes_prost(&state_hash);
+
+        // Save mergeable channels to store
+        self.save_mergeable_channels(
+            post_state_hash,
+            sender.bytes,
+            seq_num,
+            mergeable_chs,
+            pre_state_hash,
+        );
+
+        Ok((state_hash, usr_processed, sys_processed))
+    }
+
+    fn compute_state_inner(
+        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        start_hash: StateHash,
+        terms: Vec<Signed<DeployData>>,
+        system_deploys: Vec<SystemDeploy>,
+        block_data: BlockData,
+        invalid_blocks: HashMap<BlockHash, Validator>,
+    ) -> (
+        StateHash,
+        Vec<(ProcessedDeploy, NumberChannelsEndVal)>,
+        Vec<(ProcessedSystemDeploy, NumberChannelsEndVal)>,
+    ) {
         todo!()
     }
 
@@ -145,6 +206,24 @@ impl RuntimeManager {
         hex::decode("cb75e7f94e8eac21f95c524a07590f2583fbdaba6fb59291cf52fa16a14c784d")
             .unwrap()
             .into()
+    }
+
+    /**
+     * Converts final mergeable (number) channel values and save to mergeable store.
+     *
+     * Tuple (postStateHash, creator, seqNum) is used as a key, preStateHash is used to
+     * read initial value to get the difference.
+     */
+    fn save_mergeable_channels(
+        &self,
+        post_state_hash: Blake2b256Hash,
+        creator: prost::bytes::Bytes,
+        seq_num: i32,
+        channels_data: Vec<NumberChannelsEndVal>,
+        // Used to calculate value difference from final values
+        pre_state_hash: Blake2b256Hash,
+    ) -> () {
+        todo!()
     }
 
     pub fn create_with_space(

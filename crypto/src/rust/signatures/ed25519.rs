@@ -38,9 +38,7 @@ impl SignaturesAlg for Ed25519 {
         let signing_key = parse_signing_key(&sec.bytes).expect("Secret key must be 32 bytes");
         let public_key = signing_key.verifying_key();
 
-        PublicKey {
-            bytes: public_key.to_bytes().to_vec(),
-        }
+        PublicKey::from_bytes(&public_key.to_bytes())
     }
 
     fn new_key_pair(&self) -> (PrivateKey, PublicKey) {
@@ -49,12 +47,8 @@ impl SignaturesAlg for Ed25519 {
         let signing_key = SigningKey::generate(&mut csprng);
         let public_key = signing_key.verifying_key();
 
-        let private_key = PrivateKey {
-            bytes: signing_key.to_bytes().to_vec(),
-        };
-        let public_key = PublicKey {
-            bytes: public_key.to_bytes().to_vec(),
-        };
+        let private_key = PrivateKey::from_bytes(&signing_key.to_bytes());
+        let public_key = PublicKey::from_bytes(&public_key.to_bytes());
 
         (private_key, public_key)
     }
@@ -110,7 +104,7 @@ mod tests {
             decode("b18e1d0045995ec3d010c387ccfeb984d783af8fbb0f40fa7db126d889f6dadd").unwrap();
         let expected_pub = "77f48b59caeda77751ed138b0ec667ff50f8768c25d48309a8f386a2bad187fb";
 
-        let private_key = PrivateKey { bytes: sec };
+        let private_key = PrivateKey::from_bytes(&sec);
         let public_key = ed25519.to_public(&private_key);
 
         assert_eq!(hex::encode(public_key.bytes), expected_pub);

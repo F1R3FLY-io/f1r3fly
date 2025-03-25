@@ -46,22 +46,17 @@ impl SignaturesAlg for Secp256k1 {
         let public_key = secret_key.public_key();
         let public_key_bytes = public_key.to_encoded_point(false).as_bytes().to_vec();
 
-        PublicKey {
-            bytes: public_key_bytes,
-        }
+        PublicKey::from_bytes(&public_key_bytes)
     }
 
     fn new_key_pair(&self) -> (PrivateKey, PublicKey) {
         let secret_key = SecretKey::<k256::Secp256k1>::random(&mut OsRng);
         let raw_public_key = secret_key.public_key();
 
-        let private_key = PrivateKey {
-            bytes: secret_key.to_bytes().to_vec(),
-        };
+        let private_key = PrivateKey::from_bytes(&secret_key.to_bytes());
 
-        let public_key = PublicKey {
-            bytes: raw_public_key.to_encoded_point(false).as_bytes().to_vec(),
-        };
+        let public_key =
+            PublicKey::from_bytes(&raw_public_key.to_encoded_point(false).as_bytes().to_vec());
 
         (private_key, public_key)
     }
@@ -178,7 +173,7 @@ mod tests {
                 .expect("Failed to decode private key");
         let expected_public_key = "0418a6b57c4aeee6c7e19e3ea25aa5bae270eca8580ee5e59c28921df743e416a316c55ed10c63b99a7c2705de0e0d3c52ad7f06144b7f6ed97d3a63b871ced6ff";
 
-        let computed_public_key = secp256k1.to_public(&PrivateKey { bytes: private_key });
+        let computed_public_key = secp256k1.to_public(&PrivateKey::from_bytes(&private_key));
 
         assert_eq!(
             hex::encode(computed_public_key.bytes).to_uppercase(),

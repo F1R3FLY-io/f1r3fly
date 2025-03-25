@@ -289,7 +289,7 @@ mod tests {
                     expr_instance: Some(ExprInstance::GByteArray(signature)),
                 }]),
                 Par::default().with_exprs(vec![Expr {
-                    expr_instance: Some(ExprInstance::GByteArray(pub_key.bytes)),
+                    expr_instance: Some(ExprInstance::GByteArray(pub_key.bytes.as_ref().to_vec())),
                 }]),
                 ack_channel(),
             ],

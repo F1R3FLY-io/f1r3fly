@@ -17,7 +17,7 @@ pub struct F1r3flyApi<'a> {
 impl<'a> F1r3flyApi<'a> {
     pub fn new(signing_key: Vec<u8>, node_host: &'a str, grpc_port: u16) -> Self {
         F1r3flyApi {
-            signing_key: PrivateKey::new(signing_key),
+            signing_key: PrivateKey::new(signing_key.into()),
             node_host,
             grpc_port,
         }

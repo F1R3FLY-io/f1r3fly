@@ -26,6 +26,10 @@ impl Blake2b256Hash {
         Blake2b256Hash(bytes)
     }
 
+    pub fn from_bytes_prost(bytes: &prost::bytes::Bytes) -> Self {
+        Blake2b256Hash(bytes.to_vec())
+    }
+
     pub fn from_hex(hex: &str) -> Self {
         let bytes = hex::decode(hex).unwrap();
         Blake2b256Hash::from_bytes(bytes)

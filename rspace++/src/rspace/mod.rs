@@ -18,3 +18,4 @@ pub mod tuplespace_interface;
 pub mod replay_rspace_interface;
 pub mod errors;
 pub mod replay_rspace;
+pub mod merger;

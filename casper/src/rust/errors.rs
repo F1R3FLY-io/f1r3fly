@@ -2,6 +2,7 @@ use std::fmt;
 
 use rholang::rust::interpreter::errors::InterpreterError;
 use shared::rust::store::key_value_store::KvStoreError;
+
 #[derive(Debug)]
 pub enum CasperError {
     InterpreterError(InterpreterError),

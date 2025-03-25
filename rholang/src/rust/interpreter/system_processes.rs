@@ -26,8 +26,8 @@ use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::rust::rholang::implicits::single_expr;
 use models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
-use shared::rust::Byte;
 use rand::Rng;
+use shared::rust::Byte;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
@@ -533,7 +533,7 @@ impl SystemProcesses {
             }
 
             "fromPublicKey" => match RhoByteArray::unapply(second_par)
-                .map(|public_key| RevAddress::from_public_key(&PublicKey { bytes: public_key }))
+                .map(|public_key| RevAddress::from_public_key(&PublicKey::from_bytes(&public_key)))
             {
                 Some(Some(ra)) => RhoString::create_par(ra.to_base58()),
                 _ => Par::default(),
@@ -687,7 +687,7 @@ impl SystemProcesses {
         let output = vec![
             Par::default().with_exprs(vec![RhoNumber::create_expr(data.block_number)]),
             Par::default().with_exprs(vec![RhoNumber::create_expr(data.time_stamp)]),
-            RhoByteArray::create_par(data.sender.bytes.clone()),
+            RhoByteArray::create_par(data.sender.bytes.as_ref().to_vec()),
         ];
 
         produce(output.clone(), ack.clone()).await?;
@@ -1110,9 +1110,7 @@ impl SystemProcesses {
                             "sender" => {
                                 if let Some(public_key_bytes) = RhoByteArray::unapply(value_par) {
                                     let mut block_data = self.block_data.try_write().unwrap();
-                                    block_data.sender = PublicKey {
-                                        bytes: public_key_bytes.clone(),
-                                    };
+                                    block_data.sender = PublicKey::from_bytes(&public_key_bytes);
                                     drop(block_data);
 
                                     let result_par = vec![Par::default()];
