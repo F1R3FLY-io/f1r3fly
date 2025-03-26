@@ -38,6 +38,8 @@ anyhow = "1.0.95"
 k256 = { version = "0.13.4", features = ["ecdsa"] }
 openai-api-rs = "5.2.6"
 dotenv = "0.15.0"
+indexmap = "2.8.0"
+rayon = "1.10.0"
 
 [build-dependencies]
 cc = "1.0"

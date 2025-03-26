@@ -56,3 +56,46 @@ impl ReplayFailure {
         }
     }
 }
+
+impl std::fmt::Display for ReplayFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReplayFailure::InternalError { msg } => {
+                write!(f, "Internal error: {}", msg)
+            }
+            ReplayFailure::ReplayStatusMismatch {
+                initial_failed,
+                replay_failed,
+            } => {
+                write!(
+                    f,
+                    "Replay status mismatch: initial_failed={}, replay_failed={}",
+                    initial_failed, replay_failed
+                )
+            }
+            ReplayFailure::UnusedCOMMEvent { msg } => {
+                write!(f, "Unused COMM event: {}", msg)
+            }
+            ReplayFailure::ReplayCostMismatch {
+                initial_cost,
+                replay_cost,
+            } => {
+                write!(
+                    f,
+                    "Replay cost mismatch: initial_cost={}, replay_cost={}",
+                    initial_cost, replay_cost
+                )
+            }
+            ReplayFailure::SystemDeployErrorMismatch {
+                play_error,
+                replay_error,
+            } => {
+                write!(
+                    f,
+                    "System deploy error mismatch:\n  Play error: {}\n  Replay error: {}",
+                    play_error, replay_error
+                )
+            }
+        }
+    }
+}

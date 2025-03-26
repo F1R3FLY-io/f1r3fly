@@ -83,6 +83,10 @@ impl RhoNumber {
         }
     }
 
+    pub fn create_par(i: i64) -> Par {
+        Par::default().with_exprs(vec![RhoNumber::create_expr(i)])
+    }
+
     pub fn unapply(p: &Par) -> Option<i64> {
         if let Some(expr) = single_expr(&p) {
             if let Expr {

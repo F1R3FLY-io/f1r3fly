@@ -1,25 +1,29 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManager.scala
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManagerSyntax.scala
-// See casper/src/main/scala/coop/rchain/casper/rholang/RuntimeSyntax.scala
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crypto::rust::signatures::signed::Signed;
+use hex::ToHex;
 use models::casper::system_deploy_data_proto::SystemDeploy;
 use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
-use models::rust::block::state_hash::StateHash;
+use models::rust::block::state_hash::{StateHash, StateHashSerde};
 use models::rust::block_hash::BlockHash;
 use models::rust::casper::protocol::casper_message::{
     Bond, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
 };
 use models::rust::validator::Validator;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
-use rholang::rust::interpreter::merging::rholang_merging_logic::DeployMergeableData;
-use rholang::rust::interpreter::rho_runtime::{self, RhoHistoryRepository, RhoRuntimeImpl};
+use rholang::rust::interpreter::merging::rholang_merging_logic::{
+    DeployMergeableData, NumberChannel, RholangMergingLogic,
+};
+use rholang::rust::interpreter::rho_runtime::{
+    self, RhoHistoryRepository, RhoRuntime, RhoRuntimeImpl,
+};
 use rholang::rust::interpreter::system_processes::BlockData;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use rspace_plus_plus::rspace::merger::merging_logic::NumberChannelsEndVal;
+use rspace_plus_plus::rspace::merger::merging_logic::{NumberChannelsDiff, NumberChannelsEndVal};
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -28,10 +32,22 @@ use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
 use shared::rust::ByteVector;
 
 use crate::rust::errors::CasperError;
+use crate::rust::rholang::replay_runtime::ReplayRuntimeOps;
+use crate::rust::rholang::runtime::RuntimeOps;
 
 use super::replay_failure::ReplayFailure;
 
+use retry::{delay::NoDelay, retry, OperationResult};
+
 type MergeableStore = KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct MergeableKey {
+    state_hash: StateHashSerde,
+    #[serde(with = "shared::rust::serde_bytes")]
+    creator: prost::bytes::Bytes,
+    seq_num: i32,
+}
 
 pub struct RuntimeManager {
     pub space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
@@ -55,7 +71,7 @@ impl RuntimeManager {
         runtime
     }
 
-    pub async fn spawn_replay_runtime(self) -> Arc<Mutex<RhoRuntimeImpl>> {
+    pub async fn spawn_replay_runtime(&self) -> Arc<Mutex<RhoRuntimeImpl>> {
         let new_replay_space = self
             .replay_space
             .spawn()
@@ -63,7 +79,7 @@ impl RuntimeManager {
 
         let runtime = rho_runtime::create_replay_rho_runtime(
             new_replay_space,
-            self.mergeable_tag_name,
+            self.mergeable_tag_name.clone(),
             false,
             &mut Vec::new(),
         )
@@ -73,7 +89,7 @@ impl RuntimeManager {
     }
 
     pub async fn compute_state(
-        &self,
+        &mut self,
         start_hash: StateHash,
         terms: Vec<Signed<DeployData>>,
         system_deploys: Vec<SystemDeploy>,
@@ -87,7 +103,7 @@ impl RuntimeManager {
         let sender = block_data.sender.clone();
         let seq_num = block_data.seq_num;
 
-        let computed = Self::compute_state_inner(
+        let computed = RuntimeOps::compute_state(
             runtime,
             start_hash.clone(),
             terms,
@@ -121,71 +137,173 @@ impl RuntimeManager {
             seq_num,
             mergeable_chs,
             pre_state_hash,
-        );
+        )?;
 
         Ok((state_hash, usr_processed, sys_processed))
     }
 
-    fn compute_state_inner(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        start_hash: StateHash,
-        terms: Vec<Signed<DeployData>>,
-        system_deploys: Vec<SystemDeploy>,
-        block_data: BlockData,
-        invalid_blocks: HashMap<BlockHash, Validator>,
-    ) -> (
-        StateHash,
-        Vec<(ProcessedDeploy, NumberChannelsEndVal)>,
-        Vec<(ProcessedSystemDeploy, NumberChannelsEndVal)>,
-    ) {
-        todo!()
-    }
-
-    pub fn compute_genesis(
-        &self,
+    pub async fn compute_genesis(
+        &mut self,
         terms: Vec<Signed<DeployData>>,
         block_time: i64,
         block_number: i64,
     ) -> Result<(StateHash, StateHash, Vec<ProcessedDeploy>), CasperError> {
-        todo!()
+        let runtime = self.spawn_runtime().await;
+        let computed = RuntimeOps::compute_genesis(runtime, terms, block_time, block_number);
+        let (pre_state, state_hash, processed) = computed;
+        let (processed_deploys, mergeable_chs) = processed.into_iter().unzip();
+
+        // Convert from final to diff values and persist mergeable (number) channels for post-state hash
+        let pre_state_hash = Blake2b256Hash::from_bytes_prost(&pre_state);
+        let post_state_hash = Blake2b256Hash::from_bytes_prost(&state_hash);
+
+        // Save mergeable channels to store
+        self.save_mergeable_channels(
+            post_state_hash,
+            prost::bytes::Bytes::new(),
+            0,
+            mergeable_chs,
+            pre_state_hash,
+        )?;
+
+        Ok((pre_state, state_hash, processed_deploys))
     }
 
-    pub fn replay_compute_state(
-        &self,
+    pub async fn replay_compute_state(
+        &mut self,
         start_hash: StateHash,
         terms: Vec<ProcessedDeploy>,
         system_deploys: Vec<ProcessedSystemDeploy>,
         block_data: BlockData,
+        invalid_blocks: Option<HashMap<BlockHash, Validator>>,
+        is_genesis: bool, // FIXME have a better way of knowing this. Pass the replayDeploy function maybe? - OLD
     ) -> Result<StateHash, ReplayFailure> {
-        todo!()
+        let invalid_blocks = invalid_blocks.unwrap_or_default();
+        let replay_runtime = self.spawn_replay_runtime().await;
+
+        let sender = block_data.sender.clone();
+        let seq_num = block_data.seq_num;
+
+        let replay_op = ReplayRuntimeOps::replay_compute_state(
+            replay_runtime,
+            start_hash.clone(),
+            terms,
+            system_deploys,
+            block_data,
+            Some(invalid_blocks),
+            is_genesis,
+        )?;
+
+        let (state_hash, mergeable_chs) = replay_op;
+        // Convert from final to diff values and persist mergeable (number) channels for post-state hash
+        let pre_state_hash = Blake2b256Hash::from_bytes_prost(&start_hash);
+
+        self.save_mergeable_channels(
+            state_hash.clone(),
+            sender.bytes,
+            seq_num,
+            mergeable_chs,
+            pre_state_hash,
+        )
+        .unwrap_or_else(|e| panic!("Failed to save mergeable channels: {:?}", e));
+
+        Ok(state_hash.to_bytes_prost())
     }
 
-    pub fn capture_results(
+    pub async fn capture_results(
         &self,
         start: StateHash,
         deploy: Signed<DeployData>,
     ) -> Result<Vec<Par>, CasperError> {
-        todo!()
+        let runtime = self.spawn_runtime().await;
+        let computed = RuntimeOps::capture_results(runtime, start, deploy)?;
+        Ok(computed)
     }
 
-    pub fn get_active_validators(start_hash: StateHash) -> Result<Vec<Validator>, CasperError> {
-        todo!()
+    pub async fn get_active_validators(
+        &self,
+        start_hash: StateHash,
+    ) -> Result<Vec<Validator>, CasperError> {
+        let runtime = self.spawn_runtime().await;
+        let computed = RuntimeOps::get_active_validators(runtime, start_hash)?;
+        Ok(computed)
     }
 
-    pub fn compute_bonds(hash: StateHash) -> Result<Vec<Bond>, CasperError> {
-        todo!()
+    pub async fn compute_bonds(&self, hash: StateHash) -> Result<Vec<Bond>, CasperError> {
+        let runtime = self.spawn_runtime().await;
+        let mut retries = 0;
+        const MAX_RETRIES: usize = 5;
+
+        // TODO: this retry is a temp solution for debugging why this throws `IllegalArgumentException` - OLD
+        let result = retry(NoDelay.take(MAX_RETRIES), || {
+            retries += 1;
+            match RuntimeOps::compute_bonds(runtime.clone(), hash.clone()) {
+                Ok(bonds) => OperationResult::Ok(bonds),
+                Err(e) => {
+                    // Match Scala's error message format
+                    eprintln!(
+                        "Unexpected exception {} during computeBonds. {} {}.",
+                        e,
+                        if retries >= MAX_RETRIES {
+                            format!("Giving up after {} retries", retries)
+                        } else {
+                            format!("Retrying {} time", retries)
+                        },
+                        if retries >= MAX_RETRIES { "." } else { "" }
+                    );
+
+                    if retries >= MAX_RETRIES {
+                        OperationResult::Err(e)
+                    } else {
+                        OperationResult::Retry(e)
+                    }
+                }
+            }
+        });
+
+        result.map_err(|e| {
+            CasperError::RuntimeError(format!(
+                "Unexpected exception {} during computeBonds. Giving up after {} retries.",
+                e, MAX_RETRIES
+            ))
+        })
     }
 
-    pub fn play_exploratory_deploy(term: String, hash: StateHash) -> Result<Vec<Par>, CasperError> {
-        todo!()
+    // Executes deploy as user deploy with immediate rollback
+    pub async fn play_exploratory_deploy(
+        &self,
+        term: String,
+        hash: StateHash,
+    ) -> Result<Vec<Par>, CasperError> {
+        let runtime = self.spawn_runtime().await;
+        let computed = RuntimeOps::play_exploratory_deploy(runtime, term, hash)?;
+        Ok(computed)
     }
 
-    pub fn get_data(hash: StateHash) -> Result<Vec<Par>, CasperError> {
-        todo!()
+    pub async fn get_data(&self, hash: StateHash, channel: Par) -> Result<Vec<Par>, CasperError> {
+        let runtime = self.spawn_runtime().await;
+
+        let mut runtime_lock = runtime.lock().unwrap();
+        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
+        drop(runtime_lock);
+
+        let computed = RuntimeOps::get_data_par(runtime, channel)?;
+        Ok(computed)
     }
 
-    pub fn get_continuation(hash: StateHash) -> Result<Vec<Par>, CasperError> {
-        todo!()
+    pub async fn get_continuation(
+        &self,
+        hash: StateHash,
+        channels: Vec<Par>,
+    ) -> Result<Vec<(Vec<BindPattern>, Par)>, CasperError> {
+        let runtime = self.spawn_runtime().await;
+
+        let mut runtime_lock = runtime.lock().unwrap();
+        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
+        drop(runtime_lock);
+
+        let computed = RuntimeOps::get_continuation_par(runtime, channels)?;
+        Ok(computed)
     }
 
     pub fn get_history_repo(self) -> RhoHistoryRepository {
@@ -194,6 +312,121 @@ impl RuntimeManager {
 
     pub fn get_mergeable_store(self) -> MergeableStore {
         self.mergeable_store
+    }
+
+    /**
+     * Load mergeable channels from store
+     */
+    pub fn load_mergeable_channels(
+        &self,
+        state_hash_bs: StateHash,
+        creator: prost::bytes::Bytes,
+        seq_num: i32,
+    ) -> Result<Vec<NumberChannelsDiff>, CasperError> {
+        let state_hash = Blake2b256Hash::from_bytes_prost(&state_hash_bs);
+        let mergeable_key = MergeableKey {
+            state_hash: StateHashSerde(state_hash.to_bytes_prost()),
+            creator,
+            seq_num,
+        };
+
+        let get_key =
+            bincode::serialize(&mergeable_key).expect("Failed to serialize mergeable key");
+
+        let res = self.mergeable_store.get_one(&get_key)?;
+
+        match res {
+            Some(res) => {
+                let res_map = res
+                    .into_iter()
+                    .map(|x| {
+                        x.channels
+                            .into_iter()
+                            .map(|y| (y.hash, y.diff))
+                            .collect::<HashMap<_, _>>()
+                    })
+                    .collect::<Vec<_>>();
+                Ok(res_map)
+            }
+
+            None => Err(CasperError::RuntimeError(format!(
+                "Mergeable store invalid state hash {}",
+                state_hash.bytes().encode_hex::<String>()
+            ))),
+        }
+    }
+
+    /**
+     * Converts final mergeable (number) channel values and save to mergeable store.
+     *
+     * Tuple (postStateHash, creator, seqNum) is used as a key, preStateHash is used to
+     * read initial value to get the difference.
+     */
+    fn save_mergeable_channels(
+        &mut self,
+        post_state_hash: Blake2b256Hash,
+        creator: prost::bytes::Bytes,
+        seq_num: i32,
+        channels_data: Vec<NumberChannelsEndVal>,
+        // Used to calculate value difference from final values
+        pre_state_hash: Blake2b256Hash,
+    ) -> Result<(), CasperError> {
+        // Calculate difference values from final values on number channels
+        let diffs = self.convert_number_channels_to_diff(channels_data, pre_state_hash);
+
+        // Convert to storage types
+        let deploy_channels = diffs
+            .into_iter()
+            .map(|data| {
+                let channels: Vec<NumberChannel> = data
+                    .into_iter()
+                    .map(|(hash, diff)| NumberChannel { hash, diff })
+                    .collect::<Vec<_>>();
+
+                DeployMergeableData { channels }
+            })
+            .collect();
+
+        // Key is composed from post-state hash and block creator with seq number
+        let mergeable_key = MergeableKey {
+            state_hash: StateHashSerde(post_state_hash.to_bytes_prost()),
+            creator,
+            seq_num,
+        };
+
+        let key_encoded =
+            bincode::serialize(&mergeable_key).expect("Failed to serialize mergeable key");
+
+        // Save to mergeable channels store
+        self.mergeable_store.put_one(key_encoded, deploy_channels)?;
+
+        Ok(())
+    }
+
+    /**
+     * Converts number channels final values to difference values. Excludes channels without an initial value.
+     *
+     * @param channelsData Final values
+     * @param preStateHash Inital state
+     * @return Map with values as difference on number channel
+     */
+    fn convert_number_channels_to_diff(
+        &self,
+        channels_data: Vec<NumberChannelsEndVal>,
+        // Used to calculate value difference from final values
+        pre_state_hash: Blake2b256Hash,
+    ) -> Vec<NumberChannelsDiff> {
+        let history_repo = self.history_repo.clone();
+        let get_data_func = move |ch: &Blake2b256Hash| {
+            history_repo
+                .get_history_reader(pre_state_hash.clone())
+                .and_then(|reader| reader.get_data(ch))
+        };
+
+        let get_num_func = RholangMergingLogic::convert_to_read_number(get_data_func);
+
+        // Calculate difference values from final values on number channels
+        RholangMergingLogic::calculate_num_channel_diff(channels_data, get_num_func)
     }
 
     /**
@@ -206,24 +439,6 @@ impl RuntimeManager {
         hex::decode("cb75e7f94e8eac21f95c524a07590f2583fbdaba6fb59291cf52fa16a14c784d")
             .unwrap()
             .into()
-    }
-
-    /**
-     * Converts final mergeable (number) channel values and save to mergeable store.
-     *
-     * Tuple (postStateHash, creator, seqNum) is used as a key, preStateHash is used to
-     * read initial value to get the difference.
-     */
-    fn save_mergeable_channels(
-        &self,
-        post_state_hash: Blake2b256Hash,
-        creator: prost::bytes::Bytes,
-        seq_num: i32,
-        channels_data: Vec<NumberChannelsEndVal>,
-        // Used to calculate value difference from final values
-        pre_state_hash: Blake2b256Hash,
-    ) -> () {
-        todo!()
     }
 
     pub fn create_with_space(

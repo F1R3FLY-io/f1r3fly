@@ -38,6 +38,10 @@ impl Blake2b256Hash {
     pub fn bytes(&self) -> Vec<u8> {
         self.0.clone()
     }
+
+    pub fn to_bytes_prost(&self) -> prost::bytes::Bytes {
+        prost::bytes::Bytes::from(self.0.clone())
+    }
 }
 
 impl Ord for Blake2b256Hash {

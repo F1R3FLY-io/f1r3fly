@@ -70,7 +70,7 @@ fn map_data(
 
         let row = Row {
             data: vec![Datum::create(
-                channel.clone(),
+                &channel,
                 ListParWithRandom {
                     pars: entry.data.clone(),
                     random_state: entry.rand.to_bytes(),
@@ -98,7 +98,7 @@ fn check_continuation(
         Row {
             data: Vec::new(),
             wks: vec![WaitingContinuation::create(
-                channels,
+                &channels,
                 bind_patterns,
                 TaggedContinuation {
                     tagged_cont: Some(TaggedCont::ParBody(body)),
@@ -1486,7 +1486,7 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
         vec![channel0.clone()],
         Row {
             data: vec![Datum::create(
-                channel0,
+                &channel0,
                 ListParWithRandom {
                     pars: vec![Par::default().with_unforgeables(vec![GUnforgeable {
                         unf_instance: Some(UnfInstance::GPrivateBody(GPrivate { id: vec![42] })),
@@ -1503,7 +1503,7 @@ async fn eval_of_new_should_use_deterministic_names_and_provide_urn_based_resour
         vec![channel1.clone()],
         Row {
             data: vec![Datum::create(
-                channel1,
+                &channel1,
                 ListParWithRandom {
                     pars: vec![Par::default().with_unforgeables(vec![GUnforgeable {
                         unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {

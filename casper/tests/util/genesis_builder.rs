@@ -270,13 +270,13 @@ impl GenessisBuilder {
             .expect("Failed to create RSpaceStore");
 
         let m_store = RuntimeManager::mergeable_store(&mut kvs_manager).await?;
-        let runtime_manager = RuntimeManager::create_with_store(
+        let mut runtime_manager = RuntimeManager::create_with_store(
             r_store,
             m_store,
             Genesis::non_negative_mergeable_tag_name(),
         );
 
-        let genesis = Genesis::create_genesis_block(runtime_manager, genesis_parameters)?;
+        let genesis = Genesis::create_genesis_block(&mut runtime_manager, genesis_parameters).await?;
         let mut block_store = KeyValueBlockStore::create_from_kvm(&mut kvs_manager).await?;
         block_store.put(genesis.block_hash.clone(), &genesis)?;
 

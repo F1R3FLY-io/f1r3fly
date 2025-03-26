@@ -112,8 +112,8 @@ impl Genesis {
         all_deploys
     }
 
-    pub fn create_genesis_block(
-        runtime_manager: RuntimeManager,
+    pub async fn create_genesis_block(
+        runtime_manager: &mut RuntimeManager,
         genesis: &Genesis,
     ) -> Result<BlockMessage, CasperError> {
         let blessed_terms = Self::default_blessed_terms(
@@ -123,11 +123,9 @@ impl Genesis {
             &genesis.shard_id,
         );
 
-        let (start_hash, state_hash, processed_deploys) = runtime_manager.compute_genesis(
-            blessed_terms,
-            genesis.timestamp,
-            genesis.block_number,
-        )?;
+        let (start_hash, state_hash, processed_deploys) = runtime_manager
+            .compute_genesis(blessed_terms, genesis.timestamp, genesis.block_number)
+            .await?;
 
         let block_message =
             Self::create_processed_deploy(genesis, start_hash, state_hash, processed_deploys);
