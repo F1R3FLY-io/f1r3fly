@@ -17,9 +17,10 @@ pub struct OpenAIService {
 impl OpenAIService {
     pub fn new() -> Self {
         dotenv().ok();
-        let api_key = env::var("OPENAI_API_KEY")
-            .expect("Failed to load OPENAI_API_KEY environment variable")
-            .to_string();
+        let api_key = env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
+            println!("Failed to load OPENAI_API_KEY environment variable, using default key '123'");
+            "123".to_string()
+        });
 
         let client = OpenAIClient::builder()
             .with_api_key(api_key)
