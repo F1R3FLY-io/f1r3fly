@@ -1,5 +1,5 @@
 x-rnode: &default-rnode
-  image: ghcr.io/f1r3fly-io/rnode-rholang-rust:latest
+  image: spreston8/f1r3fly-rholang-rust:latest
   user: root
   networks:
     - f1r3fly
