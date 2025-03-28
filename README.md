@@ -73,7 +73,9 @@ This code has not yet completed a security review. We strongly recommend that yo
    
 ### Docker
 
-(Coming Soon)
+``docker pull spreston8/f1r3fly-rholang-rust-node``
+
+- Please see https://hub.docker.com/r/spreston8/f1r3fly-rholang-rust-node for more information on how to run image from Docker Hub.
 
 ### Debian/Ubuntu
 
