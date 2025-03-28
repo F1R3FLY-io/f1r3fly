@@ -31,7 +31,7 @@ impl OpenAIService {
     }
 
     pub async fn create_audio_speech(
-        &self,
+        &mut self,
         input: &str,
         output_path: &str,
     ) -> Result<(), InterpreterError> {
@@ -53,7 +53,7 @@ impl OpenAIService {
         Ok(())
     }
 
-    pub async fn dalle3_create_image(&self, prompt: &str) -> Result<String, InterpreterError> {
+    pub async fn dalle3_create_image(&mut self, prompt: &str) -> Result<String, InterpreterError> {
         let request = ImageGenerationRequest {
             prompt: prompt.to_string(),
             model: Some("dall-e-3".to_string()),
@@ -68,7 +68,7 @@ impl OpenAIService {
         Ok(image_url)
     }
 
-    pub async fn gpt4_chat_completion(&self, prompt: &str) -> Result<String, InterpreterError> {
+    pub async fn gpt4_chat_completion(&mut self, prompt: &str) -> Result<String, InterpreterError> {
         let request = ChatCompletionRequest::new(
             GPT4_O_MINI.to_string(),
             vec![chat_completion::ChatCompletionMessage {

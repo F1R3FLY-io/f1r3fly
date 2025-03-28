@@ -31,7 +31,7 @@ use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/SystemProcesses.scala
 // NOTE: Not implementing Logger
@@ -212,7 +212,7 @@ impl ProcessContext {
         dispatcher: RhoDispatch,
         block_data: Arc<RwLock<BlockData>>,
         invalid_blocks: InvalidBlocks,
-        openai_service: Arc<OpenAIService>,
+        openai_service: Arc<Mutex<OpenAIService>>,
     ) -> Self {
         ProcessContext {
             space: space.clone(),
@@ -343,7 +343,7 @@ pub struct SystemProcesses {
     pub dispatcher: RhoDispatch,
     pub space: RhoISpace,
     pub block_data: Arc<RwLock<BlockData>>,
-    openai_service: Arc<OpenAIService>,
+    openai_service: Arc<Mutex<OpenAIService>>,
     pretty_printer: PrettyPrinter,
 }
 
@@ -352,13 +352,13 @@ impl SystemProcesses {
         dispatcher: RhoDispatch,
         space: RhoISpace,
         block_data: Arc<RwLock<BlockData>>,
-        openai_service: Arc<OpenAIService>,
+        openai_service: Arc<Mutex<OpenAIService>>,
     ) -> Self {
         SystemProcesses {
             dispatcher: dispatcher.clone(),
             space,
             block_data,
-            openai_service: openai_service,
+            openai_service,
             pretty_printer: PrettyPrinter::new(),
         }
     }
@@ -763,7 +763,8 @@ impl SystemProcesses {
             return Ok(previous_output);
         }
 
-        let response = match self.openai_service.gpt4_chat_completion(&prompt).await {
+        let mut openai_service = self.openai_service.lock().unwrap();
+        let response = match openai_service.gpt4_chat_completion(&prompt).await {
             Ok(response) => response,
             Err(e) => {
                 produce(vec![RhoString::create_par(prompt.clone())], ack.clone()).await?;
@@ -799,7 +800,8 @@ impl SystemProcesses {
             return Ok(previous_output);
         }
 
-        let response = match self.openai_service.dalle3_create_image(&prompt).await {
+        let mut openai_service = self.openai_service.lock().unwrap();
+        let response = match openai_service.dalle3_create_image(&prompt).await {
             Ok(response) => response,
             Err(e) => {
                 produce(vec![RhoString::create_par(prompt.clone())], ack.clone()).await?;
@@ -835,8 +837,8 @@ impl SystemProcesses {
             return Ok(previous_output);
         }
 
-        match self
-            .openai_service
+        let mut openai_service = self.openai_service.lock().unwrap();
+        match openai_service
             .create_audio_speech(&input, "audio.mp3")
             .await
         {

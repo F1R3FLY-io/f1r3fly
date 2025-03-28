@@ -1379,9 +1379,9 @@ dependencies = [
 
 [[package]]
 name = "openai-api-rs"
-version = "5.2.6"
+version = "6.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15ff507006cb49c2a3bd7a8360b2d8ef851d5da04d9cef22abf7e22fff23d640"
+checksum = "637d14da57c4ef23b281f7af0f56eda7c5725e8fbfc5cc75251a6f69e56ec430"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1425,6 +1425,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
+name = "openssl-src"
+version = "300.4.2+3.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "168ce4e058f975fe43e89d9ccf78ca668601887ae736090aacc23ae353c298e2"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "openssl-sys"
 version = "0.9.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1432,6 +1441,7 @@ checksum = "8bb61ea9811cc39e3c2069f40b8b8e2e70d8569b361f879786cc7ed48b777cdd"
 dependencies = [
  "cc",
  "libc",
+ "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -1870,6 +1880,7 @@ dependencies = [
  "lazy_static",
  "models",
  "openai-api-rs",
+ "openssl",
  "pretty_assertions",
  "prost",
  "rand",
