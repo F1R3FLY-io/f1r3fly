@@ -756,7 +756,7 @@ fn dispatch_table_creator(
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
     extra_system_processes: &mut Vec<Definition>,
-    openai_service: Arc<OpenAIService>,
+    openai_service: Arc<Mutex<OpenAIService>>,
 ) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
@@ -822,7 +822,7 @@ fn setup_reducer(
     urn_map: HashMap<String, Par>,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
-    openai_service: Arc<OpenAIService>,
+    openai_service: Arc<Mutex<OpenAIService>>,
     cost: _cost,
 ) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
@@ -917,7 +917,7 @@ where
         ChargingRSpace::charging_rspace(rspace, cost.clone()),
     )));
 
-    let openai_service = Arc::new(OpenAIService::new());
+    let openai_service = Arc::new(Mutex::new(OpenAIService::new()));
     let reducer = setup_reducer(
         charging_rspace,
         block_data_ref.clone(),

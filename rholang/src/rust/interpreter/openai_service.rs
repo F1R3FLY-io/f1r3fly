@@ -17,9 +17,10 @@ pub struct OpenAIService {
 impl OpenAIService {
     pub fn new() -> Self {
         dotenv().ok();
-        let api_key = env::var("OPENAI_API_KEY")
-            .expect("Failed to load OPENAI_API_KEY environment variable")
-            .to_string();
+        let api_key = env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
+            println!("Failed to load OPENAI_API_KEY environment variable, using default key '123'");
+            "123".to_string()
+        });
 
         let client = OpenAIClient::builder()
             .with_api_key(api_key)
@@ -30,7 +31,7 @@ impl OpenAIService {
     }
 
     pub async fn create_audio_speech(
-        &self,
+        &mut self,
         input: &str,
         output_path: &str,
     ) -> Result<(), InterpreterError> {
@@ -52,7 +53,7 @@ impl OpenAIService {
         Ok(())
     }
 
-    pub async fn dalle3_create_image(&self, prompt: &str) -> Result<String, InterpreterError> {
+    pub async fn dalle3_create_image(&mut self, prompt: &str) -> Result<String, InterpreterError> {
         let request = ImageGenerationRequest {
             prompt: prompt.to_string(),
             model: Some("dall-e-3".to_string()),
@@ -67,7 +68,7 @@ impl OpenAIService {
         Ok(image_url)
     }
 
-    pub async fn gpt4_chat_completion(&self, prompt: &str) -> Result<String, InterpreterError> {
+    pub async fn gpt4_chat_completion(&mut self, prompt: &str) -> Result<String, InterpreterError> {
         let request = ChatCompletionRequest::new(
             GPT4_O_MINI.to_string(),
             vec![chat_completion::ChatCompletionMessage {

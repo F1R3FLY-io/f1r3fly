@@ -113,7 +113,7 @@ docker compose -f docker/shard.yml up
 To run a standalone node locally, you can use the following command after generating the fat jar:
 
 ```sh
-java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-0.0.0-unknown.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0
+java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-1.0.0-SNAPSHOT.jar run -s --no-upnp --allow-private-addresses --synchrony-constraint-threshold=0.0
 ```
 
 - Running: `rm -rf ~/.rnode/` will delete the data directory and ensure a fresh start (performs genesis ceremony).
@@ -139,6 +139,16 @@ Evaluate a contract:
 ### F1r3flyFS
 
 Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) project for a simple, easy-to-use, and fast file system built on top of F1r3fly.
+
+### Troubleshooting
+
+If you encounter any errors regarding `ssl`, try the following branch:
+
+```sh
+git checkout ssl-linux
+```
+
+
 
 
 <!-- Docker will be used in the examples port portability reasons, but running the
