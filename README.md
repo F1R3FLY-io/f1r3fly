@@ -1,62 +1,52 @@
-# F1r3fly
+# ASI: Artificial Superintelligence Alliance
 
-### [What is F1r3fly?]([#what-is-this-project?])
-- A decentralized, economic, censorship-resistant, public compute infrastructure and blockchain.
-- Hosts and executes programs popularly referred to as "smart contracts".
-- Trustworthy, scalable, concurrent, with proof-of-stake consensus and content delivery.
-### How to get F1r3fly
-- Access the F1r3fly Developer portal for tutorials, documentation, and project information.
-- Run the public testnet to explore F1r3fly's capabilities.
-### [Installation instructions](#Installation)
-- Install F1r3fly using Docker, Debian/Ubuntu, RedHat/Fedora, or macOS.
-- Run F1r3fly using Docker commands or as a standalone process.
-### Running F1r3fly with multiple nodes
-Connect multiple Docker RNodes to a user-defined network bridge for peer-to-peer communication and REPL capabilities.
-### Using the REPL
-- Invoke the REPL using the provided Docker command and interact with F1r3fly using Rholang language.
-- Validate F1r3fly's functionality by executing a command in the REPL and observing the output on the rnode0 node.
-### Peer node configuration
-- Start a peer node using the specified Docker command and provide the bootstrap address of rnode0.
-- Observe the successful communication between the main node and the peer node in the output of both nodes.
-### Obtaining command options
-- Use the --help option to get a comprehensive list of command-line options for RNode.
-### Configuration file
-- Specify RNode configuration parameters through a configuration file in HOCON format.
-- View the example configuration file for a detailed explanation of each parameter.
-### Development environment
-- Compile the F1r3fly project using the provided command.
-- Run the compiled binary using the specified command.
-### Developer resources
-- Refer to the developer guide for more in-depth instructions and documentation.
-### Known issues
-- Be aware of the known issues listed in the provided GitHub link.
-### Reporting issues
-- File any issues you encounter in the GitHub repository issue tracker.
-### Acknowledgments
-- Express gratitude to YourKit for their support of open-source projects.
-### License information
-- Generate a summary of licenses used by F1r3fly's dependencies using the provided command.
+## Vision: Building the Innovation Stack for Multi-Agent Networks
 
+ASI (Artificial Superintelligence Alliance) is creating a comprehensive innovation stack to deploy decentralized multi-agent AI networks. Our platform enables developers ("devpreneurs") to crowdfund, build, test, deploy, and monetize AI agents through properly resourced decentralized infrastructure for community-built open-source AI/AGI.
 
-## What is this project?
-[![Build Status](https://github.com/rchain/rchain/workflows/CI/badge.svg)](https://github.com/rchain/rchain/actions?query=workflow%3ACI+branch%3Astaging)
-[![codecov](https://codecov.io/gh/rchain/rchain/branch/master/graph/badge.svg)](https://codecov.io/gh/rchain/rchain)
+The innovation stack begins with an ASI Node that aggregates AI agent microservices for infrastructure, data aggregation/processing, training, learning, registration, crowd-sourced inference, billing, and payments. This evolves into an AI Supernode delivering multi-agent network services through agent orchestration, knowledge graphs, and decentralized cognitive architectures.
 
-The open-source F1r3fly project is building a decentralized, economic,
-censorship-resistant, public compute infrastructure and blockchain. It will
-host and execute programs popularly referred to as “smart contracts”. It will
-be trustworthy, scalable, concurrent, with proof-of-stake consensus and
-content delivery.
+## Core Components
 
-[F1r3fly Developer](https://developer.rchain.coop/) features project-related
-tutorials and documentation, project planning information, events calendar,
-and information for how to engage with this project.
+### Infrastructure
 
-## Note on the use of this software
-This code has not yet completed a security review. We strongly recommend that you do not use it in production or to transfer items of material value. We take no responsibility for any loss you may incur through the use of this code.
+- **ASI Compute**: $153M+ of advanced compute resources within modular data centers utilizing cutting-edge GPUs and CPUs from Nvidia, AMD, and Tenstorrent
+- **Reliable Data Centers**: Global access with low latency across 12 geographies
+- **Decentralized Data Markets**: Legal, transparent, and traceable high-quality training data
 
-## Use the public testnet
-The F1r3fly Cooperative maintains a public testnet running the latest version of RNode. Learn more at [F1r3fly public testnet information](https://rchain.atlassian.net/wiki/spaces/CORE/pages/678756429/RChain+public+testnet+information).
+### AI
+
+- **Agent Learning**: Support for all major agent types (reactive, deliberative, goal-based, utility-based, learning, multi-agent)
+- **Agent Training**: Multi-agent training methods including cooperative learning, competitive learning, and reinforcement learning
+- **Knowledge Graphs**: Dynamic knowledge representation for contextual reasoning and understanding
+
+### Applications
+
+- **Templates**: Pre-built agent templates for various use cases (reflex, goal-based, utility-based, learning)
+- **Use Cases**: Pre-made agents for social media, trading/prediction, drug development, and open-source projects
+- **Proto AGI**: Support for neural-symbolic AGI development with Hyperon architecture
+
+### Self Governance
+
+- **AI Wallet**: Privacy protection, data management, and account portability
+- **Privacy Credentials**: Avatar creation with personalization while ensuring privacy
+- **Verifiable Claims**: Traceability for users and machines
+- **Trust Registries**: Community self-governance and certification
+
+## Products
+
+- **ASI Compute**: Decentralized computing infrastructure
+- **ASI Zero**: Next-generation decentralized AI platform combining human and AI agents
+- **ASI Data**: Data monetization and marketplace platform
+- **ASI Train**: Domain-specific AI model training platform
+- **ASI Learn**: Knowledge graph platform for AI agent reasoning
+- **ASI Create**: Developer platform for building and deploying AI agents
+
+## Roadmap
+
+Our comprehensive 2025 roadmap details the quarterly development plan for each product, focusing on infrastructure expansion, AI capabilities enhancement, application development, and ecosystem growth.
+
+Join us in building the future of decentralized AI that's open, efficient, and affordable, powering prediction markets, simulations, and advanced robotics.
 
 ## How 
 ## Installation
@@ -246,7 +236,7 @@ We use Oracle! We have several environments for different purposes. For more det
 
 ### Caveats
 
-During this pre-release phase of the F1r3fly software, there are some [known issues](https://github.com/rchain/rchain/issues?q=is%3Aopen+is%3Aissue+label%3Abug).
+During this pre-release phase of the software, there are some [known issues]()
 
 ### Filing Issues
 
@@ -254,7 +244,7 @@ File issues in GitHub repository issue tracker: [File a bug](https://github.com/
 
 ## Acknowledgements
 
-We use YourKit to profile rchain performance.  YourKit supports open source
+We use YourKit to profile performance.  YourKit supports open source
 projects with its full-featured Java Profiler.  YourKit, LLC is the creator of
 <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a> and
 <a href="https://www.yourkit.com/.net/profiler/">YourKit .NET Profiler</a>,
@@ -262,6 +252,6 @@ innovative and intelligent tools for profiling Java and .NET applications.
 
 ## Licence information
 
-To get summary of licenses being used by the F1r3fly's dependencies, simply run
+To get summary of licenses being used by the s dependencies, simply run
 `sbt node/dumpLicenseReport`. The report will be available under
 `node/target/license-reports/rnode-licenses.html`
