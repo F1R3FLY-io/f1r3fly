@@ -72,6 +72,21 @@
               help = "The Rust toolchain installer";
             }
             {
+              name = "gcc";
+              package = gcc;
+              help = "GNU C compiler";
+            }
+            {
+              name = "make";
+              package = gnumake;
+              help = "GNU Make build tool";
+            }
+            {
+              name = "pkg-config";
+              package = pkg-config;
+              help = "Helper tool for compiling applications";
+            }
+            {
               name = "bnfc";
               package = "haskellPackages.BNFC";
               help = "EBNF parser generator targeting several languages";

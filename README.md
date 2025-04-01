@@ -65,10 +65,8 @@ This code has not yet completed a security review. We strongly recommend that yo
 
 2. Install direnv: https://direnv.net/#basic-installation
    - For more information about direnv and how it works see: https://direnv.net/
-  
-3. Install protobuf compiler: https://grpc.io/docs/protoc-installation/
 
-4. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
    - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
    
 ### Docker
@@ -144,12 +142,17 @@ Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) pro
 
 ### Troubleshooting
 
-If you encounter any errors regarding `ssl`, try the following branch:
-
-```sh
-git checkout ssl-linux
+General nix problems or unable to load `flake.nix` file:
+```bash
+nix garbage collect
 ```
 
+SBT build problems:
+```bash
+$ rm -rf ~/.cache/coursier/
+
+$ sbt clean
+```
 
 
 
