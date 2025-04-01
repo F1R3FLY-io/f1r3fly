@@ -34,7 +34,7 @@ helm uninstall f1r3fly-asi-dev -n f1r3fly-asi-dev
 ### Deploy
 ```sh
 cd deployment/envs/asi || true
-helm upgrade --install f1r3fly-asi-stg ../docker/helm/f1r3fly -n f1r3fly-asi-stg --create-namespace -f ./helm-values.yaml
+helm upgrade --install f1r3fly-asi-stg ../../../docker/helm/f1r3fly -n f1r3fly-asi-stg --create-namespace -f ./helm-values.yaml
 ```
 ### Undeploy
 ```sh
@@ -44,7 +44,7 @@ helm uninstall f1r3fly-asi-stg -n f1r3fly-asi-stg
 ### Deploy
 ```sh
 cd deployment/envs/asi || true
-helm upgrade --install f1r3fly-asi-prd ../docker/helm/f1r3fly -n f1r3fly-asi-prd --create-namespace -f ./helm-values.yaml
+helm upgrade --install f1r3fly-asi-prd ../../../docker/helm/f1r3fly -n f1r3fly-asi-prd --create-namespace -f ./helm-values.yaml
 ```
 ### Undeploy
 ```sh

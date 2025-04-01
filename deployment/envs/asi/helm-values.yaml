@@ -8,8 +8,9 @@ shardConfig:
   readOnlyReplicas: 1
 
 image:
-  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode
-  tag: "asi"
+  # repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode # scala version
+  repository: spreston8/f1r3fly-rholang-rust-node # rust version
+  tag: "latest"
 
 resources:
   limits:
@@ -17,10 +18,14 @@ resources:
     # on Oracle we had 2 OCPU and 6 memory for each cluster
     # dev;stg;prod; environments
     cpu: 1
-    memory: 1G
+    memory: 2G
 
 persistence:
-  storageClassName: "oci"
+  storageClassName: "oci-bv"
 
-imagePullSecrets:
-  - name: k8s-secret
+imagePullSecrets: [] # empty for rust version
+  # - name: k8s-secret # needed for scala only
+
+env:
+  - name: OPENAI_API_KEY
+    value: "sk-proj-1234567890" # TODO: add the actual key
