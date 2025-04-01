@@ -1,4 +1,5 @@
 [target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
 pre-build = [
 	"dpkg --add-architecture arm64",
 	"apt-get update",
@@ -9,6 +10,7 @@ pre-build = [
 ]
 
 [target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
 pre-build = [
 	"apt-get update && apt-get install -y protobuf-compiler pkg-config libssl-dev",
 	# https://github.com/sfackler/rust-openssl/issues/2217#issuecomment-2230398481
