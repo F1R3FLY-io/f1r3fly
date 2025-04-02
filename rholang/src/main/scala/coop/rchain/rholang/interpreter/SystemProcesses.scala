@@ -47,7 +47,7 @@ trait SystemProcesses[F[_]] {
   def deployerIdOps: Contract[F]
   def registryOps: Contract[F]
   def sysAuthTokenOps: Contract[F]
-  def produce16k: Contract[F]
+  def produceLargeData: Contract[F]
 }
 
 object SystemProcesses {
@@ -100,7 +100,7 @@ object SystemProcesses {
     val REG_INSERT_SIGNED: Par  = byteName(16)
     val REG_OPS: Par            = byteName(17)
     val SYS_AUTHTOKEN_OPS: Par  = byteName(18)
-    val PRODUCE_16K: Par        = byteName(19)
+    val PRODUCE_LARGE_DATA: Par = byteName(19)
   }
   object BodyRefs {
     val STDOUT: Long             = 0L
@@ -118,7 +118,7 @@ object SystemProcesses {
     val DEPLOYER_ID_OPS: Long    = 14L
     val REG_OPS: Long            = 15L
     val SYS_AUTHTOKEN_OPS: Long  = 16L
-    val PRODUCE_16K: Long        = 17L
+    val PRODUCE_LARGE_DATA: Long = 17L
   }
   final case class ProcessContext[F[_]: Concurrent: Span](
       space: RhoTuplespace[F],
@@ -400,77 +400,33 @@ object SystemProcesses {
           illegalArgumentException("invalidBlocks expects only a return channel")
       }
 
-      def produce16k: Contract[F] = {
+      def produceLargeData: Contract[F] = {
         case isContractCall(produce, Seq(ack)) =>
-          // Create a Par with multiple expensive operations
+          // Create a Par with multiple expensive CPU-bound operations rather than just memory-intensive ones
           val expensivePar = Par(
-            // 1. Multiple sends with complex data
-            sends = (0 until 10000).map { i =>
-              Send(
-                chan = GInt(i),
-                data = List(
-                  // Complex nested Par with multiple expressions
-                  Par(
-                    exprs = (0 until 50).map { j =>
-                      Expr(
-                        exprInstance = EMethodBody(
-                          EMethod(
-                            methodName = "nth",
-                            target = EVar(BoundVar(j)),
-                            arguments = List(GInt(j)),
-                            locallyFree = BitSet(j),
-                            connectiveUsed = false
-                          )
-                        )
-                      )
-                    }
+            // 1. Multiple cryptographically expensive operations (more CPU intensive)
+            exprs = (0 until 2000).map { i =>
+              Expr(
+                exprInstance = EMethodBody(
+                  EMethod(
+                    methodName = "secp256k1Verify", // Cryptographic verification is CPU intensive
+                    target = EVar(BoundVar(i % 10)),
+                    arguments = List(
+                      GByteArray(ByteString.copyFrom(Blake2b256.hash(Array.fill(32)(i.toByte)))),
+                      GByteArray(ByteString.copyFrom(Array.fill(64)(i.toByte))),
+                      GByteArray(ByteString.copyFrom(Array.fill(33)(i.toByte)))
+                    ),
+                    locallyFree = BitSet(i % 10),
+                    connectiveUsed = false
                   )
-                ),
-                persistent = true,
-                locallyFree = BitSet(),
-                connectiveUsed = true
+                )
               )
             },
-            // 2. Multiple receives with complex patterns
-            receives = (0 until 10000).map { i =>
-              Receive(
-                binds = List(
-                  ReceiveBind(
-                    patterns = (0 until 10).map { j =>
-                      Par(
-                        exprs = List(
-                          Expr(
-                            exprInstance = EMethodBody(
-                              EMethod(
-                                methodName = "nth",
-                                target = EVar(BoundVar(j)),
-                                arguments = List(GInt(j)),
-                                locallyFree = BitSet(j),
-                                connectiveUsed = false
-                              )
-                            )
-                          )
-                        )
-                      )
-                    },
-                    source = GInt(i),
-                    remainder = None,
-                    freeCount = 10
-                  )
-                ),
-                body = Par(),
-                persistent = true,
-                peek = false,
-                bindCount = 10,
-                locallyFree = BitSet(),
-                connectiveUsed = true
-              )
-            },
-            // 3. Multiple matches with complex patterns
-            matches = (0 until 10000).map { i =>
+            // 2. Complex match expressions with many cases (CPU intensive pattern matching)
+            matches = (0 until 100).map { i =>
               Match(
                 target = GInt(i),
-                cases = (0 until 10).map { j =>
+                cases = (0 until 100).map { j =>
                   MatchCase(
                     pattern = Par(
                       exprs = List(
@@ -478,9 +434,9 @@ object SystemProcesses {
                           exprInstance = EMethodBody(
                             EMethod(
                               methodName = "nth",
-                              target = EVar(BoundVar(j)),
+                              target = EVar(BoundVar(j % 10)),
                               arguments = List(GInt(j)),
-                              locallyFree = BitSet(j),
+                              locallyFree = BitSet(j % 10),
                               connectiveUsed = false
                             )
                           )
@@ -495,37 +451,71 @@ object SystemProcesses {
                 connectiveUsed = true
               )
             },
-            // 4. Multiple cryptographic operations
-            exprs = (0 until 10000).map { i =>
-              Expr(
-                exprInstance = EMethodBody(
-                  EMethod(
-                    methodName = "secp256k1Verify",
-                    target = EVar(BoundVar(i)),
-                    arguments = List(
-                      GByteArray(ByteString.copyFrom(new Array[Byte](32))),
-                      GByteArray(ByteString.copyFrom(new Array[Byte](64))),
-                      GByteArray(ByteString.copyFrom(new Array[Byte](33)))
-                    ),
-                    locallyFree = BitSet(i),
-                    connectiveUsed = false
+            // 3. Nested method calls (creates deep evaluation stacks that are CPU intensive)
+            // Each nested call requires CPU to evaluate
+            sends = (0 until 100).map { i =>
+              Send(
+                chan = GInt(i),
+                data = List(
+                  Par(
+                    exprs = (0 until 20).map { j =>
+                      Expr(
+                        exprInstance = EMethodBody(
+                          EMethod(
+                            methodName = "nth",
+                            target = Expr(
+                              exprInstance = EMethodBody(
+                                EMethod(
+                                  methodName = "slice",
+                                  target = Expr(
+                                    exprInstance = EMethodBody(
+                                      EMethod(
+                                        methodName = "toByteArray",
+                                        target = EVar(BoundVar(j % 10)),
+                                        arguments = List(),
+                                        locallyFree = BitSet(j % 10),
+                                        connectiveUsed = false
+                                      )
+                                    )
+                                  ),
+                                  arguments = List(GInt(0), GInt(j+1)),
+                                  locallyFree = BitSet(j % 10),
+                                  connectiveUsed = false
+                                )
+                              )
+                            ),
+                            arguments = List(GInt(j)),
+                            locallyFree = BitSet(j % 10),
+                            connectiveUsed = false
+                          )
+                        )
+                      )
+                    }
                   )
-                )
+                ),
+                persistent = false,
+                locallyFree = BitSet(),
+                connectiveUsed = true
               )
             },
-            // 5. Multiple hash operations
-            connectives = (0 until 10000).map { i =>
+            // 4. Add some complex connectives that require evaluation
+            connectives = (0 until 100).map { i =>
               Connective(
                 ConnAndBody(
                   ConnectiveBody(
-                    ps = List(
-                      EVar(FreeVar(i)),
-                      Send(
-                        chan = EVar(FreeVar(i + 1)),
-                        data = List(EVar(FreeVar(i + 2))),
-                        persistent = false,
-                        locallyFree = BitSet(),
-                        connectiveUsed = false
+                    ps = List.fill(10)(
+                      Expr(
+                        exprInstance = EMethodBody(
+                          EMethod(
+                            methodName = "keccak256Hash",
+                            target = EVar(FreeVar(i % 10)),
+                            arguments = List(
+                              GByteArray(ByteString.copyFrom(Array.fill(32)((i+1).toByte)))
+                            ),
+                            locallyFree = BitSet(),
+                            connectiveUsed = false
+                          )
+                        )
                       )
                     )
                   )
@@ -538,7 +528,7 @@ object SystemProcesses {
 
           produce(Seq(expensivePar), ack)
         case _ =>
-          illegalArgumentException("produce16k expects only a return channel")
+          illegalArgumentException("produceLargeData expects only a return channel")
       }
     }
 }

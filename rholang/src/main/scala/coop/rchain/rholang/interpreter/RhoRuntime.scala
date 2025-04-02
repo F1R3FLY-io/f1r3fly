@@ -366,11 +366,11 @@ object RhoRuntime {
       }
     ),
     Definition[F](
-      "rho:io:produce16k",
-      FixedChannels.PRODUCE_16K,
+      "rho:io:produceLargeData",
+      FixedChannels.PRODUCE_LARGE_DATA,
       1,
-      BodyRefs.PRODUCE_16K, { ctx =>
-        ctx.systemProcesses.produce16k
+      BodyRefs.PRODUCE_LARGE_DATA, { ctx =>
+        ctx.systemProcesses.produceLargeData
       }
     )
   )
