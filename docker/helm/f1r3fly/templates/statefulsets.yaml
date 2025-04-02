@@ -50,6 +50,13 @@ spec:
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           args:
             {{- toYaml $.Values.containerArgs | nindent 12 }}
+          {{- with $.Values.env }}
+          env:
+            {{- range . }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
           ports:
           {{- range $port := $.Values.service.ports }}
             - name: {{ $port.containerPort }}-port

@@ -9,6 +9,12 @@ metadata:
   name: {{ include "f1r3fly.fullname" $ }}{{ $index }}
   labels:
     {{- include "f1r3fly.labels" $ | nindent 4 }}
+  {{- if $.Values.metrics.enablePrometheus }}
+  annotations:
+    prometheus.io/port: "40403"
+    prometheus.io/path: "/metrics"
+    prometheus.io/scrape: "true"
+  {{- end }}
 spec:
   type: {{ $.Values.service.type }}
   ports:

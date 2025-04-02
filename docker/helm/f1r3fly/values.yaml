@@ -260,3 +260,6 @@ persistence:
 
 metrics:
   enablePrometheus: false
+
+# Environment variables for the container
+env: {}
