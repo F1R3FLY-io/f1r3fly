@@ -1,4 +1,4 @@
-# RChain Node
+# AS10 Node
 
 ## slowcooker
 
