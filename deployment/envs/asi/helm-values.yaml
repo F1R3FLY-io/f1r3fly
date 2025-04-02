@@ -18,7 +18,7 @@ resources:
     # on Oracle we had 2 OCPU and 6 memory for each cluster
     # dev;stg;prod; environments
     cpu: 1
-    memory: 4G
+    memory: 8G
 
 persistence:
   storageClassName: "oci-bv"
@@ -30,4 +30,4 @@ env:
   - name: OPENAI_API_KEY
     value: "sk-proj-1234567890" # TODO: add the actual key
   - name: JAVA_OPTS
-    value: "-Xmx2G"
+    value: "-Xmx6G"
