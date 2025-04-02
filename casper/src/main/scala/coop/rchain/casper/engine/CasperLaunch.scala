@@ -57,7 +57,7 @@ object CasperLaunch {
         conf.maxParentDepth.getOrElse(Int.MaxValue),
         conf.synchronyConstraintThreshold.toFloat,
         conf.heightConstraintThreshold,
-        50,
+        500,
         1,
         1,
         conf.genesisBlockData.bondMinimum,
