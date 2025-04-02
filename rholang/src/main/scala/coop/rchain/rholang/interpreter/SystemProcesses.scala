@@ -18,6 +18,11 @@ import coop.rchain.rholang.interpreter.RholangAndScalaDispatcher.RhoDispatch
 import coop.rchain.rholang.interpreter.util.RevAddress
 import coop.rchain.rspace.{ContResult, Result}
 import coop.rchain.shared.Base16
+import coop.rchain.models.Expr.ExprInstance._
+import coop.rchain.models.Var.VarInstance.{BoundVar, FreeVar}
+import coop.rchain.models.Connective.ConnectiveInstance._
+import coop.rchain.models.ConnectiveBody
+import scala.collection.immutable.BitSet
 
 import scala.util.Try
 
@@ -42,6 +47,7 @@ trait SystemProcesses[F[_]] {
   def deployerIdOps: Contract[F]
   def registryOps: Contract[F]
   def sysAuthTokenOps: Contract[F]
+  def produce16k: Contract[F]
 }
 
 object SystemProcesses {
@@ -94,6 +100,7 @@ object SystemProcesses {
     val REG_INSERT_SIGNED: Par  = byteName(16)
     val REG_OPS: Par            = byteName(17)
     val SYS_AUTHTOKEN_OPS: Par  = byteName(18)
+    val PRODUCE_16K: Par        = byteName(19)
   }
   object BodyRefs {
     val STDOUT: Long             = 0L
@@ -111,6 +118,7 @@ object SystemProcesses {
     val DEPLOYER_ID_OPS: Long    = 14L
     val REG_OPS: Long            = 15L
     val SYS_AUTHTOKEN_OPS: Long  = 16L
+    val PRODUCE_16K: Long        = 17L
   }
   final case class ProcessContext[F[_]: Concurrent: Span](
       space: RhoTuplespace[F],
@@ -390,6 +398,147 @@ object SystemProcesses {
           } yield ()
         case _ =>
           illegalArgumentException("invalidBlocks expects only a return channel")
+      }
+
+      def produce16k: Contract[F] = {
+        case isContractCall(produce, Seq(ack)) =>
+          // Create a Par with multiple expensive operations
+          val expensivePar = Par(
+            // 1. Multiple sends with complex data
+            sends = (0 until 10000).map { i =>
+              Send(
+                chan = GInt(i),
+                data = List(
+                  // Complex nested Par with multiple expressions
+                  Par(
+                    exprs = (0 until 50).map { j =>
+                      Expr(
+                        exprInstance = EMethodBody(
+                          EMethod(
+                            methodName = "nth",
+                            target = EVar(BoundVar(j)),
+                            arguments = List(GInt(j)),
+                            locallyFree = BitSet(j),
+                            connectiveUsed = false
+                          )
+                        )
+                      )
+                    }
+                  )
+                ),
+                persistent = true,
+                locallyFree = BitSet(),
+                connectiveUsed = true
+              )
+            },
+            // 2. Multiple receives with complex patterns
+            receives = (0 until 10000).map { i =>
+              Receive(
+                binds = List(
+                  ReceiveBind(
+                    patterns = (0 until 10).map { j =>
+                      Par(
+                        exprs = List(
+                          Expr(
+                            exprInstance = EMethodBody(
+                              EMethod(
+                                methodName = "nth",
+                                target = EVar(BoundVar(j)),
+                                arguments = List(GInt(j)),
+                                locallyFree = BitSet(j),
+                                connectiveUsed = false
+                              )
+                            )
+                          )
+                        )
+                      )
+                    },
+                    source = GInt(i),
+                    remainder = None,
+                    freeCount = 10
+                  )
+                ),
+                body = Par(),
+                persistent = true,
+                peek = false,
+                bindCount = 10,
+                locallyFree = BitSet(),
+                connectiveUsed = true
+              )
+            },
+            // 3. Multiple matches with complex patterns
+            matches = (0 until 10000).map { i =>
+              Match(
+                target = GInt(i),
+                cases = (0 until 10).map { j =>
+                  MatchCase(
+                    pattern = Par(
+                      exprs = List(
+                        Expr(
+                          exprInstance = EMethodBody(
+                            EMethod(
+                              methodName = "nth",
+                              target = EVar(BoundVar(j)),
+                              arguments = List(GInt(j)),
+                              locallyFree = BitSet(j),
+                              connectiveUsed = false
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    source = GInt(j),
+                    freeCount = 1
+                  )
+                },
+                locallyFree = BitSet(),
+                connectiveUsed = true
+              )
+            },
+            // 4. Multiple cryptographic operations
+            exprs = (0 until 10000).map { i =>
+              Expr(
+                exprInstance = EMethodBody(
+                  EMethod(
+                    methodName = "secp256k1Verify",
+                    target = EVar(BoundVar(i)),
+                    arguments = List(
+                      GByteArray(ByteString.copyFrom(new Array[Byte](32))),
+                      GByteArray(ByteString.copyFrom(new Array[Byte](64))),
+                      GByteArray(ByteString.copyFrom(new Array[Byte](33)))
+                    ),
+                    locallyFree = BitSet(i),
+                    connectiveUsed = false
+                  )
+                )
+              )
+            },
+            // 5. Multiple hash operations
+            connectives = (0 until 10000).map { i =>
+              Connective(
+                ConnAndBody(
+                  ConnectiveBody(
+                    ps = List(
+                      EVar(FreeVar(i)),
+                      Send(
+                        chan = EVar(FreeVar(i + 1)),
+                        data = List(EVar(FreeVar(i + 2))),
+                        persistent = false,
+                        locallyFree = BitSet(),
+                        connectiveUsed = false
+                      )
+                    )
+                  )
+                )
+              )
+            },
+            locallyFree = BitSet(),
+            connectiveUsed = true
+          )
+
+          produce(Seq(expensivePar), ack)
+        case _ =>
+          illegalArgumentException("produce16k expects only a return channel")
       }
     }
 }

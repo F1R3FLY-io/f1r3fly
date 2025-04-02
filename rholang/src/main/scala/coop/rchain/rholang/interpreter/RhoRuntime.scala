@@ -364,6 +364,14 @@ object RhoRuntime {
       BodyRefs.SYS_AUTHTOKEN_OPS, { ctx =>
         ctx.systemProcesses.sysAuthTokenOps
       }
+    ),
+    Definition[F](
+      "rho:io:produce16k",
+      FixedChannels.PRODUCE_16K,
+      1,
+      BodyRefs.PRODUCE_16K, { ctx =>
+        ctx.systemProcesses.produce16k
+      }
     )
   )
 

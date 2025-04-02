@@ -1,0 +1,22 @@
+shardConfig:
+  # Configure a number of deployable nodes. Bootstrap will be 1th node (value can't be not 0)
+  deployableReplicas: 1
+
+  # Configure a number of read-only nodes excluding deployable nodes
+  readOnlyReplicas: 1
+
+image:
+  repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode
+  tag: 1.0.2-loadtest
+
+resources:
+  limits:
+    cpu: 4
+    memory: 17.5Gi
+
+env:
+  - name: JAVA_OPTS
+    value: "-Xms2G -Xmx16G -Xss2m"
+
+persistence:
+  storageClassName: "oci-bv"
