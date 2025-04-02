@@ -405,7 +405,7 @@ object SystemProcesses {
           // Create a Par with multiple expensive CPU-bound operations rather than just memory-intensive ones
           val expensivePar = Par(
             // 1. Multiple cryptographically expensive operations (more CPU intensive)
-            exprs = (0 until 2000).map { i =>
+            exprs = (0 until 5000).map { i =>
               Expr(
                 exprInstance = EMethodBody(
                   EMethod(
@@ -423,10 +423,10 @@ object SystemProcesses {
               )
             },
             // 2. Complex match expressions with many cases (CPU intensive pattern matching)
-            matches = (0 until 100).map { i =>
+            matches = (0 until 5000).map { i =>
               Match(
                 target = GInt(i),
-                cases = (0 until 100).map { j =>
+                cases = (0 until 5000).map { j =>
                   MatchCase(
                     pattern = Par(
                       exprs = List(
@@ -453,43 +453,44 @@ object SystemProcesses {
             },
             // 3. Nested method calls (creates deep evaluation stacks that are CPU intensive)
             // Each nested call requires CPU to evaluate
-            sends = (0 until 100).map { i =>
+            sends = (0 until 5000).map { i =>
               Send(
                 chan = GInt(i),
                 data = List(
                   Par(
-                    exprs = (0 until 20).map { j =>
-                      Expr(
-                        exprInstance = EMethodBody(
-                          EMethod(
-                            methodName = "nth",
-                            target = Expr(
-                              exprInstance = EMethodBody(
-                                EMethod(
-                                  methodName = "slice",
-                                  target = Expr(
-                                    exprInstance = EMethodBody(
-                                      EMethod(
-                                        methodName = "toByteArray",
-                                        target = EVar(BoundVar(j % 10)),
-                                        arguments = List(),
-                                        locallyFree = BitSet(j % 10),
-                                        connectiveUsed = false
+                    exprs = (0 until 5000).map {
+                      j =>
+                        Expr(
+                          exprInstance = EMethodBody(
+                            EMethod(
+                              methodName = "nth",
+                              target = Expr(
+                                exprInstance = EMethodBody(
+                                  EMethod(
+                                    methodName = "slice",
+                                    target = Expr(
+                                      exprInstance = EMethodBody(
+                                        EMethod(
+                                          methodName = "toByteArray",
+                                          target = EVar(BoundVar(j % 10)),
+                                          arguments = List(),
+                                          locallyFree = BitSet(j % 10),
+                                          connectiveUsed = false
+                                        )
                                       )
-                                    )
-                                  ),
-                                  arguments = List(GInt(0), GInt(j+1)),
-                                  locallyFree = BitSet(j % 10),
-                                  connectiveUsed = false
+                                    ),
+                                    arguments = List(GInt(0), GInt(j + 1)),
+                                    locallyFree = BitSet(j % 10),
+                                    connectiveUsed = false
+                                  )
                                 )
-                              )
-                            ),
-                            arguments = List(GInt(j)),
-                            locallyFree = BitSet(j % 10),
-                            connectiveUsed = false
+                              ),
+                              arguments = List(GInt(j)),
+                              locallyFree = BitSet(j % 10),
+                              connectiveUsed = false
+                            )
                           )
                         )
-                      )
                     }
                   )
                 ),
@@ -499,18 +500,18 @@ object SystemProcesses {
               )
             },
             // 4. Add some complex connectives that require evaluation
-            connectives = (0 until 100).map { i =>
+            connectives = (0 until 5000).map { i =>
               Connective(
                 ConnAndBody(
                   ConnectiveBody(
-                    ps = List.fill(10)(
+                    ps = List.fill(5000)(
                       Expr(
                         exprInstance = EMethodBody(
                           EMethod(
                             methodName = "keccak256Hash",
                             target = EVar(FreeVar(i % 10)),
                             arguments = List(
-                              GByteArray(ByteString.copyFrom(Array.fill(32)((i+1).toByte)))
+                              GByteArray(ByteString.copyFrom(Array.fill(32)((i + 1).toByte)))
                             ),
                             locallyFree = BitSet(),
                             connectiveUsed = false
