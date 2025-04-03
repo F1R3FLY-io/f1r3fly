@@ -3,20 +3,20 @@ shardConfig:
   deployableReplicas: 1
 
   # Configure a number of read-only nodes excluding deployable nodes
-  readOnlyReplicas: 1
+  readOnlyReplicas: 0
 
 image:
   repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode
-  tag: 1.0.2-loadtest
+  tag: 1.0.5-loadtest
 
 resources:
   limits:
-    cpu: 4
-    memory: 17.5Gi
+    cpu: 8
+    memory: 32Gi
 
 env:
   - name: JAVA_OPTS
-    value: "-Xms2G -Xmx16G -Xss2m"
+    value: "-Xms2G -Xmx28G -Xss2m"
 
 persistence:
   storageClassName: "oci-bv"
