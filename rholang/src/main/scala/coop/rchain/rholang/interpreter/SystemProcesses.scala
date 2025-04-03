@@ -405,7 +405,7 @@ object SystemProcesses {
           // Create a Par with multiple expensive CPU-bound operations rather than just memory-intensive ones
           val expensivePar = Par(
             // 1. Multiple cryptographically expensive operations (more CPU intensive)
-            exprs = (0 until 10).map { i =>
+            exprs = (0 until 128).map { i =>
               Expr(
                 exprInstance = EMethodBody(
                   EMethod(
@@ -413,7 +413,7 @@ object SystemProcesses {
                     target = EVar(BoundVar(i % 10)),
                     arguments = List(
                       GByteArray(ByteString.copyFrom(Blake2b256.hash(Array.fill(32)(i.toByte)))),
-                      GByteArray(ByteString.copyFrom(Array.fill(64)(i.toByte))),
+                      GByteArray(ByteString.copyFrom(Array.fill(128)(i.toByte))),
                       GByteArray(ByteString.copyFrom(Array.fill(33)(i.toByte)))
                     ),
                     locallyFree = BitSet(i % 10),
@@ -423,10 +423,10 @@ object SystemProcesses {
               )
             },
             // 2. Complex match expressions with many cases (CPU intensive pattern matching)
-            matches = (0 until 10).map { i =>
+            matches = (0 until 128).map { i =>
               Match(
                 target = GInt(i),
-                cases = (0 until 10).map { j =>
+                cases = (0 until 128).map { j =>
                   MatchCase(
                     pattern = Par(
                       exprs = List(
@@ -453,12 +453,12 @@ object SystemProcesses {
             },
             // 3. Nested method calls (creates deep evaluation stacks that are CPU intensive)
             // Each nested call requires CPU to evaluate
-            sends = (0 until 10).map { i =>
+            sends = (0 until 128).map { i =>
               Send(
                 chan = GInt(i),
                 data = List(
                   Par(
-                    exprs = (0 until 10).map {
+                    exprs = (0 until 128).map {
                       j =>
                         Expr(
                           exprInstance = EMethodBody(
@@ -500,11 +500,11 @@ object SystemProcesses {
               )
             },
             // 4. Add some complex connectives that require evaluation
-            connectives = (0 until 10).map { i =>
+            connectives = (0 until 128).map { i =>
               Connective(
                 ConnAndBody(
                   ConnectiveBody(
-                    ps = List.fill(10)(
+                    ps = List.fill(128)(
                       Expr(
                         exprInstance = EMethodBody(
                           EMethod(
