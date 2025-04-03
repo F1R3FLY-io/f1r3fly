@@ -761,7 +761,7 @@ impl DeployData {
         let algorithm = SignaturesAlgFactory::apply(&proto.sig_algorithm)
             .ok_or_else(|| format!("Unknown signature algorithm: {}", proto.sig_algorithm))?;
 
-        let sig = proto.sig.to_vec();
+        let sig = proto.sig.clone();
         let pk = PublicKey::from_bytes(&proto.deployer);
         let signed = Signed::from_signed_data(DeployData::_from_proto(proto), pk, sig, algorithm)?;
 

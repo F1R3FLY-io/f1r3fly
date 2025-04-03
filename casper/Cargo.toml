@@ -24,5 +24,7 @@ tempfile = "3.18.0"
 retry = "2.0.0"
 bincode = "1.3.3"
 serde = "1.0.219"
+log = "0.4.27"
+byteorder = "1.5.0"
 
 [build-dependencies]

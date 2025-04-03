@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use crypto::rust::signatures::signed::Signed;
 use hex::ToHex;
-use models::casper::system_deploy_data_proto::SystemDeploy;
 use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::block::state_hash::{StateHash, StateHashSerde};
 use models::rust::block_hash::BlockHash;
@@ -36,6 +35,7 @@ use crate::rust::rholang::replay_runtime::ReplayRuntimeOps;
 use crate::rust::rholang::runtime::RuntimeOps;
 
 use super::replay_failure::ReplayFailure;
+use super::system_deploy::SystemDeployTrait;
 
 use retry::{delay::NoDelay, retry, OperationResult};
 
@@ -92,7 +92,7 @@ impl RuntimeManager {
         &mut self,
         start_hash: StateHash,
         terms: Vec<Signed<DeployData>>,
-        system_deploys: Vec<SystemDeploy>,
+        system_deploys: Vec<impl SystemDeployTrait>,
         block_data: BlockData,
         invalid_blocks: Option<HashMap<BlockHash, Validator>>,
     ) -> Result<(StateHash, Vec<ProcessedDeploy>, Vec<ProcessedSystemDeploy>), CasperError> {
@@ -110,7 +110,7 @@ impl RuntimeManager {
             system_deploys,
             block_data,
             invalid_blocks,
-        );
+        )?;
 
         let (state_hash, usr_deploy_res, sys_deploy_res) = computed;
         let (usr_processed, usr_mergeable): (Vec<ProcessedDeploy>, Vec<NumberChannelsEndVal>) =
@@ -149,7 +149,8 @@ impl RuntimeManager {
         block_number: i64,
     ) -> Result<(StateHash, StateHash, Vec<ProcessedDeploy>), CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::compute_genesis(runtime, terms, block_time, block_number);
+        let computed =
+            RuntimeOps::compute_genesis(runtime, terms, block_time, block_number).await?;
         let (pre_state, state_hash, processed) = computed;
         let (processed_deploys, mergeable_chs) = processed.into_iter().unzip();
 
@@ -212,8 +213,8 @@ impl RuntimeManager {
 
     pub async fn capture_results(
         &self,
-        start: StateHash,
-        deploy: Signed<DeployData>,
+        start: &StateHash,
+        deploy: &Signed<DeployData>,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
         let computed = RuntimeOps::capture_results(runtime, start, deploy)?;
@@ -222,7 +223,7 @@ impl RuntimeManager {
 
     pub async fn get_active_validators(
         &self,
-        start_hash: StateHash,
+        start_hash: &StateHash,
     ) -> Result<Vec<Validator>, CasperError> {
         let runtime = self.spawn_runtime().await;
         let computed = RuntimeOps::get_active_validators(runtime, start_hash)?;
@@ -237,7 +238,7 @@ impl RuntimeManager {
         // TODO: this retry is a temp solution for debugging why this throws `IllegalArgumentException` - OLD
         let result = retry(NoDelay.take(MAX_RETRIES), || {
             retries += 1;
-            match RuntimeOps::compute_bonds(runtime.clone(), hash.clone()) {
+            match RuntimeOps::compute_bonds(runtime.clone(), &hash) {
                 Ok(bonds) => OperationResult::Ok(bonds),
                 Err(e) => {
                     // Match Scala's error message format
@@ -273,21 +274,21 @@ impl RuntimeManager {
     pub async fn play_exploratory_deploy(
         &self,
         term: String,
-        hash: StateHash,
+        hash: &StateHash,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
         let computed = RuntimeOps::play_exploratory_deploy(runtime, term, hash)?;
         Ok(computed)
     }
 
-    pub async fn get_data(&self, hash: StateHash, channel: Par) -> Result<Vec<Par>, CasperError> {
+    pub async fn get_data(&self, hash: StateHash, channel: &Par) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
 
         let mut runtime_lock = runtime.lock().unwrap();
         runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
         drop(runtime_lock);
 
-        let computed = RuntimeOps::get_data_par(runtime, channel)?;
+        let computed = RuntimeOps::get_data_par(runtime, channel);
         Ok(computed)
     }
 
@@ -302,7 +303,7 @@ impl RuntimeManager {
         runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
         drop(runtime_lock);
 
-        let computed = RuntimeOps::get_continuation_par(runtime, channels)?;
+        let computed = RuntimeOps::get_continuation_par(runtime, channels);
         Ok(computed)
     }
 

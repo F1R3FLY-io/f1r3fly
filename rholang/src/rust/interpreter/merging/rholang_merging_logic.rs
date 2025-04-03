@@ -144,7 +144,7 @@ impl RholangMergingLogic {
         rnd
     }
 
-    fn get_number_with_rnd(par_with_rnd: &ListParWithRandom) -> (i64, Blake2b512Random) {
+    pub fn get_number_with_rnd(par_with_rnd: &ListParWithRandom) -> (i64, Blake2b512Random) {
         assert!(
             par_with_rnd.pars.len() == 1,
             "Number channel should contain single Int term, found {:?}",

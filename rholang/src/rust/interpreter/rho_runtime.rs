@@ -193,7 +193,7 @@ pub trait RhoRuntime: HasCost {
      *
      * This function would not change the state in the runtime
      */
-    fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>>;
+    fn get_data(&self, channel: &Par) -> Vec<Datum<ListParWithRandom>>;
 
     fn get_joins(&self, channel: Par) -> Vec<Vec<Par>>;
 
@@ -367,7 +367,7 @@ impl RhoRuntime for RhoRuntimeImpl {
             .consume_result(channel, pattern)?)
     }
 
-    fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
+    fn get_data(&self, channel: &Par) -> Vec<Datum<ListParWithRandom>> {
         self.reducer.space.try_lock().unwrap().get_data(channel)
     }
 

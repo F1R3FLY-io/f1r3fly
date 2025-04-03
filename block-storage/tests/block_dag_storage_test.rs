@@ -450,7 +450,7 @@ fn dag_storage_should_be_able_to_restore_deploy_index_on_startup() {
 
       let deploy_lookups: Vec<Option<BlockHash>> = deploy_sigs
           .iter()
-          .map(|sig| dag.lookup_by_deploy_id(sig).unwrap())
+          .map(|sig| dag.lookup_by_deploy_id(&sig.to_vec()).unwrap())
           .collect();
 
       assert_eq!(deploy_lookups, block_hashes.iter().map(|h| Some(h.clone())).collect::<Vec<_>>());

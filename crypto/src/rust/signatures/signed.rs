@@ -11,7 +11,7 @@ use super::{secp256k1_eth::Secp256k1Eth, signatures_alg::SignaturesAlg};
 pub struct Signed<A> {
     pub data: A,
     pub pk: PublicKey,
-    pub sig: Vec<u8>, // TODO: Convert to ByteString
+    pub sig: prost::bytes::Bytes,
     pub sig_algorithm: Box<dyn SignaturesAlg>,
 }
 
@@ -29,7 +29,7 @@ impl<A: std::fmt::Debug + serde::Serialize> Signed<A> {
         Ok(Self {
             data,
             pk: sig_algorithm.to_public(&sk),
-            sig,
+            sig: prost::bytes::Bytes::from(sig),
             sig_algorithm,
         })
     }
@@ -37,7 +37,7 @@ impl<A: std::fmt::Debug + serde::Serialize> Signed<A> {
     pub fn from_signed_data(
         data: A,
         pk: PublicKey,
-        sig: Vec<u8>,
+        sig: prost::bytes::Bytes,
         sig_algorithm: Box<dyn SignaturesAlg>,
     ) -> Result<Option<Self>, String> {
         let serialized_data =

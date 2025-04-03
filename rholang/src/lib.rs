@@ -886,7 +886,7 @@ extern "C" fn get_data(
     // let rt = tokio::runtime::Runtime::new().unwrap();
     // let datums =
     //     rt.block_on(async { unsafe { (*runtime_ptr).runtime.try_lock().unwrap().get_data(channel).await } });
-    let datums = unsafe { (*runtime_ptr).runtime.try_lock().unwrap().get_data(channel) };
+    let datums = unsafe { (*runtime_ptr).runtime.try_lock().unwrap().get_data(&channel) };
 
     // println!("\ndatums in rust get_data: {:?}", datums);
 

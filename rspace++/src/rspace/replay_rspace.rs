@@ -110,8 +110,8 @@ where
         panic!("\nERROR: ReplayRSpace consume_result should not be called here");
     }
 
-    fn get_data(&self, channel: C) -> Vec<Datum<A>> {
-        self.store.get_data(&channel)
+    fn get_data(&self, channel: &C) -> Vec<Datum<A>> {
+        self.store.get_data(channel)
     }
 
     fn get_waiting_continuations(&self, channels: Vec<C>) -> Vec<WaitingContinuation<P, K>> {
