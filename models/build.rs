@@ -3,9 +3,30 @@ extern crate tonic_build;
 // https://docs.rs/prost-build/latest/prost_build/struct.Config.html
 // https://docs.rs/tonic-build/latest/tonic_build/struct.Builder.html#
 
-use std::fs;
+use std::{env, fs, path::Path};
 
 fn main() {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let proto_src_dir = Path::new(&manifest_dir).join("src/main/protobuf");
+    let scala_proto_base_dir = Path::new(&manifest_dir).join("src");
+
+    let proto_files = [
+        "CasperMessage.proto",
+        "DeployServiceCommon.proto",
+        "DeployServiceV1.proto",
+        "ProposeServiceCommon.proto",
+        "ProposeServiceV1.proto",
+        "RholangScalaRustTypes.proto",
+        "RhoTypes.proto",
+        "RSpacePlusPlusTypes.proto",
+        "ServiceError.proto",
+    ];
+
+    let absolute_proto_files: Vec<_> = proto_files.iter().map(|f| proto_src_dir.join(f)).collect();
+    let proto_include_path = proto_src_dir.to_str().unwrap().to_string();
+    let manifest_dir_path = manifest_dir.clone();
+    let scala_proto_include_path = scala_proto_base_dir.to_str().unwrap().to_string();
+
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
@@ -18,19 +39,12 @@ fn main() {
         .enum_attribute(".rhoapi", "#[repr(C)]")
         .bytes(&[".casper"])
         .compile_protos(
+            &absolute_proto_files,
             &[
-                "CasperMessage.proto",
-                "DeployServiceCommon.proto",
-                "DeployServiceV1.proto",
-                "ProposeServiceCommon.proto",
-                "ProposeServiceV1.proto",
-                "RholangScalaRustTypes.proto",
-                "RhoTypes.proto",
-                "RSpacePlusPlusTypes.proto",
-                "ServiceError.proto",
-                "scalapb/scalapb.proto",
+                &proto_include_path,
+                &manifest_dir_path,
+                &scala_proto_include_path,
             ],
-            &["src/", "src/main/protobuf/"],
         )
         .expect("Failed to compile proto files");
 

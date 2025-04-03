@@ -17,8 +17,6 @@ set -e
 mkdir -p "$RUST_LIBRARIES_AMD64_RELEASE_PATH"
 mkdir -p "$RUST_LIBRARIES_AARCH64_RELEASE_PATH"
 
-cargo install cross --git https://github.com/cross-rs/cross
-
 cd rspace++/
 cross build --release --target $AMD64_TARGET -p rspace_plus_plus_rhotypes
 cross build --release --target $AARCH64_TARGET -p rspace_plus_plus_rhotypes

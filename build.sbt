@@ -24,16 +24,6 @@ Global / PB.protocVersion := "3.24.3"
 // ThisBuild / libraryDependencies += compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
 
 val releaseJnaLibraryPath = "rust_libraries/release/"
-val dockerJnaLibraryPath = {
-  val arch = System.getProperty("os.arch")
-  if (arch == "amd64") {
-    "-Djna.library.path=rust_libraries/release/amd64/"
-  } else if (arch == "aarch64") {
-    "-Djna.library.path=rust_libraries/release/aarch64/"
-  } else {
-    sys.error(s"Unsupported architecture: $arch")
-  }
-}
 
 inThisBuild(
   List(
@@ -58,34 +48,6 @@ inThisBuild(
     Test / javaOptions := javaOpens,
     IntegrationTest / javaOptions := javaOpens
   )
-)
-
-lazy val ensureDockerBuildx    = taskKey[Unit]("Ensure that docker buildx configuration exists")
-lazy val dockerBuildWithBuildx = taskKey[Unit]("Build docker images using buildx")
-lazy val dockerBuildxSettings = Seq(
-  ensureDockerBuildx := {
-    if (Process("docker buildx inspect multi-arch-builder").! == 1) {
-      Process("docker buildx create --use --name multi-arch-builder", baseDirectory.value).!
-    }
-  },
-  dockerBuildWithBuildx := {
-    streams.value.log("Building and pushing image with Buildx")
-    dockerAliases.value.foreach(
-      alias =>
-        Process(
-          "docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
-            alias + " .",
-          baseDirectory.value / "target" / "docker" / "stage"
-        ).!
-    )
-  },
-  publish in Docker := Def
-    .sequential(
-      publishLocal in Docker,
-      ensureDockerBuildx,
-      dockerBuildWithBuildx
-    )
-    .value
 )
 
 lazy val projectSettings = Seq(
@@ -455,26 +417,23 @@ lazy val node = (project in file("node"))
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
     // dockerBaseImage := "ghcr.io/graalvm/jdk:ol8-java17-22.3.3",
     dockerBaseImage := "azul/zulu-openjdk:17.0.9-jre-headless", // Using this image because resolves error of GLIB_C version for rspace++
-    dockerEntrypoint := List(
-      "/opt/docker/bin/rnode",
-      "--profile=docker",
-      "-XX:ErrorFile=/var/lib/rnode/hs_err_pid%p.log"
-    ),
+    dockerEntrypoint := List("/opt/docker/bin/docker-entrypoint.sh"),
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
-    // dockerBuildOptions := Seq(
-    // 	"--builder",
-    // 	"default",
-    // 	"--platform",
-    // 	"linux/amd64,linux/arm64",
-    // 	"-t",
-    // 	"ghcr.io/f1r3fly-io/rnode-rspaceplusplus:latest"
-    // ),
+    dockerBuildOptions := Seq(
+    	"--builder",
+    	"default",
+    	"--platform",
+    	"linux/amd64,linux/arm64",
+    	"-t",
+    	"ghcr.io/f1r3fly-io/rholang-rust:latest"
+    ),
     dockerCommands ++= {
       Seq(
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("LABEL", s"""version="${version.value}""""),
+        Cmd("RUN", "chmod +x /opt/docker/bin/docker-entrypoint.sh"),
         Cmd("USER", "root"),
         Cmd("USER", (Docker / daemonUser).value),
         Cmd(
@@ -492,8 +451,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-J-Xms4G -J-Xmx6G -J-Xss128m -J-XX:MaxMetaspaceSize=2G",
-      dockerJnaLibraryPath
+      "-J-Xms4G -J-Xmx6G -J-Xss128m -J-XX:MaxMetaspaceSize=2G"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
@@ -502,6 +460,7 @@ lazy val node = (project in file("node"))
       directory((baseDirectory in rholang).value / "examples")
         .map { case (f, p) => f -> s"$base/$p" }
     },
+    mappings in Docker += file("scripts/docker-entrypoint.sh") -> "/opt/docker/bin/docker-entrypoint.sh",
     mappings in Docker += file(
       "rust_libraries/docker/release/aarch64/librspace_plus_plus_rhotypes.so"
     ) -> "opt/docker/rust_libraries/release/aarch64/librspace_plus_plus_rhotypes.so",

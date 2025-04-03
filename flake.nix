@@ -6,9 +6,12 @@
     flake-utils.follows = "typelevel-nix/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
     nixpkgs-23.url = "github:NixOS/nixpkgs/d4f247e89f6e10120f911e2e2d2254a050d0f732"; #https://www.nixhub.io/packages/tree-sitter
+    naersk.url = "github:nix-community/naersk";
+    cross-src.url = "github:cross-rs/cross";
+    cross-src.flake = false;
   };
 
-  outputs = { self, nixpkgs, oldNixpkgs, flake-utils, typelevel-nix, rust-overlay, nixpkgs-23 }:
+  outputs = { self, nixpkgs, oldNixpkgs, flake-utils, typelevel-nix, rust-overlay, nixpkgs-23, naersk, cross-src }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         graalOverlay = final: prev: rec {
@@ -36,11 +39,19 @@
           inherit system overlays;
           config.allowUnfree = true;
         };
-        pkgsCross = import nixpkgs {
-          inherit system overlays;
-          crossSystem = nixpkgs.lib.systems.examples.aarch64-multiplatform;
-        };
         pkgs23 = import nixpkgs-23 { inherit system; };
+        
+        naersk-lib = naersk.lib."${system}".override {
+          cargo = pkgs.rust-bin.stable.latest.minimal;
+          rustc = pkgs.rust-bin.stable.latest.minimal;
+        };
+        
+        cross = naersk-lib.buildPackage {
+          pname = "cross";
+          root = cross-src;
+          nativeBuildInputs = with pkgs; [ pkg-config ];
+          buildInputs = with pkgs; [ openssl ];
+        };
       in
       with pkgs;
       {
@@ -51,9 +62,29 @@
               package = docker;
             }
             {
+              name = "protoc";
+              package = protobuf;
+              help = "Protocol Buffers compiler";
+            }
+            {
               name = "rustup";
               package = rustup;
               help = "The Rust toolchain installer";
+            }
+            {
+              name = "gcc";
+              package = gcc;
+              help = "GNU C compiler";
+            }
+            {
+              name = "make";
+              package = gnumake;
+              help = "GNU Make build tool";
+            }
+            {
+              name = "pkg-config";
+              package = pkg-config;
+              help = "Helper tool for compiling applications";
             }
             {
               name = "bnfc";
@@ -105,12 +136,31 @@
               package = pkgs23.tree-sitter;
               help = "Parser generator tool and incremental parsing library";
             }
+            {
+              name = "cross";
+              package = cross;
+              help = "Cross-compilation of Rust projects made easy";
+            }
           ];
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";
           typelevelShell = {
 		        jdk.package = holyGraal;
           };
+          env = [
+              {
+                name = "PROTOBUF_LOCATION";
+                value = "${pkgs.protobuf}";
+              }
+              {
+                name = "PROTOC";
+                value = "${pkgs.protobuf}/bin/protoc";
+              }
+              {
+                name = "PROTOC_INCLUDE";
+                value = "${pkgs.protobuf}/include";
+              }
+            ];
         };
       }
     );
