@@ -1,5 +1,5 @@
 x-rnode: &default-rnode
-  image: spreston8/f1r3fly-rholang-rust-node:latest
+  image: f1r3flyindustries/f1r3fly-rust-node:latest
   user: root
   networks:
     - f1r3fly

@@ -71,11 +71,11 @@
               package = rustup;
               help = "The Rust toolchain installer";
             }
-            {
+          ] ++ (if system != "x86_64-darwin" && system != "aarch64-darwin" then [{
               name = "gcc";
               package = gcc;
               help = "GNU C compiler";
-            }
+            }] else []) ++ [
             {
               name = "make";
               package = gnumake;
