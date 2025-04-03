@@ -405,7 +405,7 @@ object SystemProcesses {
           // Create a Par with multiple expensive CPU-bound operations rather than just memory-intensive ones
           val expensivePar = Par(
             // 1. Multiple cryptographically expensive operations (more CPU intensive)
-            exprs = (0 until 100).map { i =>
+            exprs = (0 until 10).map { i =>
               Expr(
                 exprInstance = EMethodBody(
                   EMethod(
@@ -423,10 +423,10 @@ object SystemProcesses {
               )
             },
             // 2. Complex match expressions with many cases (CPU intensive pattern matching)
-            matches = (0 until 100).map { i =>
+            matches = (0 until 10).map { i =>
               Match(
                 target = GInt(i),
-                cases = (0 until 100).map { j =>
+                cases = (0 until 10).map { j =>
                   MatchCase(
                     pattern = Par(
                       exprs = List(
@@ -453,12 +453,12 @@ object SystemProcesses {
             },
             // 3. Nested method calls (creates deep evaluation stacks that are CPU intensive)
             // Each nested call requires CPU to evaluate
-            sends = (0 until 100).map { i =>
+            sends = (0 until 10).map { i =>
               Send(
                 chan = GInt(i),
                 data = List(
                   Par(
-                    exprs = (0 until 100).map {
+                    exprs = (0 until 10).map {
                       j =>
                         Expr(
                           exprInstance = EMethodBody(
@@ -500,11 +500,11 @@ object SystemProcesses {
               )
             },
             // 4. Add some complex connectives that require evaluation
-            connectives = (0 until 100).map { i =>
+            connectives = (0 until 10).map { i =>
               Connective(
                 ConnAndBody(
                   ConnectiveBody(
-                    ps = List.fill(100)(
+                    ps = List.fill(10)(
                       Expr(
                         exprInstance = EMethodBody(
                           EMethod(
