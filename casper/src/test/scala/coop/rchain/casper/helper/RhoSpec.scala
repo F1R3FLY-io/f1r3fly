@@ -143,14 +143,22 @@ class RhoSpec(
       val genesis = GenesisBuilder.buildGenesis(genesisParameters)
 
       val runtimeResource = copyStorage[Task](genesis.storageDirectory)
-        .evalMap(mkTestRNodeStoreManager[Task])
-        .evalMap(_.rSpaceStores)
+      // .evalMap(mkTestRNodeStoreManager[Task])
+      // .evalMap(_.rSpaceStores)
+      // .evalMap(
+      //   RhoRuntime.createRuntime(
+      //     _,
+      //     Genesis.NonNegativeMergeableTagName,
+      //     additionalSystemProcesses = testFrameworkContracts(testResultCollector)
+      //   )
+      // )
         .evalMap(
-          RhoRuntime.createRuntime(
-            _,
-            Genesis.NonNegativeMergeableTagName,
-            additionalSystemProcesses = testFrameworkContracts(testResultCollector)
-          )
+          path =>
+            RhoRuntime.createRuntime(
+              path.toString(),
+              Genesis.NonNegativeMergeableTagName,
+              additionalSystemProcesses = testFrameworkContracts(testResultCollector)
+            )
         )
 
       runtimeResource.use { runtime =>

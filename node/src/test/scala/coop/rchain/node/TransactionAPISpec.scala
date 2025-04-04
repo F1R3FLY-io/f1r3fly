@@ -26,9 +26,9 @@ class TransactionAPISpec extends FlatSpec with Matchers with Inspectors {
       val readonly  = nodes(1)
       import readonly._
       for {
-        kvm             <- Resources.mkTestRNodeStoreManager[Task](readonly.dataDir)
-        rspaceStore     <- kvm.rSpaceStores
-        reportingCasper = ReportingCasper.rhoReporter[Task](rspaceStore)
+        kvm <- Resources.mkTestRNodeStoreManager[Task](readonly.dataDir)
+        // rspaceStore     <- kvm.rSpaceStores
+        reportingCasper = ReportingCasper.rhoReporter[Task](readonly.dataDir.toString())
         reportingStore  <- ReportStore.store[Task](kvm)
         blockReportAPI  = BlockReportAPI[Task](reportingCasper, reportingStore)
         deploy <- ConstructDeploy.sourceDeployNowF(

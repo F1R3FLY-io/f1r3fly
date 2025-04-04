@@ -541,11 +541,6 @@ final case class Options(arguments: Seq[String]) extends ScallopConf(arguments) 
       descr = "MinPhloPrice",
       validate = _ >= 0
     )
-
-    val rspacePlusPlus = opt[Flag](
-      descr = "Enable rpsace++"
-    )
-
   }
   addSubcommand(run)
 
@@ -602,6 +597,7 @@ final case class Options(arguments: Seq[String]) extends ScallopConf(arguments) 
 
     val fileNames               = trailArg[List[String]](required = true)(stringListConverter)
     val printUnmatchedSendsOnly = opt[Boolean](required = false)
+    val language                = opt[String](required = false, default = Some("rholang"))
   }
   addSubcommand(eval)
 

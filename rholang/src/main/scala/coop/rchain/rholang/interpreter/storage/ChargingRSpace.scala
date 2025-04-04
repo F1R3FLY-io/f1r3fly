@@ -45,7 +45,7 @@ object ChargingRSpace {
   )(implicit cost: _cost[F]): RhoTuplespace[F] =
     new RhoTuplespace[F] {
 
-      implicit override val m: StorageMatch[F, BindPattern, ListParWithRandom] = space.m
+      // implicit override val m: StorageMatch[F, BindPattern, ListParWithRandom] = space.m
 
       override def consume(
           channels: Seq[Par],

@@ -36,6 +36,9 @@ import scodec.bits.ByteVector
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
+import rspacePlusPlus.{IReplaySpacePlusPlus, RSpacePlusPlus_RhoTypes, ReplayRSpacePlusPlus}
+import coop.rchain.rspace.history.HistoryRepositoryInstances
+
 trait RuntimeManager[F[_]] {
   def captureResults(
       startHash: StateHash,
@@ -83,25 +86,37 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
 
   def spawnRuntime: F[RhoRuntime[F]] =
     for {
+      // newSpace <- space
+      //              .asInstanceOf[
+      //                RSpace[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
+      //              ]
+      //              .spawn
       newSpace <- space
-                   .asInstanceOf[
-                     RSpace[F, Par, BindPattern, ListParWithRandom, TaggedContinuation]
-                   ]
+                   .asInstanceOf[RSpacePlusPlus_RhoTypes[F]]
                    .spawn
       runtime <- RhoRuntime.createRhoRuntime(newSpace, mergeableTagName)
     } yield runtime
 
   def spawnReplayRuntime: F[ReplayRhoRuntime[F]] =
     for {
+      // newReplaySpace <- replaySpace
+      //                    .asInstanceOf[ReplayRSpace[
+      //                      F,
+      //                      Par,
+      //                      BindPattern,
+      //                      ListParWithRandom,
+      //                      TaggedContinuation
+      //                    ]]
+      //                    .spawn
       newReplaySpace <- replaySpace
-                         .asInstanceOf[ReplayRSpace[
+                         .asInstanceOf[ReplayRSpacePlusPlus[
                            F,
                            Par,
                            BindPattern,
                            ListParWithRandom,
                            TaggedContinuation
                          ]]
-                         .spawn
+                         .spawnReplay
       runtime <- RhoRuntime.createReplayRhoRuntime(newReplaySpace, mergeableTagName)
     } yield runtime
 
@@ -144,6 +159,10 @@ final case class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log: Contex
           // Convert from final to diff values and persist mergeable (number) channels for post-state hash
           val preStateHash  = preState.toBlake2b256Hash
           val postStateHash = stateHash.toBlake2b256Hash
+
+          // println("\npreStateHash: " + preStateHash)
+          // println("postStateHash: " + postStateHash + '\n')
+
           this
             .saveMergeableChannels(postStateHash, Array(), seqNum = 0, mergeableChs, preStateHash)
             .as((preState, stateHash, processedDeploys))
@@ -237,8 +256,10 @@ object RuntimeManager {
     * Because of the value is actually the same all
     * the time. For some situations, we can just use the value directly for better performance.
     */
+  // val emptyStateHashFixed: StateHash =
+  //   "9619d9a34bdaf56d5de8cfb7c2304d63cd9e469a0bfc5600fd2f5b9808e290f1".unsafeHexToByteString
   val emptyStateHashFixed: StateHash =
-    "9619d9a34bdaf56d5de8cfb7c2304d63cd9e469a0bfc5600fd2f5b9808e290f1".unsafeHexToByteString
+    "575c95f165bc2f27c0ef7e90ada4017b316a349f449d44a035f465b5ae8f8508".unsafeHexToByteString
 
   def apply[F[_]](implicit F: RuntimeManager[F]): F.type = F
 
@@ -253,23 +274,36 @@ object RuntimeManager {
       RuntimeManagerImpl(rSpace, replayRSpace, historyRepo, mergeableStore, mergeableTagName)
     )
 
+  // NOTE: Removed "implicit ec: ExecutionContext" parameter
   def apply[F[_]: Concurrent: ContextShift: Parallel: Metrics: Span: Log](
-      store: RSpaceStore[F],
+      // store: RSpaceStore[F],
+      storePath: String,
       mergeableStore: MergeableStore[F],
       mergeableTagName: Par
-  )(implicit ec: ExecutionContext): F[RuntimeManagerImpl[F]] =
-    createWithHistory(store, mergeableStore, mergeableTagName).map(_._1)
+  )(): F[RuntimeManagerImpl[F]] =
+    createWithHistory(storePath, mergeableStore, mergeableTagName).map(_._1)
 
+  // NOTE: Removed "implicit ec: ExecutionContext" parameter
   def createWithHistory[F[_]: Concurrent: ContextShift: Parallel: Metrics: Span: Log](
-      store: RSpaceStore[F],
+      // store: RSpaceStore[F],
+      storePath: String,
       mergeableStore: MergeableStore[F],
       mergeableTagName: Par
-  )(implicit ec: ExecutionContext): F[(RuntimeManagerImpl[F], RhoHistoryRepository[F])] = {
+  )(): F[(RuntimeManagerImpl[F], RhoHistoryRepository[F])] = {
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
+    // implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
 
-    RSpace
-      .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+    // RSpace
+    //   .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](store)
+    //   .flatMap {
+    //     case (rSpacePlay, rSpaceReplay) =>
+    //       val historyRepo = rSpacePlay.historyRepo
+    //       RuntimeManager[F](rSpacePlay, rSpaceReplay, historyRepo, mergeableStore, mergeableTagName)
+    //         .map((_, historyRepo))
+    //   }
+
+    RSpacePlusPlus_RhoTypes
+      .createWithReplay[F, Par, BindPattern, ListParWithRandom, TaggedContinuation](storePath)
       .flatMap {
         case (rSpacePlay, rSpaceReplay) =>
           val historyRepo = rSpacePlay.historyRepo
