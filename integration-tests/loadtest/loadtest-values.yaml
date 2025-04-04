@@ -7,11 +7,11 @@ shardConfig:
 
 image:
   repository: us-sanjose-1.ocir.io/axd0qezqa9z3/f1r3fly-io/rnode
-  tag: 1.0.5-loadtest
+  tag: 1.0.11-loadtest
 
 resources:
   limits:
-    cpu: 8
+    cpu: 4
     memory: 32Gi
 
 env:

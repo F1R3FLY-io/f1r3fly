@@ -1,0 +1,76 @@
+new pipe1, pipe2, pipe3, pipe4, pipe5, pipe6, pipe7, pipe8, pipe9, pipe10, 
+    pipe11, pipe12, pipe13, pipe14, pipe15, pipe16, pipe17, pipe18, pipe19, pipe20,
+    pipe21, pipe22, pipe23, pipe24, pipe25, pipe26, pipe27, pipe28, pipe29, pipe30,
+    pipe31, pipe32, pipe33, pipe34, pipe35, pipe36, pipe37, pipe38, pipe39, pipe40,
+    pipe41, pipe42, pipe43, pipe44, pipe45, pipe46, pipe47, pipe48, pipe49, pipe50,
+    pipe51, pipe52, pipe53, pipe54, pipe55, pipe56, pipe57, pipe58, pipe59, pipe60,
+    pipe61, pipe62, pipe63, pipe64, pipe65, pipe66, pipe67, pipe68, pipe69, pipe70,
+    pipe71, pipe72, pipe73, pipe74, pipe75, pipe76, pipe77, pipe78, pipe79, pipe80,
+    pipe81, pipe82, pipe83, pipe84, pipe85, pipe86, pipe87, pipe88, pipe89, pipe90,
+    pipe91, pipe92, pipe93, pipe94, pipe95, pipe96, pipe97, pipe98, pipe99, pipe100,
+    pipe101, pipe102, pipe103, pipe104, pipe105, pipe106, pipe107, pipe108, pipe109, pipe110,
+    pipe111, pipe112, pipe113, pipe114, pipe115, pipe116, pipe117, pipe118, pipe119, pipe120,
+    pipe121, pipe122, pipe123, pipe124, pipe125, pipe126, pipe127, pipe128, stdout(`rho:io:stdout`), produceLargeData(`rho:io:produceLargeData`) in { 
+
+
+    produceLargeData!(*pipe1) | produceLargeData!(*pipe2) | produceLargeData!(*pipe3) | produceLargeData!(*pipe4) |
+    produceLargeData!(*pipe5) | produceLargeData!(*pipe6) | produceLargeData!(*pipe7) | produceLargeData!(*pipe8) |
+    produceLargeData!(*pipe9) | produceLargeData!(*pipe10) | produceLargeData!(*pipe11) | produceLargeData!(*pipe12) |
+    produceLargeData!(*pipe13) | produceLargeData!(*pipe14) | produceLargeData!(*pipe15) | produceLargeData!(*pipe16) |
+    produceLargeData!(*pipe17) | produceLargeData!(*pipe18) | produceLargeData!(*pipe19) | produceLargeData!(*pipe20) |
+    produceLargeData!(*pipe21) | produceLargeData!(*pipe22) | produceLargeData!(*pipe23) | produceLargeData!(*pipe24) |
+    produceLargeData!(*pipe25) | produceLargeData!(*pipe26) | produceLargeData!(*pipe27) | produceLargeData!(*pipe28) |
+    produceLargeData!(*pipe29) | produceLargeData!(*pipe30) | produceLargeData!(*pipe31) | produceLargeData!(*pipe32) |
+    produceLargeData!(*pipe33) | produceLargeData!(*pipe34) | produceLargeData!(*pipe35) | produceLargeData!(*pipe36) |
+    produceLargeData!(*pipe37) | produceLargeData!(*pipe38) | produceLargeData!(*pipe39) | produceLargeData!(*pipe40) |
+    produceLargeData!(*pipe41) | produceLargeData!(*pipe42) | produceLargeData!(*pipe43) | produceLargeData!(*pipe44) |
+    produceLargeData!(*pipe45) | produceLargeData!(*pipe46) | produceLargeData!(*pipe47) | produceLargeData!(*pipe48) |
+    produceLargeData!(*pipe49) | produceLargeData!(*pipe50) | produceLargeData!(*pipe51) | produceLargeData!(*pipe52) |
+    produceLargeData!(*pipe53) | produceLargeData!(*pipe54) | produceLargeData!(*pipe55) | produceLargeData!(*pipe56) |
+    produceLargeData!(*pipe57) | produceLargeData!(*pipe58) | produceLargeData!(*pipe59) | produceLargeData!(*pipe60) |
+    produceLargeData!(*pipe61) | produceLargeData!(*pipe62) | produceLargeData!(*pipe63) | produceLargeData!(*pipe64) |
+    produceLargeData!(*pipe65) | produceLargeData!(*pipe66) | produceLargeData!(*pipe67) | produceLargeData!(*pipe68) |
+    produceLargeData!(*pipe69) | produceLargeData!(*pipe70) | produceLargeData!(*pipe71) | produceLargeData!(*pipe72) |
+    produceLargeData!(*pipe73) | produceLargeData!(*pipe74) | produceLargeData!(*pipe75) | produceLargeData!(*pipe76) |
+    produceLargeData!(*pipe77) | produceLargeData!(*pipe78) | produceLargeData!(*pipe79) | produceLargeData!(*pipe80) |
+    produceLargeData!(*pipe81) | produceLargeData!(*pipe82) | produceLargeData!(*pipe83) | produceLargeData!(*pipe84) |
+    produceLargeData!(*pipe85) | produceLargeData!(*pipe86) | produceLargeData!(*pipe87) | produceLargeData!(*pipe88) |
+    produceLargeData!(*pipe89) | produceLargeData!(*pipe90) | produceLargeData!(*pipe91) | produceLargeData!(*pipe92) |
+    produceLargeData!(*pipe93) | produceLargeData!(*pipe94) | produceLargeData!(*pipe95) | produceLargeData!(*pipe96) |
+    produceLargeData!(*pipe97) | produceLargeData!(*pipe98) | produceLargeData!(*pipe99) | produceLargeData!(*pipe100) |
+    produceLargeData!(*pipe101) | produceLargeData!(*pipe102) | produceLargeData!(*pipe103) | produceLargeData!(*pipe104) |
+    produceLargeData!(*pipe105) | produceLargeData!(*pipe106) | produceLargeData!(*pipe107) | produceLargeData!(*pipe108) |
+    produceLargeData!(*pipe109) | produceLargeData!(*pipe110) | produceLargeData!(*pipe111) | produceLargeData!(*pipe112) |
+    produceLargeData!(*pipe113) | produceLargeData!(*pipe114) | produceLargeData!(*pipe115) | produceLargeData!(*pipe116) |
+    produceLargeData!(*pipe117) | produceLargeData!(*pipe118) | produceLargeData!(*pipe119) | produceLargeData!(*pipe120) |
+    produceLargeData!(*pipe121) | produceLargeData!(*pipe122) | produceLargeData!(*pipe123) | produceLargeData!(*pipe124) |
+    produceLargeData!(*pipe125) | produceLargeData!(*pipe126) | produceLargeData!(*pipe127) | produceLargeData!(*pipe128) |
+
+
+    for ( @x1 <- pipe1 & @x2 <- pipe2 & @x3 <- pipe3 & @x4 <- pipe4 & @x5 <- pipe5 & @x6 <- pipe6 & @x7 <- pipe7 & @x8 <- pipe8 &
+          @x9 <- pipe9 & @x10 <- pipe10 & @x11 <- pipe11 & @x12 <- pipe12 & @x13 <- pipe13 & @x14 <- pipe14 & @x15 <- pipe15 & @x16 <- pipe16 &
+          @x17 <- pipe17 & @x18 <- pipe18 & @x19 <- pipe19 & @x20 <- pipe20 & @x21 <- pipe21 & @x22 <- pipe22 & @x23 <- pipe23 & @x24 <- pipe24 &
+          @x25 <- pipe25 & @x26 <- pipe26 & @x27 <- pipe27 & @x28 <- pipe28 & @x29 <- pipe29 & @x30 <- pipe30 & @x31 <- pipe31 & @x32 <- pipe32 &
+          @x33 <- pipe33 & @x34 <- pipe34 & @x35 <- pipe35 & @x36 <- pipe36 & @x37 <- pipe37 & @x38 <- pipe38 & @x39 <- pipe39 & @x40 <- pipe40 &
+          @x41 <- pipe41 & @x42 <- pipe42 & @x43 <- pipe43 & @x44 <- pipe44 & @x45 <- pipe45 & @x46 <- pipe46 & @x47 <- pipe47 & @x48 <- pipe48 &
+          @x49 <- pipe49 & @x50 <- pipe50 & @x51 <- pipe51 & @x52 <- pipe52 & @x53 <- pipe53 & @x54 <- pipe54 & @x55 <- pipe55 & @x56 <- pipe56 &
+          @x57 <- pipe57 & @x58 <- pipe58 & @x59 <- pipe59 & @x60 <- pipe60 & @x61 <- pipe61 & @x62 <- pipe62 & @x63 <- pipe63 & @x64 <- pipe64 &
+          @x65 <- pipe65 & @x66 <- pipe66 & @x67 <- pipe67 & @x68 <- pipe68 & @x69 <- pipe69 & @x70 <- pipe70 & @x71 <- pipe71 & @x72 <- pipe72 &
+          @x73 <- pipe73 & @x74 <- pipe74 & @x75 <- pipe75 & @x76 <- pipe76 & @x77 <- pipe77 & @x78 <- pipe78 & @x79 <- pipe79 & @x80 <- pipe80 &
+          @x81 <- pipe81 & @x82 <- pipe82 & @x83 <- pipe83 & @x84 <- pipe84 & @x85 <- pipe85 & @x86 <- pipe86 & @x87 <- pipe87 & @x88 <- pipe88 &
+          @x89 <- pipe89 & @x90 <- pipe90 & @x91 <- pipe91 & @x92 <- pipe92 & @x93 <- pipe93 & @x94 <- pipe94 & @x95 <- pipe95 & @x96 <- pipe96 &
+          @x97 <- pipe97 & @x98 <- pipe98 & @x99 <- pipe99 & @x100 <- pipe100 & @x101 <- pipe101 & @x102 <- pipe102 & @x103 <- pipe103 & @x104 <- pipe104 &
+          @x105 <- pipe105 & @x106 <- pipe106 & @x107 <- pipe107 & @x108 <- pipe108 & @x109 <- pipe109 & @x110 <- pipe110 & @x111 <- pipe111 & @x112 <- pipe112 &
+          @x113 <- pipe113 & @x114 <- pipe114 & @x115 <- pipe115 & @x116 <- pipe116 & @x117 <- pipe117 & @x118 <- pipe118 & @x119 <- pipe119 & @x120 <- pipe120 &
+          @x121 <- pipe121 & @x122 <- pipe122 & @x123 <- pipe123 & @x124 <- pipe124 & @x125 <- pipe125 & @x126 <- pipe126 & @x127 <- pipe127 & @x128 <- pipe128 ) {
+        stdout!(["Done", x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16,
+               x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31, x32,
+               x33, x34, x35, x36, x37, x38, x39, x40, x41, x42, x43, x44, x45, x46, x47, x48,
+               x49, x50, x51, x52, x53, x54, x55, x56, x57, x58, x59, x60, x61, x62, x63, x64,
+               x65, x66, x67, x68, x69, x70, x71, x72, x73, x74, x75, x76, x77, x78, x79, x80,
+               x81, x82, x83, x84, x85, x86, x87, x88, x89, x90, x91, x92, x93, x94, x95, x96,
+               x97, x98, x99, x100, x101, x102, x103, x104, x105, x106, x107, x108, x109, x110,
+               x111, x112, x113, x114, x115, x116, x117, x118, x119, x120, x121, x122, x123, x124,
+               x125, x126, x127, x128])
+    }
+}

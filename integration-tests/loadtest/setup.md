@@ -15,12 +15,10 @@ helm upgrade --install f1r3fly-loadtest ../../docker/helm/f1r3fly --namespace lo
 
 ## Expose
 ```sh
-echo "expose boot"
 kubectl port-forward svc/f1r3fly-loadtest0 -n loadtest 40403:40403 &
 kubectl port-forward svc/f1r3fly-loadtest0 -n loadtest 40405:40405 &
-echo "expose readonly"
-kubectl port-forward svc/f1r3fly-loadtest1 -n loadtest 40413:40403 &
-kubectl port-forward svc/f1r3fly-loadtest1 -n loadtest 40415:40405 &
+#kubectl port-forward svc/f1r3fly-loadtest1 -n loadtest 40413:40403 &
+#kubectl port-forward svc/f1r3fly-loadtest1 -n loadtest 40415:40405 &
 ```
 
 ### Expose dashboard
