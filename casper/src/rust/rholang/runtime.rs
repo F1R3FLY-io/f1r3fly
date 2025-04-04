@@ -70,7 +70,7 @@ use crate::rust::{
 pub struct RuntimeOps;
 
 #[allow(type_alias_bounds)]
-type SysEvalResult<S: SystemDeployTrait> =
+pub type SysEvalResult<S: SystemDeployTrait> =
     (Either<SystemDeployUserError, S::Result>, EvaluateResult);
 
 fn system_deploy_consume_all_pattern() -> BindPattern {
@@ -637,14 +637,14 @@ impl RuntimeOps {
      */
     pub fn with_soft_transaction<A>(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        fa: impl Fn() -> (A, bool),
+        mut fa: impl FnMut() -> Result<(A, bool), CasperError>,
     ) -> Result<A, CasperError> {
         let mut runtime_lock = runtime.lock().unwrap();
         let fallback = runtime_lock.create_soft_checkpoint();
         drop(runtime_lock);
 
         // Execute action
-        let (a, success) = fa();
+        let (a, success) = fa()?;
 
         // Revert the state if failed
         if !success {

@@ -10,7 +10,7 @@ use super::errors::InterpreterError;
 use super::reduce::DebruijnInterpreter;
 
 //See rholang/src/main/scala/coop/rchain/rholang/interpreter/Interpreter.scala
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EvaluateResult {
     pub cost: Cost,
     pub errors: Vec<InterpreterError>,

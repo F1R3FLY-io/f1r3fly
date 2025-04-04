@@ -16,8 +16,8 @@ pub enum ReplayFailure {
     },
 
     ReplayCostMismatch {
-        initial_cost: i64,
-        replay_cost: i64,
+        initial_cost: u64,
+        replay_cost: u64,
     },
 
     SystemDeployErrorMismatch {
@@ -42,7 +42,7 @@ impl ReplayFailure {
         ReplayFailure::UnusedCOMMEvent { msg }
     }
 
-    pub fn replay_cost_mismatch(initial_cost: i64, replay_cost: i64) -> Self {
+    pub fn replay_cost_mismatch(initial_cost: u64, replay_cost: u64) -> Self {
         ReplayFailure::ReplayCostMismatch {
             initial_cost,
             replay_cost,

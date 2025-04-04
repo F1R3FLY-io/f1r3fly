@@ -3,7 +3,9 @@ use std::fmt;
 use rholang::rust::interpreter::errors::InterpreterError;
 use shared::rust::store::key_value_store::KvStoreError;
 
-use super::util::rholang::system_deploy_user_error::SystemDeployPlatformFailure;
+use super::util::rholang::{
+    replay_failure::ReplayFailure, system_deploy_user_error::SystemDeployPlatformFailure,
+};
 
 #[derive(Debug)]
 pub enum CasperError {
@@ -12,6 +14,7 @@ pub enum CasperError {
     RuntimeError(String),
     SystemRuntimeError(SystemDeployPlatformFailure),
     SigningError(String),
+    ReplayFailure(ReplayFailure),
 }
 
 impl fmt::Display for CasperError {
@@ -22,6 +25,7 @@ impl fmt::Display for CasperError {
             CasperError::RuntimeError(error) => write!(f, "Runtime error: {}", error),
             CasperError::SystemRuntimeError(error) => write!(f, "System runtime error: {}", error),
             CasperError::SigningError(error) => write!(f, "Signing error: {}", error),
+            CasperError::ReplayFailure(error) => write!(f, "Replay failure: {}", error),
         }
     }
 }
@@ -35,5 +39,11 @@ impl From<InterpreterError> for CasperError {
 impl From<KvStoreError> for CasperError {
     fn from(error: KvStoreError) -> Self {
         CasperError::KvStoreError(error)
+    }
+}
+
+impl From<ReplayFailure> for CasperError {
+    fn from(error: ReplayFailure) -> Self {
+        CasperError::ReplayFailure(error)
     }
 }

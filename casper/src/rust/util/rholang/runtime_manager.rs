@@ -34,7 +34,6 @@ use crate::rust::errors::CasperError;
 use crate::rust::rholang::replay_runtime::ReplayRuntimeOps;
 use crate::rust::rholang::runtime::RuntimeOps;
 
-use super::replay_failure::ReplayFailure;
 use super::system_deploy::SystemDeployTrait;
 
 use retry::{delay::NoDelay, retry, OperationResult};
@@ -172,13 +171,13 @@ impl RuntimeManager {
 
     pub async fn replay_compute_state(
         &mut self,
-        start_hash: StateHash,
+        start_hash: &StateHash,
         terms: Vec<ProcessedDeploy>,
         system_deploys: Vec<ProcessedSystemDeploy>,
-        block_data: BlockData,
+        block_data: &BlockData,
         invalid_blocks: Option<HashMap<BlockHash, Validator>>,
         is_genesis: bool, // FIXME have a better way of knowing this. Pass the replayDeploy function maybe? - OLD
-    ) -> Result<StateHash, ReplayFailure> {
+    ) -> Result<StateHash, CasperError> {
         let invalid_blocks = invalid_blocks.unwrap_or_default();
         let replay_runtime = self.spawn_replay_runtime().await;
 
@@ -187,7 +186,7 @@ impl RuntimeManager {
 
         let replay_op = ReplayRuntimeOps::replay_compute_state(
             replay_runtime,
-            start_hash.clone(),
+            start_hash,
             terms,
             system_deploys,
             block_data,

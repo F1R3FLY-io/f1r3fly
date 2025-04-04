@@ -310,6 +310,7 @@ impl Definition {
     }
 }
 
+#[derive(Clone)]
 pub struct BlockData {
     pub time_stamp: i64,
     pub block_number: i64,

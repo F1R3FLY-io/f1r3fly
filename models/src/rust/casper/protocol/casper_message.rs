@@ -641,13 +641,6 @@ pub enum ProcessedSystemDeploy {
 }
 
 impl ProcessedSystemDeploy {
-    pub fn event_list(self) -> Vec<Event> {
-        match self {
-            ProcessedSystemDeploy::Succeeded { event_list, .. } => event_list,
-            ProcessedSystemDeploy::Failed { event_list, .. } => event_list,
-        }
-    }
-
     pub fn failed(self) -> bool {
         matches!(self, ProcessedSystemDeploy::Failed { .. })
     }
