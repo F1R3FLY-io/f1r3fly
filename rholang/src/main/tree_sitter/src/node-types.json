@@ -11867,7 +11867,7 @@
     }
   },
   {
-    "type": "receipts",
+    "type": "receipt",
     "named": true,
     "fields": {},
     "children": {
@@ -11884,6 +11884,21 @@
         },
         {
           "type": "repeated_bind",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "receipts",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "receipt",
           "named": true
         }
       ]
@@ -12269,6 +12284,7 @@
   {
     "type": "source_file",
     "named": true,
+    "root": true,
     "fields": {},
     "children": {
       "multiple": true,

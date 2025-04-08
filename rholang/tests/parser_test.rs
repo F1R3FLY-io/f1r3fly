@@ -635,7 +635,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
         Branch {
             pattern: vec![
                 LinearBind {
-                    names: Names {
+                    lhs: Names {
                         names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                             name: "x".to_string(),
                             line_num: 2,
@@ -645,7 +645,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                         line_num: 2,
                         col_num: 8,
                     },
-                    input: Source::Simple {
+                    rhs: Source::Simple {
                         name: Name::ProcVar(Box::new(Proc::Var(Var {
                             name: "chan1".to_string(),
                             line_num: 2,
@@ -658,7 +658,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                     col_num: 8,
                 },
                 LinearBind {
-                    names: Names {
+                    lhs: Names {
                         names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                             name: "y".to_string(),
                             line_num: 2,
@@ -668,7 +668,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                         line_num: 2,
                         col_num: 21,
                     },
-                    input: Source::Simple {
+                    rhs: Source::Simple {
                         name: Name::ProcVar(Box::new(Proc::Var(Var {
                             name: "chan2".to_string(),
                             line_num: 2,
@@ -694,7 +694,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
         },
         Branch {
             pattern: vec![LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "z".to_string(),
                         line_num: 3,
@@ -704,7 +704,7 @@ fn parse_rholang_code_to_proc_should_parse_select() {
                     line_num: 3,
                     col_num: 8,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "chan3".to_string(),
                         line_num: 3,
@@ -809,7 +809,7 @@ fn parse_rholang_code_to_proc_should_parse_simple_input_process() {
 
     let receipts = Receipts {
         receipts: vec![Receipt::LinearBinds(LinearBind {
-            names: Names {
+            lhs: Names {
                 names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "x".to_string(),
                     line_num: 1,
@@ -819,7 +819,7 @@ fn parse_rholang_code_to_proc_should_parse_simple_input_process() {
                 line_num: 1,
                 col_num: 10,
             },
-            input: Source::Simple {
+            rhs: Source::Simple {
                 name: Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "y".to_string(),
                     line_num: 1,
@@ -835,8 +835,8 @@ fn parse_rholang_code_to_proc_should_parse_simple_input_process() {
         col_num: 10,
     };
 
-    let expected_result = Proc::Input {
-        formals: receipts,
+    let expected_result = Proc::ForComprehension {
+        receipts,
         proc: Box::new(Block {
             proc: Proc::Nil {
                 line_num: 2,
@@ -866,7 +866,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
     let receipts = Receipts {
         receipts: vec![
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "x".to_string(),
                         line_num: 1,
@@ -876,7 +876,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
                     line_num: 1,
                     col_num: 10,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "y".to_string(),
                         line_num: 1,
@@ -889,7 +889,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
                 col_num: 10,
             }),
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "a".to_string(),
                         line_num: 1,
@@ -899,7 +899,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
                     line_num: 1,
                     col_num: 18,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "b".to_string(),
                         line_num: 1,
@@ -916,8 +916,8 @@ fn parse_rholang_code_to_proc_should_parse_input_with_multiple_receipts() {
         col_num: 10,
     };
 
-    let expected_result = Proc::Input {
-        formals: receipts,
+    let expected_result = Proc::ForComprehension {
+        receipts,
         proc: Box::new(Block {
             proc: Proc::Nil {
                 line_num: 2,
@@ -947,7 +947,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
     let receipts = Receipts {
         receipts: vec![
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "x".to_string(),
                         line_num: 1,
@@ -957,7 +957,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                     line_num: 1,
                     col_num: 10,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "y".to_string(),
                         line_num: 1,
@@ -970,7 +970,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                 col_num: 10,
             }),
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "z".to_string(),
                         line_num: 1,
@@ -980,7 +980,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                     line_num: 1,
                     col_num: 19,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "w".to_string(),
                         line_num: 1,
@@ -993,7 +993,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                 col_num: 19,
             }),
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "a".to_string(),
                         line_num: 1,
@@ -1003,7 +1003,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                     line_num: 1,
                     col_num: 27,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "b".to_string(),
                         line_num: 1,
@@ -1016,7 +1016,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                 col_num: 27,
             }),
             Receipt::LinearBinds(LinearBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "c".to_string(),
                         line_num: 1,
@@ -1026,7 +1026,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
                     line_num: 1,
                     col_num: 36,
                 },
-                input: Source::Simple {
+                rhs: Source::Simple {
                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "d".to_string(),
                         line_num: 1,
@@ -1043,8 +1043,8 @@ fn parse_rholang_code_to_proc_should_parse_input_with_linear_binds() {
         col_num: 10,
     };
 
-    let expected_result = Proc::Input {
-        formals: receipts,
+    let expected_result = Proc::ForComprehension {
+        receipts,
         proc: Box::new(Block {
             proc: Proc::Nil {
                 line_num: 2,
@@ -1074,7 +1074,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
     let receipts = Receipts {
         receipts: vec![
             Receipt::RepeatedBinds(RepeatedBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "x".to_string(),
                         line_num: 1,
@@ -1084,7 +1084,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
                     line_num: 1,
                     col_num: 10,
                 },
-                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                rhs: Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "y".to_string(),
                     line_num: 1,
                     col_num: 15,
@@ -1093,7 +1093,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
                 col_num: 10,
             }),
             Receipt::RepeatedBinds(RepeatedBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "a".to_string(),
                         line_num: 1,
@@ -1103,7 +1103,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
                     line_num: 1,
                     col_num: 18,
                 },
-                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                rhs: Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "b".to_string(),
                     line_num: 1,
                     col_num: 23,
@@ -1116,8 +1116,8 @@ fn parse_rholang_code_to_proc_should_parse_input_with_repeated_binds() {
         col_num: 10,
     };
 
-    let expected_result = Proc::Input {
-        formals: receipts,
+    let expected_result = Proc::ForComprehension {
+        receipts,
         proc: Box::new(Block {
             proc: Proc::Nil {
                 line_num: 2,
@@ -1147,7 +1147,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
     let receipts = Receipts {
         receipts: vec![
             Receipt::PeekBinds(PeekBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "x".to_string(),
                         line_num: 1,
@@ -1157,7 +1157,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
                     line_num: 1,
                     col_num: 10,
                 },
-                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                rhs: Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "y".to_string(),
                     line_num: 1,
                     col_num: 16,
@@ -1166,7 +1166,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
                 col_num: 10,
             }),
             Receipt::PeekBinds(PeekBind {
-                names: Names {
+                lhs: Names {
                     names: vec![Name::ProcVar(Box::new(Proc::Var(Var {
                         name: "a".to_string(),
                         line_num: 1,
@@ -1176,7 +1176,7 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
                     line_num: 1,
                     col_num: 19,
                 },
-                input: Name::ProcVar(Box::new(Proc::Var(Var {
+                rhs: Name::ProcVar(Box::new(Proc::Var(Var {
                     name: "b".to_string(),
                     line_num: 1,
                     col_num: 25,
@@ -1189,8 +1189,8 @@ fn parse_rholang_code_to_proc_should_parse_input_with_peek_binds() {
         col_num: 10,
     };
 
-    let expected_result = Proc::Input {
-        formals: receipts,
+    let expected_result = Proc::ForComprehension {
+        receipts,
         proc: Box::new(Block {
             proc: Proc::Nil {
                 line_num: 2,
@@ -2748,11 +2748,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                         line_num: 2,
                         col_num: 9,
                     }),
-                    right: Box::new(Proc::Input {
-                        formals: Receipts {
+                    right: Box::new(Proc::ForComprehension {
+                        receipts: Receipts {
                             receipts: vec![
                                 Receipt::LinearBinds(LinearBind {
-                                    names: Names {
+                                    lhs: Names {
                                         names: vec![Name::Quote(Box::new(Quote {
                                             quotable: Box::new(Proc::Var(Var {
                                                 name: "knf".to_string(),
@@ -2766,7 +2766,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                         line_num: 4,
                                         col_num: 14,
                                     },
-                                    input: Source::Simple {
+                                    rhs: Source::Simple {
                                         name: Name::ProcVar(Box::new(Proc::Var(Var {
                                             name: "north".to_string(),
                                             line_num: 4,
@@ -2779,7 +2779,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                     col_num: 14,
                                 }),
                                 Receipt::LinearBinds(LinearBind {
-                                    names: Names {
+                                    lhs: Names {
                                         names: vec![Name::Quote(Box::new(Quote {
                                             quotable: Box::new(Proc::Var(Var {
                                                 name: "spn".to_string(),
@@ -2793,7 +2793,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                         line_num: 4,
                                         col_num: 29,
                                     },
-                                    input: Source::Simple {
+                                    rhs: Source::Simple {
                                         name: Name::ProcVar(Box::new(Proc::Var(Var {
                                             name: "south".to_string(),
                                             line_num: 4,
@@ -2893,11 +2893,11 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                     line_num: 2,
                     col_num: 9,
                 }),
-                right: Box::new(Proc::Input {
-                    formals: Receipts {
+                right: Box::new(Proc::ForComprehension {
+                    receipts: Receipts {
                         receipts: vec![
                             Receipt::LinearBinds(LinearBind {
-                                names: Names {
+                                lhs: Names {
                                     names: vec![Name::Quote(Box::new(Quote {
                                         quotable: Box::new(Proc::Var(Var {
                                             name: "spn".to_string(),
@@ -2911,7 +2911,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                     line_num: 9,
                                     col_num: 14,
                                 },
-                                input: Source::Simple {
+                                rhs: Source::Simple {
                                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                                         name: "south".to_string(),
                                         line_num: 9,
@@ -2924,7 +2924,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                 col_num: 14,
                             }),
                             Receipt::LinearBinds(LinearBind {
-                                names: Names {
+                                lhs: Names {
                                     names: vec![Name::Quote(Box::new(Quote {
                                         quotable: Box::new(Proc::Var(Var {
                                             name: "knf".to_string(),
@@ -2938,7 +2938,7 @@ fn parse_rholang_code_to_proc_should_parse_dining_philosophers_example() {
                                     line_num: 9,
                                     col_num: 29,
                                 },
-                                input: Source::Simple {
+                                rhs: Source::Simple {
                                     name: Name::ProcVar(Box::new(Proc::Var(Var {
                                         name: "north".to_string(),
                                         line_num: 9,

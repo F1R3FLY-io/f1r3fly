@@ -1,131 +1,102 @@
 use super::exports::*;
-use crate::rust::interpreter::compiler::normalize::{
-    normalize_match_proc, NameVisitInputs, ProcVisitInputs, ProcVisitOutputs, VarSort,
-};
-use crate::rust::interpreter::compiler::normalizer::processes::utils::fail_on_invalid_connective;
-use crate::rust::interpreter::compiler::normalizer::remainder_normalizer_matcher::normalize_match_name;
-use crate::rust::interpreter::compiler::rholang_ast::{Block, Name, Names};
+use crate::rust::interpreter::compiler::exports::BoundMapChain;
+use crate::rust::interpreter::compiler::free_map::ConnectiveInstance;
+use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+use crate::rust::interpreter::compiler::normalizer::remainder_normalizer_matcher::handle_name_remainder;
+use crate::rust::interpreter::compiler::rholang_ast::{AnnName, Names};
 use crate::rust::interpreter::errors::InterpreterError;
-use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
-use crate::rust::interpreter::util::filter_and_adjust_bitset;
-use models::rhoapi::{Par, Receive, ReceiveBind};
-use models::rust::utils::union;
+use crate::rust::interpreter::normal_forms::{
+    adjust_bitset, union_inplace, Par, Receive, ReceiveBind,
+};
 use std::collections::HashMap;
 
 pub fn normalize_p_contr(
-    name: &Name,
-    formals: &Names,
-    proc: &Box<Block>,
-    input: ProcVisitInputs,
+    name: AnnName,
+    formals: Names,
+    body: AnnProc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    let name_match_result = normalize_name(
-        name,
-        NameVisitInputs {
-            bound_map_chain: input.bound_map_chain.clone(),
-            free_map: input.free_map.clone(),
-        },
-        env,
-    )?;
+) -> Result<(), InterpreterError> {
+    let contract_depth = bound_map_chain.depth();
+    let name_match_par = normalize_name(name.0, free_map, bound_map_chain, env, name.1)?;
 
-    let mut init_acc = (vec![], FreeMap::<VarSort>::default(), Vec::new());
+    // A free variable can only be used once in any of the parameters. And we start with the empty
+    // free variable map because these free variables aren't free in the surrounding context:
+    // they're binders
+    let mut binders = Vec::with_capacity(formals.names.len());
+    let mut freevec = name_match_par.locally_free.clone();
+    let mut binders_free_map = FreeMap::new();
+    for n in formals.names {
+        let binder: Par = bound_map_chain
+            .descend(|bound_map| normalize_name(n.0, &mut binders_free_map, bound_map, env, n.1))?;
 
-    for name in formals.names.clone() {
-        let res = normalize_name(
-            &name,
-            NameVisitInputs {
-                bound_map_chain: input.clone().bound_map_chain.push(),
-                free_map: init_acc.1.clone(),
-            },
-            env,
-        )?;
-
-        let result = fail_on_invalid_connective(&input, &res)?;
-
-        // Accumulate the result
-        init_acc.0.insert(0, result.par.clone());
-        init_acc.1 = result.free_map.clone();
-        init_acc.2 = union(
-            init_acc.clone().2,
-            result.par.locally_free(
-                result.par.clone(),
-                (input.bound_map_chain.depth() + 1) as i32,
-            ),
-        );
+        union_inplace(&mut freevec, &binder.locally_free);
+        binders.push(binder);
     }
+    if contract_depth == 0 {
+        if let Some(invalid) = binders_free_map
+            .iter_connectives()
+            .find(|c| c.item == ConnectiveInstance::Or || c.item == ConnectiveInstance::Not)
+        {
+            return Err(InterpreterError::PatternReceiveError(invalid));
+        }
+    }
+    let remainder = formals
+        .remainder
+        .map(|r| handle_name_remainder(r, &mut binders_free_map))
+        .transpose()?;
 
-    let remainder_result = normalize_match_name(&formals.cont, init_acc.1.clone())?;
+    let mut body_par = Par::default();
 
-    let new_enw = input
-        .bound_map_chain
-        .absorb_free(remainder_result.1.clone());
-    let bound_count = remainder_result.1.count_no_wildcards();
+    let bind_count = bound_map_chain.extend(binders_free_map, |bind_count, new_env| {
+        normalize_match_proc(body.proc, &mut body_par, free_map, new_env, env, body.pos)?;
+        Ok::<u32, InterpreterError>(bind_count)
+    })?;
 
-    let body_result = normalize_match_proc(
-        &proc.proc,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: new_enw,
-            free_map: name_match_result.free_map.clone(),
-        },
-        env,
-    )?;
-
-    let receive = Receive {
+    union_inplace(
+        &mut freevec,
+        adjust_bitset(&body_par.locally_free, bind_count as usize),
+    );
+    let connective_used = name_match_par.connective_used || body_par.connective_used;
+    input_par.push_receive(Receive {
         binds: vec![ReceiveBind {
-            patterns: init_acc.0.clone().into_iter().rev().collect(),
-            source: Some(name_match_result.par.clone()),
-            remainder: remainder_result.0.clone(),
-            free_count: bound_count as i32,
+            patterns: binders,
+            source: name_match_par,
+            remainder,
+            free_count: bind_count,
         }],
-        body: Some(body_result.par.clone()),
+        body: body_par,
         persistent: true,
         peek: false,
-        bind_count: bound_count as i32,
-        locally_free: union(
-            name_match_result.par.locally_free(
-                name_match_result.par.clone(),
-                input.bound_map_chain.depth() as i32,
-            ),
-            union(
-                init_acc.2,
-                filter_and_adjust_bitset(body_result.par.clone().locally_free, bound_count),
-            ),
-        ),
-        connective_used: name_match_result
-            .par
-            .connective_used(name_match_result.par.clone())
-            || body_result.par.connective_used(body_result.par.clone()),
-    };
-    //I should create new Expr for prepend_expr and provide it instead of receive.clone().into
-    let updated_par = input.clone().par.prepend_receive(receive);
-    Ok(ProcVisitOutputs {
-        par: updated_par,
-        free_map: body_result.free_map,
-    })
+        bind_count,
+        locally_free: freevec,
+        connective_used,
+    });
+
+    Ok(())
 }
 
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
 
-    use models::{
-        create_bit_vector,
-        rhoapi::{expr::ExprInstance, EPlus, Expr, Par, Receive, ReceiveBind},
-        rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_send_par},
-    };
-
     use crate::rust::interpreter::{
         compiler::{
             compiler::Compiler,
-            normalize::{normalize_match_proc, VarSort},
-            rholang_ast::{Block, Name, Names, ProcList, SendType},
+            free_map::ConnectiveInstance,
+            normalizer::processes::exports::InterpreterError,
+            rholang_ast::{AnnName, Id, Names, SendType},
+            Context,
         },
-        errors::InterpreterError,
-        test_utils::utils::proc_visit_inputs_and_env,
+        normal_forms::{Expr, Par, Receive, ReceiveBind, Send},
+        test_utils::utils::*,
     };
 
     use super::{Proc, SourcePosition};
+    use bitvec::{bitvec, order::Lsb0};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn p_contr_should_handle_a_basic_contract() {
@@ -136,84 +107,101 @@ mod tests {
            }
            // new is simulated by bindings.
         */
-        let p_contract = Proc::Contract {
-            name: Name::new_name_var("add"),
-            formals: Names::new(
-                vec![
-                    Name::new_name_var("ret"),
-                    Name::new_name_quote_var("x"),
-                    Name::new_name_quote_var("y"),
-                ],
-                None,
-            ),
-            proc: Box::new(Block {
-                proc: Proc::Send {
-                    name: Name::new_name_var("ret"),
-                    send_type: SendType::new_single(),
-                    inputs: ProcList::new(vec![Proc::Add {
-                        left: Box::new(Proc::new_proc_var("x")),
-                        right: Box::new(Proc::new_proc_var("y")),
-                        line_num: 0,
-                        col_num: 0,
-                    }]),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
+        let add = Id {
+            name: "add",
+            pos: SourcePosition { row: 0, column: 4 },
+        };
+        let formal_x = Id {
+            name: "x",
+            pos: SourcePosition { row: 1, column: 20 },
+        }
+        .as_proc();
+        let formal_y = Id {
+            name: "y",
+            pos: SourcePosition { row: 1, column: 24 },
+        }
+        .as_proc();
+        let x = Proc::new_var("x", SourcePosition { row: 2, column: 8 });
+        let y = Proc::new_var("y", SourcePosition { row: 2, column: 12 });
+        let x_plus_y = Proc::Add {
+            left: x.annotate(SourcePosition { row: 2, column: 8 }),
+            right: y.annotate(SourcePosition { row: 2, column: 12 }),
+        };
+        let p_body = Proc::Send {
+            name: Id {
+                name: "ret",
+                pos: SourcePosition { row: 2, column: 3 },
+            }
+            .as_name(),
+            send_type: SendType::Single,
+            inputs: vec![x_plus_y.annotate(SourcePosition { row: 2, column: 10 })],
         };
 
-        let (mut inputs, env) = proc_visit_inputs_and_env();
-        inputs.bound_map_chain = inputs.bound_map_chain.put((
-            "add".to_string(),
-            VarSort::NameSort,
-            SourcePosition::new(0, 0),
-        ));
-
-        let result = normalize_match_proc(&p_contract, inputs.clone(), &env);
-        assert!(result.is_ok());
-
-        let expected_result = inputs.par.prepend_receive(Receive {
-            binds: vec![ReceiveBind {
-                patterns: vec![
-                    new_freevar_par(0, Vec::new()),
-                    new_freevar_par(1, Vec::new()),
-                    new_freevar_par(2, Vec::new()),
+        let p_contract = Proc::Contract {
+            name: AnnName::declare("add", SourcePosition { row: 1, column: 10 }),
+            formals: Names {
+                names: vec![
+                    AnnName::declare("ret", SourcePosition { row: 1, column: 14 }),
+                    formal_x
+                        .quoted()
+                        .annotated(SourcePosition { row: 1, column: 19 }),
+                    formal_y
+                        .quoted()
+                        .annotated(SourcePosition { row: 1, column: 23 }),
                 ],
-                source: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
                 remainder: None,
-                free_count: 3,
-            }],
-            body: Some(new_send_par(
-                new_boundvar_par(2, create_bit_vector(&vec![2]), false),
-                vec![{
-                    let mut par = Par::default().with_exprs(vec![Expr {
-                        expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-                            p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
-                            p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                        })),
-                    }]);
-                    par.locally_free = create_bit_vector(&vec![0, 1]);
-                    par
-                }],
-                false,
-                create_bit_vector(&vec![0, 1, 2]),
-                false,
-                create_bit_vector(&vec![0, 1, 2]),
-                false,
-            )),
-            persistent: true,
-            peek: false,
-            bind_count: 3,
-            locally_free: create_bit_vector(&vec![0]),
-            connective_used: false,
-        });
+            },
+            body: p_body.annotate(SourcePosition { row: 1, column: 30 }),
+        };
 
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
+        test_normalize_match_proc(
+            &p_contract,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_name(&add);
+            }),
+            test(
+                "expected to handle a basic contract",
+                |actual_par, free_map| {
+                    let expected_par = Par {
+                        receives: vec![Receive {
+                            binds: vec![ReceiveBind {
+                                patterns: Par::free_vars(3),
+                                source: Par::bound_var(0),
+                                remainder: None,
+                                free_count: 3,
+                            }],
+                            body: Par {
+                                sends: vec![Send {
+                                    chan: Par::bound_var(2),
+                                    data: vec![Par {
+                                        exprs: vec![Expr::EPlus(
+                                            Par::bound_var(1),
+                                            Par::bound_var(0),
+                                        )],
+                                        ..Default::default()
+                                    }],
+                                    persistent: false,
+                                    locally_free: bitvec![1, 1, 1],
+                                    connective_used: false,
+                                }],
+                                locally_free: bitvec![1, 1, 1],
+                                ..Default::default()
+                            },
+                            persistent: true,
+                            peek: false,
+                            bind_count: 3,
+                            locally_free: bitvec![1],
+                            connective_used: false,
+                        }],
+                        locally_free: bitvec![1],
+                        ..Default::default()
+                    };
+
+                    assert_eq!(actual_par, &expected_par);
+                    assert!(free_map.is_empty());
+                },
+            ),
+        );
     }
 
     #[test]
@@ -225,99 +213,105 @@ mod tests {
            }
            // new is simulated by bindings.
         */
-        let p_contract = Proc::Contract {
-            name: Name::new_name_var("ret5"),
-            formals: Names::new(
-                vec![
-                    Name::new_name_var("ret"),
-                    Name::new_name_quote_ground_long_literal(5),
-                ],
-                None,
-            ),
-            proc: Box::new(Block {
-                proc: Proc::Send {
-                    name: Name::new_name_var("ret"),
-                    send_type: SendType::new_single(),
-                    inputs: ProcList::new(vec![Proc::new_proc_int(5)]),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
+        let ret5 = Id {
+            name: "ret5",
+            pos: SourcePosition { row: 0, column: 4 },
+        };
+        let _5 = Proc::LongLiteral(5);
+        let p_body = Proc::Send {
+            name: Id {
+                name: "ret",
+                pos: SourcePosition { row: 2, column: 3 },
+            }
+            .as_name(),
+            send_type: SendType::Single,
+            inputs: vec![_5.annotate(SourcePosition { row: 2, column: 8 })],
         };
 
-        let (mut inputs, env) = proc_visit_inputs_and_env();
-        inputs.bound_map_chain = inputs.bound_map_chain.put((
-            "ret5".to_string(),
-            VarSort::NameSort,
-            SourcePosition::new(0, 0),
-        ));
-
-        let result = normalize_match_proc(&p_contract, inputs.clone(), &env);
-        assert!(result.is_ok());
-
-        let expected_result = inputs.par.prepend_receive(Receive {
-            binds: vec![ReceiveBind {
-                patterns: vec![
-                    new_freevar_par(0, Vec::new()),
-                    new_gint_par(5, Vec::new(), false),
+        let p_contract = Proc::Contract {
+            name: AnnName::declare("ret5", SourcePosition { row: 1, column: 10 }),
+            formals: Names {
+                names: vec![
+                    AnnName::declare("ret", SourcePosition { row: 1, column: 14 }),
+                    _5.quoted().annotated(SourcePosition { row: 1, column: 20 }),
                 ],
-                source: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
                 remainder: None,
-                free_count: 1,
-            }],
-            body: Some(new_send_par(
-                new_boundvar_par(0, create_bit_vector(&vec![0]), false),
-                vec![new_gint_par(5, Vec::new(), false)],
-                false,
-                create_bit_vector(&vec![0]),
-                false,
-                create_bit_vector(&vec![0]),
-                false,
-            )),
-            persistent: true,
-            peek: false,
-            bind_count: 1,
-            locally_free: create_bit_vector(&vec![0]),
-            connective_used: false,
-        });
+            },
+            body: p_body.annotate(SourcePosition { row: 1, column: 26 }),
+        };
 
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
+        test_normalize_match_proc(
+            &p_contract,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_name(&ret5);
+            }),
+            test(
+                "expected not to count ground values in the formals towards the bind count",
+                |actual_par, free_map| {
+                    let expected_par = Par {
+                        receives: vec![Receive {
+                            binds: vec![ReceiveBind {
+                                patterns: vec![Par::free_var(0), Par::gint(5)],
+                                source: Par::bound_var(0),
+                                remainder: None,
+                                free_count: 1,
+                            }],
+                            body: Par {
+                                sends: vec![Send {
+                                    chan: Par::bound_var(0),
+                                    data: vec![Par::gint(5)],
+                                    persistent: false,
+                                    locally_free: bitvec![1],
+                                    connective_used: false,
+                                }],
+                                locally_free: bitvec![1],
+                                ..Default::default()
+                            },
+                            persistent: true,
+                            peek: false,
+                            bind_count: 1,
+                            locally_free: bitvec![1],
+                            connective_used: false,
+                        }],
+                        locally_free: bitvec![1],
+                        ..Default::default()
+                    };
+
+                    assert_eq!(actual_par, &expected_par);
+                    assert!(free_map.is_empty());
+                },
+            ),
+        );
     }
 
     #[test]
     fn p_contr_should_not_compile_when_logical_or_or_not_is_used_in_the_pattern_of_the_receive() {
-        let result1 =
-            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ {Nil \/ Nil}}) = { Nil } }"#);
-        assert!(result1.is_err());
+        let mut result =
+            Compiler::new(r#"new x in { contract x(@{ y /\ {Nil \/ Nil}}) = { Nil } }"#)
+                .compile_to_adt();
         assert_eq!(
-            result1,
-            Err(InterpreterError::PatternReceiveError(format!(
-                "\\/ (disjunction) at {:?}",
-                SourcePosition { row: 0, column: 31 }
-            )))
+            result,
+            Err(InterpreterError::PatternReceiveError(Context {
+                item: ConnectiveInstance::Or,
+                source_position: SourcePosition { row: 0, column: 31 }
+            }))
         );
 
-        let result2 =
-            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ ~Nil}) = { Nil } }"#);
-        assert!(result2.is_err());
+        result =
+            Compiler::new(r#"new x in { contract x(@{ y /\ ~Nil}) = { Nil } }"#).compile_to_adt();
         assert_eq!(
-            result2,
-            Err(InterpreterError::PatternReceiveError(format!(
-                "~ (negation) at {:?}",
-                SourcePosition { row: 0, column: 30 }
-            )))
+            result,
+            Err(InterpreterError::PatternReceiveError(Context {
+                item: ConnectiveInstance::Not,
+                source_position: SourcePosition { row: 0, column: 30 }
+            }))
         );
     }
 
     #[test]
     fn p_contr_should_compile_when_logical_and_is_used_in_the_pattern_of_the_receive() {
-        let result1 =
-            Compiler::source_to_adt(r#"new x in { contract x(@{ y /\ {Nil /\ Nil}}) = { Nil } }"#);
-        assert!(result1.is_ok());
+        let result = Compiler::new(r#"new x in { contract x(@{ y /\ {Nil /\ Nil}}) = { Nil } }"#)
+            .compile_to_adt();
+        assert!(result.is_ok());
     }
 }

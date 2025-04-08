@@ -568,16 +568,17 @@ in {
                                                         proc: (block
                                                           body: (input
                                                             formals: (receipts
-                                                              (peek_bind
-                                                                names: (names
-                                                                  (quote
-                                                                    (var)))
-                                                                input: (quote
-                                                                  (collection
-                                                                    (list
-                                                                      (var)
-                                                                      (eval
-                                                                        (var)))))))
+                                                              (receipt
+                                                                (peek_bind
+                                                                  names: (names
+                                                                    (quote
+                                                                      (var)))
+                                                                  input: (quote
+                                                                    (collection
+                                                                      (list
+                                                                        (var)
+                                                                        (eval
+                                                                          (var))))))))
                                                             proc: (block
                                                               body: (send
                                                                 name: (var)
@@ -718,12 +719,13 @@ in {
                                                                 (var))))
                                                           right: (input
                                                             formals: (receipts
-                                                              (linear_bind
-                                                                names: (names
-                                                                  (quote
-                                                                    (var)))
-                                                                input: (simple_source
-                                                                  (var))))
+                                                              (receipt
+                                                                (linear_bind
+                                                                  names: (names
+                                                                    (quote
+                                                                      (var)))
+                                                                  input: (simple_source
+                                                                    (var)))))
                                                             proc: (block
                                                               body: (ifElse
                                                                 condition: (eq
@@ -810,24 +812,26 @@ in {
                                                               (var))))
                                                         right: (input
                                                           formals: (receipts
-                                                            (linear_bind
-                                                              names: (names
-                                                                (quote
-                                                                  (var)))
-                                                              input: (simple_source
-                                                                (var))))
+                                                            (receipt
+                                                              (linear_bind
+                                                                names: (names
+                                                                  (quote
+                                                                    (var)))
+                                                                input: (simple_source
+                                                                  (var)))))
                                                           proc: (block
                                                             body: (input
                                                               formals: (receipts
-                                                                (peek_bind
-                                                                  names: (names
-                                                                    (quote
-                                                                      (var)))
-                                                                  input: (quote
-                                                                    (collection
-                                                                      (tuple
-                                                                        (var)
-                                                                        (string_literal))))))
+                                                                (receipt
+                                                                  (peek_bind
+                                                                    names: (names
+                                                                      (quote
+                                                                        (var)))
+                                                                    input: (quote
+                                                                      (collection
+                                                                        (tuple
+                                                                          (var)
+                                                                          (string_literal)))))))
                                                               proc: (block
                                                                 body: (par
                                                                   left: (send
@@ -843,12 +847,13 @@ in {
                                                                         (var))))
                                                                   right: (input
                                                                     formals: (receipts
-                                                                      (linear_bind
-                                                                        names: (names
-                                                                          (quote
-                                                                            (var)))
-                                                                        input: (simple_source
-                                                                          (var))))
+                                                                      (receipt
+                                                                        (linear_bind
+                                                                          names: (names
+                                                                            (quote
+                                                                              (var)))
+                                                                          input: (simple_source
+                                                                            (var)))))
                                                                     proc: (block
                                                                       body: (send
                                                                         name: (var)
@@ -902,24 +907,26 @@ in {
                                                             (var))))
                                                       right: (input
                                                         formals: (receipts
-                                                          (linear_bind
-                                                            names: (names
-                                                              (quote
-                                                                (var)))
-                                                            input: (simple_source
-                                                              (var))))
+                                                          (receipt
+                                                            (linear_bind
+                                                              names: (names
+                                                                (quote
+                                                                  (var)))
+                                                              input: (simple_source
+                                                                (var)))))
                                                         proc: (block
                                                           body: (input
                                                             formals: (receipts
-                                                              (peek_bind
-                                                                names: (names
-                                                                  (quote
-                                                                    (var)))
-                                                                input: (quote
-                                                                  (collection
-                                                                    (tuple
-                                                                      (var)
-                                                                      (string_literal))))))
+                                                              (receipt
+                                                                (peek_bind
+                                                                  names: (names
+                                                                    (quote
+                                                                      (var)))
+                                                                  input: (quote
+                                                                    (collection
+                                                                      (tuple
+                                                                        (var)
+                                                                        (string_literal)))))))
                                                             proc: (block
                                                               body: (par
                                                                 left: (send
@@ -935,12 +942,13 @@ in {
                                                                       (var))))
                                                                 right: (input
                                                                   formals: (receipts
-                                                                    (linear_bind
-                                                                      names: (names
-                                                                        (quote
-                                                                          (var)))
-                                                                      input: (simple_source
-                                                                        (var))))
+                                                                    (receipt
+                                                                      (linear_bind
+                                                                        names: (names
+                                                                          (quote
+                                                                            (var)))
+                                                                        input: (simple_source
+                                                                          (var)))))
                                                                   proc: (block
                                                                     body: (new
                                                                       decls: (decls
@@ -962,12 +970,13 @@ in {
                                                                                 (var))))
                                                                           right: (input
                                                                             formals: (receipts
-                                                                              (linear_bind
-                                                                                names: (names
-                                                                                  (quote
-                                                                                    (var)))
-                                                                                input: (simple_source
-                                                                                  (var))))
+                                                                              (receipt
+                                                                                (linear_bind
+                                                                                  names: (names
+                                                                                    (quote
+                                                                                      (var)))
+                                                                                  input: (simple_source
+                                                                                    (var)))))
                                                                             proc: (block
                                                                               body: (send
                                                                                 name: (var)
@@ -1023,16 +1032,17 @@ in {
                                                         proc: (block
                                                           body: (input
                                                             formals: (receipts
-                                                              (peek_bind
-                                                                names: (names
-                                                                  (quote
-                                                                    (var)))
-                                                                input: (quote
-                                                                  (collection
-                                                                    (list
-                                                                      (var)
-                                                                      (eval
-                                                                        (var)))))))
+                                                              (receipt
+                                                                (peek_bind
+                                                                  names: (names
+                                                                    (quote
+                                                                      (var)))
+                                                                  input: (quote
+                                                                    (collection
+                                                                      (list
+                                                                        (var)
+                                                                        (eval
+                                                                          (var))))))))
                                                             proc: (block
                                                               body: (ifElse
                                                                 condition: (eq
@@ -1041,17 +1051,18 @@ in {
                                                                 ifTrue: (block
                                                                   body: (input
                                                                     formals: (receipts
-                                                                      (linear_bind
-                                                                        names: (names
-                                                                          (quote
-                                                                            (var)))
-                                                                        input: (simple_source
-                                                                          (quote
-                                                                            (collection
-                                                                              (list
-                                                                                (var)
-                                                                                (eval
-                                                                                  (var))))))))
+                                                                      (receipt
+                                                                        (linear_bind
+                                                                          names: (names
+                                                                            (quote
+                                                                              (var)))
+                                                                          input: (simple_source
+                                                                            (quote
+                                                                              (collection
+                                                                                (list
+                                                                                  (var)
+                                                                                  (eval
+                                                                                    (var)))))))))
                                                                     proc: (block
                                                                       body: (ifElse
                                                                         condition: (eq
@@ -1120,17 +1131,18 @@ in {
                                                                     ifTrue: (block
                                                                       body: (input
                                                                         formals: (receipts
-                                                                          (linear_bind
-                                                                            names: (names
-                                                                              (quote
-                                                                                (var)))
-                                                                            input: (simple_source
-                                                                              (quote
-                                                                                (collection
-                                                                                  (list
-                                                                                    (var)
-                                                                                    (eval
-                                                                                      (var))))))))
+                                                                          (receipt
+                                                                            (linear_bind
+                                                                              names: (names
+                                                                                (quote
+                                                                                  (var)))
+                                                                              input: (simple_source
+                                                                                (quote
+                                                                                  (collection
+                                                                                    (list
+                                                                                      (var)
+                                                                                      (eval
+                                                                                        (var)))))))))
                                                                         proc: (block
                                                                           body: (ifElse
                                                                             condition: (eq
@@ -1308,24 +1320,26 @@ in {
                                                         (var))))
                                                   right: (input
                                                     formals: (receipts
-                                                      (linear_bind
-                                                        names: (names
-                                                          (quote
-                                                            (var)))
-                                                        input: (simple_source
-                                                          (var))))
+                                                      (receipt
+                                                        (linear_bind
+                                                          names: (names
+                                                            (quote
+                                                              (var)))
+                                                          input: (simple_source
+                                                            (var)))))
                                                     proc: (block
                                                       body: (input
                                                         formals: (receipts
-                                                          (peek_bind
-                                                            names: (names
-                                                              (quote
-                                                                (var)))
-                                                            input: (quote
-                                                              (collection
-                                                                (tuple
-                                                                  (var)
-                                                                  (string_literal))))))
+                                                          (receipt
+                                                            (peek_bind
+                                                              names: (names
+                                                                (quote
+                                                                  (var)))
+                                                              input: (quote
+                                                                (collection
+                                                                  (tuple
+                                                                    (var)
+                                                                    (string_literal)))))))
                                                         proc: (block
                                                           body: (par
                                                             left: (send
@@ -1341,12 +1355,13 @@ in {
                                                                   (var))))
                                                             right: (input
                                                               formals: (receipts
-                                                                (linear_bind
-                                                                  names: (names
-                                                                    (quote
-                                                                      (var)))
-                                                                  input: (simple_source
-                                                                    (var))))
+                                                                (receipt
+                                                                  (linear_bind
+                                                                    names: (names
+                                                                      (quote
+                                                                        (var)))
+                                                                    input: (simple_source
+                                                                      (var)))))
                                                               proc: (block
                                                                 body: (send
                                                                   name: (var)
@@ -1405,12 +1420,13 @@ in {
                                                       (var))))
                                                 right: (input
                                                   formals: (receipts
-                                                    (linear_bind
-                                                      names: (names
-                                                        (quote
-                                                          (var)))
-                                                      input: (simple_source
-                                                        (var))))
+                                                    (receipt
+                                                      (linear_bind
+                                                        names: (names
+                                                          (quote
+                                                            (var)))
+                                                        input: (simple_source
+                                                          (var)))))
                                                   proc: (block
                                                     body: (ifElse
                                                       condition: (eq
@@ -1497,24 +1513,26 @@ in {
                                                     (var))))
                                               right: (input
                                                 formals: (receipts
-                                                  (linear_bind
-                                                    names: (names
-                                                      (quote
-                                                        (var)))
-                                                    input: (simple_source
-                                                      (var))))
+                                                  (receipt
+                                                    (linear_bind
+                                                      names: (names
+                                                        (quote
+                                                          (var)))
+                                                      input: (simple_source
+                                                        (var)))))
                                                 proc: (block
                                                   body: (input
                                                     formals: (receipts
-                                                      (peek_bind
-                                                        names: (names
-                                                          (quote
-                                                            (var)))
-                                                        input: (quote
-                                                          (collection
-                                                            (tuple
-                                                              (var)
-                                                              (string_literal))))))
+                                                      (receipt
+                                                        (peek_bind
+                                                          names: (names
+                                                            (quote
+                                                              (var)))
+                                                          input: (quote
+                                                            (collection
+                                                              (tuple
+                                                                (var)
+                                                                (string_literal)))))))
                                                     proc: (block
                                                       body: (par
                                                         left: (send
@@ -1530,12 +1548,13 @@ in {
                                                               (var))))
                                                         right: (input
                                                           formals: (receipts
-                                                            (linear_bind
-                                                              names: (names
-                                                                (quote
-                                                                  (var)))
-                                                              input: (simple_source
-                                                                (var))))
+                                                            (receipt
+                                                              (linear_bind
+                                                                names: (names
+                                                                  (quote
+                                                                    (var)))
+                                                                input: (simple_source
+                                                                  (var)))))
                                                           proc: (block
                                                             body: (send
                                                               name: (var)
@@ -1592,16 +1611,17 @@ in {
                                                 proc: (block
                                                   body: (input
                                                     formals: (receipts
-                                                      (peek_bind
-                                                        names: (names
-                                                          (quote
-                                                            (var)))
-                                                        input: (quote
-                                                          (collection
-                                                            (list
-                                                              (var)
-                                                              (eval
-                                                                (var)))))))
+                                                      (receipt
+                                                        (peek_bind
+                                                          names: (names
+                                                            (quote
+                                                              (var)))
+                                                          input: (quote
+                                                            (collection
+                                                              (list
+                                                                (var)
+                                                                (eval
+                                                                  (var))))))))
                                                     proc: (block
                                                       body: (ifElse
                                                         condition: (eq
@@ -1626,17 +1646,18 @@ in {
                                                                 proc: (block
                                                                   body: (input
                                                                     formals: (receipts
-                                                                      (linear_bind
-                                                                        names: (names
-                                                                          (quote
-                                                                            (var)))
-                                                                        input: (simple_source
-                                                                          (quote
-                                                                            (collection
-                                                                              (list
-                                                                                (var)
-                                                                                (eval
-                                                                                  (var))))))))
+                                                                      (receipt
+                                                                        (linear_bind
+                                                                          names: (names
+                                                                            (quote
+                                                                              (var)))
+                                                                          input: (simple_source
+                                                                            (quote
+                                                                              (collection
+                                                                                (list
+                                                                                  (var)
+                                                                                  (eval
+                                                                                    (var)))))))))
                                                                     proc: (block
                                                                       body: (par
                                                                         left: (send
@@ -1652,12 +1673,13 @@ in {
                                                                               (var))))
                                                                         right: (input
                                                                           formals: (receipts
-                                                                            (linear_bind
-                                                                              names: (names
-                                                                                (quote
-                                                                                  (var)))
-                                                                              input: (simple_source
-                                                                                (var))))
+                                                                            (receipt
+                                                                              (linear_bind
+                                                                                names: (names
+                                                                                  (quote
+                                                                                    (var)))
+                                                                                input: (simple_source
+                                                                                  (var)))))
                                                                           proc: (block
                                                                             body: (par
                                                                               left: (send
@@ -1754,24 +1776,26 @@ in {
                                                 (var))))
                                           right: (input
                                             formals: (receipts
-                                              (linear_bind
-                                                names: (names
-                                                  (quote
-                                                    (var)))
-                                                input: (simple_source
-                                                  (var))))
+                                              (receipt
+                                                (linear_bind
+                                                  names: (names
+                                                    (quote
+                                                      (var)))
+                                                  input: (simple_source
+                                                    (var)))))
                                             proc: (block
                                               body: (input
                                                 formals: (receipts
-                                                  (peek_bind
-                                                    names: (names
-                                                      (quote
-                                                        (var)))
-                                                    input: (quote
-                                                      (collection
-                                                        (tuple
-                                                          (var)
-                                                          (string_literal))))))
+                                                  (receipt
+                                                    (peek_bind
+                                                      names: (names
+                                                        (quote
+                                                          (var)))
+                                                      input: (quote
+                                                        (collection
+                                                          (tuple
+                                                            (var)
+                                                            (string_literal)))))))
                                                 proc: (block
                                                   body: (par
                                                     left: (send
@@ -1787,12 +1811,13 @@ in {
                                                           (var))))
                                                     right: (input
                                                       formals: (receipts
-                                                        (linear_bind
-                                                          names: (names
-                                                            (quote
-                                                              (var)))
-                                                          input: (simple_source
-                                                            (var))))
+                                                        (receipt
+                                                          (linear_bind
+                                                            names: (names
+                                                              (quote
+                                                                (var)))
+                                                            input: (simple_source
+                                                              (var)))))
                                                       proc: (block
                                                         body: (send
                                                           name: (var)
@@ -1830,11 +1855,12 @@ in {
                     body: (par
                       left: (input
                         formals: (receipts
-                          (peek_bind
-                            names: (names
-                              (quote
-                                (var)))
-                            input: (var)))
+                          (receipt
+                            (peek_bind
+                              names: (names
+                                (quote
+                                  (var)))
+                              input: (var))))
                         proc: (block
                           body: (send
                             name: (var)
@@ -1852,11 +1878,12 @@ in {
                                 (var))))))
                       right: (input
                         formals: (receipts
-                          (linear_bind
-                            names: (names
-                              (wildcard))
-                            input: (simple_source
-                              (var))))
+                          (receipt
+                            (linear_bind
+                              names: (names
+                                (wildcard))
+                              input: (simple_source
+                                (var)))))
                         proc: (block
                           body: (par
                             left: (send
@@ -1867,11 +1894,12 @@ in {
                                   (var))))
                             right: (input
                               formals: (receipts
-                                (linear_bind
-                                  names: (names
-                                    (var))
-                                  input: (simple_source
-                                    (var))))
+                                (receipt
+                                  (linear_bind
+                                    names: (names
+                                      (var))
+                                    input: (simple_source
+                                      (var)))))
                               proc: (block
                                 body: (contract
                                   name: (var)
@@ -1913,11 +1941,12 @@ in {
                                           proc: (block
                                             body: (input
                                               formals: (receipts
-                                                (peek_bind
-                                                  names: (names
-                                                    (quote
-                                                      (var)))
-                                                  input: (var)))
+                                                (receipt
+                                                  (peek_bind
+                                                    names: (names
+                                                      (quote
+                                                        (var)))
+                                                    input: (var))))
                                               proc: (block
                                                 body: (send
                                                   name: (var)
@@ -1941,11 +1970,12 @@ in {
                     (var)))))
             right: (input
               formals: (receipts
-                (linear_bind
-                  names: (names
-                    (var))
-                  input: (simple_source
-                    (var))))
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (var))
+                    input: (simple_source
+                      (var)))))
               proc: (block
                 body: (contract
                   name: (var)
@@ -1976,20 +2006,22 @@ in {
                                 (var))))
                           right: (input
                             formals: (receipts
-                              (linear_bind
-                                names: (names
-                                  (quote
-                                    (var)))
-                                input: (simple_source
-                                  (var))))
+                              (receipt
+                                (linear_bind
+                                  names: (names
+                                    (quote
+                                      (var)))
+                                  input: (simple_source
+                                    (var)))))
                             proc: (block
                               body: (input
                                 formals: (receipts
-                                  (peek_bind
-                                    names: (names
-                                      (quote
-                                        (var)))
-                                    input: (var)))
+                                  (receipt
+                                    (peek_bind
+                                      names: (names
+                                        (quote
+                                          (var)))
+                                      input: (var))))
                                 proc: (block
                                   body: (new
                                     decls: (decls
@@ -2009,11 +2041,12 @@ in {
                                               (var))))
                                         right: (input
                                           formals: (receipts
-                                            (linear_bind
-                                              names: (names
-                                                (wildcard))
-                                              input: (simple_source
-                                                (var))))
+                                            (receipt
+                                              (linear_bind
+                                                names: (names
+                                                  (wildcard))
+                                                input: (simple_source
+                                                  (var)))))
                                           proc: (block
                                             body: (send
                                               name: (var)
@@ -2028,11 +2061,12 @@ in {
                 (var)))))
         right: (input
           formals: (receipts
-            (linear_bind
-              names: (names
-                (var))
-              input: (simple_source
-                (var))))
+            (receipt
+              (linear_bind
+                names: (names
+                  (var))
+                input: (simple_source
+                  (var)))))
           proc: (block
             body: (contract
               name: (var)
@@ -2079,12 +2113,13 @@ in {
                                     (var))))
                               right: (input
                                 formals: (receipts
-                                  (linear_bind
-                                    names: (names
-                                      (quote
-                                        (var)))
-                                    input: (simple_source
-                                      (var))))
+                                  (receipt
+                                    (linear_bind
+                                      names: (names
+                                        (quote
+                                          (var)))
+                                      input: (simple_source
+                                        (var)))))
                                 proc: (block
                                   body: (par
                                     left: (send
@@ -2098,12 +2133,13 @@ in {
                                           (var))))
                                     right: (input
                                       formals: (receipts
-                                        (linear_bind
-                                          names: (names
-                                            (quote
-                                              (var)))
-                                          input: (simple_source
-                                            (var))))
+                                        (receipt
+                                          (linear_bind
+                                            names: (names
+                                              (quote
+                                                (var)))
+                                            input: (simple_source
+                                              (var)))))
                                       proc: (block
                                         body: (ifElse
                                           condition: (var)
@@ -2119,20 +2155,22 @@ in {
                                                     (var))))
                                               right: (input
                                                 formals: (receipts
-                                                  (linear_bind
-                                                    names: (names
-                                                      (quote
-                                                        (var)))
-                                                    input: (simple_source
-                                                      (var))))
+                                                  (receipt
+                                                    (linear_bind
+                                                      names: (names
+                                                        (quote
+                                                          (var)))
+                                                      input: (simple_source
+                                                        (var)))))
                                                 proc: (block
                                                   body: (input
                                                     formals: (receipts
-                                                      (peek_bind
-                                                        names: (names
-                                                          (quote
-                                                            (var)))
-                                                        input: (var)))
+                                                      (receipt
+                                                        (peek_bind
+                                                          names: (names
+                                                            (quote
+                                                              (var)))
+                                                          input: (var))))
                                                     proc: (block
                                                       body: (new
                                                         decls: (decls
@@ -2151,12 +2189,13 @@ in {
                                                                   (var))))
                                                             right: (input
                                                               formals: (receipts
-                                                                (linear_bind
-                                                                  names: (names
-                                                                    (quote
-                                                                      (var)))
-                                                                  input: (simple_source
-                                                                    (var))))
+                                                                (receipt
+                                                                  (linear_bind
+                                                                    names: (names
+                                                                      (quote
+                                                                        (var)))
+                                                                    input: (simple_source
+                                                                      (var)))))
                                                               proc: (block
                                                                 body: (match
                                                                   expression: (var)
@@ -2185,11 +2224,12 @@ in {
                                                                                     (var))))
                                                                               right: (input
                                                                                 formals: (receipts
-                                                                                  (linear_bind
-                                                                                    names: (names
-                                                                                      (wildcard))
-                                                                                    input: (simple_source
-                                                                                      (var))))
+                                                                                  (receipt
+                                                                                    (linear_bind
+                                                                                      names: (names
+                                                                                        (wildcard))
+                                                                                      input: (simple_source
+                                                                                        (var)))))
                                                                                 proc: (block
                                                                                   body: (send
                                                                                     name: (var)
@@ -2228,11 +2268,12 @@ in {
                                                                                         (var))))
                                                                                   right: (input
                                                                                     formals: (receipts
-                                                                                      (linear_bind
-                                                                                        names: (names
-                                                                                          (wildcard))
-                                                                                        input: (simple_source
-                                                                                          (var))))
+                                                                                      (receipt
+                                                                                        (linear_bind
+                                                                                          names: (names
+                                                                                            (wildcard))
+                                                                                          input: (simple_source
+                                                                                            (var)))))
                                                                                     proc: (block
                                                                                       body: (send
                                                                                         name: (var)

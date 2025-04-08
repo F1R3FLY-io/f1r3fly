@@ -156,37 +156,38 @@ new people, stdout(`rho:io:stdout`) in {
                     (long_literal)))))))
         right: (input
           formals: (receipts
-            (repeated_bind
-              names: (names
-                (quote
-                  (block
-                    body: (par
-                      left: (send
-                        name: (quote
-                          (string_literal))
-                        send_type: (send_single)
-                        inputs: (inputs
-                          (long_literal)))
-                      right: (block
-                        body: (conjunction
-                          left: (var)
-                          right: (block
-                            body: (par
-                              left: (par
-                                left: (send
-                                  name: (quote
-                                    (string_literal))
-                                  send_type: (send_single)
-                                  inputs: (inputs
-                                    (var)))
-                                right: (send
-                                  name: (quote
-                                    (string_literal))
-                                  send_type: (send_single)
-                                  inputs: (inputs
-                                    (var))))
-                              right: (wildcard)))))))))
-              input: (var)))
+            (receipt
+              (repeated_bind
+                names: (names
+                  (quote
+                    (block
+                      body: (par
+                        left: (send
+                          name: (quote
+                            (string_literal))
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (long_literal)))
+                        right: (block
+                          body: (conjunction
+                            left: (var)
+                            right: (block
+                              body: (par
+                                left: (par
+                                  left: (send
+                                    name: (quote
+                                      (string_literal))
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (var)))
+                                  right: (send
+                                    name: (quote
+                                      (string_literal))
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (var))))
+                                right: (wildcard)))))))))
+                input: (var))))
           proc: (block
             body: (par
               left: (ifElse

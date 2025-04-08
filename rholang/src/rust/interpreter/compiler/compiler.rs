@@ -1,125 +1,91 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/Compiler.scala
 
-use models::{
-    rhoapi::{connective::ConnectiveInstance, Par},
-    rust::rholang::sorter::{par_sort_matcher::ParSortMatcher, sortable::Sortable},
-};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::rust::interpreter::{
-    compiler::normalizer::parser::parse_rholang_code_to_proc, errors::InterpreterError,
+    errors::InterpreterError,
+    normal_forms::Par,
+    sort_matcher::{Sortable, Sorted},
 };
 
 use super::{
-    normalize::{normalize_match_proc, ProcVisitInputs},
-    rholang_ast::Proc,
+    bound_map_chain::BoundMapChain,
+    normalize::normalize_match_proc,
+    normalizer::{
+        parser,
+        processes::exports::{FreeMap, SourcePosition},
+    },
+    rholang_ast::{ASTBuilder, Proc},
 };
 
-pub struct Compiler;
+pub struct Compiler<'src, 'env> {
+    ast_builder: ASTBuilder<'src>,
+    normalizer_env: BTreeMap<String, &'env Sorted<Par>>,
+}
 
-impl Compiler {
-    pub fn source_to_adt(source: &str) -> Result<Par, InterpreterError> {
-        Self::source_to_adt_with_normalizer_env(source, HashMap::new())
+impl<'src, 'env> Compiler<'src, 'env> {
+    pub fn new(source: &'src str) -> Compiler<'src, 'env> {
+        Self::new_with_normalizer_env(source, HashMap::new())
     }
 
-    pub fn source_to_adt_with_normalizer_env(
-        source: &str,
-        normalizer_env: HashMap<String, Par>,
-    ) -> Result<Par, InterpreterError> {
-        let proc = Self::source_to_ast(source)?;
-        Self::ast_to_adt_with_normalizer_env(proc, normalizer_env)
+    pub fn new_with_normalizer_env<Env, K>(source: &'src str, env: Env) -> Compiler<'src, 'env>
+    where
+        Env: IntoIterator<Item = (K, &'env Sorted<Par>)>,
+        K: ToOwned<Owned = String>,
+    {
+        let mut normalizer_env = BTreeMap::new();
+        for (k, ref_par) in env {
+            normalizer_env.insert(k.to_owned(), ref_par);
+        }
+        Compiler {
+            ast_builder: ASTBuilder::new(source),
+            normalizer_env,
+        }
     }
 
-    pub fn ast_to_adt(proc: Proc) -> Result<Par, InterpreterError> {
-        Self::ast_to_adt_with_normalizer_env(proc, HashMap::new())
-    }
-
-    pub fn ast_to_adt_with_normalizer_env(
-        proc: Proc,
-        normalizer_env: HashMap<String, Par>,
-    ) -> Result<Par, InterpreterError> {
-        let par = Self::normalize_term(proc, normalizer_env)?;
-        let sorted_par = ParSortMatcher::sort_match(&par);
+    pub fn compile_to_adt(&'src self) -> Result<Sorted<Par>, InterpreterError> {
+        let proc = self.parse_to_ast()?;
+        let par = normalize_term(proc, &self.normalizer_env)?;
+        let sorted_par = par.sort_match();
         Ok(sorted_par.term)
     }
 
-    pub fn source_to_ast(source: &str) -> Result<Proc, InterpreterError> {
-        parse_rholang_code_to_proc(source)
+    pub fn parse_to_ast(&'src self) -> Result<&Proc, InterpreterError> {
+        parser::parse_rholang_code_to_proc(&self.ast_builder)
     }
+}
 
-    fn normalize_term(
-        term: Proc,
-        normalizer_env: HashMap<String, Par>,
-    ) -> Result<Par, InterpreterError> {
-        // println!("\nhit normalize_term");
-        normalize_match_proc(&term, ProcVisitInputs::new(), &normalizer_env).map(
-            |normalized_term| {
-                // println!("\nnormalized term: {:?}", normalized_term);
-                if normalized_term.free_map.count() > 0 {
-                    if normalized_term.free_map.wildcards.is_empty()
-                        && normalized_term.free_map.connectives.is_empty()
-                    {
-                        let top_level_free_list: Vec<String> = normalized_term
-                            .free_map
-                            .level_bindings
-                            .into_iter()
-                            .map(|(name, free_context)| {
-                                format!("{} at {:?}", name, free_context.source_position)
-                            })
-                            .collect();
-
-                        Err(InterpreterError::TopLevelFreeVariablesNotAllowedError(
-                            top_level_free_list.join(", "),
-                        ))
-                    } else if !normalized_term.free_map.connectives.is_empty() {
-                        fn connective_instance_to_string(conn: ConnectiveInstance) -> String {
-                            match conn {
-                                ConnectiveInstance::ConnAndBody(_) => {
-                                    String::from("/\\ (conjunction)")
-                                }
-
-                                ConnectiveInstance::ConnOrBody(_) => {
-                                    String::from("\\/ (disjunction)")
-                                }
-
-                                ConnectiveInstance::ConnNotBody(_) => String::from("~ (negation)"),
-
-                                _ => format!("{:?}", conn),
-                            }
-                        }
-
-                        let connectives: Vec<String> = normalized_term
-                            .free_map
-                            .connectives
-                            .into_iter()
-                            .map(|(conn_type, source_position)| {
-                                format!(
-                                    "{} at {:?}",
-                                    connective_instance_to_string(conn_type),
-                                    source_position
-                                )
-                            })
-                            .collect();
-
-                        Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
-                            connectives.join(", "),
-                        ))
-                    } else {
-                        let top_level_wildcard_list: Vec<String> = normalized_term
-                            .free_map
-                            .wildcards
-                            .into_iter()
-                            .map(|source_position| format!("_ (wildcard) at {:?}", source_position))
-                            .collect();
-
-                        Err(InterpreterError::TopLevelWildcardsNotAllowedError(
-                            top_level_wildcard_list.join(", "),
-                        ))
-                    }
-                } else {
-                    Ok(normalized_term.par)
-                }
-            },
-        )?
-    }
+fn normalize_term(
+    term: &Proc,
+    normalizer_env: &HashMap<String, Par>,
+) -> Result<Par, InterpreterError> {
+    let mut result = Par::default();
+    let mut free_map = FreeMap::new();
+    let mut bound_map_chain = BoundMapChain::new();
+    normalize_match_proc(
+        &term,
+        &mut result,
+        &mut free_map,
+        &mut bound_map_chain,
+        normalizer_env,
+        SourcePosition::default(),
+    )
+    .and_then(|_| {
+        if free_map.is_empty() {
+            return Ok(result);
+        }
+        if !free_map.has_wildcards() && !free_map.has_connectives() {
+            return Err(InterpreterError::TopLevelFreeVariablesNotAllowedError(
+                free_map.iter_free_vars().collect(),
+            ));
+        }
+        if free_map.has_connectives() {
+            return Err(InterpreterError::TopLevelLogicalConnectivesNotAllowedError(
+                free_map.iter_connectives().collect(),
+            ));
+        }
+        return Err(InterpreterError::TopLevelWildcardsNotAllowedError(
+            free_map.iter_wildcards().collect(),
+        ));
+    })
 }

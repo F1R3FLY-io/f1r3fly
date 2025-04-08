@@ -1,1018 +1,1047 @@
-#[derive(Debug, PartialEq, Clone)]
-pub enum Proc {
+use tree_sitter::Node;
+use typed_arena::Arena;
+
+use crate::rust::interpreter::errors::InterpreterError;
+
+use super::normalizer::processes::exports::SourcePosition;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Proc<'ast> {
     Par {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     SendSync {
-        name: Name,
-        messages: ProcList,
-        cont: SyncSendCont,
-        line_num: usize,
-        col_num: usize,
+        name: Name<'ast>,
+        messages: Vec<AnnProc<'ast>>,
+        cont: SyncSendCont<'ast>,
     },
 
     New {
-        decls: Decls,
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        decls: Vec<NameDecl<'ast>>,
+        proc: &'ast Proc<'ast>,
     },
 
-    IfElse {
-        condition: Box<Proc>,
-        if_true: Box<Proc>,
-        alternative: Option<Box<Proc>>,
-        line_num: usize,
-        col_num: usize,
+    IfThenElse {
+        condition: AnnProc<'ast>,
+        if_true: AnnProc<'ast>,
+        if_false: Option<AnnProc<'ast>>,
     },
 
     Let {
-        decls: DeclsChoice,
-        body: Box<Block>,
-        line_num: usize,
-        col_num: usize,
+        bindings: Vec<Binding<'ast>>,
+        body: AnnProc<'ast>,
+        concurrent: bool,
     },
 
     Bundle {
         bundle_type: BundleType,
-        proc: Box<Block>,
-        line_num: usize,
-        col_num: usize,
+        proc: &'ast Proc<'ast>,
     },
 
     Match {
-        expression: Box<Proc>,
-        cases: Vec<Case>,
-        line_num: usize,
-        col_num: usize,
+        expression: AnnProc<'ast>,
+        cases: Vec<Case<'ast>>,
     },
 
     Choice {
-        branches: Vec<Branch>,
-        line_num: usize,
-        col_num: usize,
+        branches: Vec<Branch<'ast>>,
     },
 
     Contract {
-        name: Name,
-        formals: Names,
-        proc: Box<Block>,
-        line_num: usize,
-        col_num: usize,
+        name: AnnName<'ast>,
+        formals: Names<'ast>,
+        body: AnnProc<'ast>,
     },
 
-    Input {
-        formals: Receipts,
-        proc: Box<Block>,
-        line_num: usize,
-        col_num: usize,
+    ForComprehension {
+        receipts: Vec<Receipt<'ast>>,
+        proc: AnnProc<'ast>,
     },
 
     Send {
-        name: Name,
+        name: Name<'ast>,
         send_type: SendType,
-        inputs: ProcList,
-        line_num: usize,
-        col_num: usize,
+        inputs: Vec<AnnProc<'ast>>,
     },
 
     // ProcExpression
     Or {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     And {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Matches {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        target: AnnProc<'ast>,
+        pattern: AnnProc<'ast>,
     },
 
     Eq {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Neq {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Lt {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Lte {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Gt {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Gte {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Concat {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
-    MinusMinus {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+    Diff {
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
-    Minus {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+    Sub {
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Add {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
-    PercentPercent {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+    Interpolation {
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Mult {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Div {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
 
     Mod {
-        left: Box<Proc>,
-        right: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
     },
-
-    Not {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    Neg {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
+    Not(&'ast Proc<'ast>),
+    Neg(&'ast Proc<'ast>),
 
     Method {
-        receiver: Box<Proc>,
-        name: Var,
-        args: ProcList,
-        line_num: usize,
-        col_num: usize,
+        receiver: &'ast Proc<'ast>,
+        name: Id<'ast>,
+        args: Vec<AnnProc<'ast>>,
     },
 
-    Eval(Eval),
-    Quote(Quote),
-    Disjunction(Disjunction),
-    Conjunction(Conjunction),
-    Negation(Negation),
+    Eval {
+        name: AnnName<'ast>,
+    },
+    Quote(&'ast Proc<'ast>),
+
+    Disjunction {
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
+    },
+    Conjunction {
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
+    },
+    Negation(&'ast Proc<'ast>),
 
     // GroundExpression
-    Block(Box<Block>),
-
-    Collection(Collection),
-
+    Collection(Collection<'ast>),
     SimpleType(SimpleType),
 
     // Ground
-    BoolLiteral {
-        value: bool,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    LongLiteral {
-        value: i64,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    StringLiteral {
-        value: String,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    UriLiteral(UriLiteral),
-
-    Nil {
-        line_num: usize,
-        col_num: usize,
-    },
+    BoolLiteral(bool),
+    LongLiteral(i64),
+    StringLiteral(&'ast str),
+    UriLiteral(Uri<'ast>),
+    Nil,
 
     // ProcVar
-    Var(Var),
-
-    Wildcard {
-        line_num: usize,
-        col_num: usize,
-    },
+    ProcVar(Var<'ast>),
 
     // VarRef
-    VarRef(VarRef),
+    VarRef(VarRef<'ast>),
 }
 
-impl Proc {
-    pub fn new_proc_int(value: i64) -> Proc {
-        Proc::LongLiteral {
-            value,
-            line_num: 0,
-            col_num: 0,
-        }
+impl<'a> Proc<'a> {
+    pub fn new_var(name: &'a str, pos: SourcePosition) -> Proc<'a> {
+        Proc::ProcVar(Var::new_id(name, pos))
     }
 
-    pub fn new_proc_string(value: String) -> Proc {
-        Proc::StringLiteral {
-            value,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_proc_bool(value: bool) -> Proc {
-        Proc::BoolLiteral {
-            value,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_proc_uri(value: String) -> Proc {
-        Proc::UriLiteral(UriLiteral {
-            value,
-            line_num: 0,
-            col_num: 0,
+    pub fn new_list(elements: Vec<AnnProc<'a>>) -> Proc<'a> {
+        Proc::Collection(Collection::List {
+            elements,
+            cont: None,
         })
     }
 
-    pub fn new_proc_var(value: &str) -> Proc {
-        Proc::Var(Var {
-            name: value.to_string(),
-            line_num: 0,
-            col_num: 0,
-        })
+    pub fn new_tuple(elements: Vec<AnnProc<'a>>) -> Proc<'a> {
+        Proc::Collection(Collection::Tuple { elements })
     }
 
-    pub fn new_proc_eval(name: Name) -> Proc {
-        Proc::Eval(Eval {
+    pub fn annotate(&'a self, pos: SourcePosition) -> AnnProc<'a> {
+        AnnProc { proc: self, pos }
+    }
+
+    pub fn annotate_dummy(&'a self) -> AnnProc<'a> {
+        AnnProc {
+            proc: self,
+            pos: SourcePosition::default(),
+        }
+    }
+
+    pub fn quoted(&'a self) -> Name<'a> {
+        Name::Quote(self)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct AnnProc<'ast> {
+    pub proc: &'ast Proc<'ast>,
+    pub pos: SourcePosition,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Name<'ast> {
+    ProcVar(Var<'ast>),
+    Quote(&'ast Proc<'ast>),
+}
+
+impl<'a> Name<'a> {
+    pub fn declare(name: &'a str) -> Name<'a> {
+        Id {
             name,
-            line_num: 0,
-            col_num: 0,
-        })
-    }
-
-    pub fn new_proc_par_with_int_and_var(value_int: i64, value_var: &str) -> Proc {
-        Proc::Par {
-            left: Box::new(Self::new_proc_int(value_int)),
-            right: Box::new(Self::new_proc_var(value_var)),
-            line_num: 0,
-            col_num: 0,
+            pos: SourcePosition::default(),
         }
+        .as_name()
     }
 
-    pub fn new_proc_add_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
-        Proc::Add {
-            left: Box::new(Self::new_proc_var(value_left)),
-            right: Box::new(Self::new_proc_var(value_right)),
-            line_num: 0,
-            col_num: 0,
-        }
+    pub fn annotated(self, pos: SourcePosition) -> AnnName<'a> {
+        AnnName(self, pos)
     }
 
-    pub fn new_proc_wildcard() -> Proc {
-        Proc::Wildcard {
-            line_num: 0,
-            col_num: 0,
-        }
+    pub fn annotated_dummy(self) -> AnnName<'a> {
+        AnnName(self, SourcePosition::default())
     }
+}
 
-    pub fn new_proc_nil() -> Proc {
-        Proc::Nil {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+impl<'a> TryFrom<Proc<'a>> for Name<'a> {
+    type Error = String;
 
-    pub fn new_proc_par_with_wildcard_and_var(value_var: &str) -> Proc {
-        Proc::Par {
-            left: Box::new(Self::new_proc_wildcard()),
-            right: Box::new(Self::new_proc_var(value_var)),
-            line_num: 0,
-            col_num: 0,
+    fn try_from(proc: Proc<'a>) -> Result<Name<'a>, String> {
+        match proc {
+            Proc::ProcVar(var) => Ok(Name::ProcVar(var)),
+            Proc::Quote(proc) => Ok(Name::Quote(proc)),
+            other => Err(format!("{other:?} is not a name")),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProcList {
-    pub procs: Vec<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
+impl<'a> TryFrom<AnnProc<'a>> for Name<'a> {
+    type Error = String;
 
-impl ProcList {
-    pub fn new(procs: Vec<Proc>) -> ProcList {
-        ProcList {
-            procs,
-            line_num: 0,
-            col_num: 0,
+    fn try_from(ann_proc: AnnProc<'a>) -> Result<Name<'a>, String> {
+        match ann_proc.proc {
+            Proc::ProcVar(var) => Ok(Name::ProcVar(*var)),
+            Proc::Quote(proc) => Ok(Name::Quote(*proc)),
+            other => Err(format!("{other:?} is not a name")),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Name {
-    ProcVar(Box<Proc>),
-    Quote(Box<Quote>),
-}
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct AnnName<'ast>(pub Name<'ast>, pub SourcePosition);
 
-impl Name {
-    pub fn new_name_var(name: &str) -> Name {
-        Name::ProcVar(Box::new(Proc::Var(Var {
-            name: name.to_string(),
-            line_num: 0,
-            col_num: 0,
-        })))
-    }
+impl<'a> TryFrom<AnnProc<'a>> for AnnName<'a> {
+    type Error = String;
 
-    pub fn new_name_wildcard() -> Name {
-        Name::ProcVar(Box::new(Proc::Wildcard {
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_var(name: &str) -> Name {
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::Var(Var {
-                name: name.to_string(),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_var_ref(name: &str) -> Name {
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::VarRef(VarRef {
-                var_ref_kind: VarRefKind::Name,
-                var: Var::new(name.to_string()),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_nil() -> Name {
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::Nil {
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_ground_long_literal(value: i64) -> Name {
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::LongLiteral {
-                value,
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_eval(name: &str) -> Name {
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(Proc::Eval(Eval {
-                name: Name::new_name_var(name),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-
-    pub fn new_name_quote_par_of_evals(var_name: &str) -> Name {
-        let eval_left = Proc::Eval(Eval {
-            name: Name::new_name_var(var_name),
-            line_num: 0,
-            col_num: 0,
-        });
-
-        let eval_right = Proc::Eval(Eval {
-            name: Name::new_name_var(var_name),
-            line_num: 0,
-            col_num: 0,
-        });
-
-        let par_proc = Proc::Par {
-            left: Box::new(eval_left),
-            right: Box::new(eval_right),
-            line_num: 0,
-            col_num: 0,
-        };
-
-        Name::Quote(Box::new(Quote {
-            quotable: Box::new(par_proc),
-            line_num: 0,
-            col_num: 0,
-        }))
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Var {
-    pub name: String,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl Var {
-    pub fn new(name: String) -> Self {
-        Var {
-            name,
-            line_num: 0,
-            col_num: 0,
+    fn try_from(value: AnnProc<'a>) -> Result<AnnName<'a>, String> {
+        let p = value.proc;
+        let pos = value.pos;
+        match p {
+            Proc::ProcVar(var) => Ok(AnnName(var.as_name(), pos)),
+            Proc::Quote(proc) => Ok(AnnName((*proc).quoted(), pos)),
+            other => Err(format!("{other:?} at {pos} is not a name")),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Quote {
-    pub quotable: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
+impl<'a> AnnName<'a> {
+    pub fn declare(name: &'a str, pos: SourcePosition) -> AnnName<'a> {
+        Id { name, pos }.as_name().annotated(pos)
+    }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Eval {
-    pub name: Name,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Var<'a> {
+    Id(Id<'a>),
+    Wildcard,
 }
 
-impl Eval {
-    pub fn new_eval_name_var(value: &str) -> Proc {
-        Proc::Eval(Eval {
-            name: Name::new_name_var(value),
-            line_num: 0,
-            col_num: 0,
+impl<'a> Var<'a> {
+    pub fn new_id(name: &'a str, pos: SourcePosition) -> Var<'a> {
+        Var::Id(Id { name, pos })
+    }
+
+    pub fn as_name(&self) -> Name<'a> {
+        Name::ProcVar(*self)
+    }
+
+    pub fn as_proc(&self) -> Proc<'a> {
+        Proc::ProcVar(*self)
+    }
+}
+
+impl<'a> TryFrom<Name<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: Name<'a>) -> Result<Var<'a>, String> {
+        match value {
+            Name::ProcVar(var) => Ok(var),
+            Name::Quote(quoted) => Err(format!(
+                "attempt to convert a quoted process {{ {quoted:?} }} to a var"
+            )),
+        }
+    }
+}
+
+impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: &Proc<'a>) -> Result<Var<'a>, String> {
+        match value {
+            Proc::ProcVar(var) => Ok(*var),
+            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
+        }
+    }
+}
+
+impl<'a> TryFrom<AnnName<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: AnnName<'a>) -> Result<Var<'a>, String> {
+        value.0.try_into()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Id<'ast> {
+    pub name: &'ast str,
+    pub pos: SourcePosition,
+}
+
+impl<'a> Id<'a> {
+    pub fn as_name(&self) -> Name<'a> {
+        Var::Id(*self).as_name()
+    }
+
+    pub fn as_proc(&self) -> Proc<'a> {
+        Var::Id(*self).as_proc()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ProcRemainder<'a> {
+    pub var: Var<'a>,
+    pub pos: SourcePosition,
+}
+
+pub type NameRemainder<'b> = ProcRemainder<'b>;
+
+impl<'a> TryFrom<AnnProc<'a>> for ProcRemainder<'a> {
+    type Error = String;
+
+    fn try_from(value: AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into().map(|var| ProcRemainder {
+            var,
+            pos: value.pos,
         })
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Disjunction {
-    pub left: Box<Proc>,
-    pub right: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
+impl<'a> TryFrom<AnnName<'a>> for ProcRemainder<'a> {
+    type Error = String;
 
-impl Disjunction {
-    pub fn new_disjunction_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
-        Proc::Disjunction(Disjunction {
-            left: Box::new(Proc::new_proc_var(value_left)),
-            right: Box::new(Proc::new_proc_var(value_right)),
-            line_num: 0,
-            col_num: 0,
-        })
+    fn try_from(value: AnnName<'a>) -> Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(|var| ProcRemainder { var, pos: value.1 })
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Conjunction {
-    pub left: Box<Proc>,
-    pub right: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl Conjunction {
-    pub fn new_conjunction_with_par_of_var(value_left: &str, value_right: &str) -> Proc {
-        Proc::Conjunction(Conjunction {
-            left: Box::new(Proc::new_proc_var(value_left)),
-            right: Box::new(Proc::new_proc_var(value_right)),
-            line_num: 0,
-            col_num: 0,
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Negation {
-    pub proc: Box<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl Negation {
-    pub fn new_negation_var(name: &str) -> Proc {
-        Proc::Negation(Negation {
-            proc: Box::new(Proc::Var(Var {
-                name: name.to_string(),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
-        })
-    }
-
-    pub fn new_negation_int(value: i64) -> Proc {
-        Proc::Negation(Negation {
-            proc: Box::new(Proc::new_proc_int(value)),
-            line_num: 0,
-            col_num: 0,
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Block {
-    pub proc: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl Block {
-    pub fn new(proc: Proc) -> Block {
-        Block {
-            proc,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_block_nil() -> Block {
-        Block {
-            proc: Proc::Nil {
-                line_num: 0,
-                col_num: 0,
-            },
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct UriLiteral {
-    pub value: String,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Collection {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Collection<'ast> {
     List {
-        elements: Vec<Proc>,
-        cont: Option<Box<Proc>>,
-        line_num: usize,
-        col_num: usize,
+        elements: Vec<AnnProc<'ast>>,
+        cont: Option<ProcRemainder<'ast>>,
     },
 
     Tuple {
-        elements: Vec<Proc>,
-        line_num: usize,
-        col_num: usize,
+        elements: Vec<AnnProc<'ast>>,
     },
 
     Set {
-        elements: Vec<Proc>,
-        cont: Option<Box<Proc>>,
-        line_num: usize,
-        col_num: usize,
+        elements: Vec<AnnProc<'ast>>,
+        cont: Option<ProcRemainder<'ast>>,
     },
 
     Map {
-        pairs: Vec<KeyValuePair>,
-        cont: Option<Box<Proc>>,
-        line_num: usize,
-        col_num: usize,
+        pairs: Vec<KeyValuePair<'ast>>,
+        cont: Option<ProcRemainder<'ast>>,
     },
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct KeyValuePair {
-    pub key: Proc,
-    pub value: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct KeyValuePair<'ast> {
+    pub key: AnnProc<'ast>,
+    pub value: AnnProc<'ast>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SimpleType {
-    Bool { line_num: usize, col_num: usize },
-    Int { line_num: usize, col_num: usize },
-    String { line_num: usize, col_num: usize },
-    Uri { line_num: usize, col_num: usize },
-    ByteArray { line_num: usize, col_num: usize },
+    Bool,
+    Int,
+    String,
+    Uri,
+    ByteArray,
 }
 
-impl SimpleType {
-    pub fn new_bool() -> Self {
-        SimpleType::Bool {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_int() -> Self {
-        SimpleType::Int {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_string() -> Self {
-        SimpleType::String {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_uri() -> Self {
-        SimpleType::Uri {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_bytearray() -> Self {
-        SimpleType::ByteArray {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum SyncSendCont<'ast> {
+    Empty,
+    NonEmpty(AnnProc<'ast>),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum SyncSendCont {
-    Empty {
-        line_num: usize,
-        col_num: usize,
-    },
-
-    NonEmpty {
-        proc: Box<Proc>,
-        line_num: usize,
-        col_num: usize,
-    },
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct NameDecl<'ast> {
+    pub id: Id<'ast>,
+    pub uri: Option<Uri<'ast>>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Decls {
-    pub decls: Vec<NameDecl>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct NameDecl {
-    pub var: Var,
-    pub uri: Option<UriLiteral>,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl NameDecl {
-    pub fn new(var_value: &str, uri_value: Option<&str>) -> NameDecl {
+impl<'a> NameDecl<'a> {
+    pub fn id(id: &'a str, pos: SourcePosition) -> NameDecl<'a> {
         NameDecl {
-            var: Var {
-                name: var_value.to_string(),
-                line_num: 0,
-                col_num: 0,
-            },
-            uri: {
-                match uri_value {
-                    Some(value) => Some(UriLiteral {
-                        value: value.to_string(),
-                        line_num: 0,
-                        col_num: 0,
-                    }),
-                    None => None,
-                }
-            },
-            line_num: 0,
-            col_num: 0,
+            id: Id { name: id, pos },
+            uri: None,
+        }
+    }
+
+    pub fn id_with_uri(id: &'a str, uri: Uri<'a>, pos: SourcePosition) -> NameDecl<'a> {
+        NameDecl {
+            id: Id { name: id, pos },
+            uri: Some(uri),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Decl {
-    pub names: Names,
-    pub procs: Vec<Proc>,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Binding<'ast> {
+    pub names: Names<'ast>,
+    pub procs: Vec<AnnProc<'ast>>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum DeclsChoice {
-    LinearDecls {
-        decls: Vec<Decl>,
-        line_num: usize,
-        col_num: usize,
-    },
-
-    ConcDecls {
-        decls: Vec<Decl>,
-        line_num: usize,
-        col_num: usize,
-    },
-}
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BundleType {
-    BundleWrite { line_num: usize, col_num: usize },
-    BundleRead { line_num: usize, col_num: usize },
-    BundleEquiv { line_num: usize, col_num: usize },
-    BundleReadWrite { line_num: usize, col_num: usize },
+    BundleWrite,
+    BundleRead,
+    BundleEquiv,
+    BundleReadWrite,
 }
 
-impl BundleType {
-    pub fn new_bundle_write() -> Self {
-        BundleType::BundleWrite {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_bundle_read() -> Self {
-        BundleType::BundleRead {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_bundle_equiv() -> Self {
-        BundleType::BundleEquiv {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_bundle_read_write() -> Self {
-        BundleType::BundleReadWrite {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+pub struct BundleFlags {
+    pub read_flag: bool,
+    pub write_flag: bool,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Case {
-    pub pattern: Proc,
-    pub proc: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl Case {
-    pub fn new(pattern: Proc, proc: Proc) -> Case {
-        Case {
-            pattern,
-            proc,
-            line_num: 0,
-            col_num: 0,
+impl From<BundleType> for BundleFlags {
+    fn from(value: BundleType) -> Self {
+        match value {
+            BundleType::BundleWrite => BundleFlags {
+                read_flag: false,
+                write_flag: true,
+            },
+            BundleType::BundleRead => BundleFlags {
+                read_flag: true,
+                write_flag: false,
+            },
+            BundleType::BundleReadWrite => BundleFlags {
+                read_flag: true,
+                write_flag: true,
+            },
+            BundleType::BundleEquiv => BundleFlags {
+                read_flag: false,
+                write_flag: false,
+            },
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Branch {
-    pub pattern: Vec<LinearBind>,
-    pub proc: Proc,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Case<'ast> {
+    pub pattern: AnnProc<'ast>,
+    pub proc: AnnProc<'ast>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Names {
-    pub names: Vec<Name>,
-    pub cont: Option<Box<Proc>>,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Branch<'ast> {
+    pub patterns: Vec<LinearBind<'ast>>,
+    pub proc: AnnProc<'ast>,
 }
 
-impl Names {
-    pub fn new(names: Vec<Name>, cont: Option<Box<Proc>>) -> Names {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Names<'ast> {
+    pub names: Vec<AnnName<'ast>>,
+    pub remainder: Option<NameRemainder<'ast>>,
+}
+
+impl Clone for Names<'_> {
+    fn clone(&self) -> Self {
+        let mut dest_names = Vec::with_capacity(self.names.len());
+        dest_names.extend(&self.names);
+
         Names {
-            names,
-            cont,
-            line_num: 0,
-            col_num: 0,
+            names: dest_names,
+            remainder: self.remainder,
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.names.clone_from(&source.names);
+        self.remainder = source.remainder;
+    }
+}
+
+impl<'a> Names<'a> {
+    pub fn from_slice(slice: &[AnnName<'a>], with_remainder: bool) -> Result<Names<'a>, String> {
+        let mut names = Vec::new();
+        if with_remainder {
+            match slice.split_last() {
+                None => Err("attempt to build 'x, y ...@z' out of zero names".to_string()),
+                Some((_, init)) if init.is_empty() => {
+                    Err("attempt to build 'x, y ...@z' out of one name".to_string())
+                }
+                Some((last, init)) => {
+                    names.extend(init);
+                    Ok(Names {
+                        names,
+                        remainder: Some((*last).try_into().expect("a variable expected")),
+                    })
+                }
+            }
+        } else {
+            if slice.is_empty() {
+                Err("attempt to build empty names".to_string())
+            } else {
+                names.extend(slice);
+                Ok(Names {
+                    names,
+                    remainder: None,
+                })
+            }
+        }
+    }
+
+    pub fn single(name: AnnName<'a>) -> Names<'a> {
+        Names {
+            names: vec![name],
+            remainder: None,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Source {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Source<'ast> {
     Simple {
-        name: Name,
-        line_num: usize,
-        col_num: usize,
+        name: AnnName<'ast>,
     },
-
     ReceiveSend {
-        name: Name,
-        line_num: usize,
-        col_num: usize,
+        name: AnnName<'ast>,
     },
-
     SendReceive {
-        name: Name,
-        inputs: ProcList,
-        line_num: usize,
-        col_num: usize,
+        name: AnnName<'ast>,
+        inputs: Vec<AnnProc<'ast>>,
     },
 }
 
-impl Source {
-    pub fn new_simple_source(name: Name) -> Source {
-        Source::Simple {
-            name,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Receipt<'ast> {
+    Linear(Vec<LinearBind<'ast>>),
+    Repeated(Vec<RepeatedBind<'ast>>),
+    Peek(Vec<PeekBind<'ast>>),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Receipts {
-    pub receipts: Vec<Receipt>,
-    pub line_num: usize,
-    pub col_num: usize,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct LinearBind<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: Source<'ast>,
 }
 
-impl Receipts {
-    pub fn new(receipts: Vec<Receipt>) -> Self {
-        Receipts {
-            receipts,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RepeatedBind<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: AnnName<'ast>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Receipt {
-    LinearBinds(LinearBind),
-
-    RepeatedBinds(RepeatedBind),
-
-    PeekBinds(PeekBind),
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PeekBind<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: AnnName<'ast>,
 }
 
-impl Receipt {
-    pub fn new_linear_bind_receipt(names: Names, input: Source) -> Receipt {
-        Receipt::LinearBinds(LinearBind {
-            names,
-            input,
-            line_num: 0,
-            col_num: 0,
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct LinearBind {
-    pub names: Names,
-    pub input: Source,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-impl LinearBind {
-    pub(crate) fn new_linear_bind(names: Names, source: Source) -> LinearBind {
-        LinearBind {
-            names,
-            input: source,
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct RepeatedBind {
-    pub names: Names,
-    pub input: Name,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct PeekBind {
-    pub names: Names,
-    pub input: Name,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SendType {
-    Single { line_num: usize, col_num: usize },
-
-    Multiple { line_num: usize, col_num: usize },
+    Single,
+    Multiple,
 }
 
-impl SendType {
-    pub fn new_single() -> Self {
-        SendType::Single {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
-
-    pub fn new_multiple() -> Self {
-        SendType::Multiple {
-            line_num: 0,
-            col_num: 0,
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct VarRef<'a> {
+    pub kind: VarRefKind,
+    pub var: Id<'a>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct VarRef {
-    pub var_ref_kind: VarRefKind,
-    pub var: Var,
-    pub line_num: usize,
-    pub col_num: usize,
-}
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarRefKind {
     Proc,
     Name,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+pub struct Uri<'a>(&'a str);
+
+impl<'a> From<&'a str> for Uri<'a> {
+    fn from(value: &'a str) -> Self {
+        Uri(value.trim_matches('`'))
+    }
+}
+
+impl ToString for Uri<'_> {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+pub struct ASTBuilder<'ast> {
+    arena: Arena<Proc<'ast>>,
+    source_code: &'ast [u8],
+}
+
+impl<'ast> ASTBuilder<'ast> {
+    pub fn new(source_code: &'ast str) -> ASTBuilder<'ast> {
+        ASTBuilder {
+            arena: Arena::with_capacity(64),
+            source_code: source_code.as_ref(),
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> ASTBuilder<'ast> {
+        ASTBuilder {
+            arena: Arena::with_capacity(capacity),
+            source_code: &[],
+        }
+    }
+
+    pub fn get_source_code(&self) -> &[u8] {
+        self.source_code
+    }
+
+    pub fn alloc_long_literal(&'ast self, value: i64) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::LongLiteral(value))
+    }
+
+    pub fn alloc_string_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
+        self.arena
+            .alloc(Proc::StringLiteral(value.trim_matches('"')))
+    }
+
+    pub fn alloc_uri_literal(&'ast self, value: Uri<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::UriLiteral(value))
+    }
+
+    pub fn alloc_var(&'ast self, id: Id<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::ProcVar(Var::Id(id)))
+    }
+
+    pub fn alloc_var_ref(&'ast self, var_ref: VarRef<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::VarRef(var_ref))
+    }
+
+    pub fn alloc_par(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Par { left, right })
+    }
+
+    pub fn alloc_send_sync(
+        &'ast self,
+        name: Name<'ast>,
+        messages: Vec<AnnProc<'ast>>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::SendSync {
+            name,
+            messages,
+            cont: SyncSendCont::Empty,
+        })
+    }
+
+    pub fn alloc_send_sync_with_cont(
+        &'ast self,
+        name: Name<'ast>,
+        messages: Vec<AnnProc<'ast>>,
+        cont: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::SendSync {
+            name,
+            messages,
+            cont: SyncSendCont::NonEmpty(cont),
+        })
+    }
+
+    pub fn alloc_new(
+        &'ast self,
+        proc: &'ast Proc<'ast>,
+        decls: Vec<NameDecl<'ast>>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::New { decls, proc })
+    }
+
+    pub fn alloc_if_then(
+        &'ast self,
+        condition: AnnProc<'ast>,
+        if_true: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::IfThenElse {
+            condition,
+            if_true,
+            if_false: None,
+        })
+    }
+
+    pub fn alloc_if_then_else(
+        &'ast self,
+        condition: AnnProc<'ast>,
+        if_true: AnnProc<'ast>,
+        if_false: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::IfThenElse {
+            condition,
+            if_true,
+            if_false: Some(if_false),
+        })
+    }
+
+    pub fn alloc_let(
+        &'ast self,
+        bindings: Vec<Binding<'ast>>,
+        body: AnnProc<'ast>,
+        concurrent: bool,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Let {
+            bindings,
+            body,
+            concurrent,
+        })
+    }
+
+    pub fn alloc_bundle(
+        &'ast self,
+        bundle_type: BundleType,
+        proc: &'ast Proc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Bundle { bundle_type, proc })
+    }
+
+    pub fn alloc_match(
+        &'ast self,
+        expression: AnnProc<'ast>,
+        cases: Vec<Case<'ast>>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Match { expression, cases })
+    }
+
+    pub fn alloc_contract(
+        &'ast self,
+        name: AnnName<'ast>,
+        formals: Names<'ast>,
+        body: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Contract {
+            name,
+            formals,
+            body,
+        })
+    }
+
+    pub fn alloc_for(
+        &'ast self,
+        receipts: Vec<Receipt<'ast>>,
+        proc: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::ForComprehension { receipts, proc })
+    }
+
+    pub fn alloc_send(
+        &'ast self,
+        send_type: SendType,
+        name: Name<'ast>,
+        inputs: Vec<AnnProc<'ast>>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Send {
+            name,
+            send_type,
+            inputs,
+        })
+    }
+
+    pub fn alloc_method(
+        &'ast self,
+        name: Id<'ast>,
+        receiver: &'ast Proc<'ast>,
+        args: Vec<AnnProc<'ast>>,
+    ) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Method {
+            receiver,
+            name,
+            args,
+        })
+    }
+
+    pub fn alloc_eval(&'ast self, name: AnnName<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Eval { name })
+    }
+
+    pub fn alloc_quote(&'ast self, proc: &'ast Proc<'ast>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::Quote(proc))
+    }
+
+    pub fn alloc_or(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Or { left, right })
+    }
+
+    pub fn alloc_and(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::And { left, right })
+    }
+
+    pub fn alloc_matches(&'ast self, target: AnnProc<'ast>, pattern: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Matches { target, pattern })
+    }
+
+    pub fn alloc_eq(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Eq { left, right })
+    }
+
+    pub fn alloc_neq(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Neq { left, right })
+    }
+
+    pub fn alloc_lt(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Lt { left, right })
+    }
+
+    pub fn alloc_lte(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Lte { left, right })
+    }
+
+    pub fn alloc_gt(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Gt { left, right })
+    }
+
+    pub fn alloc_gte(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Gte { left, right })
+    }
+
+    pub fn alloc_concat(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Concat { left, right })
+    }
+
+    pub fn alloc_diff(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Diff { left, right })
+    }
+
+    pub fn alloc_sub(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Sub { left, right })
+    }
+
+    pub fn alloc_add(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Add { left, right })
+    }
+
+    pub fn alloc_interpolation(
+        &'ast self,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
+    ) -> &'ast Proc {
+        self.arena.alloc(Proc::Interpolation { left, right })
+    }
+
+    pub fn alloc_mult(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Mult { left, right })
+    }
+
+    pub fn alloc_div(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Div { left, right })
+    }
+
+    pub fn alloc_mod(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Mod { left, right })
+    }
+
+    pub fn alloc_conjunction(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Conjunction { left, right })
+    }
+
+    pub fn alloc_disjunction(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc {
+        self.arena.alloc(Proc::Disjunction { left, right })
+    }
+
+    pub fn alloc_not(&'ast self, proc: &'ast Proc) -> &'ast Proc {
+        self.arena.alloc(Proc::Not(proc))
+    }
+
+    pub fn alloc_neg(&'ast self, proc: &'ast Proc) -> &'ast Proc {
+        self.arena.alloc(Proc::Neg(proc))
+    }
+
+    pub fn alloc_negation(&'ast self, proc: &'ast Proc) -> &'ast Proc {
+        self.arena.alloc(Proc::Negation(proc))
+    }
+
+    pub fn alloc_list(&'ast self, procs: Vec<AnnProc<'ast>>) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::List {
+            elements: procs,
+            cont: None,
+        }))
+    }
+
+    pub fn alloc_list_with_remainder(
+        &'ast self,
+        procs: Vec<AnnProc<'ast>>,
+        remainder: ProcRemainder<'ast>,
+    ) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::List {
+            elements: procs,
+            cont: Some(remainder),
+        }))
+    }
+
+    pub fn alloc_set(&'ast self, procs: Vec<AnnProc<'ast>>) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::Set {
+            elements: procs,
+            cont: None,
+        }))
+    }
+
+    pub fn alloc_set_with_remainder(
+        &'ast self,
+        procs: Vec<AnnProc<'ast>>,
+        remainder: ProcRemainder<'ast>,
+    ) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::Set {
+            elements: procs,
+            cont: Some(remainder),
+        }))
+    }
+
+    pub fn alloc_tuple(&'ast self, procs: Vec<AnnProc<'ast>>) -> &'ast Proc {
+        self.arena
+            .alloc(Proc::Collection(Collection::Tuple { elements: procs }))
+    }
+
+    pub fn alloc_map(&'ast self, elements: Vec<KeyValuePair<'ast>>) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::Map {
+            pairs: elements,
+            cont: None,
+        }))
+    }
+
+    pub fn alloc_map_with_remainder(
+        &'ast self,
+        elements: Vec<KeyValuePair<'ast>>,
+        remainder: ProcRemainder<'ast>,
+    ) -> &'ast Proc {
+        self.arena.alloc(Proc::Collection(Collection::Map {
+            pairs: elements,
+            cont: Some(remainder),
+        }))
+    }
+
+    pub fn alloc_choice(&'ast self, branches: Vec<Branch<'ast>>) -> &'ast Proc {
+        self.arena.alloc(Proc::Choice { branches })
+    }
+
+    pub fn get_node_value(&'ast self, node: &Node) -> Result<&'ast str, InterpreterError> {
+        node.utf8_text(self.source_code)
+            .or_else(|e| Err(InterpreterError::from_utf8_error(&e, node)))
+    }
+
+    pub fn fold_procs_into_par<I>(&'ast self, procs: &'ast [Proc], positions: I) -> &'ast Proc
+    where
+        I: IntoIterator<Item = SourcePosition>,
+    {
+        fn ann<'a>(
+            proc: &'a Proc,
+            pos_stream: &mut dyn Iterator<Item = SourcePosition>,
+        ) -> AnnProc<'a> {
+            proc.annotate(pos_stream.next().unwrap())
+        }
+
+        let mut eternal_positions = positions
+            .into_iter()
+            .chain(std::iter::repeat(SourcePosition::default()));
+        match procs.len() {
+            0 => &NIL,
+            1 => panic!("Impossible to form a par from a single process"),
+            _ => {
+                let init = self.alloc_par(
+                    ann(&procs[0], &mut eternal_positions),
+                    ann(&procs[1], &mut eternal_positions),
+                );
+                (&procs[2..]).iter().fold(init, |acc, proc| {
+                    self.alloc_par(
+                        ann(acc, &mut eternal_positions),
+                        ann(proc, &mut eternal_positions),
+                    )
+                })
+            }
+        }
+    }
+}
+
+pub const NIL: Proc = Proc::Nil;
+pub const GTRUE: Proc = Proc::BoolLiteral(true);
+pub const GFALSE: Proc = Proc::BoolLiteral(false);
+pub const WILD: Proc = Proc::ProcVar(Var::Wildcard);
+pub const NAME_WILD: Name = Name::ProcVar(Var::Wildcard);
+pub const TYPE_URI: Proc = Proc::SimpleType(SimpleType::Uri);
+pub const TYPE_STRING: Proc = Proc::SimpleType(SimpleType::String);
+pub const TYPE_INT: Proc = Proc::SimpleType(SimpleType::Int);
+pub const TYPE_BOOL: Proc = Proc::SimpleType(SimpleType::Bool);
+pub const TYPE_BYTEA: Proc = Proc::SimpleType(SimpleType::ByteArray);

@@ -1,69 +1,84 @@
-use super::exports::*;
+use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct BoundMapChain<T> {
-    pub(crate) chain: Vec<BoundMap<T>>,
+use smallvec::SmallVec;
+
+use super::{bound_map::BoundContext, exports::*};
+
+#[derive(Debug)]
+pub struct BoundMapChain {
+    chain: SmallVec<[BoundMap; 1]>,
 }
 
-impl<T: Clone> BoundMapChain<T> {
+impl BoundMapChain {
     pub fn new() -> Self {
         BoundMapChain {
-            chain: vec![BoundMap::new()],
+            chain: SmallVec::from_buf([BoundMap::new()]),
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<BoundContext<T>> {
-        self.chain.first().and_then(|map| map.get(name))
-    }
-
-    pub fn find(&self, name: &str) -> Option<(BoundContext<T>, usize)> {
+    pub fn find(&self, name: &str) -> Option<((u32, &Context<BoundContext>), u32)> {
         self.chain
             .iter()
+            .rev()
             .enumerate()
-            .find_map(|(depth, map)| map.get(name).map(|context| (context, depth)))
+            .find_map(|(depth, map)| map.get(name).map(|context| (context, depth as u32)))
     }
 
-    pub fn put(&self, binding: IdContext<T>) -> BoundMapChain<T> {
-        let mut new_chain = self.chain.clone();
-        if let Some(map) = new_chain.first_mut() {
-            new_chain[0] = map.put(binding);
-        }
-        BoundMapChain { chain: new_chain }
+    pub fn push(&mut self) {
+        self.chain.push(BoundMap::new());
     }
 
-    pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> BoundMapChain<T> {
-        let mut new_chain = self.chain.clone();
-        if let Some(map) = new_chain.first_mut() {
-            new_chain[0] = map.put_all(bindings);
-        }
-        BoundMapChain { chain: new_chain }
+    pub fn pop(&mut self) {
+        self.chain.pop().expect("BoundMapChain invariant");
     }
 
-    pub(crate) fn absorb_free(&self, free_map: FreeMap<T>) -> BoundMapChain<T> {
-        let mut new_chain = self.chain.clone();
-        if let Some(map) = new_chain.first_mut() {
-            new_chain[0] = map.absorb_free(free_map);
-        }
-        BoundMapChain { chain: new_chain }
+    #[inline]
+    pub fn descend<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(&mut Self) -> R,
+    {
+        self.push();
+        let r = f(self);
+        self.pop();
+
+        return r;
     }
 
-    pub fn push(&self) -> BoundMapChain<T> {
-        let mut new_chain = self.chain.clone();
-        new_chain.insert(0, BoundMap::new());
-        BoundMapChain { chain: new_chain }
+    pub(crate) fn depth(&self) -> u32 {
+        self.chain.len() as u32 - 1
     }
 
-    pub fn get_count(&self) -> usize {
-        self.chain.first().map_or(0, |map| map.get_count())
-    }
+    #[inline]
+    pub fn extend<F, R>(&mut self, free_map: FreeMap, mut f: F) -> R
+    where
+        F: FnMut(u32, &mut Self) -> R,
+    {
+        let bound_count = free_map.count_no_wildcards();
+        self.absorb_free(free_map);
 
-    pub(crate) fn depth(&self) -> usize {
-        self.chain.len() - 1
+        let r = f(bound_count, self);
+
+        self.shift(bound_count as usize);
+        return r;
     }
 }
 
-impl<T: Clone> Default for BoundMapChain<T> {
+impl Default for BoundMapChain {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Deref for BoundMapChain {
+    type Target = BoundMap;
+
+    fn deref(&self) -> &Self::Target {
+        self.chain.last().expect("BoundMapChain invariant")
+    }
+}
+
+impl DerefMut for BoundMapChain {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.chain.last_mut().expect("BoundMapChain invariant")
     }
 }

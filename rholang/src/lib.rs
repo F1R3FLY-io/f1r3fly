@@ -1180,3 +1180,7 @@ extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
         bootstrap_registry_internal(runtime).await;
     });
 }
+
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;

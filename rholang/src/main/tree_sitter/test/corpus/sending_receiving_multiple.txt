@@ -77,15 +77,16 @@ new chan, stdout(`rho:io:stdout`) in {
                     right: (long_literal)))))
             right: (input
               formals: (receipts
-                (repeated_bind
-                  names: (names
-                    (quote
-                      (var))
-                    (quote
-                      (var))
-                    (quote
-                      (var)))
-                  input: (var)))
+                (receipt
+                  (repeated_bind
+                    names: (names
+                      (quote
+                        (var))
+                      (quote
+                        (var))
+                      (quote
+                        (var)))
+                    input: (var))))
               proc: (block
                 body: (send
                   name: (var)
@@ -99,13 +100,14 @@ new chan, stdout(`rho:io:stdout`) in {
                         (var))))))))
           right: (input
             formals: (receipts
-              (repeated_bind
-                names: (names
-                  (quote
-                    (var))
-                  (quote
-                    (var)))
-                input: (var)))
+              (receipt
+                (repeated_bind
+                  names: (names
+                    (quote
+                      (var))
+                    (quote
+                      (var)))
+                  input: (var))))
             proc: (block
               body: (send
                 name: (var)
@@ -118,11 +120,12 @@ new chan, stdout(`rho:io:stdout`) in {
                       (var))))))))
         right: (input
           formals: (receipts
-            (repeated_bind
-              names: (names
-                (quote
-                  (var)))
-              input: (var)))
+            (receipt
+              (repeated_bind
+                names: (names
+                  (quote
+                    (var)))
+                input: (var))))
           proc: (block
             body: (send
               name: (var)

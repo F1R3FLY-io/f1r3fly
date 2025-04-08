@@ -1,191 +1,196 @@
-use super::exports::{FreeMap, InterpreterError, Proc, ProcVisitInputs, ProcVisitOutputs};
-use crate::rust::interpreter::{compiler::normalize::normalize_match_proc, util::prepend_expr};
-use models::rhoapi::{expr, EMatches, Expr, Par};
+use super::exports::{AnnProc, FreeMap, InterpreterError};
+use crate::rust::interpreter::{
+    compiler::{exports::BoundMapChain, normalize::normalize_match_proc},
+    normal_forms::{EMatchesBody, Expr, Par},
+};
 use std::collections::HashMap;
 
 pub fn normalize_p_matches(
-    left_proc: &Proc,
-    right_proc: &Proc,
-    input: ProcVisitInputs,
+    target: AnnProc,
+    pattern: AnnProc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    let left_result = normalize_match_proc(
-        left_proc,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: input.bound_map_chain.clone(),
-            free_map: input.free_map.clone(),
-        },
+) -> Result<(), InterpreterError> {
+    // In case of 'matches' expression the free variables from the pattern are thrown away and only
+    // the ones from the target are used. This is because the "target matches pattern" should have
+    // the same semantics as "match target { pattern => true ; _ => false} so free variables from
+    // pattern should not be visible at the top level
+
+    let mut target_par = Par::default();
+    normalize_match_proc(
+        target.proc,
+        &mut target_par,
+        free_map,
+        bound_map_chain,
         env,
+        target.pos,
     )?;
 
-    let right_result = normalize_match_proc(
-        right_proc,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: input.bound_map_chain.clone().push(),
-            free_map: FreeMap::default(),
-        },
-        env,
-    )?;
+    let mut pattern_par = Par::default();
 
-    let new_expr = Expr {
-        expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-            target: Some(left_result.par.clone()),
-            pattern: Some(right_result.par.clone()),
-        })),
-    };
+    let depth = bound_map_chain.depth();
+    bound_map_chain.descend(|bound_map| {
+        let mut temp_free_map = FreeMap::new();
 
-    let prepend_par = prepend_expr(input.par, new_expr, input.bound_map_chain.depth() as i32);
+        normalize_match_proc(
+            pattern.proc,
+            &mut pattern_par,
+            &mut temp_free_map,
+            bound_map,
+            env,
+            pattern.pos,
+        )
+    })?;
 
-    Ok(ProcVisitOutputs {
-        par: prepend_par,
-        free_map: left_result.free_map,
-    })
+    input_par.push_expr(
+        Expr::EMatches(EMatchesBody {
+            pattern: pattern_par,
+            target: target_par,
+        }),
+        depth,
+    );
+
+    Ok(())
 }
 
 //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-    use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
-    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance::ConnNotBody;
+    use crate::rust::interpreter::compiler::normalizer::processes::exports::SourcePosition;
+    use crate::rust::interpreter::compiler::rholang_ast::{Proc, WILD};
+    use crate::rust::interpreter::normal_forms::{Connective, EMatchesBody, Expr, Par};
+    use crate::rust::interpreter::test_utils::utils::{defaults, test, test_normalize_match_proc};
 
-    use crate::rust::interpreter::util::prepend_expr;
-    use models::rhoapi::{expr, Connective, EMatches, Expr, Par};
-    use models::rust::utils::{new_gint_par, new_wildcard_par};
     use pretty_assertions::assert_eq;
 
-    //1 matches _
+    // 1 matches _
     #[test]
     fn p_matches_should_normalize_one_matches_wildcard() {
-        let (inputs, env) = proc_visit_inputs_and_env();
+        let _1 = Proc::LongLiteral(1);
+
         let proc = Proc::Matches {
-            left: Box::new(Proc::new_proc_int(1)),
-            right: Box::new(Proc::new_proc_wildcard()),
-            line_num: 0,
-            col_num: 0,
+            target: _1.annotate(SourcePosition { row: 0, column: 0 }),
+            pattern: WILD.annotate(SourcePosition { row: 0, column: 10 }),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to normalize '1 matches _'", |actual_result, _| {
+                let expected_result = Par {
+                    exprs: vec![Expr::EMatches(EMatchesBody {
+                        target: Par::gint(1),
+                        pattern: Par::wild(),
+                    })],
+                    ..Default::default()
+                };
 
-        let expected_par = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-                    target: Some(new_gint_par(1, Vec::new(), false)),
-                    pattern: Some(new_wildcard_par(Vec::new(), true)),
-                })),
-            },
-            0,
+                assert_eq!(actual_result, &expected_result);
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_par);
-        assert_eq!(result.unwrap().par.connective_used, false);
     }
 
-    //1 matches 2
+    // 1 matches 2
     #[test]
     fn p_matches_should_normalize_correctly_one_matches_two() {
-        let (inputs, env) = proc_visit_inputs_and_env();
+        let _1 = Proc::LongLiteral(1);
+        let _2 = Proc::LongLiteral(2);
+
         let proc = Proc::Matches {
-            left: Box::new(Proc::new_proc_int(1)),
-            right: Box::new(Proc::new_proc_int(2)),
-            line_num: 0,
-            col_num: 0,
+            target: _1.annotate(SourcePosition { row: 0, column: 0 }),
+            pattern: _2.annotate(SourcePosition { row: 0, column: 10 }),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test(
+                "expected to normalize correctly '1 matches 2'",
+                |actual_result, _| {
+                    let expected_result = Par {
+                        exprs: vec![Expr::EMatches(EMatchesBody {
+                            target: Par::gint(1),
+                            pattern: Par::gint(2),
+                        })],
+                        ..Default::default()
+                    };
 
-        let expected_par = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-                    target: Some(new_gint_par(1, Vec::new(), false)),
-                    pattern: Some(new_gint_par(2, Vec::new(), false)),
-                })),
-            },
-            0,
+                    assert_eq!(actual_result, &expected_result);
+                },
+            ),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_par);
-        assert_eq!(result.unwrap().par.connective_used, false);
     }
 
-    //1 matches ~1
+    // 1 matches ~1
     #[test]
     fn p_matches_should_normalize_one_matches_tilda_with_connective_used_false() {
-        let (inputs, env) = proc_visit_inputs_and_env();
+        let _1 = Proc::LongLiteral(1);
+        let neg_1 = Proc::Negation(&_1);
+
         let proc = Proc::Matches {
-            left: Box::new(Proc::new_proc_int(1)),
-            right: Box::new(Negation::new_negation_int(1)),
-            line_num: 0,
-            col_num: 0,
+            target: _1.annotate(SourcePosition { row: 0, column: 0 }),
+            pattern: neg_1.annotate(SourcePosition { row: 0, column: 10 }),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test(
+                "expected to normalize '1 matches ~1'",
+                |actual_result, _| {
+                    let expected_result = Par {
+                        exprs: vec![Expr::EMatches(EMatchesBody {
+                            target: Par::gint(1),
+                            pattern: Par {
+                                connectives: vec![Connective::ConnNot(Par::gint(1))],
+                                connective_used: true,
+                                ..Default::default()
+                            },
+                        })],
+                        ..Default::default()
+                    };
 
-        let expected_par = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-                    target: Some(new_gint_par(1, Vec::new(), false)),
-                    pattern: Some(Par {
-                        connectives: vec![Connective {
-                            connective_instance: Some(ConnNotBody(new_gint_par(
-                                1,
-                                Vec::new(),
-                                false,
-                            ))),
-                        }],
-                        connective_used: true,
-                        ..Par::default().clone()
-                    }),
-                })),
-            },
-            0,
+                    assert_eq!(actual_result, &expected_result);
+                },
+            ),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_par);
-        assert_eq!(result.unwrap().par.connective_used, false);
     }
 
-    //~1 matches 1
+    // ~1 matches 1
     #[test]
     fn p_matches_should_normalize_tilda_one_matches_one_with_connective_used_true() {
-        let (inputs, env) = proc_visit_inputs_and_env();
+        let _1 = Proc::LongLiteral(1);
+        let neg_1 = Proc::Negation(&_1);
+
         let proc = Proc::Matches {
-            left: Box::new(Negation::new_negation_int(1)),
-            right: Box::new(Proc::new_proc_int(1)),
-            line_num: 0,
-            col_num: 0,
+            target: neg_1.annotate(SourcePosition { row: 0, column: 0 }),
+            pattern: _1.annotate(SourcePosition { row: 0, column: 10 }),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-
-        let expected_par = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EMatchesBody(EMatches {
-                    target: Some(Par {
-                        connectives: vec![Connective {
-                            connective_instance: Some(ConnNotBody(new_gint_par(
-                                1,
-                                Vec::new(),
-                                false,
-                            ))),
-                        }],
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test(
+                "expected to normalize '~1 matches 1'",
+                |actual_result, _| {
+                    let expected_result = Par {
+                        exprs: vec![Expr::EMatches(EMatchesBody {
+                            pattern: Par::gint(1),
+                            target: Par {
+                                connectives: vec![Connective::ConnNot(Par::gint(1))],
+                                connective_used: true,
+                                ..Default::default()
+                            },
+                        })],
                         connective_used: true,
-                        ..Par::default().clone()
-                    }),
-                    pattern: Some(new_gint_par(1, Vec::new(), false)),
-                })),
-            },
-            0,
-        );
+                        ..Default::default()
+                    };
 
-        assert_eq!(result.clone().unwrap().par, expected_par);
-        assert_eq!(result.unwrap().par.connective_used, true)
+                    assert_eq!(actual_result, &expected_result);
+                },
+            ),
+        );
     }
 }

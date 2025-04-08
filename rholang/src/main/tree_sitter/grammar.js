@@ -89,7 +89,7 @@ module.exports = grammar({
             '(', field('formals', $.receipts), ')',
             field('proc', $.block)
         )),
-        receipts: $ => semiSep1($._receipt),
+        receipts: $ => semiSep1($.receipt),
 
         send: $ => prec(3, seq(
             field('name', $.name),
@@ -221,8 +221,8 @@ module.exports = grammar({
             field('input', $.name)
         ),
 
-        _receipt: $ => choice(
-            conc1($.linear_bind),
+        receipt: $ => choice(
+            conc1($.linear_bind, $.join),
             conc1($.repeated_bind),
             conc1($.peek_bind)),
 
@@ -246,9 +246,9 @@ module.exports = grammar({
 
         // Literals
         bool_literal: $ => choice('true', 'false'),
-        long_literal: $ => token(/\d+/),
-        string_literal: $ => token(/"[^"\\]*(\\.[^"\\]*)*"/),
-        uri_literal: $ => token(/`([^\\`]|\\.)*`/),
+        long_literal: $ => token(/-?\d+/),
+        string_literal: $ => token(/"([^"\\]|(\\.))*"/),
+        uri_literal: $ => token(/`([^`\\]|(\\.))*`/),
 
         // Simple types
         simple_type: $ => choice('Bool', 'Int', 'String', 'Uri', 'ByteArray'),
@@ -291,7 +291,7 @@ module.exports = grammar({
         ),
 
         _proc_list: $ => seq('(', commaSep($._proc), ')'),
-        var: $ => token(/((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\')+))/),
+        var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),
 
         _line_comment: $ => token(seq('//', /[^\n]*/)),
         _block_comment: $ => token(seq(

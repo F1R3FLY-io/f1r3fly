@@ -1,4 +1,5 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "rholang",
   "word": "var",
   "rules": {
@@ -529,7 +530,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "_receipt"
+          "name": "receipt"
         },
         {
           "type": "REPEAT",
@@ -542,7 +543,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "_receipt"
+                "name": "receipt"
               }
             ]
           }
@@ -1900,7 +1901,7 @@
         }
       ]
     },
-    "_receipt": {
+    "receipt": {
       "type": "CHOICE",
       "members": [
         {
@@ -2204,21 +2205,21 @@
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\\d+"
+        "value": "-?\\d+"
       }
     },
     "string_literal": {
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\""
+        "value": "\"([^\"\\\\]|(\\\\.))*\""
       }
     },
     "uri_literal": {
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "`([^\\\\`]|\\\\.)*`"
+        "value": "`([^`\\\\]|(\\\\.))*`"
       }
     },
     "simple_type": {
@@ -2665,7 +2666,7 @@
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "((([a-zA-Z]|')|'_')([a-zA-Z]|[0-9]|'_'|'\\')*)|(((_)([a-zA-Z]|[0-9]|'_'|'\\')+))"
+        "value": "[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+"
       }
     },
     "_line_comment": {
@@ -2733,5 +2734,6 @@
     "_source",
     "_proc_var",
     "_ground"
-  ]
+  ],
+  "reserved": {}
 }

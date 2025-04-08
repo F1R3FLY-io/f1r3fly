@@ -1,170 +1,101 @@
 use super::exports::*;
+use crate::rust::interpreter::compiler::exports::BoundMapChain;
 use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-use crate::rust::interpreter::compiler::rholang_ast::{Block, BundleType};
-use crate::rust::interpreter::util::prepend_bundle;
-use models::rhoapi::{Bundle, Par};
-use models::rust::bundle_ops::BundleOps;
+use crate::rust::interpreter::compiler::rholang_ast::{BundleFlags, BundleType};
+use crate::rust::interpreter::normal_forms::{Bundle, Par};
 use std::collections::HashMap;
 use std::result::Result;
 
-pub fn normalize_p_bundle(
-    bundle_type: &BundleType,
-    block: &Box<Block>,
-    input: ProcVisitInputs,
-    line_num: usize,
-    column_num: usize,
+pub fn normalize_p_bundle<'region>(
+    block: &Proc,
+    bundle_type: BundleType,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    fn error(target_result: ProcVisitOutputs) -> Result<ProcVisitOutputs, InterpreterError> {
-        let err_msg = {
-            let at = |variable: &str, source_position: &SourcePosition| {
-                format!(
-                    "{} at line {}, column {}",
-                    variable, source_position.row, source_position.column
-                )
-            };
+    pos: SourcePosition,
+) -> Result<(), InterpreterError> {
+    let mut target_par = Par::default();
+    normalize_match_proc(block, &mut target_par, free_map, bound_map_chain, env, pos)?;
 
-            let wildcards_positions: Vec<String> = target_result
-                .free_map
-                .wildcards
-                .iter()
-                .map(|pos| at("", pos))
-                .collect();
-
-            let free_vars_positions: Vec<String> = target_result
-                .free_map
-                .level_bindings
-                .iter()
-                .map(|(name, context)| at(&format!("`{}`", name), &context.source_position))
-                .collect();
-
-            let err_msg_wildcards = if !wildcards_positions.is_empty() {
-                format!(" Wildcards positions: {}", wildcards_positions.join(", "))
-            } else {
-                String::new()
-            };
-
-            let err_msg_free_vars = if !free_vars_positions.is_empty() {
-                format!(
-                    " Free variables positions: {}",
-                    free_vars_positions.join(", ")
-                )
-            } else {
-                String::new()
-            };
-
-            format!(
-                "Bundle's content must not have free variables or wildcards.{}{}",
-                err_msg_wildcards, err_msg_free_vars
-            )
-        };
-
-        Err(InterpreterError::UnexpectedBundleContent(format!(
-            "Bundle's content must not have free variables or wildcards. {}",
-            err_msg
-        )))
-    }
-    let target_result = normalize_match_proc(
-        &block.proc,
-        ProcVisitInputs {
-            par: Par::default(),
-            ..input.clone()
-        },
-        env,
-    )?;
-    // println!("\ntarget_result: {:?}", target_result);
-
-    let outermost_bundle = match bundle_type {
-        BundleType::BundleReadWrite { .. } => Bundle {
-            body: Some(target_result.par.clone()),
-            write_flag: true,
-            read_flag: true,
-        },
-        BundleType::BundleRead { .. } => Bundle {
-            body: Some(target_result.par.clone()),
-            write_flag: false,
-            read_flag: true,
-        },
-        BundleType::BundleWrite { .. } => Bundle {
-            body: Some(target_result.par.clone()),
-            write_flag: true,
-            read_flag: false,
-        },
-        BundleType::BundleEquiv { .. } => Bundle {
-            body: Some(target_result.par.clone()),
-            write_flag: false,
-            read_flag: false,
-        },
-    };
-
-    let res = if !target_result.clone().par.connectives.is_empty() {
-        Err(InterpreterError::UnexpectedBundleContent(format!(
-            "Illegal top-level connective in bundle at line {}, column {}.",
-            line_num, column_num
-        )))
-    } else if !target_result.clone().free_map.wildcards.is_empty()
-        || !target_result.free_map.level_bindings.is_empty()
-    {
-        error(target_result)
-    } else {
-        let new_bundle = match target_result.par.single_bundle() {
-            Some(single) => BundleOps::merge(&outermost_bundle, &single),
-            None => outermost_bundle,
-        };
-
-        Ok(ProcVisitOutputs {
-            par: {
-                let updated_bundle = prepend_bundle(input.par.clone(), new_bundle);
-                updated_bundle
-            },
-            free_map: input.free_map.clone(),
+    if !target_par.connectives.is_empty() {
+        Err(InterpreterError::TopLevelConnectiveInBundle(pos))
+    } else if free_map.has_wildcards() || !free_map.is_empty() {
+        Err(InterpreterError::UnexpectedBundleContent {
+            wildcards: free_map.iter_wildcards().collect(),
+            free_vars: free_map.iter_free_vars().collect(),
         })
-    };
+    } else {
+        let this_flags: BundleFlags = bundle_type.into();
+        let bundle = if let Some(inner) = target_par.single_bundle_mut() {
+            inner.read_flag = inner.read_flag && this_flags.read_flag;
+            inner.write_flag = inner.write_flag && this_flags.write_flag;
+            target_par.cast_to_bundle()
+        } else {
+            Bundle {
+                body: target_par,
+                write_flag: this_flags.write_flag,
+                read_flag: this_flags.read_flag,
+            }
+        };
+        input_par.push_bundle(bundle);
 
-    res
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::rust::interpreter::compiler::normalize::{
-        normalize_match_proc, ProcVisitInputs, VarSort,
-    };
     use crate::rust::interpreter::compiler::rholang_ast::{
-        Block, BundleType, Name, Proc, ProcList, SendType, SimpleType,
+        BundleFlags, BundleType, Id, Proc, SendType, NIL, TYPE_URI, WILD,
     };
-    use crate::rust::interpreter::errors::InterpreterError;
-    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_with_updated_bound_map_chain;
-    use models::create_bit_vector;
-    use models::rhoapi::{Bundle, Par};
-    use models::rust::utils::new_boundvar_par;
+    use crate::rust::interpreter::normal_forms::*;
+    use crate::rust::interpreter::test_utils::utils::{
+        defaults, test, test_normalize_match_proc, with_bindings,
+    };
+    use bitvec::{bitvec, order::Lsb0};
     use pretty_assertions::assert_eq;
 
+    use super::SourcePosition;
+
+    /** Example:
+     * bundle { x }
+     */
     #[test]
     fn p_bundle_should_normalize_terms_inside() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let proc = Proc::Bundle {
-            bundle_type: BundleType::new_bundle_read_write(),
-            proc: Box::new(Block::new(Proc::new_proc_var("x"))),
-            line_num: 0,
-            col_num: 0,
+        let x = Id {
+            name: "x",
+            pos: SourcePosition { row: 0, column: 9 },
         };
-        let bound_inputs =
-            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
-        // println!("\nbound_inputs: {:?}", bound_inputs);
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
-        // println!("\nresult: {:?}", result);
-        let expected_result = inputs
-            .par
-            .with_bundles(vec![Bundle {
-                body: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                write_flag: true,
-                read_flag: true,
-            }])
-            .with_locally_free(create_bit_vector(&vec![0]));
+        let proc_x = x.as_proc();
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::BundleReadWrite,
+            proc: &proc_x,
+        };
 
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.clone().unwrap().free_map, bound_inputs.free_map);
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bindings| {
+                bindings.put_id_as_proc(&x);
+            }),
+            test(
+                "expected to normalize terms inside the bundle",
+                |actual_par, free_map| {
+                    let expected_par = Par {
+                        bundles: vec![Bundle {
+                            body: Par::bound_var(0),
+                            read_flag: true,
+                            write_flag: true,
+                        }],
+                        locally_free: bitvec![1],
+                        ..Default::default()
+                    };
+
+                    assert!(free_map.is_empty());
+                    assert_eq!(actual_par, &expected_par);
+                },
+            ),
+        );
     }
 
     /** Example:
@@ -173,18 +104,19 @@ mod tests {
     #[test]
     fn p_bundle_should_throw_an_error_when_wildcard_or_free_variable_is_found_inside_body_of_bundle(
     ) {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let proc = Proc::Bundle {
-            bundle_type: BundleType::new_bundle_read_write(),
-            proc: Box::new(Block::new(Proc::new_proc_par_with_wildcard_and_var("x"))),
-            line_num: 0,
-            col_num: 0,
+        let x = Proc::new_var("x", SourcePosition { row: 0, column: 13 });
+        let par_with_wildcard_and_var = Proc::Par {
+            left: WILD.annotate(SourcePosition { row: 0, column: 9 }),
+            right: x.annotate(SourcePosition { row: 0, column: 13 }),
         };
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        assert!(matches!(
-            result,
-            Err(InterpreterError::UnexpectedBundleContent { .. })
-        ));
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::BundleReadWrite,
+            proc: &par_with_wildcard_and_var,
+        };
+
+        test_normalize_match_proc(&proc, defaults(), |result| {
+            result.expect_err("expected to throw an error when wildcard or a free variable is found inside the body of the bundle");
+        })
     }
 
     /** Example:
@@ -192,19 +124,14 @@ mod tests {
      */
     #[test]
     fn p_bundle_should_throw_an_error_when_connective_is_used_at_top_level_of_body_of_bundle() {
-        let (inputs, env) = proc_visit_inputs_and_env();
         let proc = Proc::Bundle {
-            bundle_type: BundleType::new_bundle_read_write(),
-            proc: Box::new(Block::new(Proc::SimpleType(SimpleType::new_uri()))),
-            line_num: 0,
-            col_num: 0,
+            bundle_type: BundleType::BundleReadWrite,
+            proc: &TYPE_URI,
         };
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
 
-        assert!(matches!(
-            result,
-            Err(InterpreterError::UnexpectedBundleContent { .. })
-        ));
+        test_normalize_match_proc(&proc, defaults(), |result| {
+            result.expect_err("expected to throw an error when a connective is used at the top level of the body of the bundle");
+        })
     }
 
     /** Example:
@@ -213,119 +140,103 @@ mod tests {
     #[test]
     fn p_bundle_should_not_throw_an_error_when_connective_is_used_outside_of_top_level_of_body_of_bundle(
     ) {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        let proc = Proc::Bundle {
-            bundle_type: BundleType::new_bundle_read_write(),
-            proc: Box::new(Block::new(Proc::Send {
-                name: Name::new_name_quote_nil(),
-                send_type: SendType::new_single(),
-                inputs: ProcList::new(vec![Proc::SimpleType(SimpleType::new_uri())]),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
+        let send = Proc::Send {
+            name: NIL.quoted(),
+            send_type: SendType::Single,
+            inputs: vec![TYPE_URI.annotate(SourcePosition { row: 0, column: 15 })],
         };
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        let proc = Proc::Bundle {
+            bundle_type: BundleType::BundleReadWrite,
+            proc: &send,
+        };
 
-        assert!(result.is_ok());
+        test_normalize_match_proc(&proc, defaults(), |result| {
+            result.expect("expected not to throw an error when a connective is used outside of the top level of the body of the bundle");
+        })
     }
 
     #[test]
     fn p_bundle_should_interpret_bundle_polarization() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        pub fn new_bundle(proc: Proc, read_only: bool, write_only: bool) -> Proc {
-            let bundle_type = match (read_only, write_only) {
-                (true, true) => BundleType::new_bundle_read_write(),
-                (true, false) => BundleType::new_bundle_read(),
-                (false, true) => BundleType::new_bundle_write(),
-                (false, false) => BundleType::new_bundle_equiv(),
+        let x = Id {
+            name: "x",
+            pos: SourcePosition { row: 0, column: 9 },
+        };
+        let proc_x = x.as_proc();
+        for bundle_type in vec![
+            BundleType::BundleReadWrite,
+            BundleType::BundleRead,
+            BundleType::BundleWrite,
+            BundleType::BundleEquiv,
+        ] {
+            let flags: BundleFlags = bundle_type.into();
+            let new_bundle = Proc::Bundle {
+                bundle_type,
+                proc: &proc_x,
             };
 
-            Proc::Bundle {
-                bundle_type,
-                proc: Box::new(Block::new(proc)),
-                line_num: 0,
-                col_num: 0,
-            }
-        }
+            test_normalize_match_proc(
+                &new_bundle,
+                with_bindings(|bindings| {
+                    bindings.put_id_as_proc(&x);
+                }),
+                |actual_result| {
+                    let (actual_par, _) =
+                        actual_result.expect("expected to interpret bundle polarization");
 
-        let proc = Proc::new_proc_var("x");
-        let bound_inputs =
-            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
+                    let expected_par = Par {
+                        bundles: vec![Bundle {
+                            body: Par::bound_var(0),
+                            read_flag: flags.read_flag,
+                            write_flag: flags.write_flag,
+                        }],
+                        locally_free: bitvec![1],
+                        ..Default::default()
+                    };
 
-        fn expected_results(write_flag: bool, read_flag: bool, inputs: &ProcVisitInputs) -> Par {
-            inputs
-                .clone()
-                .par
-                .with_bundles(vec![Bundle {
-                    body: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                    write_flag,
-                    read_flag,
-                }])
-                .with_locally_free(create_bit_vector(&vec![0]))
-        }
-
-        let test = |read_only: bool, write_only: bool| {
-            // println!(
-            //     "Testing bundle with flags read_only={}, write_only={}",
-            //     read_only, write_only
-            // );
-            let bundle_proc = new_bundle(proc.clone(), read_only, write_only);
-            let result = normalize_match_proc(&bundle_proc, bound_inputs.clone(), &env);
-            let expected = expected_results(write_only, read_only, &bound_inputs);
-
-            assert_eq!(
-                result.clone().unwrap().par,
-                expected,
-                "Resulting `Par` did not match expected"
+                    assert_eq!(actual_par, &expected_par);
+                },
             );
-            assert_eq!(
-                result.unwrap().free_map,
-                inputs.free_map,
-                "Resulting `FreeMap` did not match expected"
-            );
-        };
-
-        test(true, true);
-        test(true, false);
-        test(false, true);
-        test(false, false);
+        }
     }
 
     #[test]
     fn p_bundle_should_collapse_nested_bundles_merging_their_polarizations() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        let proc = Proc::Bundle {
-            bundle_type: BundleType::new_bundle_read_write(),
-            proc: Box::new(Block::new(Proc::Bundle {
-                bundle_type: BundleType::new_bundle_read(),
-                proc: Box::new(Block::new(Proc::new_proc_var("x"))),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
+        let x = Id {
+            name: "x",
+            pos: SourcePosition { row: 0, column: 9 },
+        };
+        let proc_x = x.as_proc();
+        let inner_bundle = Proc::Bundle {
+            bundle_type: BundleType::BundleReadWrite,
+            proc: &proc_x,
+        };
+        let outer_bundle = Proc::Bundle {
+            bundle_type: BundleType::BundleRead,
+            proc: &inner_bundle,
         };
 
-        let bound_inputs =
-            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", VarSort::ProcSort);
+        test_normalize_match_proc(
+            &outer_bundle,
+            with_bindings(|bindings| {
+                bindings.put_id_as_proc(&x);
+            }),
+            test(
+                "expected to collapse nested bundles, merging their polarizations",
+                |actual_par, free_map| {
+                    let expected_par = Par {
+                        bundles: vec![Bundle {
+                            body: Par::bound_var(0),
+                            read_flag: true,
+                            write_flag: false,
+                        }],
+                        locally_free: bitvec![1],
+                        ..Default::default()
+                    };
 
-        let expected_result = inputs
-            .par
-            .with_bundles(vec![Bundle {
-                body: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                write_flag: false,
-                read_flag: true,
-            }])
-            .with_locally_free(create_bit_vector(&vec![0]));
-
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
+                    assert!(free_map.is_empty());
+                    assert_eq!(actual_par, &expected_par);
+                },
+            ),
+        );
     }
 }

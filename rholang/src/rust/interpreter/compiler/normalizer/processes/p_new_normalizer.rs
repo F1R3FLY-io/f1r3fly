@@ -1,362 +1,319 @@
-use crate::rust::interpreter::compiler::exports::{BoundMapChain, IdContext, SourcePosition};
-use crate::rust::interpreter::compiler::normalize::{
-    normalize_match_proc, ProcVisitInputs, ProcVisitOutputs, VarSort,
-};
-use crate::rust::interpreter::compiler::rholang_ast::{Decls, NameDecl, Proc};
+use bitvec::vec::BitVec;
+
+use crate::rust::interpreter::compiler::exports::{BoundMapChain, SourcePosition};
+use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
+use crate::rust::interpreter::compiler::rholang_ast::{NameDecl, Proc};
 use crate::rust::interpreter::errors::InterpreterError;
-use crate::rust::interpreter::util::filter_and_adjust_bitset;
-use crate::rust::interpreter::util::prepend_new;
-use models::rhoapi::{New, Par};
-use std::collections::{BTreeMap, HashMap};
+use crate::rust::interpreter::normal_forms::{adjust_bitset, New, Par};
+use std::collections::HashMap;
+
+use super::exports::FreeMap;
 
 pub fn normalize_p_new(
-    decls: &Decls,
-    proc: &Box<Proc>,
-    input: ProcVisitInputs,
+    decls: &[NameDecl],
+    body: &Proc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    // TODO: bindings within a single new shouldn't have overlapping names. - OLD
-    let new_tagged_bindings: Vec<(Option<String>, String, VarSort, usize, usize)> = decls
-        .decls
-        .iter()
-        .map(|decl| match decl {
-            NameDecl {
-                var,
-                uri: None,
-                line_num,
-                col_num,
-            } => Ok((
-                None,
-                var.name.clone(),
-                VarSort::NameSort,
-                *line_num,
-                *col_num,
-            )),
-            NameDecl {
-                var,
-                uri: Some(urn),
-                line_num,
-                col_num,
-            } => Ok((
-                Some(urn.value.clone()),
-                var.name.clone(),
-                VarSort::NameSort,
-                *line_num,
-                *col_num,
-            )),
-        })
-        .collect::<Result<Vec<_>, InterpreterError>>()?;
+    pos: SourcePosition,
+) -> Result<(), InterpreterError> {
+    let mut uris = Vec::new(); //no point to overallocate
+    for decl in decls {
+        if let Some(old_binding) = bound_map_chain.put_name(&decl.id, &decl.uri) {
+            return Err(InterpreterError::UnexpectedReuseOfNameContextFree {
+                var_name: decl.id.name.to_string(),
+                first_use: old_binding.source_position,
+                second_use: decl.id.pos,
+            });
+        }
 
-    // Sort bindings: None's first, then URI's lexicographically
-    let mut sorted_bindings: Vec<(Option<String>, String, VarSort, usize, usize)> =
-        new_tagged_bindings;
-    sorted_bindings.sort_by(|a, b| a.0.cmp(&b.0));
+        if let Some(ref uri) = decl.uri {
+            uris.push(uri.to_string());
+        }
+    }
+    let mut body_par = Par::default();
+    normalize_match_proc(body, &mut body_par, free_map, bound_map_chain, env, pos)?;
 
-    let new_bindings: Vec<IdContext<VarSort>> = sorted_bindings
-        .iter()
-        .map(|row| {
-            (
-                row.1.clone(),
-                row.2.clone(),
-                SourcePosition::new(row.3, row.4),
-            )
-        })
-        .collect();
-
-    let uris: Vec<String> = sorted_bindings
-        .iter()
-        .filter_map(|row| row.0.clone())
-        .collect();
-
-    let new_env: BoundMapChain<VarSort> = input.bound_map_chain.put_all(new_bindings);
-    let new_count: usize = new_env.get_count() - input.bound_map_chain.get_count();
-
-    let body_result = normalize_match_proc(
-        &proc,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: new_env.clone(),
-            free_map: input.free_map.clone(),
-        },
-        env,
-    )?;
-
-    //we should build btree_map with real values, not a copied references from env: ref &HashMap
-    let btree_map: BTreeMap<String, Par> =
-        env.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-
+    let new_count = decls.len();
+    let locally_free = BitVec::from_bitslice(adjust_bitset(&body_par.locally_free, new_count));
     let result_new = New {
-        bind_count: new_count as i32,
-        p: Some(body_result.par.clone()),
-        uri: uris,
-        injections: btree_map,
-        locally_free: filter_and_adjust_bitset(body_result.par.clone().locally_free, new_count),
+        bind_count: new_count as u32,
+        p: body_par,
+        uris,
+        locally_free,
     };
 
-    Ok(ProcVisitOutputs {
-        par: prepend_new(input.par.clone(), result_new),
-        free_map: body_result.free_map.clone(),
-    })
+    input_par.push_new(result_new);
+    bound_map_chain.shift(new_count);
+
+    Ok(())
 }
 
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
-    use models::{
-        create_bit_vector,
-        rhoapi::{New, Par},
-        rust::utils::{new_boundvar_par, new_gint_par, new_send},
-    };
+    use bitvec::{bitvec, order::Lsb0, vec::BitVec};
+    use pretty_assertions::assert_eq;
 
     use crate::rust::interpreter::{
         compiler::{
-            normalize::normalize_match_proc,
-            rholang_ast::{Decls, Name, NameDecl, Proc, ProcList, SendType},
+            exports::SourcePosition,
+            rholang_ast::{ASTBuilder, Id, Name, NameDecl, Proc, SendType},
         },
-        test_utils::utils::proc_visit_inputs_and_env,
-        util::prepend_new,
+        normal_forms::{New, Par, Send},
+        test_utils::utils::*,
     };
 
     #[test]
     fn p_new_should_bind_new_variables() {
+        /* Example:
+        new x, y, z in {
+            z ! 9 | y ! 8 | x ! 7
+        }
+        */
+        let x = Id {
+            name: "x",
+            pos: SourcePosition { row: 0, column: 4 },
+        };
+        let y = Id {
+            name: "y",
+            pos: SourcePosition { row: 0, column: 7 },
+        };
+        let z = Id {
+            name: "z",
+            pos: SourcePosition { row: 0, column: 10 },
+        };
+        let _9 = Proc::LongLiteral(9);
+        let z_send_9 = Proc::Send {
+            name: Name::declare("z"),
+            send_type: SendType::Single,
+            inputs: vec![_9.annotate(SourcePosition { row: 1, column: 8 })],
+        };
+        let _8 = Proc::LongLiteral(8);
+        let y_send_8 = Proc::Send {
+            name: Name::declare("y"),
+            send_type: SendType::Single,
+            inputs: vec![_8.annotate(SourcePosition { row: 1, column: 16 })],
+        };
+        let _7 = Proc::LongLiteral(7);
+        let x_send_7 = Proc::Send {
+            name: Name::declare("x"),
+            send_type: SendType::Single,
+            inputs: vec![_7.annotate(SourcePosition { row: 1, column: 24 })],
+        };
+        let ppar_1 = Proc::Par {
+            left: z_send_9.annotate(SourcePosition { row: 1, column: 4 }),
+            right: y_send_8.annotate(SourcePosition { row: 1, column: 12 }),
+        };
+        let ppar = Proc::Par {
+            left: ppar_1.annotate(SourcePosition { row: 1, column: 10 }),
+            right: x_send_7.annotate(SourcePosition { row: 1, column: 20 }),
+        };
         let p_new = Proc::New {
-            decls: Decls {
-                decls: vec![
-                    NameDecl::new("x", None),
-                    NameDecl::new("y", None),
-                    NameDecl::new("z", None),
-                ],
-                line_num: 0,
-                col_num: 0,
-            },
-            proc: Box::new(Proc::Par {
-                left: Box::new(Proc::Par {
-                    left: Box::new(Proc::Send {
-                        name: Name::new_name_var("x"),
-                        send_type: SendType::new_single(),
-                        inputs: ProcList::new(vec![Proc::new_proc_int(7)]),
-                        line_num: 0,
-                        col_num: 0,
-                    }),
-                    right: Box::new(Proc::Send {
-                        name: Name::new_name_var("y"),
-                        send_type: SendType::new_single(),
-                        inputs: ProcList::new(vec![Proc::new_proc_int(8)]),
-                        line_num: 0,
-                        col_num: 0,
-                    }),
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                right: Box::new(Proc::Send {
-                    name: Name::new_name_var("z"),
-                    send_type: SendType::new_single(),
-                    inputs: ProcList::new(vec![Proc::new_proc_int(9)]),
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
+            decls: vec![
+                NameDecl { id: x, uri: None },
+                NameDecl { id: y, uri: None },
+                NameDecl { id: z, uri: None },
+            ],
+            proc: &ppar,
         };
 
-        let result = normalize_match_proc(
+        test_normalize_match_proc(
             &p_new,
-            proc_visit_inputs_and_env().0,
-            &proc_visit_inputs_and_env().1,
-        );
-        assert!(result.is_ok());
+            defaults(),
+            test("expected to bind new variables", |actual_par, free_map| {
+                let expected_par = Par {
+                    news: vec![New {
+                        bind_count: 3,
+                        p: Par {
+                            sends: vec![
+                                Send {
+                                    chan: Par::bound_var(2),
+                                    data: vec![Par::gint(9)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 0, 1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(1),
+                                    data: vec![Par::gint(8)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(0),
+                                    data: vec![Par::gint(7)],
+                                    persistent: false,
+                                    locally_free: bitvec![1],
+                                    connective_used: false,
+                                },
+                            ],
+                            locally_free: bitvec![1, 1, 1],
+                            ..Default::default()
+                        },
+                        uris: Vec::new(),
+                        locally_free: BitVec::EMPTY,
+                    }],
+                    locally_free: bitvec![1, 1, 1],
+                    ..Default::default()
+                };
 
-        let expected_result = prepend_new(
-            Par::default(),
-            New {
-                bind_count: 3,
-                p: Some(
-                    Par::default()
-                        .prepend_send(new_send(
-                            new_boundvar_par(2, create_bit_vector(&vec![2]), false),
-                            vec![new_gint_par(7, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![2]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(1, create_bit_vector(&vec![1]), false),
-                            vec![new_gint_par(8, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![1]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(0, create_bit_vector(&vec![0]), false),
-                            vec![new_gint_par(9, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![0]),
-                            false,
-                        )),
-                ),
-                uri: Vec::new(),
-                injections: BTreeMap::new(),
-                locally_free: Vec::new(),
-            },
+                assert_eq!(actual_par, &expected_par);
+                assert!(free_map.is_empty());
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(
-            result.unwrap().free_map,
-            proc_visit_inputs_and_env().0.free_map
-        )
     }
 
     #[test]
     fn p_new_should_sort_uris_and_place_them_at_the_end() {
+        /* Example:
+        new x, y, r(`rho:registry`), out(`rho:stdout`), z in {
+            x ! 7 | y ! 8 | r ! 9 | out ! 10 | z ! 11
+        }
+        */
+        let x = Id {
+            name: "x",
+            pos: SourcePosition { row: 0, column: 4 },
+        };
+        let y = Id {
+            name: "y",
+            pos: SourcePosition { row: 0, column: 7 },
+        };
+        let r = Id {
+            name: "r",
+            pos: SourcePosition { row: 0, column: 10 },
+        };
+        let out = Id {
+            name: "out",
+            pos: SourcePosition { row: 0, column: 29 },
+        };
+        let z = Id {
+            name: "z",
+            pos: SourcePosition { row: 0, column: 48 },
+        };
+        let _7 = Proc::LongLiteral(7);
+        let x_send_7 = Proc::Send {
+            name: Name::declare("x"),
+            send_type: SendType::Single,
+            inputs: vec![_7.annotate(SourcePosition { row: 1, column: 8 })],
+        };
+        let _8 = Proc::LongLiteral(8);
+        let y_send_8 = Proc::Send {
+            name: Name::declare("y"),
+            send_type: SendType::Single,
+            inputs: vec![_8.annotate(SourcePosition { row: 1, column: 16 })],
+        };
+        let _9 = Proc::LongLiteral(9);
+        let r_send_9 = Proc::Send {
+            name: Name::declare("r"),
+            send_type: SendType::Single,
+            inputs: vec![_9.annotate(SourcePosition { row: 1, column: 24 })],
+        };
+        let _10 = Proc::LongLiteral(10);
+        let out_send_10 = Proc::Send {
+            name: Name::declare("out"),
+            send_type: SendType::Single,
+            inputs: vec![_10.annotate(SourcePosition { row: 1, column: 34 })],
+        };
+        let _11 = Proc::LongLiteral(11);
+        let z_send_11 = Proc::Send {
+            name: Name::declare("z"),
+            send_type: SendType::Single,
+            inputs: vec![_11.annotate(SourcePosition { row: 1, column: 43 })],
+        };
+        let procs = vec![x_send_7, y_send_8, r_send_9, out_send_10, z_send_11];
+        let builder = ASTBuilder::with_capacity(4);
+        let ppar = builder.fold_procs_into_par(
+            &procs,
+            vec![
+                SourcePosition { row: 1, column: 4 },
+                SourcePosition { row: 1, column: 12 },
+                SourcePosition { row: 1, column: 10 },
+                SourcePosition { row: 1, column: 20 },
+                SourcePosition { row: 1, column: 18 },
+                SourcePosition { row: 1, column: 28 },
+                SourcePosition { row: 1, column: 26 },
+                SourcePosition { row: 1, column: 39 },
+                SourcePosition { row: 1, column: 37 },
+            ],
+        );
         let p_new = Proc::New {
-            decls: Decls {
-                decls: vec![
-                    NameDecl::new("x", None),
-                    NameDecl::new("y", None),
-                    NameDecl::new("r", Some("rho:registry")),
-                    NameDecl::new("out", Some("rho:stdout")),
-                    NameDecl::new("z", None),
-                ],
-                line_num: 0,
-                col_num: 0,
-            },
-            proc: Box::new(Proc::Par {
-                left: Box::new(Proc::Par {
-                    left: Box::new(Proc::Par {
-                        left: Box::new(Proc::Par {
-                            left: Box::new(Proc::Send {
-                                name: Name::new_name_var("x"),
-                                send_type: SendType::new_single(),
-                                inputs: ProcList::new(vec![Proc::new_proc_int(7)]),
-                                line_num: 0,
-                                col_num: 0,
-                            }),
-                            right: Box::new(Proc::Send {
-                                name: Name::new_name_var("y"),
-                                send_type: SendType::new_single(),
-                                inputs: ProcList::new(vec![Proc::new_proc_int(8)]),
-                                line_num: 0,
-                                col_num: 0,
-                            }),
-                            line_num: 0,
-                            col_num: 0,
-                        }),
-                        right: Box::new(Proc::Send {
-                            name: Name::new_name_var("r"),
-                            send_type: SendType::new_single(),
-                            inputs: ProcList::new(vec![Proc::new_proc_int(9)]),
-                            line_num: 0,
-                            col_num: 0,
-                        }),
-                        line_num: 0,
-                        col_num: 0,
-                    }),
-                    right: Box::new(Proc::Send {
-                        name: Name::new_name_var("out"),
-                        send_type: SendType::new_single(),
-                        inputs: ProcList::new(vec![Proc::new_proc_int(10)]),
-                        line_num: 0,
-                        col_num: 0,
-                    }),
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                right: Box::new(Proc::Send {
-                    name: Name::new_name_var("z"),
-                    send_type: SendType::new_single(),
-                    inputs: ProcList::new(vec![Proc::new_proc_int(11)]),
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
+            decls: vec![
+                NameDecl { id: x, uri: None },
+                NameDecl { id: y, uri: None },
+                NameDecl {
+                    id: r,
+                    uri: Some("rho:registry".into()),
+                },
+                NameDecl {
+                    id: out,
+                    uri: Some("rho:stdout".into()),
+                },
+                NameDecl { id: z, uri: None },
+            ],
+            proc: &ppar,
         };
 
-        let result = normalize_match_proc(
+        test_normalize_match_proc(
             &p_new,
-            proc_visit_inputs_and_env().0,
-            &proc_visit_inputs_and_env().1,
-        );
-        assert!(result.is_ok());
+            defaults(),
+            test("expected to bind new variables", |actual_par, free_map| {
+                let expected_par = Par {
+                    news: vec![New {
+                        bind_count: 5,
+                        p: Par {
+                            sends: vec![
+                                Send {
+                                    chan: Par::bound_var(0),
+                                    data: vec![Par::gint(7)],
+                                    persistent: false,
+                                    locally_free: bitvec![1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(1),
+                                    data: vec![Par::gint(8)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(3),
+                                    data: vec![Par::gint(9)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 0, 0, 1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(4),
+                                    data: vec![Par::gint(10)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 0, 0, 0, 1],
+                                    connective_used: false,
+                                },
+                                Send {
+                                    chan: Par::bound_var(2),
+                                    data: vec![Par::gint(11)],
+                                    persistent: false,
+                                    locally_free: bitvec![0, 0, 1],
+                                    connective_used: false,
+                                },
+                            ],
+                            locally_free: bitvec![1, 1, 1, 1, 1],
+                            ..Default::default()
+                        },
+                        uris: Vec::new(),
+                        locally_free: BitVec::EMPTY,
+                    }],
+                    locally_free: bitvec![1, 1, 1, 1, 1],
+                    ..Default::default()
+                };
 
-        let expected_result = prepend_new(
-            Par::default(),
-            New {
-                bind_count: 5,
-                p: Some(
-                    Par::default()
-                        .prepend_send(new_send(
-                            new_boundvar_par(4, create_bit_vector(&vec![4]), false),
-                            vec![new_gint_par(7, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![4]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(3, create_bit_vector(&vec![3]), false),
-                            vec![new_gint_par(8, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![3]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(1, create_bit_vector(&vec![1]), false),
-                            vec![new_gint_par(9, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![1]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(0, create_bit_vector(&vec![0]), false),
-                            vec![new_gint_par(10, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![0]),
-                            false,
-                        ))
-                        .prepend_send(new_send(
-                            new_boundvar_par(2, create_bit_vector(&vec![2]), false),
-                            vec![new_gint_par(11, Vec::new(), false)],
-                            false,
-                            create_bit_vector(&vec![2]),
-                            false,
-                        )),
-                ),
-                uri: vec!["rho:registry".to_string(), "rho:stdout".to_string()],
-                injections: BTreeMap::new(),
-                locally_free: Vec::new(),
-            },
-        );
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(
-            result.clone().unwrap().par.news[0]
-                .p
-                .clone()
-                .unwrap()
-                .sends
-                .into_iter()
-                .map(|x| x.locally_free)
-                .collect::<Vec<Vec<u8>>>(),
-            vec![
-                create_bit_vector(&vec![2]),
-                create_bit_vector(&vec![0]),
-                create_bit_vector(&vec![1]),
-                create_bit_vector(&vec![3]),
-                create_bit_vector(&vec![4])
-            ]
-        );
-        assert_eq!(
-            result.unwrap().par.news[0].p.clone().unwrap().locally_free,
-            create_bit_vector(&vec![0, 1, 2, 3, 4])
+                assert_eq!(actual_par, &expected_par);
+                assert!(free_map.is_empty());
+            }),
         );
     }
 }

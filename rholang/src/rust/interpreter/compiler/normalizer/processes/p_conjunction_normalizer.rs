@@ -1,123 +1,113 @@
-use crate::rust::interpreter::compiler::exports::SourcePosition;
-use crate::rust::interpreter::compiler::normalize::{
-    normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
-};
-use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
+use crate::rust::interpreter::compiler::exports::{BoundMapChain, SourcePosition};
+use crate::rust::interpreter::compiler::free_map::ConnectiveInstance;
+use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
 use crate::rust::interpreter::errors::InterpreterError;
-use crate::rust::interpreter::util::prepend_connective;
-use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::{Connective, ConnectiveBody, Par};
+use crate::rust::interpreter::normal_forms::{Connective, Par};
 use std::collections::HashMap;
 
+use super::exports::*;
+
 pub fn normalize_p_conjunction(
-    proc: &Conjunction,
-    input: ProcVisitInputs,
+    left: AnnProc,
+    right: AnnProc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    let left_result = normalize_match_proc(
-        &proc.left,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: input.bound_map_chain.clone(),
-            free_map: input.free_map.clone(),
-        },
+    pos: SourcePosition,
+) -> Result<(), InterpreterError> {
+    let depth = bound_map_chain.depth();
+
+    let mut left_par = Par::default();
+    normalize_match_proc(
+        left.proc,
+        &mut left_par,
+        free_map,
+        bound_map_chain,
         env,
+        left.pos,
     )?;
 
-    let right_result = normalize_match_proc(
-        &proc.right,
-        ProcVisitInputs {
-            par: Par::default(),
-            bound_map_chain: input.bound_map_chain.clone(),
-            free_map: left_result.free_map.clone(),
-        },
+    let mut right_par = Par::default();
+    normalize_match_proc(
+        right.proc,
+        &mut right_par,
+        free_map,
+        bound_map_chain,
         env,
+        right.pos,
     )?;
 
-    let lp = left_result.par;
-    let result_connective = match lp.single_connective() {
-        Some(Connective {
-            connective_instance: Some(ConnectiveInstance::ConnAndBody(conn_body)),
-        }) => Connective {
-            connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
-                ps: {
-                    let mut ps = conn_body.ps.clone();
-                    ps.push(right_result.par);
-                    ps
-                },
-            })),
-        },
-        _ => Connective {
-            connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
-                ps: vec![lp, right_result.par],
-            })),
-        },
+    let connective = if let Some(Connective::ConnAnd(conn_body)) = left_par.single_connective_mut()
+    {
+        conn_body.push(right_par);
+        left_par.cast_to_connective()
+    } else {
+        Connective::ConnAnd(vec![left_par, right_par])
     };
+    input_par.push_connective(connective, depth);
+    free_map.remember_connective(ConnectiveInstance::And, pos);
 
-    let result_par = prepend_connective(
-        input.par,
-        result_connective.clone(),
-        input.bound_map_chain.depth() as i32,
-    );
-
-    let updated_free_map = right_result.free_map.add_connective(
-        result_connective.connective_instance.unwrap(),
-        SourcePosition {
-            row: proc.line_num,
-            column: proc.col_num,
-        },
-    );
-
-    Ok(ProcVisitOutputs {
-        par: result_par,
-        free_map: updated_free_map,
-    })
+    Ok(())
 }
 
 //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-    use crate::rust::interpreter::compiler::normalize::VarSort::ProcSort;
-    use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
+    use crate::rust::interpreter::compiler::free_map::VarSort;
+    use crate::rust::interpreter::compiler::normalizer::processes::exports::Proc;
     use crate::rust::interpreter::compiler::source_position::SourcePosition;
-    use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance;
-    use models::rhoapi::{Connective, ConnectiveBody};
-    use models::rust::utils::new_freevar_par;
+    use crate::rust::interpreter::compiler::Context;
+    use crate::rust::interpreter::normal_forms::{Connective, Par};
+    use crate::rust::interpreter::test_utils::utils::{defaults, test, test_normalize_match_proc};
     use pretty_assertions::assert_eq;
 
     #[test]
+    /** Example:
+     * x /\ y
+     */
     fn p_conjunction_should_delegate_and_count_any_free_variables_inside() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let proc = Conjunction::new_conjunction_with_par_of_var("x", "y");
+        let x = Proc::new_var("x", SourcePosition { row: 0, column: 0 });
+        let y = Proc::new_var("y", SourcePosition { row: 0, column: 5 });
+        let proc = Proc::Conjunction {
+            left: x.annotate(SourcePosition { row: 0, column: 0 }),
+            right: y.annotate(SourcePosition { row: 0, column: 5 }),
+        };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        let expected_result = inputs
-            .par
-            .with_connectives(vec![Connective {
-                connective_instance: Some(ConnectiveInstance::ConnAndBody(ConnectiveBody {
-                    ps: vec![
-                        new_freevar_par(0, Vec::new()),
-                        new_freevar_par(1, Vec::new()),
-                    ],
-                })),
-            }])
-            .with_connective_used(true);
-        assert_eq!(result.clone().unwrap().par, expected_result);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test(
+                "expected to delegate and count any free variables inside",
+                |actual_par, free_map| {
+                    let expected_par = Par {
+                        connective_used: true,
+                        connectives: vec![Connective::ConnAnd(Par::free_vars(2))],
+                        ..Default::default()
+                    };
 
-        let expected_free = inputs.free_map.put_all(vec![
-            ("x".to_string(), ProcSort, SourcePosition::new(0, 0)),
-            ("y".to_string(), ProcSort, SourcePosition::new(0, 0)),
-        ]);
-
-        assert_eq!(
-            result.clone().unwrap().free_map.level_bindings,
-            expected_free.level_bindings
-        );
-        assert_eq!(
-            result.unwrap().free_map.next_level,
-            expected_free.next_level
+                    assert_eq!(actual_par, &expected_par);
+                    assert_eq!(
+                        free_map.as_free_vec(),
+                        vec![
+                            (
+                                "x",
+                                Context {
+                                    item: VarSort::ProcSort,
+                                    source_position: SourcePosition { row: 0, column: 0 }
+                                }
+                            ),
+                            (
+                                "y",
+                                Context {
+                                    item: VarSort::ProcSort,
+                                    source_position: SourcePosition { row: 0, column: 5 }
+                                }
+                            )
+                        ]
+                    )
+                },
+            ),
         );
     }
 }

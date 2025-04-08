@@ -2,394 +2,228 @@
 
 use std::collections::HashMap;
 
-use models::{
-    rhoapi::{MatchCase, Par},
-    rust::utils::{new_elist_par, new_match_par, union},
-};
+use bitvec::vec::BitVec;
+use smallvec::SmallVec;
 use uuid::Uuid;
 
 use crate::rust::interpreter::{
     compiler::{
-        exports::FreeMap,
-        normalize::{normalize_match_proc, NameVisitInputs, NameVisitOutputs, VarSort},
+        exports::{BoundMapChain, FreeMap},
+        normalize::normalize_match_proc,
         normalizer::{
             name_normalize_matcher::normalize_name,
-            remainder_normalizer_matcher::normalize_match_name,
+            remainder_normalizer_matcher::handle_name_remainder,
         },
         rholang_ast::{
-            Block, Decl, Decls, DeclsChoice, LinearBind, Name, NameDecl, Names, Proc, ProcList,
-            Receipt, Receipts, SendType, Source, Var,
+            ASTBuilder, AnnName, Binding, LinearBind, Name, NameDecl, NameRemainder, Proc, Receipt,
+            SendType, Source,
         },
     },
-    matcher::has_locally_free::HasLocallyFree,
-    util::filter_and_adjust_bitset,
+    normal_forms::{adjust_bitset, union, union_inplace, EListBody, Match, MatchCase, Par},
 };
 
-use super::exports::{InterpreterError, ProcVisitInputs, ProcVisitOutputs};
+use super::exports::{AnnProc, InterpreterError, SourcePosition};
 
-// TODO: This file is going to need a review because we do not have a single 'decl' on our 'let' rule
 pub fn normalize_p_let(
-    decls_choice: &DeclsChoice,
-    body: &Block,
-    input: ProcVisitInputs,
+    decls: &[Binding],
+    body: AnnProc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
     env: &HashMap<String, Par>,
-) -> Result<ProcVisitOutputs, InterpreterError> {
-    type ListName = Vec<Name>;
-    type NameRemainder = Option<Box<Proc>>;
-    type ListProc = Vec<Proc>;
+) -> Result<(), InterpreterError> {
+    /*
+    Let processes with a single bind or with sequential binds ";" are converted into match processes rather
+    than input processes, so that each sequential bind doesn't add a new unforgeable name to the tuplespace.
+    The Rholang 1.1 spec defines them as the latter. Because the Rholang 1.1 spec defines let processes in terms
+    of a output process in concurrent composition with an input process, the let process appears to quote the
+    process on the RHS of "<-" and bind it to the pattern on LHS. For example, in
+        let x <- 1 in { Nil }
+    the process (value) "1" is quoted and bound to "x" as a name. There is no way to perform an AST transformation
+    of sequential let into a match process and still preserve these semantics, so we have to do an ADT transformation.
+     */
 
-    match decls_choice.clone() {
-        DeclsChoice::ConcDecls { decls, .. } => {
-            fn extract_names_and_procs(decl: Decl) -> (ListName, NameRemainder, ListProc) {
-                (decl.names.names, decl.names.cont, decl.procs)
-            }
+    assert!(!decls.is_empty());
+    let mut continuation_stack = SmallVec::<[DeclCont; 1]>::new();
+    let mut total_free: u32 = 0;
+    for decl in decls {
+        let proc_list = &decl.procs;
+        let mut ps = Vec::with_capacity(proc_list.len());
+        let mut locally_free = BitVec::new();
+        let mut connective_used = false;
 
-            // We don't have a single 'decl' on 'let' rule in grammar, so I assume we just map over 'decls'
-            let (list_names, list_name_remainders, list_procs): (
-                Vec<ListName>,
-                Vec<NameRemainder>,
-                Vec<ListProc>,
-            ) = {
-                let tuples: Vec<(ListName, NameRemainder, ListProc)> = decls
-                    .into_iter()
-                    .map(|conc_decl_impl| extract_names_and_procs(conc_decl_impl))
-                    .collect();
-                unzip3(tuples)
-            };
+        for proc in proc_list {
+            let mut par = Par::default();
 
-            /*
-            It is not necessary to use UUIDs to achieve concurrent let declarations.
-            While there is the possibility for collisions with either variables declared by the user
-            or variables declared within this translation, the chances for collision are astronomically
-            small (see analysis here: https://towardsdatascience.com/are-uuids-really-unique-57eb80fc2a87).
-            A strictly correct approach would be one that performs a ADT rather than an AST translation, which
-            was not done here due to time constraints. - OLD
-            */
-            let variable_names: Vec<String> = (0..list_names.len())
-                .map(|_| Uuid::new_v4().to_string())
-                .collect();
+            normalize_match_proc(
+                proc.proc,
+                &mut par,
+                free_map,
+                bound_map_chain,
+                env,
+                proc.pos,
+            )?;
 
-            let p_sends: Vec<Proc> = variable_names
-                .clone()
-                .into_iter()
-                .zip(list_procs)
-                .map(|(variable_name, list_proc)| Proc::Send {
-                    name: Name::ProcVar(Box::new(Proc::Var(Var {
-                        name: variable_name,
-                        line_num: 0,
-                        col_num: 0,
-                    }))),
-                    send_type: SendType::Single {
-                        line_num: 0,
-                        col_num: 0,
-                    },
-                    inputs: ProcList {
-                        procs: list_proc,
-                        line_num: 0,
-                        col_num: 0,
-                    },
-                    line_num: 0,
-                    col_num: 0,
-                })
-                .collect();
-
-            let p_input = {
-                let list_linear_bind: Vec<Receipt> = variable_names
-                    .clone()
-                    .into_iter()
-                    .zip(list_names)
-                    .zip(list_name_remainders)
-                    .map(|((variable_name, list_name), name_remainder)| {
-                        Receipt::LinearBinds(LinearBind {
-                            names: Names {
-                                names: list_name,
-                                cont: name_remainder,
-                                line_num: 0,
-                                col_num: 0,
-                            },
-                            input: Source::Simple {
-                                name: Name::ProcVar(Box::new(Proc::Var(Var {
-                                    name: variable_name,
-                                    line_num: 0,
-                                    col_num: 0,
-                                }))),
-                                line_num: 0,
-                                col_num: 0,
-                            },
-                            line_num: 0,
-                            col_num: 0,
-                        })
-                    })
-                    .collect();
-
-                let list_receipt = Receipts {
-                    receipts: list_linear_bind,
-                    line_num: 0,
-                    col_num: 0,
-                };
-
-                Proc::Input {
-                    formals: list_receipt,
-                    proc: Box::new(body.clone()),
-                    line_num: 0,
-                    col_num: 0,
-                }
-            };
-
-            let p_par = {
-                let procs = {
-                    let mut combined = p_sends;
-                    combined.push(p_input);
-                    combined
-                };
-
-                procs.clone().into_iter().skip(2).fold(
-                    Proc::Par {
-                        left: Box::new(procs[0].clone()),
-                        right: Box::new(procs[1].clone()),
-                        line_num: 0,
-                        col_num: 0,
-                    },
-                    |p_par, proc| Proc::Par {
-                        left: Box::new(p_par),
-                        right: Box::new(proc),
-                        line_num: 0,
-                        col_num: 0,
-                    },
-                )
-            };
-
-            let p_new = Proc::New {
-                decls: Decls {
-                    decls: variable_names
-                        .into_iter()
-                        .map(|name| NameDecl {
-                            var: Var {
-                                name,
-                                line_num: 0,
-                                col_num: 0,
-                            },
-                            uri: None,
-                            line_num: 0,
-                            col_num: 0,
-                        })
-                        .collect(),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                proc: Box::new(p_par),
-                line_num: 0,
-                col_num: 0,
-            };
-
-            normalize_match_proc(&p_new, input, env)
+            union_inplace(&mut locally_free, &par.locally_free);
+            connective_used = connective_used | par.connective_used;
+            ps.push(par);
         }
 
-        /*
-        Let processes with a single bind or with sequential binds ";" are converted into match processes rather
-        than input processes, so that each sequential bind doesn't add a new unforgeable name to the tuplespace.
-        The Rholang 1.1 spec defines them as the latter. Because the Rholang 1.1 spec defines let processes in terms
-        of a output process in concurrent composition with an input process, the let process appears to quote the
-        process on the RHS of "<-" and bind it to the pattern on LHS. For example, in
-            let x <- 1 in { Nil }
-        the process (value) "1" is quoted and bound to "x" as a name. There is no way to perform an AST transformation
-        of sequential let into a match process and still preserve these semantics, so we have to do an ADT transformation.
-         */
-        DeclsChoice::LinearDecls { decls, .. } => {
-            let new_continuation = if decls.is_empty() {
-                body.proc.clone()
-            } else {
-                // Similarly here, we don't have a single 'decl' field on `let' rule.
-                let new_decls: Vec<Decl> = if decls.len() == 1 {
-                    decls.clone()
-                } else {
-                    let mut new_linear_decls = Vec::new();
-                    for decl in decls.clone().into_iter().skip(1) {
-                        new_linear_decls.push(decl);
-                    }
-                    new_linear_decls
-                };
+        let value_list_body = EListBody {
+            ps,
+            locally_free,
+            connective_used,
+            remainder: None,
+        };
 
-                Proc::Let {
-                    decls: DeclsChoice::LinearDecls {
-                        decls: new_decls,
-                        line_num: 0,
-                        col_num: 0,
-                    },
-                    body: Box::new(body.clone()),
-                    line_num: 0,
-                    col_num: 0,
-                }
-            };
+        let name_list = &decl.names;
+        let mut pattern_known_free = FreeMap::new();
+        let pattern_list_body = names_to_e_list(
+            &name_list.names,
+            &name_list.remainder,
+            &mut pattern_known_free,
+            bound_map_chain,
+        )?;
 
-            fn list_proc_to_elist(
-                list_proc: Vec<Proc>,
-                known_free: FreeMap<VarSort>,
-                input: ProcVisitInputs,
-                env: &HashMap<String, Par>,
-            ) -> Result<ProcVisitOutputs, InterpreterError> {
-                let mut vector_par = Vec::new();
-                let mut current_known_free = known_free;
-                let mut locally_free = Vec::new();
-                let mut connective_used = false;
+        let next_locally_free = union(
+            &value_list_body.locally_free,
+            &pattern_list_body.locally_free,
+        );
+        let free_count = pattern_known_free.count_no_wildcards();
+        total_free += free_count;
+        let output = DeclCont {
+            output: Match {
+                target: Par::elist(value_list_body),
+                cases: vec![MatchCase {
+                    pattern: Par::elist(pattern_list_body),
+                    source: Par::NIL, // continuation
+                    free_count,
+                }],
+                locally_free: next_locally_free,
+                connective_used,
+            },
+            total_free,
+        };
+        continuation_stack.push(output);
 
-                for proc in list_proc {
-                    let ProcVisitOutputs {
-                        par,
-                        free_map: updated_known_free,
-                    } = normalize_match_proc(
-                        &proc,
-                        ProcVisitInputs {
-                            par: Par::default(),
-                            bound_map_chain: input.bound_map_chain.clone(),
-                            free_map: current_known_free,
-                        },
-                        env,
-                    )?;
-
-                    vector_par.insert(0, par.clone());
-                    current_known_free = updated_known_free;
-                    locally_free = union(locally_free, par.locally_free);
-                    connective_used |= par.connective_used;
-                }
-
-                Ok(ProcVisitOutputs {
-                    par: new_elist_par(
-                        vector_par.into_iter().rev().collect(),
-                        locally_free,
-                        connective_used,
-                        None,
-                        Vec::new(),
-                        false,
-                    ),
-                    free_map: current_known_free,
-                })
-            }
-
-            fn list_name_to_elist(
-                list_name: Vec<Name>,
-                name_remainder: &NameRemainder,
-                input: ProcVisitInputs,
-                env: &HashMap<String, Par>,
-            ) -> Result<ProcVisitOutputs, InterpreterError> {
-                let (optional_var, remainder_known_free) =
-                    normalize_match_name(name_remainder, FreeMap::new())?;
-
-                let mut vector_par = Vec::new();
-                let mut current_known_free = remainder_known_free;
-                let mut locally_free = Vec::new();
-
-                for name in list_name {
-                    let NameVisitOutputs {
-                        par,
-                        free_map: updated_known_free,
-                    } = normalize_name(
-                        &name,
-                        NameVisitInputs {
-                            bound_map_chain: input.bound_map_chain.push(),
-                            free_map: current_known_free,
-                        },
-                        env,
-                    )?;
-
-                    vector_par.insert(0, par.clone());
-                    current_known_free = updated_known_free;
-                    // Use input.env.depth + 1 because the pattern was evaluated w.r.t input.env.push,
-                    // and more generally because locally free variables become binders in the pattern position
-                    locally_free = union(
-                        locally_free,
-                        par.clone()
-                            .locally_free(par, input.bound_map_chain.depth() as i32 + 1),
-                    );
-                }
-
-                Ok(ProcVisitOutputs {
-                    par: new_elist_par(
-                        vector_par.into_iter().rev().collect(),
-                        locally_free,
-                        true,
-                        optional_var,
-                        Vec::new(),
-                        false,
-                    ),
-                    free_map: current_known_free,
-                })
-            }
-
-            // Again, we don't have a single 'decl' field on 'let' I am using the first 'decl' element
-            let decl = decls[0].clone();
-
-            list_proc_to_elist(decl.procs, input.clone().free_map, input.clone(), env).and_then(
-                |ProcVisitOutputs {
-                     par: value_list_par,
-                     free_map: value_known_free,
-                 }| {
-                    list_name_to_elist(decl.names.names, &decl.names.cont, input.clone(), env)
-                        .and_then(
-                            |ProcVisitOutputs {
-                                 par: pattern_list_par,
-                                 free_map: pattern_known_free,
-                             }| {
-                                normalize_match_proc(
-                                    &new_continuation,
-                                    ProcVisitInputs {
-                                        par: Par::default(),
-                                        bound_map_chain: input
-                                            .bound_map_chain
-                                            .absorb_free(pattern_known_free.clone()),
-                                        free_map: value_known_free,
-                                    },
-                                    env,
-                                )
-                                .map(
-                                    |ProcVisitOutputs {
-                                         par: continuation_par,
-                                         free_map: continuation_known_free,
-                                     }| ProcVisitOutputs {
-                                        par: new_match_par(
-                                            value_list_par.clone(),
-                                            vec![MatchCase {
-                                                pattern: Some(pattern_list_par.clone()),
-                                                source: Some(continuation_par.clone()),
-                                                free_count: pattern_known_free.count_no_wildcards()
-                                                    as i32,
-                                            }],
-                                            union(
-                                                value_list_par.locally_free,
-                                                union(
-                                                    pattern_list_par.locally_free,
-                                                    filter_and_adjust_bitset(
-                                                        continuation_par.locally_free,
-                                                        pattern_known_free.count_no_wildcards(),
-                                                    ),
-                                                ),
-                                            ),
-                                            value_list_par.connective_used
-                                                || continuation_par.connective_used,
-                                            Vec::new(),
-                                            false,
-                                        ),
-                                        free_map: continuation_known_free,
-                                    },
-                                )
-                            },
-                        )
-                },
-            )
-        }
+        bound_map_chain.absorb_free(pattern_known_free);
     }
+
+    let mut body_par = Par::default();
+    normalize_match_proc(
+        body.proc,
+        &mut body_par,
+        free_map,
+        bound_map_chain,
+        env,
+        body.pos,
+    )?;
+    let result = continuation_stack
+        .into_iter()
+        .rfold(body_par, |continuation_par, accum| {
+            let mut output = accum.output;
+            let case = &mut output.cases[0];
+
+            output.connective_used = output.connective_used || continuation_par.connective_used;
+            union_inplace(
+                &mut output.locally_free,
+                adjust_bitset(&continuation_par.locally_free, accum.total_free as usize),
+            );
+            case.source = continuation_par;
+
+            bound_map_chain.shift(case.free_count as usize);
+            let mut result = Par::default();
+            result.push_match(output);
+            result
+        });
+
+    input_par.concat_with(result);
+    Ok(())
 }
 
-fn unzip3<T, U, V>(tuples: Vec<(Vec<T>, U, Vec<V>)>) -> (Vec<Vec<T>>, Vec<U>, Vec<Vec<V>>) {
-    let mut vec_t = Vec::with_capacity(tuples.len());
-    let mut vec_u = Vec::with_capacity(tuples.len());
-    let mut vec_v = Vec::with_capacity(tuples.len());
+pub fn normalize_p_concurrent_let(
+    decls: &[Binding],
+    body: AnnProc,
+    input_par: &mut Par,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
+    env: &HashMap<String, Par>,
+    pos: SourcePosition,
+) -> Result<(), InterpreterError> {
+    assert!(!decls.is_empty());
 
-    for (t, u, v) in tuples {
-        vec_t.push(t);
-        vec_u.push(u);
-        vec_v.push(v);
+    let n = decls.len();
+    let variable_names =
+        Vec::from_iter(std::iter::repeat_with(|| Uuid::new_v4().to_string()).take(n));
+    let mut ps = Vec::with_capacity(n + 1);
+    let mut linear_binds = Vec::with_capacity(n);
+
+    variable_names
+        .iter()
+        .zip(decls)
+        .for_each(|(variable_name, Binding { names, procs })| {
+            let mut inputs = Vec::with_capacity(procs.len());
+            inputs.extend(procs);
+            ps.push(Proc::Send {
+                name: Name::declare(variable_name),
+                send_type: SendType::Single,
+                inputs,
+            });
+            linear_binds.push(LinearBind {
+                lhs: names.clone(), // cloning names is fast - see the custom `clone()` implementation
+                rhs: Source::Simple {
+                    name: AnnName::declare(variable_name, SourcePosition::default()),
+                },
+            });
+        });
+    ps.push(Proc::ForComprehension {
+        receipts: vec![Receipt::Linear(linear_binds)],
+        proc: body,
+    });
+
+    let builder = ASTBuilder::with_capacity(n);
+    let ppar = builder.fold_procs_into_par(&ps, std::iter::empty());
+    let pnew = Proc::New {
+        decls: variable_names
+            .iter()
+            .map(|var| NameDecl::id(var, SourcePosition::default()))
+            .collect(),
+        proc: ppar,
+    };
+
+    normalize_match_proc(&pnew, input_par, free_map, bound_map_chain, env, pos)
+}
+
+fn names_to_e_list(
+    names: &[AnnName],
+    name_remainder: &Option<NameRemainder>,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
+) -> Result<EListBody, InterpreterError> {
+    let temp_env = HashMap::new();
+    let mut result = EListBody {
+        ps: Vec::with_capacity(names.len()),
+        connective_used: true,
+        ..Default::default()
+    };
+
+    for name in names {
+        let par = bound_map_chain
+            .descend(|bound_map| normalize_name(name.0, free_map, bound_map, &temp_env, name.1))?;
+
+        union_inplace(&mut result.locally_free, &par.locally_free);
+        result.ps.push(par);
     }
 
-    (vec_t, vec_u, vec_v)
+    if let Some(remainder) = name_remainder {
+        let optional_var = handle_name_remainder(*remainder, free_map)?;
+        result.remainder = Some(optional_var);
+    }
+
+    Ok(result)
+}
+
+struct DeclCont {
+    output: Match,
+    total_free: u32,
 }

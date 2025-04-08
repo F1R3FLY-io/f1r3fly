@@ -1,3 +1,4 @@
-pub mod par_builder_util;
 pub mod persistent_store_tester;
+
+#[cfg(test)]
 pub mod utils;

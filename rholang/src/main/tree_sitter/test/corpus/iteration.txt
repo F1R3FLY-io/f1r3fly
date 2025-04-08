@@ -68,11 +68,12 @@ new iterate in {
                                 (var))))
                           right: (input
                             formals: (receipts
-                              (linear_bind
-                                names: (names
-                                  (wildcard))
-                                input: (simple_source
-                                  (var))))
+                              (receipt
+                                (linear_bind
+                                  names: (names
+                                    (wildcard))
+                                  input: (simple_source
+                                    (var)))))
                             proc: (block
                               body: (send
                                 name: (var)
@@ -126,10 +127,11 @@ new iterate in {
                         (nil))))))
               right: (input
                 formals: (receipts
-                  (linear_bind
-                    names: (names
-                      (wildcard))
-                    input: (simple_source
-                      (var))))
+                  (receipt
+                    (linear_bind
+                      names: (names
+                        (wildcard))
+                      input: (simple_source
+                        (var)))))
                 proc: (block
                   body: (nil))))))))))

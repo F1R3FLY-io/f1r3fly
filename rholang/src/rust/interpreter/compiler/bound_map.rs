@@ -1,76 +1,123 @@
-use super::exports::*;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct BoundMap<T> {
-    next_index: usize,
-    index_bindings: HashMap<String, BoundContext<T>>,
+use super::{
+    exports::*,
+    free_map::VarSort,
+    rholang_ast::{Id, Uri},
+};
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct BoundMap(IndexMap<String, Context<BoundContext>>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BoundContext {
+    Proc,
+    Name(Option<String>),
 }
 
-impl<T: Clone> BoundMap<T> {
+impl BoundMap {
     pub fn new() -> Self {
-        BoundMap {
-            next_index: 0,
-            index_bindings: HashMap::new(),
-        }
+        BoundMap(IndexMap::new())
     }
 
-    pub fn get(&self, name: &str) -> Option<BoundContext<T>>
-    where
-        T: Clone,
-    {
-        self.index_bindings.get(name).map(|context| BoundContext {
-            index: self.next_index - context.index - 1,
-            typ: context.typ.clone(),
-            source_position: context.source_position.clone(),
-        })
+    pub fn get(&self, name: &str) -> Option<(u32, &Context<BoundContext>)> {
+        self.0
+            .get_full(name)
+            .map(|(level, _, ctx)| (self.next_index() - (level - 1) as u32, ctx))
     }
 
-    pub fn put(&self, binding: IdContext<T>) -> BoundMap<T> {
-        let (name, typ, source_position) = binding;
-        let mut new_bindings = self.index_bindings.clone();
-        new_bindings.insert(
-            name,
-            BoundContext {
-                index: self.next_index,
-                typ,
-                source_position,
-            },
-        );
-        BoundMap {
-            next_index: self.next_index + 1,
-            index_bindings: new_bindings,
-        }
+    pub fn put(
+        &mut self,
+        binding: (String, Context<BoundContext>),
+    ) -> Option<Context<BoundContext>> {
+        let (name, ctx) = binding;
+        self.0.insert(name, ctx)
     }
 
-    pub fn put_all(&self, bindings: Vec<IdContext<T>>) -> BoundMap<T> {
-        let mut new_map = self.clone();
-        for binding in bindings {
-            new_map = new_map.put(binding);
-        }
-        new_map
-    }
-
-    pub fn absorb_free(&self, free_map: FreeMap<T>) -> BoundMap<T> {
-        let mut new_bindings = self.index_bindings.clone();
-        for (name, context) in free_map.level_bindings {
-            new_bindings.insert(
+    pub fn absorb_free(&mut self, free_map: FreeMap) {
+        for (name, context) in free_map {
+            self.0.insert(
                 name,
-                BoundContext {
-                    index: context.level + self.next_index,
-                    typ: context.typ,
+                Context {
+                    item: match context.item {
+                        VarSort::NameSort => BoundContext::Name(None),
+                        VarSort::ProcSort => BoundContext::Proc,
+                    },
                     source_position: context.source_position,
                 },
             );
         }
-        BoundMap {
-            next_index: self.next_index + free_map.next_level,
-            index_bindings: new_bindings,
+    }
+
+    pub fn shift(&mut self, n: usize) {
+        let m = self.0.len();
+        if n >= m {
+            self.0.clear();
+        } else {
+            self.0.truncate(m - n);
         }
     }
 
     // Rename this method to avoid conflict with Iterator::count
-    pub fn get_count(&self) -> usize {
-        self.next_index
+    pub fn count(&self) -> u32 {
+        self.next_index()
+    }
+
+    pub fn next_index(&self) -> u32 {
+        self.0.len() as u32
+    }
+
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&String, &Context<BoundContext>)> + ExactSizeIterator {
+        self.0.iter()
+    }
+
+    pub fn put_id_as_proc(&mut self, id: &Id) -> Option<Context<BoundContext>> {
+        self.put((
+            id.name.to_owned(),
+            Context {
+                item: BoundContext::Proc,
+                source_position: id.pos,
+            },
+        ))
+    }
+
+    pub fn put_id_as_name(&mut self, id: &Id) -> Option<Context<BoundContext>> {
+        self.put((
+            id.name.to_owned(),
+            Context {
+                item: BoundContext::Name(None),
+                source_position: id.pos,
+            },
+        ))
+    }
+
+    pub fn put_name(&mut self, id: &Id, uri: &Option<Uri>) -> Option<Context<BoundContext>> {
+        self.put((
+            id.name.to_owned(),
+            Context {
+                item: BoundContext::Name(uri.map(|val| val.to_string())),
+                source_position: id.pos,
+            },
+        ))
+    }
+}
+
+impl IntoIterator for BoundMap {
+    type Item = (String, Context<BoundContext>);
+    type IntoIter = indexmap::map::IntoIter<String, Context<BoundContext>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a BoundMap {
+    type Item = (&'a String, &'a Context<BoundContext>);
+    type IntoIter = indexmap::map::Iter<'a, String, Context<BoundContext>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }

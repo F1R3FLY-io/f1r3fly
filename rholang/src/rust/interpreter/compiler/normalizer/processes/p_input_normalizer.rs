@@ -2,33 +2,70 @@
 
 use std::collections::{HashMap, HashSet};
 
-use models::{
-    rhoapi::{Par, Receive, ReceiveBind},
-    rust::utils::union,
-    BitSet,
-};
 use uuid::Uuid;
 
 use crate::rust::interpreter::{
     compiler::{
-        exports::FreeMap,
-        normalize::{normalize_match_proc, NameVisitInputs, NameVisitOutputs, VarSort},
-        normalizer::{
-            name_normalize_matcher::normalize_name, processes::utils::fail_on_invalid_connective,
-            remainder_normalizer_matcher::normalize_match_name,
-        },
+        bound_map_chain,
+        exports::{BoundMapChain, FreeMap},
+        normalize::normalize_match_proc,
+        normalizer::name_normalize_matcher::normalize_name,
         receive_binds_sort_matcher::pre_sort_binds,
-        rholang_ast::{
-            Block, Decls, Eval, LinearBind, Name, NameDecl, Names, ProcList, Receipt, Receipts,
-            SendType, Source, Var,
-        },
+        rholang_ast::{AnnName, LinearBind, Name, NameDecl, Names, Receipt, SendType, Source, Var},
     },
     matcher::has_locally_free::HasLocallyFree,
+    normal_forms::{Par, ReceiveBind},
     unwrap_option_safe,
     util::filter_and_adjust_bitset,
 };
 
-use super::exports::{InterpreterError, Proc, ProcVisitInputs, ProcVisitOutputs};
+use super::exports::{InterpreterError, Proc};
+
+fn process_binds<'a, I>(
+    binds: I,
+    persistent: bool,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
+    env: &HashMap<String, Par>,
+) -> Result<Par, InterpreterError>
+where
+    I: IntoIterator<Item = (&'a Names<'a>, AnnName<'a>)>,
+{
+    for (patterns, source) in binds {
+        let channel = normalize_name(source.0, free_map, bound_map_chain, env, source.1)?;
+        let mut binds_free_map = FreeMap::new();
+        let mut processed_patterns = Vec::with_capacity(patterns.names.len());
+        for pattern in &patterns.names {
+            let pattern_par = bound_map_chain.descend(|bound_map| {
+                normalize_name(pattern.0, &mut binds_free_map, bound_map, env, pattern.1)
+            })?;
+            processed_patterns.push(pattern_par);
+        }
+        let receive_bind = ReceiveBind {
+            patterns: processed_patterns,
+            source: channel,
+            remainder: todo!(),
+            free_count: binds_free_map.count_no_wildcards(),
+        };
+    }
+
+    Ok(Par::default())
+}
+
+fn normalize_single_receipt(
+    receipt: &Receipt,
+    free_map: &mut FreeMap,
+    bound_map_chain: &mut BoundMapChain,
+    env: &HashMap<String, Par>,
+) -> Result<Par, InterpreterError> {
+    match receipt {
+        Receipt::Repeated(list) => {
+            let binds = list.iter().map(|bind| (&bind.lhs, bind.rhs));
+            process_binds(binds, true)
+        }
+        _ => todo!(),
+    }
+}
 
 pub fn normalize_p_input(
     formals: &Receipts,
@@ -106,13 +143,13 @@ pub fn normalize_p_input(
 
                                                 list_linear_bind.push(Receipt::LinearBinds(
                                                     LinearBind {
-                                                        names: Names {
+                                                        lhs: Names {
                                                             names: list_name,
                                                             cont: linear_bind.names.cont,
                                                             line_num: 0,
                                                             col_num: 0,
                                                         },
-                                                        input: Source::Simple {
+                                                        rhs: Source::Simple {
                                                             name,
                                                             line_num: 0,
                                                             col_num: 0,
@@ -160,13 +197,13 @@ pub fn normalize_p_input(
 
                                                 list_linear_bind.push(Receipt::LinearBinds(
                                                     LinearBind {
-                                                        names: Names {
+                                                        lhs: Names {
                                                             names: linear_bind.names.names,
                                                             cont: linear_bind.names.cont,
                                                             line_num: 0,
                                                             col_num: 0,
                                                         },
-                                                        input: Source::Simple {
+                                                        rhs: Source::Simple {
                                                             name: Name::ProcVar(Box::new(
                                                                 r.clone(),
                                                             )),
@@ -221,8 +258,8 @@ pub fn normalize_p_input(
                                 },
                             )?;
 
-                        let p_input = Proc::Input {
-                            formals: list_receipt,
+                        let p_input = Proc::ForComprehension {
+                            receipts: list_receipt,
                             proc: Box::new(Block {
                                 proc: continuation,
                                 line_num: 0,
@@ -581,8 +618,8 @@ mod tests {
 
         let mut list_linear_binds: Vec<Receipt> = Vec::new();
         list_linear_binds.push(Receipt::LinearBinds(LinearBind {
-            names: Names::new(list_bindings, None),
-            input: Source::new_simple_source(Name::new_name_quote_nil()),
+            lhs: Names::new(list_bindings, None),
+            rhs: Source::new_simple_source(Name::new_name_quote_nil()),
             line_num: 0,
             col_num: 0,
         }));
@@ -602,8 +639,8 @@ mod tests {
             col_num: 0,
         };
 
-        let basic_input = Proc::Input {
-            formals: Receipts {
+        let basic_input = Proc::ForComprehension {
+            receipts: Receipts {
                 receipts: list_linear_binds,
                 line_num: 0,
                 col_num: 0,
@@ -749,8 +786,8 @@ mod tests {
             col_num: 0,
         };
 
-        let p_input = Proc::Input {
-            formals: Receipts {
+        let p_input = Proc::ForComprehension {
+            receipts: Receipts {
                 receipts: list_receipt,
                 line_num: 0,
                 col_num: 0,
@@ -834,16 +871,16 @@ mod tests {
         }))];
 
         let bind_count = 1;
-        let p_input = Proc::Input {
-            formals: Receipts {
+        let p_input = Proc::ForComprehension {
+            receipts: Receipts {
                 receipts: vec![Receipt::LinearBinds(LinearBind {
-                    names: Names {
+                    lhs: Names {
                         names: list_bindings,
                         cont: None,
                         line_num: 0,
                         col_num: 0,
                     },
-                    input: Source::Simple {
+                    rhs: Source::Simple {
                         name: Name::new_name_quote_nil(),
                         line_num: 0,
                         col_num: 0,
@@ -922,8 +959,8 @@ mod tests {
             ),
         ];
 
-        let p_input = Proc::Input {
-            formals: Receipts {
+        let p_input = Proc::ForComprehension {
+            receipts: Receipts {
                 receipts: list_receipt,
                 line_num: 0,
                 col_num: 0,
