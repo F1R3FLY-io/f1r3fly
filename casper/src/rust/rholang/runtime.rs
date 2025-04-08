@@ -138,7 +138,7 @@ impl RuntimeOps {
         let mut processed_system_deploys = Vec::new();
 
         for mut system_deploy in system_deploys {
-            match Self::play_system_deploy(runtime.clone(), current_hash, &mut system_deploy)
+            match Self::play_system_deploy(runtime.clone(), &current_hash, &mut system_deploy)
                 .await?
             {
                 SystemDeployResult::PlaySucceeded {
@@ -477,7 +477,7 @@ impl RuntimeOps {
      */
     pub async fn play_system_deploy<S: SystemDeployTrait>(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        state_hash: StateHash,
+        state_hash: &StateHash,
         system_deploy: &mut S,
     ) -> Result<SystemDeployResult<S::Result>, CasperError> {
         let mut runtime_lock = runtime.lock().unwrap();
@@ -602,12 +602,12 @@ impl RuntimeOps {
     /**
      * Evaluates exploratory (read-only) deploy
      */
-    pub fn play_exploratory_deploy(
+    pub async fn play_exploratory_deploy(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         term: String,
         hash: &StateHash,
     ) -> Result<Vec<Par>, CasperError> {
-        let deploy_result = (|| {
+        let deploy_result = (|| async {
             // Create a deploy with newly created private key
             let (priv_key, _) = Secp256k1.new_key_pair();
 
@@ -636,10 +636,10 @@ impl RuntimeOps {
             }]);
 
             // Execute deploy on top of specified block hash
-            Self::capture_results_with_name(runtime, hash, &deploy, &return_name)
+            Self::capture_results_with_name(runtime, hash, &deploy, &return_name).await
         })();
 
-        match deploy_result {
+        match deploy_result.await {
             Ok(result) => Ok(result),
             Err(err) => {
                 println!("Error in play_exploratory_deploy: {:?}", err);
@@ -683,7 +683,7 @@ impl RuntimeOps {
 
     // Return channel on which result is captured is the first name
     // in the deploy term `new return in { return!(42) }`
-    pub fn capture_results(
+    pub async fn capture_results(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         start: &StateHash,
         deploy: &Signed<DeployData>,
@@ -696,16 +696,16 @@ impl RuntimeOps {
             })),
         }]);
 
-        Self::capture_results_with_name(runtime, start, deploy, &return_name)
+        Self::capture_results_with_name(runtime, start, deploy, &return_name).await
     }
 
-    pub fn capture_results_with_name(
+    pub async fn capture_results_with_name(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         start: &StateHash,
         deploy: &Signed<DeployData>,
         name: &Par,
     ) -> Result<Vec<Par>, CasperError> {
-        match Self::capture_results_with_errors(runtime, start, deploy, name) {
+        match Self::capture_results_with_errors(runtime, start, deploy, name).await {
             Ok(result) => Ok(result),
             Err(err) => Err(CasperError::InterpreterError(
                 InterpreterError::BugFoundError(format!(
@@ -716,7 +716,7 @@ impl RuntimeOps {
         }
     }
 
-    pub fn capture_results_with_errors(
+    pub async fn capture_results_with_errors(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         start: &StateHash,
         deploy: &Signed<DeployData>,
@@ -726,8 +726,7 @@ impl RuntimeOps {
         runtime_lock.reset(Blake2b256Hash::from_bytes_prost(start));
         drop(runtime_lock);
 
-        let rt = tokio::runtime::Handle::current();
-        let eval_res = rt.block_on(Self::evaluate(runtime.clone(), deploy))?;
+        let eval_res = Self::evaluate(runtime.clone(), deploy).await?;
         if !eval_res.errors.is_empty() {
             return Err(CasperError::InterpreterError(eval_res.errors[0].clone()));
         }
@@ -806,20 +805,12 @@ impl RuntimeOps {
         system_deploy: &mut S,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, CasperError> {
         let return_channel = system_deploy.return_channel()?;
-
-        // Add debug code to check if data exists on channel before consuming
-        let data = Self::get_data_par(runtime.clone(), &return_channel);
-        // println!(
-        //     "\nDEBUG: Data on return channel before consuming: {:?}, channel: {:?}",
-        //     data, return_channel
-        // );
-
         Self::consume_result(runtime, return_channel, system_deploy_consume_all_pattern())
     }
 
     /* Read only Rholang evaluator helpers */
 
-    pub fn get_active_validators(
+    pub async fn get_active_validators(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         start_hash: &StateHash,
     ) -> Result<Vec<Validator>, CasperError> {
@@ -827,7 +818,8 @@ impl RuntimeOps {
             runtime,
             Self::activate_validator_query_source(),
             start_hash,
-        )?;
+        )
+        .await?;
 
         if validators_pars.len() != 1 {
             return Err(CasperError::RuntimeError(format!(
@@ -848,11 +840,12 @@ impl RuntimeOps {
         Ok(validators)
     }
 
-    pub fn compute_bonds(
+    pub async fn compute_bonds(
         runtime: Arc<Mutex<RhoRuntimeImpl>>,
         hash: &StateHash,
     ) -> Result<Vec<Bond>, CasperError> {
-        let bonds_pars = Self::play_exploratory_deploy(runtime, Self::bonds_query_source(), hash)?;
+        let bonds_pars =
+            Self::play_exploratory_deploy(runtime, Self::bonds_query_source(), hash).await?;
 
         if bonds_pars.len() != 1 {
             return Err(CasperError::RuntimeError(format!(

@@ -53,7 +53,10 @@ impl Interpreter for InterpreterImpl {
             // let phlos_left_after = self.c.get();
 
             // println!("\nterm: {:#?}", term);
-            let parsed = Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env)?;
+            let parsed = match Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env) {
+                Ok(p) => p,
+                Err(e) => return self.handle_error(initial_phlo, parsing_cost, e),
+            };
             // println!("\nparsed: {:#?}", parsed);
             // let phlos_left_after_adt = self.c.get();
 
@@ -62,21 +65,22 @@ impl Interpreter for InterpreterImpl {
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            reducer.inj(parsed, rand).await?;
-            let phlos_left = self.c.get();
-            let mergeable_channels = self.merge_chs.read().unwrap().clone();
+            match reducer.inj(parsed, rand).await {
+                Ok(()) => {
+                    let phlos_left = self.c.get();
+                    let mergeable_channels = self.merge_chs.read().unwrap().clone();
 
-            Ok(EvaluateResult {
-                cost: initial_phlo.clone() - phlos_left,
-                errors: Vec::new(),
-                mergeable: mergeable_channels,
-            })
+                    Ok(EvaluateResult {
+                        cost: initial_phlo.clone() - phlos_left,
+                        errors: Vec::new(),
+                        mergeable: mergeable_channels,
+                    })
+                }
+                Err(e) => self.handle_error(initial_phlo.clone(), parsing_cost, e),
+            }
         };
 
-        match evaluation_result {
-            Ok(eval_result) => Ok(eval_result),
-            Err(err) => self.handle_error(initial_phlo, parsing_cost, err),
-        }
+        evaluation_result
     }
 }
 
@@ -92,7 +96,6 @@ impl InterpreterImpl {
         parsing_cost: Cost,
         error: InterpreterError,
     ) -> Result<EvaluateResult, InterpreterError> {
-        // println!("\nhit handle_error");
         match error {
             // Parsing error consumes only parsing cost
             InterpreterError::ParserError(_) => Ok(EvaluateResult {
@@ -102,7 +105,7 @@ impl InterpreterImpl {
             }),
 
             // For Out Of Phlogistons error initial cost is used because evaluated cost can be higher
-            // - all phlos are consumed
+            // all phlos are consumed
             InterpreterError::OutOfPhlogistonsError => Ok(EvaluateResult {
                 cost: initial_cost,
                 errors: vec![error],
@@ -116,7 +119,12 @@ impl InterpreterImpl {
                 mergeable: HashSet::new(),
             }),
 
-            _ => panic!("Fatal Interpreter error: {:?}", error),
+            // InterpreterError is returned as a result
+            _ => Ok(EvaluateResult {
+                cost: initial_cost,
+                errors: vec![error],
+                mergeable: HashSet::new(),
+            }),
         }
     }
 }

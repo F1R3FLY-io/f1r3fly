@@ -36,8 +36,6 @@ use crate::rust::rholang::runtime::RuntimeOps;
 
 use super::system_deploy::SystemDeployTrait;
 
-use retry::{delay::NoDelay, retry, OperationResult};
-
 type MergeableStore = KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -218,7 +216,7 @@ impl RuntimeManager {
         deploy: &Signed<DeployData>,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::capture_results(runtime, start, deploy)?;
+        let computed = RuntimeOps::capture_results(runtime, start, deploy).await?;
         Ok(computed)
     }
 
@@ -227,48 +225,13 @@ impl RuntimeManager {
         start_hash: &StateHash,
     ) -> Result<Vec<Validator>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::get_active_validators(runtime, start_hash)?;
+        let computed = RuntimeOps::get_active_validators(runtime, start_hash).await?;
         Ok(computed)
     }
 
     pub async fn compute_bonds(&self, hash: StateHash) -> Result<Vec<Bond>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let mut retries = 0;
-        const MAX_RETRIES: usize = 5;
-
-        // TODO: this retry is a temp solution for debugging why this throws `IllegalArgumentException` - OLD
-        let result = retry(NoDelay.take(MAX_RETRIES), || {
-            retries += 1;
-            match RuntimeOps::compute_bonds(runtime.clone(), &hash) {
-                Ok(bonds) => OperationResult::Ok(bonds),
-                Err(e) => {
-                    // Match Scala's error message format
-                    eprintln!(
-                        "Unexpected exception {} during computeBonds. {} {}.",
-                        e,
-                        if retries >= MAX_RETRIES {
-                            format!("Giving up after {} retries", retries)
-                        } else {
-                            format!("Retrying {} time", retries)
-                        },
-                        if retries >= MAX_RETRIES { "." } else { "" }
-                    );
-
-                    if retries >= MAX_RETRIES {
-                        OperationResult::Err(e)
-                    } else {
-                        OperationResult::Retry(e)
-                    }
-                }
-            }
-        });
-
-        result.map_err(|e| {
-            CasperError::RuntimeError(format!(
-                "Unexpected exception {} during computeBonds. Giving up after {} retries.",
-                e, MAX_RETRIES
-            ))
-        })
+        RuntimeOps::compute_bonds(runtime, &hash).await
     }
 
     // Executes deploy as user deploy with immediate rollback
@@ -278,7 +241,7 @@ impl RuntimeManager {
         hash: &StateHash,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::play_exploratory_deploy(runtime, term, hash)?;
+        let computed = RuntimeOps::play_exploratory_deploy(runtime, term, hash).await?;
         Ok(computed)
     }
 
