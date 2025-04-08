@@ -34,8 +34,8 @@ async fn empty_state_hash_should_be_the_same_as_hard_coded_cached_value() {
     let hard_coded_hash = RuntimeManager::empty_state_hash_fixed();
     let empty_root_hash = RuntimeOps::empty_state_hash(runtime).await.unwrap();
 
-    let empty_hash_hard_coded = Blake2b256Hash::from_bytes(hard_coded_hash.to_vec());
-    let empty_hash = Blake2b256Hash::from_bytes(empty_root_hash.to_vec());
+    let empty_hash_hard_coded = Blake2b256Hash::from_bytes_prost(&hard_coded_hash);
+    let empty_hash = Blake2b256Hash::from_bytes_prost(&empty_root_hash);
 
     assert_eq!(empty_hash_hard_coded, empty_hash);
 }

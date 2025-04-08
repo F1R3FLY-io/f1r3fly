@@ -89,6 +89,31 @@ pub fn source_deploy_now(
     )
 }
 
+pub fn source_deploy_now_full(
+    source: String,
+    phlo_limit: Option<i64>,
+    phlo_price: Option<i64>,
+    sec: Option<PrivateKey>,
+    valid_after_block_number: Option<i64>,
+    shard_id: Option<String>,
+) -> Result<Signed<DeployData>, CasperError> {
+    let phlo_limit = phlo_limit.unwrap_or(1000000);
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| CasperError::RuntimeError(e.to_string()))?
+        .as_millis() as i64;
+
+    source_deploy(
+        source,
+        timestamp,
+        Some(phlo_limit),
+        phlo_price,
+        sec,
+        valid_after_block_number,
+        shard_id,
+    )
+}
+
 pub fn basic_deploy_data(
     id: i32,
     sec: Option<PrivateKey>,

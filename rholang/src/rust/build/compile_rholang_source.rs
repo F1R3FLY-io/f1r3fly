@@ -33,11 +33,9 @@ impl CompiledRholangSource {
     }
 
     pub fn load_source(filepath: &str) -> Result<String, InterpreterError> {
-        let content = fs::read_to_string(filepath)?;
-        Ok(format!(
-            "//Loaded from resource file <<{}>>{}",
-            filepath, content
-        ))
+        let content = fs::read_to_string(format!("src/main/resources/{}", filepath))?;
+        log::debug!("Loaded from resource file <<{}>>{}", filepath, content);
+        Ok(content)
     }
 
     pub fn apply(classpath: &str) -> Result<CompiledRholangSource, InterpreterError> {
@@ -85,17 +83,19 @@ impl CompiledRholangTemplate {
         classpath: &str,
         macros: &[(&str, &str)],
     ) -> Result<String, InterpreterError> {
-        let original_content = fs::read_to_string(classpath)?;
+        let original_content = fs::read_to_string(format!("src/main/resources/{}", classpath))?;
 
         let final_content = macros
             .iter()
             .fold(original_content, |content, (name, value)| {
-                content.replace(&format!("$$${}$$$", name), value)
+                content.replace(&format!("$${}$$", name), value)
             });
 
-        Ok(format!(
-            "//Loaded from resource file <<{}>>{}",
-            classpath, final_content
-        ))
+        log::debug!(
+            "Loaded from resource file <<{}>>{}",
+            classpath,
+            final_content
+        );
+        Ok(final_content)
     }
 }

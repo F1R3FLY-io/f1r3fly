@@ -25,7 +25,7 @@ pub trait SystemDeployTrait {
 
     fn as_any(&self) -> &dyn std::any::Any;
 
-    fn rand(&mut self) -> &mut Blake2b512Random;
+    fn rand(&self) -> Blake2b512Random;
 
     fn env(&mut self) -> HashMap<String, Par>;
 

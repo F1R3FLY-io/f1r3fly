@@ -51,8 +51,8 @@ impl SystemDeployTrait for RefundDeploy {
         self
     }
 
-    fn rand(&mut self) -> &mut Blake2b512Random {
-        &mut self.rand
+    fn rand(&self) -> Blake2b512Random {
+        self.rand.clone()
     }
 
     fn env(&mut self) -> HashMap<String, Par> {

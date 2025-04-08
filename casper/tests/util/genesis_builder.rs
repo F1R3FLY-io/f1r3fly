@@ -7,7 +7,9 @@ use block_storage::rust::{
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
-use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
+use rspace_plus_plus::rspace::{
+    hashing::blake2b256_hash::Blake2b256Hash, shared::key_value_store_manager::KeyValueStoreManager,
+};
 use std::{collections::HashMap, path::PathBuf};
 use tempfile::Builder;
 
@@ -263,7 +265,10 @@ impl GenessisBuilder {
             .tempdir()
             .expect("Failed to create temporary directory");
 
-        let mut kvs_manager = mk_test_rnode_store_manager(storage_directory.path().to_path_buf());
+        // Convert to a path that won't be automatically deleted
+        let storage_directory_path = storage_directory.into_path();
+
+        let mut kvs_manager = mk_test_rnode_store_manager(storage_directory_path.clone());
         let r_store = kvs_manager
             .r_space_stores()
             .await
@@ -276,18 +281,28 @@ impl GenessisBuilder {
             Genesis::non_negative_mergeable_tag_name(),
         );
 
-        let genesis = Genesis::create_genesis_block(&mut runtime_manager, genesis_parameters).await?;
+        let genesis =
+            Genesis::create_genesis_block(&mut runtime_manager, genesis_parameters).await?;
         let mut block_store = KeyValueBlockStore::create_from_kvm(&mut kvs_manager).await?;
         block_store.put(genesis.block_hash.clone(), &genesis)?;
 
         let mut block_dag_storage = BlockDagKeyValueStorage::new(&mut kvs_manager).await?;
         block_dag_storage.insert(&genesis, false, true)?;
 
+        // println!(
+        //     "genesis_block pre_state_hash: {:?}",
+        //     Blake2b256Hash::from_bytes_prost(&genesis.body.state.pre_state_hash)
+        // );
+        // println!(
+        //     "genesis_block post_state_hash: {:?}",
+        //     Blake2b256Hash::from_bytes_prost(&genesis.body.state.post_state_hash)
+        // );
+
         Ok(GenesisContext {
             genesis_block: genesis,
             validator_key_pairs: validator_key_pairs.clone(),
             genesis_vaults: genesis_vaults.clone(),
-            storage_directory: storage_directory.path().to_path_buf(),
+            storage_directory: storage_directory_path,
         })
     }
 }

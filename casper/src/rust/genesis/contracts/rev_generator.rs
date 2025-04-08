@@ -19,7 +19,7 @@ impl RevGenerator {
     ) -> Self {
         let vault_balance_list = user_vaults
             .iter()
-            .map(|v| format!("\"{}\" : {}", v.rev_address.to_base58(), v.initial_balance))
+            .map(|v| format!("(\"{}\", {})", v.rev_address.to_base58(), v.initial_balance))
             .collect::<Vec<String>>()
             .join(", ");
 

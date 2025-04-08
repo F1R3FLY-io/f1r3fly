@@ -9,8 +9,7 @@ pub struct Tools;
 impl Tools {
     pub fn unforgeable_name_rng(deployer: &PublicKey, timestamp: i64) -> Blake2b512Random {
         let seed = DeployDataProto {
-            // TODO: Remove into() once models crate is updated
-            deployer: deployer.bytes.clone().into(),
+            deployer: deployer.bytes.clone(),
             timestamp,
             ..Default::default()
         };

@@ -62,7 +62,7 @@ impl RuntimeManager {
         let runtime = rho_runtime::create_rho_runtime(
             new_space,
             self.mergeable_tag_name.clone(),
-            false,
+            true,
             &mut Vec::new(),
         )
         .await;
@@ -79,7 +79,7 @@ impl RuntimeManager {
         let runtime = rho_runtime::create_replay_rho_runtime(
             new_replay_space,
             self.mergeable_tag_name.clone(),
-            false,
+            true,
             &mut Vec::new(),
         )
         .await;
@@ -89,7 +89,7 @@ impl RuntimeManager {
 
     pub async fn compute_state(
         &mut self,
-        start_hash: StateHash,
+        start_hash: &StateHash,
         terms: Vec<Signed<DeployData>>,
         system_deploys: Vec<impl SystemDeployTrait>,
         block_data: BlockData,
@@ -104,12 +104,13 @@ impl RuntimeManager {
 
         let computed = RuntimeOps::compute_state(
             runtime,
-            start_hash.clone(),
+            start_hash,
             terms,
             system_deploys,
             block_data,
             invalid_blocks,
-        )?;
+        )
+        .await?;
 
         let (state_hash, usr_deploy_res, sys_deploy_res) = computed;
         let (usr_processed, usr_mergeable): (Vec<ProcessedDeploy>, Vec<NumberChannelsEndVal>) =
@@ -192,7 +193,8 @@ impl RuntimeManager {
             block_data,
             Some(invalid_blocks),
             is_genesis,
-        )?;
+        )
+        .await?;
 
         let (state_hash, mergeable_chs) = replay_op;
         // Convert from final to diff values and persist mergeable (number) channels for post-state hash

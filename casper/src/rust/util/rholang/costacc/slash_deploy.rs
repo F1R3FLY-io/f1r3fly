@@ -60,8 +60,8 @@ impl SystemDeployTrait for SlashDeploy {
         self
     }
 
-    fn rand(&mut self) -> &mut Blake2b512Random {
-        &mut self.initial_rand
+    fn rand(&self) -> Blake2b512Random {
+        self.initial_rand.clone()
     }
 
     fn env(&mut self) -> HashMap<String, Par> {
