@@ -55,7 +55,13 @@ impl Interpreter for InterpreterImpl {
             // println!("\nterm: {:#?}", term);
             let parsed = match Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env) {
                 Ok(p) => p,
-                Err(e) => return self.handle_error(initial_phlo, parsing_cost, e),
+                Err(e) => {
+                    return self.handle_error(
+                        initial_phlo,
+                        parsing_cost,
+                        InterpreterError::ParserError(e.to_string()),
+                    )
+                }
             };
             // println!("\nparsed: {:#?}", parsed);
             // let phlos_left_after_adt = self.c.get();
@@ -89,7 +95,6 @@ impl InterpreterImpl {
         InterpreterImpl { c: cost, merge_chs }
     }
 
-    // TODO: Implement and handle just 'InterpreterError'
     fn handle_error(
         &self,
         initial_cost: Cost,
@@ -116,6 +121,29 @@ impl InterpreterImpl {
             InterpreterError::AggregateError { interpreter_errors } => Ok(EvaluateResult {
                 cost: initial_cost,
                 errors: interpreter_errors,
+                mergeable: HashSet::new(),
+            }),
+
+            // TODO: Review why 'Compiler::source_to_adt_with_normalizer_env' doesn't pick this up
+            // See 'compute_state_should_capture_rholang_parsing_errors_and_charge_for_parsing'
+            InterpreterError::OperatorNotDefined {
+                op: _,
+                other_type: _,
+            } => Ok(EvaluateResult {
+                cost: parsing_cost,
+                errors: vec![error],
+                mergeable: HashSet::new(),
+            }),
+
+            // TODO: Review why 'Compiler::source_to_adt_with_normalizer_env' doesn't pick this up
+            // See 'compute_state_should_capture_rholang_parsing_errors_and_charge_for_parsing'
+            InterpreterError::OperatorExpectedError {
+                op: _,
+                expected: _,
+                other_type: _,
+            } => Ok(EvaluateResult {
+                cost: parsing_cost,
+                errors: vec![error],
                 mergeable: HashSet::new(),
             }),
 

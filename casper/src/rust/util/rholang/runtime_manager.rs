@@ -229,9 +229,9 @@ impl RuntimeManager {
         Ok(computed)
     }
 
-    pub async fn compute_bonds(&self, hash: StateHash) -> Result<Vec<Bond>, CasperError> {
+    pub async fn compute_bonds(&self, hash: &StateHash) -> Result<Vec<Bond>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        RuntimeOps::compute_bonds(runtime, &hash).await
+        RuntimeOps::compute_bonds(runtime, hash).await
     }
 
     // Executes deploy as user deploy with immediate rollback
