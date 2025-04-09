@@ -72,27 +72,10 @@ enum SystemDeployReplayResult<A> {
     },
 }
 
-impl<A> SystemDeployReplayResult<A> {
-    fn replay_succeeded(state_hash: StateHash, result: A) -> Self {
-        Self::ReplaySucceeded { state_hash, result }
-    }
-
-    fn replay_failed(system_deploy_error: SystemDeployUserError) -> Self {
-        Self::ReplayFailed {
-            system_deploy_error,
-        }
-    }
-}
-
 async fn genesis_context() -> Result<GenesisContext, CasperError> {
     let mut genesis_builder = GenessisBuilder::new();
     let genesis_context = genesis_builder.build_genesis_with_parameters(None).await?;
     Ok(genesis_context)
-}
-
-async fn genesis() -> Result<BlockMessage, CasperError> {
-    let genesis_context = genesis_context().await?;
-    Ok(genesis_context.genesis_block)
 }
 
 async fn with_runtime_manager<F, Fut, R>(f: F) -> Result<R, CasperError>
@@ -1002,8 +985,9 @@ async fn compute_state_should_charge_deploys_separately() {
                 p.iter().map(|d| d.cost.cost).sum()
             }
 
-            let deploy0 = construct_deploy::source_deploy_now_full(
+            let deploy0 = construct_deploy::source_deploy(
                 r#"for(@x <- @"w") { @"z"!("Got x") } "#.to_string(),
+                123,
                 None,
                 None,
                 None,
@@ -1012,9 +996,10 @@ async fn compute_state_should_charge_deploys_separately() {
             )
             .unwrap();
 
-            let deploy1 = construct_deploy::source_deploy_now_full(
+            let deploy1 = construct_deploy::source_deploy(
                 r#"for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(10) } "#
                     .to_string(),
+                123,
                 None,
                 None,
                 None,
@@ -1040,8 +1025,9 @@ async fn compute_state_should_charge_deploys_separately() {
             let (_, first_deploy, _) = runtime_manager
                 .compute_state(
                     &genesis_post_state,
-                    vec![construct_deploy::source_deploy_now_full(
+                    vec![construct_deploy::source_deploy(
                         r#"for(@x <- @"w") { @"z"!("Got x") } "#.to_string(),
+                        123,
                         None,
                         None,
                         None,
@@ -1064,9 +1050,10 @@ async fn compute_state_should_charge_deploys_separately() {
             let (_, second_deploy, _) = runtime_manager
                 .compute_state(
                     &genesis_post_state,
-                    vec![construct_deploy::source_deploy_now_full(
+                    vec![construct_deploy::source_deploy(
                         r#"for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(10) } "#
                             .to_string(),
+                        123,
                         None,
                         None,
                         None,
@@ -1113,19 +1100,19 @@ async fn compute_state_should_charge_deploys_separately() {
             assert!(first_deploy_cost < compound_deploy_cost);
             assert!(second_deploy_cost < compound_deploy_cost);
 
-            let matched_first: Vec<_> = compound_deploy
+            let matched_first = compound_deploy
                 .iter()
-                .filter(|d| d.deploy == first_deploy[0].deploy)
+                .find(|d| d.deploy == first_deploy[0].deploy)
                 .cloned()
-                .collect();
-            assert_eq!(first_deploy_cost, deploy_cost(&matched_first));
+                .expect("Expected at least one matching deploy");
+            assert_eq!(first_deploy_cost, deploy_cost(&vec![matched_first]));
 
-            let matched_second: Vec<_> = compound_deploy
+            let matched_second = compound_deploy
                 .iter()
-                .filter(|d| d.deploy == second_deploy[0].deploy)
+                .find(|d| d.deploy == second_deploy[0].deploy)
                 .cloned()
-                .collect();
-            assert_eq!(second_deploy_cost, deploy_cost(&matched_second));
+                .expect("Expected at least one matching deploy");
+            assert_eq!(second_deploy_cost, deploy_cost(&vec![matched_second]));
 
             assert_eq!(first_deploy_cost + second_deploy_cost, compound_deploy_cost);
         },
