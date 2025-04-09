@@ -1,6 +1,7 @@
 // See casper/src/test/scala/coop/rchain/casper/util/rholang/RuntimeManagerTest.scala
 
 use std::{
+    collections::HashMap,
     future::Future,
     sync::{Arc, Mutex, Once},
     time::{SystemTime, UNIX_EPOCH},
@@ -16,6 +17,7 @@ use casper::rust::{
                 check_balance::CheckBalance, close_block_deploy::CloseBlockDeploy,
                 pre_charge_deploy::PreChargeDeploy, refund_deploy::RefundDeploy,
             },
+            replay_failure::ReplayFailure,
             runtime_manager::RuntimeManager,
             system_deploy::SystemDeployTrait,
             system_deploy_result::SystemDeployResult,
@@ -25,16 +27,22 @@ use casper::rust::{
     },
 };
 use crypto::rust::{hash::blake2b512_random::Blake2b512Random, signatures::signed::Signed};
-use models::rust::{
-    block::state_hash::StateHash,
-    casper::protocol::casper_message::{
-        BlockMessage, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
+use models::{
+    rhoapi::PCost,
+    rust::{
+        block::state_hash::StateHash,
+        casper::protocol::casper_message::{
+            BlockMessage, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
+        },
     },
 };
 use rholang::rust::interpreter::{
-    accounting::costs,
+    accounting::costs::{self, Cost},
+    compiler::compiler::Compiler,
+    env::Env,
     rho_runtime::{RhoRuntime, RhoRuntimeImpl},
     system_processes::BlockData,
+    test_utils::par_builder_util::ParBuilderUtil,
 };
 use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
 
@@ -703,6 +711,687 @@ async fn compute_state_should_capture_rholang_parsing_errors_and_charge_for_pars
 
             assert!(result.1.is_failed == true);
             assert!(result.1.cost.cost == costs::parsing_cost(bad_rholang).value as u64);
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn compute_state_should_charge_for_parsing_and_execution() {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let correct_rholang =
+                r#" for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(2) } "#;
+            let rand = Blake2b512Random::create_from_bytes(&Vec::new());
+            let inital_phlo = Cost::unsafe_max();
+            let deploy = construct_deploy::source_deploy_now_full(
+                correct_rholang.to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let runtime = runtime_manager.spawn_runtime().await;
+            {
+                let _ = runtime.lock().unwrap().cost.set(inital_phlo.clone());
+            }
+
+            let term = Compiler::source_to_adt(&deploy.data.term).unwrap();
+            {
+                let _ = runtime.lock().unwrap().inj(term, Env::new(), rand).await;
+            }
+
+            let phlos_left = { runtime.lock().unwrap().cost.get() };
+            let reduction_cost = inital_phlo - phlos_left;
+
+            let parsing_cost = costs::parsing_cost(correct_rholang);
+
+            let result = compute_state(
+                &mut runtime_manager,
+                &genesis_context,
+                deploy,
+                &genesis_block.body.state.post_state_hash,
+            )
+            .await;
+
+            assert!(result.1.cost.cost == (reduction_cost + parsing_cost).value as u64);
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn capture_result_should_return_the_value_at_the_specified_channel_after_a_rholang_computation(
+) {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let deployo0 = construct_deploy::source_deploy_now_full(
+                r#"
+                        new rl(`rho:registry:lookup`), NonNegativeNumberCh in {
+                        rl!(`rho:lang:nonNegativeNumber`, *NonNegativeNumberCh) |
+                        for(@(_, NonNegativeNumber) <- NonNegativeNumberCh) {
+                          @NonNegativeNumber!(37, "nn")
+                        }
+                      }
+                "#
+                .to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let result0 = compute_state(
+                &mut runtime_manager,
+                &genesis_context,
+                deployo0,
+                &genesis_block.body.state.post_state_hash,
+            )
+            .await;
+
+            let hash = result0.0;
+            let deployo1 = construct_deploy::source_deploy_now_full(
+                r#"
+                new return in { for(nn <- @"nn"){ nn!("value", *return) } }
+                "#
+                .to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let result1 = runtime_manager
+                .capture_results(&hash, &deployo1)
+                .await
+                .unwrap();
+
+            assert!(result1.len() == 1);
+            assert!(result1[0] == ParBuilderUtil::mk_term("37").unwrap());
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn capture_result_should_handle_multiple_results_and_no_results_appropriately() {
+    with_runtime_manager(|runtime_manager, _, _| async move {
+        let n = 8;
+        let returns = (1..=n)
+            .map(|i| format!("return!({})", i))
+            .collect::<Vec<_>>();
+        let term = format!("new return in {{ {} }}", returns.join("|"));
+        let term_no_res = format!("new x, return in {{ {} }}", returns.join("|"));
+        let deploy =
+            construct_deploy::source_deploy(term, 0, None, None, None, None, None).unwrap();
+        let deploy_no_res =
+            construct_deploy::source_deploy(term_no_res, 0, None, None, None, None, None).unwrap();
+
+        let many_results = runtime_manager
+            .capture_results(&RuntimeManager::empty_state_hash_fixed(), &deploy)
+            .await
+            .unwrap();
+
+        let no_results = runtime_manager
+            .capture_results(&RuntimeManager::empty_state_hash_fixed(), &deploy_no_res)
+            .await
+            .unwrap();
+
+        assert!(no_results.is_empty());
+        assert!(many_results.len() == n);
+        assert!((1..=n)
+            .all(|i| many_results.contains(&ParBuilderUtil::mk_term(&i.to_string()).unwrap())));
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn capture_result_should_throw_error_if_execution_fails() {
+    with_runtime_manager(|runtime_manager, _, _| async move {
+        let deploy = construct_deploy::source_deploy(
+            "new return in { return.undefined() }".to_string(),
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let result = runtime_manager
+            .capture_results(&RuntimeManager::empty_state_hash_fixed(), &deploy)
+            .await;
+
+        assert!(result.is_err());
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn empty_state_hash_should_not_remember_previous_hot_store_state() {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let deploy1 = construct_deploy::basic_deploy_data(0, None, None).unwrap();
+            let deploy2 = construct_deploy::basic_deploy_data(0, None, None).unwrap();
+
+            let hash1 = RuntimeManager::empty_state_hash_fixed();
+            let _ = compute_state(
+                &mut runtime_manager,
+                &genesis_context,
+                deploy1,
+                &genesis_block.body.state.post_state_hash,
+            )
+            .await;
+
+            let hash2 = RuntimeManager::empty_state_hash_fixed();
+            let _ = compute_state(
+                &mut runtime_manager,
+                &genesis_context,
+                deploy2,
+                &genesis_block.body.state.post_state_hash,
+            )
+            .await;
+
+            assert!(hash1 == hash2);
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn compute_state_should_be_replayed_by_replay_compute_state() {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let deploy = construct_deploy::source_deploy_now_full(
+                r#"
+                  new deployerId(`rho:rchain:deployerId`),
+                  rl(`rho:registry:lookup`),
+                  revAddressOps(`rho:rev:address`),
+                  revAddressCh,
+                  revVaultCh in {
+                  rl!(`rho:rchain:revVault`, *revVaultCh) |
+                  revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
+                  for(@userRevAddress <- revAddressCh & @(_, revVault) <- revVaultCh){
+                    new userVaultCh in {
+                    @revVault!("findOrCreate", userRevAddress, *userVaultCh) |
+                    for(@(true, userVault) <- userVaultCh){
+                    @userVault!("balance", "IGNORE")
+                    }
+                  }
+                }
+              }
+            }
+                "#
+                .to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+
+            let genesis_post_state = genesis_block.body.state.post_state_hash;
+            let block_data = BlockData {
+                time_stamp: time as i64,
+                block_number: 0,
+                sender: genesis_context.validator_pks()[0].clone(),
+                seq_num: 0,
+            };
+
+            let invalid_blocks = HashMap::new();
+            let (play_post_state, processed_deploys, processed_system_deploys) = runtime_manager
+                .compute_state(
+                    &genesis_post_state,
+                    vec![deploy],
+                    vec![CloseBlockDeploy {
+                        initial_rand: system_deploy_util::generate_close_deploy_random_seed_from_pk(
+                            block_data.sender.clone(),
+                            block_data.seq_num,
+                        ),
+                    }],
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            let replay_compute_state_result = runtime_manager
+                .replay_compute_state(
+                    &genesis_post_state,
+                    processed_deploys,
+                    processed_system_deploys,
+                    &block_data,
+                    Some(invalid_blocks),
+                    false,
+                )
+                .await
+                .unwrap();
+
+            assert!(play_post_state == replay_compute_state_result);
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn compute_state_should_charge_deploys_separately() {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            fn deploy_cost(p: &[ProcessedDeploy]) -> u64 {
+                p.iter().map(|d| d.cost.cost).sum()
+            }
+
+            let deploy0 = construct_deploy::source_deploy_now_full(
+                r#"for(@x <- @"w") { @"z"!("Got x") } "#.to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let deploy1 = construct_deploy::source_deploy_now_full(
+                r#"for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(10) } "#
+                    .to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+
+            let genesis_post_state = genesis_block.body.state.post_state_hash;
+            let block_data = BlockData {
+                time_stamp: time as i64,
+                block_number: 0,
+                sender: genesis_context.validator_pks()[0].clone(),
+                seq_num: 0,
+            };
+
+            let invalid_blocks = HashMap::new();
+            let (_, first_deploy, _) = runtime_manager
+                .compute_state(
+                    &genesis_post_state,
+                    vec![construct_deploy::source_deploy_now_full(
+                        r#"for(@x <- @"w") { @"z"!("Got x") } "#.to_string(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .unwrap()],
+                    vec![CloseBlockDeploy {
+                        initial_rand: system_deploy_util::generate_close_deploy_random_seed_from_pk(
+                            block_data.sender.clone(),
+                            block_data.seq_num,
+                        ),
+                    }],
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            let (_, second_deploy, _) = runtime_manager
+                .compute_state(
+                    &genesis_post_state,
+                    vec![construct_deploy::source_deploy_now_full(
+                        r#"for(@x <- @"x" & @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!(10) } "#
+                            .to_string(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .unwrap()],
+                    vec![CloseBlockDeploy {
+                        initial_rand: system_deploy_util::generate_close_deploy_random_seed_from_pk(
+                            block_data.sender.clone(),
+                            block_data.seq_num,
+                        ),
+                    }],
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            let (_, compound_deploy, _) = runtime_manager
+                .compute_state(
+                    &genesis_post_state,
+                    vec![deploy0, deploy1],
+                    vec![CloseBlockDeploy {
+                        initial_rand: system_deploy_util::generate_close_deploy_random_seed_from_pk(
+                            block_data.sender.clone(),
+                            block_data.seq_num,
+                        ),
+                    }],
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            assert!(first_deploy.len() == 1);
+            assert!(second_deploy.len() == 1);
+            assert!(compound_deploy.len() == 2);
+
+            let first_deploy_cost = deploy_cost(&first_deploy);
+            let second_deploy_cost = deploy_cost(&second_deploy);
+            let compound_deploy_cost = deploy_cost(&compound_deploy);
+
+            assert!(first_deploy_cost < compound_deploy_cost);
+            assert!(second_deploy_cost < compound_deploy_cost);
+
+            let matched_first: Vec<_> = compound_deploy
+                .iter()
+                .filter(|d| d.deploy == first_deploy[0].deploy)
+                .cloned()
+                .collect();
+            assert_eq!(first_deploy_cost, deploy_cost(&matched_first));
+
+            let matched_second: Vec<_> = compound_deploy
+                .iter()
+                .filter(|d| d.deploy == second_deploy[0].deploy)
+                .cloned()
+                .collect();
+            assert_eq!(second_deploy_cost, deploy_cost(&matched_second));
+
+            assert_eq!(first_deploy_cost + second_deploy_cost, compound_deploy_cost);
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn compute_state_should_just_work() {
+    with_runtime_manager(|mut runtime_manager, genesis_context, genesis_block| async move {
+      let gen_post_state = genesis_block.body.state.post_state_hash;
+      let source =  r#"
+      new d1,d2,d3,d4,d5,d6,d7,d8,d9 in {
+        contract d1(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1) | d1!(depth - 1)
+          }
+        } |
+        contract d2(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1) | d2!(depth - 1)
+          }
+        } |
+        contract d3(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1) | d3!(depth - 1)
+          }
+        } |
+        contract d4(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1) | d4!(depth - 1)
+          }
+        } |
+        contract d5(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1) | d5!(depth - 1)
+          }
+        } |
+        contract d6(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1) | d6!(depth - 1)
+          }
+        } |
+        contract d7(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1) | d7!(depth - 1)
+          }
+        } |
+        contract d8(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1) | d8!(depth - 1)
+          }
+        } |
+        contract d9(@depth) = {
+          if (depth <= 0) {
+            Nil
+          } else {
+            d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1) | d9!(depth - 1)
+          }
+        } |
+        d1!(2) |
+        d2!(2) |
+        d3!(2) |
+        d4!(2) |
+        d5!(2) |
+        d6!(2) |
+        d7!(2) |
+        d8!(2) |
+        d9!(2)
+      }
+      "#.to_string();
+
+      let deploy = construct_deploy::source_deploy_now_full(source, Some(i64::MAX - 2), None, None, None, None).unwrap();
+      let (play_state_hash1, processed_deploy) = compute_state(&mut runtime_manager, &genesis_context, deploy, &gen_post_state).await;
+      let replay_compute_state_result = replay_compute_state(&mut runtime_manager, &genesis_context, processed_deploy, &gen_post_state).await.unwrap();
+      assert!(play_state_hash1 == replay_compute_state_result);
+      assert!(play_state_hash1 != gen_post_state);
+    })
+        .await
+        .unwrap()
+}
+
+async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let deploy = construct_deploy::source_deploy_now_full(
+                source,
+                Some(10000),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as i64;
+
+            let gen_post_state = genesis_block.body.state.post_state_hash;
+            let block_data = BlockData {
+                time_stamp: time,
+                block_number: 0,
+                sender: genesis_context.validator_pks()[0].clone(),
+                seq_num: 0,
+            };
+
+            let invalid_blocks = HashMap::new();
+            let (_, processed_deploys, processed_system_deploys) = runtime_manager
+                .compute_state(
+                    &gen_post_state,
+                    vec![deploy],
+                    vec![CloseBlockDeploy {
+                        initial_rand: system_deploy_util::generate_close_deploy_random_seed_from_pk(
+                            block_data.sender.clone(),
+                            block_data.seq_num,
+                        ),
+                    }],
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            let processed_deploy = processed_deploys.into_iter().next().unwrap();
+            let processed_deploy_cost = processed_deploy.cost.cost;
+
+            let invalid_processed_deploy = ProcessedDeploy {
+                cost: PCost {
+                    cost: processed_deploy_cost - 1,
+                },
+                ..processed_deploy
+            };
+
+            let result = runtime_manager
+                .replay_compute_state(
+                    &gen_post_state,
+                    vec![invalid_processed_deploy],
+                    processed_system_deploys,
+                    &block_data,
+                    Some(invalid_blocks),
+                    false,
+                )
+                .await;
+
+            result
+        },
+    )
+    .await?
+}
+
+#[tokio::test]
+async fn replaycomputestate_should_catch_discrepancies_in_initial_and_replay_cost_when_no_errors_are_thrown(
+) {
+    let result = invalid_replay("@0!(0) | for(@0 <- @0){ Nil }".to_string()).await;
+    match result {
+        Err(CasperError::ReplayFailure(ReplayFailure::ReplayCostMismatch {
+            initial_cost,
+            replay_cost,
+        })) => {
+            assert_eq!(initial_cost, 322);
+            assert_eq!(replay_cost, 323);
+        }
+        _ => panic!("Expected ReplayCostMismatch error"),
+    }
+}
+
+#[tokio::test]
+async fn replaycomputestate_should_not_catch_discrepancies_in_initial_and_replay_cost_when_user_errors_are_thrown(
+) {
+    let result = invalid_replay("@0!(0) | for(@x <- @0){ x.undefined() }".to_string()).await;
+    match result {
+        Err(CasperError::ReplayFailure(ReplayFailure::ReplayCostMismatch {
+            initial_cost,
+            replay_cost,
+        })) => {
+            assert_eq!(initial_cost, 9999);
+            assert_eq!(replay_cost, 10000);
+        }
+        _ => panic!("Expected ReplayCostMismatch error"),
+    }
+}
+
+// This is additional test for sorting with joins and channels inside joins.
+// - after reverted PR https://github.com/rchain/rchain/pull/2436
+#[tokio::test]
+async fn joins_should_be_replayed_correctly() {
+    with_runtime_manager(
+        |mut runtime_manager, genesis_context, genesis_block| async move {
+            let term = r#"
+            new a, b, c, d in {
+              for (_ <- a & _ <- b) { Nil } |
+              for (_ <- a & _ <- c) { Nil } |
+              for (_ <- a & _ <- d) { Nil }
+            }
+            "#;
+
+            let gen_post_state = genesis_block.body.state.post_state_hash;
+            let deploy = construct_deploy::source_deploy_now_full(
+                term.to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as i64;
+
+            let block_data = BlockData {
+                time_stamp: time,
+                block_number: 1,
+                sender: genesis_context.validator_pks()[0].clone(),
+                seq_num: 1,
+            };
+
+            let invalid_blocks = HashMap::new();
+            let (state_hash, processed_deploys, processed_sys_deploys) = runtime_manager
+                .compute_state(
+                    &gen_post_state,
+                    vec![deploy],
+                    Vec::<CheckBalance>::new(),
+                    block_data.clone(),
+                    Some(invalid_blocks.clone()),
+                )
+                .await
+                .unwrap();
+
+            let replay_state_hash = runtime_manager
+                .replay_compute_state(
+                    &gen_post_state,
+                    processed_deploys,
+                    processed_sys_deploys,
+                    &block_data,
+                    Some(invalid_blocks),
+                    false,
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                hex::encode(state_hash.to_vec()),
+                hex::encode(replay_state_hash.to_vec())
+            );
         },
     )
     .await
