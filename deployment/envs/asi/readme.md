@@ -48,7 +48,7 @@ helm upgrade --install f1r3fly-asi-prod ../../../docker/helm/f1r3fly -n f1r3fly-
 ```
 ### Undeploy
 ```sh
-helm uninstall f1r3fly-asi-prd -n f1r3fly-asi-prd
+helm uninstall f1r3fly-asi-prod -n f1r3fly-asi-prod
 ```
 
 

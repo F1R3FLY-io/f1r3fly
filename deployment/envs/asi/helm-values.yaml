@@ -32,4 +32,4 @@ env:
     value: "sk-proj-1234567890" # TODO: add the actual key
   - name: JAVA_OPTS
     value: "-Xmx1536m" # for scala version
-    value: "-Xmx6144m" # for rust version
+    # value: "-Xmx6144m" # for rust version
