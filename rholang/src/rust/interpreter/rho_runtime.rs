@@ -251,14 +251,14 @@ impl RhoRuntimeImpl {
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
-    ) -> Arc<Mutex<RhoRuntimeImpl>> {
-        Arc::new(Mutex::new(RhoRuntimeImpl {
+    ) -> RhoRuntimeImpl {
+        RhoRuntimeImpl {
             reducer,
             cost,
             block_data_ref,
             invalid_blocks_param,
             merge_chs,
-        }))
+        }
     }
 }
 
@@ -941,13 +941,12 @@ fn bootstrap_rand() -> Blake2b512Random {
          .as_bytes())
 }
 
-pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
+pub async fn bootstrap_registry(runtime: &RhoRuntimeImpl) -> () {
     // println!("\ncalling bootstrap_registry");
     let rand = bootstrap_rand();
     // rand.debug_str();
-    let runtime_lock = runtime.try_lock().unwrap();
-    let cost = runtime_lock.cost().get();
-    let _ = runtime_lock
+    let cost = runtime.cost().get();
+    let _ = runtime
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
     // println!("\nast: {:?}", ast());
@@ -955,12 +954,12 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
     //     "\nruntime space before inject, {:?}",
     //     runtime_lock.get_hot_changes().len()
     // );
-    runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
+    runtime.inj(ast(), Env::new(), rand).await.unwrap();
     // println!(
     //     "\nruntime space after inject, {:?}",
     //     runtime_lock.get_hot_changes().len()
     // );
-    let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
+    let _ = runtime.cost().set(Cost::create_from_cost(cost));
 }
 
 async fn create_runtime<T>(
@@ -968,7 +967,7 @@ async fn create_runtime<T>(
     extra_system_processes: &mut Vec<Definition>,
     init_registry: bool,
     mergeable_tag_name: Par,
-) -> Arc<Mutex<RhoRuntimeImpl>>
+) -> RhoRuntimeImpl
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
@@ -989,12 +988,12 @@ where
     );
 
     let (reducer, block_ref, invalid_blocks) = rho_env;
-    let runtime = RhoRuntimeImpl::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
+    let mut runtime = RhoRuntimeImpl::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
         // println!("\ninit_registry");
-        bootstrap_registry(runtime.clone()).await;
-        runtime.try_lock().unwrap().create_checkpoint();
+        bootstrap_registry(&runtime).await;
+        runtime.create_checkpoint();
     }
 
     runtime
@@ -1022,7 +1021,7 @@ pub async fn create_rho_runtime<T>(
     mergeable_tag_name: Par,
     init_registry: bool,
     extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<RhoRuntimeImpl>>
+) -> RhoRuntimeImpl
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
@@ -1048,7 +1047,7 @@ pub async fn create_replay_rho_runtime<T>(
     mergeable_tag_name: Par,
     init_registry: bool,
     extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<RhoRuntimeImpl>>
+) -> RhoRuntimeImpl
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
@@ -1067,7 +1066,7 @@ async fn _create_runtimes<T, R>(
     init_registry: bool,
     additional_system_processes: &mut Vec<Definition>,
     mergeable_tag_name: Par,
-) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<RhoRuntimeImpl>>)
+) -> (RhoRuntimeImpl, RhoRuntimeImpl)
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
     R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
@@ -1097,7 +1096,7 @@ pub async fn create_runtime_from_kv_store(
     init_registry: bool,
     additional_system_processes: &mut Vec<Definition>,
     matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
-) -> Arc<Mutex<RhoRuntimeImpl>> {
+) -> RhoRuntimeImpl {
     let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
         RSpace::create(stores, matcher).unwrap();
 

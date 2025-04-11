@@ -55,7 +55,7 @@ pub struct RuntimeManager {
 }
 
 impl RuntimeManager {
-    pub async fn spawn_runtime(&self) -> Arc<Mutex<RhoRuntimeImpl>> {
+    pub async fn spawn_runtime(&self) -> RhoRuntimeImpl {
         let new_space = self.space.spawn().expect("Failed to spawn RSpace");
         let runtime = rho_runtime::create_rho_runtime(
             new_space,
@@ -68,7 +68,7 @@ impl RuntimeManager {
         runtime
     }
 
-    pub async fn spawn_replay_runtime(&self) -> Arc<Mutex<RhoRuntimeImpl>> {
+    pub async fn spawn_replay_runtime(&self) -> RhoRuntimeImpl {
         let new_replay_space = self
             .replay_space
             .spawn()
@@ -95,20 +95,21 @@ impl RuntimeManager {
     ) -> Result<(StateHash, Vec<ProcessedDeploy>, Vec<ProcessedSystemDeploy>), CasperError> {
         let invalid_blocks = invalid_blocks.unwrap_or_default();
         let runtime = self.spawn_runtime().await;
+        let mut runtime_ops = RuntimeOps::new(runtime);
 
         // Block data used for mergeable key
         let sender = block_data.sender.clone();
         let seq_num = block_data.seq_num;
 
-        let computed = RuntimeOps::compute_state(
-            runtime,
-            start_hash,
-            terms,
-            system_deploys,
-            block_data,
-            invalid_blocks,
-        )
-        .await?;
+        let computed = runtime_ops
+            .compute_state(
+                start_hash,
+                terms,
+                system_deploys,
+                block_data,
+                invalid_blocks,
+            )
+            .await?;
 
         let (state_hash, usr_deploy_res, sys_deploy_res) = computed;
         let (usr_processed, usr_mergeable): (Vec<ProcessedDeploy>, Vec<NumberChannelsEndVal>) =
@@ -147,8 +148,10 @@ impl RuntimeManager {
         block_number: i64,
     ) -> Result<(StateHash, StateHash, Vec<ProcessedDeploy>), CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed =
-            RuntimeOps::compute_genesis(runtime, terms, block_time, block_number).await?;
+        let mut runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops
+            .compute_genesis(terms, block_time, block_number)
+            .await?;
         let (pre_state, state_hash, processed) = computed;
         let (processed_deploys, mergeable_chs) = processed.into_iter().unzip();
 
@@ -179,20 +182,22 @@ impl RuntimeManager {
     ) -> Result<StateHash, CasperError> {
         let invalid_blocks = invalid_blocks.unwrap_or_default();
         let replay_runtime = self.spawn_replay_runtime().await;
+        let runtime_ops = RuntimeOps::new(replay_runtime);
+        let mut replay_runtime_ops = ReplayRuntimeOps::new(runtime_ops);
 
         let sender = block_data.sender.clone();
         let seq_num = block_data.seq_num;
 
-        let replay_op = ReplayRuntimeOps::replay_compute_state(
-            replay_runtime,
-            start_hash,
-            terms,
-            system_deploys,
-            block_data,
-            Some(invalid_blocks),
-            is_genesis,
-        )
-        .await?;
+        let replay_op = replay_runtime_ops
+            .replay_compute_state(
+                start_hash,
+                terms,
+                system_deploys,
+                block_data,
+                Some(invalid_blocks),
+                is_genesis,
+            )
+            .await?;
 
         let (state_hash, mergeable_chs) = replay_op;
         // Convert from final to diff values and persist mergeable (number) channels for post-state hash
@@ -216,7 +221,8 @@ impl RuntimeManager {
         deploy: &Signed<DeployData>,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::capture_results(runtime, start, deploy).await?;
+        let mut runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.capture_results(start, deploy).await?;
         Ok(computed)
     }
 
@@ -225,13 +231,16 @@ impl RuntimeManager {
         start_hash: &StateHash,
     ) -> Result<Vec<Validator>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::get_active_validators(runtime, start_hash).await?;
+        let mut runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.get_active_validators(start_hash).await?;
         Ok(computed)
     }
 
     pub async fn compute_bonds(&self, hash: &StateHash) -> Result<Vec<Bond>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        RuntimeOps::compute_bonds(runtime, hash).await
+        let mut runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.compute_bonds(hash).await?;
+        Ok(computed)
     }
 
     // Executes deploy as user deploy with immediate rollback
@@ -241,18 +250,18 @@ impl RuntimeManager {
         hash: &StateHash,
     ) -> Result<Vec<Par>, CasperError> {
         let runtime = self.spawn_runtime().await;
-        let computed = RuntimeOps::play_exploratory_deploy(runtime, term, hash).await?;
+        let mut runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.play_exploratory_deploy(term, hash).await?;
         Ok(computed)
     }
 
     pub async fn get_data(&self, hash: StateHash, channel: &Par) -> Result<Vec<Par>, CasperError> {
-        let runtime = self.spawn_runtime().await;
+        let mut runtime = self.spawn_runtime().await;
 
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
-        drop(runtime_lock);
+        runtime.reset(Blake2b256Hash::from_bytes_prost(&hash));
 
-        let computed = RuntimeOps::get_data_par(runtime, channel);
+        let runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.get_data_par(channel);
         Ok(computed)
     }
 
@@ -261,13 +270,12 @@ impl RuntimeManager {
         hash: StateHash,
         channels: Vec<Par>,
     ) -> Result<Vec<(Vec<BindPattern>, Par)>, CasperError> {
-        let runtime = self.spawn_runtime().await;
+        let mut runtime = self.spawn_runtime().await;
 
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&hash));
-        drop(runtime_lock);
+        runtime.reset(Blake2b256Hash::from_bytes_prost(&hash));
 
-        let computed = RuntimeOps::get_continuation_par(runtime, channels);
+        let runtime_ops = RuntimeOps::new(runtime);
+        let computed = runtime_ops.get_continuation_par(channels);
         Ok(computed)
     }
 

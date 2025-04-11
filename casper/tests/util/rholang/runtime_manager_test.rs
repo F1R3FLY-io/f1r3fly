@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     future::Future,
-    sync::{Arc, Mutex, Once},
+    sync::Once,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -40,7 +40,7 @@ use rholang::rust::interpreter::{
     accounting::costs::{self, Cost},
     compiler::compiler::Compiler,
     env::Env,
-    rho_runtime::{RhoRuntime, RhoRuntimeImpl},
+    rho_runtime::RhoRuntime,
     system_processes::BlockData,
     test_utils::par_builder_util::ParBuilderUtil,
 };
@@ -209,8 +209,7 @@ where
 {
     let runtime = runtime_manager.spawn_runtime().await;
     {
-        let runtime_lock = runtime.lock().unwrap();
-        runtime_lock.set_block_data(BlockData {
+        runtime.set_block_data(BlockData {
             time_stamp: 0,
             block_number: 0,
             sender: genesis_context.validator_pks()[0].clone(),
@@ -218,8 +217,10 @@ where
         });
     }
 
-    let play_system_result =
-        RuntimeOps::play_system_deploy(runtime, start_state, play_system_deploy).await?;
+    let mut runtime_ops = RuntimeOps::new(runtime);
+    let play_system_result = runtime_ops
+        .play_system_deploy(start_state, play_system_deploy)
+        .await?;
 
     match play_system_result {
         SystemDeployResult::PlaySucceeded {
@@ -232,8 +233,7 @@ where
 
             let replay_runtime = runtime_manager.spawn_replay_runtime().await;
             {
-                let replay_runtime_lock = replay_runtime.lock().unwrap();
-                replay_runtime_lock.set_block_data(BlockData {
+                replay_runtime.set_block_data(BlockData {
                     time_stamp: 0,
                     block_number: 0,
                     sender: genesis_context.validator_pks()[0].clone(),
@@ -241,8 +241,9 @@ where
                 });
             }
 
+            let replay_runtime_ops = ReplayRuntimeOps::new_from_runtime(replay_runtime);
             let replay_system_result = exec_replay_system_deploy(
-                replay_runtime,
+                replay_runtime_ops,
                 start_state,
                 replay_system_deploy,
                 &processed_system_deploy,
@@ -278,7 +279,7 @@ where
 }
 
 async fn exec_replay_system_deploy<S: SystemDeployTrait>(
-    runtime: Arc<Mutex<RhoRuntimeImpl>>,
+    mut replay_runtime_ops: ReplayRuntimeOps,
     state_hash: &StateHash,
     system_deploy: &mut S,
     processed_system_deploy: &ProcessedSystemDeploy,
@@ -288,29 +289,21 @@ async fn exec_replay_system_deploy<S: SystemDeployTrait>(
         _ => None,
     };
 
-    let rig_result = ReplayRuntimeOps::rig_with_check_system_deploy(
-        runtime.clone(),
-        processed_system_deploy.clone(),
-        || async {
-            {
-                let mut runtime_lock = runtime.lock().unwrap();
-                runtime_lock.reset(Blake2b256Hash::from_bytes_prost(state_hash));
-            }
+    replay_runtime_ops.rig_system_deploy(processed_system_deploy)?;
+    replay_runtime_ops
+        .runtime_ops
+        .runtime
+        .reset(Blake2b256Hash::from_bytes_prost(state_hash));
 
-            ReplayRuntimeOps::replay_system_deploy_internal(
-                runtime.clone(),
-                system_deploy,
-                &expected_failure,
-            )
-            .await
-        },
-    )
-    .await?;
+    let (value, eval_res) = replay_runtime_ops
+        .replay_system_deploy_internal(system_deploy, &expected_failure)
+        .await?;
 
-    match rig_result {
+    replay_runtime_ops.check_replay_data_with_fix(eval_res.errors.is_empty())?;
+
+    match (value, eval_res) {
         (Either::Right(result), _) => {
-            let mut runtime_lock = runtime.lock().unwrap();
-            let checkpoint = runtime_lock.create_checkpoint();
+            let checkpoint = replay_runtime_ops.runtime_ops.runtime.create_checkpoint();
 
             Ok(SystemDeployReplayResult::ReplaySucceeded {
                 state_hash: checkpoint.root.to_bytes_prost(),
@@ -719,16 +712,10 @@ async fn compute_state_should_charge_for_parsing_and_execution() {
             .unwrap();
 
             let runtime = runtime_manager.spawn_runtime().await;
-            {
-                let _ = runtime.lock().unwrap().cost.set(inital_phlo.clone());
-            }
-
+            runtime.cost.set(inital_phlo.clone());
             let term = Compiler::source_to_adt(&deploy.data.term).unwrap();
-            {
-                let _ = runtime.lock().unwrap().inj(term, Env::new(), rand).await;
-            }
-
-            let phlos_left = { runtime.lock().unwrap().cost.get() };
+            let _ = runtime.inj(term, Env::new(), rand).await;
+            let phlos_left = runtime.cost.get();
             let reduction_cost = inital_phlo - phlos_left;
 
             let parsing_cost = costs::parsing_cost(correct_rholang);

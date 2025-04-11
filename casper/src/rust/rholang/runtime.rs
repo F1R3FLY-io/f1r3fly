@@ -68,7 +68,15 @@ use crate::rust::{
     },
 };
 
-pub struct RuntimeOps;
+pub struct RuntimeOps {
+    pub runtime: RhoRuntimeImpl,
+}
+
+impl RuntimeOps {
+    pub fn new(runtime: RhoRuntimeImpl) -> Self {
+        Self { runtime }
+    }
+}
 
 #[allow(type_alias_bounds)]
 pub type SysEvalResult<S: SystemDeployTrait> =
@@ -88,16 +96,11 @@ impl RuntimeOps {
      * The `emptyStateHash` is used as genesis block pre state which the state only contains registry
      * fixed channels in the state.
      */
-    pub async fn empty_state_hash(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
-    ) -> Result<StateHash, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(RadixHistory::empty_root_node_hash());
-        drop(runtime_lock);
+    pub async fn empty_state_hash(&mut self) -> Result<StateHash, CasperError> {
+        self.runtime.reset(RadixHistory::empty_root_node_hash());
 
-        bootstrap_registry(runtime.clone()).await;
-        let mut runtime_lock = runtime.lock().unwrap();
-        let checkpoint = runtime_lock.create_checkpoint();
+        bootstrap_registry(&self.runtime).await;
+        let checkpoint = self.runtime.create_checkpoint();
         Ok(checkpoint.root.bytes().into())
     }
 
@@ -107,7 +110,7 @@ impl RuntimeOps {
      * Evaluates deploys and System deploys with checkpoint to get final state hash
      */
     pub async fn compute_state(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         start_hash: &StateHash,
         terms: Vec<Signed<DeployData>>,
         system_deploys: Vec<impl SystemDeployTrait>,
@@ -121,16 +124,10 @@ impl RuntimeOps {
         ),
         CasperError,
     > {
-        let runtime_lock = runtime.lock().unwrap();
-        runtime_lock.set_block_data(block_data);
-        runtime_lock.set_invalid_blocks(invalid_blocks);
-        drop(runtime_lock);
+        self.runtime.set_block_data(block_data);
+        self.runtime.set_invalid_blocks(invalid_blocks);
 
-        let deploy_process_result =
-            Self::play_deploys(runtime.clone(), start_hash, terms, |deploy| {
-                Self::play_deploy_with_cost_accounting(runtime.clone(), deploy)
-            })
-            .await?;
+        let deploy_process_result = self.play_deploys_for_state(start_hash, terms).await?;
 
         let (start_hash, processed_deploys) = deploy_process_result;
 
@@ -138,7 +135,8 @@ impl RuntimeOps {
         let mut processed_system_deploys = Vec::new();
 
         for mut system_deploy in system_deploys {
-            match Self::play_system_deploy(runtime.clone(), &current_hash, &mut system_deploy)
+            match self
+                .play_system_deploy(&current_hash, &mut system_deploy)
                 .await?
             {
                 SystemDeployResult::PlaySucceeded {
@@ -177,7 +175,7 @@ impl RuntimeOps {
      * Evaluates genesis deploys with checkpoint to get final state hash
      */
     pub async fn compute_genesis(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         terms: Vec<Signed<DeployData>>,
         block_time: i64,
         block_number: i64,
@@ -189,20 +187,16 @@ impl RuntimeOps {
         ),
         CasperError,
     > {
-        let runtime_lock = runtime.lock().unwrap();
-        runtime_lock.set_block_data(BlockData {
+        self.runtime.set_block_data(BlockData {
             time_stamp: block_time,
             block_number,
             sender: PublicKey::from_bytes(&Vec::new()),
             seq_num: 0,
         });
-        drop(runtime_lock);
 
-        let genesis_pre_state_hash = Self::empty_state_hash(runtime.clone()).await?;
-        let play_result =
-            Self::play_deploys(runtime.clone(), &genesis_pre_state_hash, terms, |deploy| {
-                Self::process_deploy_with_mergeable_data(runtime.clone(), deploy)
-            })
+        let genesis_pre_state_hash = self.empty_state_hash().await?;
+        let play_result = self
+            .play_deploys_for_genesis(&genesis_pre_state_hash, terms)
             .await?;
 
         let (post_state_hash, processed_deploys) = play_result;
@@ -214,27 +208,40 @@ impl RuntimeOps {
     /**
      * Evaluates deploys on root hash with checkpoint to get final state hash
      */
-    pub async fn play_deploys<F, Fut>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+    pub async fn play_deploys_for_state(
+        &mut self,
         start_hash: &StateHash,
         terms: Vec<Signed<DeployData>>,
-        process_deploy: F,
-    ) -> Result<(StateHash, Vec<(ProcessedDeploy, NumberChannelsEndVal)>), CasperError>
-    where
-        F: Fn(Signed<DeployData>) -> Fut,
-        Fut: Future<Output = Result<(ProcessedDeploy, NumberChannelsEndVal), CasperError>>,
-    {
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(start_hash));
-        drop(runtime_lock);
+    ) -> Result<(StateHash, Vec<(ProcessedDeploy, NumberChannelsEndVal)>), CasperError> {
+        self.runtime
+            .reset(Blake2b256Hash::from_bytes_prost(start_hash));
 
         let mut res = Vec::new();
         for deploy in terms {
-            res.push(process_deploy(deploy).await?);
+            res.push(self.play_deploy_with_cost_accounting(deploy).await?);
         }
 
-        let mut runtime_lock = runtime.lock().unwrap();
-        let final_checkpoint = runtime_lock.create_checkpoint();
+        let final_checkpoint = self.runtime.create_checkpoint();
+        Ok((final_checkpoint.root.to_bytes_prost(), res))
+    }
+
+    /**
+     * Evaluates deploys on root hash with checkpoint to get final state hash
+     */
+    pub async fn play_deploys_for_genesis(
+        &mut self,
+        start_hash: &StateHash,
+        terms: Vec<Signed<DeployData>>,
+    ) -> Result<(StateHash, Vec<(ProcessedDeploy, NumberChannelsEndVal)>), CasperError> {
+        self.runtime
+            .reset(Blake2b256Hash::from_bytes_prost(start_hash));
+
+        let mut res = Vec::new();
+        for deploy in terms {
+            res.push(self.process_deploy_with_mergeable_data(deploy).await?);
+        }
+
+        let final_checkpoint = self.runtime.create_checkpoint();
         Ok((final_checkpoint.root.to_bytes_prost(), res))
     }
 
@@ -242,7 +249,7 @@ impl RuntimeOps {
      * Evaluates deploy with cost accounting (PoS Pre-charge and Refund calls)
      */
     pub async fn play_deploy_with_cost_accounting(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         deploy: Signed<DeployData>,
     ) -> Result<(ProcessedDeploy, NumberChannelsEndVal), CasperError> {
         let eval_collector_state = Arc::new(Mutex::new(EvalCollector::new()));
@@ -278,14 +285,11 @@ impl RuntimeOps {
                 deploy.data.total_phlo_charge()
             );
             exec_and_save::<PreChargeDeploy, _, _>(eval_collector_state.clone(), || async {
-                Self::play_system_deploy_internal(
-                    runtime.clone(),
-                    &mut PreChargeDeploy {
-                        charge_amount: deploy.data.total_phlo_charge(),
-                        pk: deploy.pk.clone(),
-                        rand: pre_charge_rand,
-                    },
-                )
+                self.play_system_deploy_internal(&mut PreChargeDeploy {
+                    charge_amount: deploy.data.total_phlo_charge(),
+                    pk: deploy.pk.clone(),
+                    rand: pre_charge_rand,
+                })
                 .await
             })
             .await
@@ -297,14 +301,11 @@ impl RuntimeOps {
                 let pd = {
                     log::info!("Processing user deploy {}", hex::encode(&deploy_pk));
                     // Evaluates user deploy and append event log to local state
-                    Self::process_deploy(runtime.clone(), deploy)
-                        .await
-                        .map(|(pd, mc)| {
-                            let mut eval_collector_state_lock =
-                                eval_collector_state.lock().unwrap();
-                            eval_collector_state_lock.add(pd.deploy_log.clone(), mc);
-                            pd
-                        })
+                    self.process_deploy(deploy).await.map(|(pd, mc)| {
+                        let mut eval_collector_state_lock = eval_collector_state.lock().unwrap();
+                        eval_collector_state_lock.add(pd.deploy_log.clone(), mc);
+                        pd
+                    })
                 }?;
 
                 // Evaluates Refund system deploy
@@ -315,13 +316,10 @@ impl RuntimeOps {
                         pd.refund_amount()
                     );
                     exec_and_save::<RefundDeploy, _, _>(eval_collector_state.clone(), || async {
-                        Self::play_system_deploy_internal(
-                            runtime.clone(),
-                            &mut RefundDeploy {
-                                refund_amount: pd.refund_amount(),
-                                rand: refund_rand,
-                            },
-                        )
+                        self.play_system_deploy_internal(&mut RefundDeploy {
+                            refund_amount: pd.refund_amount(),
+                            rand: refund_rand,
+                        })
                         .await
                     })
                     .await
@@ -334,10 +332,8 @@ impl RuntimeOps {
                         let collected = eval_collector_state_lock;
 
                         // Get mergeable channels data
-                        let mergeable_channels_data = Self::get_number_channels_data(
-                            runtime.clone(),
-                            &collected.mergeable_channels,
-                        )?;
+                        let mergeable_channels_data =
+                            self.get_number_channels_data(&collected.mergeable_channels)?;
 
                         Ok((
                             ProcessedDeploy {
@@ -370,7 +366,7 @@ impl RuntimeOps {
 
                 // Get mergeable channels data
                 let mergeable_channels_data =
-                    Self::get_number_channels_data(runtime.clone(), &collected.mergeable_channels)?;
+                    self.get_number_channels_data(&collected.mergeable_channels)?;
 
                 Ok((
                     ProcessedDeploy {
@@ -384,19 +380,15 @@ impl RuntimeOps {
     }
 
     pub async fn process_deploy(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         deploy: Signed<DeployData>,
     ) -> Result<(ProcessedDeploy, HashSet<Par>), CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        let fallback = runtime_lock.create_soft_checkpoint();
-        drop(runtime_lock);
+        let fallback = self.runtime.create_soft_checkpoint();
 
         // Evaluate deploy
-        let eval_result = Self::evaluate(runtime.clone(), &deploy).await?;
+        let eval_result = self.evaluate(&deploy).await?;
 
-        let mut runtime_lock = runtime.lock().unwrap();
-        let checkpoint = runtime_lock.create_soft_checkpoint();
-        drop(runtime_lock);
+        let checkpoint = self.runtime.create_soft_checkpoint();
 
         let eval_succeeded = eval_result.errors.is_empty();
         let deploy_sig = deploy.sig.clone();
@@ -414,8 +406,7 @@ impl RuntimeOps {
         };
 
         if !eval_succeeded {
-            let mut runtime_lock = runtime.lock().unwrap();
-            runtime_lock.revert_to_soft_checkpoint(fallback);
+            self.runtime.revert_to_soft_checkpoint(fallback);
             interpreter_util::print_deploy_errors(&deploy_sig, &eval_result.errors);
         }
 
@@ -423,23 +414,24 @@ impl RuntimeOps {
     }
 
     pub async fn process_deploy_with_mergeable_data(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         deploy: Signed<DeployData>,
     ) -> Result<(ProcessedDeploy, NumberChannelsEndVal), CasperError> {
-        Self::process_deploy(runtime.clone(), deploy)
+        self.process_deploy(deploy)
             .await
             .and_then(|(pd, merge_chs)| {
-                Self::get_number_channels_data(runtime, &merge_chs).map(|data| (pd, data))
+                self.get_number_channels_data(&merge_chs)
+                    .map(|data| (pd, data))
             })
     }
 
     pub fn get_number_channels_data(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &self,
         channels: &HashSet<Par>,
     ) -> Result<NumberChannelsEndVal, CasperError> {
         Ok(channels
             .iter()
-            .map(|chan| Self::get_number_channel(runtime.clone(), chan))
+            .map(|chan| self.get_number_channel(chan))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .flatten()
@@ -447,12 +439,10 @@ impl RuntimeOps {
     }
 
     pub fn get_number_channel(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &self,
         channel: &Par,
     ) -> Result<Option<(Blake2b256Hash, i64)>, CasperError> {
-        let runtime_lock = runtime.lock().unwrap();
-        let ch_values = runtime_lock.get_data(channel);
-        drop(runtime_lock);
+        let ch_values = self.runtime.get_data(channel);
 
         if ch_values.is_empty() {
             return Ok(None);
@@ -476,26 +466,24 @@ impl RuntimeOps {
      * Evaluates System deploy with checkpoint to get final state hash
      */
     pub async fn play_system_deploy<S: SystemDeployTrait>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         state_hash: &StateHash,
         system_deploy: &mut S,
     ) -> Result<SystemDeployResult<S::Result>, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(&state_hash));
-        drop(runtime_lock);
+        self.runtime
+            .reset(Blake2b256Hash::from_bytes_prost(&state_hash));
 
         let (event_log, result, mergeable_channels) =
-            Self::play_system_deploy_internal(runtime.clone(), system_deploy).await?;
+            self.play_system_deploy_internal(system_deploy).await?;
 
         let final_state_hash = {
-            let mut runtime_lock = runtime.lock().unwrap();
-            let checkpoint = runtime_lock.create_checkpoint();
+            let checkpoint = self.runtime.create_checkpoint();
             checkpoint.root.to_bytes_prost()
         };
 
         match result {
             Either::Right(system_deploy_result) => {
-                let mcl = Self::get_number_channels_data(runtime, &mergeable_channels)?;
+                let mcl = self.get_number_channels_data(&mergeable_channels)?;
                 if let Some(SlashDeploy {
                     invalid_block_hash,
                     pk,
@@ -535,7 +523,7 @@ impl RuntimeOps {
     }
 
     pub async fn play_system_deploy_internal<S: SystemDeployTrait>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         system_deploy: &mut S,
     ) -> Result<
         (
@@ -547,10 +535,9 @@ impl RuntimeOps {
     > {
         // Get System deploy result / throw fatal errors for unexpected results
         let (result_or_system_deploy_error, eval_result) =
-            Self::eval_system_deploy(runtime.clone(), system_deploy).await?;
+            self.eval_system_deploy(system_deploy).await?;
 
-        let mut runtime_lock = runtime.lock().unwrap();
-        let post_deploy_soft_checkpoint = runtime_lock.create_soft_checkpoint();
+        let post_deploy_soft_checkpoint = self.runtime.create_soft_checkpoint();
         let log = post_deploy_soft_checkpoint.log;
 
         Ok((
@@ -566,11 +553,11 @@ impl RuntimeOps {
      * Evaluates System deploy (applicative errors are fatal)
      */
     pub async fn eval_system_deploy<S: SystemDeployTrait>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         system_deploy: &mut S,
     ) -> Result<SysEvalResult<S>, CasperError> {
         // println!("\nEvaluating system deploy, {:?}", S::source());
-        let eval_result = Self::evaluate_system_source(runtime.clone(), system_deploy).await?;
+        let eval_result = self.evaluate_system_source(system_deploy).await?;
 
         // println!("\nEval result: {:?}", eval_result);
 
@@ -580,7 +567,7 @@ impl RuntimeOps {
             ));
         }
 
-        let r = match Self::consume_system_result(runtime, system_deploy)? {
+        let r = match self.consume_system_result(system_deploy)? {
             Some((_, vec_list)) => match vec_list.as_slice() {
                 [ListParWithRandom { pars, .. }] if pars.len() == 1 => {
                     Ok(system_deploy.extract_result(&pars[0]))
@@ -603,7 +590,7 @@ impl RuntimeOps {
      * Evaluates exploratory (read-only) deploy
      */
     pub async fn play_exploratory_deploy(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         term: String,
         hash: &StateHash,
     ) -> Result<Vec<Par>, CasperError> {
@@ -636,7 +623,8 @@ impl RuntimeOps {
             }]);
 
             // Execute deploy on top of specified block hash
-            Self::capture_results_with_name(runtime, hash, &deploy, &return_name).await
+            self.capture_results_with_name(hash, &deploy, &return_name)
+                .await
         })();
 
         match deploy_result.await {
@@ -654,26 +642,19 @@ impl RuntimeOps {
     /**
      * Creates soft checkpoint with rollback if result is false.
      */
-    pub async fn with_soft_transaction<A, F, Fut>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        action: F,
-    ) -> Result<A, CasperError>
+    pub async fn with_soft_transaction<A, F, Fut>(&mut self, action: F) -> Result<A, CasperError>
     where
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<(A, bool), CasperError>>,
     {
-        let mut runtime_lock = runtime.lock().unwrap();
-        let fallback = runtime_lock.create_soft_checkpoint();
-        drop(runtime_lock);
+        let fallback = self.runtime.create_soft_checkpoint();
 
         // Execute action
         let (a, success) = action().await?;
 
         // Revert the state if failed
         if !success {
-            let mut runtime_lock = runtime.lock().unwrap();
-            // println!("Reverting to soft checkpoint");
-            runtime_lock.revert_to_soft_checkpoint(fallback);
+            self.runtime.revert_to_soft_checkpoint(fallback);
         }
 
         Ok(a)
@@ -684,7 +665,7 @@ impl RuntimeOps {
     // Return channel on which result is captured is the first name
     // in the deploy term `new return in { return!(42) }`
     pub async fn capture_results(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         start: &StateHash,
         deploy: &Signed<DeployData>,
     ) -> Result<Vec<Par>, CasperError> {
@@ -696,16 +677,17 @@ impl RuntimeOps {
             })),
         }]);
 
-        Self::capture_results_with_name(runtime, start, deploy, &return_name).await
+        self.capture_results_with_name(start, deploy, &return_name)
+            .await
     }
 
     pub async fn capture_results_with_name(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         start: &StateHash,
         deploy: &Signed<DeployData>,
         name: &Par,
     ) -> Result<Vec<Par>, CasperError> {
-        match Self::capture_results_with_errors(runtime, start, deploy, name).await {
+        match self.capture_results_with_errors(start, deploy, name).await {
             Ok(result) => Ok(result),
             Err(err) => Err(CasperError::InterpreterError(
                 InterpreterError::BugFoundError(format!(
@@ -717,31 +699,29 @@ impl RuntimeOps {
     }
 
     pub async fn capture_results_with_errors(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         start: &StateHash,
         deploy: &Signed<DeployData>,
         name: &Par,
     ) -> Result<Vec<Par>, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        runtime_lock.reset(Blake2b256Hash::from_bytes_prost(start));
-        drop(runtime_lock);
+        self.runtime.reset(Blake2b256Hash::from_bytes_prost(start));
 
-        let eval_res = Self::evaluate(runtime.clone(), deploy).await?;
+        let eval_res = self.evaluate(deploy).await?;
         if !eval_res.errors.is_empty() {
             return Err(CasperError::InterpreterError(eval_res.errors[0].clone()));
         }
 
-        Ok(Self::get_data_par(runtime, name))
+        Ok(self.get_data_par(name))
     }
 
     /* Evaluates Rholang source code */
 
     pub async fn evaluate(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         deploy: &Signed<DeployData>,
     ) -> Result<EvaluateResult, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        Ok(runtime_lock
+        Ok(self
+            .runtime
             .evaluate(
                 deploy.data.term.clone(),
                 Cost::create(deploy.data.phlo_limit, "Evaluate deploy".to_string()),
@@ -752,11 +732,11 @@ impl RuntimeOps {
     }
 
     pub async fn evaluate_system_source<S: SystemDeployTrait>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         system_deploy: &mut S,
     ) -> Result<EvaluateResult, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        Ok(runtime_lock
+        Ok(self
+            .runtime
             .evaluate(
                 S::source(),
                 Cost::unsafe_max(),
@@ -767,18 +747,16 @@ impl RuntimeOps {
             .await?)
     }
 
-    pub fn get_data_par(runtime: Arc<Mutex<RhoRuntimeImpl>>, channel: &Par) -> Vec<Par> {
-        let runtime_lock = runtime.lock().unwrap();
-        let data = runtime_lock.get_data(channel);
-        data.into_iter().flat_map(|datum| datum.a.pars).collect()
+    pub fn get_data_par(&self, channel: &Par) -> Vec<Par> {
+        self.runtime
+            .get_data(channel)
+            .into_iter()
+            .flat_map(|datum| datum.a.pars)
+            .collect()
     }
 
-    pub fn get_continuation_par(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        channels: Vec<Par>,
-    ) -> Vec<(Vec<BindPattern>, Par)> {
-        let runtime_lock = runtime.lock().unwrap();
-        runtime_lock
+    pub fn get_continuation_par(&self, channels: Vec<Par>) -> Vec<(Vec<BindPattern>, Par)> {
+        self.runtime
             .get_continuations(channels)
             .into_iter()
             .filter_map(|wk| {
@@ -792,34 +770,30 @@ impl RuntimeOps {
     }
 
     pub fn consume_result(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         channel: Par,
         pattern: BindPattern,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, CasperError> {
-        let mut runtime_lock = runtime.lock().unwrap();
-        Ok(runtime_lock.consume_result(vec![channel], vec![pattern])?)
+        Ok(self.runtime.consume_result(vec![channel], vec![pattern])?)
     }
 
     pub fn consume_system_result<S: SystemDeployTrait>(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         system_deploy: &mut S,
     ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, CasperError> {
         let return_channel = system_deploy.return_channel()?;
-        Self::consume_result(runtime, return_channel, system_deploy_consume_all_pattern())
+        self.consume_result(return_channel, system_deploy_consume_all_pattern())
     }
 
     /* Read only Rholang evaluator helpers */
 
     pub async fn get_active_validators(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
+        &mut self,
         start_hash: &StateHash,
     ) -> Result<Vec<Validator>, CasperError> {
-        let validators_pars = Self::play_exploratory_deploy(
-            runtime,
-            Self::activate_validator_query_source(),
-            start_hash,
-        )
-        .await?;
+        let validators_pars = self
+            .play_exploratory_deploy(Self::activate_validator_query_source(), start_hash)
+            .await?;
 
         if validators_pars.len() != 1 {
             return Err(CasperError::RuntimeError(format!(
@@ -840,12 +814,10 @@ impl RuntimeOps {
         Ok(validators)
     }
 
-    pub async fn compute_bonds(
-        runtime: Arc<Mutex<RhoRuntimeImpl>>,
-        hash: &StateHash,
-    ) -> Result<Vec<Bond>, CasperError> {
-        let bonds_pars =
-            Self::play_exploratory_deploy(runtime, Self::bonds_query_source(), hash).await?;
+    pub async fn compute_bonds(&mut self, hash: &StateHash) -> Result<Vec<Bond>, CasperError> {
+        let bonds_pars = self
+            .play_exploratory_deploy(Self::bonds_query_source(), hash)
+            .await?;
 
         if bonds_pars.len() != 1 {
             return Err(CasperError::RuntimeError(format!(
