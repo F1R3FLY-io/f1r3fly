@@ -1,0 +1,38 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "rholang",
+      "camelcase": "Rholang",
+      "title": "Rholang",
+      "scope": "source.rholang",
+      "file-types": [
+        "rholang"
+      ],
+      "injection-regex": "^rholang$",
+      "class-name": "TreeSitterRholang"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Resharp grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "Denys Bushuliak"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/tree-sitter/tree-sitter-rholang"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": false,
+    "node": true,
+    "python": false,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
+}

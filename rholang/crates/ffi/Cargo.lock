@@ -60,12 +60,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
-name = "assert_matches"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
-
-[[package]]
 name = "async-trait"
 version = "0.1.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -397,6 +391,13 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "ffi"
+version = "0.1.0"
+dependencies = [
+ "rholang",
+]
 
 [[package]]
 name = "fixedbitset"
@@ -1429,7 +1430,6 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 name = "rholang"
 version = "0.1.0"
 dependencies = [
- "assert_matches",
  "bincode",
  "bitvec",
  "cc",
@@ -1980,7 +1980,6 @@ name = "tree-sitter-rholang"
 version = "0.1.0"
 dependencies = [
  "cc",
- "tree-sitter",
  "tree-sitter-language",
 ]
 
