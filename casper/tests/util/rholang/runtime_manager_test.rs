@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     future::Future,
-    sync::Once,
+    sync::{Arc, Mutex, Once},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -51,6 +51,8 @@ use crate::util::genesis_builder::{GenesisContext, GenessisBuilder};
 use super::resources::{copy_storage, mk_runtime_manager_at, mk_test_rnode_store_manager};
 
 static INIT: Once = Once::new();
+static GENESIS_INIT: Once = Once::new();
+static mut CACHED_GENESIS: Option<Arc<Mutex<Option<GenesisContext>>>> = None;
 
 fn init_logger() {
     INIT.call_once(|| {
@@ -73,9 +75,22 @@ enum SystemDeployReplayResult<A> {
 }
 
 async fn genesis_context() -> Result<GenesisContext, CasperError> {
-    let mut genesis_builder = GenessisBuilder::new();
-    let genesis_context = genesis_builder.build_genesis_with_parameters(None).await?;
-    Ok(genesis_context)
+    unsafe {
+        GENESIS_INIT.call_once(|| {
+            CACHED_GENESIS = Some(Arc::new(Mutex::new(None)));
+        });
+
+        let genesis_arc = CACHED_GENESIS.as_ref().unwrap().clone();
+        let mut genesis_guard = genesis_arc.lock().unwrap();
+
+        if genesis_guard.is_none() {
+            let mut genesis_builder = GenessisBuilder::new();
+            let new_genesis = genesis_builder.build_genesis_with_parameters(None).await?;
+            *genesis_guard = Some(new_genesis);
+        }
+
+        Ok(genesis_guard.as_ref().unwrap().clone())
+    }
 }
 
 async fn with_runtime_manager<F, Fut, R>(f: F) -> Result<R, CasperError>

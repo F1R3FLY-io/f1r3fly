@@ -7,9 +7,7 @@ use block_storage::rust::{
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rholang::rust::interpreter::util::rev_address::RevAddress;
-use rspace_plus_plus::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash, shared::key_value_store_manager::KeyValueStoreManager,
-};
+use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 use std::{collections::HashMap, path::PathBuf};
 use tempfile::Builder;
 
