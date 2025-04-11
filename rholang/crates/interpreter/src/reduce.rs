@@ -36,6 +36,7 @@ use crate::accounting::costs::{
 };
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
 use crate::rho_type::RhoTuple2;
+use crate::utils::GeneratedMessage;
 
 use super::accounting::_cost;
 use super::accounting::costs::{
@@ -52,7 +53,6 @@ use super::rho_runtime::RhoISpace;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::unwrap_option_safe;
-use super::util::GeneratedMessage;
 
 /**
  * Reduce is the interface for evaluating Rholang expressions.

@@ -173,9 +173,12 @@ mod tests {
     use crate::normal_forms::{
         EListBody, EMapBody, ESetBody, ETupleBody, Expr, Par, Var as NormalizedVar,
     };
-    use crate::test_utils::utils::{
-        assert_equal_normalized, defaults, map, set, test, test_normalize_match_proc, with_bindings,
-    };
+    use crate::utils::test_utils::utils::assert_equal_normalized;
+    use crate::utils::test_utils::utils::defaults;
+    use crate::utils::test_utils::utils::map;
+    use crate::utils::test_utils::utils::set;
+    use crate::utils::test_utils::utils::test;
+    use crate::utils::test_utils::utils::{test_normalize_match_proc, with_bindings};
     use bitvec::vec::BitVec;
     use bitvec::{bitvec, order::Lsb0};
     use pretty_assertions::assert_eq;

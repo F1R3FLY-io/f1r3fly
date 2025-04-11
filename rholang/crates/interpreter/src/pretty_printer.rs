@@ -1112,7 +1112,7 @@ mod tests {
     //ground tests
     #[test]
     fn bool_true_should_print_as_true() {
-        let proc = Proc::new_proc_bool(true);
+        let proc = Proc::BoolLiteral(true);
         let expr = normalize_ground(&proc).unwrap();
         let mut printer = PrettyPrinter::new();
 
@@ -1121,7 +1121,7 @@ mod tests {
 
     #[test]
     fn bool_false_should_print_as_false() {
-        let proc = Proc::new_proc_bool(false);
+        let proc = Proc::BoolLiteral(false);
         let expr = normalize_ground(&proc).unwrap();
         let mut printer = PrettyPrinter::new();
 
