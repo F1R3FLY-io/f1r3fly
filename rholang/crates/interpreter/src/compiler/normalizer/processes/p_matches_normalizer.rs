@@ -1,4 +1,5 @@
 use crate::{
+    aliases::EnvHashMap,
     compiler::{
         exports::{BoundMapChain, FreeMap},
         normalizer::normalize_match_proc,
@@ -7,7 +8,6 @@ use crate::{
     errors::InterpreterError,
     normal_forms::{EMatchesBody, Expr, Par},
 };
-use std::collections::BTreeMap;
 
 pub fn normalize_p_matches(
     target: AnnProc,
@@ -15,7 +15,7 @@ pub fn normalize_p_matches(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<(), InterpreterError> {
     // In case of 'matches' expression the free variables from the pattern are thrown away and only
     // the ones from the target are used. This is because the "target matches pattern" should have

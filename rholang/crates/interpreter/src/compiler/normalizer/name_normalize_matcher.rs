@@ -1,3 +1,4 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::Context;
 use crate::compiler::bound_map::BoundContext;
 use crate::compiler::exports::{BoundMapChain, FreeMap};
@@ -6,13 +7,12 @@ use crate::compiler::rholang_ast::{Name, Var};
 use crate::compiler::source_position::SourcePosition;
 use crate::errors::InterpreterError;
 use crate::normal_forms::Par;
-use std::collections::BTreeMap;
 
 pub fn normalize_name(
     n: Name,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<Par, InterpreterError> {
     match n {
@@ -81,7 +81,7 @@ mod tests {
     fn name_wildcard_should_add_a_wildcard_count_to_known_free() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
         let result = normalize_name(
             Name::ProcVar(Var::Wildcard),
             &mut free_map,
@@ -104,7 +104,7 @@ mod tests {
     fn name_var_should_compile_as_bound_var_if_its_in_env() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -133,7 +133,7 @@ mod tests {
     fn name_var_should_compile_as_free_var_if_its_not_in_env() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -167,7 +167,7 @@ mod tests {
     fn name_var_should_not_compile_if_its_in_env_of_wrong_sort() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -213,7 +213,7 @@ mod tests {
     fn name_var_should_not_compile_if_used_free_somewhere_else() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -259,7 +259,7 @@ mod tests {
     fn name_quote_should_compile_to_bound_var() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -285,7 +285,7 @@ mod tests {
     fn name_quote_should_return_a_free_use_if_the_quoted_proc_has_a_free_var() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -319,7 +319,7 @@ mod tests {
     fn name_quote_should_compile_to_a_ground() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let _7 = Proc::LongLiteral(7);
         let result = normalize_name(
@@ -340,7 +340,7 @@ mod tests {
     fn name_quote_should_collapse_an_eval() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",
@@ -368,7 +368,7 @@ mod tests {
     fn name_quote_should_not_collapse_an_eval_eval() {
         let mut free_map = FreeMap::new();
         let mut bound_map_chain = BoundMapChain::new();
-        let env = BTreeMap::new();
+        let env = EnvHashMap::new();
 
         let x = Id {
             name: "x",

@@ -1,12 +1,11 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/normalizer/processes/PLetNormalizer.scala
 
-use std::collections::BTreeMap;
-
 use bitvec::vec::BitVec;
 use smallvec::SmallVec;
 use uuid::Uuid;
 
 use crate::{
+    aliases::EnvHashMap,
     compiler::{
         exports::{BoundMapChain, FreeMap, SourcePosition},
         normalizer::{
@@ -28,7 +27,7 @@ pub fn normalize_p_let(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<(), InterpreterError> {
     /*
     Let processes with a single bind or with sequential binds ";" are converted into match processes rather
@@ -145,7 +144,7 @@ pub fn normalize_p_concurrent_let(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     assert!(!decls.is_empty());
@@ -198,7 +197,7 @@ fn names_to_e_list(
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
 ) -> Result<EListBody, InterpreterError> {
-    let temp_env = BTreeMap::new();
+    let temp_env = EnvHashMap::new();
     let mut result = EListBody {
         ps: Vec::with_capacity(names.len()),
         connective_used: true,

@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
+    aliases::EnvHashMap,
     errors::InterpreterError,
     normal_forms::Par,
     sort_matcher::{Sortable, Sorted},
@@ -52,10 +53,7 @@ impl<'src> Compiler<'src> {
     }
 }
 
-fn normalize_term(
-    term: &Proc,
-    normalizer_env: &BTreeMap<String, Par>,
-) -> Result<Par, InterpreterError> {
+fn normalize_term(term: &Proc, normalizer_env: &EnvHashMap) -> Result<Par, InterpreterError> {
     let mut result = Par::default();
     let mut free_map = FreeMap::new();
     let mut bound_map_chain = BoundMapChain::new();

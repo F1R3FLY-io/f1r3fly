@@ -1,3 +1,4 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap, SourcePosition};
 use crate::compiler::normalizer::normalize_match_proc;
 use crate::compiler::rholang_ast::{AnnProc, Id, NameDecl};
@@ -5,7 +6,6 @@ use crate::compiler::rholang_ast::{LinearBind, NAME_WILD, NIL, Names, Receipt, S
 use crate::compiler::rholang_ast::{Name, Proc, SyncSendCont};
 use crate::errors::InterpreterError;
 use crate::normal_forms::Par;
-use std::collections::BTreeMap;
 use uuid::Uuid;
 
 pub fn normalize_p_send_sync(
@@ -15,7 +15,7 @@ pub fn normalize_p_send_sync(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     let random = Uuid::new_v4().to_string();

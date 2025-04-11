@@ -1,9 +1,9 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap};
 use crate::compiler::normalizer::normalize_match_proc;
 use crate::compiler::rholang_ast::AnnProc;
 use crate::errors::InterpreterError;
 use crate::normal_forms::{Match, MatchCase, Par, union};
-use std::collections::BTreeMap;
 
 pub fn normalize_p_if(
     value_body: AnnProc,
@@ -12,7 +12,7 @@ pub fn normalize_p_if(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<(), InterpreterError> {
     let mut target_par = Par::default();
     normalize_match_proc(

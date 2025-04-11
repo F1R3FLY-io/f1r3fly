@@ -1,17 +1,17 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap, SourcePosition};
 use crate::compiler::free_map::ConnectiveInstance;
 use crate::compiler::normalizer::normalize_match_proc;
 use crate::compiler::rholang_ast::Proc;
 use crate::errors::InterpreterError;
 use crate::normal_forms::{Connective, Par};
-use std::collections::BTreeMap;
 
 pub fn normalize_p_negation(
     body: &Proc,
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     let depth = bound_map_chain.depth();

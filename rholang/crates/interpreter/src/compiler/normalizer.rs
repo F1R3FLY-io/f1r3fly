@@ -12,6 +12,7 @@ use super::normalizer::collection_normalize_matcher::{
     normalize_c_list, normalize_c_set, normalize_c_tuple,
 };
 use super::rholang_ast::{Collection, Proc, SimpleType};
+use crate::aliases::EnvHashMap;
 use crate::compiler::bound_map::BoundContext;
 use crate::compiler::normalizer::name_normalize_matcher::normalize_name;
 use crate::compiler::normalizer::processes::p_input_normalizer::normalize_p_input;
@@ -22,7 +23,6 @@ use crate::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_va
 use crate::compiler::rholang_ast::{AnnProc, Var};
 use crate::errors::InterpreterError;
 use crate::normal_forms::{Connective, Expr, Par, Var as NormalizedVar};
-use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BoundVar {
@@ -42,7 +42,7 @@ pub(crate) fn normalize_match_proc(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     maybe_grow(MINIMUM_STACK_SIZE, STACK_ALLOC_SIZE, || {
@@ -59,7 +59,7 @@ fn normalize_match_proc_internal(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     fn binary_exp<C>(
@@ -69,7 +69,7 @@ fn normalize_match_proc_internal(
         constr: C,
         free_map: &mut FreeMap,
         bound_map_chain: &mut BoundMapChain,
-        env: &BTreeMap<String, Par>,
+        env: &EnvHashMap,
     ) -> Result<(), InterpreterError>
     where
         C: FnOnce(Par, Par) -> Expr,

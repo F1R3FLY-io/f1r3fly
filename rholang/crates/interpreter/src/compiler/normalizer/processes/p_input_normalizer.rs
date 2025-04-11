@@ -1,10 +1,11 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/normalizer/processes/PInputNormalizer.scala
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use uuid::Uuid;
 
 use crate::{
+    aliases::EnvHashMap,
     compiler::{
         exports::{BoundMapChain, FreeMap},
         normalizer::{name_normalize_matcher::normalize_name, normalize_match_proc},
@@ -21,7 +22,7 @@ fn process_binds<'a, I>(
     persistent: bool,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<Par, InterpreterError>
 where
     I: IntoIterator<Item = (&'a Names<'a>, AnnName<'a>)>,

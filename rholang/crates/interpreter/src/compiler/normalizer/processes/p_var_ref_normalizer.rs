@@ -1,18 +1,17 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::Context;
 use crate::compiler::bound_map::BoundContext;
 use crate::compiler::exports::{BoundMapChain, SourcePosition};
 use crate::compiler::rholang_ast::{VarRef, VarRefKind};
 use crate::errors::InterpreterError;
 use crate::normal_forms::{Connective, Par, VarRef as PVarRef};
-
-use std::collections::BTreeMap;
 use std::result::Result;
 
 pub fn normalize_p_var_ref(
     p: VarRef,
     input_par: &mut Par,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     let var = p.var.name;

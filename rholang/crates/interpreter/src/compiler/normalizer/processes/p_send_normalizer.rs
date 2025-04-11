@@ -1,12 +1,12 @@
 use bitvec::vec::BitVec;
 
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap, SourcePosition};
 use crate::compiler::normalizer::name_normalize_matcher::normalize_name;
 use crate::compiler::normalizer::normalize_match_proc;
 use crate::compiler::rholang_ast::{AnnProc, Name, SendType};
 use crate::errors::InterpreterError;
 use crate::normal_forms::{Par, Send, union, union_inplace};
-use std::collections::BTreeMap;
 
 pub fn normalize_p_send(
     name: Name,
@@ -15,7 +15,7 @@ pub fn normalize_p_send(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     let name_match_result = normalize_name(name, free_map, bound_map_chain, env, pos)?;

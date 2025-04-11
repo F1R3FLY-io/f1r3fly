@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap};
 use crate::compiler::free_map::ConnectiveInstance;
 use crate::compiler::normalizer::name_normalize_matcher::normalize_name;
@@ -16,7 +15,7 @@ pub fn normalize_p_contr(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<(), InterpreterError> {
     let contract_depth = bound_map_chain.depth();
     let name_match_par = normalize_name(name.0, free_map, bound_map_chain, env, name.1)?;

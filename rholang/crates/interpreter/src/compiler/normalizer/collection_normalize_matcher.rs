@@ -1,5 +1,6 @@
 use super::normalize_match_proc;
 use super::remainder_normalizer_matcher::handle_proc_remainder;
+use crate::aliases::EnvHashMap;
 use crate::compiler::exports::{BoundMapChain, FreeMap};
 use crate::compiler::rholang_ast::{AnnProc, KeyValuePair, ProcRemainder};
 use crate::errors::InterpreterError;
@@ -8,7 +9,6 @@ use crate::normal_forms::{
 };
 use crate::sort_matcher::Sortable;
 use bitvec::vec::BitVec;
-use std::collections::BTreeMap;
 use std::result::Result;
 
 pub fn normalize_c_list(
@@ -16,7 +16,7 @@ pub fn normalize_c_list(
     remainder: Option<ProcRemainder>,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<Expr, InterpreterError> {
     let mut list_body = EListBody {
         ps: Vec::with_capacity(elements.len()),
@@ -51,7 +51,7 @@ pub fn normalize_c_tuple(
     elements: &[AnnProc],
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<Expr, InterpreterError> {
     let mut tuple_body = ETupleBody {
         ps: Vec::with_capacity(elements.len()),
@@ -82,7 +82,7 @@ pub fn normalize_c_set(
     remainder: Option<ProcRemainder>,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<Expr, InterpreterError> {
     let mut set_body = ESetBody::default();
     for element in elements {
@@ -115,7 +115,7 @@ pub fn normalize_c_map(
     remainder: Option<ProcRemainder>,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &BTreeMap<String, Par>,
+    env: &EnvHashMap,
 ) -> Result<Expr, InterpreterError> {
     let mut map_body = EMapBody::default();
     for KeyValuePair { key, value } in elements {
