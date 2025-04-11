@@ -1,0 +1,16 @@
+===============
+Ground literals
+===============
+
+`http://example.com`
+true
+"Hello, Rholang!"
+42
+
+---
+
+(source_file
+  (uri_literal)
+  (bool_literal)
+  (string_literal)
+  (long_literal))
