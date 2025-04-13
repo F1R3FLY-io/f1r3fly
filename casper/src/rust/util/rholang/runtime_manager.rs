@@ -101,7 +101,7 @@ impl RuntimeManager {
         let sender = block_data.sender.clone();
         let seq_num = block_data.seq_num;
 
-        let computed = runtime_ops
+        let (state_hash, usr_deploy_res, sys_deploy_res) = runtime_ops
             .compute_state(
                 start_hash,
                 terms,
@@ -111,7 +111,6 @@ impl RuntimeManager {
             )
             .await?;
 
-        let (state_hash, usr_deploy_res, sys_deploy_res) = computed;
         let (usr_processed, usr_mergeable): (Vec<ProcessedDeploy>, Vec<NumberChannelsEndVal>) =
             usr_deploy_res.into_iter().unzip();
         let (sys_processed, sys_mergeable): (
@@ -149,10 +148,10 @@ impl RuntimeManager {
     ) -> Result<(StateHash, StateHash, Vec<ProcessedDeploy>), CasperError> {
         let runtime = self.spawn_runtime().await;
         let mut runtime_ops = RuntimeOps::new(runtime);
-        let computed = runtime_ops
+
+        let (pre_state, state_hash, processed) = runtime_ops
             .compute_genesis(terms, block_time, block_number)
             .await?;
-        let (pre_state, state_hash, processed) = computed;
         let (processed_deploys, mergeable_chs) = processed.into_iter().unzip();
 
         // Convert from final to diff values and persist mergeable (number) channels for post-state hash
@@ -188,7 +187,7 @@ impl RuntimeManager {
         let sender = block_data.sender.clone();
         let seq_num = block_data.seq_num;
 
-        let replay_op = replay_runtime_ops
+        let (state_hash, mergeable_chs) = replay_runtime_ops
             .replay_compute_state(
                 start_hash,
                 terms,
@@ -199,7 +198,6 @@ impl RuntimeManager {
             )
             .await?;
 
-        let (state_hash, mergeable_chs) = replay_op;
         // Convert from final to diff values and persist mergeable (number) channels for post-state hash
         let pre_state_hash = Blake2b256Hash::from_bytes_prost(&start_hash);
 
@@ -292,11 +290,11 @@ impl RuntimeManager {
      */
     pub fn load_mergeable_channels(
         &self,
-        state_hash_bs: StateHash,
+        state_hash_bs: &StateHash,
         creator: prost::bytes::Bytes,
         seq_num: i32,
     ) -> Result<Vec<NumberChannelsDiff>, CasperError> {
-        let state_hash = Blake2b256Hash::from_bytes_prost(&state_hash_bs);
+        let state_hash = Blake2b256Hash::from_bytes_prost(state_hash_bs);
         let mergeable_key = MergeableKey {
             state_hash: StateHashSerde(state_hash.to_bytes_prost()),
             creator,

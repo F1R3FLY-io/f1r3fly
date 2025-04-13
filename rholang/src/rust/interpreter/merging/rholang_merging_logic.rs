@@ -2,9 +2,9 @@
 
 use indexmap::IndexSet;
 use prost::Message;
-use rayon::prelude::*;
 use rspace_plus_plus::rspace::errors::HistoryError;
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::ListParWithRandom;
@@ -41,10 +41,10 @@ impl RholangMergingLogic {
      * @param channelValues Final values
      * @param getInitialValue Accessor to initial value
      */
-    pub fn calculate_num_channel_diff(
-        channel_values: Vec<HashMap<Blake2b256Hash, i64>>,
-        get_initial_value: impl Fn(&Blake2b256Hash) -> Option<i64> + Send + Sync,
-    ) -> Vec<HashMap<Blake2b256Hash, i64>> {
+    pub fn calculate_num_channel_diff<Key: Clone + Eq + Hash>(
+        channel_values: Vec<HashMap<Key, i64>>,
+        get_initial_value: impl Fn(&Key) -> Option<i64> + Send + Sync,
+    ) -> Vec<HashMap<Key, i64>> {
         // First collect unique keys while preserving order
         let unique_keys: Vec<_> = channel_values
             .iter()
@@ -53,9 +53,8 @@ impl RholangMergingLogic {
             .into_iter()
             .collect();
 
-        // Get initial values for all unique keys in parallel
         let mut state = unique_keys
-            .par_iter()
+            .iter()
             .map(|key| (key.clone(), get_initial_value(key).unwrap_or(0)))
             .collect::<HashMap<_, _>>();
 
@@ -224,4 +223,84 @@ pub struct DeployMergeableData {
 pub struct NumberChannel {
     pub hash: Blake2b256Hash,
     pub diff: i64,
+}
+
+// See rholang/src/test/scala/coop/rchain/rholang/interpreter/merging/RholangMergingLogicSpec.scala
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_calculate_num_channel_diff() {
+        /*
+         *        A   B   C        A   B   C
+         *  ---------------       ----------
+         *  PSH  10      20
+         *
+         *   0.  20               10
+         *   1.       3      ==>       3
+         *   2.  15      10       -5     -10
+         */
+
+        // Create string hashes for readability
+        let ch_a = "A".to_string();
+        let ch_b = "B".to_string();
+        let ch_c = "C".to_string();
+
+        // Define initial values
+        let mut init_values = HashMap::new();
+        init_values.insert(ch_a.clone(), 10i64);
+        init_values.insert(ch_c.clone(), 20i64);
+
+        // Define the accessor function to get initial values
+        let get_data_on_hash = |hash: String| -> Option<i64> { init_values.get(&hash).copied() };
+
+        // Define input channel values (Vec of Maps)
+        let mut input = Vec::new();
+
+        // Map 0: {A -> 20}
+        let mut map0 = HashMap::new();
+        map0.insert(ch_a.clone(), 20i64);
+        input.push(map0);
+
+        // Map 1: {B -> 3}
+        let mut map1 = HashMap::new();
+        map1.insert(ch_b.clone(), 3i64);
+        input.push(map1);
+
+        // Map 2: {A -> 15, C -> 10}
+        let mut map2 = HashMap::new();
+        map2.insert(ch_a.clone(), 15i64);
+        map2.insert(ch_c.clone(), 10i64);
+        input.push(map2);
+
+        // Calculate the differences
+        let result =
+            RholangMergingLogic::calculate_num_channel_diff(input, |arg0: &std::string::String| {
+                get_data_on_hash(arg0.clone())
+            });
+
+        // Define expected results
+        let mut expected = Vec::new();
+
+        // Expected Map 0: {A -> 10}
+        let mut expected_map0 = HashMap::new();
+        expected_map0.insert(ch_a.clone(), 10i64);
+        expected.push(expected_map0);
+
+        // Expected Map 1: {B -> 3}
+        let mut expected_map1 = HashMap::new();
+        expected_map1.insert(ch_b.clone(), 3i64);
+        expected.push(expected_map1);
+
+        // Expected Map 2: {A -> -5, C -> -10}
+        let mut expected_map2 = HashMap::new();
+        expected_map2.insert(ch_a.clone(), -5i64);
+        expected_map2.insert(ch_c.clone(), -10i64);
+        expected.push(expected_map2);
+
+        // Assert that the results match the expected values
+        assert_eq!(result, expected);
+    }
 }

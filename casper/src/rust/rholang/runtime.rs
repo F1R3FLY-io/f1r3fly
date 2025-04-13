@@ -127,9 +127,8 @@ impl RuntimeOps {
         self.runtime.set_block_data(block_data);
         self.runtime.set_invalid_blocks(invalid_blocks);
 
-        let deploy_process_result = self.play_deploys_for_state(start_hash, terms).await?;
-
-        let (start_hash, processed_deploys) = deploy_process_result;
+        let (start_hash, processed_deploys) =
+            self.play_deploys_for_state(start_hash, terms).await?;
 
         let mut current_hash = start_hash;
         let mut processed_system_deploys = Vec::new();
@@ -355,6 +354,8 @@ impl RuntimeOps {
             }
 
             Either::Left(error) => {
+                log::error!("Pre-charge failure '{}'", error.error_message);
+
                 // Handle evaluation errors from PreCharge
                 // - assigning 0 cost - replay should reach the same state
                 let mut empty_pd = ProcessedDeploy::empty(deploy);
