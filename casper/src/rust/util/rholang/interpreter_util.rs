@@ -14,5 +14,5 @@ pub fn print_deploy_errors(deploy_sig: &Bytes, errors: &[InterpreterError]) {
 
     println!("Deploy ({}) errors: {}", deploy_info, error_messages);
 
-    log::info!("Deploy ({}) errors: {}", deploy_info, error_messages);
+    log::warn!("Deploy ({}) errors: {}", deploy_info, error_messages);
 }

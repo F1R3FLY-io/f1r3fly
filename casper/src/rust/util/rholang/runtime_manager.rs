@@ -2,7 +2,7 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManagerSyntax.scala
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crypto::rust::signatures::signed::Signed;
 use hex::ToHex;
