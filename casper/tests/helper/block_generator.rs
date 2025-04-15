@@ -1,6 +1,9 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/BlockGenerator.scala
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::KeyValueDagRepresentation,
@@ -10,7 +13,10 @@ use block_storage::rust::{
 use casper::rust::{
     casper::CasperSnapshot,
     errors::CasperError,
-    util::{construct_deploy, rholang::runtime_manager::RuntimeManager},
+    util::{
+        construct_deploy, proto_util,
+        rholang::{interpreter_util::compute_deploys_checkpoint, runtime_manager::RuntimeManager},
+    },
 };
 use models::rust::{
     block::state_hash::StateHash,
@@ -19,6 +25,7 @@ use models::rust::{
     casper::protocol::casper_message::{BlockMessage, Bond, Justification, ProcessedDeploy},
     validator::Validator,
 };
+use rholang::rust::interpreter::system_processes::BlockData;
 
 pub fn mk_casper_snapshot(dag: KeyValueDagRepresentation) -> CasperSnapshot {
     CasperSnapshot::new(dag)
@@ -29,13 +36,11 @@ pub fn step(
     block_store: &mut KeyValueBlockStore,
     runtime_manager: &RuntimeManager,
     block: &BlockMessage,
-    genesis: &BlockMessage,
 ) -> Result<(), CasperError> {
     let dag = block_dag_storage.get_representation();
     let (post_b1_state_hash, post_b1_processed_deploys) = compute_block_checkpoint(
         block_store,
         block,
-        genesis,
         &mk_casper_snapshot(dag),
         runtime_manager,
     )?;
@@ -44,7 +49,6 @@ pub fn step(
         block_store,
         block_dag_storage,
         block,
-        genesis,
         post_b1_state_hash,
         post_b1_processed_deploys,
     )
@@ -53,22 +57,42 @@ pub fn step(
 fn compute_block_checkpoint(
     block_store: &mut KeyValueBlockStore,
     block: &BlockMessage,
-    genesis: &BlockMessage,
     casper_snapshot: &CasperSnapshot,
     runtime_manager: &RuntimeManager,
 ) -> Result<(StateHash, Vec<ProcessedDeploy>), CasperError> {
-    todo!()
+    let parents = proto_util::get_parents(block_store, block);
+    let deploys = proto_util::deploys(block)
+        .into_iter()
+        .map(|d| d.deploy)
+        .collect();
+
+    let (_, post_state_hash, processed_deploys, _, _) = compute_deploys_checkpoint(
+        block_store,
+        parents,
+        deploys,
+        vec![],
+        casper_snapshot,
+        runtime_manager,
+        BlockData::from_block(block),
+        HashMap::new(),
+    )?;
+
+    Ok((post_state_hash, processed_deploys))
 }
 
 fn inject_post_state_hash(
     block_store: &mut KeyValueBlockStore,
     block_dag_storage: &mut IndexedBlockDagStorage,
     block: &BlockMessage,
-    genesis: &BlockMessage,
     post_state_hash: StateHash,
     processed_deploys: Vec<ProcessedDeploy>,
 ) -> Result<(), CasperError> {
-    todo!()
+    let mut updated_block = block.clone();
+    updated_block.body.state.post_state_hash = post_state_hash;
+    updated_block.body.deploys = processed_deploys;
+    block_store.put(block.block_hash.clone(), &updated_block)?;
+    block_dag_storage.insert(&updated_block, false, false)?;
+    Ok(())
 }
 
 pub fn build_block(

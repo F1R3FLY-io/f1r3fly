@@ -40,7 +40,7 @@ impl KeyValueBlockStore {
         )
     }
 
-    pub fn get(&self, block_hash: BlockHash) -> Result<Option<BlockMessage>, KvStoreError> {
+    pub fn get(&self, block_hash: &BlockHash) -> Result<Option<BlockMessage>, KvStoreError> {
         let bytes = self.store.get_one(&block_hash.to_vec())?;
         if bytes.is_none() {
             return Ok(None);
@@ -51,7 +51,7 @@ impl KeyValueBlockStore {
         match block {
             Ok(block) => Ok(Some(block)),
             Err(err) => Err(KvStoreError::SerializationError(Self::error_block(
-                block_hash,
+                block_hash.clone(),
                 err.to_string(),
             ))),
         }
@@ -62,7 +62,7 @@ impl KeyValueBlockStore {
      * 
      * Get block, "unsafe" because method expects block already in the block store.
      */
-    pub fn get_unsafe(&self, block_hash: BlockHash) -> BlockMessage {
+    pub fn get_unsafe(&self, block_hash: &BlockHash) -> BlockMessage {
         let err_msg = format!(
             "BlockStore is missing hash: {}",
             PrettyPrinter::build_string_bytes(&block_hash),
@@ -289,7 +289,7 @@ mod tests {
           let bs = KeyValueBlockStore::new(Box::new(kv), Box::new(NotImplementedKV));
 
           let key = key_string.into_bytes();
-          let result = bs.get(key.clone().into());
+          let result = bs.get(&key.clone().into());
           assert!(result.is_ok());
           assert_eq!(*input_keys.lock().unwrap(), vec![key]);
           assert_eq!(result.unwrap(), Some(block));
@@ -300,7 +300,7 @@ mod tests {
           let kv = MockKeyValueStore::new(None);
           let bs = KeyValueBlockStore::new(Box::new(kv), Box::new(NotImplementedKV));
           let key = key_string.into_bytes();
-          let result = bs.get(key.into());
+          let result = bs.get(&key.into());
           assert!(result.is_ok());
           assert_eq!(result.unwrap(), None);
       }
