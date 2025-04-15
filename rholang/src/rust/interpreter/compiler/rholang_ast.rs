@@ -696,6 +696,10 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::VarRef(var_ref))
     }
 
+    pub fn alloc_var_from_str(&'ast self, name: &'ast str, pos: SourcePosition) -> &'ast Proc<'ast> {
+        self.alloc_var(Id { name, pos })
+    }
+
     pub fn alloc_par(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Par { left, right })
     }
