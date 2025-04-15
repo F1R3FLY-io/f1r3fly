@@ -57,6 +57,19 @@ impl KeyValueBlockStore {
         }
     }
 
+    /**
+     * See block-storage/src/main/scala/coop/rchain/blockstorage/BlockStoreSyntax.scala
+     * 
+     * Get block, "unsafe" because method expects block already in the block store.
+     */
+    pub fn get_unsafe(&self, block_hash: BlockHash) -> BlockMessage {
+        let err_msg = format!(
+            "BlockStore is missing hash: {}",
+            PrettyPrinter::build_string_bytes(&block_hash),
+        );
+        self.get(block_hash).expect(&err_msg).expect(&err_msg)
+    }
+
     pub fn put(&mut self, block_hash: BlockHash, block: &BlockMessage) -> Result<(), KvStoreError> {
         let block_proto = block.to_proto();
         let bytes = Self::block_proto_to_bytes(&block_proto);

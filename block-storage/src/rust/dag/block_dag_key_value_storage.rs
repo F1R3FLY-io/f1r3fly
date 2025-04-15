@@ -155,310 +155,12 @@ impl KeyValueDagRepresentation {
             .get_one(deploy_id)
             .map(|result| result.map(|block_hash_serde| block_hash_serde.into()))
     }
-}
-
-pub struct BlockDagKeyValueStorage {
-    latest_messages_index: Arc<RwLock<KeyValueTypedStoreImpl<ValidatorSerde, BlockHashSerde>>>,
-    block_metadata_index: Arc<RwLock<BlockMetadataStore>>,
-    deploy_index: Arc<RwLock<KeyValueTypedStoreImpl<DeployId, BlockHashSerde>>>,
-    invalid_blocks_index: Arc<RwLock<KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata>>>,
-    equivocation_tracker_index: Arc<RwLock<EquivocationTrackerStore>>,
-}
-
-impl BlockDagKeyValueStorage {
-    pub async fn new(kvm: &mut impl KeyValueStoreManager) -> Result<Self, KvStoreError> {
-        let block_metadata_kv_store = kvm.store("block-metadata".to_string()).await?;
-        let block_metadata_db: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata> =
-            KeyValueTypedStoreImpl::new(block_metadata_kv_store);
-        let block_metadata_store = BlockMetadataStore::new(block_metadata_db);
-
-        let equivocation_tracker_kv_store = kvm.store("equivocation-tracker".to_string()).await?;
-        let equivocation_tracker_db: KeyValueTypedStoreImpl<
-            (ValidatorSerde, SequenceNumber),
-            BTreeSet<BlockHashSerde>,
-        > = KeyValueTypedStoreImpl::new(equivocation_tracker_kv_store);
-        let equivocation_tracker_store = EquivocationTrackerStore::new(equivocation_tracker_db);
-
-        let latest_messages_kv_store = kvm.store("latest-messages".to_string()).await?;
-        let latest_messages_db: KeyValueTypedStoreImpl<ValidatorSerde, BlockHashSerde> =
-            KeyValueTypedStoreImpl::new(latest_messages_kv_store);
-
-        let invalid_blocks_kv_store = kvm.store("invalid-blocks".to_string()).await?;
-        let invalid_blocks_db: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata> =
-            KeyValueTypedStoreImpl::new(invalid_blocks_kv_store);
-
-        let deploy_index_kv_store = kvm.store("deploy-index".to_string()).await?;
-        let deploy_index_db: KeyValueTypedStoreImpl<DeployId, BlockHashSerde> =
-            KeyValueTypedStoreImpl::new(deploy_index_kv_store);
-
-        Ok(Self {
-            block_metadata_index: Arc::new(RwLock::new(block_metadata_store)),
-            deploy_index: Arc::new(RwLock::new(deploy_index_db)),
-            invalid_blocks_index: Arc::new(RwLock::new(invalid_blocks_db)),
-            equivocation_tracker_index: Arc::new(RwLock::new(equivocation_tracker_store)),
-            latest_messages_index: Arc::new(RwLock::new(latest_messages_db)),
-        })
-    }
-
-    pub fn equivocation_records(&self) -> Result<HashSet<EquivocationRecord>, KvStoreError> {
-        let equivocation_tracker_index_guard = self.equivocation_tracker_index.read().unwrap();
-        equivocation_tracker_index_guard.data()
-    }
-
-    pub fn insert_equivocation_record(
-        &mut self,
-        record: EquivocationRecord,
-    ) -> Result<(), KvStoreError> {
-        let mut equivocation_tracker_index_guard = self.equivocation_tracker_index.write().unwrap();
-        equivocation_tracker_index_guard.add(record)
-    }
-
-    pub fn update_equivocation_record(
-        &mut self,
-        mut record: EquivocationRecord,
-        block_hash: BlockHash,
-    ) -> Result<(), KvStoreError> {
-        let mut equivocation_tracker_index_guard = self.equivocation_tracker_index.write().unwrap();
-        equivocation_tracker_index_guard.add({
-            record.equivocation_detected_block_hashes.insert(block_hash);
-            record
-        })
-    }
-
-    pub fn get_representation(&self) -> KeyValueDagRepresentation {
-        let latest_messages_guard = self.latest_messages_index.read().unwrap();
-        let latest_messages = latest_messages_guard
-            .to_map()
-            .expect("Failed to convert latest_messages_index to map")
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.into()))
-            .collect();
-        drop(latest_messages_guard);
-
-        let invalid_blocks_guard = self.invalid_blocks_index.read().unwrap();
-        let invalid_blocks = invalid_blocks_guard
-            .to_map()
-            .expect("Failed to convert invalid_blocks_index to map")
-            .into_iter()
-            .map(|(_, v)| v)
-            .collect();
-        drop(invalid_blocks_guard);
-
-        let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
-        let dag_set = block_metadata_index_guard.dag_set();
-        let child_map = block_metadata_index_guard.child_map();
-        let height_map = block_metadata_index_guard.height_map();
-        let last_finalized_block = block_metadata_index_guard.last_finalized_block();
-        let finalized_blocks = block_metadata_index_guard.finalized_block_set();
-
-        KeyValueDagRepresentation {
-            dag_set,
-            latest_messages_map: Arc::new(latest_messages),
-            child_map,
-            height_map,
-            invalid_blocks_set: Arc::new(invalid_blocks),
-            last_finalized_block_hash: last_finalized_block,
-            finalized_blocks_set: finalized_blocks,
-            block_metadata_index: self.block_metadata_index.clone(),
-            deploy_index: self.deploy_index.clone(),
-        }
-    }
-
-    pub fn insert(
-        &mut self,
-        block: &BlockMessage,
-        invalid: bool,
-        approved: bool,
-    ) -> Result<KeyValueDagRepresentation, KvStoreError> {
-        let sender_is_empty = block.sender.is_empty();
-        let sender_has_invalid_format =
-            !sender_is_empty && (block.sender.len() != validator::LENGTH);
-        let senders_new_lm = (block.sender.clone(), block.block_hash.clone());
-
-        let log_already_stored = format!(
-            "Block {} is already stored.",
-            PrettyPrinter::build_string_block_message(&block, true)
-        );
-        let log_empty_sender = format!(
-            "Block {} sender is empty.",
-            PrettyPrinter::build_string_block_message(&block, true)
-        );
-
-        // Add LM either if there is no existing message for the sender, or if sequence number advances
-        // - assumes block sender is not valid hash
-        let should_add_as_latest = || -> bool {
-            let latest_messages_guard = self.latest_messages_index.read().unwrap();
-            match latest_messages_guard.get_one(&block.sender.clone().into()) {
-                Ok(Some(latest_message_hash)) => {
-                    let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
-                    match block_metadata_index_guard.get(&latest_message_hash.into()) {
-                        Ok(Some(metadata)) => block.seq_num >= metadata.sequence_number,
-                        _ => true,
-                    }
-                }
-                _ => true,
-            }
-        };
-
-        let new_latest_messages = || -> Result<HashMap<Validator, BlockHash>, KvStoreError> {
-            let block_hash: BlockHash = block.block_hash.clone();
-
-            let newly_bonded_set: HashSet<_> = block
-                .body
-                .state
-                .bonds
-                .iter()
-                .map(|bond| &bond.validator)
-                .collect();
-
-            let justification_validators: HashSet<_> = block
-                .justifications
-                .iter()
-                .map(|justification| &justification.validator)
-                .collect();
-
-            let mut result = HashMap::new();
-            let latest_messages_guard = self.latest_messages_index.read().unwrap();
-            for validator in newly_bonded_set.difference(&justification_validators) {
-                // This filter is required to enable adding blocks backward from higher height to lower
-                if let Ok(false) =
-                    latest_messages_guard.contains_key(ValidatorSerde((*validator).clone()))
-                {
-                    result.insert((*validator).clone(), block_hash.clone());
-                }
-            }
-
-            Ok(result)
-        };
-
-        let do_insert = || -> Result<(), KvStoreError> {
-            let block_hash = block.block_hash.clone();
-            let block_hash_is_invalid = !(block_hash.len() == block_hash::LENGTH);
-
-            if sender_has_invalid_format {
-                return Err(KvStoreError::InvalidArgument(format!(
-                    "Block sender is malformed., Block: {:?}",
-                    block
-                )));
-            }
-            // TODO: should we have special error type for block hash error also?
-            //  Should this be checked before calling insert? Is DAG storage responsible for that? - OLD
-            if block_hash_is_invalid {
-                return Err(KvStoreError::InvalidArgument(format!(
-                    "Block hash {} is not correct length.",
-                    PrettyPrinter::build_string_bytes(&block_hash)
-                )));
-            }
-
-            if sender_is_empty {
-                println!("{}", log_empty_sender);
-            }
-
-            let block_metadata = BlockMetadata::from_block(&block, invalid, None, None);
-            let mut block_metadata_guard = self.block_metadata_index.write().unwrap();
-            block_metadata_guard.add(block_metadata.clone())?;
-            drop(block_metadata_guard);
-
-            let deploy_hashes: Vec<DeployId> = block
-                .body
-                .deploys
-                .iter()
-                .map(|deploy| deploy.deploy.sig.clone().into())
-                .collect();
-            let deploy_entries: Vec<(DeployId, BlockHashSerde)> = deploy_hashes
-                .into_iter()
-                .map(|deploy_id| (deploy_id, BlockHashSerde(block.block_hash.clone())))
-                .collect();
-            let mut deploy_index_guard = self.deploy_index.write().unwrap();
-            deploy_index_guard.put(deploy_entries)?;
-            drop(deploy_index_guard);
-
-            if invalid {
-                let mut invalid_blocks_guard = self.invalid_blocks_index.write().unwrap();
-                invalid_blocks_guard.put_one(block_hash.clone().into(), block_metadata)?;
-            }
-
-            let new_latest_from_sender = if !sender_is_empty {
-                if should_add_as_latest() {
-                    HashMap::from([senders_new_lm])
-                } else {
-                    HashMap::new()
-                }
-            } else {
-                HashMap::new()
-            };
-
-            let mut new_latest_to_add = new_latest_messages()?;
-            new_latest_to_add.extend(new_latest_from_sender);
-
-            let mut latest_messages_guard = self.latest_messages_index.write().unwrap();
-            latest_messages_guard.put(
-                new_latest_to_add
-                    .into_iter()
-                    .map(|(k, v)| (k.into(), v.into()))
-                    .collect(),
-            )?;
-            drop(latest_messages_guard);
-
-            if approved {
-                let mut block_metadata_guard = self.block_metadata_index.write().unwrap();
-                block_metadata_guard.record_finalized(block_hash, HashSet::new())?;
-            }
-
-            Ok(())
-        };
-
-        let block_exists = {
-            let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
-            let exists = block_metadata_index_guard.contains(&block.block_hash);
-            exists
-        };
-
-        if block_exists {
-            println!("{}", log_already_stored);
-        } else {
-            do_insert()?
-        };
-
-        Ok(self.get_representation())
-    }
-
-    /** Record that some hash is directly finalized (detected by finalizer and becomes LFB). */
-    pub fn record_directly_finalized(
-        &self,
-        directly_finalized_hash: BlockHash,
-        finalization_effect: impl Fn(&HashSet<BlockHash>) -> Result<(), KvStoreError>,
-    ) -> Result<(), KvStoreError> {
-        let dag = self.get_representation();
-        if !dag.contains(&directly_finalized_hash) {
-            return Err(KvStoreError::InvalidArgument(format!(
-                "Attempting to finalize nonexistent hash {}",
-                PrettyPrinter::build_string_bytes(&directly_finalized_hash)
-            )));
-        }
-
-        let indirectly_finalized = self.ancestors(directly_finalized_hash.clone(), |hash| {
-            !dag.is_finalized(&hash)
-        })?;
-
-        let mut all_finalized = indirectly_finalized.clone();
-        all_finalized.insert(directly_finalized_hash.clone());
-
-        finalization_effect(&all_finalized)?;
-
-        let mut block_metadata_index_guard = self.block_metadata_index.write().unwrap();
-        block_metadata_index_guard
-            .record_finalized(directly_finalized_hash, indirectly_finalized)?;
-
-        Ok(())
-    }
 
     // See block-storage/src/main/scala/coop/rchain/blockstorage/dag/BlockDagRepresentationSyntax.scala
 
     // Get block metadata, "unsafe" because method expects block already in the DAG.
     pub fn lookup_unsafe(&self, block_hash: &BlockHash) -> Result<BlockMetadata, KvStoreError> {
-        let dag = self.get_representation();
-        match dag.lookup(block_hash) {
+        match self.lookup(block_hash) {
             Ok(Some(metadata)) => Ok(metadata),
             _ => Err(KvStoreError::InvalidArgument(format!(
                 "DAG storage is missing hash {}",
@@ -478,8 +180,7 @@ impl BlockDagKeyValueStorage {
         &self,
         validator: &Validator,
     ) -> Result<BlockHash, KvStoreError> {
-        let dag = self.get_representation();
-        match dag.latest_message_hash(validator) {
+        match self.latest_message_hash(validator) {
             Some(hash) => Ok(hash),
             None => Err(KvStoreError::InvalidArgument(format!(
                 "No latest message for validator {}",
@@ -492,16 +193,14 @@ impl BlockDagKeyValueStorage {
         &self,
         validator: &Validator,
     ) -> Result<Option<BlockMetadata>, KvStoreError> {
-        let dag = self.get_representation();
-        match dag.latest_message_hash(validator) {
+        match self.latest_message_hash(validator) {
             Some(hash) => self.lookup_unsafe(&hash).map(Some),
             None => Ok(None),
         }
     }
 
     pub fn latest_messages(&self) -> Result<HashMap<Validator, BlockMetadata>, KvStoreError> {
-        let dag = self.get_representation();
-        let latest_messages = dag.latest_message_hashes();
+        let latest_messages = self.latest_message_hashes();
 
         let mut result = HashMap::new();
         for pair in latest_messages.iter() {
@@ -528,8 +227,7 @@ impl BlockDagKeyValueStorage {
         &self,
         latest_message_hashes: HashMap<Validator, BlockHash>,
     ) -> Result<HashMap<Validator, BlockHash>, KvStoreError> {
-        let dag = self.get_representation();
-        let invalid_blocks = dag.invalid_blocks();
+        let invalid_blocks = self.invalid_blocks();
         let invalid_block_hashes: HashSet<BlockHash> = invalid_blocks
             .iter()
             .map(|block| block.block_hash.clone())
@@ -542,8 +240,7 @@ impl BlockDagKeyValueStorage {
     }
 
     pub fn invalid_blocks_map(&self) -> Result<HashMap<BlockHash, Validator>, KvStoreError> {
-        let dag = self.get_representation();
-        let invalid_blocks = dag.invalid_blocks();
+        let invalid_blocks = self.invalid_blocks();
         let invalid_block_hashes: HashMap<BlockHash, Validator> = invalid_blocks
             .iter()
             .map(|block| (block.block_hash.clone(), block.sender.clone()))
@@ -647,13 +344,11 @@ impl BlockDagKeyValueStorage {
             .map(|metadata| metadata.block_hash.clone())
             .collect::<Vec<_>>();
 
-        let dag = self.get_representation();
-
         while !tips.is_empty() {
             let mut next_level = Vec::new();
 
             for hash in &tips {
-                if !dag.is_finalized(hash) {
+                if !self.is_finalized(hash) {
                     result.insert(hash.clone());
 
                     let metadata = self.lookup_unsafe(hash)?;
@@ -671,13 +366,11 @@ impl BlockDagKeyValueStorage {
         let mut result = HashSet::new();
         let mut current_level = vec![block_hash.clone()];
 
-        let dag = self.get_representation();
-
         while !current_level.is_empty() {
             let mut next_level = Vec::new();
 
             for hash in &current_level {
-                if let Some(children) = dag.children(hash) {
+                if let Some(children) = self.children(hash) {
                     for child in children.iter() {
                         if result.insert(child.clone()) {
                             next_level.push(child.clone());
@@ -728,5 +421,296 @@ impl BlockDagKeyValueStorage {
         let mut result = self.ancestors(block_hash.clone(), filter_f)?;
         result.insert(block_hash);
         Ok(result)
+    }
+}
+
+pub struct BlockDagKeyValueStorage {
+    latest_messages_index: KeyValueTypedStoreImpl<ValidatorSerde, BlockHashSerde>,
+    block_metadata_index: Arc<RwLock<BlockMetadataStore>>,
+    deploy_index: Arc<RwLock<KeyValueTypedStoreImpl<DeployId, BlockHashSerde>>>,
+    invalid_blocks_index: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata>,
+    equivocation_tracker_index: EquivocationTrackerStore,
+}
+
+impl BlockDagKeyValueStorage {
+    pub async fn new(kvm: &mut impl KeyValueStoreManager) -> Result<Self, KvStoreError> {
+        let block_metadata_kv_store = kvm.store("block-metadata".to_string()).await?;
+        let block_metadata_db: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata> =
+            KeyValueTypedStoreImpl::new(block_metadata_kv_store);
+        let block_metadata_store = BlockMetadataStore::new(block_metadata_db);
+
+        let equivocation_tracker_kv_store = kvm.store("equivocation-tracker".to_string()).await?;
+        let equivocation_tracker_db: KeyValueTypedStoreImpl<
+            (ValidatorSerde, SequenceNumber),
+            BTreeSet<BlockHashSerde>,
+        > = KeyValueTypedStoreImpl::new(equivocation_tracker_kv_store);
+        let equivocation_tracker_store = EquivocationTrackerStore::new(equivocation_tracker_db);
+
+        let latest_messages_kv_store = kvm.store("latest-messages".to_string()).await?;
+        let latest_messages_db: KeyValueTypedStoreImpl<ValidatorSerde, BlockHashSerde> =
+            KeyValueTypedStoreImpl::new(latest_messages_kv_store);
+
+        let invalid_blocks_kv_store = kvm.store("invalid-blocks".to_string()).await?;
+        let invalid_blocks_db: KeyValueTypedStoreImpl<BlockHashSerde, BlockMetadata> =
+            KeyValueTypedStoreImpl::new(invalid_blocks_kv_store);
+
+        let deploy_index_kv_store = kvm.store("deploy-index".to_string()).await?;
+        let deploy_index_db: KeyValueTypedStoreImpl<DeployId, BlockHashSerde> =
+            KeyValueTypedStoreImpl::new(deploy_index_kv_store);
+
+        Ok(Self {
+            block_metadata_index: Arc::new(RwLock::new(block_metadata_store)),
+            deploy_index: Arc::new(RwLock::new(deploy_index_db)),
+            invalid_blocks_index: invalid_blocks_db,
+            equivocation_tracker_index: equivocation_tracker_store,
+            latest_messages_index: latest_messages_db,
+        })
+    }
+
+    pub fn equivocation_records(&self) -> Result<HashSet<EquivocationRecord>, KvStoreError> {
+        self.equivocation_tracker_index.data()
+    }
+
+    pub fn insert_equivocation_record(
+        &mut self,
+        record: EquivocationRecord,
+    ) -> Result<(), KvStoreError> {
+        self.equivocation_tracker_index.add(record)
+    }
+
+    pub fn update_equivocation_record(
+        &mut self,
+        mut record: EquivocationRecord,
+        block_hash: BlockHash,
+    ) -> Result<(), KvStoreError> {
+        self.equivocation_tracker_index.add({
+            record.equivocation_detected_block_hashes.insert(block_hash);
+            record
+        })
+    }
+
+    pub fn get_representation(&self) -> KeyValueDagRepresentation {
+        let latest_messages = self
+            .latest_messages_index
+            .to_map()
+            .expect("Failed to convert latest_messages_index to map")
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+
+        let invalid_blocks = self
+            .invalid_blocks_index
+            .to_map()
+            .expect("Failed to convert invalid_blocks_index to map")
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect();
+
+        let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
+        let dag_set = block_metadata_index_guard.dag_set();
+        let child_map = block_metadata_index_guard.child_map();
+        let height_map = block_metadata_index_guard.height_map();
+        let last_finalized_block = block_metadata_index_guard.last_finalized_block();
+        let finalized_blocks = block_metadata_index_guard.finalized_block_set();
+
+        KeyValueDagRepresentation {
+            dag_set,
+            latest_messages_map: Arc::new(latest_messages),
+            child_map,
+            height_map,
+            invalid_blocks_set: Arc::new(invalid_blocks),
+            last_finalized_block_hash: last_finalized_block,
+            finalized_blocks_set: finalized_blocks,
+            block_metadata_index: self.block_metadata_index.clone(),
+            deploy_index: self.deploy_index.clone(),
+        }
+    }
+
+    pub fn insert(
+        &mut self,
+        block: &BlockMessage,
+        invalid: bool,
+        approved: bool,
+    ) -> Result<KeyValueDagRepresentation, KvStoreError> {
+        let sender_is_empty = block.sender.is_empty();
+        let sender_has_invalid_format =
+            !sender_is_empty && (block.sender.len() != validator::LENGTH);
+        let senders_new_lm = (block.sender.clone(), block.block_hash.clone());
+
+        let log_already_stored = format!(
+            "Block {} is already stored.",
+            PrettyPrinter::build_string_block_message(&block, true)
+        );
+        let log_empty_sender = format!(
+            "Block {} sender is empty.",
+            PrettyPrinter::build_string_block_message(&block, true)
+        );
+
+        let new_latest_messages = || -> Result<HashMap<Validator, BlockHash>, KvStoreError> {
+            let block_hash: BlockHash = block.block_hash.clone();
+
+            let newly_bonded_set: HashSet<_> = block
+                .body
+                .state
+                .bonds
+                .iter()
+                .map(|bond| &bond.validator)
+                .collect();
+
+            let justification_validators: HashSet<_> = block
+                .justifications
+                .iter()
+                .map(|justification| &justification.validator)
+                .collect();
+
+            let mut result = HashMap::new();
+            for validator in newly_bonded_set.difference(&justification_validators) {
+                // This filter is required to enable adding blocks backward from higher height to lower
+                if let Ok(false) = self
+                    .latest_messages_index
+                    .contains_key(ValidatorSerde((*validator).clone()))
+                {
+                    result.insert((*validator).clone(), block_hash.clone());
+                }
+            }
+
+            Ok(result)
+        };
+
+        let block_exists = {
+            let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
+            let exists = block_metadata_index_guard.contains(&block.block_hash);
+            exists
+        };
+
+        if block_exists {
+            log::warn!("{}", log_already_stored);
+            Ok(self.get_representation())
+        } else {
+            let block_hash = block.block_hash.clone();
+            let block_hash_is_invalid = !(block_hash.len() == block_hash::LENGTH);
+
+            if sender_has_invalid_format {
+                return Err(KvStoreError::InvalidArgument(format!(
+                    "Block sender is malformed., Block: {:?}",
+                    block
+                )));
+            }
+            // TODO: should we have special error type for block hash error also?
+            //  Should this be checked before calling insert? Is DAG storage responsible for that? - OLD
+            if block_hash_is_invalid {
+                return Err(KvStoreError::InvalidArgument(format!(
+                    "Block hash {} is not correct length.",
+                    PrettyPrinter::build_string_bytes(&block_hash)
+                )));
+            }
+
+            if sender_is_empty {
+                log::warn!("{}", log_empty_sender);
+            }
+
+            let block_metadata = BlockMetadata::from_block(&block, invalid, None, None);
+            let mut block_metadata_guard = self.block_metadata_index.write().unwrap();
+            block_metadata_guard.add(block_metadata.clone())?;
+            drop(block_metadata_guard);
+
+            let deploy_hashes: Vec<DeployId> = block
+                .body
+                .deploys
+                .iter()
+                .map(|deploy| deploy.deploy.sig.clone().into())
+                .collect();
+            let deploy_entries: Vec<(DeployId, BlockHashSerde)> = deploy_hashes
+                .into_iter()
+                .map(|deploy_id| (deploy_id, BlockHashSerde(block.block_hash.clone())))
+                .collect();
+            let mut deploy_index_guard = self.deploy_index.write().unwrap();
+            deploy_index_guard.put(deploy_entries)?;
+            drop(deploy_index_guard);
+
+            if invalid {
+                self.invalid_blocks_index
+                    .put_one(block_hash.clone().into(), block_metadata)?;
+            }
+
+            let new_latest_from_sender = if !sender_is_empty {
+                // Add LM either if there is no existing message for the sender, or if sequence number advances
+                // - assumes block sender is not valid hash
+                if match self
+                    .latest_messages_index
+                    .get_one(&block.sender.clone().into())
+                {
+                    Ok(Some(latest_message_hash)) => {
+                        let block_metadata_index_guard = self.block_metadata_index.read().unwrap();
+                        match block_metadata_index_guard.get(&latest_message_hash.into()) {
+                            Ok(Some(metadata)) => block.seq_num >= metadata.sequence_number,
+                            _ => true,
+                        }
+                    }
+                    _ => true,
+                } {
+                    HashMap::from([senders_new_lm])
+                } else {
+                    HashMap::new()
+                }
+            } else {
+                HashMap::new()
+            };
+
+            let mut new_latest_to_add = new_latest_messages()?;
+            new_latest_to_add.extend(new_latest_from_sender);
+
+            self.latest_messages_index.put(
+                new_latest_to_add
+                    .into_iter()
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect(),
+            )?;
+
+            if approved {
+                let mut block_metadata_guard = self.block_metadata_index.write().unwrap();
+                block_metadata_guard.record_finalized(block_hash, HashSet::new())?;
+            }
+
+            Ok(self.get_representation())
+        }
+    }
+
+    pub fn access_equivocations_tracker<A>(
+        &self,
+        f: impl Fn(&EquivocationTrackerStore) -> Result<A, KvStoreError>,
+    ) -> Result<A, KvStoreError> {
+        f(&self.equivocation_tracker_index)
+    }
+
+    /** Record that some hash is directly finalized (detected by finalizer and becomes LFB). */
+    pub fn record_directly_finalized(
+        &self,
+        directly_finalized_hash: BlockHash,
+        finalization_effect: impl Fn(&HashSet<BlockHash>) -> Result<(), KvStoreError>,
+    ) -> Result<(), KvStoreError> {
+        let dag = self.get_representation();
+        if !dag.contains(&directly_finalized_hash) {
+            return Err(KvStoreError::InvalidArgument(format!(
+                "Attempting to finalize nonexistent hash {}",
+                PrettyPrinter::build_string_bytes(&directly_finalized_hash)
+            )));
+        }
+
+        let dag = self.get_representation();
+        let indirectly_finalized = dag.ancestors(directly_finalized_hash.clone(), |hash| {
+            !dag.is_finalized(&hash)
+        })?;
+
+        let mut all_finalized = indirectly_finalized.clone();
+        all_finalized.insert(directly_finalized_hash.clone());
+
+        finalization_effect(&all_finalized)?;
+
+        let mut block_metadata_index_guard = self.block_metadata_index.write().unwrap();
+        block_metadata_index_guard
+            .record_finalized(directly_finalized_hash, indirectly_finalized)?;
+
+        Ok(())
     }
 }

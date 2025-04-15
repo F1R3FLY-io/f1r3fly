@@ -1,15 +1,14 @@
 // See casper/src/test/scala/coop/rchain/casper/util/GenesisBuilder.scala
 
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+use std::{collections::HashMap, path::PathBuf};
+use tempfile::Builder;
+
 use block_storage::rust::{
     dag::block_dag_key_value_storage::BlockDagKeyValueStorage,
     key_value_block_store::KeyValueBlockStore,
 };
-use dashmap::DashMap;
-use lazy_static::lazy_static;
-use rholang::rust::interpreter::util::rev_address::RevAddress;
-use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
-use std::{collections::HashMap, path::PathBuf};
-use tempfile::Builder;
 
 use casper::rust::{
     errors::CasperError,
@@ -28,6 +27,8 @@ use crypto::rust::{
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
 use models::rust::casper::protocol::casper_message::BlockMessage;
+use rholang::rust::interpreter::util::rev_address::RevAddress;
+use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 
 use crate::util::rholang::resources::mk_test_rnode_store_manager;
 

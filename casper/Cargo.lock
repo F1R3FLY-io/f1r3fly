@@ -314,8 +314,11 @@ dependencies = [
 name = "block-storage"
 version = "0.1.0"
 dependencies = [
+ "crypto",
  "dashmap 6.1.0",
+ "env_logger",
  "hex",
+ "log",
  "lz4_flex",
  "models",
  "once_cell",
@@ -366,6 +369,7 @@ dependencies = [
  "log",
  "models",
  "prost",
+ "rand 0.9.0",
  "rholang",
  "rspace_plus_plus",
  "serde",

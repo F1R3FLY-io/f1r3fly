@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use proptest::prelude::ProptestConfig;
 use proptest::proptest;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use tokio::runtime::Runtime;
 
 use block_storage::rust::dag::block_dag_key_value_storage::BlockDagKeyValueStorage;
@@ -20,6 +20,18 @@ use models::rust::block_metadata::BlockMetadata;
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
+
+static INIT: Once = Once::new();
+
+fn init_logger() {
+    INIT.call_once(|| {
+        env_logger::builder()
+            .is_test(true) // ensures logs show up in test output
+            .filter_level(log::LevelFilter::Debug)
+            .try_init()
+            .unwrap();
+    });
+}
 
 fn genesis_block() -> BlockMessage {
     get_random_block(
@@ -48,6 +60,8 @@ async fn create_dag_storage(genesis: &BlockMessage) -> BlockDagKeyValueStorage {
 }
 
 fn proptest_config() -> ProptestConfig {
+    init_logger();
+
     ProptestConfig {
         cases: 5,
         max_shrink_iters: 5,
@@ -89,7 +103,7 @@ fn lookup_elements(
         .map(|block_element| {
             let block_metadata = dag.lookup(&block_element.block_hash).unwrap();
             let latest_message_hash = dag.latest_message_hash(&block_element.sender);
-            let latest_message = dag_storage.latest_message(&block_element.sender).unwrap();
+            let latest_message = dag.latest_message(&block_element.sender).unwrap();
             let children = dag.children(&block_element.block_hash);
             let contains = dag.contains(&block_element.block_hash);
             (
@@ -103,7 +117,7 @@ fn lookup_elements(
         .collect();
 
     let latest_message_hashes = dag.latest_message_hashes();
-    let latest_messages = dag_storage.latest_messages().unwrap();
+    let latest_messages = dag.latest_messages().unwrap();
     let topo_sort = dag.topo_sort(topo_sort_start_block_number, None).unwrap();
     let latest_block_number = dag.latest_block_number();
     (
@@ -253,12 +267,12 @@ fn dag_storage_should_be_able_to_lookup_a_stored_block() {
       let block_element_lookups = block_elements.iter().map(|block_element| {
         let block_metadata = dag.lookup(&block_element.block_hash).unwrap();
         let latest_message_hash = dag.latest_message_hash(&block_element.sender);
-        let latest_message = dag_storage.latest_message(&block_element.sender).unwrap();
+        let latest_message = dag.latest_message(&block_element.sender).unwrap();
         (block_metadata, latest_message_hash, latest_message)
       });
 
       let latest_message_hashes = dag.latest_message_hashes();
-      let latest_messages = dag_storage.latest_messages().unwrap();
+      let latest_messages = dag.latest_messages().unwrap();
 
       block_element_lookups.zip(block_elements.clone()).for_each(|((block_metadata, latest_message_hash, latest_message), block_element)| {
         assert_eq!(block_metadata, Some(BlockMetadata::from_block(&block_element, false, None, None)));
@@ -549,8 +563,7 @@ async fn recording_of_new_directly_finalized_block_should_record_finalized_all_n
     let dag = dag_storage.insert(&b4, false, false).unwrap();
 
     assert_eq!(
-        dag_storage
-            .lookup_unsafe(&genesis.block_hash)
+        dag.lookup_unsafe(&genesis.block_hash)
             .unwrap()
             .finalized,
         true
@@ -558,25 +571,25 @@ async fn recording_of_new_directly_finalized_block_should_record_finalized_all_n
     assert_eq!(dag.is_finalized(&genesis.block_hash), true);
 
     assert_eq!(
-        dag_storage.lookup_unsafe(&b1.block_hash).unwrap().finalized,
+        dag.lookup_unsafe(&b1.block_hash).unwrap().finalized,
         false
     );
     assert_eq!(dag.is_finalized(&b1.block_hash), false);
 
     assert_eq!(
-        dag_storage.lookup_unsafe(&b2.block_hash).unwrap().finalized,
+        dag.lookup_unsafe(&b2.block_hash).unwrap().finalized,
         false
     );
     assert_eq!(dag.is_finalized(&b2.block_hash), false);
 
     assert_eq!(
-        dag_storage.lookup_unsafe(&b3.block_hash).unwrap().finalized,
+        dag.lookup_unsafe(&b3.block_hash).unwrap().finalized,
         false
     );
     assert_eq!(dag.is_finalized(&b3.block_hash), false);
 
     assert_eq!(
-        dag_storage.lookup_unsafe(&b4.block_hash).unwrap().finalized,
+        dag.lookup_unsafe(&b4.block_hash).unwrap().finalized,
         false
     );
     assert_eq!(dag.is_finalized(&b4.block_hash), false);
@@ -598,19 +611,19 @@ async fn recording_of_new_directly_finalized_block_should_record_finalized_all_n
     assert_eq!(dag.is_finalized(&b3.block_hash), true);
     assert_eq!(dag.is_finalized(&b4.block_hash), false);
 
-    let b1_meta = dag_storage.lookup_unsafe(&b1.block_hash).unwrap();
+    let b1_meta = dag.lookup_unsafe(&b1.block_hash).unwrap();
     assert_eq!(b1_meta.finalized, true);
     assert_eq!(b1_meta.directly_finalized, false);
 
-    let b2_meta = dag_storage.lookup_unsafe(&b2.block_hash).unwrap();
+    let b2_meta = dag.lookup_unsafe(&b2.block_hash).unwrap();
     assert_eq!(b2_meta.finalized, true);
     assert_eq!(b2_meta.directly_finalized, false);
 
-    let b3_meta = dag_storage.lookup_unsafe(&b3.block_hash).unwrap();
+    let b3_meta = dag.lookup_unsafe(&b3.block_hash).unwrap();
     assert_eq!(b3_meta.finalized, true);
     assert_eq!(b3_meta.directly_finalized, true);
 
-    let b4_meta = dag_storage.lookup_unsafe(&b4.block_hash).unwrap();
+    let b4_meta = dag.lookup_unsafe(&b4.block_hash).unwrap();
     assert_eq!(b4_meta.finalized, false);
     assert_eq!(b4_meta.directly_finalized, false);
 

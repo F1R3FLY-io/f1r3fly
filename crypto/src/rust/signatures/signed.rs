@@ -84,3 +84,14 @@ impl<A: PartialEq> PartialEq for Signed<A> {
             && self.sig_algorithm.eq(&other.sig_algorithm)
     }
 }
+
+impl<A: Eq> Eq for Signed<A> {}
+
+impl<A: std::hash::Hash> std::hash::Hash for Signed<A> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.data.hash(state);
+        self.pk.hash(state);
+        self.sig.hash(state);
+        self.sig_algorithm.name().hash(state);
+    }
+}

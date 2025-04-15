@@ -46,23 +46,15 @@ use rholang::rust::interpreter::{
 };
 use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
 
-use crate::util::genesis_builder::{GenesisContext, GenessisBuilder};
+use crate::{
+    init_logger,
+    util::genesis_builder::{GenesisContext, GenessisBuilder},
+};
 
 use super::resources::{copy_storage, mk_runtime_manager_at, mk_test_rnode_store_manager};
 
-static INIT: Once = Once::new();
 static GENESIS_INIT: Once = Once::new();
 static mut CACHED_GENESIS: Option<Arc<Mutex<Option<GenesisContext>>>> = None;
-
-fn init_logger() {
-    INIT.call_once(|| {
-        env_logger::builder()
-            .is_test(true) // ensures logs show up in test output
-            .filter_level(log::LevelFilter::Info)
-            .try_init()
-            .unwrap();
-    });
-}
 
 enum SystemDeployReplayResult<A> {
     ReplaySucceeded {

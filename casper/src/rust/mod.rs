@@ -4,3 +4,4 @@ pub mod util;
 pub mod rholang;
 pub mod errors;
 pub mod storage;
+pub mod casper;

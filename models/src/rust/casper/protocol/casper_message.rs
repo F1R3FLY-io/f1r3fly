@@ -712,7 +712,7 @@ impl ProcessedSystemDeploy {
     }
 }
 
-#[derive(Debug, PartialEq, serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Serialize, Eq, Hash)]
 pub struct DeployData {
     pub term: String,
     pub time_stamp: i64,
