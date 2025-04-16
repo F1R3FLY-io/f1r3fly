@@ -1,5 +1,4 @@
-use std::collections::HashMap;
+use models::rhoapi::Par;
+use std::collections::BTreeMap;
 
-use crate::normal_forms::Par;
-
-pub(crate) type EnvHashMap = HashMap<String, Par>;
+pub(crate) type EnvHashMap = BTreeMap<String, Par>;

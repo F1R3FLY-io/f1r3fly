@@ -1,7 +1,9 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::Par;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
+
+use crate::aliases::EnvHashMap;
 
 use super::accounting::_cost;
 use super::accounting::costs::{Cost, parsing_cost};
@@ -17,51 +19,35 @@ pub struct EvaluateResult {
     pub mergeable: HashSet<Par>,
 }
 
-pub trait Interpreter {
-    async fn inj_attempt(
-        &self,
-        reducer: &DebruijnInterpreter,
-        term: String,
-        initial_phlo: Cost,
-        normalizer_env: HashMap<String, Par>,
-        rand: Blake2b512Random,
-    ) -> Result<EvaluateResult, InterpreterError>;
-}
-
-pub struct InterpreterImpl {
+pub struct Interpreter {
     c: _cost,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
-impl Interpreter for InterpreterImpl {
-    async fn inj_attempt(
+impl Interpreter {
+    pub async fn inj_attempt(
         &self,
         reducer: &DebruijnInterpreter,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: HashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
-        // println!("\nhit inj_attempt");
         let parsing_cost = parsing_cost(&term);
 
         let evaluation_result: Result<EvaluateResult, InterpreterError> = {
             let _ = self.c.set(initial_phlo.clone());
-            // let phlos_left_before = self.c.get();
             let _ = self.c.charge(parsing_cost.clone())?;
-            // let phlos_left_after = self.c.get();
 
-            // println!("\nterm: {:#?}", term);
-            let parsed = Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env)?;
-            // println!("\nparsed: {:?}", parsed);
-            // let phlos_left_after_adt = self.c.get();
+            let compiler = Compiler::new(&term);
+            let parsed = compiler.compile_to_adt()?;
 
             // Empty mergeable channels
             let mut merge_chs_lock = self.merge_chs.write().unwrap();
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            reducer.inj(parsed, rand).await?;
+            reducer.inject(parsed, rand).await?;
             let phlos_left = self.c.get();
             let mergeable_channels = self.merge_chs.read().unwrap().clone();
 
@@ -77,11 +63,9 @@ impl Interpreter for InterpreterImpl {
             Err(err) => self.handle_error(initial_phlo, parsing_cost, err),
         }
     }
-}
 
-impl InterpreterImpl {
-    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
-        InterpreterImpl { c: cost, merge_chs }
+    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> Interpreter {
+        Interpreter { c: cost, merge_chs }
     }
 
     // TODO: Implement and handle just 'InterpreterError'

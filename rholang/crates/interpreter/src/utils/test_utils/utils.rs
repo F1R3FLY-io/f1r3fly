@@ -1,3 +1,4 @@
+use crate::aliases::EnvHashMap;
 use crate::compiler::bound_map_chain::BoundMapChain;
 use crate::compiler::compiler::Compiler;
 use crate::compiler::free_map::FreeMap;
@@ -12,12 +13,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn test_normalize_match_proc<A, B>(proc: &Proc, before: A, after: B)
 where
-    A: FnOnce(&mut FreeMap, &mut BoundMapChain, &mut BTreeMap<String, Par>) -> Par,
+    A: FnOnce(&mut FreeMap, &mut BoundMapChain, &mut EnvHashMap) -> Par,
     B: FnOnce(Result<(&Par, &FreeMap), InterpreterError>),
 {
     let mut free_map = FreeMap::new();
     let mut bound_map_chain = BoundMapChain::new();
-    let mut env = BTreeMap::new();
+    let mut env = EnvHashMap::new();
 
     let mut input_par = before(&mut free_map, &mut bound_map_chain, &mut env);
 

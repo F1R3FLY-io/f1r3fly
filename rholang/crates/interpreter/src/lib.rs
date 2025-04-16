@@ -33,10 +33,7 @@ use models::{
     rholang_scala_rust_types::*,
 };
 use prost::Message;
-use rho_runtime::{
-    RhoRuntime as RhoRuntimeTrait, RhoRuntimeImpl,
-    bootstrap_registry as bootstrap_registry_internal, create_rho_runtime,
-};
+use rho_runtime::{RhoRuntime, Runtime, bootstrap_registry as bootstrap_registry_internal};
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hot_store::{HotStoreState, new_dashmap};
@@ -57,13 +54,13 @@ pub fn unwrap_option_safe<A: Clone>(opt: Option<A>) -> Result<A, InterpreterErro
 }
 
 #[repr(C)]
-struct RhoRuntime {
-    runtime: Arc<Mutex<RhoRuntimeImpl>>,
+struct SharedRhoRuntime {
+    runtime: Arc<Mutex<RhoRuntime>>,
 }
 
 #[repr(C)]
 struct ReplayRhoRuntime {
-    runtime: Arc<Mutex<RhoRuntimeImpl>>,
+    runtime: Arc<Mutex<RhoRuntime>>,
 }
 
 #[repr(C)]
@@ -80,12 +77,10 @@ struct ReplaySpace {
 
 #[unsafe(no_mangle)]
 extern "C" fn evaluate(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     params_ptr: *const u8,
     params_bytes_len: usize,
 ) -> *const u8 {
-    // println!("\nhit rust lib evaluate");
-
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
     let params = EvaluateParams::decode(params_slice).unwrap();
 
@@ -95,10 +90,6 @@ extern "C" fn evaluate(
     let normalizer_env = params.normalizer_env;
     let rand_proto = params.random_state.unwrap();
     let digest_proto = rand_proto.digest.unwrap();
-    // println!(
-    //     "\nrandPathPosition in rust evaluate: {}",
-    //     rand_proto.path_position
-    // );
     let rand = Blake2b512Random {
         digest: Blake2b512Block {
             chain_value: digest_proto
@@ -122,19 +113,12 @@ extern "C" fn evaluate(
         position: rand_proto.position,
         path_position: rand_proto.path_position as usize,
     };
-    // println!("\nrand in rust evaluate: ");
-    // rand.debug_str();
 
     let mut rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
     let rt = tokio::runtime::Runtime::new().unwrap();
     let eval_result = rt.block_on(async {
         rho_runtime
-            .evaluate(
-                term,
-                initial_phlo,
-                normalizer_env.into_iter().collect(),
-                rand,
-            )
+            .evaluate(term, initial_phlo, normalizer_env, rand)
             .await
             .unwrap()
     });
@@ -162,9 +146,28 @@ extern "C" fn evaluate(
     Box::leak(result.into_boxed_slice()).as_ptr()
 }
 
+/// Creates a soft checkpoint of the current state of the runtime
+///
+/// This function creates a soft checkpoint which captures the current state of the
+/// RhoRuntime, including the cache snapshot, log, and produce counter. The soft checkpoint
+/// is serialized into a protocol buffer and returned as a raw pointer to the serialized bytes.
+///
+/// # Safety
+///
+/// This function is marked as `unsafe` because it:
+/// 1. Dereferences a raw pointer to access the runtime
+/// 2. Returns a raw pointer to leaked memory
+///
+/// # Arguments
+///
+/// * `runtime_ptr` - A raw pointer to a `SharedRhoRuntime`
+///
+/// # Returns
+///
+/// A raw pointer to the serialized bytes of the soft checkpoint. The first 4 bytes
+/// represent the length of the serialized data as a 32-bit little-endian integer.
 #[unsafe(no_mangle)]
-extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
-    // println!("\nhit rust lib create_soft_checkpoint");
+extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *const u8 {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
     let soft_checkpoint = runtime.try_lock().unwrap().create_soft_checkpoint();
 
@@ -408,7 +411,7 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
 
 #[unsafe(no_mangle)]
 extern "C" fn revert_to_soft_checkpoint(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     payload_pointer: *const u8,
     payload_bytes_len: usize,
 ) -> () {
@@ -652,7 +655,7 @@ extern "C" fn revert_to_soft_checkpoint(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
+extern "C" fn create_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *const u8 {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
     let checkpoint = runtime.try_lock().unwrap().create_checkpoint();
 
@@ -765,12 +768,10 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
 
 #[unsafe(no_mangle)]
 extern "C" fn reset(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     root_pointer: *const u8,
     root_bytes_len: usize,
 ) -> () {
-    // println!("\nHit reset");
-
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
@@ -780,7 +781,7 @@ extern "C" fn reset(
 
 #[unsafe(no_mangle)]
 extern "C" fn get_data(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     channel_pointer: *const u8,
     channel_bytes_len: usize,
 ) -> *const u8 {
@@ -821,7 +822,7 @@ extern "C" fn get_data(
 
 #[unsafe(no_mangle)]
 extern "C" fn get_joins(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     channel_pointer: *const u8,
     channel_bytes_len: usize,
 ) -> *const u8 {
@@ -849,7 +850,7 @@ extern "C" fn get_joins(
 
 #[unsafe(no_mangle)]
 extern "C" fn get_waiting_continuations(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     channels_pointer: *const u8,
     channels_bytes_len: usize,
 ) -> *const u8 {
@@ -905,7 +906,7 @@ extern "C" fn get_waiting_continuations(
 
 #[unsafe(no_mangle)]
 extern "C" fn set_block_data(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     params_ptr: *const u8,
     params_bytes_len: usize,
 ) -> () {
@@ -929,7 +930,7 @@ extern "C" fn set_block_data(
 
 #[unsafe(no_mangle)]
 extern "C" fn set_invalid_blocks(
-    runtime_ptr: *mut RhoRuntime,
+    runtime_ptr: *mut SharedRhoRuntime,
     params_ptr: *const u8,
     params_bytes_len: usize,
 ) -> () {
@@ -955,7 +956,7 @@ extern "C" fn set_invalid_blocks(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
+extern "C" fn get_hot_changes(runtime_ptr: *mut SharedRhoRuntime) -> *const u8 {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
     let hot_store_mapped = runtime.try_lock().unwrap().get_hot_changes();
 
@@ -1152,7 +1153,7 @@ extern "C" fn create_runtime(
     rspace_ptr: *mut Space,
     params_ptr: *const u8,
     params_bytes_len: usize,
-) -> *mut RhoRuntime {
+) -> *mut SharedRhoRuntime {
     let rspace = unsafe { (*rspace_ptr).rspace.try_lock().unwrap().clone() };
 
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
@@ -1163,10 +1164,16 @@ extern "C" fn create_runtime(
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let rho_runtime = tokio_runtime.block_on(async {
-        create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+        crate::rho_runtime::create_runtime(
+            rspace,
+            init_registry,
+            mergeable_tag_name,
+            &mut Vec::new(),
+        )
+        .await
     });
 
-    Box::into_raw(Box::new(RhoRuntime {
+    Box::into_raw(Box::new(SharedRhoRuntime {
         runtime: rho_runtime,
     }))
 }
@@ -1186,17 +1193,23 @@ extern "C" fn create_replay_runtime(
     let init_registry = params.init_registry;
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    let replay_rho_runtime = tokio_runtime.block_on(async {
-        create_rho_runtime(rspace, mergeable_tag_name, init_registry, &mut Vec::new()).await
+    let rho_runtime = tokio_runtime.block_on(async {
+        crate::rho_runtime::create_runtime(
+            rspace,
+            init_registry,
+            mergeable_tag_name,
+            &mut Vec::new(),
+        )
+        .await
     });
 
     Box::into_raw(Box::new(ReplayRhoRuntime {
-        runtime: replay_rho_runtime,
+        runtime: rho_runtime,
     }))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn bootstrap_registry(runtime_ptr: *mut RhoRuntime) -> () {
+extern "C" fn bootstrap_registry(runtime_ptr: *mut SharedRhoRuntime) -> () {
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     tokio_runtime.block_on(async {

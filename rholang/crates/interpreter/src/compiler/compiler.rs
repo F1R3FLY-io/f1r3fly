@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::{
     aliases::EnvHashMap,
     errors::InterpreterError,
+    interpreter::EvaluateResult,
     normal_forms::Par,
     sort_matcher::{Sortable, Sorted},
 };
@@ -18,20 +19,27 @@ use super::{
 
 pub struct Compiler<'src> {
     ast_builder: ASTBuilder<'src>,
-    normalizer_env: BTreeMap<String, Par>,
+    normalizer_env: EnvHashMap,
 }
 
 impl<'src> Compiler<'src> {
-    pub fn new(source: &'src str) -> Compiler<'src> {
-        Self::new_with_normalizer_env(source, HashMap::<String, Par>::new())
+    pub fn source_to_adt_with_normalizer_env(
+        self,
+        term: &str,
+        env: EnvHashMap,
+    ) -> Result<EvaluateResult, InterpreterError> {
+        unimplemented!()
     }
 
-    pub fn new_with_normalizer_env<Env, K>(source: &'src str, env: Env) -> Compiler<'src>
+    pub fn new(source: &'src str) -> Compiler<'src> {
+        Self::new_with_normalizer_env(source, EnvHashMap::new())
+    }
+
+    pub fn new_with_normalizer_env<K>(source: &'src str, env: EnvHashMap) -> Compiler<'src>
     where
-        Env: IntoIterator<Item = (K, Par)>,
         K: ToOwned<Owned = String>,
     {
-        let mut normalizer_env = BTreeMap::new();
+        let mut normalizer_env = EnvHashMap::new();
         for (k, ref_par) in env {
             normalizer_env.insert(k.to_owned(), ref_par);
         }
@@ -45,6 +53,7 @@ impl<'src> Compiler<'src> {
         let proc = self.parse_to_ast()?;
         let par = normalize_term(proc, &self.normalizer_env)?;
         let sorted_par = par.sort_match();
+
         Ok(sorted_par.term)
     }
 

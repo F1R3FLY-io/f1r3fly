@@ -210,8 +210,6 @@ fn normalize_match_proc_internal(
         Proc::ForComprehension {
             receipts: formals,
             proc,
-            line_num,
-            col_num,
         } => normalize_p_input(formals, proc, *line_num, *col_num, input, env),
 
         Proc::Send {

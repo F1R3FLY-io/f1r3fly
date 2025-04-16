@@ -16,10 +16,7 @@ use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
-use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::replay_rspace_interface::IReplayRSpace;
-use rspace_plus_plus::rspace::rspace::RSpace;
-use rspace_plus_plus::rspace::rspace::RSpaceStore;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::trace::Log;
 use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
@@ -27,9 +24,9 @@ use rspace_plus_plus::rspace::util::unpack_option;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
 
+use crate::aliases::EnvHashMap;
 use crate::interpreter::EvaluateResult;
 use crate::interpreter::Interpreter;
-use crate::interpreter::InterpreterImpl;
 use crate::system_processes::{BodyRefs, FixedChannels};
 
 use super::accounting::_cost;
@@ -53,7 +50,7 @@ use models::rhoapi::expr::ExprInstance::GByteArray;
 /*
  * This trait has been combined with the 'ReplayRhoRuntime' trait
 */
-pub trait RhoRuntime: HasCost {
+pub trait Runtime: HasCost {
     /**
      * Parse the rholang term into [[coop.rchain.models.Par]] and execute it with provided initial phlo.
      *
@@ -69,7 +66,7 @@ pub trait RhoRuntime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: HashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError>;
 
@@ -77,7 +74,7 @@ pub trait RhoRuntime: HasCost {
     async fn evaluate_with_env(
         &mut self,
         term: String,
-        normalizer_env: HashMap<String, Par>,
+        normalizer_env: EnvHashMap,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), normalizer_env)
             .await
@@ -87,7 +84,7 @@ pub trait RhoRuntime: HasCost {
         &mut self,
         term: String,
     ) -> Result<EvaluateResult, InterpreterError> {
-        self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), HashMap::new())
+        self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), EnvHashMap::new())
             .await
     }
 
@@ -96,7 +93,7 @@ pub trait RhoRuntime: HasCost {
         term: String,
         initial_phlo: Cost,
     ) -> Result<EvaluateResult, InterpreterError> {
-        self.evaluate_with_env_and_phlo(term, initial_phlo, HashMap::new())
+        self.evaluate_with_env_and_phlo(term, initial_phlo, EnvHashMap::new())
             .await
     }
 
@@ -104,7 +101,7 @@ pub trait RhoRuntime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: HashMap<String, Par>,
+        normalizer_env: EnvHashMap,
     ) -> Result<EvaluateResult, InterpreterError> {
         let rand = Blake2b512Random::create_from_bytes(&[0; 128]);
         let checkpoint = self.create_soft_checkpoint();
@@ -237,7 +234,7 @@ pub trait RhoRuntime: HasCost {
  * We use this struct for both normal and replay RhoRuntime instances
 */
 #[derive(Clone)]
-pub struct RhoRuntimeImpl {
+pub struct RhoRuntime {
     pub reducer: DebruijnInterpreter,
     pub cost: _cost,
     pub block_data_ref: Arc<RwLock<BlockData>>,
@@ -245,15 +242,15 @@ pub struct RhoRuntimeImpl {
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
-impl RhoRuntimeImpl {
+impl RhoRuntime {
     fn new(
         reducer: DebruijnInterpreter,
         cost: _cost,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
-    ) -> Arc<Mutex<RhoRuntimeImpl>> {
-        Arc::new(Mutex::new(RhoRuntimeImpl {
+    ) -> Arc<Mutex<RhoRuntime>> {
+        Arc::new(Mutex::new(RhoRuntime {
             reducer,
             cost,
             block_data_ref,
@@ -263,30 +260,21 @@ impl RhoRuntimeImpl {
     }
 }
 
-impl RhoRuntime for RhoRuntimeImpl {
+impl Runtime for RhoRuntime {
     async fn evaluate(
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: HashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         println!(
             "\nspace before in evaluate: {:?}",
             self.get_hot_changes().len()
         );
-        // rand.debug_str();
-        let i = InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone());
-        let reducer = &self.reducer;
-        let res = i
-            .inj_attempt(reducer, term, initial_phlo, normalizer_env, rand)
-            .await;
-        println!(
-            "\nspace after in evaluate: {:?}",
-            self.get_hot_changes().len()
-        );
-        println!("\nevaluate result: {:?}", res);
-        res
+        Interpreter::new(self.cost.clone(), self.merge_chs.clone())
+            .inj_attempt(&self.reducer, term, initial_phlo, normalizer_env, rand)
+            .await
     }
 
     async fn inj(
@@ -295,7 +283,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         _env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.reducer.inj(par, rand).await
+        self.reducer.inject(par, rand).await
     }
 
     fn create_soft_checkpoint(
@@ -425,7 +413,7 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 }
 
-impl HasCost for RhoRuntimeImpl {
+impl HasCost for RhoRuntime {
     fn cost(&self) -> &_cost {
         &self.cost
     }
@@ -878,63 +866,15 @@ fn bootstrap_rand() -> Blake2b512Random {
          .as_bytes())
 }
 
-pub async fn bootstrap_registry(runtime: Arc<Mutex<impl RhoRuntime>>) -> () {
-    // println!("\nhit bootstrap_registry");
+pub async fn bootstrap_registry(runtime: Arc<Mutex<impl Runtime>>) -> () {
     let rand = bootstrap_rand();
-    // rand.debug_str();
     let runtime_lock = runtime.try_lock().unwrap();
     let cost = runtime_lock.cost().get();
     let _ = runtime_lock
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
-    // println!("\nast: {:?}", ast());
-    // println!(
-    //     "\nruntime space before inject, {:?}",
-    //     runtime_lock.get_hot_changes().len()
-    // );
     runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
-    // println!(
-    //     "\nruntime space after inject, {:?}",
-    //     runtime_lock.get_hot_changes().len()
-    // );
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
-}
-
-async fn create_runtime<T>(
-    rspace: T,
-    extra_system_processes: &mut Vec<Definition>,
-    init_registry: bool,
-    mergeable_tag_name: Par,
-) -> Arc<Mutex<RhoRuntimeImpl>>
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
-    // println!("\nrust create_runtime");
-    let cost = CostAccounting::empty_cost();
-    let merge_chs = Arc::new(RwLock::new({
-        let mut set = HashSet::new();
-        set.insert(Par::default());
-        set
-    }));
-
-    let rho_env = create_rho_env(
-        rspace,
-        merge_chs.clone(),
-        mergeable_tag_name,
-        extra_system_processes,
-        cost.clone(),
-    );
-
-    let (reducer, block_ref, invalid_blocks) = rho_env;
-    let runtime = RhoRuntimeImpl::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
-
-    if init_registry {
-        // println!("\ninit_registry");
-        bootstrap_registry(runtime.clone()).await;
-        runtime.try_lock().unwrap().create_checkpoint();
-    }
-
-    runtime
 }
 
 /**
@@ -954,97 +894,35 @@ where
  *                use [[coop.rchain.rholang.interpreter.accounting.noOpCostLog]]
  * @return
  */
-pub async fn create_rho_runtime<T>(
+pub async fn create_runtime<T>(
     rspace: T,
-    mergeable_tag_name: Par,
     init_registry: bool,
+    mergeable_tag_name: Par,
     extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<RhoRuntimeImpl>>
+) -> Arc<Mutex<RhoRuntime>>
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
-    create_runtime(
+    let cost = CostAccounting::empty_cost();
+    let merge_chs = Arc::new(RwLock::new({
+        let mut set = HashSet::new();
+        set.insert(Par::default());
+        set
+    }));
+
+    let (reducer, block_ref, invalid_blocks) = create_rho_env(
         rspace,
+        merge_chs.clone(),
+        mergeable_tag_name,
         extra_system_processes,
-        init_registry,
-        mergeable_tag_name,
-    )
-    .await
-}
+        cost.clone(),
+    );
+    let runtime = RhoRuntime::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
 
-/**
- *
- * @param rspace the replay rspace which the runtime operate on it
- * @param extraSystemProcesses same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @param initRegistry same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @param costLog same as [[coop.rchain.rholang.interpreter.RhoRuntime.createRhoRuntime]]
- * @return
- */
-pub async fn create_replay_rho_runtime<T>(
-    rspace: T,
-    mergeable_tag_name: Par,
-    init_registry: bool,
-    extra_system_processes: &mut Vec<Definition>,
-) -> Arc<Mutex<RhoRuntimeImpl>>
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
-    create_runtime(
-        rspace,
-        extra_system_processes,
-        init_registry,
-        mergeable_tag_name,
-    )
-    .await
-}
-
-async fn create_runtimes<T, R>(
-    space: T,
-    replay_space: R,
-    init_registry: bool,
-    additional_system_processes: &mut Vec<Definition>,
-    mergeable_tag_name: Par,
-) -> (Arc<Mutex<RhoRuntimeImpl>>, Arc<Mutex<RhoRuntimeImpl>>)
-where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-    R: IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
-{
-    let rho_runtime = create_rho_runtime(
-        space,
-        mergeable_tag_name.clone(),
-        init_registry,
-        additional_system_processes,
-    )
-    .await;
-
-    let replay_rho_runtime = create_replay_rho_runtime(
-        replay_space,
-        mergeable_tag_name,
-        init_registry,
-        additional_system_processes,
-    )
-    .await;
-
-    (rho_runtime, replay_rho_runtime)
-}
-
-async fn create_runtime_from_kv_store(
-    stores: RSpaceStore,
-    mergeable_tag_name: Par,
-    init_registry: bool,
-    additional_system_processes: &mut Vec<Definition>,
-    matcher: Arc<Box<dyn Match<BindPattern, ListParWithRandom>>>,
-) -> Arc<Mutex<RhoRuntimeImpl>> {
-    let space: RSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> =
-        RSpace::create(stores, matcher).unwrap();
-
-    let runtime = create_rho_runtime(
-        space,
-        mergeable_tag_name,
-        init_registry,
-        additional_system_processes,
-    )
-    .await;
+    if init_registry {
+        bootstrap_registry(runtime.clone()).await;
+        runtime.try_lock().unwrap().create_checkpoint();
+    }
 
     runtime
 }

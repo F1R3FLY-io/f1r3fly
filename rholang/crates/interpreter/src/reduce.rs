@@ -11,7 +11,7 @@ use models::rhoapi::{
     GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
     Var,
 };
-use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
+use models::rhoapi::{ETuple, ListParWithRandom, TaggedContinuation};
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::par_set::ParSet;
@@ -35,6 +35,7 @@ use crate::accounting::costs::{
     size_method_cost, slice_cost, take_cost, to_byte_array_cost, to_list_cost, union_cost,
 };
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
+use crate::normal_forms::Par;
 use crate::rho_type::RhoTuple2;
 use crate::utils::GeneratedMessage;
 
@@ -48,7 +49,6 @@ use super::accounting::costs::{
 use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
 use super::env::Env;
 use super::errors::InterpreterError;
-use super::matcher::has_locally_free::HasLocallyFree;
 use super::rho_runtime::RhoISpace;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
@@ -181,7 +181,7 @@ impl DebruijnInterpreter {
         }
     }
 
-    pub async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
+    pub async fn inject(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
         self.eval(par, &Env::new(), rand).await
     }
 
