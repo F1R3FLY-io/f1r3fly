@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/InterpreterUtil.scala
 
+use prost::bytes::Bytes;
 use std::{collections::HashMap, sync::Arc};
 
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
@@ -18,7 +19,6 @@ use models::{
         validator::Validator,
     },
 };
-use prost::bytes::Bytes;
 use rholang::rust::interpreter::{errors::InterpreterError, system_processes::BlockData};
 
 use crate::rust::{casper::CasperSnapshot, errors::CasperError};
