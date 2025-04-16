@@ -5,7 +5,7 @@ Helm Chart for deploying F1r3fly nodes. Currently Helm Chart generate separate S
 ## Installing Helm chart
 - boot plus 4 validators
 ```sh
-helm upgrade --install f1r3fly-4nodes ./f1r3fly -n f1r3fly-4nodes --create-namespace --set shardConfig.deployableReplicas=5
+helm upgrade --install f1r3fly ./f1r3fly -n f1r3fly --create-namespace --set shardConfig.deployableReplicas=1
 ```
 - boot plus 8 validators:
 ```sh
@@ -24,8 +24,8 @@ helm upgrade --install f1r3fly-32nodes ./f1r3fly -n f1r3fly-32nodes --create-nam
 ## Uninstalling Helm chart
 - 4 nodes
 ```sh
-helm uninstall f1r3fly-4nodes -n f1r3fly-4nodes
-kubectl delete ns f1r3fly-4nodes
+helm uninstall f1r3fly -n f1r3fly
+kubectl delete ns f1r3fly
 ```
 - 8 nodes
 ```sh

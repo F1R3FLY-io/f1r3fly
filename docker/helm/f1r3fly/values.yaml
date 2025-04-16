@@ -4,7 +4,7 @@ shardConfig:
 
   # Configure a number of read-only nodes excluding deployable nodes
   # Readonly nodes are used for observing the network. Node doesn't have a validator key.
-  readOnlyReplicas: 0
+  readOnlyReplicas: 1
 
 
   # Configure `synchrony-constraint-threshold` of each node
@@ -241,4 +241,4 @@ tolerations: []
 affinity: {}
 
 persistence:
-  storageClassName: oci
+  storageClassName: oci-bv
