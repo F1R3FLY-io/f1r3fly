@@ -5,7 +5,7 @@ use models::rhoapi::Bundle;
 use models::rhoapi::Var;
 use models::rhoapi::expr::ExprInstance::EMapBody;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
+use models::rhoapi::{BindPattern, Expr, ListParWithRandom, TaggedContinuation};
 use models::rust::block_hash::BlockHash;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
@@ -239,7 +239,7 @@ pub struct RhoRuntime {
     pub cost: _cost,
     pub block_data_ref: Arc<RwLock<BlockData>>,
     pub invalid_blocks_param: InvalidBlocks,
-    pub merge_chs: Arc<RwLock<HashSet<Par>>>,
+    pub merge_chs: Arc<RwLock<HashSet<crate::normal_forms::Par>>>,
 }
 
 impl RhoRuntime {
@@ -273,7 +273,7 @@ impl Runtime for RhoRuntime {
             self.get_hot_changes().len()
         );
         Interpreter::new(self.cost.clone(), self.merge_chs.clone())
-            .inj_attempt(&self.reducer, term, initial_phlo, normalizer_env, rand)
+            .inject_attempt(&self.reducer, term, initial_phlo, normalizer_env, rand)
             .await
     }
 

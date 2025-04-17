@@ -3,9 +3,11 @@ use models::rhoapi::Par;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
+use crate::accounting::CostManager;
 use crate::aliases::EnvHashMap;
+use crate::env::Env;
+use crate::normal_forms;
 
-use super::accounting::_cost;
 use super::accounting::costs::{Cost, parsing_cost};
 use super::compiler::compiler::Compiler;
 use super::errors::InterpreterError;
@@ -16,56 +18,58 @@ use super::reduce::DebruijnInterpreter;
 pub struct EvaluateResult {
     pub cost: Cost,
     pub errors: Vec<InterpreterError>,
-    pub mergeable: HashSet<Par>,
+    pub mergeable: HashSet<normal_forms::Par>,
 }
 
 pub struct Interpreter {
-    c: _cost,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
+    cost_manager: CostManager,
+    merge_chs: Arc<RwLock<HashSet<normal_forms::Par>>>,
 }
 
 impl Interpreter {
-    pub async fn inj_attempt(
+    pub async fn inject_attempt(
         &self,
         reducer: &DebruijnInterpreter,
         term: String,
-        initial_phlo: Cost,
+        initial_cost: Cost,
         normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
-        let parsing_cost = parsing_cost(&term);
+        let cost = parsing_cost(&term);
 
-        let evaluation_result: Result<EvaluateResult, InterpreterError> = {
-            let _ = self.c.set(initial_phlo.clone());
-            let _ = self.c.charge(parsing_cost.clone())?;
+        self.cost_manager.set(initial_cost.clone());
+        self.cost_manager.charge(cost.clone())?;
 
-            let compiler = Compiler::new(&term);
-            let parsed = compiler.compile_to_adt()?;
-
-            // Empty mergeable channels
-            let mut merge_chs_lock = self.merge_chs.write().unwrap();
+        // Empty mergeable channels
+        {
+            let mut merge_chs_lock = self.merge_chs.write().expect("Can't lock to write");
             merge_chs_lock.clear();
-            drop(merge_chs_lock);
-
-            reducer.inject(parsed, rand).await?;
-            let phlos_left = self.c.get();
-            let mergeable_channels = self.merge_chs.read().unwrap().clone();
-
-            Ok(EvaluateResult {
-                cost: initial_phlo.clone() - phlos_left,
-                errors: Vec::new(),
-                mergeable: mergeable_channels,
-            })
-        };
-
-        match evaluation_result {
-            Ok(eval_result) => Ok(eval_result),
-            Err(err) => self.handle_error(initial_phlo, parsing_cost, err),
         }
+
+        let parsed = Compiler::new(&term).compile_to_adt()?;
+        reducer.eval(parsed, &Env::new(), rand).await?;
+
+        let phlos_left = self.cost_manager.get();
+        let mergeable = *self
+            .merge_chs
+            .read()
+            .expect("Can't read from merge channels");
+
+        Ok(EvaluateResult {
+            cost: initial_cost - phlos_left,
+            errors: Vec::new(),
+            mergeable,
+        })
     }
 
-    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> Interpreter {
-        Interpreter { c: cost, merge_chs }
+    pub fn new(
+        cost: CostManager,
+        merge_chs: Arc<RwLock<HashSet<normal_forms::Par>>>,
+    ) -> Interpreter {
+        Interpreter {
+            cost_manager: cost,
+            merge_chs,
+        }
     }
 
     // TODO: Implement and handle just 'InterpreterError'

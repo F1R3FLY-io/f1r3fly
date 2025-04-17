@@ -1,9 +1,9 @@
 use models::{
-    rhoapi::{
-        tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
-        TaggedContinuation,
-    },
     ByteString,
+    rhoapi::{
+        BindPattern, ListParWithRandom, Par, ParWithRandom, TaggedContinuation,
+        tagged_continuation::TaggedCont,
+    },
 };
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
@@ -11,7 +11,9 @@ use std::ops::{Add, Mul, Sub};
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cost {
+    /// The numeric value representing the cost amount in computation units
     pub value: i64,
+    /// A descriptive string indicating which operation this cost is associated with
     pub operation: String,
 }
 
