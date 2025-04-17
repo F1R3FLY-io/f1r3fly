@@ -3229,7 +3229,7 @@ impl DebruijnInterpreter {
             locally_free,
             par.exprs
                 .iter()
-                .flat_map(|expr| expr.locally_free(expr.clone(), 0))
+                .flat_map(|expr| expr.locally_free(expr.clone()))
                 .collect(),
         );
 
