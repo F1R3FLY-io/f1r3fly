@@ -309,23 +309,12 @@ impl Runtime for RhoRuntime {
     }
 
     fn create_checkpoint(&mut self) -> Checkpoint {
-        // let _ = self.reducer.space.try_lock().unwrap().create_checkpoint().unwrap();
-        let checkpoint = self
-            .reducer
+        self.reducer
             .space
             .try_lock()
             .unwrap()
             .create_checkpoint()
-            .unwrap();
-        // println!(
-        //     "\nruntime space after create_checkpoint, {:?}",
-        //     self.get_hot_changes().len()
-        // );
-        // println!(
-        //     "\nreducer space after create_checkpoint, {:?}",
-        //     self.get_reducer_hot_changes().len()
-        // );
-        checkpoint
+            .unwrap()
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {

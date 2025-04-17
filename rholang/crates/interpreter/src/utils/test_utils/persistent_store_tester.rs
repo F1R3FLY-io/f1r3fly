@@ -1,4 +1,4 @@
-use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
+use models::rhoapi::{BindPattern, ListParWithRandom, TaggedContinuation};
 use rspace_plus_plus::rspace::{
     rspace::RSpace,
     rspace_interface::ISpace,
@@ -14,6 +14,7 @@ use std::{
 use crate::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
     matcher::r#match::Matcher,
+    normal_forms::Par,
     reduce::DebruijnInterpreter,
     rho_runtime::RhoISpace,
 };

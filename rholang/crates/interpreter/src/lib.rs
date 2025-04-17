@@ -82,11 +82,9 @@ extern "C" fn evaluate(
     params_bytes_len: usize,
 ) -> *const u8 {
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
-    let params = EvaluateParams::decode(params_slice).unwrap();
+    let params = EvaluateParams::decode(params_slice).expect("Failed to decode EvaluateParams");
 
-    let term = params.term;
-    let cost_proto = params.initial_phlo.unwrap();
-    let initial_phlo = Cost::create(cost_proto.value.into(), cost_proto.operation);
+    let initial_phlo = params.initial_phlo.map(|cost|  Cost::create(cost.value.into(), cost.operation)).expect("Initial phlo empty. Can't create Cost");
     let normalizer_env = params.normalizer_env;
     let rand_proto = params.random_state.unwrap();
     let digest_proto = rand_proto.digest.unwrap();
@@ -114,16 +112,15 @@ extern "C" fn evaluate(
         path_position: rand_proto.path_position as usize,
     };
 
-    let mut rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().unwrap() };
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rho_runtime = unsafe { (*runtime_ptr).runtime.try_lock().expect("Failed to lock runtime") };
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let eval_result = rt.block_on(async {
         rho_runtime
-            .evaluate(term, initial_phlo, normalizer_env, rand)
+            .evaluate(params.term, initial_phlo, normalizer_env, rand)
             .await
-            .unwrap()
+            .expect("Failed to evaluate term")
     });
 
-    // println!("\neval_result: {:?}", eval_result);
 
     let eval_result_proto = EvaluateResultProto {
         cost: Some(CostProto {
@@ -175,7 +172,17 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
     let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
     let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
     let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
-    let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
+    let mut installed_joins_map_entri
+    use rho_runtime::{RhoRuntime, Runtime, bootstrap_registry as bootstrap_registry_internal};
+    use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
+    use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+    use rspace_plus_plus::rspace::hot_store::{HotStoreState, new_dashmap};
+    use rspace_plus_plus::rspace::internal::{Datum, Wai
+        use rho_runtime::{RhoRuntime, Runtime, bootstrap_registry as bootstrap_registry_internal};
+        use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
+        use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+        use rspace_plus_plus::rspace::hot_store::{HotStoreState, new_dashmap};
+        use rspace_plus_plus::rspace::internal::{Datum, Waies: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
 
     let hot_store_state = soft_checkpoint.cache_snapshot;
 

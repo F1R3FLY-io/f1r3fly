@@ -1,3 +1,4 @@
+use models::rhoapi::Par as ModelsPar;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -11,7 +12,8 @@ use super::{
     sorter::*,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+/// A parallel composition of Rholang terms.
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct Par {
     pub sends: Vec<Send>,
     pub receives: Vec<Receive>,
@@ -277,7 +279,7 @@ pub struct ListParWithRandom {
 /// representation we need a discipline to track whether a var is a name or a
 /// process.
 /// These are DeBruijn levels
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Var {
     BoundVar(u32),
     FreeVar(u32),
@@ -305,7 +307,7 @@ impl Var {
 /// Likewise nothing can be sent to a (quoted) bundle with `writeFlag = false`.
 ///
 /// If both flags are set to false, bundle allows only for equivalance check.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct Bundle {
     pub body: Par,
     /// flag indicating whether bundle is writeable
@@ -326,7 +328,7 @@ impl Sortable for Bundle {
 /// A send is written `chan!(data)` or `chan!!(data)` for a persistent send.
 ///
 /// Upon send, all free variables in data are substituted with their values.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct Send {
     pub chan: Par,
     pub data: Vec<Par>,
@@ -343,7 +345,7 @@ impl Sortable for Send {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ReceiveBind {
     pub patterns: Vec<Par>,
     pub source: Par,
@@ -351,7 +353,7 @@ pub struct ReceiveBind {
     pub free_count: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BindPattern {
     pub patterns: Vec<Par>,
     pub remainder: Option<Var>,
@@ -364,7 +366,7 @@ pub struct BindPattern {
 /// or for a persistent recieve: `for(patterns <= source) { body }`.
 ///
 /// It's an error for free Variable to occur more than once in a pattern.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Receive {
     pub binds: Vec<ReceiveBind>,
     pub body: Par,
@@ -387,7 +389,7 @@ impl Sortable for Receive {
 /// For normalized form, p should not contain solely another new.
 /// Also for normalized form, the first use should be level+0, next use level+1
 /// up to level+count for the last used variable.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct New {
     /// Includes any uris listed below. This makes it easier to substitute or walk
     /// a term.
@@ -408,14 +410,14 @@ impl Sortable for New {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct MatchCase {
     pub pattern: Par,
     pub source: Par,
     pub free_count: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Match {
     pub target: Par,
     pub cases: Vec<MatchCase>,
@@ -433,7 +435,7 @@ impl Sortable for Match {
 
 /// Any process may be an operand to an expression.
 /// Only processes equivalent to a ground process of compatible type will reduce.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Expr {
     GBool(bool),
     GInt(i64),
@@ -629,7 +631,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Connective {
     ConnAnd(Vec<Par>),
     ConnOr(Vec<Par>),
@@ -668,7 +670,7 @@ impl Sortable for Connective {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct VarRef {
     pub index: u32,
     pub depth: u32,
@@ -685,7 +687,7 @@ pub struct VarRef {
 /// Unforgeable names resulting from `new x { ... }`
 /// These should only occur as the program is being evaluated. There is no way in
 /// the grammar to construct them.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct GUnforgeable(pub [i8; 32]);
 
 impl GUnforgeable {

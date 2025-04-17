@@ -54,10 +54,9 @@ use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::unwrap_option_safe;
 
-/**
- * Reduce is the interface for evaluating Rholang expressions.
- */
-
+///
+/// Reduce is the interface for evaluating Rholang expressions.
+///
 #[derive(Clone)]
 pub struct DebruijnInterpreter {
     pub space: RhoISpace,
@@ -466,8 +465,8 @@ impl DebruijnInterpreter {
     ) -> Result<(), InterpreterError> {
         // println!("\ngenerated_message_eval, term: {:?}", term);
         match term {
-            GeneratedMessage::Send(term) => self.eval_send(term, env, rand).await,
-            GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand).await,
+            GeneratedMessage::Send(term) => self.eval_send(term, env, rand.to_bytes()).await,
+            GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand.to_bytes()).await,
             GeneratedMessage::New(term) => self.eval_new(term, env.clone(), rand).await,
             GeneratedMessage::Match(term) => self.eval_match(term, env, rand).await,
             GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand).await,
@@ -514,9 +513,8 @@ impl DebruijnInterpreter {
         &self,
         send: &Send,
         env: &Env<Par>,
-        rand: Blake2b512Random,
+        random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {
-        // println!("\nenv in eval_send: {:?}", env);
         self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
@@ -545,17 +543,11 @@ impl DebruijnInterpreter {
             .map(|p| self.substitute.substitute_and_charge(&p, 0, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
 
-        // println!("\ndata in eval_send: {:?}", data);
-        // println!("\nsubst_data in eval_send: {:?}", subst_data);
-
-        // println!("\nrand in eval_send");
-        // rand.debug_str();
-
         self.produce(
             unbundled,
             ListParWithRandom {
                 pars: subst_data,
-                random_state: rand.to_bytes(),
+                random_state,
             },
             send.persistent,
         )
@@ -566,26 +558,20 @@ impl DebruijnInterpreter {
         &self,
         receive: &Receive,
         env: &Env<Par>,
-        rand: Blake2b512Random,
+        random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {
-        // println!("\nreceive in eval_receive: {:?}", receive);
-        // println!("\nreceive binds length: {:?}", receive.binds.len());
         self.cost.charge(receive_eval_cost())?;
         let binds = receive
             .binds
             .clone()
             .into_iter()
             .map(|rb| {
-                // println!("\nrb in eval_receive: {:?}", rb);
                 let q = self.unbundle_receive(&rb, env)?;
-                // println!("\nq in eval_receive: {:?}", q);
                 let subst_patterns = rb
                     .patterns
                     .into_iter()
                     .map(|pattern| self.substitute.substitute_and_charge(&pattern, 1, env))
                     .collect::<Result<Vec<_>, InterpreterError>>()?;
-
-                // println!("\nsubst_patterns in eval_receive: {:?}", subst_patterns);
 
                 Ok((
                     BindPattern {
@@ -605,17 +591,11 @@ impl DebruijnInterpreter {
             &env.shift(receive.bind_count),
         )?;
 
-        // println!("\nbinds in eval_receive: {:?}", binds);
-        // println!("\nsubst_body in eval_receive: {:?}", subst_body);
-
-        // println!("\nrand in eval_receive");
-        // rand.debug_str();
-
         self.consume(
             binds,
             ParWithRandom {
                 body: Some(subst_body),
-                random_state: rand.to_bytes(),
+                random_state,
             },
             receive.persistent,
             receive.peek,
@@ -641,7 +621,7 @@ impl DebruijnInterpreter {
                 Some(p) => Ok(p),
                 None => Err(InterpreterError::ReduceError(format!(
                     "Unbound variable: {} in {:?}",
-                    level, env.env_map
+                    level, env.entities
                 ))),
             },
             Some(VarInstance::Wildcard(_)) => Err(InterpreterError::ReduceError(
@@ -687,14 +667,9 @@ impl DebruijnInterpreter {
                                 env,
                             )?;
 
-                            // println!("\ntarget in eval_matcher: {:?}", target);
-                            // println!("\npattern in eval_matcher: {:?}", pattern);
-
                             let mut spatial_matcher = SpatialMatcherContext::new();
                             let match_result =
                                 spatial_matcher.spatial_match_result(_target.clone(), pattern);
-
-                            // println!("\nmatch_result in eval_matcher: {:?}", match_result);
 
                             match match_result {
                                 None => {
@@ -745,10 +720,6 @@ impl DebruijnInterpreter {
         env: Env<Par>,
         mut rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\nnew in eval_new: {:?}", new);
-        // println!("\nrand in eval_new");
-        // rand.debug_str();
-        // println!("\nrand next: {:?}", rand.next());
         let mut alloc = |count: usize, urns: Vec<String>| {
             let simple_news =
                 (0..(count - urns.len()))
@@ -759,22 +730,21 @@ impl DebruijnInterpreter {
                                 id: rand.next().iter().map(|&x| x as u8).collect::<Vec<u8>>(),
                             })),
                         }]);
-                        // println!("\nrand in simple_news");
-                        // rand.debug_str();
+
                         _env.put(addr)
                     });
 
-            // println!("\nrand in eval_new after");
-            // rand.debug_str();
-            // println!("\nsimple_news in eval_new: {:?}", simple_news);
-
-            let add_urn = |new_env: &mut Env<Par>, urn: String| {
-                // println!("\nurn_map: {:?}", self.urn_map);
-                if !self.urn_map.contains_key(&urn) {
+            fn add_urn(
+                new_env: &mut Env<Par>,
+                urn: String,
+                self_urn_map: &HashMap<String, Par>,
+                new_injections: &BTreeMap<String, models::rhoapi::Par>,
+            ) -> Result<Env<Par>, InterpreterError> {
+                if !self_urn_map.contains_key(&urn) {
                     // TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]].
                     // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
                     // println!("\nnew_injections: {:?}", new.injections);
-                    match new.injections.get(&urn) {
+                    match new_injections.get(&urn) {
                         Some(p) => {
                             if let Some(gunf) = RhoUnforgeable::unapply(p) {
                                 if let Some(instance) = gunf.unf_instance {
@@ -810,7 +780,7 @@ impl DebruijnInterpreter {
                         ))),
                     }
                 } else {
-                    match self.urn_map.get(&urn) {
+                    match self_urn_map.get(&urn) {
                         Some(p) => Ok(new_env.put(p.clone())),
                         None => Err(InterpreterError::ReduceError(format!(
                             "Unknown urn for new: {}",
@@ -818,19 +788,16 @@ impl DebruijnInterpreter {
                         ))),
                     }
                 }
-            };
+            }
 
             urns.iter().try_fold(simple_news, |mut acc, urn| {
-                add_urn(&mut acc, urn.to_string())
+                add_urn(&mut acc, urn.to_string(), &self.urn_map, &new.injections)
             })
         };
 
-        // println!("\nhit eval_new");
         self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
-        // println!("\nnew uri: {:?}", new.uri);
         match alloc(new.bind_count as usize, new.uri.clone()) {
             Ok(env) => {
-                // println!("\nenv in eval_new: {:?}", env);
                 self.eval(unwrap_option_safe(new.p.clone())?, &env, rand)
                     .await
             }

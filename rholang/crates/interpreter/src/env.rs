@@ -1,43 +1,35 @@
 use std::collections::HashMap;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Env.scala
-#[derive(Clone, Debug)]
-pub struct Env<A: Clone> {
-    pub env_map: HashMap<i32, A>,
+#[derive(Clone, Debug, Default)]
+pub struct Env<V: Default> {
+    pub entities: HashMap<i32, V>,
     pub level: i32,
     pub shift: i32,
 }
 
-impl<A: Clone> Env<A> {
-    pub fn new() -> Env<A> {
-        Env {
-            env_map: HashMap::new(),
-            level: 0,
-            shift: 0,
-        }
+impl<V: Default> Env<V> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn put(&mut self, a: A) -> Env<A> {
+    pub fn put(self, a: V) -> Env<V> {
         Env {
-            env_map: {
-                self.env_map.insert(self.level, a);
-                self.env_map.clone()
-            },
+            entities: HashMap::from_iter(self.entities.into_iter().chain([(self.level, a)])),
             level: self.level + 1,
-            shift: self.shift,
+            ..self
         }
     }
 
-    pub fn get(&self, k: &i32) -> Option<A> {
-        self.env_map
-            .get(&((self.level + self.shift) - k - 1))
-            .cloned()
+    pub fn get(&self, k: &i32) -> Option<&V> {
+        let key = self.level + self.shift - k - 1;
+        self.entities.get(&key)
     }
 
-    pub fn shift(&self, j: i32) -> Env<A> {
+    pub fn shift(self, j: i32) -> Env<V> {
         Env {
             shift: self.shift + j,
-            ..(*self).clone()
+            ..self
         }
     }
 }
