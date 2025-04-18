@@ -20,6 +20,8 @@ fn main() {
         "RhoTypes.proto",
         "RSpacePlusPlusTypes.proto",
         "ServiceError.proto",
+        "ExternalCommunicationServiceCommon.proto",
+        "ExternalCommunicationServiceV1.proto",
     ];
 
     let absolute_proto_files: Vec<_> = proto_files.iter().map(|f| proto_src_dir.join(f)).collect();
