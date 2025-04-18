@@ -1,3 +1,5 @@
+// See rholang/src/main/scala/coop/rchain/rholang/interpreter/OpenAIService.scala
+
 use dotenv::dotenv;
 use openai_api_rs::v1::{
     api::OpenAIClient,

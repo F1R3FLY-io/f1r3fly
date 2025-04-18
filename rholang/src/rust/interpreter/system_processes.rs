@@ -162,6 +162,10 @@ impl FixedChannels {
     pub fn random() -> Par {
         byte_name(22)
     }
+
+    pub fn grpc_tell() -> Par {
+        byte_name(23)
+    }
 }
 
 pub struct BodyRefs;
@@ -186,6 +190,7 @@ impl BodyRefs {
     pub const DALLE3: i64 = 18;
     pub const TEXT_TO_AUDIO: i64 = 19;
     pub const RANDOM: i64 = 20;
+    pub const GRPC_TELL: i64 = 21;
 }
 
 pub fn non_deterministic_ops() -> HashSet<i64> {
@@ -850,6 +855,127 @@ impl SystemProcesses {
             }
         }
     }
+
+    pub async fn grpc_tell(
+        &self,
+        contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
+    ) -> Result<Vec<Par>, InterpreterError> {
+        let Some((produce, is_replay, previous_output, args)) =
+            self.is_contract_call().unapply(contract_args)
+        else {
+            return Err(illegal_argument_error("grpc_tell"));
+        };
+
+        // Handle replay case
+        if is_replay {
+            println!("grpcTell (replay): args: {:?}", args);
+            return Ok(previous_output);
+        }
+
+        // Handle normal case - expecting clientHost, clientPort, notificationPayload
+        match args.as_slice() {
+            [client_host_par, client_port_par, notification_payload_par, ack] => {
+                match (
+                    RhoString::unapply(client_host_par),
+                    RhoNumber::unapply(client_port_par),
+                    RhoString::unapply(notification_payload_par),
+                ) {
+                    (Some(client_host), Some(client_port), Some(notification_payload)) => {
+                        println!(
+                            "grpcTell: clientHost: {}, clientPort: {}, notificationPayload: {}",
+                            client_host, client_port, notification_payload
+                        );
+
+                        use models::rust::rholang::grpc_client::GrpcClient;
+
+                        // Convert client_port from i64 to u64
+                        let port = if client_port < 0 {
+                            return Err(InterpreterError::BugFoundError(
+                                "Invalid port number: must be non-negative".to_string(),
+                            ));
+                        } else {
+                            client_port as u64
+                        };
+
+                        // Execute the gRPC call and handle errors
+                        match GrpcClient::init_client_and_tell(
+                            &client_host,
+                            port,
+                            &notification_payload,
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                let output = vec![Par::default()];
+                                produce(output.clone(), ack.clone()).await?;
+                                Ok(output)
+                            }
+                            Err(e) => {
+                                println!("GrpcClient crashed: {}", e);
+                                let output = vec![Par::default()];
+                                produce(output.clone(), ack.clone()).await?;
+                                Ok(output)
+                            }
+                        }
+                    }
+                    _ => {
+                        println!("grpcTell: invalid argument types: {:?}", args);
+                        Err(illegal_argument_error("grpc_tell"))
+                    }
+                }
+            }
+            _ => {
+                println!(
+                    "grpcTell: isReplay {} invalid arguments: {:?}",
+                    is_replay, args
+                );
+                Ok(vec![Par::default()])
+            }
+        }
+    }
+
+    /*
+
+    override def grpcTell: Contract[F] = {
+        case isContractCall(_, true, previous, args) =>
+          // args could be:
+          // - clientHost, clientPort, folderId, ack
+          // - clientHost, clientPort, folderId, error, ack if failed previously
+
+          // so using the last element as ack
+          println("grpcTell (replay): args: " + args)
+          F.delay(previous)
+
+        case isContractCall(
+            _,
+            false,
+            _,
+            Seq(
+              RhoType.String(clientHost),
+              RhoType.Number(clientPort),
+              RhoType.String(notificationPayload)
+            )
+            ) =>
+          //TODO: remove
+          println(
+            "grpcTell: clientHost: " + clientHost + ", clientPort: " + clientPort + ", notificationPayload: " + notificationPayload
+          )
+          (for {
+            _ <- GrpcClient.initClientAndTell(clientHost, clientPort, notificationPayload).recover {
+                  case e => println("GrpcClient crashed: " + e.getMessage)
+                }
+            output = Seq(RhoType.Nil())
+          } yield output).onError {
+            case e =>
+              println("grpcTell: error: " + e.getMessage)
+              e.raiseError
+          }
+        case isContractCall(_, isReplay, _, args) =>
+          println("grpcTell: isReplay " + isReplay + " invalid arguments: " + args)
+          F.delay(Seq(RhoType.Nil()))
+      }
+
+     */
 
     /*
      * The following functions below can be removed once rust-casper calls create_rho_runtime.

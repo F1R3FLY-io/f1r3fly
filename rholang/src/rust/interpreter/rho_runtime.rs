@@ -629,6 +629,19 @@ fn std_system_processes() -> Vec<Definition> {
             }),
             remainder: None,
         },
+        Definition {
+            urn: "rho:io:grpcTell".to_string(),
+            fixed_channel: FixedChannels::grpc_tell(),
+            arity: 3,
+            body_ref: BodyRefs::GRPC_TELL,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().grpc_tell(args).await })
+                })
+            }),
+            remainder: None,
+        },
     ]
 }
 
