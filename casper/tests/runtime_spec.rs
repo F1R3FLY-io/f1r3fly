@@ -195,7 +195,7 @@ in {
         .try_lock()
         .unwrap()
         .evaluate(
-            rholang_code.to_string(),
+            rholang_code,
             Cost::unsafe_max(),
             HashMap::new(),
             Blake2b512Random::create_from_bytes(&[]),

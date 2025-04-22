@@ -22,7 +22,7 @@ pub trait Interpreter {
     async fn inj_attempt(
         &self,
         reducer: &DebruijnInterpreter,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
@@ -38,13 +38,13 @@ impl Interpreter for InterpreterImpl {
     async fn inj_attempt(
         &self,
         reducer: &DebruijnInterpreter,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         // println!("\nhit inj_attempt");
-        let parsing_cost = parsing_cost(&term);
+        let parsing_cost = parsing_cost(term);
 
         let evaluation_result: Result<EvaluateResult, InterpreterError> = {
             let _ = self.c.set(initial_phlo.clone());
@@ -53,7 +53,7 @@ impl Interpreter for InterpreterImpl {
             // let phlos_left_after = self.c.get();
 
             // println!("\nterm: {:#?}", term);
-            let parsed = match Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env) {
+            let parsed = match Compiler::source_to_adt_with_normalizer_env(term, normalizer_env) {
                 Ok(p) => p,
                 Err(e) => {
                     return self.handle_error(

@@ -209,7 +209,7 @@ pub fn to_list_cost(size: i64) -> Cost {
     Cost::create(size, "to_list".to_string())
 }
 
-pub fn parsing_cost(term: &String) -> Cost {
+pub fn parsing_cost(term: &str) -> Cost {
     Cost::create(term.as_bytes().len() as i64, "parsing".to_string())
 }
 

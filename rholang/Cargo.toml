@@ -39,6 +39,7 @@ k256 = { version = "0.13.4", features = ["ecdsa"] }
 openai-api-rs = "6.0.3"
 dotenv = "0.15.0"
 openssl = { version = "0.10", features = ["vendored"] }
+tempfile = "3.19.1"
 
 [build-dependencies]
 cc = "1.0"
