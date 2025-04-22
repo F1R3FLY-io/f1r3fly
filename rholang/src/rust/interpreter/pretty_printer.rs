@@ -1101,7 +1101,7 @@ impl PrettyPrinter {
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::rholang_ast::{
-        ASTBuilder, AnnProc, KeyValuePair, Name, Proc, Var, Id, ProcRemainder
+        KeyValuePair, Proc, Var, ProcRemainder, Uri, Collection
     };
     use crate::rust::interpreter::compiler::source_position::SourcePosition;
     use crate::rust::interpreter::test_utils::utils::{
@@ -1125,24 +1125,16 @@ mod tests {
     }
 
     // Helper function to test collections with PrettyPrinter
-    fn test_pretty_print(name: &str, proc: &Proc, bound_shift: i32, expected: &str) {
+    fn test_pretty_print(proc: &Proc, bound_shift: i32, expected: &str) {
         test_normalize_match_proc(
             proc,
             defaults(),
-            test(name,|actual_par, _| {
+            test("should pretty print correctly",|actual_par, _| {
                 let mut printer = PrettyPrinter::create(0, bound_shift);
                 let printed = printer.build_string_from_message(actual_par);
                 assert_eq!(printed, expected);
             })
         );
-    }
-
-    // Helper functions to reduce duplication
-    fn create_id(name: &str, pos: SourcePosition) -> Id {
-        Id {
-            name,
-            pos
-        }
     }
 
     fn create_remainder(name: &str, pos: SourcePosition) -> ProcRemainder {
@@ -1175,116 +1167,139 @@ mod tests {
 
     #[test]
     fn ground_uri_should_print_with_back_ticks() {
-        let ast_builder = ASTBuilder::with_capacity(64);
-        let uri = "Uri".into();
-        let uri_literal = ast_builder.alloc_uri_literal(uri);
-        test_ground_expression(uri_literal, "`Uri`");
+        let proc = Proc::UriLiteral(Uri::from("Uri"));
+        test_ground_expression(&proc, "`Uri`");
     }
 
     //collections tests
     #[test]
     fn list_should_print() {
-        let ast_builder = ASTBuilder::with_capacity(64);
-        let pos = SourcePosition::default();
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
 
-        let p_var = ast_builder.alloc_var(create_id("P", pos));
-        let x_name = Name::ProcVar(Var::new_id("x", pos));
-        let x_eval = ast_builder.alloc_eval(x_name.annotated(pos));
-        let int_proc = ast_builder.alloc_long_literal(7);
+        let int_proc = Proc::LongLiteral(7);
 
         // Create elements and remainder
         let elements = vec![
-            AnnProc { proc: p_var, pos },
-            AnnProc { proc: x_eval, pos },
-            AnnProc { proc: int_proc, pos },
+            p_var.annotate(pos),
+            x_name.annotate(pos),
+            int_proc.annotate(pos),
         ];
-        let remainder = create_remainder("ignored", pos);
 
-        let list_proc = ast_builder.alloc_list_with_remainder(elements, remainder);
-        test_pretty_print("list should print", list_proc, 2, "[x0, x1, 7...free0]");
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let list_proc = Proc::Collection(Collection::List {
+            elements,
+            cont: Some(remainder),
+        });
+        test_pretty_print(&list_proc, 2, "[x0, x1, 7...free0]");
     }
 
     #[test]
     fn set_should_print() {
-        let ast_builder = ASTBuilder::with_capacity(64);
-        let pos = SourcePosition::default();
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
 
-        let p_var = ast_builder.alloc_var(create_id("P", pos));
-        let x_name = Name::ProcVar(Var::new_id("x", pos));
-        let x_eval = ast_builder.alloc_eval(x_name.annotated(pos));
-        let int_proc = ast_builder.alloc_long_literal(7);
+        let int_proc = Proc::LongLiteral(7);
 
         // Create elements and remainder
         let elements = vec![
-            AnnProc { proc: p_var, pos },
-            AnnProc { proc: x_eval, pos },
-            AnnProc { proc: int_proc, pos },
+            p_var.annotate(pos),
+            x_name.annotate(pos),
+            int_proc.annotate(pos),
         ];
-        let remainder = create_remainder("ignored", pos);
 
-        let set_proc = ast_builder.alloc_set_with_remainder(elements, remainder);
-        test_pretty_print("set should print", set_proc, 2, "Set(7, x1, x0...free0)");
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let set_proc = Proc::Collection(Collection::Set {
+            elements,
+            cont: Some(remainder),
+        });
+        test_pretty_print(&set_proc, 2, "Set(7, x1, x0...free0)");
     }
 
     #[test]
     fn map_should_print() {
-        let ast_builder = ASTBuilder::with_capacity(64);
-        let pos = SourcePosition::default();
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
 
-        let p_var = ast_builder.alloc_var(create_id("P", pos));
-        let x_name = Name::ProcVar(Var::new_id("x", pos));
-        let x_eval = ast_builder.alloc_eval(x_name.annotated(pos));
-        let int_proc = ast_builder.alloc_long_literal(7);
-        let string_proc = ast_builder.alloc_string_literal("Seven");
+        let int_proc = Proc::LongLiteral(7);
+        let string_proc = Proc::StringLiteral("Seven");
 
         let pairs = vec![
             KeyValuePair {
-                key: AnnProc { proc: int_proc, pos },
-                value: AnnProc { proc: string_proc, pos },
+                key: int_proc.annotate(pos),
+                value: string_proc.annotate(pos),
             },
             KeyValuePair {
-                key: AnnProc { proc: p_var, pos },
-                value: AnnProc { proc: x_eval, pos },
+                key: p_var.annotate(pos),
+                value: x_name.annotate(pos),
             },
         ];
-        let remainder = create_remainder("ignored", pos);
 
-        let map_proc = ast_builder.alloc_map_with_remainder(pairs, remainder);
-        test_pretty_print("map should print", map_proc, 2, "{7 : \"Seven\", x0 : x1...free0}");
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let map_proc = Proc::Collection(Collection::Map {
+            pairs,
+            cont: Some(remainder),
+        });
+        test_pretty_print(&map_proc, 2, "{7 : \"Seven\", x0 : x1...free0}");
     }
 
     #[test]
     fn map_should_print_commas_correctly() {
-        let ast_builder = ASTBuilder::with_capacity(64);
-        let pos = SourcePosition::default();
+        let pos = SourcePosition { row: 0, column: 0 };
+        let a_proc = Proc::StringLiteral("a");
+        let b_proc = Proc::StringLiteral("b");
+        let c_proc = Proc::StringLiteral("c");
 
-        let a_proc = ast_builder.alloc_string_literal("a");
-        let b_proc = ast_builder.alloc_string_literal("b");
-        let c_proc = ast_builder.alloc_string_literal("c");
-
-        let one_proc = ast_builder.alloc_long_literal(1);
-        let two_proc = ast_builder.alloc_long_literal(2);
-        let three_proc = ast_builder.alloc_long_literal(3);
+        let one_proc = Proc::LongLiteral(1);
+        let two_proc = Proc::LongLiteral(2);
+        let three_proc = Proc::LongLiteral(3);
 
         let pairs = vec![
             KeyValuePair {
-                key: AnnProc { proc: c_proc, pos },
-                value: AnnProc { proc: three_proc, pos },
+                key: c_proc.annotate(pos),
+                value: three_proc.annotate(pos),
             },
             KeyValuePair {
-                key: AnnProc { proc: b_proc, pos },
-                value: AnnProc { proc: two_proc, pos },
+                key: b_proc.annotate(pos),
+                value: two_proc.annotate(pos),
             },
             KeyValuePair {
-                key: AnnProc { proc: a_proc, pos },
-                value: AnnProc { proc: one_proc, pos },
+                key: a_proc.annotate(pos),
+                value: one_proc.annotate(pos),
             },
         ];
 
+        let map_proc = Proc::Collection(Collection::Map {
+            pairs,
+            cont: None,
+        });
 
-        let map_proc = ast_builder.alloc_map(pairs);
         test_normalize_match_proc(
-            map_proc,
+            &map_proc,
             defaults(),
             test("should print commas correctly", |actual_par, _| {
                 let mut printer = PrettyPrinter::new();
