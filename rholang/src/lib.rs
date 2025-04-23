@@ -110,7 +110,7 @@ extern "C" fn evaluate(
     let eval_result = rt.block_on(async {
         rho_runtime
             .evaluate(
-                term,
+                &term,
                 initial_phlo,
                 normalizer_env.into_iter().collect(),
                 rand,
