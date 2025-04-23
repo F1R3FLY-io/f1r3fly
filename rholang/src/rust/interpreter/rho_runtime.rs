@@ -66,7 +66,7 @@ pub trait RhoRuntime: HasCost {
      */
     async fn evaluate(
         &mut self,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
@@ -75,7 +75,7 @@ pub trait RhoRuntime: HasCost {
     // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntimeSyntax.scala
     async fn evaluate_with_env(
         &mut self,
-        term: String,
+        term: &str,
         normalizer_env: HashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), normalizer_env)
@@ -84,7 +84,7 @@ pub trait RhoRuntime: HasCost {
 
     async fn evaluate_with_term(
         &mut self,
-        term: String,
+        term: &str,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), HashMap::new())
             .await
@@ -92,7 +92,7 @@ pub trait RhoRuntime: HasCost {
 
     async fn evaluate_with_phlo(
         &mut self,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, initial_phlo, HashMap::new())
@@ -101,7 +101,7 @@ pub trait RhoRuntime: HasCost {
 
     async fn evaluate_with_env_and_phlo(
         &mut self,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
@@ -265,7 +265,7 @@ impl RhoRuntimeImpl {
 impl RhoRuntime for RhoRuntimeImpl {
     async fn evaluate(
         &mut self,
-        term: String,
+        term: &str,
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,

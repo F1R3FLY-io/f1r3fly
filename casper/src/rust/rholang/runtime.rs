@@ -724,7 +724,7 @@ impl RuntimeOps {
         Ok(self
             .runtime
             .evaluate(
-                deploy.data.term.clone(),
+                &deploy.data.term,
                 Cost::create(deploy.data.phlo_limit, "Evaluate deploy".to_string()),
                 normalizer_env_from_deploy(deploy),
                 Tools::unforgeable_name_rng(&deploy.pk, deploy.data.time_stamp),
@@ -739,7 +739,7 @@ impl RuntimeOps {
         Ok(self
             .runtime
             .evaluate(
-                S::source(),
+                &S::source(),
                 Cost::unsafe_max(),
                 system_deploy.env(),
                 // TODO: Review this clone and whether to pass mut ref down into evaluate

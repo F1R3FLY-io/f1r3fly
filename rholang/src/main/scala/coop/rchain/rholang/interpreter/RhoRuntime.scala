@@ -517,19 +517,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   override def revertToSoftCheckpoint(
       softCheckpoint: SoftCheckpoint[Name, BindPattern, ListParWithRandom, TaggedContinuation]
   ): F[Unit] =
-    // space.revertToSoftCheckpoint(softCheckpoint)
     for {
       _ <- Sync[F].delay {
-            // println("\nhit scala revertToSoftCheckpoint")
             val cacheSnapshot = softCheckpoint.cacheSnapshot
 
-            val continuationsMapEntries          = Seq.empty
-            val installedContinuationsMapEntries = Seq.empty
-            val datumsMapEntries                 = Seq.empty
-            val joinsMapEntries                  = Seq.empty
-            val installedJoinsMapEntries         = Seq.empty
-
-            cacheSnapshot.continuations.map { mapEntry =>
+            val continuationsMapEntries = cacheSnapshot.continuations.map { mapEntry =>
               val key = mapEntry._1
               val value = mapEntry._2.map { wk =>
                 WaitingContinuationProto(
@@ -548,34 +540,33 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                   )
                 )
               }
+              StoreStateContMapEntry(key, value)
+            }.toSeq
 
-              continuationsMapEntries :+ StoreStateContMapEntry(key, value)
-            }
-
-            cacheSnapshot.installedContinuations.map { mapEntry =>
-              val key = mapEntry._1
-              val wk  = mapEntry._2
-              val value =
-                WaitingContinuationProto(
-                  patterns = wk.patterns,
-                  continuation = Some(wk.continuation),
-                  persist = wk.persist,
-                  peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
-                  source = Some(
-                    ConsumeProto(
-                      channelHashes = wk.source.channelsHashes.map(
-                        channelHash => channelHash.toByteString
-                      ),
-                      hash = wk.source.hash.toByteString,
-                      persistent = wk.source.persistent
+            val installedContinuationsMapEntries = cacheSnapshot.installedContinuations.map {
+              mapEntry =>
+                val key = mapEntry._1
+                val wk  = mapEntry._2
+                val value =
+                  WaitingContinuationProto(
+                    patterns = wk.patterns,
+                    continuation = Some(wk.continuation),
+                    persist = wk.persist,
+                    peeks = wk.peeks.map(elem => SortedSetElement(elem)).toSeq,
+                    source = Some(
+                      ConsumeProto(
+                        channelHashes = wk.source.channelsHashes.map(
+                          channelHash => channelHash.toByteString
+                        ),
+                        hash = wk.source.hash.toByteString,
+                        persistent = wk.source.persistent
+                      )
                     )
                   )
-                )
+                StoreStateInstalledContMapEntry(key, Some(value))
+            }.toSeq
 
-              installedContinuationsMapEntries :+ StoreStateInstalledContMapEntry(key, Some(value))
-            }
-
-            cacheSnapshot.data.map { mapEntry =>
+            val datumsMapEntries = cacheSnapshot.data.map { mapEntry =>
               val key = mapEntry._1
               val value = mapEntry._2.map { datum =>
                 DatumProto(
@@ -592,27 +583,24 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                   )
                 )
               }
+              StoreStateDataMapEntry(Some(key), value)
+            }.toSeq
 
-              datumsMapEntries :+ StoreStateDataMapEntry(Some(key), value)
-            }
-
-            cacheSnapshot.joins.map { mapEntry =>
+            val joinsMapEntries = cacheSnapshot.joins.map { mapEntry =>
               val key = mapEntry._1
               val value = mapEntry._2.map(
                 join => JoinProto(join)
               )
+              StoreStateJoinsMapEntry(Some(key), value)
+            }.toSeq
 
-              joinsMapEntries :+ StoreStateJoinsMapEntry(Some(key), value)
-            }
-
-            cacheSnapshot.installedJoins.map { mapEntry =>
+            val installedJoinsMapEntries = cacheSnapshot.installedJoins.map { mapEntry =>
               val key = mapEntry._1
               val value = mapEntry._2.map(
                 join => JoinProto(join)
               )
-
-              installedJoinsMapEntries :+ StoreStateInstalledJoinsMapEntry(Some(key), value)
-            }
+              StoreStateInstalledJoinsMapEntry(Some(key), value)
+            }.toSeq
 
             val hotStoreStateProto = HotStoreStateProto(
               continuationsMapEntries,
@@ -622,10 +610,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
               installedJoinsMapEntries
             )
 
-            val produceCounterMapEntries = Seq.empty
-            val produceCounterMap        = softCheckpoint.produceCounter
-
-            produceCounterMap.map { mapEntry =>
+            val produceCounterMapEntries = softCheckpoint.produceCounter.map { mapEntry =>
               val produce = mapEntry._1
               val produceProto = ProduceProto(
                 produce.channelsHash.toByteString,
@@ -634,9 +619,8 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                 produce.isDeterministic,
                 produce.outputValue.map(ByteString.copyFrom)
               )
-
-              produceCounterMapEntries :+ ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
-            }
+              ProduceCounterMapEntry(Some(produceProto), mapEntry._2)
+            }.toSeq
 
             val logProto = softCheckpoint.log.map {
               case comm: COMM =>

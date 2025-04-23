@@ -73,7 +73,7 @@ async fn state_hash_after_fixed_rholang_term_execution_should_be_hash_fixed_with
     let random = Tools::rng(&Blake2b256Hash::from_bytes(vec![0; 1]).bytes());
     let r = runtime
         .evaluate(
-            contract.to_string(),
+            contract,
             Cost::unsafe_max(),
             HashMap::new(),
             random,
