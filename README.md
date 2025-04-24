@@ -93,6 +93,7 @@ Prerequisites: [Environment set up](#installation).
 
 1. `sbt ";compile ;project node ;Docker/publishLocal ;project rchain"` will compile the project and create a docker image. 
    - It is recommended to have a terminal window open just for `sbt` to run various commands. 
+   - Ensure you have the correct context. Run: `docker context use default` then `docker buildx use default`
 2. `sbt ";compile ;project node ;assembly ;project rchain"` will compile the project and create a fat jar. You can use this to run locally without docker.
 3. `sbt "clean"` will clean the project.
 
