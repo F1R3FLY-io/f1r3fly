@@ -1,5 +1,6 @@
 pub mod accounting;
 pub mod aliases;
+mod charging_rspace;
 pub mod compiler;
 pub mod contract_call;
 pub mod dispatch;
