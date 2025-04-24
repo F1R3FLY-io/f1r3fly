@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use models::rhoapi::Par;
+
 use crate::{
     aliases::EnvHashMap,
     errors::InterpreterError,
@@ -19,26 +21,26 @@ use super::{
 
 pub struct Compiler<'src> {
     ast_builder: ASTBuilder<'src>,
-    normalizer_env: EnvHashMap,
+    normalizer_env: EnvHashMap<String, Par>,
 }
 
 impl<'src> Compiler<'src> {
     pub fn source_to_adt_with_normalizer_env(
         self,
         term: &str,
-        env: EnvHashMap,
+        env: EnvHashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
         unimplemented!()
     }
 
     pub fn new(source: &'src str) -> Compiler<'src> {
-        Self::new_with_normalizer_env(source, EnvHashMap::new())
+        Self::new_with_normalizer_env(source, EnvHashMap::<String, Par>::new())
     }
 
-    pub fn new_with_normalizer_env<K>(source: &'src str, env: EnvHashMap) -> Compiler<'src>
-    where
-        K: ToOwned<Owned = String>,
-    {
+    pub fn new_with_normalizer_env(
+        source: &'src str,
+        env: EnvHashMap<String, Par>,
+    ) -> Compiler<'src> {
         let mut normalizer_env = EnvHashMap::new();
         for (k, ref_par) in env {
             normalizer_env.insert(k.to_owned(), ref_par);
@@ -52,7 +54,7 @@ impl<'src> Compiler<'src> {
     pub fn compile_to_adt(&'src self) -> Result<Sorted<Par>, InterpreterError> {
         let proc = self.parse_to_ast()?;
         let par = normalize_term(proc, &self.normalizer_env)?;
-        let sorted_par = par.sort_match();
+        let sorted_par = crate::normal_forms::Par::from(par).sort_match();
 
         Ok(sorted_par.term)
     }
@@ -62,7 +64,10 @@ impl<'src> Compiler<'src> {
     }
 }
 
-fn normalize_term(term: &Proc, normalizer_env: &EnvHashMap) -> Result<Par, InterpreterError> {
+fn normalize_term(
+    term: &Proc,
+    normalizer_env: &EnvHashMap<String, Par>,
+) -> Result<Par, InterpreterError> {
     let mut result = Par::default();
     let mut free_map = FreeMap::new();
     let mut bound_map_chain = BoundMapChain::new();

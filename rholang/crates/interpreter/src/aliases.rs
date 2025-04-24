@@ -1,4 +1,3 @@
-use models::rhoapi::Par;
 use std::collections::BTreeMap;
 
-pub(crate) type EnvHashMap = BTreeMap<String, Par>;
+pub(crate) type EnvHashMap<K, V> = BTreeMap<K, V>;

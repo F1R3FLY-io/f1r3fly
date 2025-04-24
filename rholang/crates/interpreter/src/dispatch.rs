@@ -3,7 +3,7 @@ use models::rhoapi::TaggedContinuation;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use std::sync::{Arc, RwLock};
 
-use crate::normal_forms::{ListParWithRandom, Par};
+use models::rhoapi::{ListParWithRandom, Par};
 
 use super::system_processes::RhoDispatchMap;
 use super::{env::Env, errors::InterpreterError, reduce::DebruijnInterpreter, unwrap_option_safe};
@@ -27,7 +27,7 @@ impl RholangAndScalaDispatcher {
     pub async fn dispatch(
         &self,
         continuation: TaggedContinuation,
-        data_list: Vec<ListParWithRandom>,
+        data_list: Vec<models::rhoapi::ListParWithRandom>,
     ) -> Result<(), InterpreterError> {
         match continuation.tagged_cont {
             Some(cont) => match cont {

@@ -34,10 +34,11 @@ use crate::accounting::costs::{
     length_method_cost, lookup_cost, match_eval_cost, nth_method_call_cost, remove_cost,
     size_method_cost, slice_cost, take_cost, to_byte_array_cost, to_list_cost, union_cost,
 };
+use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
-use crate::normal_forms::Par;
 use crate::rho_type::RhoTuple2;
 use crate::utils::GeneratedMessage;
+use models::rhoapi::Par;
 
 use super::accounting::_cost;
 use super::accounting::costs::{
@@ -373,9 +374,7 @@ impl DebruijnInterpreter {
         continuation: TaggedContinuation,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Result<(), InterpreterError> {
-        // println!("\nreduce dispatch");
         let dispatcher_lock = &self.dispatcher.try_read().unwrap();
-        // println!("Dispatcher lock acquired");
         dispatcher_lock
             .dispatch(
                 continuation,
@@ -588,7 +587,7 @@ impl DebruijnInterpreter {
         let subst_body = self.substitute.substitute_no_sort_and_charge(
             receive.body.as_ref().unwrap(),
             0,
-            &env.shift(receive.bind_count),
+            &(env.shift(receive.bind_count)),
         )?;
 
         self.consume(
@@ -618,7 +617,7 @@ impl DebruijnInterpreter {
         // println!("\nenv in eval_var: {:?}", env);
         match valproc.var_instance {
             Some(VarInstance::BoundVar(level)) => match env.get(&level) {
-                Some(p) => Ok(p),
+                Some(p) => Ok(p.clone()),
                 None => Err(InterpreterError::ReduceError(format!(
                     "Unbound variable: {} in {:?}",
                     level, env.entities
@@ -735,7 +734,7 @@ impl DebruijnInterpreter {
                     });
 
             fn add_urn(
-                new_env: &mut Env<Par>,
+                new_env: Env<Par>,
                 urn: String,
                 self_urn_map: &HashMap<String, Par>,
                 new_injections: &BTreeMap<String, models::rhoapi::Par>,
@@ -791,7 +790,7 @@ impl DebruijnInterpreter {
             }
 
             urns.iter().try_fold(simple_news, |mut acc, urn| {
-                add_urn(&mut acc, urn.to_string(), &self.urn_map, &new.injections)
+                add_urn(acc, urn.to_string(), &self.urn_map, &new.injections)
             })
         };
 

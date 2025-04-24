@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Env.scala
 #[derive(Clone, Debug, Default)]
-pub struct Env<V: Default> {
+pub struct Env<V: Default + Clone> {
     pub entities: HashMap<i32, V>,
     pub level: i32,
     pub shift: i32,
 }
 
-impl<V: Default> Env<V> {
+impl<V: Default + Clone> Env<V> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -26,10 +26,10 @@ impl<V: Default> Env<V> {
         self.entities.get(&key)
     }
 
-    pub fn shift(self, j: i32) -> Env<V> {
+    pub fn shift(&self, j: i32) -> Env<V> {
         Env {
             shift: self.shift + j,
-            ..self
+            ..self.clone()
         }
     }
 }

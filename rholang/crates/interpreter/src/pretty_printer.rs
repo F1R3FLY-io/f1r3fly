@@ -1168,8 +1168,6 @@ mod tests {
                 Proc::new_proc_int(7),
             ],
             cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
         });
 
         let mut printer = PrettyPrinter::create(0, 2);
@@ -1191,8 +1189,6 @@ mod tests {
                 Proc::new_proc_int(7),
             ],
             cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
         });
 
         let mut printer = PrettyPrinter::create(0, 2);
@@ -1212,19 +1208,13 @@ mod tests {
                 KeyValuePair {
                     key: Proc::new_proc_int(7),
                     value: Proc::new_proc_string("Seven".to_string()),
-                    line_num: 0,
-                    col_num: 0,
                 },
                 KeyValuePair {
                     key: Proc::new_proc_var("P"),
                     value: Eval::new_eval_name_var("x"),
-                    line_num: 0,
-                    col_num: 0,
                 },
             ],
             cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
         });
 
         let mut printer = PrettyPrinter::create(0, 2);
@@ -1244,25 +1234,17 @@ mod tests {
                 KeyValuePair {
                     key: Proc::new_proc_string("c".to_string()),
                     value: Proc::new_proc_int(3),
-                    line_num: 0,
-                    col_num: 0,
                 },
                 KeyValuePair {
                     key: Proc::new_proc_string("b".to_string()),
                     value: Proc::new_proc_int(2),
-                    line_num: 0,
-                    col_num: 0,
                 },
                 KeyValuePair {
                     key: Proc::new_proc_string("a".to_string()),
                     value: Proc::new_proc_int(1),
-                    line_num: 0,
-                    col_num: 0,
                 },
             ],
             cont: None,
-            line_num: 0,
-            col_num: 0,
         });
 
         let mut printer = PrettyPrinter::new();

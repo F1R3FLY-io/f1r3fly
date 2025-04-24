@@ -39,10 +39,10 @@ const STACK_ALLOC_SIZE: usize = 4 * 1024 * 1024;
 #[must_use]
 pub(crate) fn normalize_match_proc(
     proc: &Proc,
-    input_par: &mut Par,
+    input_par: &mut models::rhoapi::Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &EnvHashMap,
+    env: &EnvHashMap<String, models::rhoapi::Par>,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     maybe_grow(MINIMUM_STACK_SIZE, STACK_ALLOC_SIZE, || {
@@ -59,7 +59,7 @@ fn normalize_match_proc_internal(
     input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &EnvHashMap,
+    env: &EnvHashMap<String, models::rhoapi::Par>,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     fn binary_exp<C>(
@@ -69,7 +69,7 @@ fn normalize_match_proc_internal(
         constr: C,
         free_map: &mut FreeMap,
         bound_map_chain: &mut BoundMapChain,
-        env: &EnvHashMap,
+        env: &EnvHashMap<String, models::rhoapi::Par>,
     ) -> Result<(), InterpreterError>
     where
         C: FnOnce(Par, Par) -> Expr,

@@ -1,16 +1,14 @@
-use models::rhoapi::Par as ModelsPar;
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
 };
 
-use bitvec::{slice::BitSlice, vec::BitVec};
+use bitvec::{order::Msb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
+use models::rhoapi::{EMinusMinus, EMod, EPercentPercent, EPlusPlus};
+use prost::bytes;
 
-use super::{
-    sort_matcher::{ScoredTerm, Sortable, Sorted},
-    sorter::*,
-};
+use super::{sort_matcher::Sortable, sorter::*};
 
 /// A parallel composition of Rholang terms.
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
@@ -240,6 +238,25 @@ impl Par {
     }
 }
 
+impl From<models::rhoapi::Par> for Par {
+    fn from(par: models::rhoapi::Par) -> Self {
+        Par {
+            sends: par.sends.into_iter().map(Into::into).collect(),
+            receives: par.receives.into_iter().map(Into::into).collect(),
+            news: par.news.into_iter().map(Into::into).collect(),
+            exprs: par.exprs.into_iter().map(Into::into).collect(),
+            matches: par.matches.into_iter().map(Into::into).collect(),
+            unforgeables: par.unforgeables.into_iter().map(Into::into).collect(),
+            bundles: par.bundles.into_iter().map(Into::into).collect(),
+            connectives: par.connectives.into_iter().map(Into::into).collect(),
+            locally_free: BitVec::<usize, _>::from_iter(
+                par.locally_free.into_iter().map(|v| v as usize),
+            ),
+            connective_used: par.connective_used.into(),
+        }
+    }
+}
+
 impl Sortable for Par {
     type Sorter<'a> = ParSorter<'a>;
 
@@ -286,6 +303,16 @@ pub enum Var {
     Wildcard,
 }
 
+impl From<models::rhoapi::Var> for Var {
+    fn from(value: models::rhoapi::Var) -> Self {
+        match value.var_instance.unwrap() {
+            models::rhoapi::var::VarInstance::BoundVar(v) => Var::BoundVar(v as u32),
+            models::rhoapi::var::VarInstance::FreeVar(v) => Var::FreeVar(v as u32),
+            models::rhoapi::var::VarInstance::Wildcard(_) => Var::Wildcard,
+        }
+    }
+}
+
 impl Var {
     pub fn connective_used(&self) -> bool {
         match self {
@@ -316,6 +343,16 @@ pub struct Bundle {
     pub read_flag: bool,
 }
 
+impl From<models::rhoapi::Bundle> for Bundle {
+    fn from(bundle: models::rhoapi::Bundle) -> Self {
+        Bundle {
+            body: bundle.body.map(Into::into).unwrap(),
+            write_flag: bundle.write_flag,
+            read_flag: bundle.read_flag,
+        }
+    }
+}
+
 impl Sortable for Bundle {
     type Sorter<'a> = BundleSorter<'a>;
 
@@ -333,8 +370,20 @@ pub struct Send {
     pub chan: Par,
     pub data: Vec<Par>,
     pub persistent: bool,
-    pub locally_free: BitVec,
+    pub locally_free: BitVec<u8, Msb0>,
     pub connective_used: bool,
+}
+
+impl From<models::rhoapi::Send> for Send {
+    fn from(send: models::rhoapi::Send) -> Self {
+        Send {
+            chan: send.chan.map(Into::into).unwrap(),
+            data: send.data.into_iter().map(Into::into).collect(),
+            persistent: send.persistent,
+            locally_free: BitVec::<u8, Msb0>::from_vec(send.locally_free),
+            connective_used: send.connective_used.into(),
+        }
+    }
 }
 
 impl Sortable for Send {
@@ -377,6 +426,37 @@ pub struct Receive {
     pub connective_used: bool,
 }
 
+impl From<models::rhoapi::ReceiveBind> for ReceiveBind {
+    fn from(value: models::rhoapi::ReceiveBind) -> Self {
+        Self {
+            patterns: value.patterns.into_iter().map(Into::into).collect(),
+            remainder: value.remainder.map(Into::into),
+            free_count: value.free_count as u32,
+            source: value.source.map(Into::into).unwrap(),
+        }
+    }
+}
+
+impl From<models::rhoapi::Receive> for Receive {
+    fn from(receive: models::rhoapi::Receive) -> Self {
+        Self {
+            binds: receive.binds.into_iter().map(Into::into).collect(),
+            body: receive.body.map(Into::into).unwrap(),
+            persistent: receive.persistent,
+            peek: receive.peek,
+            bind_count: receive.bind_count as u32,
+            locally_free: BitVec::<usize, _>::from_vec(
+                receive
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as usize)
+                    .collect(),
+            ),
+            connective_used: receive.connective_used,
+        }
+    }
+}
+
 impl Sortable for Receive {
     type Sorter<'a> = ReceiveSorter<'a>;
 
@@ -402,6 +482,19 @@ pub struct New {
     pub locally_free: BitVec,
 }
 
+impl From<models::rhoapi::New> for New {
+    fn from(new: models::rhoapi::New) -> Self {
+        Self {
+            bind_count: new.bind_count as u32,
+            p: new.p.map(Into::into).unwrap(),
+            uris: new.uri,
+            locally_free: BitVec::<usize, _>::from_vec(
+                new.locally_free.into_iter().map(|v| v as usize).collect(),
+            ),
+        }
+    }
+}
+
 impl Sortable for New {
     type Sorter<'a> = NewSorter<'a>;
 
@@ -425,11 +518,111 @@ pub struct Match {
     pub connective_used: bool,
 }
 
+impl From<models::rhoapi::Match> for Match {
+    fn from(value: models::rhoapi::Match) -> Self {
+        Match {
+            target: value.target.map(Into::into).unwrap(),
+            cases: value
+                .cases
+                .into_iter()
+                .map(|case| MatchCase {
+                    pattern: case.pattern.map(Into::into).unwrap(),
+                    source: case.source.map(Into::into).unwrap(),
+                    free_count: case.free_count as u32,
+                })
+                .collect(),
+            locally_free: BitVec::<usize, _>::from_iter(
+                value.locally_free.into_iter().map(|x| x as usize),
+            ),
+            connective_used: value.connective_used,
+        }
+    }
+}
+
 impl Sortable for Match {
     type Sorter<'a> = MatchSorter<'a>;
 
     fn sorter(&mut self) -> Self::Sorter<'_> {
         MatchSorter::new(self)
+    }
+}
+
+impl From<models::rhoapi::Expr> for Expr {
+    fn from(value: models::rhoapi::Expr) -> Self {
+        match value.expr_instance.unwrap() {
+            models::rhoapi::expr::ExprInstance::GBool(v) => Expr::GBool(v),
+            models::rhoapi::expr::ExprInstance::GInt(v) => Expr::GInt(v),
+            models::rhoapi::expr::ExprInstance::GString(v) => Expr::GString(v),
+            models::rhoapi::expr::ExprInstance::GUri(v) => Expr::GUri(v),
+            models::rhoapi::expr::ExprInstance::GByteArray(items) => Expr::GByteArray(items),
+            models::rhoapi::expr::ExprInstance::ENotBody(enot) => {
+                Expr::ENot(enot.p.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::ENegBody(eneg) => {
+                Expr::ENeg(eneg.p.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EMultBody(models::rhoapi::EMult { p1, p2 }) => {
+                Expr::EMult(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EDivBody(models::rhoapi::EDiv { p1, p2 }) => {
+                Expr::EDiv(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EPlusBody(models::rhoapi::EPlus { p1, p2 }) => {
+                Expr::EPlus(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EMinusBody(models::rhoapi::EMinus { p1, p2 }) => {
+                Expr::EMinus(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::ELtBody(models::rhoapi::ELt { p1, p2 }) => {
+                Expr::ELt(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::ELteBody(models::rhoapi::ELte { p1, p2 }) => {
+                Expr::ELte(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EGtBody(models::rhoapi::EGt { p1, p2 }) => {
+                Expr::EGt(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EGteBody(models::rhoapi::EGte { p1, p2 }) => {
+                Expr::EGte(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EEqBody(models::rhoapi::EEq { p1, p2 }) => {
+                Expr::EEq(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::ENeqBody(models::rhoapi::ENeq { p1, p2 }) => {
+                Expr::ENeq(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EAndBody(models::rhoapi::EAnd { p1, p2 }) => {
+                Expr::EAnd(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EOrBody(models::rhoapi::EOr { p1, p2 }) => {
+                Expr::EOr(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EVarBody(evar) => {
+                Expr::EVar(evar.v.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EListBody(elist) => Expr::EList(elist.into()),
+            models::rhoapi::expr::ExprInstance::ETupleBody(etuple) => Expr::ETuple(etuple.into()),
+            models::rhoapi::expr::ExprInstance::ESetBody(eset) => Expr::ESet(eset.into()),
+            models::rhoapi::expr::ExprInstance::EMapBody(emap) => Expr::EMap(emap.into()),
+            models::rhoapi::expr::ExprInstance::EMethodBody(emethod) => {
+                Expr::EMethod(emethod.into())
+            }
+            models::rhoapi::expr::ExprInstance::EMatchesBody(ematches) => {
+                Expr::EMatches(ematches.into())
+            }
+            models::rhoapi::expr::ExprInstance::EPercentPercentBody(EPercentPercent { p1, p2 }) => {
+                Expr::EPercentPercent(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EPlusPlusBody(EPlusPlus { p1, p2 }) => {
+                Expr::EPlusPlus(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EMinusMinusBody(EMinusMinus { p1, p2 }) => {
+                Expr::EMinusMinus(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+            models::rhoapi::expr::ExprInstance::EModBody(EMod { p1, p2 }) => {
+                Expr::EMod(p1.map(Into::into).unwrap(), p2.map(Into::into).unwrap())
+            }
+        }
     }
 }
 
@@ -476,6 +669,27 @@ pub enum Expr {
     EMod(Par, Par),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub(crate) struct ElistBody {
+    pub ps: Vec<Par>,
+    pub locally_free: BitVec,
+    pub connective_used: bool,
+    pub remainder: Option<Var>,
+}
+
+impl From<models::rhoapi::EList> for EListBody {
+    fn from(body: models::rhoapi::EList) -> Self {
+        Self {
+            ps: body.ps.into_iter().map(Into::into).collect(),
+            locally_free: BitVec::<usize, _>::from_vec(
+                body.locally_free.into_iter().map(|v| v as usize).collect(),
+            ),
+            connective_used: body.connective_used,
+            remainder: body.remainder.map(Into::into),
+        }
+    }
+}
+
 impl Sortable for Expr {
     type Sorter<'a> = ExprSorter<'a>;
 
@@ -484,7 +698,7 @@ impl Sortable for Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EListBody {
     pub ps: Vec<Par>,
     pub locally_free: BitVec,
@@ -492,28 +706,75 @@ pub struct EListBody {
     pub remainder: Option<Var>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ETupleBody {
     pub ps: Vec<Par>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+impl From<models::rhoapi::ETuple> for ETupleBody {
+    fn from(tuple: models::rhoapi::ETuple) -> Self {
+        ETupleBody {
+            ps: tuple.ps.into_iter().map(Into::into).collect(),
+            locally_free: BitVec::<usize, _>::from_vec(
+                tuple.locally_free.into_iter().map(|v| v as usize).collect(),
+            ),
+            connective_used: tuple.connective_used,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct ESetBody {
-    pub ps: BTreeSet<ScoredTerm<Par>>,
+    pub ps: Vec<Par>,
     pub locally_free: BitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+impl From<models::rhoapi::ESet> for ESetBody {
+    fn from(set: models::rhoapi::ESet) -> Self {
+        ESetBody {
+            ps: set.ps.into_iter().map(Into::into).collect::<Vec<Par>>(),
+            locally_free: BitVec::<usize, _>::from_vec(
+                set.locally_free.into_iter().map(|v| v as usize).collect(),
+            ),
+            connective_used: set.connective_used,
+            remainder: set.remainder.map(Into::into),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EMapBody {
-    pub ps: BTreeMap<ScoredTerm<Par>, Sorted<Par>>,
+    pub ps: Vec<(Par, Par)>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 
     pub remainder: Option<Var>,
+}
+
+impl From<models::rhoapi::EMap> for EMapBody {
+    fn from(map: models::rhoapi::EMap) -> Self {
+        EMapBody {
+            ps: map
+                .kvs
+                .into_iter()
+                .map(|kvp| {
+                    (
+                        kvp.key.map(Into::into).unwrap(),
+                        kvp.value.map(Into::into).unwrap(),
+                    )
+                })
+                .collect::<Vec<(Par, Par)>>(),
+            locally_free: BitVec::<usize, _>::from_vec(
+                map.locally_free.into_iter().map(|v| v as usize).collect(),
+            ),
+            connective_used: map.connective_used,
+            remainder: map.remainder.map(Into::into),
+        }
+    }
 }
 
 // #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -524,7 +785,7 @@ pub struct EMapBody {
 
 /// *
 /// `target.method(arguments)`
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct EMethodBody {
     pub method_name: String,
     pub target: Par,
@@ -533,10 +794,37 @@ pub struct EMethodBody {
     pub connective_used: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+impl From<models::rhoapi::EMethod> for EMethodBody {
+    fn from(method: models::rhoapi::EMethod) -> Self {
+        EMethodBody {
+            method_name: method.method_name,
+            target: method.target.map(Into::into).unwrap(),
+            arguments: method.arguments.into_iter().map(Into::into).collect(),
+            locally_free: BitVec::from_vec(
+                method
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as usize)
+                    .collect(),
+            ),
+            connective_used: method.connective_used,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct EMatchesBody {
     pub pattern: Par,
     pub target: Par,
+}
+
+impl From<models::rhoapi::EMatches> for EMatchesBody {
+    fn from(matches: models::rhoapi::EMatches) -> Self {
+        EMatchesBody {
+            pattern: matches.pattern.map(Into::into).unwrap(),
+            target: matches.target.map(Into::into).unwrap(),
+        }
+    }
 }
 
 impl Expr {
@@ -637,11 +925,39 @@ pub enum Connective {
     ConnOr(Vec<Par>),
     ConnNot(Par),
     VarRef(VarRef),
-    ConnBool,
-    ConnInt,
-    ConnString,
-    ConnUri,
-    ConnByteArray,
+    ConnBool(bool),
+    ConnInt(bool),
+    ConnString(bool),
+    ConnUri(bool),
+    ConnByteArray(bool),
+}
+
+impl From<models::rhoapi::Connective> for Connective {
+    fn from(connective: models::rhoapi::Connective) -> Self {
+        match connective.connective_instance.unwrap() {
+            models::rhoapi::connective::ConnectiveInstance::ConnAndBody(connective_body) => {
+                Connective::ConnAnd(connective_body.ps.into_iter().map(Into::into).collect())
+            }
+            models::rhoapi::connective::ConnectiveInstance::ConnOrBody(connective_body) => {
+                Connective::ConnOr(connective_body.ps.into_iter().map(Into::into).collect())
+            }
+            models::rhoapi::connective::ConnectiveInstance::ConnNotBody(par) => {
+                Connective::ConnNot(par.into())
+            }
+            models::rhoapi::connective::ConnectiveInstance::VarRefBody(var_ref) => {
+                Connective::VarRef(var_ref.into())
+            }
+            models::rhoapi::connective::ConnectiveInstance::ConnBool(v) => Connective::ConnBool(v),
+            models::rhoapi::connective::ConnectiveInstance::ConnInt(v) => Connective::ConnInt(v),
+            models::rhoapi::connective::ConnectiveInstance::ConnString(v) => {
+                Connective::ConnString(v)
+            }
+            models::rhoapi::connective::ConnectiveInstance::ConnUri(v) => Connective::ConnUri(v),
+            models::rhoapi::connective::ConnectiveInstance::ConnByteArray(v) => {
+                Connective::ConnByteArray(v)
+            }
+        }
+    }
 }
 
 impl Connective {
@@ -676,6 +992,15 @@ pub struct VarRef {
     pub depth: u32,
 }
 
+impl From<models::rhoapi::VarRef> for VarRef {
+    fn from(var_ref: models::rhoapi::VarRef) -> Self {
+        VarRef {
+            index: var_ref.index as u32,
+            depth: var_ref.depth as u32,
+        }
+    }
+}
+
 // pub struct DeployId {
 //     pub sig: Vec<u8>,
 // }
@@ -689,6 +1014,20 @@ pub struct VarRef {
 /// the grammar to construct them.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct GUnforgeable(pub [i8; 32]);
+
+impl From<models::rhoapi::GUnforgeable> for GUnforgeable {
+    fn from(unf: models::rhoapi::GUnforgeable) -> Self {
+        let mut buf = vec![];
+        unf.unf_instance.unwrap().encode(&mut buf);
+
+        buf.into_iter()
+            .map(|v| v as i8)
+            .collect::<Vec<i8>>()
+            .try_into()
+            .map(GUnforgeable)
+            .unwrap()
+    }
+}
 
 impl GUnforgeable {
     pub fn to_bytes_vec(&self) -> Vec<u8> {
