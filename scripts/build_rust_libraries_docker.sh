@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 AMD64_TARGET="x86_64-unknown-linux-gnu"
 AARCH64_TARGET="aarch64-unknown-linux-gnu"
 
