@@ -2,8 +2,6 @@
 
 use std::{
     collections::HashMap,
-    future::Future,
-    sync::{Arc, Mutex, Once},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -31,9 +29,7 @@ use models::{
     rhoapi::PCost,
     rust::{
         block::state_hash::StateHash,
-        casper::protocol::casper_message::{
-            BlockMessage, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
-        },
+        casper::protocol::casper_message::{DeployData, ProcessedDeploy, ProcessedSystemDeploy},
     },
 };
 use rholang::rust::interpreter::{
@@ -46,15 +42,7 @@ use rholang::rust::interpreter::{
 };
 use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
 
-use crate::{
-    init_logger,
-    util::genesis_builder::{GenesisContext, GenessisBuilder},
-};
-
-use super::resources::{copy_storage, mk_runtime_manager_at, mk_test_rnode_store_manager};
-
-static GENESIS_INIT: Once = Once::new();
-static mut CACHED_GENESIS: Option<Arc<Mutex<Option<GenesisContext>>>> = None;
+use crate::util::{genesis_builder::GenesisContext, rholang::resources::with_runtime_manager};
 
 enum SystemDeployReplayResult<A> {
     ReplaySucceeded {
@@ -64,41 +52,6 @@ enum SystemDeployReplayResult<A> {
     ReplayFailed {
         system_deploy_error: SystemDeployUserError,
     },
-}
-
-async fn genesis_context() -> Result<GenesisContext, CasperError> {
-    unsafe {
-        GENESIS_INIT.call_once(|| {
-            CACHED_GENESIS = Some(Arc::new(Mutex::new(None)));
-        });
-
-        let genesis_arc = CACHED_GENESIS.as_ref().unwrap().clone();
-        let mut genesis_guard = genesis_arc.lock().unwrap();
-
-        if genesis_guard.is_none() {
-            let mut genesis_builder = GenessisBuilder::new();
-            let new_genesis = genesis_builder.build_genesis_with_parameters(None).await?;
-            *genesis_guard = Some(new_genesis);
-        }
-
-        Ok(genesis_guard.as_ref().unwrap().clone())
-    }
-}
-
-async fn with_runtime_manager<F, Fut, R>(f: F) -> Result<R, CasperError>
-where
-    F: FnOnce(RuntimeManager, GenesisContext, BlockMessage) -> Fut,
-    Fut: Future<Output = R>,
-{
-    init_logger();
-    let genesis_context = genesis_context().await?;
-    let genesis_block = genesis_context.genesis_block.clone();
-
-    let storage_dir = copy_storage(genesis_context.storage_directory.clone());
-    let kvm = mk_test_rnode_store_manager(storage_dir);
-    let runtime_manager = mk_runtime_manager_at(kvm, None).await;
-
-    Ok(f(runtime_manager, genesis_context, genesis_block).await)
 }
 
 async fn compute_state(

@@ -3,7 +3,7 @@
 use indexmap::IndexSet;
 use prost::Message;
 use rspace_plus_plus::rspace::errors::HistoryError;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
@@ -41,10 +41,10 @@ impl RholangMergingLogic {
      * @param channelValues Final values
      * @param getInitialValue Accessor to initial value
      */
-    pub fn calculate_num_channel_diff<Key: Clone + Eq + Hash>(
-        channel_values: Vec<HashMap<Key, i64>>,
+    pub fn calculate_num_channel_diff<Key: Clone + Eq + Hash + Ord>(
+        channel_values: Vec<BTreeMap<Key, i64>>,
         get_initial_value: impl Fn(&Key) -> Option<i64> + Send + Sync,
-    ) -> Vec<HashMap<Key, i64>> {
+    ) -> Vec<BTreeMap<Key, i64>> {
         // First collect unique keys while preserving order
         let unique_keys: Vec<_> = channel_values
             .iter()
@@ -56,13 +56,13 @@ impl RholangMergingLogic {
         let mut state = unique_keys
             .iter()
             .map(|key| (key.clone(), get_initial_value(key).unwrap_or(0)))
-            .collect::<HashMap<_, _>>();
+            .collect::<BTreeMap<_, _>>();
 
         // Process each channel value map
         channel_values
             .into_iter()
             .map(|end_val_map| {
-                let mut diffs = HashMap::with_capacity(end_val_map.len());
+                let mut diffs = BTreeMap::new();
 
                 for (ch, end_val) in end_val_map {
                     if let Some(prev_val) = state.get(&ch) {
@@ -260,17 +260,17 @@ mod tests {
         let mut input = Vec::new();
 
         // Map 0: {A -> 20}
-        let mut map0 = HashMap::new();
+        let mut map0 = BTreeMap::new();
         map0.insert(ch_a.clone(), 20i64);
         input.push(map0);
 
         // Map 1: {B -> 3}
-        let mut map1 = HashMap::new();
+        let mut map1 = BTreeMap::new();
         map1.insert(ch_b.clone(), 3i64);
         input.push(map1);
 
         // Map 2: {A -> 15, C -> 10}
-        let mut map2 = HashMap::new();
+        let mut map2 = BTreeMap::new();
         map2.insert(ch_a.clone(), 15i64);
         map2.insert(ch_c.clone(), 10i64);
         input.push(map2);
@@ -285,17 +285,17 @@ mod tests {
         let mut expected = Vec::new();
 
         // Expected Map 0: {A -> 10}
-        let mut expected_map0 = HashMap::new();
+        let mut expected_map0 = BTreeMap::new();
         expected_map0.insert(ch_a.clone(), 10i64);
         expected.push(expected_map0);
 
         // Expected Map 1: {B -> 3}
-        let mut expected_map1 = HashMap::new();
+        let mut expected_map1 = BTreeMap::new();
         expected_map1.insert(ch_b.clone(), 3i64);
         expected.push(expected_map1);
 
         // Expected Map 2: {A -> -5, C -> -10}
-        let mut expected_map2 = HashMap::new();
+        let mut expected_map2 = BTreeMap::new();
         expected_map2.insert(ch_a.clone(), -5i64);
         expected_map2.insert(ch_c.clone(), -10i64);
         expected.push(expected_map2);

@@ -1,7 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManager.scala
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManagerSyntax.scala
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use crypto::rust::signatures::signed::Signed;
@@ -277,8 +277,8 @@ impl RuntimeManager {
         Ok(computed)
     }
 
-    pub fn get_history_repo(self) -> RhoHistoryRepository {
-        self.history_repo
+    pub fn get_history_repo(&self) -> RhoHistoryRepository {
+        self.history_repo.clone()
     }
 
     pub fn get_mergeable_store(self) -> MergeableStore {
@@ -314,7 +314,7 @@ impl RuntimeManager {
                         x.channels
                             .into_iter()
                             .map(|y| (y.hash, y.diff))
-                            .collect::<HashMap<_, _>>()
+                            .collect::<BTreeMap<_, _>>()
                     })
                     .collect::<Vec<_>>();
                 Ok(res_map)

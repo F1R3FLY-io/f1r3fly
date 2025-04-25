@@ -1,7 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/rholang/RuntimeReplaySyntax.scala
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     sync::{Arc, Mutex},
 };
@@ -339,7 +339,7 @@ impl ReplayRuntimeOps {
                         let data = self
                             .runtime_ops
                             .get_number_channels_data(&eval_result.mergeable)?;
-                        Ok::<(HashMap<Blake2b256Hash, i64>, EvaluateResult), CasperError>((
+                        Ok::<(BTreeMap<Blake2b256Hash, i64>, EvaluateResult), CasperError>((
                             data,
                             eval_result,
                         ))
@@ -371,7 +371,7 @@ impl ReplayRuntimeOps {
                         let data = self
                             .runtime_ops
                             .get_number_channels_data(&eval_result.mergeable)?;
-                        Ok::<(HashMap<Blake2b256Hash, i64>, EvaluateResult), CasperError>((
+                        Ok::<(BTreeMap<Blake2b256Hash, i64>, EvaluateResult), CasperError>((
                             data,
                             eval_result,
                         ))

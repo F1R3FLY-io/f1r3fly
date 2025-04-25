@@ -1,8 +1,14 @@
 // See casper/src/test/scala/coop/rchain/casper/util/rholang/Resources.scala
 
+use casper::rust::errors::CasperError;
+use models::rust::casper::protocol::casper_message::BlockMessage;
 use std::fs;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::Once;
 use tempfile::Builder;
 
 use casper::rust::{
@@ -17,6 +23,48 @@ use rspace_plus_plus::rspace::shared::{
     key_value_store_manager::KeyValueStoreManager,
     lmdb_dir_store_manager::{Db, LmdbDirStoreManager, LmdbEnvConfig, MB},
 };
+
+use crate::init_logger;
+use crate::util::genesis_builder::GenesisContext;
+use crate::util::genesis_builder::GenessisBuilder;
+
+static GENESIS_INIT: Once = Once::new();
+static mut CACHED_GENESIS: Option<Arc<Mutex<Option<GenesisContext>>>> = None;
+
+pub async fn genesis_context() -> Result<GenesisContext, CasperError> {
+    unsafe {
+        GENESIS_INIT.call_once(|| {
+            CACHED_GENESIS = Some(Arc::new(Mutex::new(None)));
+        });
+
+        let genesis_arc = CACHED_GENESIS.as_ref().unwrap().clone();
+        let mut genesis_guard = genesis_arc.lock().unwrap();
+
+        if genesis_guard.is_none() {
+            let mut genesis_builder = GenessisBuilder::new();
+            let new_genesis = genesis_builder.build_genesis_with_parameters(None).await?;
+            *genesis_guard = Some(new_genesis);
+        }
+
+        Ok(genesis_guard.as_ref().unwrap().clone())
+    }
+}
+
+pub async fn with_runtime_manager<F, Fut, R>(f: F) -> Result<R, CasperError>
+where
+    F: FnOnce(RuntimeManager, GenesisContext, BlockMessage) -> Fut,
+    Fut: Future<Output = R>,
+{
+    init_logger();
+    let genesis_context = genesis_context().await?;
+    let genesis_block = genesis_context.genesis_block.clone();
+
+    let storage_dir = copy_storage(genesis_context.storage_directory.clone());
+    let kvm = mk_test_rnode_store_manager(storage_dir);
+    let runtime_manager = mk_runtime_manager_at(kvm, None).await;
+
+    Ok(f(runtime_manager, genesis_context, genesis_block).await)
+}
 
 pub fn mk_test_rnode_store_manager(dir_path: PathBuf) -> impl KeyValueStoreManager {
     // Limit maximum environment (file) size for LMDB in tests
