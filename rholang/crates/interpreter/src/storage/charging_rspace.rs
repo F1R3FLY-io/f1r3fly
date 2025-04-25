@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::{
     accounting::{
-        _cost,
+        CostManager,
         costs::{
             Cost, comm_event_storage_cost, event_storage_cost, storage_cost_consume,
             storage_cost_produce,
@@ -26,7 +26,157 @@ use rspace_plus_plus::rspace::{
     trace::Log,
 };
 
-pub struct ChargingRSpace;
+#[derive(Clone)]
+pub struct ChargingRSpace<T> {
+    space: T,
+    cost_manager: CostManager,
+}
+
+impl<T> ChargingRSpace<T> {
+    pub fn create(
+        space: T,
+        cost_manager: CostManager,
+    ) -> impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone
+    where
+        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
+    {
+        ChargingRSpace {
+            space,
+            cost_manager,
+        }
+    }
+}
+
+impl<T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>
+    ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> for ChargingRSpace<T>
+{
+    fn consume(
+        &mut self,
+        channels: Vec<Par>,
+        patterns: Vec<BindPattern>,
+        continuation: TaggedContinuation,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> Result<
+        MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+        RSpaceError,
+    > {
+        self.cost_manager.charge(storage_cost_consume(
+            channels.clone(),
+            patterns.clone(),
+            continuation.clone(),
+        ))?;
+
+        let consume_res = self.space.consume(
+            channels.clone(),
+            patterns,
+            continuation.clone(),
+            persist,
+            peeks,
+        )?;
+
+        let id = consume_id(continuation)?;
+        handle_result(
+            consume_res.clone(),
+            TriggeredBy::Consume {
+                id,
+                persistent: persist,
+                channels_count: channels.len() as i64,
+            },
+            self.cost_manager.clone(),
+        )?;
+        Ok(consume_res)
+    }
+
+    fn produce(
+        &mut self,
+        channel: Par,
+        data: ListParWithRandom,
+        persist: bool,
+    ) -> Result<
+        MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+        RSpaceError,
+    > {
+        self.cost_manager
+            .charge(storage_cost_produce(channel.clone(), data.clone()))?;
+        let produce_res = self.space.produce(channel, data.clone(), persist)?;
+        handle_result(
+            produce_res.clone(),
+            TriggeredBy::Produce {
+                id: Blake2b512Random::create_from_bytes(&data.random_state),
+                persistent: persist,
+                channels_count: 1,
+            },
+            self.cost_manager.clone(),
+        )?;
+        Ok(produce_res)
+    }
+
+    fn install(
+        &mut self,
+        channels: Vec<Par>,
+        patterns: Vec<BindPattern>,
+        continuation: TaggedContinuation,
+    ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, RSpaceError> {
+        self.space.install(channels, patterns, continuation)
+    }
+
+    fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        self.space.create_checkpoint()
+    }
+
+    fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
+        self.space.get_data(channel)
+    }
+
+    fn get_waiting_continuations(
+        &self,
+        channels: Vec<Par>,
+    ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
+        self.space.get_waiting_continuations(channels)
+    }
+
+    fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
+        self.space.get_joins(channel)
+    }
+
+    fn clear(&mut self) -> Result<(), RSpaceError> {
+        self.space.clear()
+    }
+
+    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+        self.space.reset(root)
+    }
+
+    fn to_map(&self) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>> {
+        self.space.to_map()
+    }
+
+    fn create_soft_checkpoint(
+        &mut self,
+    ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation> {
+        self.space.create_soft_checkpoint()
+    }
+
+    fn revert_to_soft_checkpoint(
+        &mut self,
+        checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    ) -> Result<(), RSpaceError> {
+        self.space.revert_to_soft_checkpoint(checkpoint)
+    }
+
+    fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
+        self.space.rig_and_reset(start_root, log)
+    }
+
+    fn rig(&self, log: Log) -> Result<(), RSpaceError> {
+        self.space.rig(log)
+    }
+
+    fn check_replay_data(&self) -> Result<(), RSpaceError> {
+        self.space.check_replay_data()
+    }
+}
 
 #[derive(Clone)]
 pub enum TriggeredBy {
@@ -54,168 +204,10 @@ fn consume_id(continuation: TaggedContinuation) -> Result<Blake2b512Random, Inte
     }
 }
 
-impl ChargingRSpace {
-    pub fn charging_rspace<T>(
-        space: T,
-        cost: _cost,
-    ) -> impl ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone
-    where
-        T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone,
-    {
-        #[derive(Clone)]
-        struct ChargingRSpace<T> {
-            space: T,
-            cost: _cost,
-        }
-
-        impl<T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>
-            ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> for ChargingRSpace<T>
-        {
-            fn consume(
-                &mut self,
-                channels: Vec<Par>,
-                patterns: Vec<BindPattern>,
-                continuation: TaggedContinuation,
-                persist: bool,
-                peeks: BTreeSet<i32>,
-            ) -> Result<
-                MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-                RSpaceError,
-            > {
-                self.cost.charge(storage_cost_consume(
-                    channels.clone(),
-                    patterns.clone(),
-                    continuation.clone(),
-                ))?;
-
-                let consume_res = self.space.consume(
-                    channels.clone(),
-                    patterns,
-                    continuation.clone(),
-                    persist,
-                    peeks,
-                )?;
-
-                let id = consume_id(continuation)?;
-                handle_result(
-                    consume_res.clone(),
-                    TriggeredBy::Consume {
-                        id,
-                        persistent: persist,
-                        channels_count: channels.len() as i64,
-                    },
-                    self.cost.clone(),
-                )?;
-                Ok(consume_res)
-            }
-
-            fn produce(
-                &mut self,
-                channel: Par,
-                data: ListParWithRandom,
-                persist: bool,
-            ) -> Result<
-                MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-                RSpaceError,
-            > {
-                self.cost
-                    .charge(storage_cost_produce(channel.clone(), data.clone()))?;
-                let produce_res = self.space.produce(channel, data.clone(), persist)?;
-                handle_result(
-                    produce_res.clone(),
-                    TriggeredBy::Produce {
-                        id: Blake2b512Random::create_from_bytes(&data.random_state),
-                        persistent: persist,
-                        channels_count: 1,
-                    },
-                    self.cost.clone(),
-                )?;
-                Ok(produce_res)
-            }
-
-            fn install(
-                &mut self,
-                channels: Vec<Par>,
-                patterns: Vec<BindPattern>,
-                continuation: TaggedContinuation,
-            ) -> Result<Option<(TaggedContinuation, Vec<ListParWithRandom>)>, RSpaceError>
-            {
-                self.space.install(channels, patterns, continuation)
-            }
-
-            fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-                self.space.create_checkpoint()
-            }
-
-            fn get_data(&self, channel: Par) -> Vec<Datum<ListParWithRandom>> {
-                self.space.get_data(channel)
-            }
-
-            fn get_waiting_continuations(
-                &self,
-                channels: Vec<Par>,
-            ) -> Vec<WaitingContinuation<BindPattern, TaggedContinuation>> {
-                self.space.get_waiting_continuations(channels)
-            }
-
-            fn get_joins(&self, channel: Par) -> Vec<Vec<Par>> {
-                self.space.get_joins(channel)
-            }
-
-            fn clear(&mut self) -> Result<(), RSpaceError> {
-                self.space.clear()
-            }
-
-            fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
-                self.space.reset(root)
-            }
-
-            fn to_map(
-                &self,
-            ) -> HashMap<Vec<Par>, Row<BindPattern, ListParWithRandom, TaggedContinuation>>
-            {
-                self.space.to_map()
-            }
-
-            fn create_soft_checkpoint(
-                &mut self,
-            ) -> SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>
-            {
-                self.space.create_soft_checkpoint()
-            }
-
-            fn revert_to_soft_checkpoint(
-                &mut self,
-                checkpoint: SoftCheckpoint<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-            ) -> Result<(), RSpaceError> {
-                self.space.revert_to_soft_checkpoint(checkpoint)
-            }
-
-            fn rig_and_reset(
-                &mut self,
-                start_root: Blake2b256Hash,
-                log: Log,
-            ) -> Result<(), RSpaceError> {
-                self.space.rig_and_reset(start_root, log)
-            }
-
-            fn rig(&self, log: Log) -> Result<(), RSpaceError> {
-                self.space.rig(log)
-            }
-
-            fn check_replay_data(&self) -> Result<(), RSpaceError> {
-                self.space.check_replay_data()
-            }
-        }
-
-        ChargingRSpace { space, cost }
-    }
-}
-
 fn handle_result(
     result: MaybeActionResult<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
     triggered_by: TriggeredBy,
-    cost: _cost,
+    cost: CostManager,
 ) -> Result<(), InterpreterError> {
     let triggered_by_id = match triggered_by.clone() {
         TriggeredBy::Consume { id, .. } => id,

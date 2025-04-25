@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::aliases::EnvHashMap;
 
-use super::accounting::_cost;
+use super::accounting::CostManager;
 use super::accounting::costs::{Cost, parsing_cost};
 use super::compiler::compiler::Compiler;
 use super::errors::InterpreterError;
@@ -31,7 +31,7 @@ pub trait Interpreter {
 }
 
 pub struct InterpreterImpl {
-    c: _cost,
+    c: CostManager,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
 }
 
@@ -78,7 +78,7 @@ impl Interpreter for InterpreterImpl {
 }
 
 impl InterpreterImpl {
-    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
+    pub fn new(cost: CostManager, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
         InterpreterImpl { c: cost, merge_chs }
     }
 

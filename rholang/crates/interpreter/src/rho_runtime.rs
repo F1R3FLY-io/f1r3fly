@@ -13,6 +13,7 @@ use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
+use rspace_plus_plus::rspace::errors::RSpaceError;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
@@ -30,7 +31,7 @@ use crate::interpreter::Interpreter;
 use crate::interpreter::InterpreterImpl;
 use crate::system_processes::{BodyRefs, FixedChannels};
 
-use super::accounting::_cost;
+use super::accounting::CostManager;
 use super::accounting::cost_accounting::CostAccounting;
 use super::accounting::costs::Cost;
 use super::accounting::has_cost::HasCost;
@@ -237,7 +238,7 @@ pub trait Runtime: HasCost {
 #[derive(Clone)]
 pub struct RhoRuntime {
     pub reducer: DebruijnInterpreter,
-    pub cost: _cost,
+    pub cost: CostManager,
     pub block_data_ref: Arc<RwLock<BlockData>>,
     pub invalid_blocks_param: InvalidBlocks,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -246,7 +247,7 @@ pub struct RhoRuntime {
 impl RhoRuntime {
     fn new(
         reducer: DebruijnInterpreter,
-        cost: _cost,
+        cost: CostManager,
         block_data_ref: Arc<RwLock<BlockData>>,
         invalid_blocks_param: InvalidBlocks,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
@@ -404,7 +405,7 @@ impl Runtime for RhoRuntime {
 }
 
 impl HasCost for RhoRuntime {
-    fn cost(&self) -> &_cost {
+    fn cost(&self) -> &CostManager {
         &self.cost
     }
 }
@@ -424,14 +425,12 @@ pub type RhoHistoryRepository =
 pub type ISpaceAndReplay = (RhoISpace, RhoReplayISpace);
 
 fn introduce_system_process<T>(
-    mut spaces: Vec<&mut T>,
+    space: &mut T,
     processes: Vec<(Name, Arity, Remainder, BodyRef)>,
-) -> Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>>
+) -> Result<(), RSpaceError>
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
 {
-    let mut results: Vec<Option<(TaggedContinuation, Vec<ListParWithRandom>)>> = Vec::new();
-
     for (name, arity, remainder, body_ref) in processes {
         let channels = vec![name];
         let patterns = vec![BindPattern {
@@ -444,13 +443,12 @@ where
             tagged_cont: Some(TaggedCont::ScalaBodyRef(body_ref)),
         };
 
-        for space in &mut spaces {
-            let result = space.install(channels.clone(), patterns.clone(), continuation.clone());
-            results.push(result.map_err(|err| panic!("{}", err)).unwrap());
+        if let Err(err) = space.install(channels.clone(), patterns.clone(), continuation.clone()) {
+            return Err(err);
         }
     }
 
-    results
+    Ok(())
 }
 
 fn std_system_processes() -> Vec<Definition> {
@@ -681,15 +679,13 @@ fn dispatch_table_creator(
     dispatcher: RhoDispatch,
     block_data: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
-    extra_system_processes: &mut Vec<Definition>,
 ) -> RhoDispatchMap {
     let mut dispatch_table = HashMap::new();
 
-    for def in std_system_processes().iter_mut().chain(
-        std_rho_crypto_processes()
-            .iter_mut()
-            .chain(extra_system_processes.iter_mut()),
-    ) {
+    for def in std_system_processes()
+        .iter_mut()
+        .chain(std_rho_crypto_processes().iter_mut())
+    {
         let tuple = def.to_dispatch_table(ProcessContext::create(
             space.clone(),
             dispatcher.clone(),
@@ -740,11 +736,10 @@ fn setup_reducer(
     charging_rspace: RhoISpace,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
-    extra_system_processes: &mut Vec<Definition>,
     urn_map: HashMap<String, Par>,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
-    cost: _cost,
+    cost: CostManager,
 ) -> DebruijnInterpreter {
     // println!("\nsetup_reducer");
 
@@ -759,7 +754,7 @@ fn setup_reducer(
         urn_map,
         merge_chs,
         mergeable_tag_name,
-        cost: cost.clone(),
+        cost_manager: cost.clone(),
         substitute: Substitute { cost: cost.clone() },
     };
 
@@ -770,30 +765,21 @@ fn setup_reducer(
         dispatcher.clone(),
         block_data_ref,
         invalid_blocks,
-        extra_system_processes,
     );
 
     dispatcher.try_write().unwrap()._dispatch_table = replay_dispatch_table;
     reducer
 }
 
-fn setup_maps_and_refs(
-    extra_system_processes: &Vec<Definition>,
-) -> (
-    Arc<RwLock<BlockData>>,
-    InvalidBlocks,
+fn setup_maps_and_refs() -> (
     HashMap<String, Name>,
     Vec<(Name, Arity, Remainder, BodyRef)>,
 ) {
-    let block_data_ref = Arc::new(RwLock::new(BlockData::empty()));
-    let invalid_blocks = InvalidBlocks::new();
-
     let system_binding = std_system_processes();
     let rho_crypto_binding = std_rho_crypto_processes();
     let combined_processes = system_binding
         .iter()
         .chain(rho_crypto_binding.iter())
-        .chain(extra_system_processes.iter())
         .collect::<Vec<&Definition>>();
 
     let mut urn_map: HashMap<_, _> = basic_processes();
@@ -804,45 +790,41 @@ fn setup_maps_and_refs(
             urn_map.insert(key, value);
         });
 
-    // println!("\nurn_map length: {:?}", urn_map.len());
-
     let proc_defs: Vec<(Par, i32, Option<Var>, i64)> = combined_processes
         .iter()
         .map(|process| process.to_proc_defs())
         .collect();
 
-    // println!("\nproc_defs length: {:?}", proc_defs.len());
-
-    (block_data_ref, invalid_blocks, urn_map, proc_defs)
+    (urn_map, proc_defs)
 }
 
 fn create_rho_env<T>(
     mut rspace: T,
     merge_chs: Arc<RwLock<HashSet<Par>>>,
     mergeable_tag_name: Par,
-    extra_system_processes: &mut Vec<Definition>,
-    cost: _cost,
+    cost_manager: CostManager,
 ) -> (DebruijnInterpreter, Arc<RwLock<BlockData>>, InvalidBlocks)
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
-    let maps_and_refs = setup_maps_and_refs(&extra_system_processes);
-    let (block_data_ref, invalid_blocks, urn_map, proc_defs) = maps_and_refs;
-    let res = introduce_system_process(vec![&mut rspace], proc_defs);
-    assert!(res.iter().all(|s| s.is_none()));
+    let block_data_ref = Arc::new(RwLock::new(BlockData::empty()));
+    let invalid_blocks = InvalidBlocks::new();
+    let (urn_map, proc_defs) = setup_maps_and_refs();
+    introduce_system_process(&mut rspace, proc_defs).unwrap();
 
-    let charging_rspace: RhoISpace = Arc::new(Mutex::new(Box::new(
-        ChargingRSpace::charging_rspace(rspace, cost.clone()),
-    )));
+    let charging_rspace: RhoISpace = Arc::new(Mutex::new(Box::new(ChargingRSpace::create(
+        rspace,
+        cost_manager.clone(),
+    ))));
+
     let reducer = setup_reducer(
         charging_rspace,
         block_data_ref.clone(),
         invalid_blocks.clone(),
-        extra_system_processes,
         urn_map,
         merge_chs,
         mergeable_tag_name,
-        cost,
+        cost_manager,
     );
 
     (reducer, block_data_ref, invalid_blocks)
@@ -888,12 +870,11 @@ pub async fn create_runtime<T>(
     rspace: T,
     init_registry: bool,
     mergeable_tag_name: Par,
-    extra_system_processes: &mut Vec<Definition>,
 ) -> Arc<Mutex<RhoRuntime>>
 where
     T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
 {
-    let cost = CostAccounting::empty_cost();
+    let cost_manager = CostAccounting::empty_cost();
     let merge_chs = Arc::new(RwLock::new({
         let mut set = HashSet::new();
         set.insert(Par::default());
@@ -904,10 +885,9 @@ where
         rspace,
         merge_chs.clone(),
         mergeable_tag_name,
-        extra_system_processes,
-        cost.clone(),
+        cost_manager.clone(),
     );
-    let runtime = RhoRuntime::new(reducer, cost, block_ref, invalid_blocks, merge_chs);
+    let runtime = RhoRuntime::new(reducer, cost_manager, block_ref, invalid_blocks, merge_chs);
 
     if init_registry {
         bootstrap_registry(runtime.clone()).await;

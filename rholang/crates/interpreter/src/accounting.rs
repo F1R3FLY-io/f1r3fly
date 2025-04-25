@@ -9,10 +9,6 @@ pub mod cost_accounting;
 pub mod costs;
 pub mod has_cost;
 
-// See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/package.scala
-#[allow(non_camel_case_types)]
-pub type _cost = CostManager;
-
 #[derive(Clone)]
 pub struct CostManager {
     state: Arc<Mutex<Cost>>,

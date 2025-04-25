@@ -1,7 +1,7 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/HasCost.scala
 
-use super::_cost;
+use super::CostManager;
 
 pub trait HasCost {
-    fn cost(&self) -> &_cost;
+    fn cost(&self) -> &CostManager;
 }

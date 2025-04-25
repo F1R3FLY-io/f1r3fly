@@ -40,7 +40,7 @@ use crate::rho_type::RhoTuple2;
 use crate::utils::GeneratedMessage;
 use models::rhoapi::Par;
 
-use super::accounting::_cost;
+use super::accounting::CostManager;
 use super::accounting::costs::{
     boolean_and_cost, boolean_or_cost, byte_array_append_cost, comparison_cost, division_cost,
     equality_check_cost, list_append_cost, method_call_cost, modulo_cost, multiplication_cost,
@@ -65,7 +65,7 @@ pub struct DebruijnInterpreter {
     pub urn_map: HashMap<String, Par>,
     pub merge_chs: Arc<RwLock<HashSet<Par>>>,
     pub mergeable_tag_name: Par,
-    pub cost: _cost,
+    pub cost_manager: CostManager,
     pub substitute: Substitute,
 }
 
@@ -514,7 +514,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {
-        self.cost.charge(send_eval_cost())?;
+        self.cost_manager.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
         let unbundled = match single_bundle(&sub_chan) {
@@ -559,7 +559,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {
-        self.cost.charge(receive_eval_cost())?;
+        self.cost_manager.charge(receive_eval_cost())?;
         let binds = receive
             .binds
             .clone()
@@ -613,7 +613,7 @@ impl DebruijnInterpreter {
      *                  an exception.
      */
     fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
-        self.cost.charge(var_eval_cost())?;
+        self.cost_manager.charge(var_eval_cost())?;
         // println!("\nenv in eval_var: {:?}", env);
         match valproc.var_instance {
             Some(VarInstance::BoundVar(level)) => match env.get(&level) {
@@ -697,7 +697,7 @@ impl DebruijnInterpreter {
             },
         );
 
-        self.cost.charge(match_eval_cost())?;
+        self.cost_manager.charge(match_eval_cost())?;
         let evaled_target = self.eval_expr(&mat.target.as_ref().unwrap(), env)?;
         let subst_target = self
             .substitute
@@ -794,7 +794,8 @@ impl DebruijnInterpreter {
             })
         };
 
-        self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
+        self.cost_manager
+            .charge(new_bindings_cost(new.bind_count as i64))?;
         match alloc(new.bind_count as usize, new.uri.clone()) {
             Ok(env) => {
                 self.eval(unwrap_option_safe(new.p.clone())?, &env, rand)
@@ -849,7 +850,7 @@ impl DebruijnInterpreter {
                 Ok(evaled_p)
             }
             ExprInstance::EMethodBody(emethod) => {
-                self.cost.charge(method_call_cost())?;
+                self.cost_manager.charge(method_call_cost())?;
                 let evaled_target = self.eval_expr(&unwrap_option_safe(emethod.target)?, env)?;
                 let evaled_args: Vec<Par> = emethod
                     .arguments
@@ -944,7 +945,7 @@ impl DebruijnInterpreter {
                 ExprInstance::EMultBody(EMult { p1, p2 }) => {
                     let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(multiplication_cost())?;
+                    self.cost_manager.charge(multiplication_cost())?;
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GInt(v1 * v2)),
                     })
@@ -953,7 +954,7 @@ impl DebruijnInterpreter {
                 ExprInstance::EDivBody(EDiv { p1, p2 }) => {
                     let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(division_cost())?;
+                    self.cost_manager.charge(division_cost())?;
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GInt(v1 / v2)),
                     })
@@ -962,7 +963,7 @@ impl DebruijnInterpreter {
                 ExprInstance::EModBody(EMod { p1, p2 }) => {
                     let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(modulo_cost())?;
+                    self.cost_manager.charge(modulo_cost())?;
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GInt(v1 % v2)),
                     })
@@ -974,14 +975,14 @@ impl DebruijnInterpreter {
 
                     match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
                         (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
-                            self.cost.charge(sum_cost())?;
+                            self.cost_manager.charge(sum_cost())?;
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::GInt(lhs.wrapping_add(rhs))),
                             })
                         }
 
                         (ExprInstance::ESetBody(lhs), rhs) => {
-                            self.cost.charge(op_call_cost())?;
+                            self.cost_manager.charge(op_call_cost())?;
                             let result_par = self.add_method().apply(
                                 Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::ESetBody(lhs)),
@@ -1017,14 +1018,14 @@ impl DebruijnInterpreter {
 
                     match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
                         (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
-                            self.cost.charge(subtraction_cost())?;
+                            self.cost_manager.charge(subtraction_cost())?;
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::GInt(lhs - rhs)),
                             })
                         }
 
                         (ExprInstance::EMapBody(lhs), rhs) => {
-                            self.cost.charge(op_call_cost())?;
+                            self.cost_manager.charge(op_call_cost())?;
                             let result_par = self.delete_method().apply(
                                 Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::EMapBody(lhs)),
@@ -1040,7 +1041,7 @@ impl DebruijnInterpreter {
                         }
 
                         (ExprInstance::ESetBody(lhs), rhs) => {
-                            self.cost.charge(op_call_cost())?;
+                            self.cost_manager.charge(op_call_cost())?;
                             let result_par = self.delete_method().apply(
                                 Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::ESetBody(lhs)),
@@ -1071,7 +1072,7 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::ELtBody(ELt { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
+                    self.cost_manager.charge(comparison_cost())?;
                     relop(
                         &p1.clone().unwrap(),
                         &p2.clone().unwrap(),
@@ -1082,7 +1083,7 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::ELteBody(ELte { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
+                    self.cost_manager.charge(comparison_cost())?;
                     relop(
                         &p1.clone().unwrap(),
                         &p2.clone().unwrap(),
@@ -1093,7 +1094,7 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::EGtBody(EGt { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
+                    self.cost_manager.charge(comparison_cost())?;
                     relop(
                         &p1.clone().unwrap(),
                         &p2.clone().unwrap(),
@@ -1104,7 +1105,7 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::EGteBody(EGte { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
+                    self.cost_manager.charge(comparison_cost())?;
                     relop(
                         &p1.clone().unwrap(),
                         &p2.clone().unwrap(),
@@ -1120,7 +1121,7 @@ impl DebruijnInterpreter {
                     // TODO: build an equality operator that takes in an environment. - OLD
                     let sv1 = self.substitute.substitute_and_charge(&v1, 0, env)?;
                     let sv2 = self.substitute.substitute_and_charge(&v2, 0, env)?;
-                    self.cost.charge(equality_check_cost(&sv1, &sv2))?;
+                    self.cost_manager.charge(equality_check_cost(&sv1, &sv2))?;
 
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GBool(sv1 == sv2)),
@@ -1132,7 +1133,7 @@ impl DebruijnInterpreter {
                     let v2 = self.eval_expr(&p2.clone().unwrap(), env)?;
                     let sv1 = self.substitute.substitute_and_charge(&v1, 0, env)?;
                     let sv2 = self.substitute.substitute_and_charge(&v2, 0, env)?;
-                    self.cost.charge(equality_check_cost(&sv1, &sv2))?;
+                    self.cost_manager.charge(equality_check_cost(&sv1, &sv2))?;
 
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GBool(sv1 != sv2)),
@@ -1142,7 +1143,7 @@ impl DebruijnInterpreter {
                 ExprInstance::EAndBody(EAnd { p1, p2 }) => {
                     let b1 = self.eval_to_bool(&p1.clone().unwrap(), env)?;
                     let b2 = self.eval_to_bool(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(boolean_and_cost())?;
+                    self.cost_manager.charge(boolean_and_cost())?;
 
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GBool(b1 && b2)),
@@ -1152,7 +1153,7 @@ impl DebruijnInterpreter {
                 ExprInstance::EOrBody(EOr { p1, p2 }) => {
                     let b1 = self.eval_to_bool(&p1.clone().unwrap(), env)?;
                     let b2 = self.eval_to_bool(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(boolean_or_cost())?;
+                    self.cost_manager.charge(boolean_or_cost())?;
 
                     Ok(Expr {
                         expr_instance: Some(ExprInstance::GBool(b1 || b2)),
@@ -1245,7 +1246,7 @@ impl DebruijnInterpreter {
                         result
                     }
 
-                    self.cost.charge(op_call_cost())?;
+                    self.cost_manager.charge(op_call_cost())?;
                     let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
 
@@ -1264,7 +1265,7 @@ impl DebruijnInterpreter {
                                     })
                                     .collect::<Result<Vec<_>, InterpreterError>>()?;
 
-                                self.cost.charge(interpolate_cost(
+                                self.cost_manager.charge(interpolate_cost(
                                     lhs.len() as i64,
                                     rhs.length() as i64,
                                 ))?;
@@ -1298,13 +1299,13 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::EPlusPlusBody(EPlusPlus { p1, p2 }) => {
-                    self.cost.charge(op_call_cost())?;
+                    self.cost_manager.charge(op_call_cost())?;
                     let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
 
                     match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
                         (ExprInstance::GString(lhs), ExprInstance::GString(rhs)) => {
-                            self.cost
+                            self.cost_manager
                                 .charge(string_append_cost(lhs.len() as i64, rhs.len() as i64))?;
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::GString(lhs + &rhs)),
@@ -1312,7 +1313,8 @@ impl DebruijnInterpreter {
                         }
 
                         (ExprInstance::GByteArray(lhs), ExprInstance::GByteArray(rhs)) => {
-                            self.cost.charge(byte_array_append_cost(lhs.clone()))?;
+                            self.cost_manager
+                                .charge(byte_array_append_cost(lhs.clone()))?;
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::GByteArray(
                                     lhs.into_iter().chain(rhs.into_iter()).collect(),
@@ -1321,7 +1323,7 @@ impl DebruijnInterpreter {
                         }
 
                         (ExprInstance::EListBody(lhs), ExprInstance::EListBody(rhs)) => {
-                            self.cost.charge(list_append_cost(lhs.clone().ps))?;
+                            self.cost_manager.charge(list_append_cost(lhs.clone().ps))?;
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::EListBody(EList {
                                     ps: lhs.ps.into_iter().chain(rhs.ps.into_iter()).collect(),
@@ -1400,7 +1402,7 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::EMinusMinusBody(EMinusMinus { p1, p2 }) => {
-                    self.cost.charge(op_call_cost())?;
+                    self.cost_manager.charge(op_call_cost())?;
                     let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
                     let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
 
@@ -1538,7 +1540,7 @@ impl DebruijnInterpreter {
                     arguments,
                     ..
                 }) => {
-                    self.cost.charge(method_call_cost())?;
+                    self.cost_manager.charge(method_call_cost())?;
                     let evaled_target = self.eval_expr(&target.as_ref().unwrap(), env)?;
                     let evaled_args = arguments
                         .iter()
@@ -1601,7 +1603,7 @@ impl DebruijnInterpreter {
                     });
                 }
 
-                self.outer.cost.charge(nth_method_call_cost())?;
+                self.outer.cost_manager.charge(nth_method_call_cost())?;
                 let nth = self.outer.eval_to_i64(&args[0], env)? as usize;
                 let v = self.outer.eval_single_expr(&p, env)?;
 
@@ -1673,7 +1675,9 @@ impl DebruijnInterpreter {
 
                 // println!("\nexpr_subst in to_byte_array_method: {:?}", expr_subst);
 
-                self.outer.cost.charge(to_byte_array_cost(&expr_subst))?;
+                self.outer
+                    .cost_manager
+                    .charge(to_byte_array_cost(&expr_subst))?;
                 let ba = self.serialize(&expr_subst)?;
 
                 Ok(Par::default().with_exprs(vec![Expr {
@@ -1707,7 +1711,9 @@ impl DebruijnInterpreter {
                     match single_expr(&p) {
                         Some(expr) => match unwrap_option_safe(expr.expr_instance)? {
                             ExprInstance::GString(encoded) => {
-                                self.outer.cost.charge(hex_to_bytes_cost(&encoded))?;
+                                self.outer
+                                    .cost_manager
+                                    .charge(hex_to_bytes_cost(&encoded))?;
                                 Ok(Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::GByteArray(
                                         StringOps::unsafe_decode_hex(encoded),
@@ -1754,7 +1760,7 @@ impl DebruijnInterpreter {
                     match single_expr(&p) {
                         Some(expr) => match expr.expr_instance.unwrap() {
                             ExprInstance::GByteArray(bytes) => {
-                                self.outer.cost.charge(bytes_to_hex_cost(&bytes))?;
+                                self.outer.cost_manager.charge(bytes_to_hex_cost(&bytes))?;
 
                                 let str =
                                     bytes.iter().map(|byte| format!("{:02x}", byte)).collect();
@@ -1801,7 +1807,9 @@ impl DebruijnInterpreter {
                     match single_expr(&p) {
                         Some(expr) => match expr.expr_instance.unwrap() {
                             ExprInstance::GString(utf8_string) => {
-                                self.outer.cost.charge(hex_to_bytes_cost(&utf8_string))?;
+                                self.outer
+                                    .cost_manager
+                                    .charge(hex_to_bytes_cost(&utf8_string))?;
 
                                 Ok(Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(ExprInstance::GByteArray(
@@ -1846,7 +1854,7 @@ impl DebruijnInterpreter {
                         let other_ps = other_par_set.ps;
 
                         self.outer
-                            .cost
+                            .cost_manager
                             .charge(union_cost(other_ps.length() as i64))?;
 
                         Ok(Expr {
@@ -1873,7 +1881,7 @@ impl DebruijnInterpreter {
                         let other_sorted_par_map = other_par_map.ps;
 
                         self.outer
-                            .cost
+                            .cost_manager
                             .charge(union_cost(other_map.kvs.len() as i64))?;
 
                         Ok(Expr {
@@ -1945,7 +1953,7 @@ impl DebruijnInterpreter {
                         // diff is implemented in terms of foldLeft that at each step
                         // removes one element from the collection.
                         self.outer
-                            .cost
+                            .cost_manager
                             .charge(diff_cost(other_ps.length() as i64))?;
 
                         let base_sorted_pars_set: HashSet<Par> =
@@ -1975,7 +1983,7 @@ impl DebruijnInterpreter {
                         let other_ps = other_par_map.ps;
 
                         self.outer
-                            .cost
+                            .cost_manager
                             .charge(diff_cost(other_ps.length() as i64))?;
 
                         let new_par_map = ParMap::create_from_sorted_par_map(
@@ -2078,7 +2086,7 @@ impl DebruijnInterpreter {
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let element = self.outer.eval_expr(&args[0], env)?;
-                    self.outer.cost.charge(add_cost())?;
+                    self.outer.cost_manager.charge(add_cost())?;
                     let result = self.add(base_expr, element)?;
                     Ok(Par::default().with_exprs(vec![result]))
                 }
@@ -2162,7 +2170,7 @@ impl DebruijnInterpreter {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let element = self.outer.eval_expr(&args[0], env)?;
                     //TODO(mateusz.gorski): think whether deletion of an element from the collection should dependent on the collection type/size - OLD
-                    self.outer.cost.charge(remove_cost())?;
+                    self.outer.cost_manager.charge(remove_cost())?;
                     let result = self.delete(base_expr, element)?;
                     Ok(Par::default().with_exprs(vec![result]))
                 }
@@ -2227,7 +2235,7 @@ impl DebruijnInterpreter {
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let element = self.outer.eval_expr(&args[0], env)?;
-                    self.outer.cost.charge(lookup_cost())?;
+                    self.outer.cost_manager.charge(lookup_cost())?;
                     let result = self.contains(base_expr, element)?;
                     Ok(Par::default().with_exprs(vec![result]))
                 }
@@ -2281,7 +2289,7 @@ impl DebruijnInterpreter {
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let key = self.outer.eval_expr(&args[0], env)?;
-                    self.outer.cost.charge(lookup_cost())?;
+                    self.outer.cost_manager.charge(lookup_cost())?;
                     let result = self.get(base_expr, key)?;
                     Ok(result)
                 }
@@ -2341,7 +2349,7 @@ impl DebruijnInterpreter {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let key = self.outer.eval_expr(&args[0], env)?;
                     let default = self.outer.eval_expr(&args[1], env)?;
-                    self.outer.cost.charge(lookup_cost())?;
+                    self.outer.cost_manager.charge(lookup_cost())?;
                     let result = self.get_or_else(base_expr, key, default)?;
                     Ok(result)
                 }
@@ -2407,7 +2415,7 @@ impl DebruijnInterpreter {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let key = self.outer.eval_expr(&args[0], env)?;
                     let value = self.outer.eval_expr(&args[1], env)?;
-                    self.outer.cost.charge(add_cost())?;
+                    self.outer.cost_manager.charge(add_cost())?;
                     let result = self.set(base_expr, key, value)?;
                     Ok(result)
                 }
@@ -2466,7 +2474,7 @@ impl DebruijnInterpreter {
                     });
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
-                    self.outer.cost.charge(keys_method_cost())?;
+                    self.outer.cost_manager.charge(keys_method_cost())?;
                     let result = self.keys(base_expr)?;
                     Ok(result)
                 }
@@ -2529,7 +2537,7 @@ impl DebruijnInterpreter {
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let result = self.size(base_expr)?;
-                    self.outer.cost.charge(size_method_cost(result.0))?;
+                    self.outer.cost_manager.charge(size_method_cost(result.0))?;
                     Ok(result.1)
                 }
             }
@@ -2582,7 +2590,7 @@ impl DebruijnInterpreter {
                     });
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
-                    self.outer.cost.charge(length_method_cost())?;
+                    self.outer.cost_manager.charge(length_method_cost())?;
                     let result = self.length(base_expr)?;
                     Ok(Par::default().with_exprs(vec![result]))
                 }
@@ -2672,7 +2680,7 @@ impl DebruijnInterpreter {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let from_arg = self.outer.eval_to_i64(&args[0], env)?;
                     let to_arg = self.outer.eval_to_i64(&args[1], env)?;
-                    self.outer.cost.charge(slice_cost(to_arg))?;
+                    self.outer.cost_manager.charge(slice_cost(to_arg))?;
                     let result = self.slice(
                         base_expr,
                         if from_arg > 0 { from_arg as usize } else { 0 },
@@ -2734,7 +2742,7 @@ impl DebruijnInterpreter {
                 } else {
                     let base_expr = self.outer.eval_single_expr(&p, env)?;
                     let n_arg = self.outer.eval_to_i64(&args[0], env)?;
-                    self.outer.cost.charge(take_cost(n_arg))?;
+                    self.outer.cost_manager.charge(take_cost(n_arg))?;
                     let result = self.take(base_expr, n_arg as usize)?;
                     Ok(result)
                 }
@@ -2761,7 +2769,9 @@ impl DebruijnInterpreter {
 
                         ExprInstance::ESetBody(eset) => {
                             let ps = ParSetTypeMapper::eset_to_par_set(eset).ps;
-                            self.outer.cost.charge(to_list_cost(ps.length() as i64))?;
+                            self.outer
+                                .cost_manager
+                                .charge(to_list_cost(ps.length() as i64))?;
 
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::EListBody(EList {
@@ -2775,7 +2785,9 @@ impl DebruijnInterpreter {
 
                         ExprInstance::EMapBody(emap) => {
                             let ps = ParMapTypeMapper::emap_to_par_map(emap).ps;
-                            self.outer.cost.charge(to_list_cost(ps.length() as i64))?;
+                            self.outer
+                                .cost_manager
+                                .charge(to_list_cost(ps.length() as i64))?;
 
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::EListBody(EList {
@@ -2803,7 +2815,9 @@ impl DebruijnInterpreter {
 
                         ExprInstance::ETupleBody(etuple) => {
                             let ps = etuple.ps;
-                            self.outer.cost.charge(to_list_cost(ps.len() as i64))?;
+                            self.outer
+                                .cost_manager
+                                .charge(to_list_cost(ps.len() as i64))?;
 
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::EListBody(EList {
@@ -3312,7 +3326,7 @@ impl DebruijnInterpreter {
         urn_map: HashMap<String, Par>,
         merge_chs: Arc<RwLock<HashSet<Par>>>,
         mergeable_tag_name: Par,
-        cost: _cost,
+        cost: CostManager,
     ) -> Self {
         let dispatcher = Arc::new(RwLock::new(RholangAndScalaDispatcher {
             _dispatch_table: Arc::new(RwLock::new(HashMap::new())),
@@ -3325,7 +3339,7 @@ impl DebruijnInterpreter {
             urn_map,
             merge_chs,
             mergeable_tag_name,
-            cost: cost.clone(),
+            cost_manager: cost.clone(),
             substitute: Substitute { cost: cost.clone() },
         };
 

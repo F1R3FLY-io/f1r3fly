@@ -1169,13 +1169,7 @@ extern "C" fn create_runtime(
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let rho_runtime = tokio_runtime.block_on(async {
-        crate::rho_runtime::create_runtime(
-            rspace,
-            init_registry,
-            mergeable_tag_name,
-            &mut Vec::new(),
-        )
-        .await
+        crate::rho_runtime::create_runtime(rspace, init_registry, mergeable_tag_name).await
     });
 
     Box::into_raw(Box::new(SharedRhoRuntime {
@@ -1199,13 +1193,7 @@ extern "C" fn create_replay_runtime(
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let rho_runtime = tokio_runtime.block_on(async {
-        crate::rho_runtime::create_runtime(
-            rspace,
-            init_registry,
-            mergeable_tag_name,
-            &mut Vec::new(),
-        )
-        .await
+        crate::rho_runtime::create_runtime(rspace, init_registry, mergeable_tag_name).await
     });
 
     Box::into_raw(Box::new(ReplayRhoRuntime {

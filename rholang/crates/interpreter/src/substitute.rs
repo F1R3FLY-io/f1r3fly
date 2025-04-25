@@ -24,7 +24,7 @@ use models::rust::sorted_par_hash_set::SortedParHashSet;
 use models::rust::sorted_par_map::SortedParMap;
 use rspace_plus_plus::rspace::history::Either;
 
-use super::accounting::_cost;
+use super::accounting::CostManager;
 use super::accounting::costs::Cost;
 use super::env::Env;
 use super::errors::InterpreterError;
@@ -44,7 +44,7 @@ pub trait SubstituteTrait<A> {
 
 #[derive(Clone)]
 pub struct Substitute {
-    pub cost: _cost,
+    pub cost: CostManager,
 }
 
 impl Substitute {

@@ -1,10 +1,4 @@
-use models::{
-    rhoapi::{
-        tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
-        TaggedContinuation,
-    },
-    ByteString,
-};
+use models::ByteString;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
 
@@ -53,6 +47,7 @@ impl Cost {
         Cost { value, operation }
     }
 
+    #[deprecated(reason = "Use ::from instead")]
     pub fn create_from_cost(cost: Cost) -> Cost {
         Cost {
             value: cost.value,
