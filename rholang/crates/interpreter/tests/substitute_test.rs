@@ -5,18 +5,18 @@ use std::collections::BTreeMap;
 use models::{
     create_bit_vector,
     rhoapi::{
-        connective::ConnectiveInstance, expr::ExprInstance, var::VarInstance, Bundle, Connective,
-        ConnectiveBody, EMinusMinus, EPercentPercent, EPlusPlus, Expr, Match, MatchCase, New, Par,
-        Send, Var, VarRef,
+        Bundle, Connective, ConnectiveBody, EMinusMinus, EPercentPercent, EPlusPlus, Expr, Match,
+        MatchCase, New, Par, Send, Var, VarRef, connective::ConnectiveInstance, expr::ExprInstance,
+        var::VarInstance,
     },
     rust::{
         rholang::implicits::GPrivateBuilder,
         utils::{new_boundvar_par, new_freevar_var, new_gstring_par},
     },
 };
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{Rng, seq::SliceRandom, thread_rng};
 use rholang::rust::interpreter::{
-    accounting::{costs::Cost, CostManager},
+    accounting::{CostManager, costs::Cost},
     env::Env,
     substitute::{Substitute, SubstituteTrait},
     util::prepend_connective,

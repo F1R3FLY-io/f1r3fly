@@ -5,7 +5,7 @@ use rholang::rust::interpreter::{
     accounting::costs::Cost,
     interpreter::EvaluateResult,
     matcher::r#match::Matcher,
-    rho_runtime::{create_rho_runtime, RhoRuntime},
+    rho_runtime::{RhoRuntime, create_rho_runtime},
 };
 use rspace_plus_plus::rspace::{
     rspace::RSpace,

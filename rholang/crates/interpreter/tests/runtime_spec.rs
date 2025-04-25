@@ -10,7 +10,7 @@ use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rholang::rust::interpreter::{
     accounting::costs::Cost,
     matcher::r#match::Matcher,
-    rho_runtime::{bootstrap_registry, create_rho_runtime, RhoRuntime, RhoRuntimeImpl},
+    rho_runtime::{RhoRuntime, RhoRuntimeImpl, bootstrap_registry, create_rho_runtime},
 };
 use rspace_plus_plus::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,

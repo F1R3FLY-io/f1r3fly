@@ -537,8 +537,8 @@ fn matching_that_requires_revision_of_prior_matches_should_work_with_remainders(
 }
 
 #[test]
-fn matching_that_requires_revision_of_prior_matches_should_work_despite_having_other_terms_in_the_same_list(
-) {
+fn matching_that_requires_revision_of_prior_matches_should_work_despite_having_other_terms_in_the_same_list()
+ {
     let pattern: Par = prepend_expr(
         new_elist_par(
             vec![
@@ -777,8 +777,8 @@ fn matching_send_with_free_variable_in_channel_and_variable_position_should_capt
 }
 
 #[test]
-fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in_the_body_should_capture_for_both_variables(
-) {
+fn matching_a_receive_with_a_free_variable_in_the_channel_and_a_free_variable_in_the_body_should_capture_for_both_variables()
+ {
     let target: Par = new_receive_par(
         vec![
             ReceiveBind {
@@ -1192,12 +1192,14 @@ fn matching_sets_should_work_with_wildcard_remainders() {
         true,
     );
 
-    assert!(assert_spatial_match(
-        target.clone(),
-        all_elements_and_wildcard,
-        Some(BTreeMap::new())
-    )
-    .is_ok());
+    assert!(
+        assert_spatial_match(
+            target.clone(),
+            all_elements_and_wildcard,
+            Some(BTreeMap::new())
+        )
+        .is_ok()
+    );
 
     let just_wildcard = new_eset_par(
         Vec::new(),
@@ -1270,15 +1272,17 @@ fn matching_sets_should_work_with_var_remainders() {
         true,
     );
 
-    assert!(assert_spatial_match(
-        target.clone(),
-        all_elements_and_remainder,
-        Some(BTreeMap::from([(
-            0,
-            new_eset_par(vec![], Vec::new(), false, None, Vec::new(), false)
-        )]))
-    )
-    .is_ok());
+    assert!(
+        assert_spatial_match(
+            target.clone(),
+            all_elements_and_remainder,
+            Some(BTreeMap::from([(
+                0,
+                new_eset_par(vec![], Vec::new(), false, None, Vec::new(), false)
+            )]))
+        )
+        .is_ok()
+    );
 
     let just_remainder = new_eset_par(
         Vec::new(),
@@ -1289,15 +1293,17 @@ fn matching_sets_should_work_with_var_remainders() {
         true,
     );
 
-    assert!(assert_spatial_match(
-        target,
-        just_remainder,
-        Some(BTreeMap::from([(
-            0,
-            new_eset_par(target_elements, Vec::new(), false, None, Vec::new(), false)
-        )]))
-    )
-    .is_ok());
+    assert!(
+        assert_spatial_match(
+            target,
+            just_remainder,
+            Some(BTreeMap::from([(
+                0,
+                new_eset_par(target_elements, Vec::new(), false, None, Vec::new(), false)
+            )]))
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -1461,12 +1467,14 @@ fn matching_maps_should_work_with_wildcard_remainders() {
         true,
     );
 
-    assert!(assert_spatial_match(
-        target.clone(),
-        all_elements_and_wildcard,
-        Some(BTreeMap::new())
-    )
-    .is_ok());
+    assert!(
+        assert_spatial_match(
+            target.clone(),
+            all_elements_and_wildcard,
+            Some(BTreeMap::new())
+        )
+        .is_ok()
+    );
 
     let just_wildcard = new_emap_par(vec![], vec![], true, Some(new_wildcard_var()), vec![], true);
 
@@ -1549,12 +1557,14 @@ fn matching_maps_should_work_with_var_remainders() {
         0,
         new_emap_par(vec![], Vec::new(), false, None, Vec::new(), false),
     )]);
-    assert!(assert_spatial_match(
-        target.clone(),
-        all_elements_and_remainder,
-        Some(expected_captures)
-    )
-    .is_ok());
+    assert!(
+        assert_spatial_match(
+            target.clone(),
+            all_elements_and_remainder,
+            Some(expected_captures)
+        )
+        .is_ok()
+    );
 
     let just_remainder = new_emap_par(vec![], vec![], true, Some(new_freevar_var(0)), vec![], true);
 
