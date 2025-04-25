@@ -13,6 +13,10 @@ services:
         "run",
         "--host=$BOOTSTRAP_HOST",
         "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
+        "-J-Xms6G",
+        "-J-Xmx8G",
+        "-J-Xss256m",
+        "-J-XX:MaxMetaspaceSize=3G"
       ]
     ports:
       - 40400:40400
@@ -35,6 +39,10 @@ services:
         "run",
         "--host=$VALIDATOR1_HOST",
         "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
+        "-J-Xms6G",
+        "-J-Xmx8G",
+        "-J-Xss256m",
+        "-J-XX:MaxMetaspaceSize=3G",
       ]
     ports:
       - 50400:40400
@@ -57,6 +65,10 @@ services:
         "run",
         "--host=$VALIDATOR2_HOST",
         "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
+        "-J-Xms6G",
+        "-J-Xmx8G",
+        "-J-Xss256m",
+        "-J-XX:MaxMetaspaceSize=3G",
       ]
     ports:
       - 60400:40400
@@ -79,6 +91,10 @@ services:
         "run",
         "--host=$VALIDATOR3_HOST",
         "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
+        "-J-Xms6G",
+        "-J-Xmx8G",
+        "-J-Xss256m",
+        "-J-XX:MaxMetaspaceSize=3G",
       ]
     ports:
       - 60500:40400

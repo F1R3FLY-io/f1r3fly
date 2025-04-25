@@ -451,7 +451,7 @@ lazy val node = (project in file("node"))
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-J-Xms4G -J-Xmx6G -J-Xss128m -J-XX:MaxMetaspaceSize=2G"
+      "-J-Xms6G -J-Xmx8G -J-Xss256m -J-XX:MaxMetaspaceSize=3G"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
