@@ -2,8 +2,9 @@ use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
 
 // See crypto/src/main/scala/coop/rchain/crypto/PublicKey.scala
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PublicKey {
+    #[serde(with = "shared::rust::serde_bytes")]
     pub bytes: prost::bytes::Bytes,
 }
 

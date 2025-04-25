@@ -7,10 +7,11 @@ use crate::rust::{
 use super::{secp256k1_eth::Secp256k1Eth, signatures_alg::SignaturesAlg};
 
 // See crypto/src/main/scala/coop/rchain/crypto/signatures/Signed.scala
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Signed<A> {
     pub data: A,
     pub pk: PublicKey,
+    #[serde(with = "shared::rust::serde_bytes")]
     pub sig: prost::bytes::Bytes,
     pub sig_algorithm: Box<dyn SignaturesAlg>,
 }

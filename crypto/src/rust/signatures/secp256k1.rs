@@ -72,6 +72,10 @@ impl SignaturesAlg for Secp256k1 {
     fn eq(&self, other: &dyn SignaturesAlg) -> bool {
         self.name() == other.name()
     }
+
+    fn box_clone(&self) -> Box<dyn SignaturesAlg> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]

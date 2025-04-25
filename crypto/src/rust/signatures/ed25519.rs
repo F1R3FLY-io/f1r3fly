@@ -64,6 +64,10 @@ impl SignaturesAlg for Ed25519 {
     fn eq(&self, other: &dyn SignaturesAlg) -> bool {
         self.name() == other.name()
     }
+
+    fn box_clone(&self) -> Box<dyn SignaturesAlg> {
+        Box::new(self.clone())
+    }
 }
 
 fn parse_public_key(pub_key: &[u8]) -> Result<VerifyingKey, &'static str> {

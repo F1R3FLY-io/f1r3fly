@@ -50,6 +50,10 @@ impl SignaturesAlg for Secp256k1Eth {
     fn eq(&self, other: &dyn SignaturesAlg) -> bool {
         self.name() == other.name()
     }
+
+    fn box_clone(&self) -> Box<dyn SignaturesAlg> {
+        Box::new(self.clone())
+    }
 }
 
 fn encode_signature_rs_to_der(signature_rs: &[u8]) -> Result<Vec<u8>, &'static str> {
