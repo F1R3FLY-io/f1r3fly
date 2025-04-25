@@ -1,12 +1,8 @@
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, HashMap},
-};
+use std::cmp::Ordering;
 
-use bitvec::{order::Msb0, slice::BitSlice, vec::BitVec};
+use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
 use models::rhoapi::{EMinusMinus, EMod, EPercentPercent, EPlusPlus};
-use prost::bytes;
 
 use super::{sort_matcher::Sortable, sorter::*};
 
@@ -118,7 +114,7 @@ impl Par {
     }
 
     pub fn push_expr(&mut self, e: Expr, depth: u32) {
-        union_inplace(&mut self.locally_free, e.locally_free(depth));
+        union_inplace(&mut self.locally_free, &e.locally_free(depth));
         self.connective_used = self.connective_used || e.connective_used();
         self.exprs.push(e);
     }
@@ -142,7 +138,7 @@ impl Par {
     }
 
     pub fn push_send(&mut self, s: Send) {
-        union_inplace(&mut self.locally_free, &s.locally_free);
+        union_inplace(&mut self.locally_free, &s.locally_free[..]);
         self.connective_used = self.connective_used || s.connective_used;
         self.sends.push(s);
     }
@@ -370,7 +366,7 @@ pub struct Send {
     pub chan: Par,
     pub data: Vec<Par>,
     pub persistent: bool,
-    pub locally_free: BitVec<u8, Msb0>,
+    pub locally_free: BitVec,
     pub connective_used: bool,
 }
 
@@ -380,7 +376,9 @@ impl From<models::rhoapi::Send> for Send {
             chan: send.chan.map(Into::into).unwrap(),
             data: send.data.into_iter().map(Into::into).collect(),
             persistent: send.persistent,
-            locally_free: BitVec::<u8, Msb0>::from_vec(send.locally_free),
+            locally_free: BitVec::<_, Lsb0>::from_iter(
+                send.locally_free.into_iter().map(|v| v as usize),
+            ),
             connective_used: send.connective_used.into(),
         }
     }
@@ -1082,7 +1080,7 @@ impl Ord for GUnforgeable {
 
 // helper functions
 #[inline]
-pub(crate) fn union_inplace(this: &mut BitVec, that: impl AsRef<BitSlice>) {
+pub(crate) fn union_inplace(this: &mut BitVec, that: &BitSlice) {
     let that_slice = that.as_ref();
     if that_slice.len() == 0 {
         return;
