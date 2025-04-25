@@ -1100,177 +1100,212 @@ impl PrettyPrinter {
 // rholang/src/test/scala/coop/rchain/rholang/interpreter/PrettyPrinterTest.scala
 #[cfg(test)]
 mod tests {
-    use crate::rust::interpreter::compiler::normalize::{normalize_match_proc, ProcVisitOutputs};
-    use crate::rust::interpreter::compiler::normalizer::ground_normalize_matcher::normalize_ground;
-    use crate::rust::interpreter::compiler::rholang_ast::{Collection, Eval, KeyValuePair, Proc};
-    use crate::rust::interpreter::errors::InterpreterError;
+    use crate::rust::interpreter::compiler::rholang_ast::{
+        KeyValuePair, Proc, Var, ProcRemainder, Uri, Collection
+    };
+    use crate::rust::interpreter::compiler::source_position::SourcePosition;
+    use crate::rust::interpreter::test_utils::utils::{
+        defaults, test, test_normalize_match_proc
+    };
     use crate::rust::interpreter::pretty_printer::PrettyPrinter;
-    use crate::rust::interpreter::test_utils::utils::collection_proc_visit_inputs_and_env;
-    use pretty_assertions;
+    use pretty_assertions::assert_eq;
+
+    // Custom test function for ground expressions
+    fn test_ground_expression(proc: &Proc, expected: &str) {
+        test_normalize_match_proc(
+            proc,
+            defaults(),
+            test("should pretty print correctly", |actual_par, free_map| {
+                let mut printer = PrettyPrinter::new();
+                let printed = printer.build_string_from_message(actual_par);
+                assert_eq!(printed, expected);
+                assert!(free_map.is_empty(), "Expected free map to be empty");
+            })
+        );
+    }
+
+    // Helper function to test collections with PrettyPrinter
+    fn test_pretty_print(proc: &Proc, bound_shift: i32, expected: &str) {
+        test_normalize_match_proc(
+            proc,
+            defaults(),
+            test("should pretty print correctly",|actual_par, _| {
+                let mut printer = PrettyPrinter::create(0, bound_shift);
+                let printed = printer.build_string_from_message(actual_par);
+                assert_eq!(printed, expected);
+            })
+        );
+    }
+
+    fn create_remainder(name: &str, pos: SourcePosition) -> ProcRemainder {
+        ProcRemainder {
+            var: Var::new_id(name, pos),
+            pos,
+        }
+    }
 
     //ground tests
     #[test]
     fn bool_true_should_print_as_true() {
-        let proc = Proc::new_proc_bool(true);
-        let expr = normalize_ground(&proc).unwrap();
-        let mut printer = PrettyPrinter::new();
-
-        assert_eq!(printer.build_string_from_expr(&expr), "true");
+        test_ground_expression(&Proc::BoolLiteral(true), "true");
     }
 
     #[test]
     fn bool_false_should_print_as_false() {
-        let proc = Proc::new_proc_bool(false);
-        let expr = normalize_ground(&proc).unwrap();
-        let mut printer = PrettyPrinter::new();
-
-        assert_eq!(printer.build_string_from_expr(&expr), "false");
+        test_ground_expression(&Proc::BoolLiteral(false), "false");
     }
 
     #[test]
     fn ground_int_should_print_as_string_int() {
-        let proc = Proc::new_proc_int(7);
-        let expr = normalize_ground(&proc).unwrap();
-        let mut printer = PrettyPrinter::new();
-
-        assert_eq!(printer.build_string_from_expr(&expr), "7".to_string());
+        test_ground_expression(&Proc::LongLiteral(7), "7");
     }
 
     #[test]
     fn ground_string_should_print_as_string() {
-        let proc = Proc::new_proc_string("String".to_string());
-        let expr = normalize_ground(&proc).unwrap();
-        let target: String = "\"String\"".to_string();
-        let mut printer = PrettyPrinter::new();
-
-        assert_eq!(printer.build_string_from_expr(&expr), target);
+        test_ground_expression(&Proc::StringLiteral("String"), "\"String\"");
     }
 
     #[test]
     fn ground_uri_should_print_with_back_ticks() {
-        let proc = Proc::new_proc_uri("Uri".to_string());
-        let expr = normalize_ground(&proc).unwrap();
-        let target: String = "`Uri`".to_string();
-        let mut printer = PrettyPrinter::new();
-
-        assert_eq!(printer.build_string_from_expr(&expr), target);
+        let proc = Proc::UriLiteral(Uri::from("Uri"));
+        test_ground_expression(&proc, "`Uri`");
     }
 
     //collections tests
     #[test]
     fn list_should_print() {
-        let (inputs, env) = collection_proc_visit_inputs_and_env();
-        let proc = Proc::Collection(Collection::List {
-            elements: vec![
-                Proc::new_proc_var("P"),
-                Eval::new_eval_name_var("x"),
-                Proc::new_proc_int(7),
-            ],
-            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
+
+        let int_proc = Proc::LongLiteral(7);
+
+        // Create elements and remainder
+        let elements = vec![
+            p_var.annotate(pos),
+            x_name.annotate(pos),
+            int_proc.annotate(pos),
+        ];
+
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let list_proc = Proc::Collection(Collection::List {
+            elements,
+            cont: Some(remainder),
         });
-
-        let mut printer = PrettyPrinter::create(0, 2);
-        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
-            normalize_match_proc(&proc, inputs.clone(), &env);
-        let normalizer_result_as_par = &normalizer_result.unwrap().par;
-        let result = printer.build_string_from_message(normalizer_result_as_par);
-
-        assert_eq!(result, "[x0, x1, 7...free0]");
+        test_pretty_print(&list_proc, 2, "[x0, x1, 7...free0]");
     }
 
     #[test]
     fn set_should_print() {
-        let (inputs, env) = collection_proc_visit_inputs_and_env();
-        let proc = Proc::Collection(Collection::Set {
-            elements: vec![
-                Proc::new_proc_var("P"),
-                Eval::new_eval_name_var("x"),
-                Proc::new_proc_int(7),
-            ],
-            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
+
+        let int_proc = Proc::LongLiteral(7);
+
+        // Create elements and remainder
+        let elements = vec![
+            p_var.annotate(pos),
+            x_name.annotate(pos),
+            int_proc.annotate(pos),
+        ];
+
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let set_proc = Proc::Collection(Collection::Set {
+            elements,
+            cont: Some(remainder),
         });
-
-        let mut printer = PrettyPrinter::create(0, 2);
-        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
-            normalize_match_proc(&proc, inputs.clone(), &env);
-        let normalizer_result_as_par = &normalizer_result.unwrap().par;
-        let result = printer.build_string_from_message(normalizer_result_as_par);
-
-        assert_eq!(result, "Set(7, x1, x0...free0)");
+        test_pretty_print(&set_proc, 2, "Set(7, x1, x0...free0)");
     }
 
     #[test]
     fn map_should_print() {
-        let (inputs, env) = collection_proc_visit_inputs_and_env();
-        let proc = Proc::Collection(Collection::Map {
-            pairs: vec![
-                KeyValuePair {
-                    key: Proc::new_proc_int(7),
-                    value: Proc::new_proc_string("Seven".to_string()),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                KeyValuePair {
-                    key: Proc::new_proc_var("P"),
-                    value: Eval::new_eval_name_var("x"),
-                    line_num: 0,
-                    col_num: 0,
-                },
-            ],
-            cont: Some(Box::new(Proc::new_proc_var("ignored"))),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition { row: 0, column: 0 };
+        let p_var = Proc::new_var("P", pos);
+        let x_var = Proc::new_var("x", pos);
+        let x_quoted = x_var.quoted();
+        let x_quoted_ann = x_quoted.annotated(pos);
+        let x_name = Proc::Eval { name: x_quoted_ann };
+
+        let int_proc = Proc::LongLiteral(7);
+        let string_proc = Proc::StringLiteral("Seven");
+
+        let pairs = vec![
+            KeyValuePair {
+                key: int_proc.annotate(pos),
+                value: string_proc.annotate(pos),
+            },
+            KeyValuePair {
+                key: p_var.annotate(pos),
+                value: x_name.annotate(pos),
+            },
+        ];
+
+        let remainder = ProcRemainder {
+            var: Var::new_id("ignored", pos),
+            pos,
+        };
+
+        let map_proc = Proc::Collection(Collection::Map {
+            pairs,
+            cont: Some(remainder),
         });
-
-        let mut printer = PrettyPrinter::create(0, 2);
-        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
-            normalize_match_proc(&proc, inputs.clone(), &env);
-        let normalizer_result_as_par = &normalizer_result.unwrap().par;
-        let result = printer.build_string_from_message(normalizer_result_as_par);
-
-        assert_eq!(result, "{7 : \"Seven\", x0 : x1...free0}");
+        test_pretty_print(&map_proc, 2, "{7 : \"Seven\", x0 : x1...free0}");
     }
 
     #[test]
     fn map_should_print_commas_correctly() {
-        let (inputs, env) = collection_proc_visit_inputs_and_env();
-        let proc = Proc::Collection(Collection::Map {
-            pairs: vec![
-                KeyValuePair {
-                    key: Proc::new_proc_string("c".to_string()),
-                    value: Proc::new_proc_int(3),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                KeyValuePair {
-                    key: Proc::new_proc_string("b".to_string()),
-                    value: Proc::new_proc_int(2),
-                    line_num: 0,
-                    col_num: 0,
-                },
-                KeyValuePair {
-                    key: Proc::new_proc_string("a".to_string()),
-                    value: Proc::new_proc_int(1),
-                    line_num: 0,
-                    col_num: 0,
-                },
-            ],
+        let pos = SourcePosition { row: 0, column: 0 };
+        let a_proc = Proc::StringLiteral("a");
+        let b_proc = Proc::StringLiteral("b");
+        let c_proc = Proc::StringLiteral("c");
+
+        let one_proc = Proc::LongLiteral(1);
+        let two_proc = Proc::LongLiteral(2);
+        let three_proc = Proc::LongLiteral(3);
+
+        let pairs = vec![
+            KeyValuePair {
+                key: c_proc.annotate(pos),
+                value: three_proc.annotate(pos),
+            },
+            KeyValuePair {
+                key: b_proc.annotate(pos),
+                value: two_proc.annotate(pos),
+            },
+            KeyValuePair {
+                key: a_proc.annotate(pos),
+                value: one_proc.annotate(pos),
+            },
+        ];
+
+        let map_proc = Proc::Collection(Collection::Map {
+            pairs,
             cont: None,
-            line_num: 0,
-            col_num: 0,
         });
 
-        let mut printer = PrettyPrinter::new();
-        let normalizer_result: Result<ProcVisitOutputs, InterpreterError> =
-            normalize_match_proc(&proc, inputs.clone(), &env);
-        let normalizer_result_as_par = &normalizer_result.unwrap().par;
-        let result = printer.build_string_from_message(normalizer_result_as_par);
-
-        let target = r#"{"a" : 1, "b" : 2, "c" : 3}"#;
-        assert_eq!(result, target);
+        test_normalize_match_proc(
+            &map_proc,
+            defaults(),
+            test("should print commas correctly", |actual_par, _| {
+                let mut printer = PrettyPrinter::new();
+                let printed = printer.build_string_from_message(actual_par);
+                assert_eq!(printed, r#"{"a" : 1, "b" : 2, "c" : 3}"#);
+            })
+        );
     }
 }

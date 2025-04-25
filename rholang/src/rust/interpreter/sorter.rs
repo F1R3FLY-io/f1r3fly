@@ -9,8 +9,8 @@ impl<'a> ParSorter<'a> {
         ParSorter(par)
     }
 
-    pub fn into_score_tree<'b, Builder: ScoreBuilder>(
-        sorted_par: &'b Sorted<Par>,
+    pub fn convert_to_score_tree<Builder: ScoreBuilder>(
+        sorted_par: &Sorted<Par>,
         score: &mut Builder,
     ) {
         let mut holes = Vec::with_capacity(10);
@@ -25,14 +25,14 @@ impl<'a> ParSorter<'a> {
             match holes.pop() {
                 Some(hole) => {
                     score.focus(hole.location);
-                    Self::into_score_tree_inner(hole.par, score, &mut holes);
+                    Self::process_score_tree_node(hole.par, score, &mut holes);
                 }
                 None => break,
             }
         }
     }
 
-    fn into_score_tree_inner<'b, B: ScoreBuilder>(
+    fn process_score_tree_node<'b, B: ScoreBuilder>(
         par: &'b Par,
         score: &mut B,
         holes: &mut Vec<Hole<'b>>,
@@ -693,7 +693,7 @@ impl<'a> SortMatcher for ExprSorter<'a> {
 
                 body.ps.iter().for_each(|(k, v)| {
                     k.graft_into(score);
-                    ParSorter::into_score_tree(v, score)
+                    ParSorter::convert_to_score_tree(v, score)
                 });
                 remainder_score(body.remainder, -1, score);
                 score.leaf_bool(body.connective_used);
