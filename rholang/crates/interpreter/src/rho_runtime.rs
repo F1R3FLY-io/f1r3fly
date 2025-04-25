@@ -67,7 +67,7 @@ pub trait Runtime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError>;
 
@@ -75,7 +75,7 @@ pub trait Runtime: HasCost {
     async fn evaluate_with_env(
         &mut self,
         term: String,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), normalizer_env)
             .await
@@ -102,7 +102,7 @@ pub trait Runtime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
     ) -> Result<EvaluateResult, InterpreterError> {
         let rand = Blake2b512Random::create_from_bytes(&[0; 128]);
         let checkpoint = self.create_soft_checkpoint();
@@ -266,7 +266,7 @@ impl Runtime for RhoRuntime {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         println!(

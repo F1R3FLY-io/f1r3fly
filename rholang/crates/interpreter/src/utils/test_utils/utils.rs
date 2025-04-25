@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn test_normalize_match_proc<A, B>(proc: &Proc, before: A, after: B)
 where
-    A: FnOnce(&mut FreeMap, &mut BoundMapChain, &mut EnvHashMap<String, Par>) -> Par,
+    A: FnOnce(&mut FreeMap, &mut BoundMapChain, &mut EnvHashMap) -> Par,
     B: FnOnce(Result<(&Par, &FreeMap), InterpreterError>),
 {
     let mut free_map = FreeMap::new();

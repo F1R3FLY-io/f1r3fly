@@ -17,25 +17,16 @@ use super::{
 
 pub struct Compiler<'src> {
     ast_builder: ASTBuilder<'src>,
-    normalizer_env: EnvHashMap<String, crate::normal_forms::Par>,
+    normalizer_env: EnvHashMap,
 }
 
 impl<'src> Compiler<'src> {
     pub fn new(source: &'src str) -> Compiler<'src> {
-        Self::new_with_normalizer_env(
-            source,
-            EnvHashMap::<String, crate::normal_forms::Par>::new(),
-        )
+        Self::new_with_normalizer_env(source, EnvHashMap::new())
     }
 
-    pub fn new_with_normalizer_env(
-        source: &'src str,
-        env: EnvHashMap<String, crate::normal_forms::Par>,
-    ) -> Compiler<'src> {
-        let mut normalizer_env = EnvHashMap::new();
-        for (k, ref_par) in env {
-            normalizer_env.insert(k.to_owned(), ref_par);
-        }
+    pub fn new_with_normalizer_env(source: &'src str, env: EnvHashMap) -> Compiler<'src> {
+        let normalizer_env = EnvHashMap::from(env);
         Compiler {
             ast_builder: ASTBuilder::new(source),
             normalizer_env,
@@ -59,7 +50,7 @@ impl<'src> Compiler<'src> {
 
 fn normalize_term(
     term: &Proc,
-    normalizer_env: &EnvHashMap<String, crate::normal_forms::Par>,
+    normalizer_env: &EnvHashMap,
 ) -> Result<crate::normal_forms::Par, InterpreterError> {
     let mut result: crate::normal_forms::Par = Par::default().into();
     let mut free_map = FreeMap::new();

@@ -301,23 +301,23 @@ impl<'a> ParSorter<'a> {
                     score.leaf_int((*index).into());
                     score.leaf_int((*depth).into());
                 }
-                Connective::ConnBool => {
+                Connective::ConnBool(_) => {
                     score.begin(CONNECTIVE_BOOL);
                     score.leaf_int(1);
                 }
-                Connective::ConnInt => {
+                Connective::ConnInt(_) => {
                     score.begin(CONNECTIVE_INT);
                     score.leaf_int(1);
                 }
-                Connective::ConnString => {
+                Connective::ConnString(_) => {
                     score.begin(CONNECTIVE_STRING);
                     score.leaf_int(1);
                 }
-                Connective::ConnUri => {
+                Connective::ConnUri(_) => {
                     score.begin(CONNECTIVE_URI);
                     score.leaf_int(1);
                 }
-                Connective::ConnByteArray => {
+                Connective::ConnByteArray(_) => {
                     score.begin(CONNECTIVE_BYTEARRAY);
                     score.leaf_int(1);
                 }
@@ -554,23 +554,23 @@ impl<'a> SortMatcher for ConnectiveSorter<'a> {
                 score.leaf_int((*index).into());
                 score.leaf_int((*depth).into());
             }
-            Connective::ConnBool => {
+            Connective::ConnBool(_) => {
                 score.begin(CONNECTIVE_BOOL);
                 score.leaf_int(1);
             }
-            Connective::ConnInt => {
+            Connective::ConnInt(_) => {
                 score.begin(CONNECTIVE_INT);
                 score.leaf_int(1);
             }
-            Connective::ConnString => {
+            Connective::ConnString(_) => {
                 score.begin(CONNECTIVE_STRING);
                 score.leaf_int(1);
             }
-            Connective::ConnUri => {
+            Connective::ConnUri(_) => {
                 score.begin(CONNECTIVE_URI);
                 score.leaf_int(1);
             }
-            Connective::ConnByteArray => {
+            Connective::ConnByteArray(_) => {
                 score.begin(CONNECTIVE_BYTEARRAY);
                 score.leaf_int(1);
             }

@@ -643,7 +643,7 @@ impl DebruijnInterpreter {
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         fn add_to_env(env: &Env<Par>, free_map: BTreeMap<i32, Par>, free_count: i32) -> Env<Par> {
-            (0..free_count).fold(env.clone(), |mut acc, e| {
+            (0..free_count).fold(env.clone(), |acc, e| {
                 let value = free_map.get(&e).unwrap_or(&Par::default()).clone();
                 acc.put(value)
             })
@@ -789,7 +789,7 @@ impl DebruijnInterpreter {
                 }
             }
 
-            urns.iter().try_fold(simple_news, |mut acc, urn| {
+            urns.iter().try_fold(simple_news, |acc, urn| {
                 add_urn(acc, urn.to_string(), &self.urn_map, &new.injections)
             })
         };

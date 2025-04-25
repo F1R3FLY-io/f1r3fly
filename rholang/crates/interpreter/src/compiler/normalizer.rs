@@ -59,7 +59,7 @@ fn normalize_match_proc_internal(
     input_par: &mut crate::normal_forms::Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &EnvHashMap<String, normal_forms::Par>,
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     fn binary_exp<C>(
@@ -69,7 +69,7 @@ fn normalize_match_proc_internal(
         constr: C,
         free_map: &mut FreeMap,
         bound_map_chain: &mut BoundMapChain,
-        env: &EnvHashMap<String, normal_forms::Par>,
+        env: &EnvHashMap,
     ) -> Result<(), InterpreterError>
     where
         C: FnOnce(Par, Par) -> Expr,

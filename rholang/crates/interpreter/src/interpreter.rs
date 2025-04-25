@@ -25,7 +25,7 @@ pub trait Interpreter {
         reducer: &DebruijnInterpreter,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError>;
 }
@@ -41,7 +41,7 @@ impl Interpreter for InterpreterImpl {
         reducer: &DebruijnInterpreter,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap<String, Par>,
+        normalizer_env: EnvHashMap,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         // println!("\nhit inj_attempt");
@@ -59,7 +59,7 @@ impl Interpreter for InterpreterImpl {
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            reducer.inj(parsed, rand).await?;
+            reducer.inject(parsed, rand).await?;
             let phlos_left = self.c.get();
             let mergeable_channels = self.merge_chs.read().unwrap().clone();
 

@@ -89,7 +89,7 @@ extern "C" fn evaluate(
         .initial_phlo
         .map(|cost| Cost::create(cost.value.into(), cost.operation))
         .expect("Initial phlo empty. Can't create Cost");
-    let normalizer_env = params.normalizer_env;
+    let normalizer_env = params.normalizer_env.into();
     let rand_proto = params.random_state.unwrap();
     let digest_proto = rand_proto.digest.unwrap();
     let rand = Blake2b512Random {
