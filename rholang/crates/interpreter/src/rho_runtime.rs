@@ -27,6 +27,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use crate::aliases::EnvHashMap;
 use crate::interpreter::EvaluateResult;
 use crate::interpreter::Interpreter;
+use crate::interpreter::InterpreterImpl;
 use crate::system_processes::{BodyRefs, FixedChannels};
 
 use super::accounting::_cost;
@@ -66,7 +67,7 @@ pub trait Runtime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap,
+        normalizer_env: EnvHashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError>;
 
@@ -74,7 +75,7 @@ pub trait Runtime: HasCost {
     async fn evaluate_with_env(
         &mut self,
         term: String,
-        normalizer_env: EnvHashMap,
+        normalizer_env: EnvHashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), normalizer_env)
             .await
@@ -101,7 +102,7 @@ pub trait Runtime: HasCost {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap,
+        normalizer_env: EnvHashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
         let rand = Blake2b512Random::create_from_bytes(&[0; 128]);
         let checkpoint = self.create_soft_checkpoint();
@@ -265,14 +266,14 @@ impl Runtime for RhoRuntime {
         &mut self,
         term: String,
         initial_phlo: Cost,
-        normalizer_env: EnvHashMap,
+        normalizer_env: EnvHashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
         println!(
             "\nspace before in evaluate: {:?}",
             self.get_hot_changes().len()
         );
-        Interpreter::new(self.cost.clone(), self.merge_chs.clone())
+        InterpreterImpl::new(self.cost.clone(), self.merge_chs.clone())
             .inj_attempt(&self.reducer, term, initial_phlo, normalizer_env, rand)
             .await
     }

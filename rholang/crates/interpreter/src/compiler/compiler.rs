@@ -1,14 +1,10 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/Compiler.scala
 
-use std::collections::{BTreeMap, HashMap};
-
 use models::rhoapi::Par;
 
 use crate::{
     aliases::EnvHashMap,
     errors::InterpreterError,
-    interpreter::EvaluateResult,
-    normal_forms::Par,
     sort_matcher::{Sortable, Sorted},
 };
 
@@ -21,25 +17,20 @@ use super::{
 
 pub struct Compiler<'src> {
     ast_builder: ASTBuilder<'src>,
-    normalizer_env: EnvHashMap<String, Par>,
+    normalizer_env: EnvHashMap<String, crate::normal_forms::Par>,
 }
 
 impl<'src> Compiler<'src> {
-    pub fn source_to_adt_with_normalizer_env(
-        self,
-        term: &str,
-        env: EnvHashMap<String, Par>,
-    ) -> Result<EvaluateResult, InterpreterError> {
-        unimplemented!()
-    }
-
     pub fn new(source: &'src str) -> Compiler<'src> {
-        Self::new_with_normalizer_env(source, EnvHashMap::<String, Par>::new())
+        Self::new_with_normalizer_env(
+            source,
+            EnvHashMap::<String, crate::normal_forms::Par>::new(),
+        )
     }
 
     pub fn new_with_normalizer_env(
         source: &'src str,
-        env: EnvHashMap<String, Par>,
+        env: EnvHashMap<String, crate::normal_forms::Par>,
     ) -> Compiler<'src> {
         let mut normalizer_env = EnvHashMap::new();
         for (k, ref_par) in env {
@@ -51,7 +42,9 @@ impl<'src> Compiler<'src> {
         }
     }
 
-    pub fn compile_to_adt(&'src self) -> Result<Sorted<Par>, InterpreterError> {
+    pub fn compile_to_adt(
+        &'src self,
+    ) -> Result<Sorted<crate::normal_forms::Par>, InterpreterError> {
         let proc = self.parse_to_ast()?;
         let par = normalize_term(proc, &self.normalizer_env)?;
         let sorted_par = crate::normal_forms::Par::from(par).sort_match();
@@ -66,11 +59,12 @@ impl<'src> Compiler<'src> {
 
 fn normalize_term(
     term: &Proc,
-    normalizer_env: &EnvHashMap<String, Par>,
-) -> Result<Par, InterpreterError> {
-    let mut result = Par::default();
+    normalizer_env: &EnvHashMap<String, crate::normal_forms::Par>,
+) -> Result<crate::normal_forms::Par, InterpreterError> {
+    let mut result: crate::normal_forms::Par = Par::default().into();
     let mut free_map = FreeMap::new();
     let mut bound_map_chain = BoundMapChain::new();
+
     normalize_match_proc(
         &term,
         &mut result,

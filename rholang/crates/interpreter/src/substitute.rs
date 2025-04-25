@@ -119,7 +119,7 @@ impl Substitute {
                     match env.get(&index) {
                         Some(p) => {
                             // println!("\np in maybe_substitute_var: {:?}", p);
-                            Ok(Either::Right(p))
+                            Ok(Either::Right(p.clone()))
                         }
                         None => Ok(Either::Left(term)),
                     }
@@ -154,7 +154,7 @@ impl Substitute {
             Ok(Either::Left(term))
         } else {
             match env.get(&term.index) {
-                Some(p) => Ok(Either::Right(p)),
+                Some(p) => Ok(Either::Right(p.clone())),
                 None => Ok(Either::Left(term)),
             }
         }

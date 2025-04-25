@@ -51,7 +51,8 @@ impl Interpreter for InterpreterImpl {
             let _ = self.c.set(initial_phlo.clone());
             let _ = self.c.charge(parsing_cost.clone())?;
 
-            let parsed = Compiler::source_to_adt_with_normalizer_env(&term, normalizer_env)?;
+            let parsed =
+                Compiler::new_with_normalizer_env(&term, normalizer_env).compile_to_adt()?;
 
             // Empty mergeable channels
             let mut merge_chs_lock = self.merge_chs.write().unwrap();
