@@ -67,6 +67,7 @@ This code has not yet completed a security review. We strongly recommend that yo
    - For more information about direnv and how it works see: https://direnv.net/
 
 3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+   - You may run into the following error: `error: experimental Nix feature 'nix-command' is disabled; add '--extra-experimental-features nix-command' to enable it`. To fix this, first create the following file: `~/.config/nix/nix.conf`. Add the following line to the file you just created: `experimental-features = flakes nix-command`. Then run `direnv allow` again.
    - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
    
 ### Docker
