@@ -92,9 +92,11 @@ mod tests {
         },
         normal_forms::{EListBody, Expr, Match, MatchCase, Par, Receive, ReceiveBind, Send},
         test_utils::utils::*,
+        test_utils::utils::assert_matches
     };
     use bitvec::{bitvec, order::Lsb0, vec::BitVec};
     use pretty_assertions::assert_eq;
+    use crate::assert_matches;
 
     #[test]
     fn p_match_should_handle_a_match_inside_a_for_comprehension() {

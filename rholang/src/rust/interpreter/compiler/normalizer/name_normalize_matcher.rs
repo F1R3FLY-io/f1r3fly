@@ -78,6 +78,7 @@ mod tests {
     };
     use bitvec::{bitvec, order::Lsb0};
     use pretty_assertions::assert_eq;
+    use crate::assert_matches;
 
     #[test]
     fn name_wildcard_should_add_a_wildcard_count_to_known_free() {

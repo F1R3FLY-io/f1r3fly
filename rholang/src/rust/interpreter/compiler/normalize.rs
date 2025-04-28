@@ -27,6 +27,26 @@ pub enum BoundVar {
 const MINIMUM_STACK_SIZE: usize = 512;
 const STACK_ALLOC_SIZE: usize = 4 * 1024 * 1024;
 
+#[derive(Debug, Clone, Copy)]
+enum BinaryOp {
+    Mult,
+    Interpolation,
+    Sub,
+    Concat,
+    Diff,
+    Div,
+    Mod,
+    Add,
+    Or,
+    And,
+    Eq,
+    Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+}
+
 /**
  * Rholang normalizer entry point
  */
@@ -42,6 +62,27 @@ pub(crate) fn normalize_match_proc(
     maybe_grow(MINIMUM_STACK_SIZE, STACK_ALLOC_SIZE, || {
         normalize_match_proc_internal(proc, input_par, free_map, bound_map_chain, env, pos)
     })
+}
+
+fn binary_op_to_expr_constructor(op: BinaryOp) -> fn(Par, Par) -> Expr {
+    match op {
+        BinaryOp::Mult => Expr::EMult,
+        BinaryOp::Interpolation => Expr::EPercentPercent,
+        BinaryOp::Sub => Expr::EMinus,
+        BinaryOp::Concat => Expr::EPlusPlus,
+        BinaryOp::Diff => Expr::EMinusMinus,
+        BinaryOp::Div => Expr::EDiv,
+        BinaryOp::Mod => Expr::EMod,
+        BinaryOp::Add => Expr::EPlus,
+        BinaryOp::Or => Expr::EOr,
+        BinaryOp::And => Expr::EAnd,
+        BinaryOp::Eq => Expr::EEq,
+        BinaryOp::Neq => Expr::ENeq,
+        BinaryOp::Lt => Expr::ELt,
+        BinaryOp::Lte => Expr::ELte,
+        BinaryOp::Gt => Expr::EGt,
+        BinaryOp::Gte => Expr::EGte,
+    }
 }
 
 /**
@@ -85,6 +126,26 @@ fn normalize_match_proc_internal(
         let e = constr(p1, p2);
         input_par.push_expr(e, depth);
         Ok(())
+    }
+
+    fn handle_binary_op(
+        op: BinaryOp,
+        left: AnnProc,
+        right: AnnProc,
+        input_par: &mut Par,
+        free_map: &mut FreeMap,
+        bound_map_chain: &mut BoundMapChain,
+        env: &HashMap<String, Par>,
+    ) -> Result<(), InterpreterError> {
+        binary_exp(
+            left,
+            right,
+            input_par,
+            binary_op_to_expr_constructor(op),
+            free_map,
+            bound_map_chain,
+            env,
+        )
     }
 
     let depth = bound_map_chain.depth();
@@ -228,146 +289,146 @@ fn normalize_match_proc_internal(
         }
 
         // binary
-        Proc::Mult { left, right } => binary_exp(
+        Proc::Mult { left, right } => handle_binary_op(
+            BinaryOp::Mult,
             *left,
             *right,
             input_par,
-            Expr::EMult,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Interpolation { left, right } => binary_exp(
+        Proc::Interpolation { left, right } => handle_binary_op(
+            BinaryOp::Interpolation,
             *left,
             *right,
             input_par,
-            Expr::EPercentPercent,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Sub { left, right } => binary_exp(
+        Proc::Sub { left, right } => handle_binary_op(
+            BinaryOp::Sub,
             *left,
             *right,
             input_par,
-            Expr::EMinus,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Concat { left, right } => binary_exp(
+        Proc::Concat { left, right } => handle_binary_op(
+            BinaryOp::Concat,
             *left,
             *right,
             input_par,
-            Expr::EMult,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Diff { left, right } => binary_exp(
+        Proc::Diff { left, right } => handle_binary_op(
+            BinaryOp::Diff,
             *left,
             *right,
             input_par,
-            Expr::EMult,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Div { left, right } => binary_exp(
+        Proc::Div { left, right } => handle_binary_op(
+            BinaryOp::Div,
             *left,
             *right,
             input_par,
-            Expr::EDiv,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Mod { left, right } => binary_exp(
+        Proc::Mod { left, right } => handle_binary_op(
+            BinaryOp::Mod,
             *left,
             *right,
             input_par,
-            Expr::EMod,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Add { left, right } => binary_exp(
+        Proc::Add { left, right } => handle_binary_op(
+            BinaryOp::Add,
             *left,
             *right,
             input_par,
-            Expr::EPlus,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Or { left, right } => binary_exp(
+        Proc::Or { left, right } => handle_binary_op(
+            BinaryOp::Or,
             *left,
             *right,
             input_par,
-            Expr::EOr,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::And { left, right } => binary_exp(
+        Proc::And { left, right } => handle_binary_op(
+            BinaryOp::And,
             *left,
             *right,
             input_par,
-            Expr::EAnd,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Eq { left, right } => binary_exp(
+        Proc::Eq { left, right } => handle_binary_op(
+            BinaryOp::Eq,
             *left,
             *right,
             input_par,
-            Expr::EEq,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Neq { left, right } => binary_exp(
+        Proc::Neq { left, right } => handle_binary_op(
+            BinaryOp::Neq,
             *left,
             *right,
             input_par,
-            Expr::ENeq,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Lt { left, right } => binary_exp(
+        Proc::Lt { left, right } => handle_binary_op(
+            BinaryOp::Lt,
             *left,
             *right,
             input_par,
-            Expr::ELt,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Lte { left, right } => binary_exp(
+        Proc::Lte { left, right } => handle_binary_op(
+            BinaryOp::Lte,
             *left,
             *right,
             input_par,
-            Expr::ELte,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Gt { left, right } => binary_exp(
+        Proc::Gt { left, right } => handle_binary_op(
+            BinaryOp::Gt,
             *left,
             *right,
             input_par,
-            Expr::EGt,
             free_map,
             bound_map_chain,
             env,
         ),
-        Proc::Gte { left, right } => binary_exp(
+        Proc::Gte { left, right } => handle_binary_op(
+            BinaryOp::Gte,
             *left,
             *right,
             input_par,
-            Expr::EGte,
             free_map,
             bound_map_chain,
             env,
@@ -536,352 +597,373 @@ fn normalize_match_proc_internal(
 #[cfg(test)]
 mod tests {
     use crate::rust::interpreter::compiler::compiler::Compiler;
-    use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
-    use crate::rust::interpreter::compiler::normalize::VarSort::ProcSort;
-    use crate::rust::interpreter::compiler::rholang_ast::{Collection, KeyValuePair, Proc};
+    use crate::rust::interpreter::compiler::rholang_ast::{Collection, Id, KeyValuePair, Proc, Name};
     use crate::rust::interpreter::compiler::source_position::SourcePosition;
-    use crate::rust::interpreter::test_utils::utils::{
-        proc_visit_inputs_and_env, proc_visit_inputs_with_updated_bound_map_chain,
-        proc_visit_inputs_with_updated_vec_bound_map_chain,
-    };
-    use crate::rust::interpreter::util::prepend_expr;
+    use crate::rust::interpreter::errors::InterpreterError;
     use models::create_bit_vector;
     use models::rhoapi::expr::ExprInstance;
     use models::rhoapi::{
         expr, EDiv, EMinus, EMinusMinus, EMult, ENeg, ENot, EPercentPercent, EPlus, EPlusPlus,
-        Expr, Par,
+        Expr, Par, EVar,
     };
     use models::rust::utils::{
         new_boundvar_expr, new_boundvar_par, new_emap_par, new_freevar_par, new_gint_par,
         new_gstring_par, new_key_value_pair,
     };
     use pretty_assertions::assert_eq;
+    use crate::rust::interpreter::test_utils::utils::{
+        defaults, test, test_normalize_match_proc, with_bindings,
+    };
+    use crate::assert_matches;
 
     #[test]
     fn p_nil_should_compile_as_no_modification() {
-        let (inputs, env) = proc_visit_inputs_and_env();
+        let proc = Proc::Nil;
 
-        let proc = Proc::Nil {
-            line_num: 0,
-            col_num: 0,
-        };
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-
-        assert_eq!(result.clone().unwrap().par, inputs.par);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to compile with no modification", |actual_par, free_map| {
+                assert_eq!(actual_par.exprs.len(), Par::default().exprs.len());
+                assert!(free_map.is_empty());
+            }),
+        );
     }
 
     //unary operations:
     #[test]
     fn p_not_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let proc = Proc::Not {
-            proc: Box::new(Proc::new_proc_bool(false)),
-            line_num: 0,
-            col_num: 0,
-        };
+        let proc = Proc::Not(&Proc::BoolLiteral(false));
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        let expected_par = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::ENotBody(ENot {
-                    p: Some(Par {
-                        exprs: vec![Expr {
-                            expr_instance: Some(expr::ExprInstance::GBool(false)),
-                        }],
-                        ..Par::default()
-                    }),
-                })),
-            },
-            0,
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to delegate not correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::ENotBody(ENot {
+                            p: Some(Par {
+                                exprs: vec![Expr {
+                                    expr_instance: Some(expr::ExprInstance::GBool(false)),
+                                }],
+                                ..Par::default()
+                            }),
+                        })),
+                    }],
+                    ..Par::default()
+                };
+
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_par);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     #[test]
     fn p_neg_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        let bound_inputs =
-            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", ProcSort);
-        let proc = Proc::Neg {
-            proc: Box::new(Proc::new_proc_var("x")),
-            line_num: 0,
-            col_num: 0,
+        let x = Id {
+            name: "x",
+            pos: SourcePosition::default(),
         };
+        let proc_x = x.as_proc();
+        let proc = Proc::Neg(&proc_x);
 
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::ENegBody(ENeg {
-                    p: Some(Par {
-                        exprs: vec![new_boundvar_expr(0)],
-                        locally_free: create_bit_vector(&vec![0]),
-                        ..Par::default()
-                    }),
-                })),
-            },
-            0,
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+            }),
+            test("expected to delegate neg correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::ENegBody(ENeg {
+                            p: Some(Par {
+                                exprs: vec![new_boundvar_expr(0)],
+                                locally_free: create_bit_vector(&vec![0]),
+                                ..Par::default()
+                            }),
+                        })),
+                    }],
+                    ..Par::default()
+                };
+
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     //binary operations:
     #[test]
     fn p_mult_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        let bound_inputs =
-            proc_visit_inputs_with_updated_bound_map_chain(inputs.clone(), "x", ProcSort);
-
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
+        };
+        let y = Id {
+            name: "y",
+            pos,
+        };
+        let proc_x = x.as_proc();
+        let proc_y = y.as_proc();
         let proc = Proc::Mult {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::new_proc_var("y")),
-            line_num: 0,
-            col_num: 0,
+            left: proc_x.annotate(pos),
+            right: proc_y.annotate(pos),
         };
 
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+            }),
+            test("expected to delegate mult correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EMultBody(EMult {
+                            p1: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                            p2: Some(new_freevar_par(0, Vec::new())),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EMultBody(EMult {
-                    p1: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                    p2: Some(new_freevar_par(0, Vec::new())),
-                })),
-            },
-            0,
-        );
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(
-            result.unwrap().free_map,
-            bound_inputs
-                .free_map
-                .put(("y".to_string(), ProcSort, SourcePosition::new(0, 0)))
+                assert_eq!(actual_par, &expected_par);
+                assert_eq!(
+                    free_map.len(),
+                    1,
+                    "Expected free_map to contain the variable y"
+                );
+            }),
         );
     }
 
     #[test]
     fn p_div_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
         let proc = Proc::Div {
-            left: Box::new(Proc::new_proc_int(7)),
-            right: Box::new(Proc::new_proc_int(2)),
-            line_num: 0,
-            col_num: 0,
+            left: Proc::LongLiteral(7).annotate_dummy(),
+            right: Proc::LongLiteral(2).annotate_dummy(),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to delegate div correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EDivBody(EDiv {
+                            p1: Some(new_gint_par(7, Vec::new(), false)),
+                            p2: Some(new_gint_par(2, Vec::new(), false)),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(expr::ExprInstance::EDivBody(EDiv {
-                    p1: Some(new_gint_par(7, Vec::new(), false)),
-                    p2: Some(new_gint_par(2, Vec::new(), false)),
-                })),
-            },
-            0,
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     #[test]
     fn p_percent_percent_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
         let map_data = Proc::Collection(Collection::Map {
             pairs: vec![KeyValuePair {
-                key: Proc::new_proc_string("name".to_string()),
-                value: Proc::new_proc_string("Alice".to_string()),
-                line_num: 0,
-                col_num: 0,
+                key: Proc::StringLiteral("name").annotate_dummy(),
+                value: Proc::StringLiteral("Alice").annotate_dummy(),
             }],
             cont: None,
-            line_num: 0,
-            col_num: 0,
         });
 
-        let proc = Proc::PercentPercent {
-            left: Box::new(Proc::new_proc_string("Hi ${name}".to_string())),
-            right: Box::new(map_data),
-            line_num: 0,
-            col_num: 0,
+        let proc = Proc::Interpolation {
+            left: Proc::StringLiteral("Hi ${name}").annotate_dummy(),
+            right: map_data.annotate_dummy(),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        assert_eq!(
-            result.clone().unwrap().par,
-            prepend_expr(
-                inputs.par,
-                Expr {
-                    expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
-                        p1: Some(new_gstring_par("Hi ${name}".to_string(), Vec::new(), false)),
-                        p2: Some(new_emap_par(
-                            vec![new_key_value_pair(
-                                new_gstring_par("name".to_string(), Vec::new(), false),
-                                new_gstring_par("Alice".to_string(), Vec::new(), false),
-                            )],
-                            Vec::new(),
-                            false,
-                            None,
-                            Vec::new(),
-                            false,
-                        ))
-                    }))
-                },
-                0
-            )
-        );
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to delegate percent percent correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
+                            p1: Some(new_gstring_par("Hi ${name}".to_string(), Vec::new(), false)),
+                            p2: Some(new_emap_par(
+                                vec![new_key_value_pair(
+                                    new_gstring_par("name".to_string(), Vec::new(), false),
+                                    new_gstring_par("Alice".to_string(), Vec::new(), false),
+                                )],
+                                Vec::new(),
+                                false,
+                                None,
+                                Vec::new(),
+                                false,
+                            )),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        assert_eq!(result.unwrap().free_map, inputs.free_map)
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
+        );
     }
 
     #[test]
     fn p_add_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let bound_inputs = proc_visit_inputs_with_updated_vec_bound_map_chain(
-            inputs.clone(),
-            vec![("x".into(), ProcSort), ("y".into(), ProcSort)],
-        );
-        let proc = Proc::Add {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::new_proc_var("y")),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
         };
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+        let y = Id {
+            name: "y",
+            pos,
+        };
+        let proc_x = x.as_proc();
+        let proc_y = y.as_proc();
+        let proc = Proc::Add {
+            left: proc_x.annotate(pos),
+            right: proc_y.annotate(pos),
+        };
 
-        // Формуємо очікуваний результат за допомогою хелперів
-        let p1 = new_boundvar_par(1, vec![1], false);
-        let p2 = new_boundvar_par(0, vec![0], false);
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+                bound_map.put_id_as_proc(&y);
+            }),
+            test("expected to delegate add correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EPlusBody(EPlus {
+                            p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                            p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-                    p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
-                    p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                })),
-            },
-            0,
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, bound_inputs.free_map);
     }
 
     #[test]
     fn p_minus_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-        let bound_inputs = proc_visit_inputs_with_updated_vec_bound_map_chain(
-            inputs.clone(),
-            vec![
-                ("x".into(), ProcSort),
-                ("y".into(), ProcSort),
-                ("z".into(), ProcSort),
-            ],
-        );
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
+        };
+        let y = Id {
+            name: "y",
+            pos,
+        };
+        let z = Id {
+            name: "z",
+            pos,
+        };
+        let proc_x = x.as_proc();
+        let proc_y = y.as_proc();
+        let proc_z = z.as_proc();
 
-        let proc = Proc::Minus {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::Mult {
-                left: Box::new(Proc::new_proc_var("y")),
-                right: Box::new(Proc::new_proc_var("z")),
-                line_num: 0,
-                col_num: 0,
-            }),
-            line_num: 0,
-            col_num: 0,
+        let mult_proc = Proc::Mult {
+            left: proc_y.annotate(pos),
+            right: proc_z.annotate(pos),
+        };
+        let proc = Proc::Sub {
+            left: proc_x.annotate(pos),
+            right: mult_proc.annotate(pos),
         };
 
-        let result = normalize_match_proc(&proc, bound_inputs.clone(), &env);
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+                bound_map.put_id_as_proc(&y);
+                bound_map.put_id_as_proc(&z);
+            }),
+            test("expected to delegate minus correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EMinusBody(EMinus {
+                            p1: Some(new_boundvar_par(2, create_bit_vector(&vec![2]), false)),
+                            p2: Some(Par {
+                                exprs: vec![Expr {
+                                    expr_instance: Some(ExprInstance::EMultBody(EMult {
+                                        p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
+                                        p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
+                                    })),
+                                }],
+                                locally_free: create_bit_vector(&vec![0, 1]),
+                                ..Par::default()
+                            }),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(ExprInstance::EMinusBody(EMinus {
-                    p1: Some(new_boundvar_par(2, create_bit_vector(&vec![2]), false)),
-                    p2: Some(Par {
-                        exprs: vec![Expr {
-                            expr_instance: Some(ExprInstance::EMultBody(EMult {
-                                p1: Some(new_boundvar_par(1, create_bit_vector(&vec![1]), false)),
-                                p2: Some(new_boundvar_par(0, create_bit_vector(&vec![0]), false)),
-                            })),
-                        }],
-                        locally_free: create_bit_vector(&vec![0, 1]),
-                        connective_used: false,
-                        ..Par::default()
-                    }),
-                })),
-            },
-            0,
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     #[test]
     fn p_plus_plus_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
         let proc = Proc::Concat {
-            left: Box::new(Proc::new_proc_string("abc".to_string())),
-            right: Box::new(Proc::new_proc_string("def".to_string())),
-            line_num: 0,
-            col_num: 0,
+            left: Proc::StringLiteral("abc").annotate_dummy(),
+            right:Proc::StringLiteral("def").annotate_dummy(),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
-                    p1: Some(new_gstring_par("abc".to_string(), Vec::new(), false)),
-                    p2: Some(new_gstring_par("def".to_string(), Vec::new(), false)),
-                })),
-            },
-            0,
-        );
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to delegate plus plus correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
+                            p1: Some(new_gstring_par("abc".to_string(), Vec::new(), false)),
+                            p2: Some(new_gstring_par("def".to_string(), Vec::new(), false)),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
+        );
     }
 
     #[test]
     fn p_minus_minus_should_delegate() {
-        let (inputs, env) = proc_visit_inputs_and_env();
-
-        let proc = Proc::MinusMinus {
-            left: Box::new(Proc::new_proc_string("abc".to_string())),
-            right: Box::new(Proc::new_proc_string("def".to_string())),
-            line_num: 0,
-            col_num: 0,
+        let proc = Proc::Diff {
+            left: Proc::StringLiteral("abc").annotate_dummy(),
+            right: Proc::StringLiteral("def").annotate_dummy(),
         };
 
-        let result = normalize_match_proc(&proc, inputs.clone(), &env);
-        let expected_result = prepend_expr(
-            inputs.par.clone(),
-            Expr {
-                expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
-                    p1: Some(new_gstring_par("abc".to_string(), vec![], false)),
-                    p2: Some(new_gstring_par("def".to_string(), vec![], false)),
-                })),
-            },
-            0,
-        );
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to delegate correctly", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
+                            p1: Some(new_gstring_par("abc".to_string(), vec![], false)),
+                            p2: Some(new_gstring_par("def".to_string(), vec![], false)),
+                        })),
+                    }],
+                    ..Par::default()
+                };
 
-        assert_eq!(result.clone().unwrap().par, expected_result);
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
+        );
     }
 
     #[test]
@@ -905,7 +987,7 @@ mod tests {
                 pattern
             );
 
-            match Compiler::source_to_adt(&rho) {
+            match Compiler::new(&rho).compile_to_adt() {
                 Ok(_) => assert!(true),
                 Err(e) => panic!(
                     "{} in the {} '{}' should not throw errors: {:?}",
@@ -978,249 +1060,364 @@ mod tests {
 
     #[test]
     fn p_var_should_compile_as_bound_var_if_its_in_env() {
-        let bound_inputs = {
-            let mut inputs = inputs();
-            inputs.bound_map_chain = inputs.bound_map_chain.put((
-                "x".to_string(),
-                VarSort::ProcSort,
-                SourcePosition::new(0, 0),
-            ));
-            inputs
+        let x = Id {
+            name: "x",
+            pos: SourcePosition::default(),
         };
+        let proc_x = x.as_proc();
 
-        let result = normalize_p_var(&p_var(), bound_inputs);
-        assert!(result.is_ok());
-        assert_eq!(
-            result.clone().unwrap().par,
-            prepend_expr(inputs().par, new_boundvar_expr(0), 0)
-        );
+        test_normalize_match_proc(
+            &proc_x,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+            }),
+            test("expected to compile as bound var if it's in env", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar {
+                            v: Some(models::rhoapi::Var {
+                                var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(0)),
+                            }),
+                        })),
+                    }],
+                    locally_free: create_bit_vector(&vec![0]),
+                    ..Par::default()
+                };
 
-        assert_eq!(result.clone().unwrap().free_map, inputs().free_map);
-        assert_eq!(
-            result.unwrap().par.locally_free,
-            create_bit_vector(&vec![0])
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
     }
 
     #[test]
     fn p_var_should_compile_as_free_var_if_its_not_in_env() {
-        let result = normalize_p_var(&p_var(), inputs());
-        assert!(result.is_ok());
-        assert_eq!(
-            result.clone().unwrap().par,
-            prepend_expr(inputs().par, new_freevar_expr(0), 0)
-        );
+        let x = Id {
+            name: "x",
+            pos: SourcePosition::default(),
+        };
+        let proc_x = x.as_proc();
 
-        assert_eq!(
-            result.clone().unwrap().free_map,
-            inputs().free_map.put((
-                "x".to_string(),
-                VarSort::ProcSort,
-                SourcePosition::new(0, 0)
-            ))
+        test_normalize_match_proc(
+            &proc_x,
+            defaults(),
+            test("expected to compile as free var if it's not in env", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar {
+                            v: Some(models::rhoapi::Var {
+                                var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(0)),
+                            }),
+                        })),
+                    }],
+                    ..Par::default()
+                };
+
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert_eq!(free_map.len(), 1);
+            }),
         );
     }
 
     #[test]
     fn p_var_should_not_compile_if_its_in_env_of_the_wrong_sort() {
-        let bound_inputs = {
-            let mut inputs = inputs();
-            inputs.bound_map_chain = inputs.bound_map_chain.put((
-                "x".to_string(),
-                VarSort::NameSort,
-                SourcePosition::new(0, 0),
-            ));
-            inputs
+        let x = Id {
+            name: "x",
+            pos: SourcePosition::default(),
         };
+        let proc_x = x.as_proc();
 
-        let result = normalize_p_var(&p_var(), bound_inputs);
-        assert!(result.is_err());
-        assert_eq!(
-            result,
-            Err(InterpreterError::UnexpectedProcContext {
-                var_name: "x".to_string(),
-                name_var_source_position: SourcePosition::new(0, 0),
-                process_source_position: SourcePosition::new(0, 0),
-            })
-        )
+        test_normalize_match_proc(
+            &proc_x,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_name(&x);
+            }),
+            |result| {
+                assert_matches!(
+                    result,
+                    Err(InterpreterError::UnexpectedProcContext {
+                        var_name,
+                        name_var_source_position: SourcePosition::default(),
+                        process_source_position: SourcePosition::default(),
+                    }) => {
+                        assert_eq!(var_name, "x")
+                    }
+                );
+            },
+        );
     }
 
     #[test]
     fn p_var_should_not_compile_if_its_used_free_somewhere_else() {
-        let bound_inputs = {
-            let mut inputs = inputs();
-            inputs.free_map = inputs.free_map.put((
-                "x".to_string(),
-                VarSort::ProcSort,
-                SourcePosition::new(0, 0),
-            ));
-            inputs
+        let pos = SourcePosition::default();
+        let x1 = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x1 = x1.as_proc();
+
+        let x2 = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x2 = x2.as_proc();
+
+        let proc = Proc::Par {
+            left: proc_x1.annotate(pos),
+            right: proc_x2.annotate(pos),
         };
 
-        let result = normalize_p_var(&p_var(), bound_inputs);
-        assert!(result.is_err());
-        assert_eq!(
-            result,
-            Err(InterpreterError::UnexpectedReuseOfProcContextFree {
-                var_name: "x".to_string(),
-                first_use: SourcePosition::new(0, 0),
-                second_use: SourcePosition::new(0, 0)
-            })
-        )
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            |result| {
+                assert_matches!(
+                    result,
+                    Err(InterpreterError::UnexpectedReuseOfProcContextFree {
+                        var_name,
+                        first_use: SourcePosition { row: 0, column: 0 },
+                        second_use: SourcePosition { row: 0, column: 0 }
+                    }) => {
+                        assert_eq!(var_name, "x")
+                    }
+                );
+            },
+        );
     }
 
     #[test]
     fn p_eval_should_handle_a_bound_name_variable() {
-        let p_eval = Proc::Eval(Eval {
-            name: Name::new_name_var("x"),
-            line_num: 0,
-            col_num: 0,
-        });
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
+        };
+        let proc = Proc::Eval {
+            name: x.as_name().annotated(pos),
+        };
 
-        let (mut inputs, env) = proc_visit_inputs_and_env();
-        inputs.bound_map_chain = inputs.bound_map_chain.put((
-            "x".to_string(),
-            VarSort::NameSort,
-            SourcePosition::new(0, 0),
-        ));
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_name(&x);
+            }),
+            test("expected to handle a bound name variable", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar {
+                            v: Some(models::rhoapi::Var {
+                                var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(0)),
+                            }),
+                        })),
+                    }],
+                    locally_free: create_bit_vector(&vec![0]),
+                    ..Par::default()
+                };
 
-        let result = normalize_match_proc(&p_eval, inputs.clone(), &env);
-        assert!(result.is_ok());
-        assert_eq!(
-            result.clone().unwrap().par,
-            prepend_expr(inputs.par, new_boundvar_expr(0), 0)
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     #[test]
     fn p_eval_should_collapse_a_quote() {
-        let p_eval = Proc::Eval(Eval {
-            name: Name::Quote(Box::new(Quote {
-                quotable: Box::new(Proc::Par {
-                    left: Box::new(Proc::new_proc_var("x")),
-                    right: Box::new(Proc::new_proc_var("x")),
-                    line_num: 0,
-                    col_num: 0,
-                }),
-                line_num: 0,
-                col_num: 0,
-            })),
-            line_num: 0,
-            col_num: 0,
-        });
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x = x.as_proc();
+        let proc = Proc::Eval {
+            name: Name::Quote(&proc_x).annotated(pos),
+        };
 
-        let (mut inputs, env) = proc_visit_inputs_and_env();
-        inputs.bound_map_chain = inputs.bound_map_chain.put((
-            "x".to_string(),
-            VarSort::ProcSort,
-            SourcePosition::new(0, 0),
-        ));
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+            }),
+            test("expected to collapse a quote", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar {
+                            v: Some(models::rhoapi::Var {
+                                var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(0)),
+                            }),
+                        })),
+                    }],
+                    locally_free: create_bit_vector(&vec![0]),
+                    ..Par::default()
+                };
 
-        let result = normalize_match_proc(&p_eval, inputs.clone(), &env);
-        assert!(result.is_ok());
-        assert_eq!(
-            result.clone().unwrap().par,
-            prepend_expr(
-                prepend_expr(inputs.par, new_boundvar_expr(0), 0),
-                new_boundvar_expr(0),
-                0
-            )
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-        assert_eq!(result.unwrap().free_map, inputs.free_map);
     }
 
     #[test]
     fn p_par_should_compile_both_branches_into_a_par_object() {
-        let par_ground = Proc::Par {
-            left: Box::new(Proc::new_proc_int(7)),
-            right: Box::new(Proc::new_proc_int(8)),
-            line_num: 0,
-            col_num: 0,
+        let proc = Proc::Par {
+            left: Proc::LongLiteral(7).annotate_dummy(),
+            right: Proc::LongLiteral(8).annotate_dummy(),
         };
 
-        let result = normalize_match_proc(&par_ground, ProcVisitInputs::new(), &HashMap::new());
-        assert!(result.is_ok());
-        assert_eq!(
-            result.clone().unwrap().par,
-            Par::default().with_exprs(vec![new_gint_expr(8), new_gint_expr(7)])
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to compile both branches into a par object", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![
+                        Expr {
+                            expr_instance: Some(ExprInstance::GInt(8)),
+                        },
+                        Expr {
+                            expr_instance: Some(ExprInstance::GInt(7)),
+                        },
+                    ],
+                    ..Par::default()
+                };
+
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
         );
-        assert_eq!(result.unwrap().free_map, ProcVisitInputs::new().free_map);
     }
 
     #[test]
     fn p_par_should_compile_both_branches_with_the_same_environment() {
-        let par_double_bound = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::new_proc_var("x")),
-            line_num: 0,
-            col_num: 0,
+        let x = Id {
+            name: "x",
+            pos: SourcePosition::default(),
+        };
+        let proc_x1 = x.as_proc();
+        let proc_x2 = x.as_proc();
+        let proc = Proc::Par {
+            left: proc_x1.annotate_dummy(),
+            right: proc_x2.annotate_dummy(),
         };
 
-        let (mut inputs, env) = proc_visit_inputs_and_env();
-        inputs.bound_map_chain = inputs.bound_map_chain.put((
-            "x".to_string(),
-            VarSort::ProcSort,
-            SourcePosition::new(0, 0),
-        ));
+        test_normalize_match_proc(
+            &proc,
+            with_bindings(|bound_map| {
+                bound_map.put_id_as_proc(&x);
+            }),
+            test("expected to compile both branches with same env", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![
+                        Expr {
+                            expr_instance: Some(ExprInstance::EVarBody(EVar {
+                                v: Some(models::rhoapi::Var {
+                                    var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(0)),
+                                }),
+                            })),
+                        },
+                        Expr {
+                            expr_instance: Some(ExprInstance::EVarBody(EVar {
+                                v: Some(models::rhoapi::Var {
+                                    var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(0)),
+                                }),
+                            })),
+                        },
+                    ],
+                    locally_free: create_bit_vector(&vec![0]),
+                    ..Par::default()
+                };
 
-        let result = normalize_match_proc(&par_double_bound, inputs, &env);
-        assert!(result.is_ok());
-        assert_eq!(result.clone().unwrap().par, {
-            let mut par =
-                Par::default().with_exprs(vec![new_boundvar_expr(0), new_boundvar_expr(0)]);
-            par.locally_free = create_bit_vector(&vec![0]);
-            par
-        });
-        assert_eq!(result.unwrap().free_map, ProcVisitInputs::new().free_map);
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert!(free_map.is_empty());
+            }),
+        );
     }
 
     #[test]
     fn p_par_should_not_compile_if_both_branches_use_the_same_free_variable() {
-        let par_double_free = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::new_proc_var("x")),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition::default();
+        let x1 = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x1 = x1.as_proc();
+
+        let x2 = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x2 = x2.as_proc();
+
+        let proc = Proc::Par {
+            left: proc_x1.annotate(pos),
+            right: proc_x2.annotate(pos),
         };
 
-        let result =
-            normalize_match_proc(&par_double_free, ProcVisitInputs::new(), &HashMap::new());
-        assert!(result.is_err());
-        assert_eq!(
-            result,
-            Err(InterpreterError::UnexpectedReuseOfProcContextFree {
-                var_name: "x".to_string(),
-                first_use: SourcePosition::new(0, 0),
-                second_use: SourcePosition::new(0, 0)
-            })
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            |result| {
+                assert_matches!(
+                    result,
+                    Err(InterpreterError::UnexpectedReuseOfProcContextFree {
+                        var_name,
+                        first_use: SourcePosition::default(),
+                        second_use: SourcePosition::default()
+                    }) => {
+                        assert_eq!(var_name, "x")
+                    }
+                );
+            },
         );
     }
 
     #[test]
     fn p_par_should_accumulate_free_counts_from_both_branches() {
-        let par_double_free = Proc::Par {
-            left: Box::new(Proc::new_proc_var("x")),
-            right: Box::new(Proc::new_proc_var("y")),
-            line_num: 0,
-            col_num: 0,
+        let pos = SourcePosition::default();
+        let x = Id {
+            name: "x",
+            pos,
+        };
+        let proc_x = x.as_proc();
+
+        let y = Id {
+            name: "y",
+            pos,
+        };
+        let proc_y = y.as_proc();
+
+        let proc = Proc::Par {
+            left: proc_x.annotate(pos),
+            right: proc_y.annotate(pos),
         };
 
-        let result =
-            normalize_match_proc(&par_double_free, ProcVisitInputs::new(), &HashMap::new());
-        assert!(result.is_ok());
-        assert_eq!(result.clone().unwrap().par, {
-            let mut par = Par::default().with_exprs(vec![new_freevar_expr(1), new_freevar_expr(0)]);
-            par.connective_used = true;
-            par
-        });
-        assert_eq!(
-            result.unwrap().free_map,
-            ProcVisitInputs::new().free_map.put_all(vec![
-                ("x".to_owned(), VarSort::ProcSort, SourcePosition::new(0, 0)),
-                ("y".to_owned(), VarSort::ProcSort, SourcePosition::new(0, 0))
-            ])
-        )
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            test("expected to accumulate free counts from both branches", |actual_par, free_map| {
+                let expected_par = Par {
+                    exprs: vec![
+                        Expr {
+                            expr_instance: Some(ExprInstance::EVarBody(EVar {
+                                v: Some(models::rhoapi::Var {
+                                    var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(1)),
+                                }),
+                            })),
+                        },
+                        Expr {
+                            expr_instance: Some(ExprInstance::EVarBody(EVar {
+                                v: Some(models::rhoapi::Var {
+                                    var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(0)),
+                                }),
+                            })),
+                        },
+                    ],
+                    connective_used: true,
+                    ..Par::default()
+                };
+
+                assert_eq!(actual_par.exprs.len(), expected_par.exprs.len());
+                assert_eq!(free_map.len(), 2);
+            }),
+        );
     }
 
     /*
@@ -1234,17 +1431,46 @@ mod tests {
      */
     #[test]
     fn p_par_should_normalize_without_stack_overflow_error_even_for_huge_program() {
-        let huge_p_par = (1..=50)
-            .map(|x| Proc::new_proc_int(x as i64))
-            .reduce(|l, r| Proc::Par {
-                left: Box::new(l),
-                right: Box::new(r),
-                line_num: 0,
-                col_num: 0,
-            })
-            .expect("Failed to create huge Proc::Par");
+        let base_proc = Proc::LongLiteral(1);
 
-        let result = normalize_match_proc(&huge_p_par, ProcVisitInputs::new(), &HashMap::new());
-        assert!(result.is_ok());
+        let mut procs = Vec::with_capacity(50);
+        for i in 1..=50 {
+            procs.push(Proc::LongLiteral(i));
+        }
+
+        /*
+         * This function build a balanced binary tree of Proc::Par nodes from an array of Proc objects.
+         * It's transforms a flat array of processes [Proc1, Proc2, ..., ProcN]
+         * into a balanced binary tree structure of Proc::Par.
+         * This is necessary for a correct stack overflow test.
+         */
+        fn build_par(procs: &[Proc], start: usize, end: usize) -> Proc {
+            if start == end {
+                return procs[start].clone();
+            }
+            let mid = start + (end - start) / 2;
+            let left = build_par(procs, start, mid);
+            let right = build_par(procs, mid + 1, end);
+            Proc::Par {
+                left: left.annotate_dummy(),
+                right: right.annotate_dummy(),
+            }
+        }
+
+        let proc = if procs.len() > 0 {
+            build_par(&procs, 0, procs.len() - 1)
+        } else {
+            base_proc
+        };
+
+        test_normalize_match_proc(
+            &proc,
+            defaults(),
+            |result| {
+                assert!(result.is_ok(), "Expected no stack overflow for large program");
+                let (par, _) = result.unwrap();
+                assert_eq!(par.exprs.len(), 50);
+            },
+        );
     }
 }

@@ -80,6 +80,7 @@ mod tests {
     use super::{Proc, SourcePosition};
     use bitvec::{bitvec, order::Lsb0};
     use pretty_assertions::assert_eq;
+    use crate::assert_matches;
 
     #[test]
     fn p_send_should_handle_a_basic_send() {

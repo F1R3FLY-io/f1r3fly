@@ -182,6 +182,7 @@ mod tests {
     use bitvec::vec::BitVec;
     use bitvec::{bitvec, order::Lsb0};
     use pretty_assertions::assert_eq;
+    use crate::assert_matches;
 
     #[test]
     fn list_should_delegate() {
