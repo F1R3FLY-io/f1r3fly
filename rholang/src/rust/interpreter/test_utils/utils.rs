@@ -106,3 +106,27 @@ pub(crate) fn assert_equal_normalized(lhs: &str, rhs: &str) {
     })
     .expect("Normalization expected not to fail");
 }
+
+#[macro_export]
+macro_rules! assert_matches {
+    ($expression:expr, $pattern:pat => $assertions:block) => {
+        match $expression {
+            $pattern => $assertions,
+            other => panic!(
+                "assertion failed: `{:?}` does not match pattern `{}`",
+                other,
+                stringify!($pattern)
+            ),
+        }
+    };
+}
+
+pub fn assert_matches<T, F>(result: Result<T, InterpreterError>, matcher: F)
+where
+    F: FnOnce(InterpreterError),
+{
+    match result {
+        Ok(_) => panic!("Expected an error, but got Ok"),
+        Err(e) => matcher(e),
+    }
+}
