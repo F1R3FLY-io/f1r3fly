@@ -31,6 +31,7 @@ The following tests all use `rholang-rust` and must be run at root project direc
 - Run Casper Rholang tests: `sbt ";casper/testOnly coop.rchain.casper.batch1.MultiParentCasperRholangSpec"`
 - Run Casper Block tests: `sbt ";casper/testOnly coop.rchain.casper.addblock.MultiParentCasperAddBlockSpec"`
 - Run Casper Propose test: `sbt ";casper/testOnly coop.rchain.casper.addblock.ProposerSpec"`
+- Run Casper Contract tests: `sbt "compile ;casper/testOnly coop.rchain.casper.genesis.contracts.*"`
 
 ## What's working, what's broken:
 ### The bad
