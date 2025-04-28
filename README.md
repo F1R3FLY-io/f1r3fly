@@ -156,6 +156,13 @@ $ rm -rf ~/.cache/coursier/
 $ sbt clean
 ```
 
+Rust problems: 
+```bash
+$ ./scripts/clean_rust_libraries.sh
+
+$ rustup default stable
+```
+
 
 
 <!-- Docker will be used in the examples port portability reasons, but running the
