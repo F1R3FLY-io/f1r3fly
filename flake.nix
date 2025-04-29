@@ -160,6 +160,18 @@
                 name = "PROTOC_INCLUDE";
                 value = "${pkgs.protobuf}/include";
               }
+              {
+                name = "OPENSSL_STATIC";
+                value = "1";
+              }
+              {
+                name = "OPENSSL_INCLUDE_DIR";
+                value = "${pkgs.openssl.dev}/include";
+              }
+              {
+                name = "OPENSSL_LIB_DIR";
+                value = "${pkgs.openssl.out}/lib";
+              }
             ];
         };
       }

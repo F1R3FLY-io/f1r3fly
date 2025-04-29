@@ -67,6 +67,7 @@ This code has not yet completed a security review. We strongly recommend that yo
    - For more information about direnv and how it works see: https://direnv.net/
 
 3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+   - You may run into the following error: `error: experimental Nix feature 'nix-command' is disabled; add '--extra-experimental-features nix-command' to enable it`. To fix this, first create the following file: `~/.config/nix/nix.conf`. Add the following line to the file you just created: `experimental-features = flakes nix-command`. Then run `direnv allow` again.
    - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
    
 ### Docker
@@ -91,11 +92,11 @@ This code has not yet completed a security review. We strongly recommend that yo
 
 Prerequisites: [Environment set up](#installation).
 
-1. `sbt ";compile ;project node ;Docker/publishLocal ;project rchain"` will compile the project and create a docker image. 
-   - It is recommended to have a terminal window open just for `sbt` to run various commands. 
-   - Ensure you have the correct context. Run: `docker context use default` then `docker buildx use default`
+1. `docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"` will compile the project and create a docker image. 
 2. `sbt ";compile ;project node ;assembly ;project rchain"` will compile the project and create a fat jar. You can use this to run locally without docker.
 3. `sbt "clean"` will clean the project.
+
+- It is recommended to have a terminal window open just for `sbt` to run various commands.
 
 ## Running
 
@@ -153,6 +154,13 @@ SBT build problems:
 $ rm -rf ~/.cache/coursier/
 
 $ sbt clean
+```
+
+Rust problems: 
+```bash
+$ ./scripts/clean_rust_libraries.sh
+
+$ rustup default stable
 ```
 
 
