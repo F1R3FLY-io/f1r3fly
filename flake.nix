@@ -172,6 +172,10 @@
                 name = "OPENSSL_LIB_DIR";
                 value = "${pkgs.openssl.out}/lib";
               }
+              {
+                name = "BLOOP_JAVA_OPTS";
+                value = "-Xmx4G -XX:+UseZGC -Xss4m -Xms1g";
+              }
             ];
         };
       }
