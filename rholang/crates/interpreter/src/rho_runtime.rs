@@ -5,7 +5,7 @@ use models::rhoapi::Bundle;
 use models::rhoapi::Var;
 use models::rhoapi::expr::ExprInstance::EMapBody;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
+use models::rhoapi::{BindPattern, Expr, ListParWithRandom, TaggedContinuation};
 use models::rust::block_hash::BlockHash;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
@@ -29,6 +29,9 @@ use crate::aliases::EnvHashMap;
 use crate::interpreter::EvaluateResult;
 use crate::interpreter::Interpreter;
 use crate::interpreter::InterpreterImpl;
+use crate::normal_forms;
+use crate::normal_forms::Par;
+use crate::sort_matcher::Sorted;
 use crate::system_processes::{BodyRefs, FixedChannels};
 
 use super::accounting::CostManager;
@@ -141,7 +144,7 @@ pub trait Runtime: HasCost {
      */
     async fn inj(
         &self,
-        par: Par,
+        par: Sorted<Par>,
         env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError>;
@@ -281,11 +284,10 @@ impl Runtime for RhoRuntime {
 
     async fn inj(
         &self,
-        par: Par,
-        _env: Env<Par>,
+        par: Sorted<normal_forms::Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.reducer.inject(par, rand).await
+        self.reducer.evaluate(par, rand).await
     }
 
     fn create_soft_checkpoint(
@@ -741,8 +743,6 @@ fn setup_reducer(
     mergeable_tag_name: Par,
     cost: CostManager,
 ) -> DebruijnInterpreter {
-    // println!("\nsetup_reducer");
-
     let dispatcher = Arc::new(RwLock::new(RholangAndScalaDispatcher {
         _dispatch_table: Arc::new(RwLock::new(HashMap::new())),
         reducer: None,

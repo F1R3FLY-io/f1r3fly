@@ -4,22 +4,13 @@ pub mod rev_address;
 pub mod test_utils;
 
 use models::{
-    rhoapi::{Bundle, Connective, Expr, Match, New, Par, Receive, Send},
+    rhoapi::{Connective, Par},
     rust::utils::union,
 };
 
-use super::matcher::has_locally_free::HasLocallyFree;
+use crate::normal_forms::{Bundle, Expr, Match, New, Receive, Send};
 
-// Helper enum. This is 'GeneratedMessage' in Scala
-#[derive(Clone, Debug)]
-pub enum GeneratedMessage {
-    Send(Send),
-    Receive(Receive),
-    New(New),
-    Match(Match),
-    Bundle(Bundle),
-    Expr(Expr),
-}
+use super::matcher::has_locally_free::HasLocallyFree;
 
 // These two functions need to be under 'rholang' dir because of HasLocallyFree Trait.
 // This trait should, I think, be moved to models

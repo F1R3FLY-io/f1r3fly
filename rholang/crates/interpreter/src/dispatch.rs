@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use models::rhoapi::{ListParWithRandom, Par};
 
 use super::system_processes::RhoDispatchMap;
-use super::{env::Env, errors::InterpreterError, reduce::DebruijnInterpreter, unwrap_option_safe};
+use super::{env::Env, errors::InterpreterError, reduce::DebruijnInterpreter};
 
 pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
     data_list
@@ -32,7 +32,6 @@ impl RholangAndScalaDispatcher {
         match continuation.tagged_cont {
             Some(cont) => match cont {
                 TaggedCont::ParBody(par_with_rand) => {
-                    let env = build_env(data_list.clone());
                     let mut randoms =
                         vec![Blake2b512Random::from_bytes(&par_with_rand.random_state)];
                     randoms.extend(
@@ -41,23 +40,19 @@ impl RholangAndScalaDispatcher {
                             .map(|p| Blake2b512Random::from_bytes(&p.random_state)),
                     );
 
+                    let par = par_with_rand
+                        .body
+                        .map(Into::into)
+                        .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)?;
+
                     self.reducer
                         .clone()
                         .unwrap()
-                        .eval(
-                            unwrap_option_safe(par_with_rand.body)?,
-                            &env,
-                            Blake2b512Random::merge(randoms),
-                        )
+                        .evaluate(par, Blake2b512Random::merge(randoms))
                         .await
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {
-                    // println!("self {:p}", self);
                     let dispatch_table = &self._dispatch_table.try_read().unwrap();
-                    // println!(
-                    //     "dispatch_table at ScalaBodyRef: {:?}",
-                    //     dispatch_table.keys()
-                    // );
                     match dispatch_table.get(&_ref) {
                         Some(f) => Ok(f(data_list).await),
                         None => Err(InterpreterError::BugFoundError(format!(

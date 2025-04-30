@@ -1,8 +1,11 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
-use models::rhoapi::{EMinusMinus, EMod, EPercentPercent, EPlusPlus};
+use models::rhoapi::{
+    EMinusMinus, EMod, ENot, EPercentPercent, EPlusPlus, expr::ExprInstance,
+    g_unforgeable::UnfInstance, var::WildcardMsg,
+};
 
 use super::{sort_matcher::Sortable, sorter::*};
 
@@ -19,6 +22,38 @@ pub struct Par {
     pub connectives: Vec<Connective>,
     pub locally_free: BitVec,
     pub connective_used: bool,
+}
+
+impl From<Par> for models::rhoapi::Par {
+    fn from(value: Par) -> Self {
+        Self {
+            sends: value.sends.into_iter().map(Into::into).collect(),
+            receives: value.receives.into_iter().map(Into::into).collect(),
+            news: value.news.into_iter().map(Into::into).collect(),
+            exprs: value
+                .exprs
+                .into_iter()
+                .map(|v| models::rhoapi::Expr {
+                    expr_instance: Some(v.into()),
+                })
+                .collect(),
+            matches: value
+                .matches
+                .into_iter()
+                .map(|v| models::rhoapi::Match {
+                    target: Some(v.target.into()),
+                    cases: v.cases.into_iter().map(Into::into).collect(),
+                    locally_free: v.locally_free.into_iter().map(Into::into).collect(),
+                    connective_used: v.connective_used,
+                })
+                .collect(),
+            unforgeables: value.unforgeables.into_iter().map(|v| v.into()).collect(),
+            bundles: value.bundles.into_iter().map(Into::into).collect(),
+            connectives: value.connectives.into_iter().map(Into::into).collect(),
+            locally_free: value.locally_free.into_iter().map(Into::into).collect(),
+            connective_used: value.connective_used,
+        }
+    }
 }
 
 impl Par {
@@ -357,6 +392,17 @@ impl Sortable for Bundle {
     }
 }
 
+// Helper enum. This is 'GeneratedMessage' in Scala
+#[derive(Clone, Debug)]
+pub enum GeneratedMessage {
+    Send(Send),
+    Receive(Receive),
+    New(New),
+    Match(Match),
+    Bundle(Bundle),
+    Expr(Expr),
+}
+
 /// *
 /// A send is written `chan!(data)` or `chan!!(data)` for a persistent send.
 ///
@@ -370,6 +416,18 @@ pub struct Send {
     pub connective_used: bool,
 }
 
+impl From<Send> for models::rhoapi::Send {
+    fn from(send: Send) -> Self {
+        models::rhoapi::Send {
+            chan: Some(send.chan.into()),
+            data: send.data.into_iter().map(Into::into).collect(),
+            persistent: send.persistent,
+            locally_free: send.locally_free.into_iter().map(|v| v as u8).collect(),
+            connective_used: send.connective_used.into(),
+        }
+    }
+}
+
 impl From<models::rhoapi::Send> for Send {
     fn from(send: models::rhoapi::Send) -> Self {
         Send {
@@ -379,6 +437,18 @@ impl From<models::rhoapi::Send> for Send {
             locally_free: BitVec::<_, Lsb0>::from_iter(
                 send.locally_free.into_iter().map(|v| v as usize),
             ),
+            connective_used: send.connective_used.into(),
+        }
+    }
+}
+
+impl From<Send> for models::rhoapi::Send {
+    fn from(send: Send) -> Self {
+        models::rhoapi::Send {
+            chan: send.chan.into(),
+            data: send.data.into_iter().map(Into::into).collect(),
+            persistent: send.persistent,
+            locally_free: send.locally_free.into_iter().map(|v| v as u32).collect(),
             connective_used: send.connective_used.into(),
         }
     }
@@ -422,6 +492,20 @@ pub struct Receive {
     pub bind_count: u32,
     pub locally_free: BitVec,
     pub connective_used: bool,
+}
+
+impl From<Receive> for models::rhoapi::Receive {
+    fn from(value: Receive) -> Self {
+        Self {
+            binds: value.binds.into_iter().map(Into::into).collect(),
+            body: value.body.into(),
+            persistent: value.persistent,
+            peek: value.peek,
+            bind_count: value.bind_count as u32,
+            locally_free: value.locally_free.into(),
+            connective_used: value.connective_used,
+        }
+    }
 }
 
 impl From<models::rhoapi::ReceiveBind> for ReceiveBind {
@@ -476,8 +560,24 @@ pub struct New {
     /// For normalization, uri-referenced variables come at the end, and in
     /// lexicographical order.
     pub uris: Vec<String>,
-
     pub locally_free: BitVec,
+    pub injections: BTreeMap<String, Par>,
+}
+
+impl From<New> for models::rhoapi::New {
+    fn from(value: New) -> Self {
+        Self {
+            bind_count: value.bind_count as i32,
+            p: Some(value.p.into()),
+            uri: value.uris,
+            locally_free: value.locally_free.into_iter().map(|v| v as u8).collect(),
+            injections: value
+                .injections
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
+        }
+    }
 }
 
 impl From<models::rhoapi::New> for New {
@@ -506,6 +606,16 @@ pub struct MatchCase {
     pub pattern: Par,
     pub source: Par,
     pub free_count: u32,
+}
+
+impl From<MatchCase> for models::rhoapi::MatchCase {
+    fn from(value: MatchCase) -> Self {
+        models::rhoapi::MatchCase {
+            pattern: Some(value.pattern.into()),
+            source: Some(value.source.into()),
+            free_count: value.free_count as i32,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -665,6 +775,202 @@ pub enum Expr {
     /// set difference
     EMinusMinus(Par, Par),
     EMod(Par, Par),
+}
+
+impl From<Expr> for models::rhoapi::expr::ExprInstance {
+    fn from(value: Expr) -> Self {
+        match value {
+            Expr::GBool(v) => Self::GBool(v),
+            Expr::GInt(v) => Self::GInt(v),
+            Expr::GString(v) => Self::GString(v),
+            Expr::GUri(v) => Self::GUri(v),
+            Expr::GByteArray(items) => Self::GByteArray(items),
+            Expr::ENot(par) => Self::ENotBody(models::rhoapi::ENot {
+                p: Some(par.into()),
+            }),
+            Expr::ENeg(par) => Self::ENegBody(models::rhoapi::ENeg {
+                p: Some(par.into()),
+            }),
+            Expr::EMult(p1, p2) => Self::EMultBody(models::rhoapi::EMult {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EDiv(p1, p2) => Self::EDivBody(models::rhoapi::EDiv {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EPlus(p1, p2) => Self::EPlusBody(models::rhoapi::EPlus {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EMinus(p1, p2) => Self::EMinusBody(models::rhoapi::EMinus {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::ELt(p1, p2) => Self::ELtBody(models::rhoapi::ELt {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::ELte(p1, p2) => Self::ELteBody(models::rhoapi::ELte {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EGt(p1, p2) => Self::EGtBody(models::rhoapi::EGt {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EGte(p1, p2) => Self::EGteBody(models::rhoapi::EGte {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EEq(p1, p2) => Self::EEqBody(models::rhoapi::EEq {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::ENeq(p1, p2) => Self::ENeqBody(models::rhoapi::ENeq {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EAnd(p1, p2) => Self::EAndBody(models::rhoapi::EAnd {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EOr(p1, p2) => Self::EOrBody(models::rhoapi::EOr {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EVar(var) => Self::EVarBody(models::rhoapi::EVar {
+                v: Some(match var {
+                    Var::BoundVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(idx as i32)),
+                    },
+                    Var::FreeVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(idx as i32)),
+                    },
+                    Var::Wildcard => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::Wildcard(
+                            WildcardMsg {},
+                        )),
+                    },
+                }),
+            }),
+            Expr::EList(elist_body) => Self::EListBody(models::rhoapi::EList {
+                ps: elist_body.ps.into_iter().map(Into::into).collect(),
+                locally_free: elist_body
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as u8)
+                    .collect(),
+                connective_used: elist_body.connective_used,
+                remainder: elist_body.remainder.map(|var| match var {
+                    Var::BoundVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(idx as i32)),
+                    },
+                    Var::FreeVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(idx as i32)),
+                    },
+                    Var::Wildcard => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::Wildcard(
+                            WildcardMsg {},
+                        )),
+                    },
+                }),
+            }),
+            Expr::ETuple(etuple_body) => Self::ETupleBody(models::rhoapi::ETuple {
+                ps: etuple_body.ps.into_iter().map(Into::into).collect(),
+                locally_free: etuple_body
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as u8)
+                    .collect(),
+                connective_used: etuple_body.connective_used,
+            }),
+            Expr::ESet(eset_body) => Self::ESetBody(models::rhoapi::ESet {
+                ps: eset_body.ps.into_iter().map(Into::into).collect(),
+                locally_free: eset_body
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as u8)
+                    .collect(),
+                connective_used: eset_body.connective_used,
+                remainder: eset_body.remainder.map(|var| match var {
+                    Var::BoundVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(idx as i32)),
+                    },
+                    Var::FreeVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(idx as i32)),
+                    },
+                    Var::Wildcard => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::Wildcard(
+                            WildcardMsg {},
+                        )),
+                    },
+                }),
+            }),
+            Expr::EMap(emap_body) => Self::EMapBody(models::rhoapi::EMap {
+                kvs: emap_body
+                    .ps
+                    .into_iter()
+                    .map(|(k, v)| models::rhoapi::KeyValuePair {
+                        key: Some(k.into()),
+                        value: Some(v.into()),
+                    })
+                    .collect(),
+                locally_free: emap_body
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as u8)
+                    .collect(),
+                connective_used: emap_body.connective_used,
+                remainder: emap_body.remainder.map(|var| match var {
+                    Var::BoundVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(idx as i32)),
+                    },
+                    Var::FreeVar(idx) => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::FreeVar(idx as i32)),
+                    },
+                    Var::Wildcard => models::rhoapi::Var {
+                        var_instance: Some(models::rhoapi::var::VarInstance::Wildcard(
+                            WildcardMsg {},
+                        )),
+                    },
+                }),
+            }),
+            Expr::EMethod(emethod_body) => Self::EMethodBody(models::rhoapi::EMethod {
+                method_name: emethod_body.method_name,
+                target: Some(emethod_body.target.into()),
+                arguments: emethod_body.arguments.into_iter().map(Into::into).collect(),
+                locally_free: emethod_body
+                    .locally_free
+                    .into_iter()
+                    .map(|v| v as u8)
+                    .collect(),
+                connective_used: emethod_body.connective_used,
+            }),
+            Expr::EMatches(ematches_body) => Self::EMatchesBody(models::rhoapi::EMatches {
+                target: Some(ematches_body.target.into()),
+                pattern: Some(ematches_body.pattern.into()),
+            }),
+            Expr::EPercentPercent(p1, p2) => {
+                Self::EPercentPercentBody(models::rhoapi::EPercentPercent {
+                    p1: Some(p1.into()),
+                    p2: Some(p2.into()),
+                })
+            }
+            Expr::EPlusPlus(p1, p2) => Self::EPlusPlusBody(models::rhoapi::EPlusPlus {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EMinusMinus(p1, p2) => Self::EMinusMinusBody(models::rhoapi::EMinusMinus {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+            Expr::EMod(p1, p2) => Self::EModBody(models::rhoapi::EMod {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -1024,6 +1330,20 @@ impl From<models::rhoapi::GUnforgeable> for GUnforgeable {
             .try_into()
             .map(GUnforgeable)
             .unwrap()
+    }
+}
+
+impl From<GUnforgeable> for models::rhoapi::GUnforgeable {
+    fn from(unf: GUnforgeable) -> Self {
+        assert_eq!(unf.0.len(), size_of::<UnfInstance>());
+
+        let ptr = &unf.0 as *const _ as usize;
+
+        let unf_instace: UnfInstance = unsafe { *(ptr as *const UnfInstance) };
+
+        models::rhoapi::GUnforgeable {
+            unf_instance: Some(unf_instace),
+        }
     }
 }
 

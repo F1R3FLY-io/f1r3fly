@@ -1,6 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/CostAccounting.scala
 
-use super::{CostManager, CostManager, costs::Cost};
+use super::{CostManager, costs::Cost};
 
 pub struct CostAccounting;
 

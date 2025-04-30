@@ -177,14 +177,16 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
     let soft_checkpoint = runtime.try_lock().unwrap().create_soft_checkpoint();
 
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
-    let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
-    let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
-    let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
 
     let hot_store_state = soft_checkpoint.cache_snapshot;
     let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
 
-    for (key, value) in hot_store_state.continuations.clone().into_iter() {
+    for (key, value) in soft_checkpoint
+        .cache_snapshot
+        .continuations
+        .clone()
+        .into_iter()
+    {
         let wks: Vec<WaitingContinuationProto> = value
             .into_iter()
             .map(|wk| {
@@ -213,9 +215,15 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
             })
             .collect();
 
-        conts_map_entries.push(StoreStateContMapEntry { key, value: wks });
+        conts_map_entries.push(StoreStateContMapEntry {
+            key: key.into_iter().map(Into::into).collect(),
+            value: wks,
+        });
     }
 
+    let mut installed_conts_map_entries: Vec<StoreStateInstalledContMapEntry> = Vec::new();
+    let mut data_map_entries: Vec<StoreStateDataMapEntry> = Vec::new();
+    let mut joins_map_entries: Vec<StoreStateJoinsMapEntry> = Vec::new();
     for (key, value) in hot_store_state.installed_continuations.clone().into_iter() {
         let wk = WaitingContinuationProto {
             patterns: value.patterns,

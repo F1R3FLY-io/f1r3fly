@@ -1,6 +1,6 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::Par;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
 use crate::aliases::EnvHashMap;
@@ -59,7 +59,7 @@ impl Interpreter for InterpreterImpl {
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            reducer.inject(parsed, rand).await?;
+            reducer.evaluate(parsed, rand).await?;
             let phlos_left = self.c.get();
             let mergeable_channels = self.merge_chs.read().unwrap().clone();
 

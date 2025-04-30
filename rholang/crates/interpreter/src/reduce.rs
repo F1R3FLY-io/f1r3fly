@@ -8,8 +8,7 @@ use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
-    GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
-    Var,
+    GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, TaggedContinuation};
 use models::rust::par_map::ParMap;
@@ -36,9 +35,9 @@ use crate::accounting::costs::{
 };
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
+use crate::normal_forms::{self, GeneratedMessage, Par};
 use crate::rho_type::RhoTuple2;
-use crate::utils::GeneratedMessage;
-use models::rhoapi::Par;
+use crate::sort_matcher::Sorted;
 
 use super::accounting::CostManager;
 use super::accounting::costs::{
@@ -87,13 +86,11 @@ trait Method {
  * @param persistent  True if the write should remain in the tuplespace indefinitely.
  */
 impl DebruijnInterpreter {
-    pub async fn eval(
+    pub async fn evaluate(
         &self,
-        par: Par,
-        env: &Env<Par>,
+        par: normal_forms::Par,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\neval");
         let terms: Vec<GeneratedMessage> = vec![
             par.sends
                 .into_iter()
@@ -102,49 +99,24 @@ impl DebruijnInterpreter {
             par.receives
                 .into_iter()
                 .map(GeneratedMessage::Receive)
-                .collect(),
+                .collect::<Vec<_>>(),
             par.news.into_iter().map(GeneratedMessage::New).collect(),
             par.matches
                 .into_iter()
                 .map(GeneratedMessage::Match)
-                .collect(),
+                .collect::<Vec<_>>(),
             par.bundles
                 .into_iter()
                 .map(GeneratedMessage::Bundle)
-                .collect(),
+                .collect::<Vec<_>>(),
             par.exprs
                 .into_iter()
-                .filter(|expr| match &expr.expr_instance {
-                    Some(expr_instance) => match expr_instance {
-                        ExprInstance::EVarBody(_) => true,
-                        ExprInstance::EMethodBody(_) => true,
-                        _ => false,
-                    },
-                    None => false,
-                })
-                .collect::<Vec<Expr>>()
-                .into_iter()
                 .map(GeneratedMessage::Expr)
-                .collect(),
+                .collect::<Vec<_>>(),
         ]
         .into_iter()
-        .filter(|vec| !vec.is_empty())
         .flatten()
         .collect();
-
-        fn split(
-            id: i32,
-            terms: &Vec<GeneratedMessage>,
-            rand: Blake2b512Random,
-        ) -> Blake2b512Random {
-            if terms.len() == 1 {
-                rand
-            } else if terms.len() > 256 {
-                rand.split_short(id.try_into().unwrap())
-            } else {
-                rand.split_byte(id.try_into().unwrap())
-            }
-        }
 
         let term_split_limit = i16::MAX;
         if terms.len() > term_split_limit.try_into().unwrap() {
@@ -156,6 +128,19 @@ impl DebruijnInterpreter {
         } else {
             // Collect errors from all parallel execution paths (pars)
             // parTraverseSafe
+            fn split(
+                id: i32,
+                terms: &Vec<GeneratedMessage>,
+                rand: Blake2b512Random,
+            ) -> Blake2b512Random {
+                if terms.len() == 1 {
+                    rand
+                } else if terms.len() > 256 {
+                    rand.split_short(id.try_into().unwrap())
+                } else {
+                    rand.split_byte(id.try_into().unwrap())
+                }
+            }
             let futures: Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>> =
                 terms
                     .iter()
@@ -163,7 +148,6 @@ impl DebruijnInterpreter {
                     .map(|(index, term)| {
                         Box::pin(self.generated_message_eval(
                             term,
-                            env,
                             split(index.try_into().unwrap(), &terms, rand.clone()),
                         ))
                             as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
@@ -179,10 +163,6 @@ impl DebruijnInterpreter {
 
             self.aggregate_evaluator_errors(flattened_results)
         }
-    }
-
-    pub async fn inject(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.eval(par, &Env::new(), rand).await
     }
 
     /**
@@ -459,10 +439,9 @@ impl DebruijnInterpreter {
     async fn generated_message_eval(
         &self,
         term: &GeneratedMessage,
-        env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\ngenerated_message_eval, term: {:?}", term);
+        let env = &Env::new();
         match term {
             GeneratedMessage::Send(term) => self.eval_send(term, env, rand.to_bytes()).await,
             GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand.to_bytes()).await,
@@ -473,7 +452,7 @@ impl DebruijnInterpreter {
                 Some(expr_instance) => match expr_instance {
                     ExprInstance::EVarBody(e) => {
                         let res = self.eval_var(&e.clone().v.unwrap(), &env)?;
-                        self.eval(res, env, rand).await
+                        self.evaluate(res, env, rand).await
                     }
                     ExprInstance::EMethodBody(e) => {
                         let res = self.eval_expr_to_par(
@@ -482,7 +461,7 @@ impl DebruijnInterpreter {
                             },
                             env,
                         )?;
-                        self.eval(res, env, rand).await
+                        self.evaluate(res, env, rand).await
                     }
                     other => Err(InterpreterError::BugFoundError(format!(
                         "Undefined term: {:?}",
@@ -677,7 +656,7 @@ impl DebruijnInterpreter {
 
                                 Some(free_map) => {
                                     let eval_result = self
-                                        .eval(
+                                        .evaluate(
                                             single_case.source.clone().unwrap(),
                                             &add_to_env(
                                                 env,
@@ -798,7 +777,7 @@ impl DebruijnInterpreter {
             .charge(new_bindings_cost(new.bind_count as i64))?;
         match alloc(new.bind_count as usize, new.uri.clone()) {
             Ok(env) => {
-                self.eval(unwrap_option_safe(new.p.clone())?, &env, rand)
+                self.evaluate(unwrap_option_safe(new.p.clone())?, &env, rand)
                     .await
             }
             Err(e) => Err(e),
@@ -834,7 +813,7 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.eval(unwrap_option_safe(bundle.body.clone())?, env, rand)
+        self.evaluate(unwrap_option_safe(bundle.body.clone())?, env, rand)
             .await
     }
 

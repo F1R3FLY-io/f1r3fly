@@ -2,6 +2,8 @@ use std::{borrow::Borrow, hash::Hash, ops::Deref};
 
 use indextree::NodeId;
 
+use crate::normal_forms::Par;
+
 use super::score_tree::{ArenaBuilder, ScoreBuilder, ScoreTree};
 
 #[derive(Debug, Clone)]
@@ -18,6 +20,12 @@ impl<T> ScoredTerm<T> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Sorted<T>(T);
+
+impl From<Par> for Sorted<Par> {
+    fn from(par: Par) -> Self {
+        Sorted(par)
+    }
+}
 
 impl<T> Sorted<T> {
     pub fn take(self) -> T {
