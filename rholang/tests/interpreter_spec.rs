@@ -1,7 +1,7 @@
 // See rholang/src/test/scala/coop/rchain/rholang/InterpreterSpec.scala
 
 use models::rhoapi::{expr, Expr, Par};
-use rholang::rust::interpreter::accounting::costs::parsing_cost;
+use rholang::rust::interpreter::accounting::costs::{parsing_cost, subtraction_cost_with_value};
 use rholang::rust::interpreter::{
     errors::InterpreterError,
     interpreter::EvaluateResult,
@@ -202,6 +202,25 @@ async fn interpreter_should_capture_parsing_errors_and_charge_for_parsing() {
         assert!(!result.errors.is_empty());
 
         assert_eq!(result.cost, parsing_cost(bad_rholang));
+    })
+    .await
+}
+
+#[tokio::test]
+async fn interpreter_should_charge_for_parsing_even_when_not_enough_phlo() {
+    with_runtime("parsing-cost-spec-", |runtime| async move {
+        let mut runtime_lock = runtime.lock().unwrap();
+
+        let send_rho = "@{0}!(0)";
+        let initial_phlo = parsing_cost(send_rho) - subtraction_cost_with_value(1);
+
+        let result = runtime_lock
+            .evaluate_with_phlo(send_rho, initial_phlo.clone())
+            .await
+            .unwrap();
+
+        assert!(!result.errors.is_empty());
+        assert_eq!(result.cost.value, initial_phlo.value);
     })
     .await
 }
