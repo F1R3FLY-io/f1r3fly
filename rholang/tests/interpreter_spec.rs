@@ -141,7 +141,6 @@ async fn interpreter_should_yield_correct_results_for_prime_check_contract() {
         let ch_zero = rho_int(0);
         println!("ch_zero: {:?}", ch_zero);
 
-        // Get results from tuple_space using ch_zero as key
         let tuple_space_data = tuple_space.get(&ch_zero);
         println!("tuple_space_data: {:?}", tuple_space_data);
 
@@ -154,23 +153,18 @@ async fn interpreter_should_yield_correct_results_for_prime_check_contract() {
             })
             .unwrap_or_default();
 
-        // Create expected values using rho_string
         let expected: Vec<Par> = vec!["Nil", "Nil", "Pr", "Pr", "Pr", "Co", "Co"]
             .iter()
             .flat_map(|s| rho_string(s))
             .collect();
 
-        // Convert to HashSet for comparison
         let results_set: HashSet<Par> = results.into_iter().collect();
         let expected_set: HashSet<Par> = expected.into_iter().collect();
 
-        // Compare results and expected as sets
         assert_eq!(results_set, expected_set);
     })
     .await
 }
-
-//TODO fix it
 
 #[tokio::test]
 async fn interpreter_should_signal_syntax_errors_to_the_caller() {
@@ -181,13 +175,16 @@ async fn interpreter_should_signal_syntax_errors_to_the_caller() {
 
         let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
 
-        // Перевіряємо, що є помилки
         assert!(!result.errors.is_empty());
 
-        // Перевіряємо, що перша помилка є SyntaxError
+        /*
+        In the Scala implementation, we check for a SyntaxError
+        but in the Rust implementation we don't use SyntaxError at all—only ParseError,
+        so we should be checking for ParseError.
+         */
         match result.errors.first() {
-            Some(InterpreterError::SyntaxError(_)) => (),
-            _ => panic!("Expected SyntaxError, got {:?}", result.errors.first()),
+            Some(InterpreterError::ParserError(_)) => (),
+            _ => panic!("Expected ParserError, got {:?}", result.errors.first()),
         }
     })
     .await
@@ -202,10 +199,8 @@ async fn interpreter_should_capture_parsing_errors_and_charge_for_parsing() {
 
         let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
 
-        // Перевіряємо, що є помилки
         assert!(!result.errors.is_empty());
 
-        // Перевіряємо, що вартість дорівнює вартості парсингу
         assert_eq!(result.cost, parsing_cost(bad_rholang));
     })
     .await
