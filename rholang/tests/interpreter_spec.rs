@@ -105,8 +105,8 @@ async fn interpreter_should_yield_correct_results_for_prime_check_contract() {
                 contract primeCheck(@x, ret) = {
                     match x {
                         Nil => { stdoutAck!("Nil", *ret) | @0!("Nil") }
-                        ~{~Nil | ~Nil} => { stdoutAck!("Pr", *ret) | @0!("Pr") }
-                        _ => { stdoutAck!("Co", *ret) | @0!("Co") }
+                        ~{~Nil | ~Nil} => { stdoutAck!("Prime", *ret) | @0!("Pr") }
+                        _ => { stdoutAck!("Composite", *ret) |  @0!("Co") }
                     }
                 } |
                 loop!([Nil, 7, 7 | 8, 9 | Nil, 9 | 10, Nil, 9])
@@ -172,41 +172,41 @@ async fn interpreter_should_yield_correct_results_for_prime_check_contract() {
 
 //TODO fix it
 
-// #[tokio::test]
-// async fn interpreter_should_signal_syntax_errors_to_the_caller() {
-//     with_runtime("syntax-error-spec-", |runtime| async move {
-//         let mut runtime_lock = runtime.lock().unwrap();
-//
-//         let bad_rholang = "new f, x in { f(x) }";
-//
-//         let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
-//
-//         // Перевіряємо, що є помилки
-//         assert!(!result.errors.is_empty());
-//
-//         // Перевіряємо, що перша помилка є SyntaxError
-//         match result.errors.first() {
-//             Some(InterpreterError::SyntaxError(_)) => (),
-//             _ => panic!("Expected SyntaxError, got {:?}", result.errors.first()),
-//         }
-//     })
-//     .await
-// }
-//
-// #[tokio::test]
-// async fn interpreter_should_capture_parsing_errors_and_charge_for_parsing() {
-//     with_runtime("parsing-error-spec-", |runtime| async move {
-//         let mut runtime_lock = runtime.lock().unwrap();
-//
-//         let bad_rholang = r#"for(@x <- @"x"; @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!("hi") "#;
-//
-//         let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
-//
-//         // Перевіряємо, що є помилки
-//         assert!(!result.errors.is_empty());
-//
-//         // Перевіряємо, що вартість дорівнює вартості парсингу
-//         assert_eq!(result.cost, parsing_cost(bad_rholang));
-//     })
-//     .await
-// }
+#[tokio::test]
+async fn interpreter_should_signal_syntax_errors_to_the_caller() {
+    with_runtime("syntax-error-spec-", |runtime| async move {
+        let mut runtime_lock = runtime.lock().unwrap();
+
+        let bad_rholang = "new f, x in { f(x) }";
+
+        let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
+
+        // Перевіряємо, що є помилки
+        assert!(!result.errors.is_empty());
+
+        // Перевіряємо, що перша помилка є SyntaxError
+        match result.errors.first() {
+            Some(InterpreterError::SyntaxError(_)) => (),
+            _ => panic!("Expected SyntaxError, got {:?}", result.errors.first()),
+        }
+    })
+    .await
+}
+
+#[tokio::test]
+async fn interpreter_should_capture_parsing_errors_and_charge_for_parsing() {
+    with_runtime("parsing-error-spec-", |runtime| async move {
+        let mut runtime_lock = runtime.lock().unwrap();
+
+        let bad_rholang = r#"for(@x <- @"x"; @y <- @"y"){ @"xy"!(x + y) | @"x"!(1) | @"y"!("hi") "#;
+
+        let result = execute(&mut runtime_lock, bad_rholang).await.unwrap();
+
+        // Перевіряємо, що є помилки
+        assert!(!result.errors.is_empty());
+
+        // Перевіряємо, що вартість дорівнює вартості парсингу
+        assert_eq!(result.cost, parsing_cost(bad_rholang));
+    })
+    .await
+}
