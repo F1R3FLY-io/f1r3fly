@@ -13,6 +13,7 @@ pub struct InMemoryStoreManager {
 
 #[async_trait]
 impl KeyValueStoreManager for InMemoryStoreManager {
+    // This method will return a new instance of the store because of cloning the store
     async fn store(&mut self, name: String) -> Result<Box<dyn KeyValueStore>, heed::Error> {
         let kv_store = self
             .state

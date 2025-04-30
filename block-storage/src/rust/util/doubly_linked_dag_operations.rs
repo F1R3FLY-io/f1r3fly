@@ -4,12 +4,13 @@ use dashmap::{DashMap, DashSet};
 use shared::rust::store::key_value_store::KvStoreError;
 use std::collections::HashSet;
 
-use models::rust::block_hash::BlockHash;
+use models::rust::block_hash::BlockHashSerde;
 
+#[derive(Debug, Clone)]
 pub struct BlockDependencyDag {
-    parent_to_child_adjacency_list: DashMap<BlockHash, DashSet<BlockHash>>,
-    child_to_parent_adjacency_list: DashMap<BlockHash, DashSet<BlockHash>>,
-    dependency_free: DashSet<BlockHash>,
+    pub parent_to_child_adjacency_list: DashMap<BlockHashSerde, DashSet<BlockHashSerde>>,
+    pub child_to_parent_adjacency_list: DashMap<BlockHashSerde, DashSet<BlockHashSerde>>,
+    pub dependency_free: DashSet<BlockHashSerde>,
 }
 
 impl BlockDependencyDag {
@@ -31,7 +32,7 @@ impl BlockDependencyDag {
         map.insert(key, new_value);
     }
 
-    pub fn add(&mut self, parent: BlockHash, child: BlockHash) {
+    pub fn add(&mut self, parent: BlockHashSerde, child: BlockHashSerde) {
         Self::updated_with(
             &mut self.parent_to_child_adjacency_list,
             parent.clone(),
@@ -40,7 +41,7 @@ impl BlockDependencyDag {
                 set.insert(child.clone());
                 set
             },
-            |set: DashSet<BlockHash>| {
+            |set: DashSet<BlockHashSerde>| {
                 set.insert(child.clone());
                 set
             },
@@ -54,7 +55,7 @@ impl BlockDependencyDag {
                 set.insert(parent.clone());
                 set
             },
-            |set: DashSet<BlockHash>| {
+            |set: DashSet<BlockHashSerde>| {
                 set.insert(parent.clone());
                 set
             },
@@ -69,8 +70,8 @@ impl BlockDependencyDag {
 
     pub fn remove(
         &mut self,
-        element: BlockHash,
-    ) -> Result<(HashSet<BlockHash>, HashSet<BlockHash>), KvStoreError> {
+        element: BlockHashSerde,
+    ) -> Result<(HashSet<BlockHashSerde>, HashSet<BlockHashSerde>), KvStoreError> {
         assert!(!self.child_to_parent_adjacency_list.contains_key(&element));
         assert!(!self
             .parent_to_child_adjacency_list
@@ -78,7 +79,8 @@ impl BlockDependencyDag {
             .any(|entry| entry.value().contains(&element)));
 
         // Get children first and release the lock
-        let children: Vec<BlockHash> = match self.parent_to_child_adjacency_list.get(&element) {
+        let children: Vec<BlockHashSerde> = match self.parent_to_child_adjacency_list.get(&element)
+        {
             Some(children) => {
                 let mut vec = Vec::new();
                 for child in children.value().iter() {
@@ -96,26 +98,26 @@ impl BlockDependencyDag {
         // Process each child independently
         for child in children {
             // Get parents and release the lock
-            let parents: HashSet<BlockHash> = match self.child_to_parent_adjacency_list.get(&child) {
-                Some(parents) => {
-                    let mut set = HashSet::new();
-                    for parent in parents.value().iter() {
-                        set.insert(parent.clone());
+            let parents: HashSet<BlockHashSerde> =
+                match self.child_to_parent_adjacency_list.get(&child) {
+                    Some(parents) => {
+                        let mut set = HashSet::new();
+                        for parent in parents.value().iter() {
+                            set.insert(parent.clone());
+                        }
+                        set
                     }
-                    set
-                }
-                None => {
-                    return Err(KvStoreError::KeyNotFound(format!(
-                        "We should have at least {:?} as parent",
-                        element
-                    )))
-                }
-            };
+                    None => {
+                        return Err(KvStoreError::KeyNotFound(format!(
+                            "We should have at least {:?} as parent",
+                            element
+                        )))
+                    }
+                };
 
             // Create new parents set without the element
-            let updated_parents: HashSet<_> = parents.into_iter()
-                .filter(|p| !p.eq(&element))
-                .collect();
+            let updated_parents: HashSet<_> =
+                parents.into_iter().filter(|p| !p.eq(&element)).collect();
 
             if updated_parents.is_empty() {
                 self.child_to_parent_adjacency_list.remove(&child);
@@ -148,8 +150,8 @@ mod tests {
     use super::*;
     use prost::bytes::Bytes;
 
-    fn create_block_hash(value: &[u8]) -> BlockHash {
-        Bytes::from(value.to_vec())
+    fn create_block_hash(value: &[u8]) -> BlockHashSerde {
+        models::rust::block_hash::BlockHashSerde(Bytes::from(value.to_vec()))
     }
 
     #[test]
@@ -170,11 +172,19 @@ mod tests {
 
         // Check parent -> child mapping
         assert!(dag.parent_to_child_adjacency_list.contains_key(&parent));
-        assert!(dag.parent_to_child_adjacency_list.get(&parent).unwrap().contains(&child));
+        assert!(dag
+            .parent_to_child_adjacency_list
+            .get(&parent)
+            .unwrap()
+            .contains(&child));
 
         // Check child -> parent mapping
         assert!(dag.child_to_parent_adjacency_list.contains_key(&child));
-        assert!(dag.child_to_parent_adjacency_list.get(&child).unwrap().contains(&parent));
+        assert!(dag
+            .child_to_parent_adjacency_list
+            .get(&child)
+            .unwrap()
+            .contains(&parent));
 
         // Check dependency free set
         assert!(dag.dependency_free.contains(&parent));
@@ -197,8 +207,16 @@ mod tests {
         assert!(children.contains(&child2));
 
         // Check children -> parent mapping
-        assert!(dag.child_to_parent_adjacency_list.get(&child1).unwrap().contains(&parent));
-        assert!(dag.child_to_parent_adjacency_list.get(&child2).unwrap().contains(&parent));
+        assert!(dag
+            .child_to_parent_adjacency_list
+            .get(&child1)
+            .unwrap()
+            .contains(&parent));
+        assert!(dag
+            .child_to_parent_adjacency_list
+            .get(&child2)
+            .unwrap()
+            .contains(&parent));
 
         // Check dependency free set
         assert!(dag.dependency_free.contains(&parent));
@@ -273,7 +291,11 @@ mod tests {
         assert!(!dag.dependency_free.contains(&parent1));
 
         // Check that child still has parent2
-        assert!(dag.child_to_parent_adjacency_list.get(&child).unwrap().contains(&parent2));
+        assert!(dag
+            .child_to_parent_adjacency_list
+            .get(&child)
+            .unwrap()
+            .contains(&parent2));
         assert!(!dag.dependency_free.contains(&child));
 
         // Check returned sets
