@@ -1147,6 +1147,23 @@ mod tests {
     }
 
     #[test]
+    fn prime_check_strings_should_print_correctly() {
+        let mut printer = PrettyPrinter::new();
+
+        let nil_proc = Proc::new_proc_string("Nil".to_string());
+        let nil_expr = normalize_ground(&nil_proc).unwrap();
+        assert_eq!(printer.build_string_from_expr(&nil_expr), "\"Nil\"");
+
+        let pr_proc = Proc::new_proc_string("Pr".to_string());
+        let pr_expr = normalize_ground(&pr_proc).unwrap();
+        assert_eq!(printer.build_string_from_expr(&pr_expr), "\"Pr\"");
+
+        let co_proc = Proc::new_proc_string("Co".to_string());
+        let co_expr = normalize_ground(&co_proc).unwrap();
+        assert_eq!(printer.build_string_from_expr(&co_expr), "\"Co\"");
+    }
+
+    #[test]
     fn ground_uri_should_print_with_back_ticks() {
         let proc = Proc::new_proc_uri("Uri".to_string());
         let expr = normalize_ground(&proc).unwrap();
