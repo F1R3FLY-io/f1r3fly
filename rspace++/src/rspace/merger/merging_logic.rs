@@ -1,4 +1,5 @@
 // See rspace/src/main/scala/coop/rchain/rspace/merger/MergingLogic.scala
+// See rspace/src/test/scala/coop/rchain/rspace/merging/MergingLogicSpec.scala
 
 use std::collections::{BTreeMap, BTreeSet};
 

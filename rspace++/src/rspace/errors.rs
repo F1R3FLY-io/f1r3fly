@@ -49,6 +49,7 @@ pub enum HistoryError {
     RadixTreeError(RadixTreeError),
     KvStoreError(KvStoreError),
     RootError(RootError),
+    MergeError(String),
 }
 
 impl std::fmt::Display for HistoryError {
@@ -58,6 +59,7 @@ impl std::fmt::Display for HistoryError {
             HistoryError::RadixTreeError(err) => write!(f, "Radix Tree Error: {}", err),
             HistoryError::KvStoreError(err) => write!(f, "Key Value Store Error: {}", err),
             HistoryError::RootError(err) => write!(f, "Root Error: {}", err),
+            HistoryError::MergeError(err) => write!(f, "Merge Error: {}", err),
         }
     }
 }

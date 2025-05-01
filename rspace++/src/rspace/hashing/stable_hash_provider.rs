@@ -22,14 +22,15 @@ pub fn hash_vec<C: Serialize>(channels: &Vec<C>) -> Vec<Blake2b256Hash> {
 }
 
 pub fn hash_from_vec<C: Serialize>(channels: &Vec<C>) -> Blake2b256Hash {
-    hash_from_hashes(hash_vec(channels))
+    hash_from_hashes(&hash_vec(channels))
 }
 
 // TODO: Double check the sorting here against scala side
-pub fn hash_from_hashes(channels_hashes: Vec<Blake2b256Hash>) -> Blake2b256Hash {
-    let mut ord_hashes = channels_hashes;
-    ord_hashes.sort();
-    let concatenated: Vec<u8> = ord_hashes.into_iter().flat_map(|h| h.0.clone()).collect();
+pub fn hash_from_hashes(channels_hashes: &Vec<Blake2b256Hash>) -> Blake2b256Hash {
+    let mut ord_refs: Vec<&Blake2b256Hash> = channels_hashes.iter().collect();
+    ord_refs.sort();
+
+    let concatenated: Vec<u8> = ord_refs.iter().flat_map(|h| h.0.iter().copied()).collect();
     Blake2b256Hash::new(&concatenated)
 }
 
