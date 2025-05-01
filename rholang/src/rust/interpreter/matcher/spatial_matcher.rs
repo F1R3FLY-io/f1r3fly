@@ -97,11 +97,28 @@ impl SpatialMatcher<Par, Connective> for SpatialMatcherContext {
             }
 
             Some(ConnNotBody(p)) => {
-                // println!("\nhit ConnNotBody");
-                let match_option = self.spatial_match(target, p);
-                // println!("\nConnNotBody match_option: {:?}", match_option);
-                let _ = guard(match_option.is_none());
-                Some(())
+                // Check if there is a ConnOrBody inside the ConnNotBody
+                let has_or_body = match &p {
+                    Par { connectives, .. } => connectives
+                        .iter()
+                        .any(|c| matches!(c.connective_instance, Some(ConnOrBody(_)))),
+                };
+
+                if has_or_body {
+                    // If there is a ConnOrBody inside, we need to handle it specially
+                    let match_option = self.spatial_match(target, p);
+                    match match_option {
+                        Some(_) => None,  // If inner pattern matches, the negation fails
+                        None => Some(()), // If inner pattern doesn't match, the negation succeeds
+                    }
+                } else {
+                    // Regular negation handling
+                    let match_option = self.spatial_match(target, p);
+                    match match_option {
+                        Some(_) => None,
+                        None => Some(()),
+                    }
+                }
             }
 
             Some(VarRefBody(_)) => None,
