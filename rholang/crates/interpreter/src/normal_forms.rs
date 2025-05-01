@@ -2,22 +2,20 @@ use std::{cmp::Ordering, collections::BTreeMap};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
-use models::rhoapi::{
-    EMinusMinus, EMod, ENot, EPercentPercent, EPlusPlus, expr::ExprInstance,
-    g_unforgeable::UnfInstance, var::WildcardMsg,
-};
+use models::rhoapi::{EMinusMinus, EMod, EPercentPercent, EPlusPlus, var::WildcardMsg};
+use prost::Message;
 
 use super::{sort_matcher::Sortable, sorter::*};
 
 /// A parallel composition of Rholang terms.
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
-pub struct Par {
+pub struct Par<const N: usize> {
     pub sends: Vec<Send>,
     pub receives: Vec<Receive>,
     pub news: Vec<New>,
     pub exprs: Vec<Expr>,
     pub matches: Vec<Match>,
-    pub unforgeables: Vec<GUnforgeable>,
+    pub unforgeables: Vec<GUnforgeable<N>>,
     pub bundles: Vec<Bundle>,
     pub connectives: Vec<Connective>,
     pub locally_free: BitVec,
@@ -1317,35 +1315,27 @@ impl From<models::rhoapi::VarRef> for VarRef {
 /// These should only occur as the program is being evaluated. There is no way in
 /// the grammar to construct them.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct GUnforgeable(pub [i8; 32]);
+pub struct GUnforgeable<const N: usize>(pub [u8; N]);
 
-impl From<models::rhoapi::GUnforgeable> for GUnforgeable {
+impl<const N: usize> From<models::rhoapi::GUnforgeable> for GUnforgeable<N> {
     fn from(unf: models::rhoapi::GUnforgeable) -> Self {
-        let mut buf = vec![];
-        unf.unf_instance.unwrap().encode(&mut buf);
+        let mut buf = [0u8; N];
 
-        buf.into_iter()
-            .map(|v| v as i8)
-            .collect::<Vec<i8>>()
-            .try_into()
-            .map(GUnforgeable)
-            .unwrap()
+        unf.unf_instance
+            .expect("unf_instance can't be None")
+            .encode(&mut buf.as_mut_slice());
+
+        GUnforgeable(buf)
     }
 }
 
-impl From<GUnforgeable> for models::rhoapi::GUnforgeable {
-    fn from(unf: GUnforgeable) -> Self {
-        let unf_instance: Option<UnfInstance> = if unf.0.len() != size_of::<UnfInstance>() {
-            None
-        } else {
-            Some(unsafe { std::mem::transmute::<[i8; 32], UnfInstance>(unf.0) })
-        };
-
-        models::rhoapi::GUnforgeable { unf_instance }
+impl<const N: usize> From<GUnforgeable<N>> for models::rhoapi::GUnforgeable {
+    fn from(unf: GUnforgeable<N>) -> Self {
+        models::rhoapi::GUnforgeable::decode(&unf.0[..]).unwrap()
     }
 }
 
-impl GUnforgeable {
+impl<const N: usize> GUnforgeable<N> {
     pub fn to_bytes_vec(&self) -> Vec<u8> {
         let mut unf_private_data = std::mem::ManuallyDrop::new(self.0.to_vec());
         unsafe {
@@ -1358,13 +1348,13 @@ impl GUnforgeable {
     }
 }
 
-impl PartialOrd for GUnforgeable {
+impl<const N: usize> PartialOrd for GUnforgeable<N> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for GUnforgeable {
+impl<const N: usize> Ord for GUnforgeable<N> {
     fn cmp(&self, other: &Self) -> Ordering {
         let lhs = &self.0;
         let rhs = &other.0;
