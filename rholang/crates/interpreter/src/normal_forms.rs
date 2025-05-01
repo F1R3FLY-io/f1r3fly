@@ -1335,15 +1335,13 @@ impl From<models::rhoapi::GUnforgeable> for GUnforgeable {
 
 impl From<GUnforgeable> for models::rhoapi::GUnforgeable {
     fn from(unf: GUnforgeable) -> Self {
-        assert_eq!(unf.0.len(), size_of::<UnfInstance>());
+        let unf_instance: Option<UnfInstance> = if unf.0.len() != size_of::<UnfInstance>() {
+            None
+        } else {
+            Some(unsafe { std::mem::transmute::<[i8; 32], UnfInstance>(unf.0) })
+        };
 
-        let ptr = &unf.0 as *const _ as usize;
-
-        let unf_instace: UnfInstance = unsafe { *(ptr as *const UnfInstance) };
-
-        models::rhoapi::GUnforgeable {
-            unf_instance: Some(unf_instace),
-        }
+        models::rhoapi::GUnforgeable { unf_instance }
     }
 }
 
