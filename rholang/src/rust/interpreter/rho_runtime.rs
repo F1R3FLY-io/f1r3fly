@@ -82,10 +82,7 @@ pub trait RhoRuntime: HasCost {
             .await
     }
 
-    async fn evaluate_with_term(
-        &mut self,
-        term: &str,
-    ) -> Result<EvaluateResult, InterpreterError> {
+    async fn evaluate_with_term(&mut self, term: &str) -> Result<EvaluateResult, InterpreterError> {
         self.evaluate_with_env_and_phlo(term, Cost::unsafe_max(), HashMap::new())
             .await
     }

@@ -8,6 +8,7 @@ pub mod env;
 pub mod errors;
 pub mod interpreter;
 pub mod matcher;
+pub mod openai_service;
 pub mod pretty_printer;
 pub mod reduce;
 pub mod registry;
@@ -18,7 +19,6 @@ pub mod substitute;
 pub mod system_processes;
 pub mod test_utils;
 pub mod util;
-pub mod openai_service;
 
 pub fn unwrap_option_safe<A: Clone + std::fmt::Debug>(
     opt: Option<A>,

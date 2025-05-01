@@ -26,8 +26,24 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
         .set_language(&tree_sitter_rholang::LANGUAGE.into())
         .expect("Error loading Rholang grammar");
 
-    let tree = parser.parse(code, None).expect("Failed to parse code");
+    let tree = match parser.parse(code, None) {
+        Some(tree) => tree,
+        None => {
+            return Err(InterpreterError::SyntaxError(
+                "Failed to parse code".to_string(),
+            ))
+        }
+    };
+
     // println!("\nTree: {:#?} \n", tree.root_node().to_sexp());
+
+    // Check if there were syntax errors during parsing
+    if tree.root_node().has_error() {
+        return Err(InterpreterError::SyntaxError(format!(
+            "Syntax error in code: {}",
+            code
+        )));
+    }
 
     let root_node = tree.root_node();
     let start_node = match root_node.named_child(0) {

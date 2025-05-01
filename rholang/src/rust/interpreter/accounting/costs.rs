@@ -81,6 +81,10 @@ pub fn subtraction_cost() -> Cost {
     Cost::create(3, "subtraction".to_string())
 }
 
+pub fn subtraction_cost_with_value(value: i64) -> Cost {
+    Cost::create(value, "subtraction".to_string())
+}
+
 pub fn equality_check_cost<T: prost::Message, P: prost::Message>(x: &T, y: &P) -> Cost {
     let size_x = x.encoded_len();
     let size_y = y.encoded_len();
