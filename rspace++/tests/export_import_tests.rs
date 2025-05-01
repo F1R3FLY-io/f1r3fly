@@ -6,7 +6,6 @@ use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::state::exporters::rspace_exporter_items::RSpaceExporterItems;
 use rspace_plus_plus::rspace::state::rspace_importer::RSpaceImporterInstance;
-use rspace_plus_plus::rspace::tuplespace_interface::Tuplespace;
 use rspace_plus_plus::rspace::{
     history::history_repository::HistoryRepositoryInstances,
     hot_store::HotStoreState,
@@ -60,7 +59,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        space1.produce(format!("ch{}", i), format!("data{}", i), false).unwrap();
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -106,7 +105,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
             continuation.clone(),
             false,
             BTreeSet::new(),
-        );
+        ).unwrap();
     }
 
     // println!("\nspace2: {:?}", space2.to_map());
@@ -180,7 +179,7 @@ async fn multipage_export_should_work_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        space1.produce(format!("ch{}", i), format!("data{}", i), false).unwrap();
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -220,7 +219,7 @@ async fn multipage_export_should_work_correctly() {
             continuation.clone(),
             false,
             BTreeSet::new(),
-        );
+        ).unwrap();
     }
     let end_point = space2.create_checkpoint().unwrap();
     assert_eq!(end_point.root, RadixHistory::empty_root_node_hash())
@@ -294,7 +293,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
 
     // Generate init data in space1
     for i in 0..data_size {
-        space1.produce(format!("ch{}", i), format!("data{}", i), false);
+        space1.produce(format!("ch{}", i), format!("data{}", i), false).unwrap();
     }
 
     let init_point = space1.create_checkpoint().unwrap();
@@ -334,7 +333,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
             continuation.clone(),
             false,
             BTreeSet::new(),
-        );
+        ).unwrap();
     }
     let end_point = space2.create_checkpoint().unwrap();
     assert_eq!(end_point.root, RadixHistory::empty_root_node_hash())

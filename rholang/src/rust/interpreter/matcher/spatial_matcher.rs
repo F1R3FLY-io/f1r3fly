@@ -102,7 +102,6 @@ impl SpatialMatcher<Par, Connective> for SpatialMatcherContext {
                     Par { connectives, .. } => connectives
                         .iter()
                         .any(|c| matches!(c.connective_instance, Some(ConnOrBody(_)))),
-                    _ => false,
                 };
 
                 if has_or_body {
