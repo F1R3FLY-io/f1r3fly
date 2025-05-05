@@ -32,7 +32,7 @@ pub trait Interpreter {
 
 pub struct InterpreterImpl {
     c: CostManager,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
+    merge_chs: Arc<RwLock<HashSet<crate::normal_forms::Par>>>,
 }
 
 impl Interpreter for InterpreterImpl {
@@ -78,7 +78,10 @@ impl Interpreter for InterpreterImpl {
 }
 
 impl InterpreterImpl {
-    pub fn new(cost: CostManager, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
+    pub fn new(
+        cost: CostManager,
+        merge_chs: Arc<RwLock<HashSet<crate::normal_forms::Par>>>,
+    ) -> InterpreterImpl {
         InterpreterImpl { c: cost, merge_chs }
     }
 

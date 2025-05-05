@@ -22,6 +22,7 @@ pub mod substitute;
 pub mod system_processes;
 pub mod utils;
 
+use dashmap::DashMap;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -37,7 +38,7 @@ use prost::Message;
 use rho_runtime::{RhoRuntime, Runtime, bootstrap_registry as bootstrap_registry_internal};
 use rspace_plus_plus::rspace::checkpoint::SoftCheckpoint;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
-use rspace_plus_plus::rspace::hot_store::{HotStoreState, new_dashmap};
+use rspace_plus_plus::rspace::hot_store::HotStoreState;
 use rspace_plus_plus::rspace::internal::{Datum, WaitingContinuation};
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
 use rspace_plus_plus::rspace::trace::event::{COMM, Consume, Produce};
@@ -178,7 +179,7 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
 
     let mut conts_map_entries: Vec<StoreStateContMapEntry> = Vec::new();
 
-    let hot_store_state = soft_checkpoint.cache_snapshot;
+    let hot_store_state = soft_checkpoint.cache_snapshot.clone();
     let mut installed_joins_map_entries: Vec<StoreStateInstalledJoinsMapEntry> = Vec::new();
 
     for (key, value) in soft_checkpoint
@@ -247,7 +248,7 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
         };
 
         installed_conts_map_entries.push(StoreStateInstalledContMapEntry {
-            key,
+            key: key.into_iter().map(Into::into).collect(),
             value: Some(wk),
         });
     }
@@ -267,25 +268,35 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut SharedRhoRuntime) -> *con
             .collect();
 
         data_map_entries.push(StoreStateDataMapEntry {
-            key: Some(key),
+            key: Some(key.into()),
             value: datums,
         });
     }
 
     for (key, value) in hot_store_state.joins.clone().into_iter() {
-        let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+        let joins = value
+            .into_iter()
+            .map(|join| JoinProto {
+                join: join.into_iter().map(Into::into).collect(),
+            })
+            .collect();
 
         joins_map_entries.push(StoreStateJoinsMapEntry {
-            key: Some(key),
+            key: Some(key.into()),
             value: joins,
         });
     }
 
     for (key, value) in hot_store_state.installed_joins.clone().into_iter() {
-        let joins = value.into_iter().map(|join| JoinProto { join }).collect();
+        let joins = value
+            .into_iter()
+            .map(|join| JoinProto {
+                join: join.into_iter().map(Into::into).collect(),
+            })
+            .collect();
 
         installed_joins_map_entries.push(StoreStateInstalledJoinsMapEntry {
-            key: Some(key),
+            key: Some(key.into()),
             value: joins,
         });
     }
@@ -432,7 +443,7 @@ extern "C" fn revert_to_soft_checkpoint(
     let soft_checkpoint_proto = SoftCheckpointProto::decode(payload_slice).unwrap();
     let cache_snapshot_proto = soft_checkpoint_proto.cache_snapshot.unwrap();
 
-    let conts_map = new_dashmap();
+    let conts_map = DashMap::new();
     for map_entry in cache_snapshot_proto.continuations {
         let key = map_entry.key;
         let value = map_entry
@@ -465,7 +476,7 @@ extern "C" fn revert_to_soft_checkpoint(
         conts_map.insert(key, value);
     }
 
-    let installed_conts_map = new_dashmap();
+    let installed_conts_map = DashMap::new();
     for map_entry in cache_snapshot_proto.installed_continuations {
         let key = map_entry.key;
         let wk_proto = map_entry.value.unwrap();
@@ -491,7 +502,7 @@ extern "C" fn revert_to_soft_checkpoint(
         installed_conts_map.insert(key, value);
     }
 
-    let datums_map = new_dashmap();
+    let datums_map = DashMap::new();
     for map_entry in cache_snapshot_proto.data {
         let key = map_entry.key.unwrap();
         let value = map_entry
@@ -514,7 +525,7 @@ extern "C" fn revert_to_soft_checkpoint(
         datums_map.insert(key, value);
     }
 
-    let joins_map = new_dashmap();
+    let joins_map = DashMap::new();
     for map_entry in cache_snapshot_proto.joins {
         let key = map_entry.key.unwrap();
         let value = map_entry
@@ -526,7 +537,7 @@ extern "C" fn revert_to_soft_checkpoint(
         joins_map.insert(key, value);
     }
 
-    let installed_joins_map = new_dashmap();
+    let installed_joins_map = DashMap::new();
     for map_entry in cache_snapshot_proto.installed_joins {
         let key = map_entry.key.unwrap();
         let value = map_entry
@@ -628,7 +639,7 @@ extern "C" fn revert_to_soft_checkpoint(
         })
         .collect();
 
-    let produce_counter_map: BTreeMap<Produce, i32> = soft_checkpoint_proto
+    let produce_counter: BTreeMap<Produce, i32> = soft_checkpoint_proto
         .produce_counter
         .into_iter()
         .map(|map_entry| {
@@ -656,7 +667,7 @@ extern "C" fn revert_to_soft_checkpoint(
     let soft_checkpoint = SoftCheckpoint {
         cache_snapshot,
         log,
-        produce_counter: produce_counter_map,
+        produce_counter,
     };
 
     let runtime = unsafe { (*runtime_ptr).runtime.clone() };
@@ -804,7 +815,13 @@ extern "C" fn get_data(
     // let rt = tokio::runtime::Runtime::new().unwrap();
     // let datums =
     //     rt.block_on(async { unsafe { (*runtime_ptr).runtime.try_lock().unwrap().get_data(channel).await } });
-    let datums = unsafe { (*runtime_ptr).runtime.try_lock().unwrap().get_data(channel) };
+    let datums = unsafe {
+        (*runtime_ptr)
+            .runtime
+            .try_lock()
+            .unwrap()
+            .get_data(channel.into())
+    };
 
     // println!("\ndatums in rust get_data: {:?}", datums);
 
@@ -847,10 +864,15 @@ extern "C" fn get_joins(
             .runtime
             .try_lock()
             .unwrap()
-            .get_joins(channel)
+            .get_joins(channel.into())
     };
 
-    let vec_join: Vec<JoinProto> = joins.into_iter().map(|join| JoinProto { join }).collect();
+    let vec_join: Vec<JoinProto> = joins
+        .into_iter()
+        .map(|join| JoinProto {
+            join: join.into_iter().map(Into::into).collect(),
+        })
+        .collect();
     let joins_proto = JoinsProto { joins: vec_join };
 
     let mut bytes = joins_proto.encode_to_vec();
@@ -876,7 +898,13 @@ extern "C" fn get_waiting_continuations(
             .runtime
             .try_lock()
             .unwrap()
-            .get_continuations(channels_proto.channels)
+            .get_continuations(
+                channels_proto
+                    .channels
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
     };
 
     let wks_protos: Vec<WaitingContinuationProto> = wks
@@ -1021,7 +1049,7 @@ extern "C" fn get_hot_changes(runtime_ptr: *mut SharedRhoRuntime) -> *const u8 {
 
         let value = StoreToMapValue { data: datums, wks };
         map_entries.push(StoreToMapEntry {
-            key,
+            key: key.into_iter().map(Into::into).collect(),
             value: Some(value),
         });
     }
@@ -1172,7 +1200,7 @@ extern "C" fn create_runtime(
     let params_slice = unsafe { std::slice::from_raw_parts(params_ptr, params_bytes_len) };
     let params = CreateRuntimeParams::decode(params_slice).unwrap();
 
-    let mergeable_tag_name = params.mergeable_tag_name.unwrap();
+    let mergeable_tag_name = params.mergeable_tag_name.unwrap().into();
     let init_registry = params.init_registry;
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();

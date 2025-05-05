@@ -1,6 +1,7 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use models::rhoapi;
 use models::rhoapi::Bundle;
 use models::rhoapi::Var;
 use models::rhoapi::expr::ExprInstance::EMapBody;
@@ -9,6 +10,7 @@ use models::rhoapi::{BindPattern, Expr, ListParWithRandom, TaggedContinuation};
 use models::rust::block_hash::BlockHash;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
+use models::rust::rholang;
 use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
@@ -142,12 +144,7 @@ pub trait Runtime: HasCost {
      * @param rand random seed for rholang execution
      * @return
      */
-    async fn inj(
-        &self,
-        par: Sorted<Par>,
-        env: Env<Par>,
-        rand: Blake2b512Random,
-    ) -> Result<(), InterpreterError>;
+    async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError>;
 
     /**
      * After some executions([[evaluate]]) on the runtime, you can create a soft checkpoint which is the changes
@@ -282,11 +279,7 @@ impl Runtime for RhoRuntime {
             .await
     }
 
-    async fn inj(
-        &self,
-        par: Sorted<normal_forms::Par>,
-        rand: Blake2b512Random,
-    ) -> Result<(), InterpreterError> {
+    async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
         self.reducer.evaluate(par, rand).await
     }
 
@@ -366,17 +359,17 @@ impl Runtime for RhoRuntime {
     }
 
     fn set_invalid_blocks(&self, invalid_blocks: HashMap<BlockHash, Validator>) -> () {
-        let invalid_blocks: Par = Par::default().with_exprs(vec![Expr {
+        let invalid_blocks = models::rhoapi::Par::default().with_exprs(vec![Expr {
             expr_instance: Some(EMapBody(ParMapTypeMapper::par_map_to_emap(
                 ParMap::create_from_sorted_par_map(SortedParMap::create_from_map(
                     invalid_blocks
                         .into_iter()
                         .map(|(validator, block_hash)| {
                             (
-                                Par::default().with_exprs(vec![Expr {
+                                models::rhoapi::Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(GByteArray(validator)),
                                 }]),
-                                Par::default().with_exprs(vec![Expr {
+                                models::rhoapi::Par::default().with_exprs(vec![Expr {
                                     expr_instance: Some(GByteArray(block_hash)),
                                 }]),
                             )
@@ -431,7 +424,7 @@ fn introduce_system_process<T>(
     processes: Vec<(Name, Arity, Remainder, BodyRef)>,
 ) -> Result<(), RSpaceError>
 where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
+    T: ISpace<models::rhoapi::Par, BindPattern, ListParWithRandom, TaggedContinuation>,
 {
     for (name, arity, remainder, body_ref) in processes {
         let channels = vec![name];
@@ -445,7 +438,7 @@ where
             tagged_cont: Some(TaggedCont::ScalaBodyRef(body_ref)),
         };
 
-        if let Err(err) = space.install(channels.clone(), patterns.clone(), continuation.clone()) {
+        if let Err(err) = space.install(channels, patterns.clone(), continuation.clone()) {
             return Err(err);
         }
     }
@@ -701,12 +694,12 @@ fn dispatch_table_creator(
     Arc::new(RwLock::new(dispatch_table))
 }
 
-fn basic_processes() -> HashMap<String, Par> {
+fn basic_processes() -> HashMap<String, models::rhoapi::Par> {
     let mut map = HashMap::new();
 
     map.insert(
         "rho:registry:lookup".to_string(),
-        Par::default().with_bundles(vec![Bundle {
+        models::rhoapi::Par::default().with_bundles(vec![Bundle {
             body: Some(FixedChannels::reg_lookup()),
             write_flag: true,
             read_flag: false,
@@ -715,7 +708,7 @@ fn basic_processes() -> HashMap<String, Par> {
 
     map.insert(
         "rho:registry:insertArbitrary".to_string(),
-        Par::default().with_bundles(vec![Bundle {
+        models::rhoapi::Par::default().with_bundles(vec![Bundle {
             body: Some(FixedChannels::reg_insert_random()),
             write_flag: true,
             read_flag: false,
@@ -724,7 +717,7 @@ fn basic_processes() -> HashMap<String, Par> {
 
     map.insert(
         "rho:registry:insertSigned:secp256k1".to_string(),
-        Par::default().with_bundles(vec![Bundle {
+        models::rhoapi::Par::default().with_bundles(vec![Bundle {
             body: Some(FixedChannels::reg_insert_signed()),
             write_flag: true,
             read_flag: false,
@@ -782,15 +775,15 @@ fn setup_maps_and_refs() -> (
         .chain(rho_crypto_binding.iter())
         .collect::<Vec<&Definition>>();
 
-    let mut urn_map: HashMap<_, _> = basic_processes();
+    let mut urn_map = basic_processes();
     combined_processes
         .iter()
         .map(|process| process.to_urn_map())
         .for_each(|(key, value)| {
-            urn_map.insert(key, value);
+            urn_map.insert(key, value.into());
         });
 
-    let proc_defs: Vec<(Par, i32, Option<Var>, i64)> = combined_processes
+    let proc_defs = combined_processes
         .iter()
         .map(|process| process.to_proc_defs())
         .collect();
@@ -845,7 +838,8 @@ pub async fn bootstrap_registry(runtime: Arc<Mutex<impl Runtime>>) -> () {
     let _ = runtime_lock
         .cost()
         .set(Cost::create(i64::MAX, "bootstrap registry".to_string()));
-    runtime_lock.inj(ast(), Env::new(), rand).await.unwrap();
+    let value: crate::normal_forms::Par = ast().into();
+    runtime_lock.inj(value, rand).await.unwrap();
     let _ = runtime_lock.cost().set(Cost::create_from_cost(cost));
 }
 
