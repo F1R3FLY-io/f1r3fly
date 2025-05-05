@@ -4,7 +4,6 @@ use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::var::VarInstance::{self, BoundVar};
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
@@ -28,24 +27,21 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
+use crate::accounting::CostManager;
 use crate::accounting::costs::{
-    add_cost, bytes_to_hex_cost, diff_cost, hex_to_bytes_cost, interpolate_cost, keys_method_cost,
-    length_method_cost, lookup_cost, match_eval_cost, nth_method_call_cost, remove_cost,
-    size_method_cost, slice_cost, take_cost, to_byte_array_cost, to_list_cost, union_cost,
+    add_cost, boolean_and_cost, boolean_or_cost, byte_array_append_cost, bytes_to_hex_cost,
+    comparison_cost, diff_cost, division_cost, equality_check_cost, hex_to_bytes_cost,
+    interpolate_cost, keys_method_cost, length_method_cost, list_append_cost, lookup_cost,
+    match_eval_cost, method_call_cost, modulo_cost, multiplication_cost, new_bindings_cost,
+    nth_method_call_cost, op_call_cost, receive_eval_cost, remove_cost, send_eval_cost,
+    size_method_cost, slice_cost, string_append_cost, subtraction_cost, sum_cost, take_cost,
+    to_byte_array_cost, to_list_cost, union_cost, var_eval_cost,
 };
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
 use crate::normal_forms::{self, GeneratedMessage, Par};
 use crate::rho_type::RhoTuple2;
-use crate::sort_matcher::Sorted;
 
-use super::accounting::CostManager;
-use super::accounting::costs::{
-    boolean_and_cost, boolean_or_cost, byte_array_append_cost, comparison_cost, division_cost,
-    equality_check_cost, list_append_cost, method_call_cost, modulo_cost, multiplication_cost,
-    new_bindings_cost, op_call_cost, receive_eval_cost, send_eval_cost, string_append_cost,
-    subtraction_cost, sum_cost, var_eval_cost,
-};
 use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
 use super::env::Env;
 use super::errors::InterpreterError;
@@ -89,6 +85,7 @@ impl DebruijnInterpreter {
     pub async fn evaluate(
         &self,
         par: normal_forms::Par,
+        env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         let terms: Vec<GeneratedMessage> = vec![
@@ -148,6 +145,7 @@ impl DebruijnInterpreter {
                     .map(|(index, term)| {
                         Box::pin(self.generated_message_eval(
                             term,
+                            env,
                             split(index.try_into().unwrap(), &terms, rand.clone()),
                         ))
                             as Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>>>>
@@ -439,15 +437,15 @@ impl DebruijnInterpreter {
     async fn generated_message_eval(
         &self,
         term: &GeneratedMessage,
+        env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        let env = &Env::new();
         match term {
-            GeneratedMessage::Send(term) => self.eval_send(term, env, rand.to_bytes()).await,
-            GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand.to_bytes()).await,
+            GeneratedMessage::Send(term) => self.eval_send(term, &env, rand.to_bytes()).await,
+            GeneratedMessage::Receive(term) => self.eval_receive(term, &env, rand.to_bytes()).await,
             GeneratedMessage::New(term) => self.eval_new(term, env.clone(), rand).await,
-            GeneratedMessage::Match(term) => self.eval_match(term, env, rand).await,
-            GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand).await,
+            GeneratedMessage::Match(term) => self.eval_match(term, &env, rand).await,
+            GeneratedMessage::Bundle(term) => self.eval_bundle(term, &env, rand).await,
             GeneratedMessage::Expr(term) => match &term.expr_instance {
                 Some(expr_instance) => match expr_instance {
                     ExprInstance::EVarBody(e) => {
@@ -598,13 +596,13 @@ impl DebruijnInterpreter {
     ) -> Result<Par, InterpreterError> {
         self.cost_manager.charge(var_eval_cost())?;
         match valproc {
-            &normal_forms::Var::BoundVar(level) => match env.get(&level) {
-                Some(p) => Ok(p.clone()),
-                None => Err(InterpreterError::ReduceError(format!(
-                    "Unbound variable: {} in {:?}",
-                    level, env.entities
-                ))),
-            },
+            &normal_forms::Var::BoundVar(level) => {
+                env.get(&level)
+                    .ok_or(Err(InterpreterError::ReduceError(format!(
+                        "Unbound variable: {} in {:?}",
+                        level, env.entities
+                    ))))
+            }
             _ => Err(InterpreterError::ReduceError(
                 "Unbound variable: attempting to evaluate a pattern".to_string(),
             )),
@@ -815,27 +813,27 @@ impl DebruijnInterpreter {
     }
 
     // Public here for testing purposes
-    pub fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
+    pub fn eval_expr_to_par(&self, expr: &Expr, env: Env<Par>) -> Result<Par, InterpreterError> {
         match unwrap_option_safe(expr.expr_instance.clone())? {
             ExprInstance::EVarBody(evar) => {
                 // println!("\nenv in eval_expr_to_par: {:?}", env);
-                let p = self.eval_var(&unwrap_option_safe(evar.v)?, env)?;
+                let p = self.eval_var(&unwrap_option_safe(evar.v)?, &env)?;
                 // println!("\np in eval_expr_to_par: {:?}", p);
                 // println!("\nenv in eval_expr_to_par: {:?}", env);
-                let evaled_p = self.eval_expr(&p, env)?;
+                let evaled_p = self.eval_expr(&p, &env)?;
                 Ok(evaled_p)
             }
             ExprInstance::EMethodBody(emethod) => {
                 self.cost_manager.charge(method_call_cost())?;
-                let evaled_target = self.eval_expr(&unwrap_option_safe(emethod.target)?, env)?;
+                let evaled_target = self.eval_expr(&unwrap_option_safe(emethod.target)?, &env)?;
                 let evaled_args: Vec<Par> = emethod
                     .arguments
                     .iter()
-                    .map(|arg| self.eval_expr(arg, env))
+                    .map(|arg| self.eval_expr(arg, &env))
                     .collect::<Result<Vec<_>, InterpreterError>>()?;
 
                 let result_par = match self.method_table().get(&emethod.method_name) {
-                    Some(_method) => _method.apply(evaled_target, evaled_args, env)?,
+                    Some(_method) => _method.apply(evaled_target, evaled_args, &env)?,
                     None => {
                         return Err(InterpreterError::ReduceError(format!(
                             "Unimplemented method: {}",
@@ -846,7 +844,7 @@ impl DebruijnInterpreter {
 
                 Ok(result_par)
             }
-            _ => Ok(Par::default().with_exprs(vec![self.eval_expr_to_expr(expr, env)?])),
+            _ => Ok(Par::default().with_exprs(vec![self.eval_expr_to_expr(expr, &env)?])),
         }
     }
 

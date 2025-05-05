@@ -1,16 +1,13 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi;
 use models::rhoapi::Bundle;
-use models::rhoapi::Var;
 use models::rhoapi::expr::ExprInstance::EMapBody;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{BindPattern, Expr, ListParWithRandom, TaggedContinuation};
 use models::rust::block_hash::BlockHash;
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::rholang;
 use models::rust::sorted_par_map::SortedParMap;
 use models::rust::utils::new_freevar_par;
 use models::rust::validator::Validator;
@@ -31,9 +28,7 @@ use crate::aliases::EnvHashMap;
 use crate::interpreter::EvaluateResult;
 use crate::interpreter::Interpreter;
 use crate::interpreter::InterpreterImpl;
-use crate::normal_forms;
 use crate::normal_forms::Par;
-use crate::sort_matcher::Sorted;
 use crate::system_processes::{BodyRefs, FixedChannels};
 
 use super::accounting::CostManager;
@@ -280,7 +275,7 @@ impl Runtime for RhoRuntime {
     }
 
     async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.reducer.evaluate(par, rand).await
+        self.reducer.evaluate(par, Env::new(), rand).await
     }
 
     fn create_soft_checkpoint(
