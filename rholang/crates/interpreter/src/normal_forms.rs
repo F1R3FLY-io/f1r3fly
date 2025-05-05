@@ -17,13 +17,13 @@ pub struct Par<const N: usize> {
     pub matches: Vec<Match>,
     pub unforgeables: Vec<GUnforgeable<N>>,
     pub bundles: Vec<Bundle>,
-    pub connectives: Vec<Connective>,
+    pub connectives: Vec<Connective<N>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 }
 
-impl From<Par> for models::rhoapi::Par {
-    fn from(value: Par) -> Self {
+impl<const N: usize> From<Par<N>> for models::rhoapi::Par {
+    fn from(value: Par<N>) -> Self {
         Self {
             sends: value.sends.into_iter().map(Into::into).collect(),
             receives: value.receives.into_iter().map(Into::into).collect(),
@@ -54,8 +54,8 @@ impl From<Par> for models::rhoapi::Par {
     }
 }
 
-impl Par {
-    pub fn concat_with(&mut self, other: Par) {
+impl<const N: usize> Par<N> {
+    pub fn concat_with(&mut self, other: Par<N>) {
         if self.is_nil() {
             // worth it?
             self.clone_from(&other);
@@ -376,6 +376,16 @@ impl From<models::rhoapi::Bundle> for Bundle {
     fn from(bundle: models::rhoapi::Bundle) -> Self {
         Bundle {
             body: bundle.body.map(Into::into).unwrap(),
+            write_flag: bundle.write_flag,
+            read_flag: bundle.read_flag,
+        }
+    }
+}
+
+impl From<Bundle> for models::rhoapi::Bundle {
+    fn from(bundle: Bundle) -> Self {
+        models::rhoapi::Bundle {
+            body: Some(bundle.body.into()),
             write_flag: bundle.write_flag,
             read_flag: bundle.read_flag,
         }
@@ -1222,10 +1232,10 @@ impl Expr {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum Connective {
-    ConnAnd(Vec<Par>),
-    ConnOr(Vec<Par>),
-    ConnNot(Par),
+pub enum Connective<const N: usize> {
+    ConnAnd(Vec<Par<N>>),
+    ConnOr(Vec<Par<N>>),
+    ConnNot(Par<N>),
     VarRef(VarRef),
     ConnBool(bool),
     ConnInt(bool),
@@ -1234,7 +1244,7 @@ pub enum Connective {
     ConnByteArray(bool),
 }
 
-impl From<models::rhoapi::Connective> for Connective {
+impl<const N: usize> From<models::rhoapi::Connective> for Connective<N> {
     fn from(connective: models::rhoapi::Connective) -> Self {
         match connective.connective_instance.unwrap() {
             models::rhoapi::connective::ConnectiveInstance::ConnAndBody(connective_body) => {
@@ -1258,6 +1268,34 @@ impl From<models::rhoapi::Connective> for Connective {
             models::rhoapi::connective::ConnectiveInstance::ConnByteArray(v) => {
                 Connective::ConnByteArray(v)
             }
+        }
+    }
+}
+
+impl<const N: usize> From<Connective<N>> for models::rhoapi::Connective {
+    fn from(value: Connective<N>) -> Self {
+        Self {
+            connective_instance: match value {
+                Connective::ConnBool(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnBool(v).into()
+                }
+                Connective::ConnInt(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnInt(v).into()
+                }
+                Connective::ConnString(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnString(v).into()
+                }
+                Connective::ConnUri(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnUri(v).into()
+                }
+                Connective::ConnByteArray(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnByteArray(v).into()
+                }
+                Connective::ConnAnd(pars) => todo!(),
+                Connective::ConnOr(pars) => todo!(),
+                Connective::ConnNot(par) => todo!(),
+                Connective::VarRef(var_ref) => todo!(),
+            },
         }
     }
 }
