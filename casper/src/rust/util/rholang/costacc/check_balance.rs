@@ -42,7 +42,6 @@ impl SystemDeployTrait for CheckBalance {
               }
             }
           }
-        }
       "#
         .to_string()
     }
