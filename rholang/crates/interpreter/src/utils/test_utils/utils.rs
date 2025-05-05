@@ -54,7 +54,7 @@ pub(crate) fn with_par(
 
 pub(crate) fn defaults()
 -> impl FnOnce(&mut FreeMap, &mut BoundMapChain, &mut BTreeMap<String, Par>) -> Par {
-    with_par(Par::NIL)
+    with_par(Par::default())
 }
 
 pub(crate) fn test<T>(
