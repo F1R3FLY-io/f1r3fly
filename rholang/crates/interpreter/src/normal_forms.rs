@@ -382,6 +382,16 @@ impl From<models::rhoapi::Bundle> for Bundle {
     }
 }
 
+impl From<Bundle> for models::rhoapi::Bundle {
+    fn from(bundle: Bundle) -> Self {
+        models::rhoapi::Bundle {
+            body: Some(bundle.body.into()),
+            write_flag: bundle.write_flag,
+            read_flag: bundle.read_flag,
+        }
+    }
+}
+
 impl Sortable for Bundle {
     type Sorter<'a> = BundleSorter<'a>;
 
