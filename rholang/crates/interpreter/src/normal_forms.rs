@@ -382,16 +382,6 @@ impl From<models::rhoapi::Bundle> for Bundle {
     }
 }
 
-impl From<Bundle> for models::rhoapi::Bundle {
-    fn from(value: Bundle) -> Self {
-        Self {
-            body: Some(value.body.into()),
-            write_flag: value.write_flag,
-            read_flag: value.read_flag,
-        }
-    }
-}
-
 impl Sortable for Bundle {
     type Sorter<'a> = BundleSorter<'a>;
 
@@ -1272,43 +1262,51 @@ impl From<models::rhoapi::Connective> for Connective {
     }
 }
 
-impl From<Connective> for models::rhoapi::Connective {
-    fn from(value: Connective) -> Self {
-        let connective_instance = match value {
-            Connective::ConnAnd(ps) => {
-                models::rhoapi::connective::ConnectiveInstance::ConnAndBody(
-                    models::rhoapi::ConnectiveBody {
-                        ps: ps.into_iter().map(Into::into).collect(),
-                    }
-                )
-            },
-            Connective::ConnOr(ps) => {
-                models::rhoapi::connective::ConnectiveInstance::ConnOrBody(
-                    models::rhoapi::ConnectiveBody {
-                        ps: ps.into_iter().map(Into::into).collect(),
-                    }
-                )
-            },
-            Connective::ConnNot(p) => {
-                models::rhoapi::connective::ConnectiveInstance::ConnNotBody(p.into())
-            },
-            Connective::VarRef(var_ref) => {
-                models::rhoapi::connective::ConnectiveInstance::VarRefBody(
-                    models::rhoapi::VarRef {
-                        index: var_ref.index as i32,
-                        depth: var_ref.depth as i32,
-                    }
-                )
-            },
-            Connective::ConnBool(v) => models::rhoapi::connective::ConnectiveInstance::ConnBool(v),
-            Connective::ConnInt(v) => models::rhoapi::connective::ConnectiveInstance::ConnInt(v),
-            Connective::ConnString(v) => models::rhoapi::connective::ConnectiveInstance::ConnString(v),
-            Connective::ConnUri(v) => models::rhoapi::connective::ConnectiveInstance::ConnUri(v),
-            Connective::ConnByteArray(v) => models::rhoapi::connective::ConnectiveInstance::ConnByteArray(v),
-        };
-
+impl<const N: usize> From<Connective<N>> for models::rhoapi::Connective {
+    fn from(value: Connective<N>) -> Self {
         Self {
-            connective_instance: Some(connective_instance),
+            connective_instance: match value {
+                Connective::ConnBool(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnBool(v).into()
+                }
+                Connective::ConnInt(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnInt(v).into()
+                }
+                Connective::ConnString(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnString(v).into()
+                }
+                Connective::ConnUri(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnUri(v).into()
+                }
+                Connective::ConnByteArray(v) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnByteArray(v).into()
+                }
+                Connective::ConnAnd(pars) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnAndBody(
+                        models::rhoapi::ConnectiveBody {
+                            ps: pars.into_iter().map(Into::into).collect(),
+                        }
+                    ).into()
+                },
+                Connective::ConnOr(pars) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnOrBody(
+                        models::rhoapi::ConnectiveBody {
+                            ps: pars.into_iter().map(Into::into).collect(),
+                        }
+                    ).into()
+                },
+                Connective::ConnNot(par) => {
+                    models::rhoapi::connective::ConnectiveInstance::ConnNotBody(par.into()).into()
+                },
+                Connective::VarRef(var_ref) => {
+                    models::rhoapi::connective::ConnectiveInstance::VarRefBody(
+                        models::rhoapi::VarRef {
+                            index: var_ref.index as i32,
+                            depth: var_ref.depth as i32,
+                        }
+                    ).into()
+                },
+            },
         }
     }
 }

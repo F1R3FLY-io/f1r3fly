@@ -25,7 +25,6 @@ impl CostManager {
     }
 
     pub fn charge(&self, amount: Cost) -> Result<(), InterpreterError> {
-        // println!("\nhit charge");
         let permit = self
             .semaphore
             .try_acquire()
