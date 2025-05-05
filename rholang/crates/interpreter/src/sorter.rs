@@ -782,7 +782,10 @@ fn var_score<Builder: ScoreBuilder>(var: Var, score: &mut Builder) {
     }
 }
 
-fn unforgeable_score<Builder: ScoreBuilder>(unf: &GUnforgeable, score: &mut Builder) {
+fn unforgeable_score<const N: usize, Builder: ScoreBuilder>(
+    unf: &GUnforgeable<N>,
+    score: &mut Builder,
+) {
     score.begin(PRIVATE);
     score.leaf_bytes(unf.to_bytes_vec());
     score.done();

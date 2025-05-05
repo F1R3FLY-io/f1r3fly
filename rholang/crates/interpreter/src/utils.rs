@@ -8,7 +8,7 @@ use models::{
     rust::utils::union,
 };
 
-use crate::normal_forms::{Bundle, Expr, Match, New, Receive, Send};
+use crate::normal_forms::{Bundle, Expr, New};
 
 use super::matcher::has_locally_free::HasLocallyFree;
 
@@ -34,8 +34,8 @@ pub fn prepend_expr(mut p: Par, e: Expr, depth: i32) -> Par {
 
     Par {
         exprs: new_exprs,
-        locally_free: union(p.locally_free.clone(), e.locally_free(e.clone(), depth)),
-        connective_used: p.connective_used || e.clone().connective_used(e),
+        locally_free: union(p.locally_free.clone(), e.locally_free(depth)),
+        connective_used: p.connective_used || e.clone().connective_used(),
         ..p.clone()
     }
 }

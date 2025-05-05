@@ -39,8 +39,7 @@ use crate::accounting::costs::{
 };
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
-use crate::normal_forms::GeneratedMessage::Expr;
-use crate::normal_forms::{self, ETupleBody, GeneratedMessage, Par};
+use crate::normal_forms::{self, GeneratedMessage, Par};
 use crate::rho_type::RhoTuple2;
 
 use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
