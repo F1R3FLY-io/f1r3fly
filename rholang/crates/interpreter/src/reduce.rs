@@ -39,7 +39,8 @@ use crate::accounting::costs::{
 };
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
-use crate::normal_forms::{self, GeneratedMessage, Par};
+use crate::normal_forms::GeneratedMessage::Expr;
+use crate::normal_forms::{self, ETupleBody, GeneratedMessage, Par};
 use crate::rho_type::RhoTuple2;
 
 use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
@@ -184,7 +185,7 @@ impl DebruijnInterpreter {
         // println!("Attempting to lock space for produce");
         let mut space_locked = self.space.try_lock().unwrap();
         // println!("Locked space for produce");
-        let produce_result = space_locked.produce(chan.clone(), data.clone(), persistent)?;
+        let produce_result = space_locked.produce(chan.into().clone(), data.clone(), persistent)?;
         drop(space_locked);
 
         self.continue_produce_process(
@@ -218,7 +219,7 @@ impl DebruijnInterpreter {
         // println!("Attempting to lock space for produce");
         let mut space_locked = self.space.try_lock().unwrap();
         let consume_result = space_locked.consume(
-            sources.clone(),
+            sources.iter().map(Into::into).collect().clone(),
             patterns.clone(),
             TaggedContinuation {
                 tagged_cont: Some(TaggedCont::ParBody(body.clone())),
@@ -365,7 +366,6 @@ impl DebruijnInterpreter {
         &self,
         data_list: Vec<(Par, ListParWithRandom, ListParWithRandom, bool)>,
     ) -> Vec<Pin<Box<dyn futures::Future<Output = Result<(), InterpreterError>> + '_>>> {
-        // println!("\nreduce produce_peeks");
         data_list
             .into_iter()
             .filter(|(_, _, _, persist)| !persist)
@@ -380,7 +380,6 @@ impl DebruijnInterpreter {
 
     fn update_mergeable_channels(&self, chan: &Par) -> () {
         let is_mergeable = self.is_mergeable_channel(chan);
-        // println!("\nis_mergeable: {:?}", is_mergeable);
 
         if is_mergeable {
             let mut merge_chs_write = self.merge_chs.write().unwrap();
@@ -389,19 +388,13 @@ impl DebruijnInterpreter {
     }
 
     fn is_mergeable_channel(&self, chan: &Par) -> bool {
-        let tuple_elms: Vec<Par> = chan
-            .exprs
+        chan.exprs
             .iter()
-            .flat_map(|y| match &y.expr_instance {
-                Some(expr_instance) => match expr_instance {
-                    ExprInstance::ETupleBody(etuple) => etuple.ps.clone(),
-                    _ => ETuple::default().ps,
-                },
-                None => ETuple::default().ps,
+            .flat_map(|y| match &y {
+                crate::normal_forms::Expr::ETuple(etuple) => etuple.ps.clone(),
+                _ => Default::default(),
             })
-            .collect();
-
-        tuple_elms
+            .collect()
             .first()
             .map_or(false, |head| head == &self.mergeable_tag_name)
     }

@@ -22,7 +22,7 @@ use crate::compiler::normalizer::processes::p_let_normalizer::{
 use crate::compiler::normalizer::processes::p_var_ref_normalizer::normalize_p_var_ref;
 use crate::compiler::rholang_ast::{AnnProc, Var};
 use crate::errors::InterpreterError;
-use crate::normal_forms::{self, Connective, Expr, Par, Var as NormalizedVar};
+use crate::normal_forms::{Connective, Expr, Par, Var as NormalizedVar};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BoundVar {
