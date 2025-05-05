@@ -12,7 +12,7 @@ pub fn normalize_name(
     n: Name,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &EnvHashMap
+    env: &EnvHashMap,
     pos: SourcePosition,
 ) -> Result<Par, InterpreterError> {
     match n {
