@@ -10,11 +10,11 @@ use prost::Message;
 
 use super::{sort_matcher::Sortable, sorter::*};
 
-const GUNFORGEABLE_SIZE: usize = 32;
+pub const GUNFORGEABLE_SIZE: usize = 32;
 
 /// A parallel composition of Rholang terms.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Par<const N: usize> {
+pub struct Par<const N: usize = GUNFORGEABLE_SIZE> {
     pub sends: Vec<Send>,
     pub receives: Vec<Receive>,
     pub news: Vec<New>,
@@ -295,7 +295,7 @@ impl<const N: usize> From<models::rhoapi::Par> for Par<N> {
     }
 }
 
-impl<const N: usize> Sortable for Par<N> {
+impl Sortable for Par {
     type Sorter<'a> = ParSorter<'a>;
 
     fn sorter(&mut self) -> Self::Sorter<'_> {
