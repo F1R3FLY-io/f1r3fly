@@ -2,6 +2,8 @@ use models::ByteString;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
 
+use crate::normal_forms::Par;
+
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cost {
@@ -47,7 +49,7 @@ impl Cost {
         Cost { value, operation }
     }
 
-    #[deprecated(reason = "Use ::from instead")]
+    #[deprecated(note = "Use ::from instead")]
     pub fn create_from_cost(cost: Cost) -> Cost {
         Cost {
             value: cost.value,

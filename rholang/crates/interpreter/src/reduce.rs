@@ -4,7 +4,7 @@ use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::var::VarInstance;
+use models::rhoapi::var::VarInstance::{self, BoundVar};
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
@@ -591,25 +591,22 @@ impl DebruijnInterpreter {
      *                  binding into the monadic context, else signal
      *                  an exception.
      */
-    fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
+    fn eval_var(
+        &self,
+        valproc: &crate::normal_forms::Var,
+        env: &Env<Par>,
+    ) -> Result<Par, InterpreterError> {
         self.cost_manager.charge(var_eval_cost())?;
-        // println!("\nenv in eval_var: {:?}", env);
-        match valproc.var_instance {
-            Some(VarInstance::BoundVar(level)) => match env.get(&level) {
+        match valproc {
+            &normal_forms::Var::BoundVar(level) => match env.get(&level) {
                 Some(p) => Ok(p.clone()),
                 None => Err(InterpreterError::ReduceError(format!(
                     "Unbound variable: {} in {:?}",
                     level, env.entities
                 ))),
             },
-            Some(VarInstance::Wildcard(_)) => Err(InterpreterError::ReduceError(
+            _ => Err(InterpreterError::ReduceError(
                 "Unbound variable: attempting to evaluate a pattern".to_string(),
-            )),
-            Some(VarInstance::FreeVar(_)) => Err(InterpreterError::ReduceError(
-                "Unbound variable: attempting to evaluate a pattern".to_string(),
-            )),
-            None => Err(InterpreterError::ReduceError(
-                "Impossible var instance EMPTY".to_string(),
             )),
         }
     }
@@ -3158,18 +3155,9 @@ impl DebruijnInterpreter {
             )))
         } else {
             match p.exprs.as_slice() {
-                [
-                    Expr {
-                        expr_instance: Some(ExprInstance::GBool(b)),
-                    },
-                ] => Ok(*b),
-
-                [
-                    Expr {
-                        expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
-                    },
-                ] => {
-                    let p = self.eval_var(&unwrap_option_safe(v.clone())?, env)?;
+                [crate::normal_forms::Expr::GBool(b)] => Ok(*b),
+                [crate::normal_forms::Expr::EVar(v)] => {
+                    let p = self.eval_var(v, env)?;
                     self.eval_to_bool(&p, env)
                 }
 

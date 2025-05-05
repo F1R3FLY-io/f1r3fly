@@ -408,8 +408,9 @@ impl HasCost for RhoRuntime {
 pub type RhoTuplespace =
     Arc<Mutex<Box<dyn Tuplespace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
 
-pub type RhoISpace =
-    Arc<Mutex<Box<dyn ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
+pub type RhoISpace = Arc<
+    Mutex<Box<dyn ISpace<models::rhoapi::Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
+>;
 
 pub type RhoReplayISpace =
     Arc<Mutex<Box<dyn IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>>;
@@ -731,9 +732,9 @@ fn setup_reducer(
     charging_rspace: RhoISpace,
     block_data_ref: Arc<RwLock<BlockData>>,
     invalid_blocks: InvalidBlocks,
-    urn_map: HashMap<String, Par>,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
-    mergeable_tag_name: Par,
+    urn_map: HashMap<String, models::rhoapi::Par>,
+    merge_chs: Arc<RwLock<HashSet<models::rhoapi::Par>>>,
+    mergeable_tag_name: models::rhoapi::Par,
     cost: CostManager,
 ) -> DebruijnInterpreter {
     let dispatcher = Arc::new(RwLock::new(RholangAndScalaDispatcher {
@@ -793,16 +794,19 @@ fn setup_maps_and_refs() -> (
 
 fn create_rho_env<T>(
     mut rspace: T,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
-    mergeable_tag_name: Par,
+    merge_chs: Arc<RwLock<HashSet<models::rhoapi::Par>>>,
+    mergeable_tag_name: models::rhoapi::Par,
     cost_manager: CostManager,
 ) -> (DebruijnInterpreter, Arc<RwLock<BlockData>>, InvalidBlocks)
 where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    T: ISpace<models::rhoapi::Par, BindPattern, ListParWithRandom, TaggedContinuation>
+        + Clone
+        + 'static,
 {
     let block_data_ref = Arc::new(RwLock::new(BlockData::empty()));
     let invalid_blocks = InvalidBlocks::new();
     let (urn_map, proc_defs) = setup_maps_and_refs();
+
     introduce_system_process(&mut rspace, proc_defs).unwrap();
 
     let charging_rspace: RhoISpace = Arc::new(Mutex::new(Box::new(ChargingRSpace::create(
@@ -866,7 +870,9 @@ pub async fn create_runtime<T>(
     mergeable_tag_name: Par,
 ) -> Arc<Mutex<RhoRuntime>>
 where
-    T: ISpace<Par, BindPattern, ListParWithRandom, TaggedContinuation> + Clone + 'static,
+    T: ISpace<models::rhoapi::Par, BindPattern, ListParWithRandom, TaggedContinuation>
+        + Clone
+        + 'static,
 {
     let cost_manager = CostAccounting::empty_cost();
     let merge_chs = Arc::new(RwLock::new({

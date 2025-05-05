@@ -243,7 +243,7 @@ impl Definition {
         (self.body_ref, (self.handler)(context))
     }
 
-    pub fn to_urn_map(&self) -> (String, Par) {
+    pub fn to_urn_map(&self) -> (String, models::rhoapi::Par) {
         let bundle: Par = Par::default().with_bundles(vec![Bundle {
             body: Some(self.fixed_channel.clone()),
             write_flag: true,
