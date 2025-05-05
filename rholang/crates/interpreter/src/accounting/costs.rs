@@ -1,8 +1,8 @@
-use models::ByteString;
+use models::{ByteString, rhoapi::tagged_continuation::TaggedCont};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
 
-use crate::normal_forms::Par;
+use crate::normal_forms::{BindPattern, ListParWithRandom, Par, ParWithRandom, TaggedContinuation};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
 #[derive(Clone, Debug, PartialEq)]
