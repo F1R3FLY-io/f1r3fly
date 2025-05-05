@@ -42,7 +42,7 @@ where
 {
     |_, bindings, _| {
         fun(bindings);
-        Par::NIL
+        Par::default()
     }
 }
 

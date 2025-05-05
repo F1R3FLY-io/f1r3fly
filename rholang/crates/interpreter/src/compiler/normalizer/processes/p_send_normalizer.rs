@@ -103,7 +103,7 @@ mod tests {
             test("expected to handle a basic send", |actual_par, free_map| {
                 let expected_par = Par {
                     sends: vec![Send {
-                        chan: Par::NIL,
+                        chan: Par::default(),
                         data: vec![Par::gint(7), Par::gint(8)],
                         ..Default::default()
                     }],

@@ -47,7 +47,7 @@ pub fn normalize_p_if(
 
         par
     } else {
-        Par::NIL
+        Par::default()
     };
 
     // Construct the desugared if as a Match
@@ -140,7 +140,7 @@ mod tests {
                                 },
                                 MatchCase {
                                     pattern: Par::gfalse(),
-                                    source: Par::NIL,
+                                    source: Par::default(),
                                     free_count: 0,
                                 },
                             ],
@@ -183,7 +183,7 @@ mod tests {
                                 },
                                 MatchCase {
                                     pattern: Par::gfalse(),
-                                    source: Par::NIL,
+                                    source: Par::default(),
                                     free_count: 0,
                                 },
                             ],

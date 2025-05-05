@@ -138,7 +138,7 @@ mod tests {
                                 locally_free: bitvec![1],
                                 ..Default::default()
                             },
-                            source: Par::NIL,
+                            source: Par::default(),
                             free_count: 0,
                         }],
                         locally_free: bitvec![1],
@@ -203,11 +203,11 @@ mod tests {
                                 locally_free: bitvec![1],
                                 ..Default::default()
                             }],
-                            source: Par::NIL,
+                            source: Par::default(),
                             remainder: None,
                             free_count: 0,
                         }],
-                        body: Par::NIL,
+                        body: Par::default(),
                         persistent: false,
                         peek: false,
                         bind_count: 0,

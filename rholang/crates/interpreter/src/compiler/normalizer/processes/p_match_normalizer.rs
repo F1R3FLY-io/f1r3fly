@@ -156,14 +156,14 @@ mod tests {
                 |actual_par, free_map| {
                     let expected_par = Par {
                         sends: vec![Send {
-                            chan: Par::NIL,
+                            chan: Par::default(),
                             data: vec![Par::gint(47)],
                             ..Default::default()
                         }],
                         receives: vec![Receive {
                             binds: vec![ReceiveBind {
                                 patterns: vec![Par::free_var(0)],
-                                source: Par::NIL,
+                                source: Par::default(),
                                 remainder: None,
                                 free_count: 1,
                             }],
@@ -173,12 +173,12 @@ mod tests {
                                     cases: vec![
                                         MatchCase {
                                             pattern: Par::gint(42),
-                                            source: Par::NIL,
+                                            source: Par::default(),
                                             free_count: 0,
                                         },
                                         MatchCase {
                                             pattern: Par::free_var(0),
-                                            source: Par::NIL,
+                                            source: Par::default(),
                                             free_count: 1,
                                         },
                                     ],
@@ -255,12 +255,12 @@ mod tests {
                                         connective_used: true,
                                         ..Default::default()
                                     },
-                                    source: Par::NIL,
+                                    source: Par::default(),
                                     free_count: 1,
                                 },
                                 MatchCase {
                                     pattern: Par::wild(),
-                                    source: Par::NIL,
+                                    source: Par::default(),
                                     free_count: 0,
                                 },
                             ],
@@ -368,7 +368,7 @@ mod tests {
                                         },
                                         cases: vec![MatchCase {
                                             pattern: Par::gint(47),
-                                            source: Par::NIL,
+                                            source: Par::default(),
                                             free_count: 0,
                                         }],
                                         locally_free: BitVec::EMPTY,
@@ -377,11 +377,11 @@ mod tests {
                                     connective_used: true,
                                     ..Default::default()
                                 }],
-                                source: Par::NIL,
+                                source: Par::default(),
                                 remainder: None,
                                 free_count: 2,
                             }],
-                            body: Par::NIL,
+                            body: Par::default(),
                             persistent: false,
                             peek: false,
                             bind_count: 2,

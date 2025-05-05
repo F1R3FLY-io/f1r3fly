@@ -93,7 +93,7 @@ pub fn normalize_p_let(
                 target: Par::elist(value_list_body),
                 cases: vec![MatchCase {
                     pattern: Par::elist(pattern_list_body),
-                    source: Par::NIL, // continuation
+                    source: Par::default(), // continuation
                     free_count,
                 }],
                 locally_free: next_locally_free,

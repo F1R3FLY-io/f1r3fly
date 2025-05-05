@@ -2,13 +2,18 @@ use std::{cmp::Ordering, collections::BTreeMap};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
-use models::rhoapi::{EMinusMinus, EMod, EPercentPercent, EPlusPlus, var::WildcardMsg};
+use models::rhoapi::{
+    EMinusMinus, EMod, EPercentPercent, EPlusPlus,
+    var::{VarInstance, WildcardMsg},
+};
 use prost::Message;
 
 use super::{sort_matcher::Sortable, sorter::*};
 
+const GUNFORGEABLE_SIZE: usize = 32;
+
 /// A parallel composition of Rholang terms.
-#[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Par<const N: usize> {
     pub sends: Vec<Send>,
     pub receives: Vec<Receive>,
@@ -22,8 +27,25 @@ pub struct Par<const N: usize> {
     pub connective_used: bool,
 }
 
-impl From<Par> for models::rhoapi::Par {
-    fn from(value: Par) -> Self {
+impl<const N: usize> Default for Par<N> {
+    fn default() -> Self {
+        Self {
+            sends: Vec::new(),
+            receives: Vec::new(),
+            news: Vec::new(),
+            exprs: Vec::new(),
+            matches: Vec::new(),
+            unforgeables: Vec::new(),
+            bundles: Vec::new(),
+            connectives: Vec::new(),
+            locally_free: BitVec::EMPTY,
+            connective_used: false,
+        }
+    }
+}
+
+impl<const N: usize> From<Par<N>> for models::rhoapi::Par {
+    fn from(value: Par<N>) -> Self {
         Self {
             sends: value.sends.into_iter().map(Into::into).collect(),
             receives: value.receives.into_iter().map(Into::into).collect(),
@@ -54,8 +76,8 @@ impl From<Par> for models::rhoapi::Par {
     }
 }
 
-impl Par {
-    pub fn concat_with(&mut self, other: Par) {
+impl<const N: usize> Par<N> {
+    pub fn concat_with(&mut self, other: Par<N>) {
         if self.is_nil() {
             // worth it?
             self.clone_from(&other);
@@ -182,83 +204,70 @@ impl Par {
         self.news.push(new);
     }
 
-    pub const NIL: Par = Par {
-        sends: Vec::new(),
-        receives: Vec::new(),
-        news: Vec::new(),
-        exprs: Vec::new(),
-        matches: Vec::new(),
-        unforgeables: Vec::new(),
-        bundles: Vec::new(),
-        connectives: Vec::new(),
-        locally_free: BitVec::EMPTY,
-        connective_used: false,
-    };
-
-    pub fn gtrue() -> Par {
-        Par {
+    pub fn gtrue() -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::GTRUE],
             ..Default::default()
         }
     }
 
-    pub fn gfalse() -> Par {
-        Par {
+    pub fn gfalse() -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::GFALSE],
             ..Default::default()
         }
     }
 
-    pub fn gint(value: i64) -> Par {
-        Par {
+    pub fn gint(value: i64) -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::GInt(value)],
             ..Default::default()
         }
     }
 
-    pub fn gstr(value: String) -> Par {
-        Par {
+    pub fn gstr(value: String) -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::GString(value)],
             ..Default::default()
         }
     }
 
-    pub fn wild() -> Par {
-        Par {
+    pub fn wild() -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::WILDCARD],
             connective_used: true,
             ..Default::default()
         }
     }
 
-    pub fn bound_var(idx: u32) -> Par {
-        Par {
+    pub fn bound_var(idx: u32) -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::new_bound_var(idx)],
             locally_free: single_bit(idx as usize),
             ..Default::default()
         }
     }
 
-    pub fn free_var(idx: u32) -> Par {
-        Par {
+    pub fn free_var(idx: u32) -> Par<N> {
+        Par::<N> {
             exprs: vec![Expr::new_free_var(idx)],
             connective_used: true,
             ..Default::default()
         }
     }
 
-    pub fn free_vars(n: u32) -> Vec<Par> {
+    pub fn free_vars(n: u32) -> Vec<Par<N>> {
         (0..n).map(Par::free_var).collect()
     }
 
-    pub fn bound_vars(n: u32) -> Vec<Par> {
+    pub fn bound_vars(n: u32) -> Vec<Par<N>> {
         (0..n).rev().map(Par::bound_var).collect_vec()
     }
 
-    pub fn elist(body: EListBody) -> Par {
+    pub fn elist(body: EListBody) -> Par<N> {
         let connective_used = body.connective_used;
         let locally_free = body.locally_free.clone();
-        Par {
+        Par::<N> {
             exprs: vec![Expr::EList(body)],
             locally_free,
             connective_used,
@@ -267,7 +276,7 @@ impl Par {
     }
 }
 
-impl From<models::rhoapi::Par> for Par {
+impl<const N: usize> From<models::rhoapi::Par> for Par<N> {
     fn from(par: models::rhoapi::Par) -> Self {
         Par {
             sends: par.sends.into_iter().map(Into::into).collect(),
@@ -286,7 +295,7 @@ impl From<models::rhoapi::Par> for Par {
     }
 }
 
-impl Sortable for Par {
+impl<const N: usize> Sortable for Par<N> {
     type Sorter<'a> = ParSorter<'a>;
 
     fn sorter(&mut self) -> Self::Sorter<'_> {
@@ -307,7 +316,7 @@ pub enum TaggedContinuation {
 /// generator for generating new unforgeable names.
 
 pub struct ParWithRandom {
-    pub body: Par,
+    pub body: Par<GUNFORGEABLE_SIZE>,
     pub random_state: Vec<u8>,
 }
 
@@ -317,7 +326,7 @@ pub struct ParWithRandom {
 pub struct PCost(u64);
 
 pub struct ListParWithRandom {
-    pub pars: Vec<Par>,
+    pub pars: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub random_state: Vec<u8>,
 }
 
@@ -338,6 +347,19 @@ impl From<models::rhoapi::Var> for Var {
             models::rhoapi::var::VarInstance::BoundVar(v) => Var::BoundVar(v as u32),
             models::rhoapi::var::VarInstance::FreeVar(v) => Var::FreeVar(v as u32),
             models::rhoapi::var::VarInstance::Wildcard(_) => Var::Wildcard,
+        }
+    }
+}
+
+impl From<Var> for models::rhoapi::Var {
+    fn from(value: Var) -> Self {
+        let var_instance = match value {
+            Var::BoundVar(v) => VarInstance::BoundVar(v as i32),
+            Var::FreeVar(v) => VarInstance::FreeVar(v as i32),
+            Var::Wildcard => VarInstance::Wildcard(WildcardMsg {}),
+        };
+        Self {
+            var_instance: Some(var_instance),
         }
     }
 }
@@ -365,7 +387,7 @@ impl Var {
 /// If both flags are set to false, bundle allows only for equivalance check.
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct Bundle {
-    pub body: Par,
+    pub body: Par<GUNFORGEABLE_SIZE>,
     /// flag indicating whether bundle is writeable
     pub write_flag: bool,
     /// flag indicating whether bundle is readable
@@ -417,8 +439,8 @@ pub enum GeneratedMessage {
 /// Upon send, all free variables in data are substituted with their values.
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct Send {
-    pub chan: Par,
-    pub data: Vec<Par>,
+    pub chan: Par<GUNFORGEABLE_SIZE>,
+    pub data: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub persistent: bool,
     pub locally_free: BitVec,
     pub connective_used: bool,
@@ -450,18 +472,6 @@ impl From<models::rhoapi::Send> for Send {
     }
 }
 
-impl From<Send> for models::rhoapi::Send {
-    fn from(send: Send) -> Self {
-        models::rhoapi::Send {
-            chan: send.chan.into(),
-            data: send.data.into_iter().map(Into::into).collect(),
-            persistent: send.persistent,
-            locally_free: send.locally_free.into_iter().map(|v| v as u32).collect(),
-            connective_used: send.connective_used.into(),
-        }
-    }
-}
-
 impl Sortable for Send {
     type Sorter<'a> = SendSorter<'a>;
 
@@ -472,15 +482,15 @@ impl Sortable for Send {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ReceiveBind {
-    pub patterns: Vec<Par>,
-    pub source: Par,
+    pub patterns: Vec<Par<GUNFORGEABLE_SIZE>>,
+    pub source: Par<GUNFORGEABLE_SIZE>,
     pub remainder: Option<Var>,
     pub free_count: u32,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BindPattern {
-    pub patterns: Vec<Par>,
+    pub patterns: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub remainder: Option<Var>,
     pub free_count: usize,
 }
@@ -494,7 +504,7 @@ pub struct BindPattern {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Receive {
     pub binds: Vec<ReceiveBind>,
-    pub body: Par,
+    pub body: Par<GUNFORGEABLE_SIZE>,
     pub persistent: bool,
     pub peek: bool,
     pub bind_count: u32,
@@ -506,11 +516,11 @@ impl From<Receive> for models::rhoapi::Receive {
     fn from(value: Receive) -> Self {
         Self {
             binds: value.binds.into_iter().map(Into::into).collect(),
-            body: value.body.into(),
+            body: Some(value.body.into()),
             persistent: value.persistent,
             peek: value.peek,
-            bind_count: value.bind_count as u32,
-            locally_free: value.locally_free.into(),
+            bind_count: value.bind_count as i32,
+            locally_free: value.locally_free.into_iter().map(|v| v as u8).collect(),
             connective_used: value.connective_used,
         }
     }
@@ -523,6 +533,17 @@ impl From<models::rhoapi::ReceiveBind> for ReceiveBind {
             remainder: value.remainder.map(Into::into),
             free_count: value.free_count as u32,
             source: value.source.map(Into::into).unwrap(),
+        }
+    }
+}
+
+impl From<ReceiveBind> for models::rhoapi::ReceiveBind {
+    fn from(value: ReceiveBind) -> Self {
+        Self {
+            patterns: value.patterns.into_iter().map(Into::into).collect(),
+            source: Some(value.source.into()),
+            remainder: value.remainder.map(Into::into),
+            free_count: value.free_count as i32,
         }
     }
 }
@@ -564,12 +585,12 @@ pub struct New {
     /// Includes any uris listed below. This makes it easier to substitute or walk
     /// a term.
     pub bind_count: u32,
-    pub p: Par,
+    pub p: Par<GUNFORGEABLE_SIZE>,
     /// For normalization, uri-referenced variables come at the end, and in
     /// lexicographical order.
     pub uris: Vec<String>,
     pub locally_free: BitVec,
-    pub injections: BTreeMap<String, Par>,
+    pub injections: BTreeMap<String, Par<GUNFORGEABLE_SIZE>>,
 }
 
 impl From<New> for models::rhoapi::New {
@@ -597,6 +618,11 @@ impl From<models::rhoapi::New> for New {
             locally_free: BitVec::<usize, _>::from_vec(
                 new.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
+            injections: new
+                .injections
+                .into_iter()
+                .map(|(key, value)| (key, value.into()))
+                .collect(),
         }
     }
 }
@@ -611,8 +637,8 @@ impl Sortable for New {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct MatchCase {
-    pub pattern: Par,
-    pub source: Par,
+    pub pattern: Par<GUNFORGEABLE_SIZE>,
+    pub source: Par<GUNFORGEABLE_SIZE>,
     pub free_count: u32,
 }
 
@@ -628,7 +654,7 @@ impl From<MatchCase> for models::rhoapi::MatchCase {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Match {
-    pub target: Par,
+    pub target: Par<GUNFORGEABLE_SIZE>,
     pub cases: Vec<MatchCase>,
     pub locally_free: BitVec,
     pub connective_used: bool,
@@ -751,20 +777,20 @@ pub enum Expr {
     GString(String),
     GUri(String),
     GByteArray(Vec<u8>),
-    ENot(Par),
-    ENeg(Par),
-    EMult(Par, Par),
-    EDiv(Par, Par),
-    EPlus(Par, Par),
-    EMinus(Par, Par),
-    ELt(Par, Par),
-    ELte(Par, Par),
-    EGt(Par, Par),
-    EGte(Par, Par),
-    EEq(Par, Par),
-    ENeq(Par, Par),
-    EAnd(Par, Par),
-    EOr(Par, Par),
+    ENot(Par<GUNFORGEABLE_SIZE>),
+    ENeg(Par<GUNFORGEABLE_SIZE>),
+    EMult(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EDiv(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EPlus(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EMinus(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    ELt(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    ELte(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EGt(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EGte(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EEq(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    ENeq(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EAnd(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EOr(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
     /// A variable used as a var should be bound in a process context, not a name
     /// context. For example:
     /// `for (@x <- c1; @y <- c2) { z!(x + y) }` is fine, but
@@ -777,12 +803,12 @@ pub enum Expr {
     EMethod(EMethodBody),
     EMatches(EMatchesBody),
     /// string interpolation
-    EPercentPercent(Par, Par),
+    EPercentPercent(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
     /// concatenation
-    EPlusPlus(Par, Par),
+    EPlusPlus(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
     /// set difference
-    EMinusMinus(Par, Par),
-    EMod(Par, Par),
+    EMinusMinus(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
+    EMod(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>),
 }
 
 impl From<Expr> for models::rhoapi::expr::ExprInstance {
@@ -983,7 +1009,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub(crate) struct ElistBody {
-    pub ps: Vec<Par>,
+    pub ps: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
@@ -1012,7 +1038,7 @@ impl Sortable for Expr {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EListBody {
-    pub ps: Vec<Par>,
+    pub ps: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
@@ -1020,7 +1046,7 @@ pub struct EListBody {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ETupleBody {
-    pub ps: Vec<Par>,
+    pub ps: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 }
@@ -1039,7 +1065,7 @@ impl From<models::rhoapi::ETuple> for ETupleBody {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct ESetBody {
-    pub ps: Vec<Par>,
+    pub ps: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
@@ -1048,7 +1074,11 @@ pub struct ESetBody {
 impl From<models::rhoapi::ESet> for ESetBody {
     fn from(set: models::rhoapi::ESet) -> Self {
         ESetBody {
-            ps: set.ps.into_iter().map(Into::into).collect::<Vec<Par>>(),
+            ps: set
+                .ps
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<Par<GUNFORGEABLE_SIZE>>>(),
             locally_free: BitVec::<usize, _>::from_vec(
                 set.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
@@ -1060,7 +1090,7 @@ impl From<models::rhoapi::ESet> for ESetBody {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EMapBody {
-    pub ps: Vec<(Par, Par)>,
+    pub ps: Vec<(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>)>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 
@@ -1079,7 +1109,7 @@ impl From<models::rhoapi::EMap> for EMapBody {
                         kvp.value.map(Into::into).unwrap(),
                     )
                 })
-                .collect::<Vec<(Par, Par)>>(),
+                .collect::<Vec<(Par<GUNFORGEABLE_SIZE>, Par<GUNFORGEABLE_SIZE>)>>(),
             locally_free: BitVec::<usize, _>::from_vec(
                 map.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
@@ -1100,8 +1130,8 @@ impl From<models::rhoapi::EMap> for EMapBody {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct EMethodBody {
     pub method_name: String,
-    pub target: Par,
-    pub arguments: Vec<Par>,
+    pub target: Par<GUNFORGEABLE_SIZE>,
+    pub arguments: Vec<Par<GUNFORGEABLE_SIZE>>,
     pub locally_free: BitVec,
     pub connective_used: bool,
 }
@@ -1126,8 +1156,8 @@ impl From<models::rhoapi::EMethod> for EMethodBody {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct EMatchesBody {
-    pub pattern: Par,
-    pub target: Par,
+    pub pattern: Par<GUNFORGEABLE_SIZE>,
+    pub target: Par<GUNFORGEABLE_SIZE>,
 }
 
 impl From<models::rhoapi::EMatches> for EMatchesBody {
@@ -1233,9 +1263,9 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Connective {
-    ConnAnd(Vec<Par>),
-    ConnOr(Vec<Par>),
-    ConnNot(Par),
+    ConnAnd(Vec<Par<GUNFORGEABLE_SIZE>>),
+    ConnOr(Vec<Par<GUNFORGEABLE_SIZE>>),
+    ConnNot(Par<GUNFORGEABLE_SIZE>),
     VarRef(VarRef),
     ConnBool(bool),
     ConnInt(bool),
@@ -1272,8 +1302,8 @@ impl From<models::rhoapi::Connective> for Connective {
     }
 }
 
-impl<const N: usize> From<Connective<N>> for models::rhoapi::Connective {
-    fn from(value: Connective<N>) -> Self {
+impl From<Connective> for models::rhoapi::Connective {
+    fn from(value: Connective) -> Self {
         Self {
             connective_instance: match value {
                 Connective::ConnBool(v) => {
@@ -1295,27 +1325,30 @@ impl<const N: usize> From<Connective<N>> for models::rhoapi::Connective {
                     models::rhoapi::connective::ConnectiveInstance::ConnAndBody(
                         models::rhoapi::ConnectiveBody {
                             ps: pars.into_iter().map(Into::into).collect(),
-                        }
-                    ).into()
-                },
+                        },
+                    )
+                    .into()
+                }
                 Connective::ConnOr(pars) => {
                     models::rhoapi::connective::ConnectiveInstance::ConnOrBody(
                         models::rhoapi::ConnectiveBody {
                             ps: pars.into_iter().map(Into::into).collect(),
-                        }
-                    ).into()
-                },
+                        },
+                    )
+                    .into()
+                }
                 Connective::ConnNot(par) => {
                     models::rhoapi::connective::ConnectiveInstance::ConnNotBody(par.into()).into()
-                },
+                }
                 Connective::VarRef(var_ref) => {
                     models::rhoapi::connective::ConnectiveInstance::VarRefBody(
                         models::rhoapi::VarRef {
                             index: var_ref.index as i32,
                             depth: var_ref.depth as i32,
-                        }
-                    ).into()
-                },
+                        },
+                    )
+                    .into()
+                }
             },
         }
     }
