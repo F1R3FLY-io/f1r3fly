@@ -26,6 +26,11 @@ full-deploy:
 full-deploy-big:
 	cargo run -- full-deploy -f $(EXAMPLE_FILE) -b
 
+# Check if a block is finalized (requires a block hash)
+check-finalized:
+	@echo "Usage: make check-finalized BLOCK_HASH=<block hash>"
+	@[ "$(BLOCK_HASH)" ] && cargo run -- is-finalized --block-hash $(BLOCK_HASH) || echo "Please provide a block hash: make check-finalized BLOCK_HASH=<block hash>"
+
 # Help message
 help:
 	@echo "F1r3fly Node CLI Makefile"
@@ -37,5 +42,6 @@ help:
 	@echo "  make propose        - Propose a block"
 	@echo "  make full-deploy    - Deploy and propose in one operation"
 	@echo "  make full-deploy-big - Full deploy with bigger phlo limit"
+	@echo "  make check-finalized BLOCK_HASH=<hash> - Check if a block is finalized"
 
-.PHONY: build deploy deploy-big propose full-deploy full-deploy-big help 
+.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized help 

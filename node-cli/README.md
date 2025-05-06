@@ -59,6 +59,21 @@ cargo run -- full-deploy -f ../rholang/examples/stdout.rho --private-key YOUR_PR
 cargo run -- full-deploy -f ../rholang/examples/stdout.rho -b
 ```
 
+### Is Finalized
+
+Check if a block is finalized, with automatic retries.
+
+```bash
+# Using default values (retry every 5 seconds, up to 12 times)
+cargo run -- is-finalized -b BLOCK_HASH
+
+# With custom parameters
+cargo run -- is-finalized -b BLOCK_HASH --private-key YOUR_PRIVATE_KEY -H node.example.com -p 40402
+
+# With custom retry settings
+cargo run -- is-finalized -b BLOCK_HASH -m 20 -r 3  # Retry every 3 seconds, up to 20 times
+```
+
 ## Using the Makefile
 
 For convenience, a Makefile is provided to simplify common operations. The Makefile uses the example Rholang file located at `../rholang/examples/stdout.rho`.
@@ -82,6 +97,9 @@ make full-deploy
 # Full deploy with bigger phlo limit
 make full-deploy-big
 
+# Check if a block is finalized
+make check-finalized BLOCK_HASH=your_block_hash_here
+
 # Show help information
 make help
 ```
@@ -101,3 +119,12 @@ make help
 - `--private-key <PRIVATE_KEY>`: Private key in hex format
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-p, --port <PORT>`: gRPC port number (default: 40402)
+
+### Is-Finalized Command
+
+- `-b, --block-hash <BLOCK_HASH>`: Block hash to check (required)
+- `--private-key <PRIVATE_KEY>`: Private key in hex format
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: gRPC port number (default: 40402)
+- `-m, --max-attempts <MAX_ATTEMPTS>`: Maximum number of retry attempts (default: 12)
+- `-r, --retry-delay <RETRY_DELAY>`: Delay between retries in seconds (default: 5)

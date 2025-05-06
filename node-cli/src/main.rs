@@ -22,6 +22,9 @@ enum Commands {
     
     /// Deploy Rholang code and propose a block in one operation
     FullDeploy(DeployArgs),
+    
+    /// Check if a block is finalized
+    IsFinalized(IsFinalizedArgs),
 }
 
 /// Arguments for deploy and full-deploy commands
@@ -70,6 +73,37 @@ struct ProposeArgs {
     port: u16,
 }
 
+/// Arguments for is-finalized command
+#[derive(Parser)]
+struct IsFinalizedArgs {
+    /// Block hash to check
+    #[arg(short, long)]
+    block_hash: String,
+
+    /// Private key in hex format
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    private_key: String,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    host: String,
+
+    /// gRPC port number
+    #[arg(short, long, default_value_t = 40402)]
+    port: u16,
+    
+    /// Maximum number of retry attempts
+    #[arg(short, long, default_value_t = 12)]
+    max_attempts: u32,
+    
+    /// Delay between retries in seconds
+    #[arg(short, long, default_value_t = 5)]
+    retry_delay: u64,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -78,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Deploy(args) => deploy_command(args).await,
         Commands::Propose(args) => propose_command(args).await,
         Commands::FullDeploy(args) => full_deploy_command(args).await,
+        Commands::IsFinalized(args) => is_finalized_command(args).await,
     }
 }
 
@@ -192,6 +227,42 @@ async fn full_deploy_command(args: &DeployArgs) -> Result<(), Box<dyn std::error
         }
         Err(e) => {
             println!("❌ Operation failed!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+async fn is_finalized_command(args: &IsFinalizedArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize the F1r3fly API client
+    println!(
+        "🔌 Connecting to F1r3fly node at {}:{}",
+        args.host, args.port
+    );
+    let f1r3fly_api = F1r3flyApi::new(&args.private_key, &args.host, args.port);
+
+    // Check if the block is finalized
+    println!("🔍 Checking if block is finalized: {}", args.block_hash);
+    println!("⏱️  Will retry every {} seconds, up to {} times", args.retry_delay, args.max_attempts);
+    let start_time = Instant::now();
+
+    match f1r3fly_api
+        .is_finalized(&args.block_hash, Some(args.max_attempts), Some(args.retry_delay))
+        .await
+    {
+        Ok(is_finalized) => {
+            let duration = start_time.elapsed();
+            if is_finalized {
+                println!("✅ Block is finalized!");
+            } else {
+                println!("❌ Block is not finalized after {} attempts", args.max_attempts);
+            }
+            println!("⏱️  Time taken: {:.2?}", duration);
+        }
+        Err(e) => {
+            println!("❌ Error checking block finalization!");
             println!("Error: {}", e);
             return Err(e);
         }

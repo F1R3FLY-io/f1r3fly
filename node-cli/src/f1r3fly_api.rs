@@ -3,13 +3,14 @@ use models::casper::v1::deploy_response::Message as DeployResponseMessage;
 use models::casper::v1::deploy_service_client::DeployServiceClient;
 use models::casper::v1::propose_response::Message as ProposeResponseMessage;
 use models::casper::v1::propose_service_client::ProposeServiceClient;
-use models::casper::ProposeQuery;
-use models::casper::DeployDataProto;
+use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
+use models::casper::{IsFinalizedQuery, ProposeQuery, DeployDataProto};
 use models::ByteString;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
 use typenum::U32;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use tokio::time::sleep;
 
 /// Client for interacting with the F1r3fly API
 pub struct F1r3flyApi<'a> {
@@ -151,6 +152,71 @@ impl<'a> F1r3flyApi<'a> {
         
         // Then propose a block
         self.propose().await
+    }
+
+    /// Checks if a block is finalized, with retry logic
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash` - The hash of the block to check
+    /// * `max_attempts` - Maximum number of retry attempts (default: 12)
+    /// * `retry_delay_sec` - Delay between retries in seconds (default: 5)
+    ///
+    /// # Returns
+    ///
+    /// true if the block is finalized, false if the block is not finalized after all retry attempts
+    pub async fn is_finalized(
+        &self,
+        block_hash: &str,
+        max_attempts: Option<u32>,
+        retry_delay_sec: Option<u64>,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let max_attempts = max_attempts.unwrap_or(12); // Default 12 attempts (1 minute with 5-second retry)
+        let retry_delay = Duration::from_secs(retry_delay_sec.unwrap_or(5)); // Default 5 second delay
+        let mut attempts = 0;
+
+        // Connect to the F1r3fly node
+        let mut deploy_service_client =
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
+
+        loop {
+            attempts += 1;
+
+            // Create the query
+            let query = IsFinalizedQuery {
+                hash: block_hash.to_string(),
+            };
+
+            // Send the query
+            let response = deploy_service_client.is_finalized(query).await?;
+            
+            // Process the response
+            let message = response
+                .get_ref()
+                .message
+                .as_ref()
+                .ok_or("is_finalized result not found")?;
+            
+            match message {
+                IsFinalizedResponseMessage::Error(service_error) => {
+                    return Err(service_error.clone().into());
+                }
+                IsFinalizedResponseMessage::IsFinalized(is_finalized) => {
+                    if *is_finalized {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            if attempts >= max_attempts {
+                // We've reached the maximum number of attempts, give up
+                return Ok(false);
+            }
+
+            // Wait before retrying
+            sleep(retry_delay).await;
+        }
     }
 
     /// Builds and signs a deploy message
