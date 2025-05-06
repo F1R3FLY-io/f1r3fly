@@ -1,13 +1,11 @@
-use std::sync::{Arc, Mutex};
-
-use costs::Cost;
-use tokio::sync::Semaphore;
-
-use super::errors::InterpreterError;
-
 pub mod cost_accounting;
 pub mod costs;
 pub mod has_cost;
+
+use super::errors::InterpreterError;
+use costs::Cost;
+use std::sync::{Arc, Mutex};
+use tokio::sync::Semaphore;
 
 #[derive(Clone)]
 pub struct CostManager {

@@ -3,13 +3,13 @@ use models::rhoapi::Par;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
-use crate::aliases::EnvHashMap;
-
 use super::accounting::CostManager;
 use super::accounting::costs::{Cost, parsing_cost};
 use super::compiler::compiler::Compiler;
 use super::errors::InterpreterError;
 use super::reduce::DebruijnInterpreter;
+use crate::aliases::EnvHashMap;
+use crate::env::Env;
 
 //See rholang/src/main/scala/coop/rchain/rholang/interpreter/Interpreter.scala
 #[derive(Clone, Debug)]
@@ -59,7 +59,7 @@ impl Interpreter for InterpreterImpl {
             merge_chs_lock.clear();
             drop(merge_chs_lock);
 
-            reducer.evaluate(parsed, rand).await?;
+            reducer.evaluate(parsed, Env::default(), rand).await?;
             let phlos_left = self.c.get();
             let mergeable_channels = self.merge_chs.read().unwrap().clone();
 

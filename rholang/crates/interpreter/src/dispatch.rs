@@ -1,6 +1,6 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::TaggedContinuation;
 use models::rhoapi::tagged_continuation::TaggedCont;
+use models::rhoapi::TaggedContinuation;
 use std::sync::{Arc, RwLock};
 
 use models::rhoapi::{ListParWithRandom, Par};
@@ -12,7 +12,7 @@ pub fn build_env(data_list: Vec<ListParWithRandom>) -> Env<Par> {
     data_list
         .into_iter()
         .flat_map(|v| v.pars)
-        .fold(Env::new(), |acc, value| acc.put(value))
+        .fold(Env::default(), |acc, value| acc.put(value))
 }
 
 #[derive(Clone)]
@@ -48,7 +48,7 @@ impl RholangAndScalaDispatcher {
                     self.reducer
                         .clone()
                         .unwrap()
-                        .evaluate(par, Blake2b512Random::merge(randoms))
+                        .evaluate(par, Env::default(), Blake2b512Random::merge(randoms))
                         .await
                 }
                 TaggedCont::ScalaBodyRef(_ref) => {

@@ -39,14 +39,14 @@ const STACK_ALLOC_SIZE: usize = 4 * 1024 * 1024;
 #[must_use]
 pub(crate) fn normalize_match_proc(
     proc: &Proc,
-    input_par: &mut crate::normal_forms::Par,
+    input_par: &mut Par,
     free_map: &mut FreeMap,
     bound_map_chain: &mut BoundMapChain,
-    env: &EnvHashMap<String, crate::normal_forms::Par>,
+    env: &EnvHashMap<String, Par>,
     pos: SourcePosition,
 ) -> Result<(), InterpreterError> {
     maybe_grow(MINIMUM_STACK_SIZE, STACK_ALLOC_SIZE, || {
-        normalize_match_proc_internal(proc, &mut input_par, free_map, bound_map_chain, env, pos)
+        normalize_match_proc_internal(proc, input_par, free_map, bound_map_chain, env, pos)
     })
 }
 
@@ -199,7 +199,7 @@ fn normalize_match_proc_internal(
             body,
         } => normalize_p_contr(
             *name,
-            *formals,
+            formals.clone(),
             *body,
             input_par,
             free_map,

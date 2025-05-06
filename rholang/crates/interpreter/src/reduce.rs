@@ -27,7 +27,13 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
-use crate::accounting::CostManager;
+use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
+use super::env::Env;
+use super::errors::InterpreterError;
+use super::rho_runtime::RhoISpace;
+use super::rho_type::{RhoExpression, RhoUnforgeable};
+use super::substitute::Substitute;
+use super::unwrap_option_safe;
 use crate::accounting::costs::{
     add_cost, boolean_and_cost, boolean_or_cost, byte_array_append_cost, bytes_to_hex_cost,
     comparison_cost, diff_cost, division_cost, equality_check_cost, hex_to_bytes_cost,
@@ -37,18 +43,12 @@ use crate::accounting::costs::{
     size_method_cost, slice_cost, string_append_cost, subtraction_cost, sum_cost, take_cost,
     to_byte_array_cost, to_list_cost, union_cost, var_eval_cost,
 };
+use crate::accounting::CostManager;
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
 use crate::normal_forms::{self, GeneratedMessage, Par};
 use crate::rho_type::RhoTuple2;
-
-use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
-use super::env::Env;
-use super::errors::InterpreterError;
-use super::rho_runtime::RhoISpace;
-use super::rho_type::{RhoExpression, RhoUnforgeable};
-use super::substitute::Substitute;
-use super::unwrap_option_safe;
+use crate::sort_matcher::Sorted;
 
 ///
 /// Reduce is the interface for evaluating Rholang expressions.
@@ -84,29 +84,36 @@ trait Method {
 impl DebruijnInterpreter {
     pub async fn evaluate(
         &self,
-        par: normal_forms::Par,
+        par: Sorted<Par>,
         env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
         let terms: Vec<GeneratedMessage> = vec![
             par.sends
+                .cloned()
                 .into_iter()
                 .map(GeneratedMessage::Send)
                 .collect::<Vec<_>>(),
             par.receives
+                .cloned()
                 .into_iter()
                 .map(GeneratedMessage::Receive)
                 .collect::<Vec<_>>(),
-            par.news.into_iter().map(GeneratedMessage::New).collect(),
+            par.news
+                .cloned()
+                .into_iter().map(GeneratedMessage::New).collect(),
             par.matches
+                .cloned()
                 .into_iter()
                 .map(GeneratedMessage::Match)
                 .collect::<Vec<_>>(),
             par.bundles
+                .cloned()
                 .into_iter()
                 .map(GeneratedMessage::Bundle)
                 .collect::<Vec<_>>(),
             par.exprs
+                .cloned()
                 .into_iter()
                 .map(GeneratedMessage::Expr)
                 .collect::<Vec<_>>(),

@@ -275,7 +275,7 @@ impl Runtime for RhoRuntime {
     }
 
     async fn inj(&self, par: Par, rand: Blake2b512Random) -> Result<(), InterpreterError> {
-        self.reducer.evaluate(par, Env::new(), rand).await
+        self.reducer.evaluate(par, Env::default(), rand).await
     }
 
     fn create_soft_checkpoint(
@@ -296,7 +296,7 @@ impl Runtime for RhoRuntime {
             .space
             .try_lock()
             .unwrap()
-            .revert_to_soft_checkpoint(soft_checkpoint)
+            .revert_to_soft_checkpoint(soft_checkpoint.into())
             .unwrap()
     }
 

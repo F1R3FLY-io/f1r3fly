@@ -2,8 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use uuid::Uuid;
-
+use crate::compiler::rholang_ast::Proc;
+use crate::compiler::rholang_ast::Proc::Eval;
 use crate::{
     aliases::EnvHashMap,
     compiler::{
@@ -16,6 +16,8 @@ use crate::{
     normal_forms::{Par, ReceiveBind},
     unwrap_option_safe,
 };
+use models::BitSet;
+use uuid::Uuid;
 
 fn process_binds<'a, I>(
     binds: I,
@@ -88,11 +90,6 @@ pub fn normalize_p_input(
             _ => false,
         };
 
-        // println!(
-        //     "\nreceipt_contains_complex_source: {:?}",
-        //     receipt_contains_complex_source,
-        // );
-
         if receipt_contains_complex_source {
             match head_receipt {
                 Receipt::Linear(linear_bind) => match &linear_bind.input {
@@ -145,6 +142,7 @@ pub fn normalize_p_input(
                                                             cont: linear_bind.names.cont,
                                                             line_num: 0,
                                                             col_num: 0,
+                                                            remainder: None,
                                                         },
                                                         rhs: Source::Simple {
                                                             name,
@@ -182,6 +180,7 @@ pub fn normalize_p_input(
 
                                             Source::SendReceive { name, inputs, .. } => {
                                                 list_name_decl.decls.push(NameDecl {
+                                                    id: Id {},
                                                     var: Var {
                                                         name: identifier,
                                                         line_num: 0,
@@ -199,6 +198,7 @@ pub fn normalize_p_input(
                                                             cont: linear_bind.names.cont,
                                                             line_num: 0,
                                                             col_num: 0,
+                                                            remainder: None,
                                                         },
                                                         rhs: Source::Simple {
                                                             name: Name::ProcVar(Box::new(
@@ -314,7 +314,7 @@ pub fn normalize_p_input(
                 sources: Vec<Name>,
                 input: ProcVisitInputs,
                 env: &HashMap<String, Par>,
-            ) -> Result<(Vec<Par>, FreeMap<VarSort>, BitSet, bool), InterpreterError> {
+            ) -> Result<(Vec<Par>, FreeMap, BitSet, bool), InterpreterError> {
                 let mut vector_par = Vec::new();
                 let mut current_known_free = input.free_map;
                 let mut locally_free = Vec::new();
@@ -358,7 +358,7 @@ pub fn normalize_p_input(
                 Vec<(
                     Vec<Par>,
                     Option<models::rhoapi::Var>,
-                    FreeMap<VarSort>,
+                    FreeMap,
                     BitSet,
                 )>,
                 InterpreterError,
@@ -379,12 +379,8 @@ pub fn normalize_p_input(
                                     bound_map_chain: input.bound_map_chain.push(),
                                     free_map: current_known_free,
                                 };
-                                // println!("\ninput: {:?}", input);
-                                // println!("\nname: {:?}", name);
                                 normalize_name(&name, input, env)?
                             };
-
-                            // println!("\npar: {:?}", par);
 
                             fail_on_invalid_connective(
                                 &input,
@@ -405,13 +401,9 @@ pub fn normalize_p_input(
                             );
                         }
 
-                        // println!("\ncurrent_known_free: {:?}", current_known_free);
 
                         let (optional_var, known_free) =
                             normalize_match_name(&name_remainder, current_known_free)?;
-
-                        // println!("\noptional_var: {:?}", optional_var);
-                        // println!("\nknown_free: {:?}", known_free);
 
                         Ok((vector_par, optional_var, known_free, locally_free))
                     })
@@ -460,15 +452,11 @@ pub fn normalize_p_input(
             let (patterns, names): (Vec<(Vec<Name>, Option<Box<Proc>>)>, Vec<Name>) =
                 consumes.into_iter().unzip();
 
-            // println!("\npatterns: {:#?}", patterns);
 
             let processed_patterns = process_patterns(patterns, input.clone(), env)?;
-            // println!("\nprocessed_patterns: {:#?}", processed_patterns);
             let processed_sources = process_sources(names, input.clone(), env)?;
             let (sources, sources_free, sources_locally_free, sources_connective_used) =
                 processed_sources;
-
-            // println!("\nsources: {:?}", sources);
 
             let receive_binds_and_free_maps = pre_sort_binds(
                 processed_patterns
@@ -480,7 +468,7 @@ pub fn normalize_p_input(
                     .collect(),
             )?;
 
-            let (receive_binds, receive_bind_free_maps): (Vec<ReceiveBind>, Vec<FreeMap<VarSort>>) =
+            let (receive_binds, receive_bind_free_maps): (Vec<ReceiveBind>, Vec<FreeMap>) =
                 receive_binds_and_free_maps.into_iter().unzip();
 
             let channels: Vec<Par> = receive_binds
@@ -499,11 +487,9 @@ pub fn normalize_p_input(
                 });
             }
 
-            // println!("\nreceive_binds_free_maps: {:?}", receive_bind_free_maps);
-
             let receive_binds_free_map = receive_bind_free_maps.into_iter().try_fold(
                 FreeMap::new(),
-                |known_free, receive_bind_free_map| {
+                |mut known_free, receive_bind_free_map| {
                     let (updated_known_free, conflicts) = known_free.merge(receive_bind_free_map);
 
                     if conflicts.is_empty() {
@@ -589,14 +575,15 @@ mod tests {
         },
     };
 
+    use super::*;
+    use crate::compiler::rholang_ast::Proc;
+    use crate::compiler::rholang_ast::Proc::Eval;
     use crate::compiler::{
         compiler::Compiler,
         exports::{BoundMapChain, SourcePosition},
         normalizer::parser::parse_rholang_code_to_proc,
         rholang_ast::{Collection, Quote},
     };
-
-    use super::*;
 
     fn inputs() -> ProcVisitInputs {
         ProcVisitInputs {
@@ -627,7 +614,7 @@ mod tests {
                 line_num: 0,
                 col_num: 0,
             },
-            inputs: ProcList::new(vec![Proc::Eval(Eval {
+            inputs: ProcList::new(vec![Eval(Eval {
                 name: Name::new_name_var("y"),
                 line_num: 0,
                 col_num: 0,
@@ -846,9 +833,6 @@ mod tests {
             locally_free: Vec::new(),
             connective_used: false,
         });
-
-        // println!("\nresult: {:#?}", result.clone().unwrap().par);
-        // println!("\nexpected_result: {:#?}", expected_result);
 
         assert_eq!(result.unwrap().par, expected_result)
     }

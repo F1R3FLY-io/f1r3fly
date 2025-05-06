@@ -1,34 +1,34 @@
-pub mod accounting;
-pub mod aliases;
+mod accounting;
+mod aliases;
 mod charging_rspace;
-pub mod compiler;
-pub mod contract_call;
-pub mod dispatch;
-pub mod env;
-pub mod errors;
-pub mod interpreter;
-pub mod matcher;
-pub mod normal_forms;
-pub mod pretty_printer;
-pub mod reduce;
-pub mod registry;
-pub mod rho_runtime;
-pub mod rho_type;
-pub mod score_tree;
-pub mod sort_matcher;
-pub mod sorter;
-pub mod storage;
-pub mod substitute;
-pub mod system_processes;
-pub mod utils;
+mod compiler;
+mod contract_call;
+mod dispatch;
+mod env;
+mod errors;
+mod interpreter;
+mod matcher;
+mod normal_forms;
+mod pretty_printer;
+mod reduce;
+mod registry;
+mod rho_runtime;
+mod rho_type;
+mod score_tree;
+mod sort_matcher;
+mod sorter;
+mod storage;
+mod substitute;
+mod system_processes;
+mod utils;
 
-use dashmap::DashMap;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use accounting::costs::Cost;
 use crypto::rust::hash::blake2b512_block::Blake2b512Block;
 use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
+use dashmap::DashMap;
 use models::rspace_plus_plus_types::*;
 use models::{
     rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation},
@@ -675,7 +675,7 @@ extern "C" fn revert_to_soft_checkpoint(
     runtime
         .try_lock()
         .unwrap()
-        .revert_to_soft_checkpoint(soft_checkpoint);
+        .revert_to_soft_checkpoint(soft_checkpoint.into());
 }
 
 #[unsafe(no_mangle)]
@@ -1229,7 +1229,7 @@ extern "C" fn create_replay_runtime(
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let rho_runtime = tokio_runtime.block_on(async {
-        crate::rho_runtime::create_runtime(rspace, init_registry, mergeable_tag_name).await
+        crate::rho_runtime::create_runtime(rspace, init_registry, mergeable_tag_name.into()).await
     });
 
     Box::into_raw(Box::new(ReplayRhoRuntime {

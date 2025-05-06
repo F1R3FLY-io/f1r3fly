@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-pub(crate) struct EnvHashMap<K = String, V = crate::normal_forms::Par>(BTreeMap<K, V>);
+pub(crate) struct EnvHashMap<K = String, V = super::normal_forms::Par>(BTreeMap<K, V>);
 
 impl<K, V> EnvHashMap<K, V> {
     pub fn new() -> Self {
