@@ -122,6 +122,18 @@ java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.secur
 
 ## Usage
 
+### Node CLI
+
+A command-line interface for interacting with F1r3fly nodes is available in the `node-cli` directory. This CLI provides functionality for:
+
+- **Deploying** Rholang code to F1r3fly nodes
+- **Proposing** blocks to create a new block containing deployed code
+- **Full Deploy** operations (deploy + propose in one step)
+- **Checking finalization** of blocks with automatic retries
+- **Exploratory Deploy** to execute Rholang without committing to the blockchain (ideal for read-only nodes)
+
+For detailed usage instructions and examples, see the [Node CLI README](node-cli/README.md).
+
 ### Evaluating Rholang contracts
 
 Prerequisites: [Running node](#running).
