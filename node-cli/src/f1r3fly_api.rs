@@ -1,6 +1,9 @@
 use blake2::{Blake2b, Digest};
 use models::casper::v1::deploy_response::Message as DeployResponseMessage;
 use models::casper::v1::deploy_service_client::DeployServiceClient;
+use models::casper::v1::propose_response::Message as ProposeResponseMessage;
+use models::casper::v1::propose_service_client::ProposeServiceClient;
+use models::casper::ProposeQuery;
 use models::casper::DeployDataProto;
 use models::ByteString;
 use prost::Message;
@@ -84,6 +87,70 @@ impl<'a> F1r3flyApi<'a> {
                 Ok(result.clone())
             }
         }
+    }
+
+    /// Sends a proposal to the network to create a new block
+    ///
+    /// # Returns
+    ///
+    /// The block hash of the proposed block if successful, otherwise an error
+    pub async fn propose(&self) -> Result<String, Box<dyn std::error::Error>> {
+        // Connect to the F1r3fly node's propose service
+        let mut propose_client = ProposeServiceClient::connect(
+            format!("http://{}:{}/", self.node_host, self.grpc_port)
+        ).await?;
+
+        // Send the propose request
+        let propose_response = propose_client
+            .propose(ProposeQuery { is_async: false })
+            .await?
+            .into_inner();
+            
+        // Process the response
+        let message = propose_response
+            .message
+            .ok_or("Missing propose response")?;
+
+        match message {
+            ProposeResponseMessage::Result(block_hash) => {
+                // Extract the block hash from the response
+                if let Some(hash) = block_hash
+                    .strip_prefix("Success! Block ")
+                    .and_then(|s| s.strip_suffix(" created and added."))
+                {
+                    Ok(hash.to_string())
+                } else {
+                    Ok(block_hash) // Return the full message if we can't extract the hash
+                }
+            }
+            ProposeResponseMessage::Error(error) => {
+                Err(format!("Propose error: {:?}", error).into())
+            }
+        }
+    }
+
+    /// Performs a full deployment cycle: deploy and propose
+    ///
+    /// # Arguments
+    ///
+    /// * `rho_code` - Rholang source code to deploy
+    /// * `use_bigger_phlo_price` - Whether to use a larger phlo limit
+    /// * `language` - Language of the deploy (typically "rholang")
+    ///
+    /// # Returns
+    ///
+    /// The block hash if successful, otherwise an error
+    pub async fn full_deploy(
+        &self,
+        rho_code: &str,
+        use_bigger_phlo_price: bool,
+        language: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // First deploy the code
+        self.deploy(rho_code, use_bigger_phlo_price, language).await?;
+        
+        // Then propose a block
+        self.propose().await
     }
 
     /// Builds and signs a deploy message
