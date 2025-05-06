@@ -1,41 +1,81 @@
+use clap::Parser;
 use node_cli::f1r3fly_api::F1r3flyApi;
+use std::fs;
+use std::path::PathBuf;
+use std::time::Instant;
+
+/// Command-line interface for deploying Rholang code to F1r3fly nodes
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to the Rholang file to deploy
+    #[arg(short, long)]
+    file: PathBuf,
+
+    /// Private key in hex format
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    private_key: String,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    host: String,
+
+    /// gRPC port number
+    #[arg(short, long, default_value_t = 40402)]
+    port: u16,
+
+    /// Use bigger phlo price
+    #[arg(short, long, default_value_t = false)]
+    bigger_phlo: bool,
+}
 
 #[tokio::main]
-async fn main() {
-    let rholang_code = r#"
-    new gptAnswer, audio, dalle3Answer,
-    gpt3(`rho:ai:gpt3`),
-    gpt4(`rho:ai:gpt4`),
-    dalle3(`rho:ai:dalle3`),
-    textToAudio(`rho:ai:textToAudio`),
-    dumpFile(`rho:ai:dumpFile`),  // temporary
-    stdout(`rho:io:stdout`) in {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
 
-  gpt3!("Describe an appearance of human-like robot: ", *gptAnswer) |
-  for(@answer <- gptAnswer) {
-    stdout!(["GTP3 created a prompt", answer]) |
+    // Read the Rholang code from file
+    println!("📄 Reading Rholang from: {}", args.file.display());
+    let rholang_code = fs::read_to_string(&args.file)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    println!("📊 Code size: {} bytes", rholang_code.len());
 
-    dalle3!(answer, *dalle3Answer) |
-    for(@dalle3Answer <- dalle3Answer) {
-      stdout!(["Dall-e-3 created an image", dalle3Answer])
+    // Initialize the F1r3fly API client
+    println!(
+        "🔌 Connecting to F1r3fly node at {}:{}",
+        args.host, args.port
+    );
+    let f1r3fly_api = F1r3flyApi::new(&args.private_key, &args.host, args.port);
+
+    let phlo_limit = if args.bigger_phlo {
+        "5,000,000,000"
+    } else {
+        "50,000"
+    };
+    println!("💰 Using phlo limit: {}", phlo_limit);
+
+    // Deploy the Rholang code
+    println!("🚀 Deploying Rholang code...");
+    let start_time = Instant::now();
+
+    match f1r3fly_api
+        .deploy(&rholang_code, args.bigger_phlo, "rholang")
+        .await
+    {
+        Ok(deploy_id) => {
+            let duration = start_time.elapsed();
+            println!("✅ Deployment successful!");
+            println!("⏱️  Time taken: {:.2?}", duration);
+            println!("🆔 Deploy ID: {}", deploy_id);
+        }
+        Err(e) => {
+            println!("❌ Deployment failed!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
     }
-  } |
 
-  textToAudio!("Hello, I am a robot. Rholang give me a voice!", *audio) |
-
-  for(@bytes <- audio) {
-    dumpFile!("text-to-audio.mp3", bytes)
-  }
-}
-    "#;
-
-    let private_key =
-        hex::decode("f9854c5199bc86237206c75b25c6aeca024dccc0f55df3a553131111fd25dd85")
-            .expect("Failed to decode private key");
-
-    let f1r3fly_api = F1r3flyApi::new(private_key, "localhost", 40402);
-
-    let deploy_result = f1r3fly_api.deploy(rholang_code, false, "rholang").await;
-
-    println!("Deploy result: {:#?}", deploy_result);
+    Ok(())
 }

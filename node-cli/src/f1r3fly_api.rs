@@ -1,164 +1,164 @@
-use crypto::rust::{
-    hash::blake2b256::Blake2b256,
-    private_key::PrivateKey,
-    signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
-};
+use blake2::{Blake2b, Digest};
 use models::casper::v1::deploy_response::Message as DeployResponseMessage;
 use models::casper::v1::deploy_service_client::DeployServiceClient;
 use models::casper::DeployDataProto;
+use models::ByteString;
 use prost::Message;
+use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
+use typenum::U32;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Client for interacting with the F1r3fly API
 pub struct F1r3flyApi<'a> {
-    signing_key: PrivateKey,
+    signing_key: SecretKey,
     node_host: &'a str,
     grpc_port: u16,
 }
 
 impl<'a> F1r3flyApi<'a> {
-    pub fn new(signing_key: Vec<u8>, node_host: &'a str, grpc_port: u16) -> Self {
+    /// Creates a new F1r3fly API client
+    ///
+    /// # Arguments
+    ///
+    /// * `signing_key` - Hex-encoded private key for signing deploys
+    /// * `node_host` - Hostname or IP address of the F1r3fly node
+    /// * `grpc_port` - gRPC port for the node's API service
+    ///
+    /// # Returns
+    ///
+    /// A new `F1r3flyApi` instance
+    pub fn new(signing_key: &str, node_host: &'a str, grpc_port: u16) -> Self {
         F1r3flyApi {
-            signing_key: PrivateKey::new(signing_key),
+            signing_key: SecretKey::from_slice(&hex::decode(signing_key).unwrap()).unwrap(),
             node_host,
             grpc_port,
         }
     }
 
+    /// Deploys Rholang code to the F1r3fly node
+    ///
+    /// # Arguments
+    ///
+    /// * `rho_code` - Rholang source code to deploy
+    /// * `use_bigger_phlo_price` - Whether to use a larger phlo limit
+    /// * `language` - Language of the deploy (typically "rholang")
+    ///
+    /// # Returns
+    ///
+    /// The deploy ID if successful, otherwise an error
     pub async fn deploy(
         &self,
         rho_code: &str,
-        use_bigger_rhlo_price: bool,
+        use_bigger_phlo_price: bool,
         language: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        //  let max_rholang_in_logs = 2000;
-        //  debug!("Rholang code {}", if rho_code.len() > max_rholang_in_logs { &rho_code[..max_rholang_in_logs] } else { rho_code });
-
-        let phlo_limit: i64 = if use_bigger_rhlo_price {
+        let phlo_limit: i64 = if use_bigger_phlo_price {
             5_000_000_000
         } else {
             50_000
         };
 
-        let mut deployment = DeployDataProto {
-            term: rho_code.to_string(),
-            timestamp: 0,
-            phlo_price: 1,
-            phlo_limit,
-            shard_id: "root".to_string(),
-            language: language.to_string(),
-            ..Default::default()
-        };
+        // Build and sign the deployment
+        let deployment = self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string());
 
-        self.sign_deploy(&mut deployment)?;
-
+        // Connect to the F1r3fly node
         let mut deploy_service_client =
-            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port)).await?;
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
 
+        // Send the deploy
         let deploy_response = deploy_service_client.do_deploy(deployment).await?;
-        let deploy_message: &DeployResponseMessage = deploy_response
+        
+        // Process the response
+        let deploy_message = deploy_response
             .get_ref()
             .message
             .as_ref()
-            .expect("Deploy result not found");
+            .ok_or("Deploy result not found")?;
 
-        let deploy_result = match deploy_message {
+        match deploy_message {
             DeployResponseMessage::Error(service_error) => {
-                return Err(Box::new(service_error.clone()));
+                Err(service_error.clone().into())
             }
-            DeployResponseMessage::Result(result) => result,
+            DeployResponseMessage::Result(result) => {
+                Ok(result.clone())
+            }
+        }
+    }
+
+    /// Builds and signs a deploy message
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - Rholang source code to deploy
+    /// * `phlo_limit` - Maximum amount of phlo to use for execution
+    /// * `language` - Language of the deploy (typically "rholang")
+    ///
+    /// # Returns
+    ///
+    /// A signed `DeployDataProto` ready to be sent to the node
+    fn build_deploy_msg(&self, code: String, phlo_limit: i64, language: String) -> DeployDataProto {
+        // Get current timestamp in milliseconds
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
+            
+        // Create a projection with only the fields used for signature calculation
+        // IMPORTANT: The language field is deliberately excluded from signature calculation
+        let projection = DeployDataProto {
+            term: code.clone(),
+            timestamp,
+            phlo_price: 1,
+            phlo_limit,
+            valid_after_block_number: 0,
+            shard_id: "root".into(),
+            language: String::new(), // Excluded from signature calculation
+            sig: ByteString::new(),
+            deployer: ByteString::new(),
+            sig_algorithm: String::new(),
         };
-
-        Ok(deploy_result.clone())
-
-        //  if let Some(error) = deploy_response.get_ref().error.as_ref() {
-        //      return Err(Box::new(ServiceError::new(error.clone())));
-        //  }
-
-        //  let deploy_result = &deploy_response.get_ref().result;
-        //  let deploy_id = deploy_result.split("DeployId is: ").nth(1).unwrap_or("");
-
-        //  let propose_response = self.propose_service.propose(Request::new(ProposeQuery { is_async: false })).await?;
-        //  if let Some(error) = propose_response.get_ref().error.as_ref() {
-        //      return Err(Box::new(ServiceError::new(error.clone())));
-        //  }
-
-        //  let b64 = hex::decode(deploy_id)?;
-        //  let find_response = self.deploy_service.find_deploy(Request::new(FindDeployQuery { deploy_id: b64 })).await?;
-        //  if let Some(error) = find_response.get_ref().error.as_ref() {
-        //      return Err(Box::new(ServiceError::new(error.clone())));
-        //  }
-
-        //  let block_hash = &find_response.get_ref().block_info.as_ref().unwrap().block_hash;
-        //  debug!("Block Hash {}", block_hash);
-
-        //  let is_finalized_response = self.deploy_service.is_finalized(Request::new(IsFinalizedQuery { hash: block_hash.clone() })).await?;
-        //  if let Some(error) = is_finalized_response.get_ref().error.as_ref() || !is_finalized_response.get_ref().is_finalized {
-        //      return Err(Box::new(ServiceError::new(error.clone())));
-        //  }
-
-        //  Ok(block_hash.clone())
+        
+        // Serialize the projection for hashing
+        let serialized = projection.encode_to_vec();
+        
+        // Hash with Blake2b256
+        let digest = blake2b_256_hash(&serialized);
+        
+        // Sign the digest with secp256k1
+        let secp = Secp256k1::new();
+        let message = Secp256k1Message::from_digest(digest.into());
+        let signature = secp.sign_ecdsa(&message, &self.signing_key);
+        
+        // Get signature in DER format
+        let sig_bytes = signature.serialize_der().to_vec();
+        
+        // Get the public key in uncompressed format
+        let public_key = self.signing_key.public_key(&secp);
+        let pub_key_bytes = public_key.serialize_uncompressed().to_vec();
+        
+        // Return the complete deploy message
+        DeployDataProto {
+            term: code,
+            timestamp,
+            phlo_price: 1,
+            phlo_limit,
+            valid_after_block_number: 0,
+            shard_id: "root".into(),
+            language,
+            sig: ByteString::from(sig_bytes),
+            sig_algorithm: "secp256k1".into(),
+            deployer: ByteString::from(pub_key_bytes),
+        }
     }
+}
 
-    //  pub async fn find_data_by_name(&self, expr: &str) -> Result<Vec<RhoTypesPar>, Box<dyn std::error::Error>> {
-    //      info!("Find data by name {}", expr);
-
-    //      let par = RhoTypesPar {
-    //          exprs: vec![RhoTypesExpr { g_string: expr.to_string(), ..Default::default() }],
-    //          ..Default::default()
-    //      };
-
-    //      let request = DataAtNameQuery {
-    //          name: Some(par),
-    //          depth: 50,
-    //          ..Default::default()
-    //      };
-
-    //      let response = self.deploy_service.listen_for_data_at_name(Request::new(request)).await?;
-    //      if let Some(error) = response.get_ref().error.as_ref() {
-    //          return Err(Box::new(ServiceError::new(error.clone())));
-    //      }
-
-    //      let payload = response.get_ref().payload.as_ref().unwrap();
-    //      if payload.length == 0 {
-    //          return Err(Box::new(NoDataByPath::new(expr.to_string())));
-    //      }
-
-    //      Ok(payload.block_info[0].post_block_data.clone())
-    //  }
-
-    //  pub async fn get_data_at_block_by_name(&self, block_hash: &str, expr: &str) -> Result<Vec<RhoTypesPar>, Box<dyn std::error::Error>> {
-    //      info!("Get data at block {} by name {}", block_hash, expr);
-
-    //      let par = RhoTypesPar {
-    //          exprs: vec![RhoTypesExpr { g_string: expr.to_string(), ..Default::default() }],
-    //          ..Default::default()
-    //      };
-
-    //      let request = DataAtNameByBlockQuery {
-    //          block_hash: block_hash.to_string(),
-    //          par: Some(par),
-    //          ..Default::default()
-    //      };
-
-    //      let response = self.deploy_service.get_data_at_name(Request::new(request)).await?;
-    //      if let Some(error) = response.get_ref().error.as_ref() {
-    //          return Err(Box::new(ServiceError::new(error.clone())));
-    //      }
-
-    //      Ok(response.get_ref().payload.as_ref().unwrap().par.clone())
-    //  }
-
-    fn sign_deploy(&self, deploy: &mut DeployDataProto) -> Result<(), Box<dyn std::error::Error>> {
-        let encoded = deploy.encode_to_vec();
-        let hashed = Blake2b256::hash(encoded);
-
-        let secp256k1 = Secp256k1;
-        let signature = secp256k1.sign(&hashed, &self.signing_key.bytes);
-        let pub_key = secp256k1.to_public(&self.signing_key);
-
-        deploy.sig_algorithm = "secp256k1".to_string();
-        deploy.sig = signature;
-        deploy.deployer = pub_key.bytes;
-
-        Ok(())
-    }
+/// Computes a Blake2b 256-bit hash of the provided data
+fn blake2b_256_hash(data: &[u8]) -> [u8; 32] {
+    let mut blake = Blake2b::<U32>::new();
+    blake.update(data);
+    let hash = blake.finalize();
+    let mut result = [0u8; 32];
+    result.copy_from_slice(&hash);
+    result
 }
