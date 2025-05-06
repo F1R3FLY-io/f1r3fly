@@ -4,8 +4,10 @@ use models::casper::v1::deploy_service_client::DeployServiceClient;
 use models::casper::v1::propose_response::Message as ProposeResponseMessage;
 use models::casper::v1::propose_service_client::ProposeServiceClient;
 use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
-use models::casper::{IsFinalizedQuery, ProposeQuery, DeployDataProto};
+use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeployResponseMessage;
+use models::casper::{IsFinalizedQuery, ProposeQuery, DeployDataProto, ExploratoryDeployQuery};
 use models::ByteString;
+use models::rhoapi::Par;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
 use typenum::U32;
@@ -86,6 +88,91 @@ impl<'a> F1r3flyApi<'a> {
             }
             DeployResponseMessage::Result(result) => {
                 Ok(result.clone())
+            }
+        }
+    }
+
+    /// Executes Rholang code without committing to the blockchain (exploratory deployment)
+    ///
+    /// # Arguments
+    ///
+    /// * `rho_code` - Rholang source code to execute
+    /// * `block_hash` - Optional block hash to use as reference
+    /// * `use_pre_state_hash` - Whether to use pre-state hash instead of post-state hash
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (result data as JSON string, block info) if successful, otherwise an error
+    pub async fn exploratory_deploy(
+        &self,
+        rho_code: &str,
+        block_hash: Option<&str>,
+        use_pre_state_hash: bool,
+    ) -> Result<(String, String), Box<dyn std::error::Error>> {
+        // Connect to the F1r3fly node
+        let mut deploy_service_client =
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
+
+        // Build the exploratory deploy query
+        let query = ExploratoryDeployQuery {
+            term: rho_code.to_string(),
+            block_hash: block_hash.unwrap_or("").to_string(),
+            use_pre_state_hash,
+        };
+
+        // Send the exploratory deploy
+        let response = deploy_service_client.exploratory_deploy(query).await?;
+        
+        // Process the response
+        let message = response
+            .get_ref()
+            .message
+            .as_ref()
+            .ok_or("Exploratory deploy result not found")?;
+
+        match message {
+            ExploratoryDeployResponseMessage::Error(service_error) => {
+                Err(service_error.clone().into())
+            }
+            ExploratoryDeployResponseMessage::Result(result) => {
+                // Format the Par data structure to a readable string
+                let data = {
+                    let mut result_str = String::new();
+                    
+                    // Process the data
+                    if !result.post_block_data.is_empty() {
+                        for (i, par) in result.post_block_data.iter().enumerate() {
+                            if i > 0 {
+                                result_str.push_str("\n");
+                            }
+                            // We're using a simplified representation of the Par data
+                            // A more sophisticated approach would be to recursively traverse the structure
+                            match extract_par_data(par) {
+                                Some(data) => result_str.push_str(&data),
+                                None => result_str.push_str(&format!("Result {}: Complex data structure", i + 1)),
+                            }
+                        }
+                    } else {
+                        result_str = "No data returned".to_string();
+                    }
+                    
+                    result_str
+                };
+                
+                // Format the block info to a readable string
+                let block_info = {
+                    if let Some(block) = &result.block {
+                        format!(
+                            "Block hash: {}, Block number: {}",
+                            block.block_hash, block.block_number
+                        )
+                    } else {
+                        "No block info".to_string()
+                    }
+                };
+                
+                Ok((data, block_info))
             }
         }
     }
@@ -283,6 +370,43 @@ impl<'a> F1r3flyApi<'a> {
             sig_algorithm: "secp256k1".into(),
             deployer: ByteString::from(pub_key_bytes),
         }
+    }
+}
+
+/// Extracts a simplified string representation from a Par object
+fn extract_par_data(par: &Par) -> Option<String> {
+    // Check for expressions
+    if !par.exprs.is_empty() && par.exprs[0].expr_instance.is_some() {
+        // Extract data from the first expression
+        let expr = &par.exprs[0];
+        if let Some(instance) = &expr.expr_instance {
+            match instance {
+                // Handle different types of expressions
+                models::rhoapi::expr::ExprInstance::GString(s) => Some(format!("\"{}\"", s)),
+                models::rhoapi::expr::ExprInstance::GInt(i) => Some(i.to_string()),
+                models::rhoapi::expr::ExprInstance::GBool(b) => Some(b.to_string()),
+                // Add other types as needed
+                _ => Some("Complex expression".to_string())
+            }
+        } else {
+            None
+        }
+    } 
+    // Check for sends
+    else if !par.sends.is_empty() {
+        Some("Send operation".to_string())
+    }
+    // Check for receives
+    else if !par.receives.is_empty() {
+        Some("Receive operation".to_string())
+    }
+    // Check for news
+    else if !par.news.is_empty() {
+        Some("New declaration".to_string())
+    }
+    // Empty or unsupported Par object
+    else {
+        None
     }
 }
 

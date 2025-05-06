@@ -25,6 +25,9 @@ enum Commands {
     
     /// Check if a block is finalized
     IsFinalized(IsFinalizedArgs),
+    
+    /// Execute Rholang code without committing to the blockchain (exploratory deployment)
+    ExploratoryDeploy(ExploratoryDeployArgs),
 }
 
 /// Arguments for deploy and full-deploy commands
@@ -104,6 +107,37 @@ struct IsFinalizedArgs {
     retry_delay: u64,
 }
 
+/// Arguments for exploratory-deploy command
+#[derive(Parser)]
+struct ExploratoryDeployArgs {
+    /// Path to the Rholang file to execute
+    #[arg(short, long)]
+    file: PathBuf,
+
+    /// Private key in hex format
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    private_key: String,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    host: String,
+
+    /// gRPC port number
+    #[arg(short, long, default_value_t = 40402)]
+    port: u16,
+    
+    /// Block hash to use as reference (optional)
+    #[arg(short, long)]
+    block_hash: Option<String>,
+    
+    /// Use pre-state hash instead of post-state hash
+    #[arg(short, long, default_value_t = false)]
+    use_pre_state: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -113,7 +147,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Propose(args) => propose_command(args).await,
         Commands::FullDeploy(args) => full_deploy_command(args).await,
         Commands::IsFinalized(args) => is_finalized_command(args).await,
+        Commands::ExploratoryDeploy(args) => exploratory_deploy_command(args).await,
     }
+}
+
+async fn exploratory_deploy_command(args: &ExploratoryDeployArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Read the Rholang code from file
+    println!("📄 Reading Rholang from: {}", args.file.display());
+    let rholang_code = fs::read_to_string(&args.file)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    println!("📊 Code size: {} bytes", rholang_code.len());
+
+    // Initialize the F1r3fly API client
+    println!(
+        "🔌 Connecting to F1r3fly node at {}:{}",
+        args.host, args.port
+    );
+    let f1r3fly_api = F1r3flyApi::new(&args.private_key, &args.host, args.port);
+
+    // Execute the exploratory deployment
+    println!("🚀 Executing Rholang code (exploratory deploy)...");
+    
+    // Display block hash if provided
+    if let Some(block_hash) = &args.block_hash {
+        println!("🧱 Using block hash: {}", block_hash);
+    }
+    
+    // Display state hash preference
+    if args.use_pre_state {
+        println!("🔍 Using pre-state hash");
+    } else {
+        println!("🔍 Using post-state hash");
+    }
+    
+    let start_time = Instant::now();
+
+    match f1r3fly_api
+        .exploratory_deploy(
+            &rholang_code, 
+            args.block_hash.as_deref(), 
+            args.use_pre_state
+        )
+        .await
+    {
+        Ok((result, block_info)) => {
+            let duration = start_time.elapsed();
+            println!("✅ Execution successful!");
+            println!("⏱️  Time taken: {:.2?}", duration);
+            println!("🧱 {}", block_info);
+            println!("📊 Result:");
+            println!("{}", result);
+        }
+        Err(e) => {
+            println!("❌ Execution failed!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
 
 async fn deploy_command(args: &DeployArgs) -> Result<(), Box<dyn std::error::Error>> {
