@@ -146,7 +146,7 @@ Check out the [F1r3flyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) pro
 
 General nix problems or unable to load `flake.nix` file:
 ```bash
-nix garbage collect
+nix-garbage-collect
 ```
 
 SBT build problems:
