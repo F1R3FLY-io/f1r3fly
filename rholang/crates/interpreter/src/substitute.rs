@@ -169,33 +169,39 @@ impl SubstituteTrait<crate::normal_forms::Bundle> for Substitute {
         let sub_bundle = self.substitute(term.body.clone(), depth, env)?.into();
         let term_clone = term.clone();
 
-        single_bundle(&sub_bundle).map_or_else(
-            || {
+        let result = match single_bundle(&sub_bundle) {
+            None => {
                 let mut term_mut = term_clone;
                 term_mut.body = sub_bundle.into();
-                Ok(term_mut)
-            },
-            |b| Ok(BundleOps::merge(&term.into(), &b).into()),
-        )
+                term_mut
+            }
+            Some(b) => BundleOps::merge(&term.into(), &b).into(),
+        };
+
+        Ok(result)
     }
 
     fn substitute_no_sort(
         &self,
-        term: Bundle,
+        term: crate::normal_forms::Bundle,
         depth: i32,
         env: &Env<Par>,
-    ) -> Result<Bundle, InterpreterError> {
-        let sub_bundle =
-            self.substitute_no_sort(unwrap_option_safe(term.clone().body)?, depth, env)?;
+    ) -> Result<crate::normal_forms::Bundle, InterpreterError> {
+        let sub_bundle = self
+            .substitute_no_sort(term.clone().body, depth, env)?
+            .into();
+        let term_clone = term.clone();
 
-        match single_bundle(&sub_bundle) {
-            Some(b) => Ok(BundleOps::merge(&term, &b)),
+        let result = match single_bundle(&sub_bundle) {
+            Some(b) => BundleOps::merge(&term.into(), &b).into(),
             None => {
-                let mut term_mut = term.clone();
-                term_mut.body = Some(sub_bundle);
-                Ok(term_mut)
+                let mut term_mut = term_clone;
+                term_mut.body = sub_bundle.into();
+                term_mut
             }
-        }
+        };
+
+        Ok(result)
     }
 }
 
