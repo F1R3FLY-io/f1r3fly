@@ -5,11 +5,11 @@ use models::rhoapi::expr::ExprInstance;
 use models::rhoapi::g_unforgeable::UnfInstance;
 use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{
-    BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
+    EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
-    GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Var,
+    GUnforgeable, KeyValuePair, MatchCase, ParWithRandom, Var,
 };
-use models::rhoapi::{ETuple, ListParWithRandom, TaggedContinuation};
+use models::rhoapi::{ETuple, TaggedContinuation};
 use models::rust::par_map::ParMap;
 use models::rust::par_map_type_mapper::ParMapTypeMapper;
 use models::rust::par_set::ParSet;
@@ -39,7 +39,10 @@ use crate::accounting::costs::{
 };
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
-use crate::normal_forms::{self, GeneratedMessage, Par};
+use crate::normal_forms::{
+    self, GeneratedMessage, Par, Receive, New, Match, Bundle, ListParWithRandom, ReceiveBind,
+    BindPattern,
+};
 use crate::rho_type::RhoTuple2;
 
 use super::dispatch::{RhoDispatch, RholangAndScalaDispatcher};
@@ -84,7 +87,7 @@ trait Method {
 impl DebruijnInterpreter {
     pub async fn evaluate(
         &self,
-        par: normal_forms::Par,
+        par: Par,
         env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
@@ -184,7 +187,7 @@ impl DebruijnInterpreter {
         // println!("Attempting to lock space for produce");
         let mut space_locked = self.space.try_lock().unwrap();
         // println!("Locked space for produce");
-        let produce_result = space_locked.produce(chan.into().clone(), data.clone(), persistent)?;
+        let produce_result = space_locked.produce(chan.into().clone(), &data, persistent)?;
         drop(space_locked);
 
         self.continue_produce_process(
@@ -437,19 +440,16 @@ impl DebruijnInterpreter {
             GeneratedMessage::Receive(term) => self.eval_receive(term, &env, rand.to_bytes()).await,
             GeneratedMessage::New(term) => self.eval_new(term, env.clone(), rand).await,
             GeneratedMessage::Match(term) => self.eval_match(term, &env, rand).await,
-            GeneratedMessage::Bundle(term) => self.eval_bundle(term, &env, rand).await,
-            GeneratedMessage::Expr(term) => match &term.expr_instance {
-                Some(expr_instance) => match expr_instance {
-                    ExprInstance::EVarBody(e) => {
-                        let res = self.eval_var(&e.clone().v.unwrap(), &env)?;
+            GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand).await,
+            GeneratedMessage::Expr(term) => match &term {
+                    normal_forms::Expr::EVar(e) => {
+                        let res = self.eval_var(&e.clone(), &env)?;
                         self.evaluate(res, env, rand).await
                     }
-                    ExprInstance::EMethodBody(e) => {
+                    normal_forms::Expr::EMethod(e) => {
                         let res = self.eval_expr_to_par(
-                            &Expr {
-                                expr_instance: Some(ExprInstance::EMethodBody(e.clone())),
-                            },
-                            env,
+                            term,
+                            &env,
                         )?;
                         self.evaluate(res, env, rand).await
                     }
@@ -457,10 +457,6 @@ impl DebruijnInterpreter {
                         "Undefined term: {:?}",
                         other
                     ))),
-                },
-                None => Err(InterpreterError::BugFoundError(format!(
-                    "Undefined term, expr_instance was None"
-                ))),
             },
         }
     }
@@ -479,12 +475,12 @@ impl DebruijnInterpreter {
      */
     async fn eval_send(
         &self,
-        send: &Send,
+        send: &normal_forms::Send,
         env: &Env<Par>,
         random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {
         self.cost_manager.charge(send_eval_cost())?;
-        let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
+        let eval_chan = self.eval_expr(&send.chan, env)?;
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
         let unbundled = match single_bundle(&sub_chan) {
             Some(value) => {
@@ -545,7 +541,7 @@ impl DebruijnInterpreter {
                     BindPattern {
                         patterns: subst_patterns,
                         remainder: rb.remainder,
-                        free_count: rb.free_count,
+                        free_count: rb.free_count.into(),
                     },
                     q,
                 ))
@@ -590,10 +586,10 @@ impl DebruijnInterpreter {
         match valproc {
             &normal_forms::Var::BoundVar(level) => {
                 env.get(&level)
-                    .ok_or(Err(InterpreterError::ReduceError(format!(
+                    .ok_or(InterpreterError::ReduceError(format!(
                         "Unbound variable: {} in {:?}",
                         level, env.entities
-                    ))))
+                    )))
             }
             _ => Err(InterpreterError::ReduceError(
                 "Unbound variable: attempting to evaluate a pattern".to_string(),
@@ -762,7 +758,7 @@ impl DebruijnInterpreter {
 
         self.cost_manager
             .charge(new_bindings_cost(new.bind_count as i64))?;
-        match alloc(new.bind_count as usize, new.uri.clone()) {
+        match alloc(new.bind_count as usize, new.uris.clone()) {
             Ok(env) => {
                 self.evaluate(unwrap_option_safe(new.p.clone())?, &env, rand)
                     .await
@@ -772,7 +768,7 @@ impl DebruijnInterpreter {
     }
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
-        let eval_src = self.eval_expr(&unwrap_option_safe(rb.source.clone())?, env)?;
+        let eval_src = self.eval_expr(&rb.source, env)?;
         // println!("\neval_src in unbundle_receive: {:?}", eval_src);
         let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
         // println!("\nsubst in unbundle_receive: {:?}", eval_src);
@@ -797,27 +793,27 @@ impl DebruijnInterpreter {
     async fn eval_bundle(
         &self,
         bundle: &Bundle,
-        env: &Env<Par>,
+        env: Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        self.evaluate(unwrap_option_safe(bundle.body.clone())?, env, rand)
+        self.evaluate(bundle.body.clone(), env, rand)
             .await
     }
 
     // Public here for testing purposes
-    pub fn eval_expr_to_par(&self, expr: &Expr, env: Env<Par>) -> Result<Par, InterpreterError> {
+    pub fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
         match unwrap_option_safe(expr.expr_instance.clone())? {
-            ExprInstance::EVarBody(evar) => {
+            normal_forms::Expr::EVar(evar) => {
                 // println!("\nenv in eval_expr_to_par: {:?}", env);
-                let p = self.eval_var(&unwrap_option_safe(evar.v)?, &env)?;
+                let p = self.eval_var(&evar, &env)?;
                 // println!("\np in eval_expr_to_par: {:?}", p);
                 // println!("\nenv in eval_expr_to_par: {:?}", env);
                 let evaled_p = self.eval_expr(&p, &env)?;
                 Ok(evaled_p)
             }
-            ExprInstance::EMethodBody(emethod) => {
+            normal_forms::Expr::EMethod(emethod) => {
                 self.cost_manager.charge(method_call_cost())?;
-                let evaled_target = self.eval_expr(&unwrap_option_safe(emethod.target)?, &env)?;
+                let evaled_target = self.eval_expr(&emethod.target, &env)?;
                 let evaled_args: Vec<Par> = emethod
                     .arguments
                     .iter()
