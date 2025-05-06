@@ -1,3 +1,4 @@
+use crate::normal_forms::Par;
 use crate::utils::{prepend_connective, prepend_expr};
 use models::rhoapi::connective::ConnectiveInstance;
 use models::rhoapi::expr::ExprInstance;
@@ -5,8 +6,7 @@ use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     Bundle, Connective, ConnectiveBody, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches,
     EMethod, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent, EPlus,
-    EPlusPlus, ETuple, EVar, Expr, Match, MatchCase, New, Par, Receive, ReceiveBind, Send, Var,
-    VarRef,
+    EPlusPlus, ETuple, EVar, Expr, Match, MatchCase, New, Receive, ReceiveBind, Send, Var, VarRef,
 };
 use models::rust::bundle_ops::BundleOps;
 use models::rust::par_map::ParMap;
@@ -109,14 +109,12 @@ impl Substitute {
         depth: i32,
         env: &Env<Par>,
     ) -> Result<Either<Var, Par>, InterpreterError> {
-        // println!("\nenv in maybe_substitute_var: {:?}", env);
         if depth != 0 {
             Ok(Either::Left(term))
         } else {
             match unwrap_option_safe(term.clone().var_instance)? {
                 VarInstance::BoundVar(index) => {
-                    // println!("\nindex in maybe_substitute_var: {:?}", index);
-                    match env.get(&index) {
+                    match env.get(index as u32) {
                         Some(p) => {
                             // println!("\np in maybe_substitute_var: {:?}", p);
                             Ok(Either::Right(p.clone()))
@@ -153,7 +151,7 @@ impl Substitute {
         if term.depth != depth {
             Ok(Either::Left(term))
         } else {
-            match env.get(&term.index) {
+            match env.get(term.index as u32) {
                 Some(p) => Ok(Either::Right(p.clone())),
                 None => Ok(Either::Left(term)),
             }
@@ -161,23 +159,24 @@ impl Substitute {
     }
 }
 
-impl SubstituteTrait<Bundle> for Substitute {
+impl SubstituteTrait<crate::normal_forms::Bundle> for Substitute {
     fn substitute(
         &self,
-        term: Bundle,
+        term: crate::normal_forms::Bundle,
         depth: i32,
         env: &Env<Par>,
-    ) -> Result<Bundle, InterpreterError> {
-        let sub_bundle = self.substitute(unwrap_option_safe(term.clone().body)?, depth, env)?;
+    ) -> Result<crate::normal_forms::Bundle, InterpreterError> {
+        let sub_bundle = self.substitute(term.body.clone(), depth, env)?.into();
+        let term_clone = term.clone();
 
-        match single_bundle(&sub_bundle) {
-            Some(b) => Ok(BundleOps::merge(&term, &b)),
-            None => {
-                let mut term_mut = term.clone();
-                term_mut.body = Some(sub_bundle);
+        single_bundle(&sub_bundle).map_or_else(
+            || {
+                let mut term_mut = term_clone;
+                term_mut.body = sub_bundle.into();
                 Ok(term_mut)
-            }
-        }
+            },
+            |b| Ok(BundleOps::merge(&term.into(), &b).into()),
+        )
     }
 
     fn substitute_no_sort(
