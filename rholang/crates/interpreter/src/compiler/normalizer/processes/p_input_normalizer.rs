@@ -51,10 +51,10 @@ where
 }
 
 fn normalize_single_receipt(
-    receipt: &Receipt,
-    free_map: &mut FreeMap,
-    bound_map_chain: &mut BoundMapChain,
-    env: &HashMap<String, Par>,
+    _receipt: &Receipt,
+    _free_map: &mut FreeMap,
+    _bound_map_chain: &mut BoundMapChain,
+    _env: &HashMap<String, Par>,
 ) -> Result<Par, InterpreterError> {
     unimplemented!();
     // match receipt {

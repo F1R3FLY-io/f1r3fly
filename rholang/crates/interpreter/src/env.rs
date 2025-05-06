@@ -1,42 +1,35 @@
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    ops::{Add, Sub},
-};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default)]
-pub struct Env<K, V>
+pub struct Env<V>
 where
-    K: Add<Output = K> + Sub<Output = K> + Clone + Eq + Hash + From<u8>,
     V: Default + Clone,
 {
-    pub entities: HashMap<K, V>,
-    pub level: K,
-    pub shift: K,
+    pub entities: HashMap<u32, V>,
+    pub level: u32,
+    pub shift: u32,
 }
 
-impl<K: Add<Output = K> + Sub<Output = K> + Clone + Eq + Hash + From<u8>, V: Default + Clone>
-    Env<K, V>
-{
-    pub fn put(self, a: V) -> Env<K, V> {
+impl<V: Default + Clone> Env<V> {
+    pub fn put(self, a: V) -> Env<V> {
         let entities =
-            HashMap::<K, V>::from_iter(self.entities.into_iter().chain([(self.level.clone(), a)]));
+            HashMap::from_iter(self.entities.into_iter().chain([(self.level.clone(), a)]));
 
         Env {
             entities,
-            level: self.level + 1.into(),
+            level: self.level + 1,
             ..self
         }
     }
 
-    pub fn get(&self, k: K) -> Option<&V> {
-        let key = self.level.clone() + self.shift.clone() - k - 1.into();
+    pub fn get(&self, k: u32) -> Option<&V> {
+        let key = self.level.clone() + self.shift.clone() - k - 1;
         self.entities.get(&key)
     }
 
-    pub fn shift(&self, j: K) -> Env<K, V> {
+    pub fn shift(&self, j: u32) -> Env<V> {
         Env {
-            shift: self.shift.clone() + j,
+            shift: self.shift + j,
             ..self.to_owned()
         }
     }

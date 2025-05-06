@@ -34,6 +34,7 @@ use super::rho_runtime::RhoISpace;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
 use super::unwrap_option_safe;
+use crate::accounting::CostManager;
 use crate::accounting::costs::{
     add_cost, boolean_and_cost, boolean_or_cost, byte_array_append_cost, bytes_to_hex_cost,
     comparison_cost, diff_cost, division_cost, equality_check_cost, hex_to_bytes_cost,
@@ -43,7 +44,6 @@ use crate::accounting::costs::{
     size_method_cost, slice_cost, string_append_cost, subtraction_cost, sum_cost, take_cost,
     to_byte_array_cost, to_list_cost, union_cost, var_eval_cost,
 };
-use crate::accounting::CostManager;
 use crate::matcher::has_locally_free::HasLocallyFree;
 use crate::matcher::spatial_matcher::SpatialMatcherContext;
 use crate::normal_forms::{self, GeneratedMessage, Par};
@@ -101,7 +101,9 @@ impl DebruijnInterpreter {
                 .collect::<Vec<_>>(),
             par.news
                 .cloned()
-                .into_iter().map(GeneratedMessage::New).collect(),
+                .into_iter()
+                .map(GeneratedMessage::New)
+                .collect(),
             par.matches
                 .cloned()
                 .into_iter()
