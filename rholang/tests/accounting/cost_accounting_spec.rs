@@ -20,9 +20,11 @@ use rspace_plus_plus::rspace::{
     },
 };
 
+use rand::Rng;
 use std::collections::HashMap;
 use std::option::Option;
 use std::sync::{Arc, Mutex};
+
 async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> EvaluateResult {
     let mut kvm = InMemoryStoreManager::new();
 
@@ -249,5 +251,148 @@ async fn total_cost_of_evaluation_should_be_equal_to_the_sum_of_all_costs_in_the
         assert_eq!(eval_result.errors, Vec::new());
 
         //TODO add costLog asserts
+    }
+}
+
+// #[tokio::test]
+// async fn cost_should_be_deterministic() {
+//   for (contract, _) in contracts() {
+//     let contract_clone = contract.clone();
+//
+//     check_deterministic_cost(|| async {
+//       let result = evaluate_with_cost_log(i32::MAX as i64, contract_clone.clone()).await;
+//       assert!(result.errors.is_empty());
+//       result
+//     }).await;
+//   }
+// }
+
+#[tokio::test]
+#[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed
+async fn cost_should_be_repeatable_when_generated() {
+    // Try contract fromLong(1716417707L) = @2!!(0) | @0!!(0) | for (_ <<- @2) { 0 } | @2!(0)
+    // because the cost is nondeterministic
+    let result1 = evaluate_and_replay(
+        Cost::create(i32::MAX as i64, "max_value".to_string()),
+        from_long(1716417707),
+    )
+    .await;
+
+    assert!(result1.0.errors.is_empty());
+    assert!(result1.1.errors.is_empty());
+    assert_eq!(result1.0.cost, result1.1.cost);
+
+    // Try contract fromLong(510661906) = @1!(0) | @1!(0) | for (_ <= @1 & _ <= @1) { 0 }
+    // because of bug RCHAIN-3917
+    let contract = from_long(510661906);
+    println!("Generated contract: {}", contract);
+    let result2 = evaluate_and_replay(
+        Cost::create(i32::MAX as i64, "max_value".to_string()),
+        contract,
+    )
+    .await;
+
+    assert!(result2.0.errors.is_empty());
+    assert!(result2.1.errors.is_empty());
+    assert_eq!(result2.0.cost, result2.1.cost);
+
+    let mut rng = rand::thread_rng();
+    for _ in 1..10000 {
+        let long = ((rng.gen::<i64>() % 0x144000000) + 0x144000000) % 0x144000000;
+        let contract = from_long(long);
+        if !contract.is_empty() {
+            let result = evaluate_and_replay(
+                Cost::create(i32::MAX as i64, "max_value".to_string()),
+                contract,
+            )
+            .await;
+
+            assert!(result.0.errors.is_empty());
+            assert!(result.1.errors.is_empty());
+            assert_eq!(result.0.cost, result.1.cost);
+        }
+    }
+}
+
+#[tokio::test]
+async fn running_out_of_phlogistons_should_stop_evaluation_upon_cost_depletion_in_a_single_execution_branch(
+) {
+    let parsing_cost = 6;
+
+    check_phlo_limit_exceeded(
+        "@1!(1)".to_string(),
+        parsing_cost,
+        vec![Cost::create(parsing_cost, "parsing".to_string())],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn should_not_attempt_reduction_when_there_was_not_enough_phlo_for_parsing() {
+    let parsing_cost = 6;
+
+    check_phlo_limit_exceeded("@1!(1)".to_string(), parsing_cost - 1, vec![]).await;
+}
+
+async fn check_phlo_limit_exceeded(
+    contract: String,
+    initial_phlo: i64,
+    expected_costs: Vec<Cost>,
+) -> bool {
+    let evaluate_result = evaluate_with_cost_log(initial_phlo, contract).await;
+    let expected_sum: i64 = expected_costs.iter().map(|cost| cost.value).sum();
+
+    assert!(
+        expected_sum <= initial_phlo,
+        "We must not expect more costs than initialPhlo allows (duh!): {} > {}",
+        expected_sum,
+        initial_phlo
+    );
+
+    //TODO add asserts for errors, costLog.
+    /*
+      errors shouldBe List(OutOfPhlogistonsError)
+      costLog.toList should contain allElementsOf expectedCosts
+      withClue("Exactly one cost should be logged past the expected ones, yet:\n") {
+      elementCounts(costLog.toList) diff elementCounts(expectedCosts) should have size 1
+      totalCost.value should be >= initialPhlo
+    */
+    assert!(
+        evaluate_result.cost.value >= initial_phlo,
+        "Total cost value should be >= initialPhlo"
+    );
+
+    true
+}
+
+#[tokio::test]
+async fn should_stop_the_evaluation_of_all_execution_branches_when_one_of_them_runs_out_of_phlo_with_a_more_sophisticated_contract(
+) {
+    let mut rng = rand::thread_rng();
+    for (contract, expected_total_cost) in contracts() {
+        for _ in 0..1 {
+            let initial_phlo = rng.gen_range(1..expected_total_cost);
+
+            let result = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
+
+            //TODO add assertions when costLog will be ready
+
+            // errors shouldBe List(OutOfPhlogistonsError)
+            // val costs = costLog.map(_.value).toList
+            // costs.init.sum should be <= initialPhlo
+            // costs.sum > initialPhlo
+
+            assert!(
+                result.cost.value >= initial_phlo,
+                "Total cost value should be >= initialPhlo, but got {} < {}",
+                result.cost.value,
+                initial_phlo
+            );
+
+            println!(
+                "Contract '{}' with initial_phlo={} executed with cost={}",
+                contract, initial_phlo, result.cost.value
+            );
+        }
     }
 }
