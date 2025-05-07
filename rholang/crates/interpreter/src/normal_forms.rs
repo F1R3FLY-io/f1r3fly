@@ -3,7 +3,7 @@ use std::{cmp::Ordering, collections::BTreeMap};
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
 use models::rhoapi::{
-    EMinusMinus, EMod, EPercentPercent, EPlusPlus,
+    EMinusMinus, EMod, EPercentPercent, EPlusPlus, KeyValuePair,
     expr::ExprInstance::*,
     var::{VarInstance, WildcardMsg},
 };
@@ -1086,7 +1086,6 @@ pub struct EMapBody {
     pub ps: Vec<(Par, Par)>,
     pub locally_free: BitVec,
     pub connective_used: bool,
-
     pub remainder: Option<Var>,
 }
 
@@ -1108,6 +1107,29 @@ impl From<models::rhoapi::EMap> for EMapBody {
             ),
             connective_used: map.connective_used,
             remainder: map.remainder.map(Into::into),
+        }
+    }
+}
+
+impl From<EMapBody> for models::rhoapi::EMap {
+    fn from(value: EMapBody) -> Self {
+        Self {
+            kvs: value
+                .ps
+                .into_iter()
+                .map(|(k, v)| KeyValuePair {
+                    key: Some(k.into()),
+                    value: Some(v.into()),
+                })
+                .collect(),
+            locally_free: value
+                .locally_free
+                .into_vec()
+                .into_iter()
+                .map(|v| v as u8)
+                .collect(),
+            connective_used: value.connective_used,
+            remainder: value.remainder.map(Into::into),
         }
     }
 }

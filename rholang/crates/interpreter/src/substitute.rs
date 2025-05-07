@@ -1,12 +1,13 @@
-use crate::normal_forms::{self, Expr, Par};
+use crate::normal_forms::{self, EListBody, EMethodBody, ESetBody, ETupleBody, Expr, Par};
 use crate::utils::{prepend_connective, prepend_expr};
+use bitvec::vec::BitVec;
 use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::expr::ExprInstance::{self};
+use models::rhoapi::expr::ExprInstance::{self, EMatchesBody};
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     Bundle, Connective, ConnectiveBody, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches,
     EMethod, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent, EPlus,
-    EPlusPlus, ETuple, EVar, Match, MatchCase, New, Receive, ReceiveBind, Send, Var, VarRef,
+    EPlusPlus, ESet, ETuple, EVar, Match, MatchCase, New, Receive, ReceiveBind, Send, Var, VarRef,
 };
 use models::rust::bundle_ops::BundleOps;
 use models::rust::par_map::ParMap;
@@ -31,7 +32,7 @@ use super::errors::InterpreterError;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Substitute.scala
 pub trait SubstituteTrait<A> {
-    fn substitute(&self, term: A, depth: u32, env: &Env<Par>) -> Result<A, InterpreterError>;
+    fn substitute(&self, term: A, depth: u32, env: &Env<Par>) -> A;
 
     fn substitute_no_sort(&self, term: A, depth: u32, env: &Env<Par>) -> A;
 }
@@ -301,7 +302,7 @@ impl SubstituteTrait<Par> for Substitute {
         ))
     }
 
-    fn substitute(&self, term: Par, depth: i32, env: &Env<Par>) -> Result<Par, InterpreterError> {
+    fn substitute(&self, term: Par, depth: u32, env: &Env<Par>) -> Result<Par, InterpreterError> {
         self.substitute_no_sort(term, depth, env)
             .map(|p| ParSortMatcher::sort_match(&p))
             .map(|st| st.term)
@@ -498,7 +499,7 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
         term: normal_forms::Expr,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<normal_forms::Expr, InterpreterError> {
+    ) -> normal_forms::Expr {
         match unwrap_option_safe(term.expr_instance.clone())? {
             ExprInstance::ENotBody(ENot { p }) => self
                 .substitute(unwrap_option_safe(p)?, depth, env)
@@ -846,336 +847,276 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
             Expr::EMult(p1, p2) => {
                 let p1 = self.substitute_no_sort(p1, depth, env);
                 let p2 = self.substitute_no_sort(p2, depth, env);
+
                 Expr::EMult(p1, p2)
             }
 
-            ExprInstance::EDivBody(EDiv { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EDiv(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EDivBody(EDiv {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EDiv(p1, p2)
             }
 
-            ExprInstance::EModBody(EMod { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EMod(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EModBody(EMod {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EMod(p1, p2)
             }
 
-            ExprInstance::EPercentPercentBody(EPercentPercent { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EPercentPercent(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EPercentPercentBody(EPercentPercent {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EPercentPercent(p1, p2)
             }
 
-            ExprInstance::EPlusBody(EPlus { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EPlus(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EPlus(p1, p2)
             }
 
-            ExprInstance::EMinusBody(EMinus { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EMinus(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EPlusBody(EPlus {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EMinus(p1, p2)
             }
 
-            ExprInstance::EPlusPlusBody(EPlusPlus { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EPlusPlus(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EPlusPlusBody(EPlusPlus {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EPlusPlus(p1, p2)
             }
 
-            ExprInstance::EMinusMinusBody(EMinusMinus { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EMinusMinus(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EMinusMinusBody(EMinusMinus {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EMinusMinus(p1, p2)
             }
 
-            ExprInstance::ELtBody(ELt { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::ELt(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ELtBody(ELt {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::ELt(p1, p2)
             }
 
-            ExprInstance::ELteBody(ELte { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::ELte(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ELteBody(ELte {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::ELte(p1, p2)
             }
 
-            ExprInstance::EGtBody(EGt { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EGt(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EGtBody(EGt {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EGt(p1, p2)
             }
 
-            ExprInstance::EGteBody(EGte { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EGte(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EGteBody(EGte {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EGte(p1, p2)
             }
 
-            ExprInstance::EEqBody(EEq { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EEq(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EEqBody(EEq {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EEq(p1, p2)
             }
 
-            ExprInstance::ENeqBody(ENeq { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::ENeq(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ENeqBody(ENeq {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::ENeq(p1, p2)
             }
 
-            ExprInstance::EAndBody(EAnd { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EAnd(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EAndBody(EAnd {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EAnd(p1, p2)
             }
 
-            ExprInstance::EOrBody(EOr { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
+            Expr::EOr(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EOrBody(EOr {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+                Expr::EOr(p1, p2)
             }
 
-            ExprInstance::EMatchesBody(EMatches { target, pattern }) => {
-                let _target = self.substitute_no_sort(unwrap_option_safe(target)?, depth, env)?;
-                let _pattern = self.substitute_no_sort(unwrap_option_safe(pattern)?, depth, env)?;
+            Expr::EMatches(normal_forms::EMatchesBody { target, pattern }) => {
+                let target = self.substitute_no_sort(target, depth, env);
+                let pattern = self.substitute_no_sort(pattern, depth, env);
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ELtBody(ELt {
-                        p1: Some(_target),
-                        p2: Some(_pattern),
-                    })),
-                })
+                Expr::ELt(target, pattern)
             }
 
-            ExprInstance::EListBody(EList {
+            Expr::EList(EListBody {
                 ps,
                 locally_free,
                 connective_used,
                 remainder,
             }) => {
-                let _ps = ps
+                let ps = ps
                     .iter()
                     .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .collect();
 
-                let new_locally_free = set_bits_until(locally_free, env.shift);
+                let locally_free = set_bits_until(
+                    locally_free.into_iter().map(|v| v as u8).collect(),
+                    env.shift,
+                );
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EListBody(EList {
-                        ps: _ps,
-                        locally_free: new_locally_free,
-                        connective_used,
-                        remainder,
-                    })),
+                let locally_free = BitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
+
+                Expr::EList(EListBody {
+                    ps,
+                    locally_free,
+                    connective_used,
+                    remainder,
                 })
             }
 
-            ExprInstance::ETupleBody(ETuple {
+            Expr::ETuple(ETupleBody {
                 ps,
                 locally_free,
                 connective_used,
             }) => {
-                let _ps = ps
+                let ps = ps
                     .iter()
                     .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .collect();
 
-                let new_locally_free = set_bits_until(locally_free, env.shift);
+                let locally_free = set_bits_until(
+                    locally_free.into_iter().map(|v| v as u8).collect(),
+                    env.shift,
+                );
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ETupleBody(ETuple {
-                        ps: _ps,
-                        locally_free: new_locally_free,
-                        connective_used,
-                    })),
+                let locally_free = BitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
+
+                Expr::ETuple(ETupleBody {
+                    ps,
+                    locally_free,
+                    connective_used,
                 })
             }
 
-            ExprInstance::ESetBody(eset) => {
-                let par_set = ParSetTypeMapper::eset_to_par_set(eset);
-                let _ps = par_set
+            Expr::ESet(eset) => {
+                let ps = eset
                     .ps
-                    .sorted_pars
-                    .iter()
-                    .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .into_iter()
+                    .map(|p| self.substitute(p, depth, env))
+                    .collect();
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ESetBody(ParSetTypeMapper::par_set_to_eset(
-                        ParSet {
-                            ps: SortedParHashSet::create_from_vec(_ps),
-                            connective_used: par_set.connective_used,
-                            locally_free: set_bits_until(par_set.locally_free, env.shift),
-                            remainder: par_set.remainder,
-                        },
-                    ))),
+                let iter = set_bits_until(
+                    eset.locally_free
+                        .into_vec()
+                        .into_iter()
+                        .map(|v| v as u8)
+                        .collect(),
+                    env.shift,
+                )
+                .into_iter()
+                .map(|v| v as usize)
+                .collect();
+
+                let locally_free = BitVec::from_iter::<Vec<usize>>(iter);
+                let ps =
+                    SortedParHashSet::create_from_vec(ps.into_iter().map(Into::into).collect())
+                        .ps
+                        .into_iter()
+                        .map(Into::into)
+                        .collect();
+
+                Expr::ESet(ESetBody {
+                    ps,
+                    locally_free,
+                    connective_used: eset.connective_used,
+                    remainder: eset.remainder.into(),
                 })
             }
 
-            ExprInstance::EMapBody(emap) => {
-                let par_map = ParMapTypeMapper::emap_to_par_map(emap);
-                let _ps = par_map
+            Expr::EMap(emap) => {
+                let par_map = ParMapTypeMapper::emap_to_par_map(emap.into());
+                let ps = par_map
                     .ps
                     .sorted_list
-                    .iter()
-                    .map(|p| {
-                        let p1 = self.substitute_no_sort(p.0.clone(), depth, env)?;
-                        let p2 = self.substitute_no_sort(p.1.clone(), depth, env)?;
-                        Ok((p1, p2))
+                    .into_iter()
+                    .map(|(p1, p2)| {
+                        let p1 = self.substitute(p1.into(), depth, env).into();
+                        let p2 = self.substitute(p2.into(), depth, env).into();
+                        (p1, p2)
                     })
-                    .collect::<Result<Vec<(Par, Par)>, InterpreterError>>()?;
+                    .collect();
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EMapBody(ParMapTypeMapper::par_map_to_emap(
-                        ParMap {
-                            ps: SortedParMap::create_from_vec(_ps),
-                            connective_used: par_map.connective_used,
-                            locally_free: set_bits_until(par_map.locally_free, env.shift),
-                            remainder: par_map.remainder,
-                        },
-                    ))),
-                })
+                let emap_body = ParMapTypeMapper::par_map_to_emap(ParMap {
+                    ps: SortedParMap::create_from_vec(ps),
+                    connective_used: par_map.connective_used,
+                    locally_free: set_bits_until(par_map.locally_free, env.shift),
+                    remainder: par_map.remainder,
+                });
+
+                Expr::EMap(emap_body.into())
             }
 
-            ExprInstance::EMethodBody(EMethod {
+            Expr::EMethod(normal_forms::EMethodBody {
                 method_name,
                 target,
                 arguments,
                 locally_free,
                 connective_used,
             }) => {
-                let sub_target =
-                    self.substitute_no_sort(unwrap_option_safe(target)?, depth, env)?;
-                let sub_arguments = arguments
-                    .iter()
-                    .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                let target = self.substitute_no_sort(target, depth, env);
+                let arguments = arguments
+                    .into_iter()
+                    .map(|p| self.substitute_no_sort(p, depth, env))
+                    .collect();
 
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EMethodBody(EMethod {
-                        method_name,
-                        target: Some(sub_target),
-                        arguments: sub_arguments,
-                        locally_free: set_bits_until(locally_free, env.shift),
-                        connective_used,
-                    })),
+                let locally_free = set_bits_until(
+                    locally_free
+                        .into_vec()
+                        .into_iter()
+                        .map(|v| v as u8)
+                        .collect(),
+                    env.shift,
+                )
+                .into_iter()
+                .map(|v| v as usize);
+
+                Expr::EMethod(EMethodBody {
+                    method_name,
+                    target,
+                    arguments,
+                    locally_free: BitVec::from_iter(locally_free),
+                    connective_used,
                 })
             }
-
-            _ => Ok(term),
+            _ => term,
         }
     }
 }
 
 fn set_bits_until(bits: Vec<u8>, until: u32) -> Vec<u8> {
-    // println!("\nbits in set_bits_until: {:?}", bits);
-    // println!("\nuntil in set_bits_until: {:?}", until);
     if until <= 0 {
         return Vec::new();
     }
     let until_usize = until as usize;
 
-    let result = bits
-        .iter()
+    bits.iter()
         .enumerate()
         .filter(|&(i, &bit)| i < until_usize && bit == 1)
         .map(|(_, &bit)| bit)
-        .collect();
-
-    // println!("\nresult bits in set_bits_until: {:?}", result);
-    result
+        .collect()
 }
