@@ -486,9 +486,9 @@ impl DebruijnInterpreter {
      * @param env An execution context
      *
      */
-    async fn eval_send(
+    async fn eval_send<T:Send>(
         &self,
-        send: &Send,
+        send: &T,
         env: &Env<Par>,
         random_state: Vec<u8>,
     ) -> Result<(), InterpreterError> {

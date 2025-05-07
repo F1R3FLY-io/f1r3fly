@@ -3,10 +3,8 @@ pub mod base58;
 pub mod rev_address;
 pub mod test_utils;
 
-use models::{
-    rhoapi::{Connective, Par},
-    rust::utils::union,
-};
+use bitvec::vec::BitVec;
+use models::{rhoapi::Par, rust::utils::union};
 
 use crate::normal_forms::{Bundle, Expr, New};
 
@@ -16,25 +14,52 @@ use super::matcher::has_locally_free::HasLocallyFree;
 // This trait should, I think, be moved to models
 
 // See models/src/main/scala/coop/rchain/models/rholang/implicits.scala - prepend
-pub fn prepend_connective(mut p: Par, c: Connective, depth: i32) -> Par {
+pub fn prepend_connective(
+    p: crate::normal_forms::Par,
+    c: crate::normal_forms::Connective,
+    depth: u32,
+) -> crate::normal_forms::Par {
     let mut new_connectives = vec![c.clone()];
-    new_connectives.append(&mut p.connectives);
+    new_connectives.extend(p.connectives.into_iter());
 
-    Par {
+    crate::normal_forms::Par {
         connectives: new_connectives,
-        locally_free: c.locally_free(c.clone(), depth),
-        connective_used: p.connective_used || c.clone().connective_used(c),
-        ..p.clone()
+        locally_free: c.locally_free(depth),
+        connective_used: p.connective_used || c.clone().connective_used(),
+        ..p
     }
 }
 
-pub fn prepend_expr(mut p: Par, e: Expr, depth: i32) -> Par {
+pub fn prepend_expr(
+    mut p: crate::normal_forms::Par,
+    e: Expr,
+    depth: u32,
+) -> crate::normal_forms::Par {
     let mut new_exprs = vec![e.clone()];
     new_exprs.append(&mut p.exprs);
 
-    Par {
+    let bitset1 = p
+        .locally_free
+        .to_owned()
+        .into_vec()
+        .into_iter()
+        .map(|v| v as u8)
+        .collect::<Vec<u8>>();
+    let bitset2 = e
+        .locally_free(depth)
+        .into_vec()
+        .into_iter()
+        .map(|v| v as u8)
+        .collect::<Vec<u8>>();
+
+    let locally_free = union(bitset1, bitset2)
+        .into_iter()
+        .map(|v| v as usize)
+        .collect();
+
+    crate::normal_forms::Par {
         exprs: new_exprs,
-        locally_free: union(p.locally_free.clone(), e.locally_free(depth)),
+        locally_free: BitVec::from_vec(locally_free),
         connective_used: p.connective_used || e.clone().connective_used(),
         ..p.clone()
     }

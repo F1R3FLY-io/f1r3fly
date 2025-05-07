@@ -4,6 +4,7 @@ use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
 use models::rhoapi::{
     EMinusMinus, EMod, EPercentPercent, EPlusPlus,
+    expr::ExprInstance::*,
     var::{VarInstance, WildcardMsg},
 };
 use prost::Message;
@@ -50,13 +51,7 @@ impl<const N: usize> From<Par<N>> for models::rhoapi::Par {
             sends: value.sends.into_iter().map(Into::into).collect(),
             receives: value.receives.into_iter().map(Into::into).collect(),
             news: value.news.into_iter().map(Into::into).collect(),
-            exprs: value
-                .exprs
-                .into_iter()
-                .map(|v| models::rhoapi::Expr {
-                    expr_instance: Some(v.into()),
-                })
-                .collect(),
+            exprs: value.exprs.into_iter().map(|v| v.into()).collect(),
             matches: value
                 .matches
                 .into_iter()
@@ -811,69 +806,69 @@ pub enum Expr {
     EMod(Par, Par),
 }
 
-impl From<Expr> for models::rhoapi::expr::ExprInstance {
+impl From<Expr> for models::rhoapi::Expr {
     fn from(value: Expr) -> Self {
-        match value {
-            Expr::GBool(v) => Self::GBool(v),
-            Expr::GInt(v) => Self::GInt(v),
-            Expr::GString(v) => Self::GString(v),
-            Expr::GUri(v) => Self::GUri(v),
-            Expr::GByteArray(items) => Self::GByteArray(items),
-            Expr::ENot(par) => Self::ENotBody(models::rhoapi::ENot {
+        let instance = match value {
+            Expr::GBool(v) => GBool(v),
+            Expr::GInt(v) => GInt(v),
+            Expr::GString(v) => GString(v),
+            Expr::GUri(v) => GUri(v),
+            Expr::GByteArray(items) => GByteArray(items),
+            Expr::ENot(par) => ENotBody(models::rhoapi::ENot {
                 p: Some(par.into()),
             }),
-            Expr::ENeg(par) => Self::ENegBody(models::rhoapi::ENeg {
+            Expr::ENeg(par) => ENegBody(models::rhoapi::ENeg {
                 p: Some(par.into()),
             }),
-            Expr::EMult(p1, p2) => Self::EMultBody(models::rhoapi::EMult {
+            Expr::EMult(p1, p2) => EMultBody(models::rhoapi::EMult {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EDiv(p1, p2) => Self::EDivBody(models::rhoapi::EDiv {
+            Expr::EDiv(p1, p2) => EDivBody(models::rhoapi::EDiv {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EPlus(p1, p2) => Self::EPlusBody(models::rhoapi::EPlus {
+            Expr::EPlus(p1, p2) => EPlusBody(models::rhoapi::EPlus {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EMinus(p1, p2) => Self::EMinusBody(models::rhoapi::EMinus {
+            Expr::EMinus(p1, p2) => EMinusBody(models::rhoapi::EMinus {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::ELt(p1, p2) => Self::ELtBody(models::rhoapi::ELt {
+            Expr::ELt(p1, p2) => ELtBody(models::rhoapi::ELt {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::ELte(p1, p2) => Self::ELteBody(models::rhoapi::ELte {
+            Expr::ELte(p1, p2) => ELteBody(models::rhoapi::ELte {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EGt(p1, p2) => Self::EGtBody(models::rhoapi::EGt {
+            Expr::EGt(p1, p2) => EGtBody(models::rhoapi::EGt {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EGte(p1, p2) => Self::EGteBody(models::rhoapi::EGte {
+            Expr::EGte(p1, p2) => EGteBody(models::rhoapi::EGte {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EEq(p1, p2) => Self::EEqBody(models::rhoapi::EEq {
+            Expr::EEq(p1, p2) => EEqBody(models::rhoapi::EEq {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::ENeq(p1, p2) => Self::ENeqBody(models::rhoapi::ENeq {
+            Expr::ENeq(p1, p2) => ENeqBody(models::rhoapi::ENeq {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EAnd(p1, p2) => Self::EAndBody(models::rhoapi::EAnd {
+            Expr::EAnd(p1, p2) => EAndBody(models::rhoapi::EAnd {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EOr(p1, p2) => Self::EOrBody(models::rhoapi::EOr {
+            Expr::EOr(p1, p2) => EOrBody(models::rhoapi::EOr {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EVar(var) => Self::EVarBody(models::rhoapi::EVar {
+            Expr::EVar(var) => EVarBody(models::rhoapi::EVar {
                 v: Some(match var {
                     Var::BoundVar(idx) => models::rhoapi::Var {
                         var_instance: Some(models::rhoapi::var::VarInstance::BoundVar(idx as i32)),
@@ -888,7 +883,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     },
                 }),
             }),
-            Expr::EList(elist_body) => Self::EListBody(models::rhoapi::EList {
+            Expr::EList(elist_body) => EListBody(models::rhoapi::EList {
                 ps: elist_body.ps.into_iter().map(Into::into).collect(),
                 locally_free: elist_body
                     .locally_free
@@ -910,7 +905,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     },
                 }),
             }),
-            Expr::ETuple(etuple_body) => Self::ETupleBody(models::rhoapi::ETuple {
+            Expr::ETuple(etuple_body) => ETupleBody(models::rhoapi::ETuple {
                 ps: etuple_body.ps.into_iter().map(Into::into).collect(),
                 locally_free: etuple_body
                     .locally_free
@@ -919,7 +914,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     .collect(),
                 connective_used: etuple_body.connective_used,
             }),
-            Expr::ESet(eset_body) => Self::ESetBody(models::rhoapi::ESet {
+            Expr::ESet(eset_body) => ESetBody(models::rhoapi::ESet {
                 ps: eset_body.ps.into_iter().map(Into::into).collect(),
                 locally_free: eset_body
                     .locally_free
@@ -941,7 +936,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     },
                 }),
             }),
-            Expr::EMap(emap_body) => Self::EMapBody(models::rhoapi::EMap {
+            Expr::EMap(emap_body) => EMapBody(models::rhoapi::EMap {
                 kvs: emap_body
                     .ps
                     .into_iter()
@@ -970,7 +965,7 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     },
                 }),
             }),
-            Expr::EMethod(emethod_body) => Self::EMethodBody(models::rhoapi::EMethod {
+            Expr::EMethod(emethod_body) => EMethodBody(models::rhoapi::EMethod {
                 method_name: emethod_body.method_name,
                 target: Some(emethod_body.target.into()),
                 arguments: emethod_body.arguments.into_iter().map(Into::into).collect(),
@@ -981,28 +976,30 @@ impl From<Expr> for models::rhoapi::expr::ExprInstance {
                     .collect(),
                 connective_used: emethod_body.connective_used,
             }),
-            Expr::EMatches(ematches_body) => Self::EMatchesBody(models::rhoapi::EMatches {
+            Expr::EMatches(ematches_body) => EMatchesBody(models::rhoapi::EMatches {
                 target: Some(ematches_body.target.into()),
                 pattern: Some(ematches_body.pattern.into()),
             }),
-            Expr::EPercentPercent(p1, p2) => {
-                Self::EPercentPercentBody(models::rhoapi::EPercentPercent {
-                    p1: Some(p1.into()),
-                    p2: Some(p2.into()),
-                })
-            }
-            Expr::EPlusPlus(p1, p2) => Self::EPlusPlusBody(models::rhoapi::EPlusPlus {
+            Expr::EPercentPercent(p1, p2) => EPercentPercentBody(models::rhoapi::EPercentPercent {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EMinusMinus(p1, p2) => Self::EMinusMinusBody(models::rhoapi::EMinusMinus {
+            Expr::EPlusPlus(p1, p2) => EPlusPlusBody(models::rhoapi::EPlusPlus {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
-            Expr::EMod(p1, p2) => Self::EModBody(models::rhoapi::EMod {
+            Expr::EMinusMinus(p1, p2) => EMinusMinusBody(models::rhoapi::EMinusMinus {
                 p1: Some(p1.into()),
                 p2: Some(p2.into()),
             }),
+            Expr::EMod(p1, p2) => EModBody(models::rhoapi::EMod {
+                p1: Some(p1.into()),
+                p2: Some(p2.into()),
+            }),
+        };
+
+        Self {
+            expr_instance: Some(instance),
         }
     }
 }
@@ -1387,6 +1384,15 @@ impl From<models::rhoapi::VarRef> for VarRef {
         VarRef {
             index: var_ref.index as u32,
             depth: var_ref.depth as u32,
+        }
+    }
+}
+
+impl From<VarRef> for models::rhoapi::VarRef {
+    fn from(var_ref: VarRef) -> Self {
+        models::rhoapi::VarRef {
+            index: var_ref.index as i32,
+            depth: var_ref.depth as i32,
         }
     }
 }

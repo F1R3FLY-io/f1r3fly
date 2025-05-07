@@ -50,6 +50,7 @@ use system_processes::BlockData;
 
 use errors::InterpreterError;
 
+#[deprecated]
 pub fn unwrap_option_safe<A: Clone>(opt: Option<A>) -> Result<A, InterpreterError> {
     opt.map(|x| x.clone())
         .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)

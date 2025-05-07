@@ -535,8 +535,11 @@ pub fn new_wildcard_var() -> Var {
 }
 
 pub fn new_boundvar_par(value: i32, _locally_free_par: Vec<u8>, _connective_used_par: bool) -> Par {
-    vector_par(create_bit_vector(&vec![value as usize]), _connective_used_par)
-        .with_exprs(vec![new_boundvar_expr(value)])
+    vector_par(
+        create_bit_vector(&vec![value as usize]),
+        _connective_used_par,
+    )
+    .with_exprs(vec![new_boundvar_expr(value)])
 }
 
 pub fn new_boundvar_expr(value: i32) -> Expr {

@@ -1,12 +1,12 @@
-use crate::normal_forms::Par;
+use crate::normal_forms::{self, Expr, Par};
 use crate::utils::{prepend_connective, prepend_expr};
 use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::expr::ExprInstance;
+use models::rhoapi::expr::ExprInstance::{self};
 use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     Bundle, Connective, ConnectiveBody, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches,
     EMethod, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr, EPercentPercent, EPlus,
-    EPlusPlus, ETuple, EVar, Expr, Match, MatchCase, New, Receive, ReceiveBind, Send, Var, VarRef,
+    EPlusPlus, ETuple, EVar, Match, MatchCase, New, Receive, ReceiveBind, Send, Var, VarRef,
 };
 use models::rust::bundle_ops::BundleOps;
 use models::rust::par_map::ParMap;
@@ -28,18 +28,12 @@ use super::accounting::CostManager;
 use super::accounting::costs::Cost;
 use super::env::Env;
 use super::errors::InterpreterError;
-use super::unwrap_option_safe;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Substitute.scala
 pub trait SubstituteTrait<A> {
-    fn substitute(&self, term: A, depth: i32, env: &Env<Par>) -> Result<A, InterpreterError>;
+    fn substitute(&self, term: A, depth: u32, env: &Env<Par>) -> Result<A, InterpreterError>;
 
-    fn substitute_no_sort(
-        &self,
-        term: A,
-        depth: i32,
-        env: &Env<Par>,
-    ) -> Result<A, InterpreterError>;
+    fn substitute_no_sort(&self, term: A, depth: u32, env: &Env<Par>) -> A;
 }
 
 #[derive(Clone)]
@@ -51,7 +45,7 @@ impl Substitute {
     pub fn substitute_and_charge<A>(
         &self,
         term: &A,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<A, InterpreterError>
     where
@@ -75,53 +69,38 @@ impl Substitute {
         }
     }
 
-    pub fn substitute_no_sort_and_charge<A>(
-        &self,
-        term: &A,
-        depth: i32,
-        env: &Env<Par>,
-    ) -> Result<A, InterpreterError>
+    pub fn substitute_no_sort_and_charge<A>(&self, term: &A, depth: u32, env: &Env<Par>) -> A
     where
         Self: SubstituteTrait<A>,
         A: Clone + prost::Message,
     {
-        // scala 'charge' function built in here
-        match self.substitute_no_sort(term.clone(), depth, env) {
-            Ok(subst_term) => {
-                self.cost.charge(Cost::create_from_generic(
-                    subst_term.clone(),
-                    "substitution".to_string(),
-                ))?;
-                Ok(subst_term)
-            }
-            Err(th) => {
-                self.cost
-                    .charge(Cost::create_from_generic(term.clone(), "".to_string()))?;
-                Err(th)
-            }
-        }
+        let subst_term = self.substitute_no_sort(term.clone(), depth, env);
+        self.cost.charge(Cost::create_from_generic(
+            subst_term.clone(),
+            "substitution".to_string(),
+        ));
+        subst_term
     }
 
     // pub here for testing purposes
     pub fn maybe_substitute_var(
         &self,
         term: Var,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Either<Var, Par>, InterpreterError> {
         if depth != 0 {
             Ok(Either::Left(term))
         } else {
-            match unwrap_option_safe(term.clone().var_instance)? {
-                VarInstance::BoundVar(index) => {
-                    match env.get(index as u32) {
-                        Some(p) => {
-                            // println!("\np in maybe_substitute_var: {:?}", p);
-                            Ok(Either::Right(p.clone()))
-                        }
-                        None => Ok(Either::Left(term)),
-                    }
-                }
+            let v = term
+                .clone()
+                .var_instance
+                .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)?;
+            match v {
+                VarInstance::BoundVar(index) => match env.get(index as u32) {
+                    Some(p) => Ok(Either::Right(p.clone())),
+                    None => Ok(Either::Left(term)),
+                },
                 _ => Err(InterpreterError::SubstituteError(format!(
                     "Illegal Substitution [{:?}]",
                     term
@@ -132,11 +111,11 @@ impl Substitute {
 
     fn maybe_substitute_evar(
         &self,
-        term: EVar,
-        depth: i32,
+        term: crate::normal_forms::Var,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Either<EVar, Par>, InterpreterError> {
-        match self.maybe_substitute_var(unwrap_option_safe(term.v)?, depth, env)? {
+        match self.maybe_substitute_var(term.into(), depth, env)? {
             Either::Left(v) => Ok(Either::Left(EVar { v: Some(v) })),
             Either::Right(p) => Ok(Either::Right(p)),
         }
@@ -144,16 +123,16 @@ impl Substitute {
 
     fn maybe_substitute_var_ref(
         &self,
-        term: VarRef,
-        depth: i32,
+        term: crate::normal_forms::VarRef,
+        depth: u32,
         env: &Env<Par>,
-    ) -> Result<Either<VarRef, Par>, InterpreterError> {
+    ) -> Either<VarRef, Par> {
         if term.depth != depth {
-            Ok(Either::Left(term))
+            Either::Left(term.into())
         } else {
             match env.get(term.index as u32) {
-                Some(p) => Ok(Either::Right(p.clone())),
-                None => Ok(Either::Left(term)),
+                Some(p) => Either::Right(p.clone()),
+                None => Either::Left(term.into()),
             }
         }
     }
@@ -163,7 +142,7 @@ impl SubstituteTrait<crate::normal_forms::Bundle> for Substitute {
     fn substitute(
         &self,
         term: crate::normal_forms::Bundle,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<crate::normal_forms::Bundle, InterpreterError> {
         let sub_bundle = self.substitute(term.body.clone(), depth, env)?.into();
@@ -184,24 +163,22 @@ impl SubstituteTrait<crate::normal_forms::Bundle> for Substitute {
     fn substitute_no_sort(
         &self,
         term: crate::normal_forms::Bundle,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
-    ) -> Result<crate::normal_forms::Bundle, InterpreterError> {
+    ) -> crate::normal_forms::Bundle {
         let sub_bundle = self
-            .substitute_no_sort(term.clone().body, depth, env)?
+            .substitute_no_sort(term.clone().body, depth, env)
             .into();
         let term_clone = term.clone();
 
-        let result = match single_bundle(&sub_bundle) {
+        match single_bundle(&sub_bundle) {
             Some(b) => BundleOps::merge(&term.into(), &b).into(),
             None => {
                 let mut term_mut = term_clone;
                 term_mut.body = sub_bundle.into();
                 term_mut
             }
-        };
-
-        Ok(result)
+        }
     }
 }
 
@@ -209,177 +186,97 @@ impl Substitute {
     fn sub_exp(
         &self,
         exprs: Vec<Expr>,
-        depth: i32,
-        env: &Env<Par>,
+        depth: u32,
+        env: &Env<crate::normal_forms::Par>,
     ) -> Result<Par, InterpreterError> {
-        exprs.into_iter().try_fold(Par::default(), |par, expr| {
-            match unwrap_option_safe(expr.clone().expr_instance)? {
-                ExprInstance::EVarBody(e) => match self.maybe_substitute_evar(e, depth, env)? {
-                    Either::Left(_e) => {
-                        // println!("\npar in sub_expr: {:?}", par);
-                        Ok(prepend_expr(
-                            par,
-                            Expr {
-                                expr_instance: Some(ExprInstance::EVarBody(_e)),
-                            },
-                            depth,
-                        ))
+        exprs
+            .into_iter()
+            .try_fold(Par::default(), |par, expr| match &expr {
+                &Expr::EVar(var) => match self.maybe_substitute_evar(var, depth, env)? {
+                    Either::Left(e_var) => Ok(prepend_expr(par.into(), expr, depth)),
+                    Either::Right(right_par) => {
+                        Ok(concatenate_pars(right_par.into(), par.into()).into())
                     }
-                    Either::Right(_par) => Ok(concatenate_pars(_par, par)),
                 },
-                _ => match self.substitute_no_sort(expr, depth, env) {
-                    Ok(e) => Ok(prepend_expr(par, e, depth)),
-                    Err(e) => Err(e),
-                },
-            }
-        })
+                _ => self
+                    .substitute_no_sort(expr, depth, env)
+                    .map(|e| prepend_expr(par, e, depth)),
+            })
     }
 
     fn sub_conn(
         &self,
-        conns: Vec<Connective>,
-        depth: i32,
+        conns: Vec<crate::normal_forms::Connective>,
+        depth: u32,
         env: &Env<Par>,
-    ) -> Result<Par, InterpreterError> {
+    ) -> Par {
         conns
             .into_iter()
-            .try_fold(Par::default(), |par, conn| match conn.connective_instance {
-                Some(ref conn_instance) => match conn_instance {
-                    ConnectiveInstance::VarRefBody(v) => {
-                        match self.maybe_substitute_var_ref(v.clone(), depth, env)? {
-                            Either::Left(_) => Ok(prepend_connective(par, conn, depth)),
-                            Either::Right(new_par) => Ok(concatenate_pars(new_par, par)),
+            .try_fold(Par::default(), |par, conn| match conn {
+                crate::normal_forms::Connective::VarRef(v) => {
+                    match self.maybe_substitute_var_ref(v.clone().into(), depth, env) {
+                        Either::Left(_) => prepend_connective(par, conn, depth),
+                        Either::Right(new_par) => {
+                            concatenate_pars(new_par.into(), par.into()).into()
                         }
                     }
-
-                    ConnectiveInstance::ConnAndBody(ConnectiveBody { ps }) => {
-                        let _ps: Vec<Par> = ps
-                            .iter()
-                            .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                            .collect::<Result<Vec<Par>, InterpreterError>>()?;
-
-                        Ok(prepend_connective(
-                            par,
-                            Connective {
-                                connective_instance: Some(ConnectiveInstance::ConnAndBody(
-                                    ConnectiveBody { ps: ps.to_vec() },
-                                )),
-                            },
-                            depth,
-                        ))
-                    }
-
-                    ConnectiveInstance::ConnOrBody(ConnectiveBody { ps }) => {
-                        let _ps: Vec<Par> = ps
-                            .iter()
-                            .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-                            .collect::<Result<Vec<Par>, InterpreterError>>()?;
-
-                        Ok(prepend_connective(
-                            par,
-                            Connective {
-                                connective_instance: Some(ConnectiveInstance::ConnOrBody(
-                                    ConnectiveBody { ps: ps.to_vec() },
-                                )),
-                            },
-                            depth,
-                        ))
-                    }
-
-                    ConnectiveInstance::ConnNotBody(p) => {
-                        self.substitute_no_sort(p.clone(), depth, env).map(|p| {
-                            prepend_connective(
-                                par,
-                                Connective {
-                                    connective_instance: Some(ConnectiveInstance::ConnNotBody(p)),
-                                },
-                                depth,
-                            )
-                        })
-                    }
-
-                    ConnectiveInstance::ConnBool(c) => Ok(prepend_connective(
-                        par,
-                        Connective {
-                            connective_instance: Some(ConnectiveInstance::ConnBool(*c)),
-                        },
-                        depth,
-                    )),
-                    ConnectiveInstance::ConnInt(c) => Ok(prepend_connective(
-                        par,
-                        Connective {
-                            connective_instance: Some(ConnectiveInstance::ConnInt(*c)),
-                        },
-                        depth,
-                    )),
-                    ConnectiveInstance::ConnString(c) => Ok(prepend_connective(
-                        par,
-                        Connective {
-                            connective_instance: Some(ConnectiveInstance::ConnString(*c)),
-                        },
-                        depth,
-                    )),
-                    ConnectiveInstance::ConnUri(c) => Ok(prepend_connective(
-                        par,
-                        Connective {
-                            connective_instance: Some(ConnectiveInstance::ConnUri(*c)),
-                        },
-                        depth,
-                    )),
-                    ConnectiveInstance::ConnByteArray(c) => Ok(prepend_connective(
-                        par,
-                        Connective {
-                            connective_instance: Some(ConnectiveInstance::ConnByteArray(*c)),
-                        },
-                        depth,
-                    )),
-                },
-                None => Ok(par),
+                }
+                crate::normal_forms::Connective::ConnAnd(ps) => {
+                    prepend_connective(par, conn, depth)
+                }
+                crate::normal_forms::Connective::ConnOr(ps) => prepend_connective(par, conn, depth),
+                crate::normal_forms::Connective::ConnNot(p) => self
+                    .substitute_no_sort(par, depth, env)
+                    .map(|p| prepend_connective(p, conn, depth)),
+                crate::normal_forms::Connective::ConnBool(c) => {
+                    prepend_connective(par, conn, depth)
+                }
+                crate::normal_forms::Connective::ConnInt(c) => prepend_connective(par, conn, depth),
+                crate::normal_forms::Connective::ConnString(c) => {
+                    prepend_connective(par, conn, depth)
+                }
+                crate::normal_forms::Connective::ConnUri(c) => prepend_connective(par, conn, depth),
+                crate::normal_forms::Connective::ConnByteArray(c) => {
+                    prepend_connective(par, conn, depth)
+                }
             })
     }
 }
 
 impl SubstituteTrait<Par> for Substitute {
-    fn substitute_no_sort(
-        &self,
-        term: Par,
-        depth: i32,
-        env: &Env<Par>,
-    ) -> Result<Par, InterpreterError> {
-        // println!("\nterm in substitute_no_sort for par: {:?}", term);
-        let exprs = self.sub_exp(term.exprs, depth, env)?;
-        // println!("\nexprs in substitute_no_sort for par: {:?}", exprs);
-        let connectives = self.sub_conn(term.connectives, depth, env)?;
+    fn substitute_no_sort(&self, term: Par, depth: u32, env: &Env<Par>) -> Par {
+        let exprs = self.sub_exp(term.exprs, depth, env);
+        let connectives = self.sub_conn(term.connectives, depth, env);
 
         let sends = term
             .sends
             .iter()
             .map(|s| self.substitute_no_sort(s.clone(), depth, env))
-            .collect::<Result<Vec<Send>, InterpreterError>>()?;
+            .collect::<Vec<Send>, InterpreterError>();
 
         let bundles = term
             .bundles
             .iter()
             .map(|b| self.substitute_no_sort(b.clone(), depth, env))
-            .collect::<Result<Vec<Bundle>, InterpreterError>>()?;
+            .collect::<Vec<Bundle>, InterpreterError>();
 
         let receives = term
             .receives
             .iter()
             .map(|r| self.substitute_no_sort(r.clone(), depth, env))
-            .collect::<Result<Vec<Receive>, InterpreterError>>()?;
+            .collect::<Vec<Receive>, InterpreterError>();
 
         let news = term
             .news
             .iter()
             .map(|n| self.substitute_no_sort(n.clone(), depth, env))
-            .collect::<Result<Vec<New>, InterpreterError>>()?;
+            .collect::<Vec<New>, InterpreterError>();
 
         let matches = term
             .matches
             .iter()
             .map(|m| self.substitute_no_sort(m.clone(), depth, env))
-            .collect::<Result<Vec<Match>, InterpreterError>>()?;
+            .collect::<Vec<Match>, InterpreterError>();
 
         Ok(concatenate_pars(
             exprs,
@@ -415,7 +312,7 @@ impl SubstituteTrait<Send> for Substitute {
     fn substitute_no_sort(
         &self,
         term: Send,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Send, InterpreterError> {
         let channels_sub =
@@ -449,7 +346,7 @@ impl SubstituteTrait<Receive> for Substitute {
     fn substitute_no_sort(
         &self,
         term: Receive,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Receive, InterpreterError> {
         let binds_sub = term
@@ -499,7 +396,7 @@ impl SubstituteTrait<Receive> for Substitute {
     fn substitute(
         &self,
         term: Receive,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Receive, InterpreterError> {
         self.substitute_no_sort(term, depth, env)
@@ -512,7 +409,7 @@ impl SubstituteTrait<New> for Substitute {
     fn substitute_no_sort(
         &self,
         term: New,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<New, InterpreterError> {
         self.substitute_no_sort(
@@ -540,7 +437,7 @@ impl SubstituteTrait<Match> for Substitute {
     fn substitute_no_sort(
         &self,
         term: Match,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Match, InterpreterError> {
         let target_sub = self.substitute_no_sort(unwrap_option_safe(term.target)?, depth, env)?;
@@ -586,7 +483,7 @@ impl SubstituteTrait<Match> for Substitute {
     fn substitute(
         &self,
         term: Match,
-        depth: i32,
+        depth: u32,
         env: &Env<Par>,
     ) -> Result<Match, InterpreterError> {
         self.substitute_no_sort(term, depth, env)
@@ -595,8 +492,13 @@ impl SubstituteTrait<Match> for Substitute {
     }
 }
 
-impl SubstituteTrait<Expr> for Substitute {
-    fn substitute(&self, term: Expr, depth: i32, env: &Env<Par>) -> Result<Expr, InterpreterError> {
+impl SubstituteTrait<normal_forms::Expr> for Substitute {
+    fn substitute(
+        &self,
+        term: normal_forms::Expr,
+        depth: u32,
+        env: &Env<Par>,
+    ) -> Result<normal_forms::Expr, InterpreterError> {
         match unwrap_option_safe(term.expr_instance.clone())? {
             ExprInstance::ENotBody(ENot { p }) => self
                 .substitute(unwrap_option_safe(p)?, depth, env)
@@ -936,39 +838,15 @@ impl SubstituteTrait<Expr> for Substitute {
         }
     }
 
-    fn substitute_no_sort(
-        &self,
-        term: Expr,
-        depth: i32,
-        env: &Env<Par>,
-    ) -> Result<Expr, InterpreterError> {
-        match unwrap_option_safe(term.expr_instance.clone())? {
-            ExprInstance::ENotBody(ENot { p }) => self
-                .substitute_no_sort(unwrap_option_safe(p)?, depth, env)
-                .map(|p| {
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::ENotBody(ENot { p: Some(p) })),
-                    })
-                })?,
+    fn substitute_no_sort(&self, term: Expr, depth: u32, env: &Env<Par>) -> Expr {
+        match term {
+            Expr::ENot(p) => Expr::ENot(self.substitute_no_sort(p, depth, env)),
+            Expr::ENeg(p) => Expr::ENeg(self.substitute_no_sort(p, depth, env)),
 
-            ExprInstance::ENegBody(ENeg { p }) => self
-                .substitute_no_sort(unwrap_option_safe(p)?, depth, env)
-                .map(|p| {
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::ENegBody(ENeg { p: Some(p) })),
-                    })
-                })?,
-
-            ExprInstance::EMultBody(EMult { p1, p2 }) => {
-                let _p1 = self.substitute_no_sort(unwrap_option_safe(p1)?, depth, env)?;
-                let _p2 = self.substitute_no_sort(unwrap_option_safe(p2)?, depth, env)?;
-
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::EMultBody(EMult {
-                        p1: Some(_p1),
-                        p2: Some(_p2),
-                    })),
-                })
+            Expr::EMult(p1, p2) => {
+                let p1 = self.substitute_no_sort(p1, depth, env);
+                let p2 = self.substitute_no_sort(p2, depth, env);
+                Expr::EMult(p1, p2)
             }
 
             ExprInstance::EDivBody(EDiv { p1, p2 }) => {
@@ -1283,7 +1161,7 @@ impl SubstituteTrait<Expr> for Substitute {
     }
 }
 
-fn set_bits_until(bits: Vec<u8>, until: i32) -> Vec<u8> {
+fn set_bits_until(bits: Vec<u8>, until: u32) -> Vec<u8> {
     // println!("\nbits in set_bits_until: {:?}", bits);
     // println!("\nuntil in set_bits_until: {:?}", until);
     if until <= 0 {
