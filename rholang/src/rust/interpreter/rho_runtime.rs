@@ -1070,7 +1070,7 @@ where
     .await
 }
 
-async fn _create_runtimes<T, R>(
+pub(crate) async fn _create_runtimes<T, R>(
     space: T,
     replay_space: R,
     init_registry: bool,
