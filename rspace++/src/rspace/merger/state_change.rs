@@ -22,9 +22,9 @@ use super::{
  * inserted or removed on merge requires channels before hashing.
  */
 pub struct StateChange {
-    datums_changes: DashMap<Blake2b256Hash, ChannelChange<Vec<u8>>>,
-    cont_changes: DashMap<Vec<Blake2b256Hash>, ChannelChange<Vec<u8>>>,
-    consume_channels_to_join_serialized_map: DashMap<Vec<Blake2b256Hash>, Vec<u8>>,
+    pub datums_changes: DashMap<Blake2b256Hash, ChannelChange<Vec<u8>>>,
+    pub cont_changes: DashMap<Vec<Blake2b256Hash>, ChannelChange<Vec<u8>>>,
+    pub consume_channels_to_join_serialized_map: DashMap<Vec<Blake2b256Hash>, Vec<u8>>,
 }
 
 impl StateChange {
