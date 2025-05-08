@@ -14,7 +14,7 @@ services:
       [
         "run",
         "--host=$BOOTSTRAP_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
       ]
     ports:
       - 40400:40400
@@ -28,6 +28,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/bootstrap.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+    environment:
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
 
   validator1:
     <<: *default-rnode
@@ -36,7 +39,7 @@ services:
       [
         "run",
         "--host=$VALIDATOR1_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
       ]
     ports:
       - 50400:40400
@@ -50,6 +53,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator1.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+    environment:
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
 
   validator2:
     <<: *default-rnode
@@ -58,7 +64,7 @@ services:
       [
         "run",
         "--host=$VALIDATOR2_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
       ]
     ports:
       - 60400:40400
@@ -72,6 +78,9 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator2.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+    environment:
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
 
   validator3:
     <<: *default-rnode
@@ -80,7 +89,7 @@ services:
       [
         "run",
         "--host=$VALIDATOR3_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml",
       ]
     ports:
       - 60500:40400
@@ -94,13 +103,12 @@ services:
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
       - ./conf/validator3.conf:/var/lib/rnode/rnode.conf
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - "../rspace++/target/docker/release:/var/lib/rnode/rspace++/target/docker/release"
+    environment:
+      - JAVA_OPTS=-Djna.library.path=/var/lib/rnode/rspace++/target/docker/release
 
 networks:
   f1r3fly:
-
-
-
-
 # BOOTSTRAP
 # Private key
 # 5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657
@@ -150,5 +158,4 @@ networks:
 # 0cab9328d6d896e5159a1f70bc377e261ded7414
 # REV
 # 1111La6tHaCtGjRiv4wkffbTAAjGyMsVhzSUNzQxH1jjZH9jtEi3M
-
 

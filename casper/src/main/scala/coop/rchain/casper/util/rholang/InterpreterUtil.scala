@@ -62,6 +62,7 @@ object InterpreterUtil {
       _                   <- Span[F].mark("before-compute-parents-post-state")
       computedParentsInfo <- computeParentsPostState(parents, s, runtimeManager).attempt
       _                   <- Log[F].info(s"Computed parents post state for ${PrettyPrinter.buildString(block)}.")
+      _                   = println(s"\nComputed parents post state for ${PrettyPrinter.buildString(block)}.")
       result <- computedParentsInfo match {
                  case Left(ex) =>
                    BlockStatus.exception(ex).asLeft[Option[StateHash]].pure
@@ -69,6 +70,10 @@ object InterpreterUtil {
                    val rejectedDeployIds = rejectedDeploys.toSet
                    if (incomingPreStateHash != computedPreStateHash) {
                      //TODO at this point we may just as well terminate the replay, there's no way it will succeed.
+                     println(
+                       s"Computed pre-state hash ${PrettyPrinter.buildString(computedPreStateHash)} does not equal block's pre-state hash ${PrettyPrinter
+                         .buildString(incomingPreStateHash)}"
+                     )
                      Log[F]
                        .warn(
                          s"Computed pre-state hash ${PrettyPrinter.buildString(computedPreStateHash)} does not equal block's pre-state hash ${PrettyPrinter
@@ -76,6 +81,12 @@ object InterpreterUtil {
                        )
                        .as(none[StateHash].asRight[BlockError])
                    } else if (rejectedDeployIds != block.body.rejectedDeploys.map(_.sig).toSet) {
+                     println(
+                       s"Computed rejected deploys " +
+                         s"${rejectedDeployIds.map(PrettyPrinter.buildString).mkString(",")} does not equal " +
+                         s"block's rejected deploy " +
+                         s"${block.body.rejectedDeploys.map(_.sig).map(PrettyPrinter.buildString).mkString(",")}"
+                     )
                      Log[F]
                        .warn(
                          s"Computed rejected deploys " +
@@ -200,6 +211,10 @@ object InterpreterUtil {
         } else {
           // state hash in block does not match computed hash -- invalid!
           // return no state hash, do not update the state hash set
+          println(
+            s"Tuplespace hash ${PrettyPrinter.buildString(tsHash)} does not match computed hash ${PrettyPrinter
+              .buildString(computedStateHash)}."
+          )
           Log[F]
             .warn(
               s"Tuplespace hash ${PrettyPrinter.buildString(tsHash)} does not match computed hash ${PrettyPrinter
@@ -264,6 +279,8 @@ object InterpreterUtil {
       runtimeManager: RuntimeManager[F]
   )(implicit spanF: Span[F]): F[(StateHash, Seq[ByteString])] =
     spanF.trace(ComputeParentPostStateMetricsSource) {
+      println("\nparents: " + parents)
+      println("emptyStateHashFixed: " + RuntimeManager.emptyStateHashFixed.toBlake2b256Hash)
       parents match {
         // For genesis, use empty trie's root hash
         case Seq() =>

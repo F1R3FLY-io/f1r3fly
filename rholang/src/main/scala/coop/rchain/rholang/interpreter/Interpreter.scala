@@ -51,9 +51,17 @@ class InterpreterImpl[F[_]: Sync: Span](implicit C: _cost[F], mergeChs: Ref[F, S
     // Internal helper exception to mark parser error
 
     val parsingCost = accounting.parsingCost(term)
+    // println("initialPhlo: " + initialPhlo)
+    // println("parsingCost: " + parsingCost)
+    // println("initialPhlo - phlosLeft: " + (initialPhlo - phlosLeft))
     val evaluationResult = for {
-      _ <- Span[F].traceI("set-initial-cost") { C.set(initialPhlo) }
-      _ <- Span[F].traceI("charge-parsing-cost") { charge[F](parsingCost) }
+      _               <- Span[F].traceI("set-initial-cost") { C.set(initialPhlo) }
+      phlosLeftBefore <- C.get
+      // _               <- Sync[F].delay(println("phlosLeft before charge call: " + phlosLeftBefore))
+      _              <- Span[F].traceI("charge-parsing-cost") { charge[F](parsingCost) }
+      phlosLeftAfter <- C.get
+      // _               <- Sync[F].delay(println("phlosLeft after charge call: " + phlosLeftAfter))
+      // _               <- Sync[F].delay(println("normalizerEnv: " + normalizerEnv))
       parsed <- Span[F].traceI("build-normalized-term") {
                  Compiler[F]
                    .sourceToADT(term, normalizerEnv)
@@ -61,12 +69,21 @@ class InterpreterImpl[F[_]: Sync: Span](implicit C: _cost[F], mergeChs: Ref[F, S
                      case err: InterpreterError => ParserError(err).raiseError[F, Par]
                    }
                }
+      phlosLeftAfterADT <- C.get
+      // _                 <- Sync[F].delay(println("phlosLeft after sourceToADT call: " + phlosLeftAfterADT))
       // Empty mergeable channels
       _ <- mergeChs.update(_.empty)
 
+      // _                 <- Sync[F].delay(println("parsed: " + parsed))
       _                 <- Span[F].traceI("reduce-term") { reducer.inj(parsed) }
       phlosLeft         <- C.get
       mergeableChannels <- mergeChs.get
+      // _ <- Sync[F].delay(
+      //       println(
+      //         s"initialPhlo: $initialPhlo, phlosLeft: $phlosLeft, initialPhlo - phlosLeft: ${initialPhlo - phlosLeft}"
+      //       )
+      //     )
+      // _                 <- Log[F].debug(println("initialPhlo - phlosLeft: " + initialPhlo - phlosLeft))
     } yield EvaluateResult(initialPhlo - phlosLeft, Vector(), mergeableChannels)
 
     // Convert InterpreterError(s) to EvaluateResult
@@ -82,6 +99,7 @@ class InterpreterImpl[F[_]: Sync: Span](implicit C: _cost[F], mergeChs: Ref[F, S
       evalCost: Cost,
       error: Throwable
   ): F[EvaluateResult] =
+    // println("hit handleError")
     error match {
       // Parsing error consumes only parsing cost
       case ParserError(parseError: InterpreterError) =>

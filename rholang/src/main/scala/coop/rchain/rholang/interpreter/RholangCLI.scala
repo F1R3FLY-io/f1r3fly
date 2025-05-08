@@ -70,8 +70,8 @@ object RholangCLI {
     val kvm = mkRSpaceStoreManager[Task](conf.dataDir(), conf.mapSize()).runSyncUnsafe()
 
     val runtime = (for {
-      store   <- kvm.rSpaceStores
-      runtime <- RhoRuntime.createRuntime[Task](store, Par())
+      // store   <- kvm.rSpaceStores
+      runtime <- RhoRuntime.createRuntime[Task](conf.dataDir().toString(), Par())
     } yield runtime).unsafeRunSync
 
     val problems = try {
@@ -145,7 +145,7 @@ object RholangCLI {
     Console.print("\nrholang> ")
 
   private def printNormalizedTerm(normalizedTerm: Par): Unit = {
-    Console.println("\nEvaluating:")
+    Console.println("\nEvaluating rhocli:")
     Console.println(PrettyPrinter().buildString(normalizedTerm))
   }
 

@@ -23,6 +23,8 @@ import java.nio.file.{Files, Path}
 import scala.collection.immutable.BitSet
 import scala.concurrent.duration._
 
+import rspacePlusPlus.RSpacePlusPlus_RhoTypes
+
 class RholangMethodsCostsSpec
     extends WordSpec
     with TripleEqualsSupport
@@ -827,15 +829,16 @@ class RholangMethodsCostsSpec
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
   implicit val ms: Metrics.Source         = Metrics.BaseSource
   implicit val kvm                        = InMemoryStoreManager[Task]
-  val rSpaceStore                         = kvm.rSpaceStores.runSyncUnsafe()
+  // val rSpaceStore                         = kvm.rSpaceStores.runSyncUnsafe()
   protected override def beforeAll(): Unit = {
     import coop.rchain.catscontrib.TaskContrib._
     import coop.rchain.rholang.interpreter.storage._
-    implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
+    // implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
     dbDir = Files.createTempDirectory("rholang-interpreter-test-")
-    space = RSpace
-      .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](rSpaceStore)
-      .unsafeRunSync
+    // space = RSpace
+    //   .create[Task, Par, BindPattern, ListParWithRandom, TaggedContinuation](rSpaceStore)
+    //   .unsafeRunSync
+    space = RSpacePlusPlus_RhoTypes.create[Task](dbDir.toString()).unsafeRunSync
   }
 
   protected override def afterAll(): Unit = {

@@ -26,8 +26,9 @@ trait EvalBenchStateBase {
 
   val rhoScriptSource: String
 
-  val store                       = kvm.rSpaceStores.unsafeRunSync
-  lazy val spaces                 = Resources.createRuntimes[Task](store).unsafeRunSync
+  // val store                    = kvm.rSpaceStores.unsafeRunSync
+  // lazy val spaces              = Resources.createRuntimes[Task](store).unsafeRunSync
+  lazy val spaces                 = Resources.createRuntimes[Task](dbDir.toString()).unsafeRunSync
   val (runtime, replayRuntime, _) = spaces
 
   val rand: Blake2b512Random = Blake2b512Random(128)

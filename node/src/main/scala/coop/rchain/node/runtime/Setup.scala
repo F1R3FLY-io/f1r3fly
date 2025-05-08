@@ -152,17 +152,22 @@ object Setup {
       // Runtime for `rnode eval`
       evalRuntime <- {
         implicit val sp = span
-        rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](_, Par()))
+        // rnodeStoreManager.evalStores.flatMap(RhoRuntime.createRuntime[F](Par()))
+        RhoRuntime.createRuntime[F](conf.storage.dataDir.toString(), Par())
       }
 
       // Runtime manager (play and replay runtimes)
       runtimeManagerWithHistory <- {
         implicit val sp = span
         for {
-          rStores    <- rnodeStoreManager.rSpaceStores
+          // rStores    <- rnodeStoreManager.rSpaceStores
           mergeStore <- RuntimeManager.mergeableStore(rnodeStoreManager)
           rm <- RuntimeManager
-                 .createWithHistory[F](rStores, mergeStore, Genesis.NonNegativeMergeableTagName)
+                 .createWithHistory[F](
+                   conf.storage.dataDir.toString(),
+                   mergeStore,
+                   Genesis.NonNegativeMergeableTagName
+                 )
         } yield rm
       }
       (runtimeManager, historyRepo) = runtimeManagerWithHistory
@@ -172,7 +177,9 @@ object Setup {
         implicit val (bs, bd, sp) = (blockStore, blockDagStorage, span)
         if (conf.apiServer.enableReporting) {
           // In reporting replay channels map is not needed
-          rnodeStoreManager.rSpaceStores.map(ReportingCasper.rhoReporter(_))
+          // rnodeStoreManager.rSpaceStores.map(ReportingCasper.rhoReporter(_))
+          println("\nenableReporting is disabled because of RSpace++")
+          ReportingCasper.noop.pure[F]
         } else
           ReportingCasper.noop.pure[F]
       }
