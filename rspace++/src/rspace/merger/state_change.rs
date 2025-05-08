@@ -2,11 +2,15 @@
 
 use dashmap::DashMap;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::rspace::{
     errors::HistoryError,
     hashing::{blake2b256_hash::Blake2b256Hash, stable_hash_provider},
-    history::history_reader::HistoryReader,
+    history::{
+        history_reader::HistoryReader,
+        instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl,
+    },
 };
 
 use super::{
@@ -28,17 +32,16 @@ pub struct StateChange {
 }
 
 impl StateChange {
-    pub fn new<HR, C, P, A, K>(
-        pre_state_reader: HR,
-        post_state_reader: HR,
+    pub fn new<C, P, A, K>(
+        pre_state_reader: RSpaceHistoryReaderImpl<C, P, A, K>,
+        post_state_reader: RSpaceHistoryReaderImpl<C, P, A, K>,
         event_log_index: EventLogIndex,
     ) -> Result<Self, HistoryError>
     where
-        HR: HistoryReader<Blake2b256Hash, C, P, A, K> + Send + Sync + 'static,
-        C: Clone + serde::Serialize,
-        P: Clone,
-        A: Clone,
-        K: Clone,
+        C: Clone + for<'a> Deserialize<'a> + Serialize + 'static + Sync + Send,
+        P: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
+        A: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
+        K: Clone + for<'a> Deserialize<'a> + 'static + Sync + Send,
     {
         let datums_diff = DashMap::new();
         let cont_diff = DashMap::new();

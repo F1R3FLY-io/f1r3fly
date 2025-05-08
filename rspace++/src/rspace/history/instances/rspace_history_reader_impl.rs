@@ -183,6 +183,7 @@ where
             None => Ok(Vec::new()),
         }
     }
+
     fn base(&self) -> Box<dyn HistoryReaderBase<C, P, A, K>> {
         struct HistoryReaderBaseImpl<C, P, A, K> {
             outer: Arc<RSpaceHistoryReaderImpl<C, P, A, K>>,
@@ -216,5 +217,20 @@ where
 
         let outer_arc = Arc::new(self.clone());
         Box::new(HistoryReaderBaseImpl { outer: outer_arc })
+    }
+
+    fn get_data_proj_generic(&self, key: &C) -> Vec<Datum<A>> {
+        self.get_data_proj(&hash(key))
+            .expect("Failed to get data proj")
+    }
+
+    fn get_continuations_proj_generic(&self, key: &Vec<C>) -> Vec<WaitingContinuation<P, K>> {
+        self.get_continuations_proj(&hash_from_vec(key))
+            .expect("Failed to get continuations proj")
+    }
+
+    fn get_joins_proj_generic(&self, key: &C) -> Vec<Vec<C>> {
+        self.get_joins_proj(&hash(key))
+            .expect("Failed to get joins proj")
     }
 }

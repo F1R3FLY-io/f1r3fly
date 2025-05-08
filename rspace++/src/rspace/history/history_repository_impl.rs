@@ -427,6 +427,18 @@ where
         Ok(Box::new(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone())))
     }
 
+    fn get_history_reader_struct(
+        &self,
+        state_hash: &Blake2b256Hash,
+    ) -> Result<RSpaceHistoryReaderImpl<C, P, A, K>, HistoryError> {
+        let history_lock = self
+            .current_history
+            .lock()
+            .expect("History Repository Impl: Unable to acquire history lock");
+        let history_repo = history_lock.reset(state_hash)?;
+        Ok(RSpaceHistoryReaderImpl::new(history_repo, self.leaf_store.clone()))
+    }
+
     fn root(&self) -> Blake2b256Hash {
         let history_lock = self
             .current_history

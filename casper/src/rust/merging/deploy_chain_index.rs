@@ -4,6 +4,7 @@ use prost::bytes::Bytes;
 use std::collections::HashSet;
 
 use rspace_plus_plus::rspace::{
+    errors::HistoryError,
     hashing::blake2b256_hash::Blake2b256Hash,
     history::history_repository::HistoryRepository,
     merger::{event_log_index::EventLogIndex, state_change::StateChange},
@@ -19,7 +20,7 @@ struct DeployIdWithCost {
 
 /** index of deploys depending on each other inside a single block (state transition) */
 pub struct DeployChainIndex {
-    deploys_with_cost: Vec<DeployIdWithCost>,
+    deploys_with_cost: HashSet<DeployIdWithCost>,
     pre_state_hash: Blake2b256Hash,
     post_state_hash: Blake2b256Hash,
     event_log_index: EventLogIndex,
@@ -35,12 +36,17 @@ impl DeployChainIndex {
         pre_state_hash: Blake2b256Hash,
         post_state_hash: Blake2b256Hash,
         history_repository: impl HistoryRepository<C, P, A, K>,
-    ) -> Self
+    ) -> Result<Self, HistoryError>
     where
-        C: std::clone::Clone,
-        P: std::clone::Clone,
-        A: std::clone::Clone,
-        K: std::clone::Clone,
+        C: std::clone::Clone
+            + serde::Serialize
+            + for<'de> serde::Deserialize<'de>
+            + Send
+            + Sync
+            + 'static,
+        P: std::clone::Clone + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
+        A: std::clone::Clone + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
+        K: std::clone::Clone + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
     {
         let deploys_with_cost: HashSet<DeployIdWithCost> = deploys
             .iter()
@@ -56,7 +62,31 @@ impl DeployChainIndex {
                 EventLogIndex::combine(acc, deploy.event_log_index)
             });
 
-        todo!()
+        let pre_history_reader =
+            history_repository.get_history_reader_struct(&pre_state_hash)?;
+        let post_history_reader =
+            history_repository.get_history_reader_struct(&post_state_hash)?;
+
+        let state_changes = StateChange::new(
+            pre_history_reader,
+            post_history_reader,
+            event_log_index.clone(),
+        )?;
+
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for deploy in &deploys_with_cost {
+            std::hash::Hash::hash(&deploy.deploy_id, &mut hasher);
+        }
+        let hash_code = std::hash::Hasher::finish(&hasher) as i32;
+
+        Ok(Self {
+            deploys_with_cost,
+            pre_state_hash,
+            post_state_hash,
+            event_log_index,
+            state_changes,
+            hash_code,
+        })
     }
 }
 

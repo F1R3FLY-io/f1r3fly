@@ -11,10 +11,12 @@ use crate::rspace::state::instances::rspace_exporter_store::RSpaceExporterStore;
 use crate::rspace::state::instances::rspace_importer_store::RSpaceImporterStore;
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
-use shared::rust::store::key_value_store::KeyValueStore;
 use serde::{Deserialize, Serialize};
+use shared::rust::store::key_value_store::KeyValueStore;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
+
+use super::instances::rspace_history_reader_impl::RSpaceHistoryReaderImpl;
 
 // See rspace/src/main/scala/coop/rchain/rspace/history/HistoryRepository.scala
 pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync {
@@ -43,6 +45,11 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
         &self,
         state_hash: Blake2b256Hash,
     ) -> Result<Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>, HistoryError>;
+
+    fn get_history_reader_struct(
+        &self,
+        state_hash: &Blake2b256Hash,
+    ) -> Result<RSpaceHistoryReaderImpl<C, P, A, K>, HistoryError>;
 
     fn root(&self) -> Blake2b256Hash;
 }
