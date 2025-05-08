@@ -3,6 +3,9 @@ use node_cli::f1r3fly_api::F1r3flyApi;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
+use secp256k1::{Secp256k1, SecretKey};
+use hex;
+use rand::rngs::OsRng;
 
 /// Command-line interface for interacting with F1r3fly nodes
 #[derive(Parser)]
@@ -28,6 +31,12 @@ enum Commands {
     
     /// Execute Rholang code without committing to the blockchain (exploratory deployment)
     ExploratoryDeploy(ExploratoryDeployArgs),
+
+    /// Generate a public key from a private key
+    GeneratePublicKey(GeneratePublicKeyArgs),
+    
+    /// Generate a new secp256k1 private/public key pair
+    GenerateKeyPair(GenerateKeyPairArgs),
 }
 
 /// Arguments for deploy and full-deploy commands
@@ -138,6 +147,38 @@ struct ExploratoryDeployArgs {
     use_pre_state: bool,
 }
 
+/// Arguments for generate-public-key command
+#[derive(Parser)]
+struct GeneratePublicKeyArgs {
+    /// Private key in hex format
+    #[arg(
+        short,
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    private_key: String,
+
+    /// Output public key in compressed format (shorter)
+    #[arg(short, long, default_value_t = false)]
+    compressed: bool,
+}
+
+/// Arguments for generate-key-pair command
+#[derive(Parser)]
+struct GenerateKeyPairArgs {
+    /// Output public key in compressed format (shorter)
+    #[arg(short, long, default_value_t = false)]
+    compressed: bool,
+    
+    /// Save keys to files instead of displaying them
+    #[arg(short, long, default_value_t = false)]
+    save: bool,
+    
+    /// Output directory for saved keys (default: current directory)
+    #[arg(short, long, default_value = ".")]
+    output_dir: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -148,6 +189,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::FullDeploy(args) => full_deploy_command(args).await,
         Commands::IsFinalized(args) => is_finalized_command(args).await,
         Commands::ExploratoryDeploy(args) => exploratory_deploy_command(args).await,
+        Commands::GeneratePublicKey(args) => generate_public_key_command(args),
+        Commands::GenerateKeyPair(args) => generate_key_pair_command(args),
     }
 }
 
@@ -360,5 +403,83 @@ async fn is_finalized_command(args: &IsFinalizedArgs) -> Result<(), Box<dyn std:
         }
     }
 
+    Ok(())
+}
+
+fn generate_public_key_command(args: &GeneratePublicKeyArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Decode private key from hex
+    let private_key_bytes = hex::decode(&args.private_key)
+        .map_err(|e| format!("Failed to decode private key: {}", e))?;
+    
+    // Create a secret key from the decoded bytes
+    let secret_key = SecretKey::from_slice(&private_key_bytes)
+        .map_err(|e| format!("Invalid private key: {}", e))?;
+    
+    // Initialize secp256k1 context
+    let secp = Secp256k1::new();
+    
+    // Derive public key from private key
+    let public_key = secret_key.public_key(&secp);
+    
+    // Serialize public key in the requested format
+    let public_key_hex = if args.compressed {
+        hex::encode(public_key.serialize())
+    } else {
+        hex::encode(public_key.serialize_uncompressed())
+    };
+    
+    // Print the public key
+    println!("Public key ({}): {}", 
+        if args.compressed { "compressed" } else { "uncompressed" }, 
+        public_key_hex);
+    
+    Ok(())
+}
+
+fn generate_key_pair_command(args: &GenerateKeyPairArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize secp256k1 context with random number generator
+    let secp = Secp256k1::new();
+    let mut rng = OsRng::default();
+    
+    // Generate a new random private key
+    let secret_key = SecretKey::new(&mut rng);
+    
+    // Get the corresponding public key
+    let public_key = secret_key.public_key(&secp);
+    
+    // Get the keys in hex format
+    let private_key_hex = hex::encode(secret_key.secret_bytes());
+    let public_key_hex = if args.compressed {
+        hex::encode(public_key.serialize())
+    } else {
+        hex::encode(public_key.serialize_uncompressed())
+    };
+    
+    if args.save {
+        // Create output directory if it doesn't exist
+        let output_dir = std::path::Path::new(&args.output_dir);
+        if !output_dir.exists() {
+            std::fs::create_dir_all(output_dir)?;
+        }
+        
+        // Create filenames
+        let private_key_file = output_dir.join("private_key.hex");
+        let public_key_file = output_dir.join("public_key.hex");
+        
+        // Write keys to files
+        std::fs::write(&private_key_file, &private_key_hex)?;
+        std::fs::write(&public_key_file, &public_key_hex)?;
+        
+        println!("Key pair generated and saved to:");
+        println!("  Private key: {}", private_key_file.display());
+        println!("  Public key: {}", public_key_file.display());
+    } else {
+        // Print keys to stdout
+        println!("Private key: {}", private_key_hex);
+        println!("Public key ({}): {}", 
+            if args.compressed { "compressed" } else { "uncompressed" }, 
+            public_key_hex);
+    }
+    
     Ok(())
 }

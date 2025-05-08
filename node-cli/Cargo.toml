@@ -18,3 +18,4 @@ clap = { version = "4.4.6", features = ["derive"] }
 secp256k1 = { version = "0.28.0", features = ["rand-std"] }
 blake2 = "0.10.6"
 typenum = "1.16.0"
+rand = "0.8.5"

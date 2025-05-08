@@ -40,6 +40,42 @@ exploratory-deploy-at-block:
 	@echo "Usage: make exploratory-deploy-at-block BLOCK_HASH=<block hash>"
 	@[ "$(BLOCK_HASH)" ] && cargo run -- exploratory-deploy -f $(EXAMPLE_FILE) --block-hash $(BLOCK_HASH) || echo "Please provide a block hash: make exploratory-deploy-at-block BLOCK_HASH=<block hash>"
 
+# Generate public key from private key
+generate-key:
+	@if [ "$(PRIVATE_KEY)" ]; then \
+		if [ "$(COMPRESSED)" = "true" ]; then \
+			cargo run -- generate-public-key --private-key $(PRIVATE_KEY) --compressed; \
+		else \
+			cargo run -- generate-public-key --private-key $(PRIVATE_KEY); \
+		fi; \
+	else \
+		cargo run -- generate-public-key; \
+	fi
+
+# Generate a new private/public key pair
+generate-key-pair:
+	@if [ "$(SAVE)" = "true" ]; then \
+		if [ "$(OUTPUT_DIR)" ]; then \
+			if [ "$(COMPRESSED)" = "true" ]; then \
+				cargo run -- generate-key-pair --save --output-dir $(OUTPUT_DIR) --compressed; \
+			else \
+				cargo run -- generate-key-pair --save --output-dir $(OUTPUT_DIR); \
+			fi; \
+		else \
+			if [ "$(COMPRESSED)" = "true" ]; then \
+				cargo run -- generate-key-pair --save --compressed; \
+			else \
+				cargo run -- generate-key-pair --save; \
+			fi; \
+		fi; \
+	else \
+		if [ "$(COMPRESSED)" = "true" ]; then \
+			cargo run -- generate-key-pair --compressed; \
+		else \
+			cargo run -- generate-key-pair; \
+		fi; \
+	fi
+
 # Help message
 help:
 	@echo "F1r3fly Node CLI Makefile"
@@ -54,5 +90,7 @@ help:
 	@echo "  make check-finalized BLOCK_HASH=<hash> - Check if a block is finalized"
 	@echo "  make exploratory-deploy - Execute Rholang without committing (read-only mode)"
 	@echo "  make exploratory-deploy-at-block BLOCK_HASH=<hash> - Execute Rholang at a specific block"
+	@echo "  make generate-key [PRIVATE_KEY=<key>] [COMPRESSED=true] - Generate public key from private key"
+	@echo "  make generate-key-pair [COMPRESSED=true] [SAVE=true] [OUTPUT_DIR=<dir>] - Generate new key pair"
 
-.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block help 
+.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block generate-key generate-key-pair help 

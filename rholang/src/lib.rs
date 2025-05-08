@@ -1037,8 +1037,6 @@ extern "C" fn set_invalid_blocks(
         .invalid_blocks
         .into_iter()
         .map(|block| {
-            println!("\nblock.block_hash: {:?}", block.block_hash);
-            println!("\nblock.validator: {:?}", block.validator);
             (block.block_hash, block.validator)
         })
         .collect();

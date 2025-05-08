@@ -943,6 +943,7 @@ dependencies = [
  "hex",
  "models",
  "prost",
+ "rand",
  "secp256k1",
  "tokio",
  "typenum",
