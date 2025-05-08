@@ -2,9 +2,10 @@ pub mod address_tools;
 pub mod base58;
 pub mod rev_address;
 pub mod test_utils;
+use crate::normal_forms::Par;
 
 use bitvec::vec::BitVec;
-use models::{rhoapi::Par, rust::utils::union};
+use models::rust::utils::union;
 
 use crate::normal_forms::{Bundle, Expr, New};
 
@@ -30,11 +31,7 @@ pub fn prepend_connective(
     }
 }
 
-pub fn prepend_expr(
-    mut p: crate::normal_forms::Par,
-    e: Expr,
-    depth: u32,
-) -> crate::normal_forms::Par {
+pub fn prepend_expr(mut p: Par, e: Expr, depth: u32) -> Par {
     let mut new_exprs = vec![e.clone()];
     new_exprs.append(&mut p.exprs);
 
@@ -57,7 +54,7 @@ pub fn prepend_expr(
         .map(|v| v as usize)
         .collect();
 
-    crate::normal_forms::Par {
+    Par {
         exprs: new_exprs,
         locally_free: BitVec::from_vec(locally_free),
         connective_used: p.connective_used || e.clone().connective_used(),
@@ -65,14 +62,36 @@ pub fn prepend_expr(
     }
 }
 
-pub fn prepend_new(mut p: Par, n: New) -> Par {
+pub fn prepend_new<N, T>(mut p: Par, n: N) -> Par
+where
+    N: HasLocallyFree<T>,
+    T: Clone,
+{
     let mut new_news = vec![n.clone()];
-    new_news.append(&mut p.news);
+    new_news.extend(p.news);
+
+    let bitset1 = p
+        .locally_free
+        .clone()
+        .into_vec()
+        .into_iter()
+        .map(|v| v as u8)
+        .collect();
+    let bitset2 = n
+        .clone()
+        .locally_free
+        .clone()
+        .into_vec()
+        .into_iter()
+        .map(|v| v as u8)
+        .collect();
+
+    let connective_used = p.connective_used || n.connective_used(n);
 
     Par {
         news: new_news,
-        locally_free: union(p.locally_free.clone(), n.clone().locally_free),
-        connective_used: p.connective_used || n.clone().connective_used(n),
+        locally_free: union(bitset1, bitset2),
+        connective_used,
         ..p.clone()
     }
 }
