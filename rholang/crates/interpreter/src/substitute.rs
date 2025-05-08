@@ -43,31 +43,17 @@ pub struct Substitute {
 }
 
 impl Substitute {
-    pub fn substitute_and_charge<A>(
-        &self,
-        term: &A,
-        depth: u32,
-        env: &Env<Par>,
-    ) -> Result<A, InterpreterError>
+    pub fn substitute_and_charge<A>(&self, term: &A, depth: u32, env: &Env<Par>) -> A
     where
         Self: SubstituteTrait<A>,
         A: Clone + prost::Message,
     {
-        // scala 'charge' function built in here
-        match self.substitute(term.clone(), depth, env) {
-            Ok(subst_term) => {
-                self.cost.charge(Cost::create_from_generic(
-                    subst_term.clone(),
-                    "substitution".to_string(),
-                ))?;
-                Ok(subst_term)
-            }
-            Err(th) => {
-                self.cost
-                    .charge(Cost::create_from_generic(term.clone(), "".to_string()))?;
-                Err(th)
-            }
-        }
+        let substitute = self.substitute(term.clone(), depth, env);
+        self.cost.charge(Cost::create_from_generic(
+            substitute.clone(),
+            "substitution".to_string(),
+        ));
+        substitute
     }
 
     pub fn substitute_no_sort_and_charge<A>(&self, term: &A, depth: u32, env: &Env<Par>) -> A
@@ -86,19 +72,20 @@ impl Substitute {
     // pub here for testing purposes
     pub fn maybe_substitute_var(
         &self,
-        term: Var,
+        term: normal_forms::Var,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<Either<Var, Par>, InterpreterError> {
+    ) -> Result<Either<normal_forms::Var, Par>, InterpreterError> {
         if depth != 0 {
             Ok(Either::Left(term))
         } else {
-            let v = term
-                .clone()
-                .var_instance
-                .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)?;
-            match v {
-                VarInstance::BoundVar(index) => match env.get(index as u32) {
+            // VarInstance is the same as our Var enum, so we can remove that
+            // let v = term
+            //     .clone()
+            //     .var_instance
+            //     .ok_or(InterpreterError::UndefinedRequiredProtobufFieldError)?;
+            match term {
+                normal_forms::Var::BoundVar(index) => match env.get(index as u32) {
                     Some(p) => Ok(Either::Right(p.clone())),
                     None => Ok(Either::Left(term)),
                 },
@@ -344,12 +331,7 @@ impl SubstituteTrait<Send> for Substitute {
 }
 
 impl SubstituteTrait<Receive> for Substitute {
-    fn substitute_no_sort(
-        &self,
-        term: Receive,
-        depth: u32,
-        env: &Env<Par>,
-    ) -> Result<Receive, InterpreterError> {
+    fn substitute_no_sort(&self, term: Receive, depth: u32, env: &Env<Par>) -> Receive {
         let binds_sub = term
             .binds
             .into_iter()
