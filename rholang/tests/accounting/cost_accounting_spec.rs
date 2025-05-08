@@ -254,18 +254,17 @@ async fn total_cost_of_evaluation_should_be_equal_to_the_sum_of_all_costs_in_the
     }
 }
 
-// #[tokio::test]
-// async fn cost_should_be_deterministic() {
-//   for (contract, _) in contracts() {
-//     let contract_clone = contract.clone();
-//
-//     check_deterministic_cost(|| async {
-//       let result = evaluate_with_cost_log(i32::MAX as i64, contract_clone.clone()).await;
-//       assert!(result.errors.is_empty());
-//       result
-//     }).await;
-//   }
-// }
+#[tokio::test]
+async fn cost_should_be_deterministic() {
+    for (contract, _) in contracts() {
+        check_deterministic_cost(|| async {
+            let result = evaluate_with_cost_log(i32::MAX as i64, contract.clone()).await;
+            assert!(result.errors.is_empty());
+            result
+        })
+        .await;
+    }
+}
 
 #[tokio::test]
 #[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed
@@ -312,6 +311,33 @@ async fn cost_should_be_repeatable_when_generated() {
             assert_eq!(result.0.cost, result.1.cost);
         }
     }
+}
+
+async fn check_deterministic_cost<F, Fut>(block: F) -> bool
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = EvaluateResult>,
+{
+    let repetitions = 20;
+    let first = block().await;
+
+    // Execute sequentially for now (could be parallel with join_all later)
+    for _ in 1..repetitions {
+        let subsequent = block().await;
+
+        let expected = first.cost.value;
+        let actual = subsequent.cost.value;
+
+        if expected != actual {
+            // TODO implement when costLog will be ready!
+            panic!(
+                "Cost was not repeatable, expected {}, got {}.",
+                expected, actual
+            );
+        }
+    }
+
+    true
 }
 
 #[tokio::test]
