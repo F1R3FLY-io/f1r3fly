@@ -216,7 +216,7 @@ pub fn to_vec(fm: FreeMap, max: i32) -> Vec<Par> {
         .collect()
 }
 
-pub fn union<T: Iterator>(bitset1: T, bitset2: T) -> FromIterator<Into = u8> {
+pub fn union(bitset1: Vec<u8>, bitset2: Vec<u8>) -> Vec<u8> {
     let max_len = bitset1.len().max(bitset2.len());
     let mut result = vec![0; max_len];
 
