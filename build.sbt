@@ -104,18 +104,14 @@ lazy val projectSettings = Seq(
   IntegrationTest / fork := true,
   IntegrationTest / parallelExecution := false,
   IntegrationTest / testForkedParallel := false,
-  // assemblyMergeStrategy in assembly := {
-  //   // For some reason, all artifacts from 'io.netty' group contain this file with different contents.
-  //   // Discarding it as it's not needed.
-  //   case path if path.endsWith("io.netty.versions.properties") => MergeStrategy.discard
-  //   // The scala compiler includes native bindings for jansi under the same path jansi does.
-  //   // This should pick the ones provided by jansi.
-  //   case path if path.startsWith("META-INF/native/") && path.contains("jansi") => MergeStrategy.last
-  //   case path                                                                  => MergeStrategy.defaultMergeStrategy(path)
-  // }
   assemblyMergeStrategy in assembly := {
-    case PathList("META-INF", _*) => MergeStrategy.discard
-    case _                        => MergeStrategy.first
+    // For some reason, all artifacts from 'io.netty' group contain this file with different contents.
+    // Discarding it as it's not needed.
+    case path if path.endsWith("io.netty.versions.properties") => MergeStrategy.discard
+    // The scala compiler includes native bindings for jansi under the same path jansi does.
+    // This should pick the ones provided by jansi.
+    case path if path.startsWith("META-INF/native/") && path.contains("jansi") => MergeStrategy.last
+    case path                                                                  => MergeStrategy.defaultMergeStrategy(path)
   }
 ) ++
   // skip api doc generation if SKIP_DOC env variable is defined
