@@ -4,7 +4,8 @@ from typing import Iterable
 
 import yaml
 
-WORKFLOW_PROJECT_PATH = '.github/workflows/continuous-integration.yml'
+GITHUB_DIR = os.path.dirname(os.path.abspath(__file__))
+WORKFLOW_PROJECT_PATH = GITHUB_DIR + '/workflows/continuous-integration.yml'
 REMAINDER = 'REMAINDER'
 
 
