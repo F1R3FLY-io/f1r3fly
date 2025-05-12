@@ -655,13 +655,13 @@ pub struct Match {
     pub connective_used: bool,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub(crate) struct MyBitVec<T = usize, O = Lsb0>(BitVec<T, O>)
 where
     T: bitvec::store::BitStore,
     O: bitvec::order::BitOrder;
 impl MyBitVec {
-    pub(crate) fn from_vec(locally_free: _) -> MyBitVec {
+    pub(crate) fn from_vec(locally_free: Vec<usize>) -> MyBitVec {
         Self(BitVec::from_vec(locally_free))
     }
 }
