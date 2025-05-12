@@ -1,6 +1,7 @@
 pub mod shared;
 pub mod store;
 pub mod dag;
+pub mod hashable_set;
 
 pub type ByteVector = Vec<u8>;
 pub type ByteBuffer = Vec<u8>;

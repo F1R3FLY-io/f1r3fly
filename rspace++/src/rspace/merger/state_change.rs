@@ -51,12 +51,13 @@ impl StateChange {
 
         let produces_affected = produces_affected(&event_log_index);
         let channels_of_consumes_affected = consumes_affected(&event_log_index)
+            .0
             .into_iter()
             .map(|consume| consume.channel_hashes)
             .collect::<Vec<_>>();
 
         // Process produces in parallel
-        produces_affected.par_iter().try_for_each(|produce| {
+        produces_affected.0.par_iter().try_for_each(|produce| {
             let history_pointer = produce.channel_hash.clone();
 
             let change = Self::compute_value_change(

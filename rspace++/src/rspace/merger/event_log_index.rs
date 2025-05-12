@@ -1,26 +1,27 @@
 // See rspace/src/main/scala/coop/rchain/rspace/merger/EventLogIndex.scala
 
 use rayon::prelude::*;
-use std::collections::BTreeSet;
+use shared::rust::hashable_set::HashableSet;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use crate::rspace::trace::event::{Consume, Event, IOEvent, Produce};
 
 use super::merging_logic::{NumberChannelsDiff, combine_produces_copied_by_peek};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EventLogIndex {
-    pub produces_linear: BTreeSet<Produce>,
-    pub produces_persistent: BTreeSet<Produce>,
-    pub produces_consumed: BTreeSet<Produce>,
-    pub produces_peeked: BTreeSet<Produce>,
-    pub produces_copied_by_peek: BTreeSet<Produce>,
-    pub produces_touching_base_joins: BTreeSet<Produce>,
-    pub consumes_linear_and_peeks: BTreeSet<Consume>,
-    pub consumes_persistent: BTreeSet<Consume>,
-    pub consumes_produced: BTreeSet<Consume>,
-    pub produces_mergeable: BTreeSet<Produce>,
-    pub consumes_mergeable: BTreeSet<Consume>,
+    pub produces_linear: HashableSet<Produce>,
+    pub produces_persistent: HashableSet<Produce>,
+    pub produces_consumed: HashableSet<Produce>,
+    pub produces_peeked: HashableSet<Produce>,
+    pub produces_copied_by_peek: HashableSet<Produce>,
+    pub produces_touching_base_joins: HashableSet<Produce>,
+    pub consumes_linear_and_peeks: HashableSet<Consume>,
+    pub consumes_persistent: HashableSet<Consume>,
+    pub consumes_produced: HashableSet<Consume>,
+    pub produces_mergeable: HashableSet<Produce>,
+    pub consumes_mergeable: HashableSet<Consume>,
     pub number_channels_data: NumberChannelsDiff,
 }
 
@@ -32,15 +33,15 @@ impl EventLogIndex {
         mergeable_chs: NumberChannelsDiff,
     ) -> Self {
         // Use Arc<Mutex<>> for thread-safe collections that will be updated in parallel
-        let produces_linear = Arc::new(Mutex::new(BTreeSet::new()));
-        let produces_persistent = Arc::new(Mutex::new(BTreeSet::new()));
-        let produces_consumed = Arc::new(Mutex::new(BTreeSet::new()));
-        let produces_peeked = Arc::new(Mutex::new(BTreeSet::new()));
-        let produces_copied_by_peek = Arc::new(Mutex::new(BTreeSet::new()));
-        let produces_touching_base_joins = Arc::new(Mutex::new(BTreeSet::new()));
-        let consumes_linear_and_peeks = Arc::new(Mutex::new(BTreeSet::new()));
-        let consumes_persistent = Arc::new(Mutex::new(BTreeSet::new()));
-        let consumes_produced = Arc::new(Mutex::new(BTreeSet::new()));
+        let produces_linear = Arc::new(Mutex::new(HashSet::new()));
+        let produces_persistent = Arc::new(Mutex::new(HashSet::new()));
+        let produces_consumed = Arc::new(Mutex::new(HashSet::new()));
+        let produces_peeked = Arc::new(Mutex::new(HashSet::new()));
+        let produces_copied_by_peek = Arc::new(Mutex::new(HashSet::new()));
+        let produces_touching_base_joins = Arc::new(Mutex::new(HashSet::new()));
+        let consumes_linear_and_peeks = Arc::new(Mutex::new(HashSet::new()));
+        let consumes_persistent = Arc::new(Mutex::new(HashSet::new()));
+        let consumes_produced = Arc::new(Mutex::new(HashSet::new()));
 
         // Pre-process events to collect all produces and consumes
         // This allows us to clone each event at most once
@@ -124,20 +125,20 @@ impl EventLogIndex {
                 }
             });
 
-        // Helper function to safely unwrap Arc<Mutex<BTreeSet<T>>> with minimal cloning
-        fn unwrap_arc_mutex<T>(arc_mutex: Arc<Mutex<BTreeSet<T>>>) -> BTreeSet<T>
+        // Helper function to safely unwrap Arc<Mutex<HashSet<T>>> with minimal cloning
+        fn unwrap_arc_mutex<T>(arc_mutex: Arc<Mutex<HashSet<T>>>) -> HashableSet<T>
         where
-            T: Ord + Clone,
+            T: Eq + std::hash::Hash + Clone,
         {
             // Try to get exclusive ownership of the Arc
             match Arc::try_unwrap(arc_mutex) {
                 // Success case: we have exclusive ownership, just unwrap the mutex
-                Ok(mutex) => mutex.into_inner().unwrap_or_default(),
+                Ok(mutex) => HashableSet(mutex.into_inner().unwrap_or_default()),
 
                 // Can't get exclusive ownership - we need to construct a new set
                 // with minimal cloning by draining items instead of cloning the whole set
                 Err(arc) => {
-                    let mut result = BTreeSet::new();
+                    let mut result = HashSet::new();
                     if let Ok(guard) = arc.lock() {
                         // Insert each item individually - still requires cloning elements
                         // but avoids cloning the entire collection structure
@@ -145,7 +146,7 @@ impl EventLogIndex {
                             result.insert(item.clone());
                         }
                     }
-                    result
+                    HashableSet(result)
                 }
             }
         }
@@ -162,37 +163,43 @@ impl EventLogIndex {
         let consumes_produced = unwrap_arc_mutex(consumes_produced);
 
         // Calculate mergeable channels more efficiently
-        // First create references to avoid redundant cloning
-        let all_produces_refs: BTreeSet<&Produce> = produces_linear
+        // First, create a HashSet for efficient lookups
+        let all_produces: HashSet<Produce> = produces_linear
+            .0
             .iter()
-            .chain(produces_persistent.iter())
-            .chain(produces_consumed.iter())
-            .chain(produces_peeked.iter())
+            .chain(produces_persistent.0.iter())
+            .chain(produces_consumed.0.iter())
+            .chain(produces_peeked.0.iter())
+            .cloned()
             .collect();
 
         // Then filter and clone only once for the final set
-        let produces_mergeable: BTreeSet<Produce> = all_produces_refs
-            .into_iter()
-            .filter(|p| mergeable_chs.contains_key(&p.channel_hash))
-            .map(|p| (*p).clone())
-            .collect();
+        let produces_mergeable = HashableSet(
+            all_produces
+                .into_iter()
+                .filter(|p| mergeable_chs.contains_key(&p.channel_hash))
+                .collect(),
+        );
 
         // Same approach for consumes
-        let all_consumes_refs: BTreeSet<&Consume> = consumes_linear_and_peeks
+        let all_consumes: HashSet<Consume> = consumes_linear_and_peeks
+            .0
             .iter()
-            .chain(consumes_persistent.iter())
-            .chain(consumes_produced.iter())
+            .chain(consumes_persistent.0.iter())
+            .chain(consumes_produced.0.iter())
+            .cloned()
             .collect();
 
-        let consumes_mergeable: BTreeSet<Consume> = all_consumes_refs
-            .into_iter()
-            .filter(|c| {
-                c.channel_hashes
-                    .iter()
-                    .any(|hash| mergeable_chs.contains_key(hash))
-            })
-            .map(|c| (*c).clone())
-            .collect();
+        let consumes_mergeable = HashableSet(
+            all_consumes
+                .into_iter()
+                .filter(|c| {
+                    c.channel_hashes
+                        .iter()
+                        .any(|hash| mergeable_chs.contains_key(hash))
+                })
+                .collect(),
+        );
 
         EventLogIndex {
             produces_linear,
@@ -212,76 +219,96 @@ impl EventLogIndex {
 
     pub fn empty() -> Self {
         EventLogIndex {
-            produces_linear: BTreeSet::new(),
-            produces_persistent: BTreeSet::new(),
-            produces_consumed: BTreeSet::new(),
-            produces_peeked: BTreeSet::new(),
-            produces_copied_by_peek: BTreeSet::new(),
-            produces_touching_base_joins: BTreeSet::new(),
-            consumes_linear_and_peeks: BTreeSet::new(),
-            consumes_persistent: BTreeSet::new(),
-            consumes_produced: BTreeSet::new(),
-            produces_mergeable: BTreeSet::new(),
-            consumes_mergeable: BTreeSet::new(),
+            produces_linear: HashableSet(HashSet::new()),
+            produces_persistent: HashableSet(HashSet::new()),
+            produces_consumed: HashableSet(HashSet::new()),
+            produces_peeked: HashableSet(HashSet::new()),
+            produces_copied_by_peek: HashableSet(HashSet::new()),
+            produces_touching_base_joins: HashableSet(HashSet::new()),
+            consumes_linear_and_peeks: HashableSet(HashSet::new()),
+            consumes_persistent: HashableSet(HashSet::new()),
+            consumes_produced: HashableSet(HashSet::new()),
+            produces_mergeable: HashableSet(HashSet::new()),
+            consumes_mergeable: HashableSet(HashSet::new()),
             number_channels_data: NumberChannelsDiff::new(),
         }
     }
 
     pub fn combine(x: Self, y: Self) -> Self {
         EventLogIndex {
-            produces_linear: x
-                .produces_linear
-                .union(&y.produces_linear)
-                .cloned()
-                .collect(),
-            produces_persistent: x
-                .produces_persistent
-                .union(&y.produces_persistent)
-                .cloned()
-                .collect(),
-            produces_consumed: x
-                .produces_consumed
-                .union(&y.produces_consumed)
-                .cloned()
-                .collect(),
-            produces_peeked: x
-                .produces_peeked
-                .union(&y.produces_peeked)
-                .cloned()
-                .collect(),
+            produces_linear: HashableSet(
+                x.produces_linear
+                    .0
+                    .union(&y.produces_linear.0)
+                    .cloned()
+                    .collect(),
+            ),
+            produces_persistent: HashableSet(
+                x.produces_persistent
+                    .0
+                    .union(&y.produces_persistent.0)
+                    .cloned()
+                    .collect(),
+            ),
+            produces_consumed: HashableSet(
+                x.produces_consumed
+                    .0
+                    .union(&y.produces_consumed.0)
+                    .cloned()
+                    .collect(),
+            ),
+            produces_peeked: HashableSet(
+                x.produces_peeked
+                    .0
+                    .union(&y.produces_peeked.0)
+                    .cloned()
+                    .collect(),
+            ),
             produces_copied_by_peek: combine_produces_copied_by_peek(&x, &y),
             //TODO this joins combination is very restrictive. Join might be originated inside aggregated event log - OLD
-            produces_touching_base_joins: x
-                .produces_touching_base_joins
-                .union(&y.produces_touching_base_joins)
-                .cloned()
-                .collect(),
-            consumes_linear_and_peeks: x
-                .consumes_linear_and_peeks
-                .union(&y.consumes_linear_and_peeks)
-                .cloned()
-                .collect(),
-            consumes_persistent: x
-                .consumes_persistent
-                .union(&y.consumes_persistent)
-                .cloned()
-                .collect(),
-            consumes_produced: x
-                .consumes_produced
-                .union(&y.consumes_produced)
-                .cloned()
-                .collect(),
+            produces_touching_base_joins: HashableSet(
+                x.produces_touching_base_joins
+                    .0
+                    .union(&y.produces_touching_base_joins.0)
+                    .cloned()
+                    .collect(),
+            ),
+            consumes_linear_and_peeks: HashableSet(
+                x.consumes_linear_and_peeks
+                    .0
+                    .union(&y.consumes_linear_and_peeks.0)
+                    .cloned()
+                    .collect(),
+            ),
+            consumes_persistent: HashableSet(
+                x.consumes_persistent
+                    .0
+                    .union(&y.consumes_persistent.0)
+                    .cloned()
+                    .collect(),
+            ),
+            consumes_produced: HashableSet(
+                x.consumes_produced
+                    .0
+                    .union(&y.consumes_produced.0)
+                    .cloned()
+                    .collect(),
+            ),
             // Combine mergeable produces and consumes
-            produces_mergeable: x
-                .produces_mergeable
-                .union(&y.produces_mergeable)
-                .cloned()
-                .collect(),
-            consumes_mergeable: x
-                .consumes_mergeable
-                .union(&y.consumes_mergeable)
-                .cloned()
-                .collect(),
+            produces_mergeable: HashableSet(
+                x.produces_mergeable
+                    .0
+                    .union(&y.produces_mergeable.0)
+                    .cloned()
+                    .collect(),
+            ),
+            consumes_mergeable: HashableSet(
+                x.consumes_mergeable
+                    .0
+                    .union(&y.consumes_mergeable.0)
+                    .cloned()
+                    .collect(),
+            ),
             // Merge number channels (add differences)
             number_channels_data: x
                 .number_channels_data

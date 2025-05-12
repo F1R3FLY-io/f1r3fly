@@ -1,7 +1,8 @@
 // See rspace/src/main/scala/coop/rchain/rspace/merger/MergingLogic.scala
 // See rspace/src/test/scala/coop/rchain/rspace/merging/MergingLogicSpec.scala
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use shared::rust::hashable_set::HashableSet;
 
 use crate::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
@@ -16,31 +17,43 @@ pub type NumberChannelsDiff = BTreeMap<Blake2b256Hash, i64>;
 
 /// If target depends on source.
 pub fn depends(target: &EventLogIndex, source: &EventLogIndex) -> bool {
-    let produces_source: BTreeSet<Produce> = produces_created_and_not_destroyed(source)
-        .difference(&source.produces_mergeable)
-        .cloned()
-        .collect();
+    let produces_source: HashableSet<Produce> = HashableSet(
+        produces_created_and_not_destroyed(source)
+            .0
+            .difference(&source.produces_mergeable.0)
+            .cloned()
+            .collect(),
+    );
 
-    let produces_target: BTreeSet<Produce> = target
-        .produces_consumed
-        .difference(&source.produces_mergeable)
-        .cloned()
-        .collect();
+    let produces_target: HashableSet<Produce> = HashableSet(
+        target
+            .produces_consumed
+            .0
+            .difference(&source.produces_mergeable.0)
+            .cloned()
+            .collect(),
+    );
 
     let consumes_source = consumes_created_and_not_destroyed(source);
     let consumes_target = &target.consumes_produced;
 
-    let produces_depends: BTreeSet<Produce> = produces_source
-        .intersection(&produces_target)
-        .cloned()
-        .collect();
+    let produces_depends: HashableSet<Produce> = HashableSet(
+        produces_source
+            .0
+            .intersection(&produces_target.0)
+            .cloned()
+            .collect(),
+    );
 
-    let consumes_depends: BTreeSet<Consume> = consumes_source
-        .intersection(consumes_target)
-        .cloned()
-        .collect();
+    let consumes_depends: HashableSet<Consume> = HashableSet(
+        consumes_source
+            .0
+            .intersection(&consumes_target.0)
+            .cloned()
+            .collect(),
+    );
 
-    !produces_depends.is_empty() || !consumes_depends.is_empty()
+    !produces_depends.0.is_empty() || !consumes_depends.0.is_empty()
 }
 
 /// If two event logs are conflicting.
@@ -59,34 +72,44 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
     //
     // If produces/consumes are mergeable in both indices, they are not considered as conflicts.
     let races_for_same_io_event = {
-        let shared_consumes: BTreeSet<Consume> = a
-            .consumes_produced
-            .intersection(&b.consumes_produced)
-            .cloned()
-            .collect();
-        let mergeable_consumes: BTreeSet<Consume> = a
-            .consumes_mergeable
-            .intersection(&b.consumes_mergeable)
-            .cloned()
-            .collect();
+        let shared_consumes: HashableSet<Consume> = HashableSet(
+            a.consumes_produced
+                .0
+                .intersection(&b.consumes_produced.0)
+                .cloned()
+                .collect(),
+        );
+        let mergeable_consumes: HashableSet<Consume> = HashableSet(
+            a.consumes_mergeable
+                .0
+                .intersection(&b.consumes_mergeable.0)
+                .cloned()
+                .collect(),
+        );
         let consume_races: Vec<Consume> = shared_consumes
-            .difference(&mergeable_consumes)
+            .0
+            .difference(&mergeable_consumes.0)
             .filter(|c| !c.persistent)
             .cloned()
             .collect();
 
-        let shared_produces: BTreeSet<Produce> = a
-            .produces_consumed
-            .intersection(&b.produces_consumed)
-            .cloned()
-            .collect();
-        let mergeable_produces: BTreeSet<Produce> = a
-            .produces_mergeable
-            .intersection(&b.produces_mergeable)
-            .cloned()
-            .collect();
+        let shared_produces: HashableSet<Produce> = HashableSet(
+            a.produces_consumed
+                .0
+                .intersection(&b.produces_consumed.0)
+                .cloned()
+                .collect(),
+        );
+        let mergeable_produces: HashableSet<Produce> = HashableSet(
+            a.produces_mergeable
+                .0
+                .intersection(&b.produces_mergeable.0)
+                .cloned()
+                .collect(),
+        );
         let produce_races: Vec<Produce> = shared_produces
-            .difference(&mergeable_produces)
+            .0
+            .difference(&mergeable_produces.0)
             .filter(|p| !p.persistent)
             .cloned()
             .collect();
@@ -115,8 +138,8 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
             let p = produces_created_and_not_destroyed(left);
             let c = consumes_created_and_not_destroyed(right);
             let mut result = Vec::new();
-            for produce in &p {
-                for consume in &c {
+            for produce in &p.0 {
+                for consume in &c.0 {
                     if match_found(consume, produce) {
                         result.push(produce.channel_hash.clone());
                     }
@@ -136,8 +159,9 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
         let mut result = Vec::new();
         for produce in a
             .produces_touching_base_joins
+            .0
             .iter()
-            .chain(b.produces_touching_base_joins.iter())
+            .chain(b.produces_touching_base_joins.0.iter())
         {
             result.push(produce.channel_hash.clone());
         }
@@ -153,123 +177,155 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
 }
 
 /// Produce created inside event log.
-pub fn produces_created(e: &EventLogIndex) -> BTreeSet<Produce> {
-    let mut result: BTreeSet<Produce> = e
+pub fn produces_created(e: &EventLogIndex) -> HashableSet<Produce> {
+    let mut result: HashSet<Produce> = e
         .produces_linear
-        .union(&e.produces_persistent)
+        .0
+        .union(&e.produces_persistent.0)
         .cloned()
         .collect();
 
-    for produce in &e.produces_copied_by_peek {
+    for produce in &e.produces_copied_by_peek.0 {
         result.remove(produce);
     }
-    result
+    HashableSet(result)
 }
 
 /// Consume created inside event log.
-pub fn consumes_created(e: &EventLogIndex) -> BTreeSet<Consume> {
-    e.consumes_linear_and_peeks
-        .union(&e.consumes_persistent)
-        .cloned()
-        .collect()
+pub fn consumes_created(e: &EventLogIndex) -> HashableSet<Consume> {
+    HashableSet(
+        e.consumes_linear_and_peeks
+            .0
+            .union(&e.consumes_persistent.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Produces that are created inside event log and not destroyed via COMM inside event log.
-pub fn produces_created_and_not_destroyed(e: &EventLogIndex) -> BTreeSet<Produce> {
-    let linear_not_consumed: BTreeSet<Produce> = e
+pub fn produces_created_and_not_destroyed(e: &EventLogIndex) -> HashableSet<Produce> {
+    let linear_not_consumed: HashSet<Produce> = e
         .produces_linear
-        .difference(&e.produces_consumed)
+        .0
+        .difference(&e.produces_consumed.0)
         .cloned()
         .collect();
-    let combined: BTreeSet<Produce> = linear_not_consumed
-        .union(&e.produces_persistent)
+    let combined: HashSet<Produce> = linear_not_consumed
+        .union(&e.produces_persistent.0)
         .cloned()
         .collect();
 
-    combined
-        .difference(&e.produces_copied_by_peek)
-        .cloned()
-        .collect()
+    HashableSet(
+        combined
+            .difference(&e.produces_copied_by_peek.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Consumes that are created inside event log and not destroyed via COMM inside event log.
-pub fn consumes_created_and_not_destroyed(e: &EventLogIndex) -> BTreeSet<Consume> {
-    let linear_not_produced: BTreeSet<Consume> = e
+pub fn consumes_created_and_not_destroyed(e: &EventLogIndex) -> HashableSet<Consume> {
+    let linear_not_produced: HashSet<Consume> = e
         .consumes_linear_and_peeks
-        .difference(&e.consumes_produced)
+        .0
+        .difference(&e.consumes_produced.0)
         .cloned()
         .collect();
-    linear_not_produced
-        .union(&e.consumes_persistent)
-        .cloned()
-        .collect()
+    HashableSet(
+        linear_not_produced
+            .union(&e.consumes_persistent.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Produces that are affected by event log - locally created + external destroyed.
-pub fn produces_affected(e: &EventLogIndex) -> BTreeSet<Produce> {
+pub fn produces_affected(e: &EventLogIndex) -> HashableSet<Produce> {
     let created = produces_created(e);
-    let external_produces_destroyed: BTreeSet<Produce> = e
-        .produces_consumed
-        .difference(&created)
-        .filter(|p| !p.persistent)
-        .cloned()
-        .collect();
+    let external_produces_destroyed: HashableSet<Produce> = HashableSet(
+        e.produces_consumed
+            .0
+            .difference(&created.0)
+            .filter(|p| !p.persistent)
+            .cloned()
+            .collect(),
+    );
 
-    produces_created_and_not_destroyed(e)
-        .union(&external_produces_destroyed)
-        .cloned()
-        .collect()
+    HashableSet(
+        produces_created_and_not_destroyed(e)
+            .0
+            .union(&external_produces_destroyed.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Consumes that are affected by event log - locally created + external destroyed.
-pub fn consumes_affected(e: &EventLogIndex) -> BTreeSet<Consume> {
+pub fn consumes_affected(e: &EventLogIndex) -> HashableSet<Consume> {
     let created = consumes_created(e);
-    let external_consumes_destroyed: BTreeSet<Consume> = e
-        .consumes_produced
-        .difference(&created)
-        .filter(|c| !c.persistent)
-        .cloned()
-        .collect();
+    let external_consumes_destroyed: HashableSet<Consume> = HashableSet(
+        e.consumes_produced
+            .0
+            .difference(&created.0)
+            .filter(|c| !c.persistent)
+            .cloned()
+            .collect(),
+    );
 
-    consumes_created_and_not_destroyed(e)
-        .union(&external_consumes_destroyed)
-        .cloned()
-        .collect()
+    HashableSet(
+        consumes_created_and_not_destroyed(e)
+            .0
+            .union(&external_consumes_destroyed.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// If produce is copied by peek in one index and originated in another - it is considered as created in aggregate.
-pub fn combine_produces_copied_by_peek(x: &EventLogIndex, y: &EventLogIndex) -> BTreeSet<Produce> {
-    let combined_copied_by_peek: BTreeSet<Produce> = x
-        .produces_copied_by_peek
-        .union(&y.produces_copied_by_peek)
-        .cloned()
-        .collect();
+pub fn combine_produces_copied_by_peek(
+    x: &EventLogIndex,
+    y: &EventLogIndex,
+) -> HashableSet<Produce> {
+    let combined_copied_by_peek: HashableSet<Produce> = HashableSet(
+        x.produces_copied_by_peek
+            .0
+            .union(&y.produces_copied_by_peek.0)
+            .cloned()
+            .collect(),
+    );
 
-    let combined_created: BTreeSet<Produce> = produces_created(x)
-        .union(&produces_created(y))
-        .cloned()
-        .collect();
+    let combined_created: HashableSet<Produce> = HashableSet(
+        produces_created(x)
+            .0
+            .union(&produces_created(y).0)
+            .cloned()
+            .collect(),
+    );
 
-    combined_copied_by_peek
-        .difference(&combined_created)
-        .cloned()
-        .collect()
+    HashableSet(
+        combined_copied_by_peek
+            .0
+            .difference(&combined_created.0)
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Arrange list[v] into map v -> Vec[v] for items that match predicate.
 /// NOTE: predicate here is forced to be non directional.
 /// If either (a,b) or (b,a) is true, both relations are recorded as true.
 /// TODO: adjust once dependency graph is implemented for branch computing - OLD
-pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone + Ord>(
-    items: &BTreeSet<A>,
+pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone>(
+    items: &HashableSet<A>,
     relation: impl Fn(&A, &A) -> bool,
-) -> BTreeMap<A, BTreeSet<A>> {
-    let mut init: BTreeMap<A, BTreeSet<A>> = items
+) -> HashMap<A, HashableSet<A>> {
+    let mut init: HashMap<A, HashableSet<A>> = items
+        .0
         .iter()
-        .map(|item| (item.clone(), BTreeSet::new()))
+        .map(|item| (item.clone(), HashableSet(HashSet::new())))
         .collect();
 
-    let items_vec: Vec<A> = items.iter().cloned().collect();
+    let items_vec: Vec<A> = items.0.iter().cloned().collect();
     for i in 0..items_vec.len() {
         for j in (i + 1)..items_vec.len() {
             let l = &items_vec[i];
@@ -277,10 +333,10 @@ pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone + Ord>(
 
             if relation(l, r) || relation(r, l) {
                 if let Some(l_set) = init.get_mut(l) {
-                    l_set.insert(r.clone());
+                    l_set.0.insert(r.clone());
                 }
                 if let Some(r_set) = init.get_mut(r) {
-                    r_set.insert(l.clone());
+                    r_set.0.insert(l.clone());
                 }
             }
         }
@@ -290,46 +346,47 @@ pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone + Ord>(
 }
 
 /// Given relation map, return sets of related items.
-pub fn gather_related_sets<A: Eq + std::hash::Hash + Clone + Ord>(
-    relation_map: &BTreeMap<A, BTreeSet<A>>,
-) -> Vec<BTreeSet<A>> {
-    fn add_relations<A: Eq + std::hash::Hash + Clone + Ord>(
-        to_add: &BTreeSet<A>,
-        acc: &BTreeSet<A>,
-        relation_map: &BTreeMap<A, BTreeSet<A>>,
-    ) -> BTreeSet<A> {
+pub fn gather_related_sets<A: Eq + std::hash::Hash + Clone>(
+    relation_map: &HashMap<A, HashableSet<A>>,
+) -> Vec<HashableSet<A>> {
+    fn add_relations<A: Eq + std::hash::Hash + Clone>(
+        to_add: &HashableSet<A>,
+        acc: &HashableSet<A>,
+        relation_map: &HashMap<A, HashableSet<A>>,
+    ) -> HashableSet<A> {
         // stop if all new dependencies are already in set
         let mut next = acc.clone();
-        for item in to_add {
-            next.insert(item.clone());
+        for item in &to_add.0 {
+            next.0.insert(item.clone());
         }
 
-        let stop = next.len() == acc.len();
+        let stop = next.0.len() == acc.0.len();
         if stop {
             acc.clone()
         } else {
-            let mut n = BTreeSet::new();
-            for v in to_add {
+            let mut n = HashSet::new();
+            for v in &to_add.0 {
                 if let Some(related) = relation_map.get(v) {
-                    for r in related {
+                    for r in &related.0 {
                         n.insert(r.clone());
                     }
                 }
             }
-            add_relations(&n, &next, relation_map)
+            add_relations(&HashableSet(n), &next, relation_map)
         }
     }
 
     let mut result = Vec::new();
     for k in relation_map.keys() {
         let related = relation_map.get(k).unwrap();
-        let mut start = BTreeSet::new();
+        let mut start = HashSet::new();
         start.insert(k.clone());
-        let set = add_relations(related, &start, relation_map);
+        let set = add_relations(&related, &HashableSet(start), relation_map);
 
         // Check if this set is already in result to avoid duplicates
-        if !result.iter().any(|existing_set: &BTreeSet<A>| {
-            existing_set.len() == set.len() && existing_set.iter().all(|item| set.contains(item))
+        if !result.iter().any(|existing_set: &HashableSet<A>| {
+            existing_set.0.len() == set.0.len()
+                && existing_set.0.iter().all(|item| set.0.contains(item))
         }) {
             result.push(set);
         }
@@ -339,46 +396,47 @@ pub fn gather_related_sets<A: Eq + std::hash::Hash + Clone + Ord>(
 }
 
 /// Compute related sets directly from items and relation
-pub fn compute_related_sets<A: Eq + std::hash::Hash + Clone + Ord>(
-    items: &BTreeSet<A>,
+pub fn compute_related_sets<A: Eq + std::hash::Hash + Clone>(
+    items: &HashableSet<A>,
     relation: impl Fn(&A, &A) -> bool,
-) -> Vec<BTreeSet<A>> {
+) -> Vec<HashableSet<A>> {
     let relation_map = compute_relation_map(items, relation);
     gather_related_sets(&relation_map)
 }
 
 /// Given conflicts map, output possible rejection options.
-pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone + Ord>(
-    conflict_map: &BTreeMap<A, BTreeSet<A>>,
-) -> Vec<BTreeSet<A>> {
+pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
+    conflict_map: &HashMap<A, HashableSet<A>>,
+) -> Vec<HashableSet<A>> {
     // Set of rejection paths with corresponding remaining conflicts map
     #[derive(Clone)]
-    struct RejectionOption<A: Eq + std::hash::Hash + Clone + Ord> {
-        rejected_so_far: BTreeSet<A>,
-        remaining_conflicts_map: BTreeMap<A, BTreeSet<A>>,
+    struct RejectionOption<A: Eq + std::hash::Hash + Clone> {
+        rejected_so_far: HashableSet<A>,
+        remaining_conflicts_map: HashMap<A, HashableSet<A>>,
     }
 
-    fn gather_rej_options<A: Eq + std::hash::Hash + Clone + Ord>(
-        conflicts_map: &BTreeMap<A, BTreeSet<A>>,
+    fn gather_rej_options<A: Eq + std::hash::Hash + Clone>(
+        conflicts_map: &HashMap<A, HashableSet<A>>,
     ) -> Vec<RejectionOption<A>> {
         let mut result = Vec::new();
 
         for (_, to_reject) in conflicts_map {
             // keeping each key - reject conflicting values
-            let mut remaining_conflicts_map = BTreeMap::new();
+            let mut remaining_conflicts_map = HashMap::new();
 
             for (key, conflicts) in conflicts_map {
-                if !to_reject.contains(key) {
+                if !to_reject.0.contains(key) {
                     // Filter out rejected items from conflicts
-                    let updated_conflicts: BTreeSet<A> = conflicts
+                    let updated_conflicts: HashSet<A> = conflicts
+                        .0
                         .iter()
-                        .filter(|c| !to_reject.contains(c))
+                        .filter(|c| !to_reject.0.contains(c))
                         .cloned()
                         .collect();
 
                     // Only include keys that still have conflicts
                     if !updated_conflicts.is_empty() {
-                        remaining_conflicts_map.insert(key.clone(), updated_conflicts);
+                        remaining_conflicts_map.insert(key.clone(), HashableSet(updated_conflicts));
                     }
                 }
             }
@@ -390,7 +448,7 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone + Ord>(
 
             // Only add if not already in result
             if !result.iter().any(|existing: &RejectionOption<A>| {
-                existing.rejected_so_far == option.rejected_so_far
+                existing.rejected_so_far.0 == option.rejected_so_far.0
             }) {
                 result.push(option);
             }
@@ -400,16 +458,16 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone + Ord>(
     }
 
     // Only keys that have conflicts associated should be examined
-    let mut conflicts_only_map = BTreeMap::new();
+    let mut conflicts_only_map = HashMap::new();
     for (key, conflicts) in conflict_map {
-        if !conflicts.is_empty() {
+        if !conflicts.0.is_empty() {
             conflicts_only_map.insert(key.clone(), conflicts.clone());
         }
     }
 
     // Start with rejecting nothing and full conflicts map
     let start = RejectionOption {
-        rejected_so_far: BTreeSet::new(),
+        rejected_so_far: HashableSet(HashSet::new()),
         remaining_conflicts_map: conflicts_only_map,
     };
 
@@ -423,11 +481,12 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone + Ord>(
             if option.remaining_conflicts_map.is_empty() {
                 // No more conflicts, this is a valid rejection option
                 // Only add if not already in result
-                if !result.iter().any(|existing_set: &BTreeSet<A>| {
-                    existing_set.len() == option.rejected_so_far.len()
+                if !result.iter().any(|existing_set: &HashableSet<A>| {
+                    existing_set.0.len() == option.rejected_so_far.0.len()
                         && existing_set
+                            .0
                             .iter()
-                            .all(|item| option.rejected_so_far.contains(item))
+                            .all(|item| option.rejected_so_far.0.contains(item))
                 }) {
                     result.push(option.rejected_so_far);
                 }
@@ -435,8 +494,8 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone + Ord>(
                 // Continue resolving conflicts
                 for mut new_option in gather_rej_options(&option.remaining_conflicts_map) {
                     // Add previously rejected items
-                    for item in &option.rejected_so_far {
-                        new_option.rejected_so_far.insert(item.clone());
+                    for item in &option.rejected_so_far.0 {
+                        new_option.rejected_so_far.0.insert(item.clone());
                     }
                     next.push(new_option);
                 }
@@ -457,108 +516,100 @@ mod tests {
     #[test]
     fn test_compute_rejection_options() {
         // Test 1
-        let mut map1: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
-        map1.insert(1, BTreeSet::from_iter(vec![2, 3, 4]));
-        map1.insert(2, BTreeSet::from_iter(vec![1]));
-        map1.insert(3, BTreeSet::from_iter(vec![1, 2]));
-        map1.insert(4, BTreeSet::from_iter(vec![1]));
+        let mut map1: HashMap<i32, HashableSet<i32>> = HashMap::new();
+        map1.insert(1, HashableSet(HashSet::from_iter(vec![2, 3, 4])));
+        map1.insert(2, HashableSet(HashSet::from_iter(vec![1])));
+        map1.insert(3, HashableSet(HashSet::from_iter(vec![1, 2])));
+        map1.insert(4, HashableSet(HashSet::from_iter(vec![1])));
 
         let result1 = compute_rejection_options(&map1);
         assert_eq!(result1.len(), 2);
         assert!(
             result1
                 .iter()
-                .any(|set| set.len() == 2 && set.contains(&1) && set.contains(&2))
+                .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&2))
         );
-        assert!(
-            result1.iter().any(|set| set.len() == 3
-                && set.contains(&2)
-                && set.contains(&3)
-                && set.contains(&4))
-        );
+        assert!(result1.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&2)
+            && set.0.contains(&3)
+            && set.0.contains(&4)));
 
         // Test 2
-        let mut map2: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
-        map2.insert(1, BTreeSet::from_iter(vec![2, 3, 4]));
-        map2.insert(2, BTreeSet::from_iter(vec![1, 3, 4]));
-        map2.insert(3, BTreeSet::from_iter(vec![1, 2, 4]));
-        map2.insert(4, BTreeSet::from_iter(vec![1, 2, 3]));
+        let mut map2: HashMap<i32, HashableSet<i32>> = HashMap::new();
+        map2.insert(1, HashableSet(HashSet::from_iter(vec![2, 3, 4])));
+        map2.insert(2, HashableSet(HashSet::from_iter(vec![1, 3, 4])));
+        map2.insert(3, HashableSet(HashSet::from_iter(vec![1, 2, 4])));
+        map2.insert(4, HashableSet(HashSet::from_iter(vec![1, 2, 3])));
 
         let result2 = compute_rejection_options(&map2);
         assert_eq!(result2.len(), 4);
-        assert!(
-            result2.iter().any(|set| set.len() == 3
-                && set.contains(&2)
-                && set.contains(&3)
-                && set.contains(&4))
-        );
-        assert!(
-            result2.iter().any(|set| set.len() == 3
-                && set.contains(&1)
-                && set.contains(&3)
-                && set.contains(&4))
-        );
-        assert!(
-            result2.iter().any(|set| set.len() == 3
-                && set.contains(&1)
-                && set.contains(&2)
-                && set.contains(&4))
-        );
-        assert!(
-            result2.iter().any(|set| set.len() == 3
-                && set.contains(&1)
-                && set.contains(&2)
-                && set.contains(&3))
-        );
+        assert!(result2.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&2)
+            && set.0.contains(&3)
+            && set.0.contains(&4)));
+        assert!(result2.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&1)
+            && set.0.contains(&3)
+            && set.0.contains(&4)));
+        assert!(result2.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&1)
+            && set.0.contains(&2)
+            && set.0.contains(&4)));
+        assert!(result2.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&1)
+            && set.0.contains(&2)
+            && set.0.contains(&3)));
 
         // Test 3
-        let mut map3: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
-        map3.insert(1, BTreeSet::from_iter(vec![2, 3, 4]));
-        map3.insert(2, BTreeSet::from_iter(vec![1]));
-        map3.insert(3, BTreeSet::from_iter(vec![1, 4]));
-        map3.insert(4, BTreeSet::from_iter(vec![1, 3]));
+        let mut map3: HashMap<i32, HashableSet<i32>> = HashMap::new();
+        map3.insert(1, HashableSet(HashSet::from_iter(vec![2, 3, 4])));
+        map3.insert(2, HashableSet(HashSet::from_iter(vec![1])));
+        map3.insert(3, HashableSet(HashSet::from_iter(vec![1, 4])));
+        map3.insert(4, HashableSet(HashSet::from_iter(vec![1, 3])));
 
         let result3 = compute_rejection_options(&map3);
         assert_eq!(result3.len(), 3);
+        assert!(result3.iter().any(|set| set.0.len() == 3
+            && set.0.contains(&2)
+            && set.0.contains(&3)
+            && set.0.contains(&4)));
         assert!(
-            result3.iter().any(|set| set.len() == 3
-                && set.contains(&2)
-                && set.contains(&3)
-                && set.contains(&4))
+            result3
+                .iter()
+                .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&3))
         );
         assert!(
             result3
                 .iter()
-                .any(|set| set.len() == 2 && set.contains(&1) && set.contains(&3))
-        );
-        assert!(
-            result3
-                .iter()
-                .any(|set| set.len() == 2 && set.contains(&1) && set.contains(&4))
+                .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&4))
         );
 
         // Test 4
-        let mut map4: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
-        map4.insert(1, BTreeSet::new());
-        map4.insert(2, BTreeSet::from_iter(vec![3]));
-        map4.insert(3, BTreeSet::from_iter(vec![2, 4]));
-        map4.insert(4, BTreeSet::from_iter(vec![3]));
+        let mut map4: HashMap<i32, HashableSet<i32>> = HashMap::new();
+        map4.insert(1, HashableSet(HashSet::new()));
+        map4.insert(2, HashableSet(HashSet::from_iter(vec![3])));
+        map4.insert(3, HashableSet(HashSet::from_iter(vec![2, 4])));
+        map4.insert(4, HashableSet(HashSet::from_iter(vec![3])));
 
         let result4 = compute_rejection_options(&map4);
         assert_eq!(result4.len(), 2);
-        assert!(result4.iter().any(|set| set.len() == 1 && set.contains(&3)));
         assert!(
             result4
                 .iter()
-                .any(|set| set.len() == 2 && set.contains(&2) && set.contains(&4))
+                .any(|set| set.0.len() == 1 && set.0.contains(&3))
+        );
+        assert!(
+            result4
+                .iter()
+                .any(|set| set.0.len() == 2 && set.0.contains(&2) && set.0.contains(&4))
         );
 
-        let all: BTreeSet<i32> = (1..=1000).collect();
-        let mut map5: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
+        let all: HashSet<i32> = (1..=1000).collect();
+        let mut map5: HashMap<i32, HashableSet<i32>> = HashMap::new();
         for i in 1..=1000 {
             let mut conflicts = all.clone();
             conflicts.remove(&i);
-            map5.insert(i, conflicts);
+            map5.insert(i, HashableSet(conflicts));
         }
 
         let result5 = compute_rejection_options(&map5);
@@ -567,9 +618,9 @@ mod tests {
             let mut expected = all.clone();
             expected.remove(&i);
             assert!(result5.iter().any(|set| {
-                set.len() == 999
-                    && !set.contains(&i)
-                    && (1..=1000).filter(|j| *j != i).all(|j| set.contains(&j))
+                set.0.len() == 999
+                    && !set.0.contains(&i)
+                    && (1..=1000).filter(|j| *j != i).all(|j| set.0.contains(&j))
             }));
         }
     }
@@ -577,7 +628,7 @@ mod tests {
     #[test]
     fn test_compute_related_sets() {
         // Test relation: numbers with the same parity (both odd or both even)
-        let items: BTreeSet<i32> = BTreeSet::from_iter(vec![1, 2, 3, 4, 5]);
+        let items: HashableSet<i32> = HashableSet(HashSet::from_iter(vec![1, 2, 3, 4, 5]));
         let same_parity = |a: &i32, b: &i32| a % 2 == b % 2;
 
         let result = compute_related_sets(&items, same_parity);
@@ -588,10 +639,10 @@ mod tests {
         let mut found_even = false;
 
         for set in result {
-            if set.len() == 3 && set.contains(&1) && set.contains(&3) && set.contains(&5) {
+            if set.0.len() == 3 && set.0.contains(&1) && set.0.contains(&3) && set.0.contains(&5) {
                 found_odd = true;
             }
-            if set.len() == 2 && set.contains(&2) && set.contains(&4) {
+            if set.0.len() == 2 && set.0.contains(&2) && set.0.contains(&4) {
                 found_even = true;
             }
         }
@@ -603,20 +654,20 @@ mod tests {
     #[test]
     fn test_relation_map() {
         // Test creating relation map for divisibility relationship
-        let items: BTreeSet<i32> = BTreeSet::from_iter(vec![2, 3, 4, 6, 12]);
+        let items: HashableSet<i32> = HashableSet(HashSet::from_iter(vec![2, 3, 4, 6, 12]));
         let is_divisible = |a: &i32, b: &i32| b % a == 0;
 
         let relation_map = compute_relation_map(&items, is_divisible);
 
         // Check a few key relationships
-        assert!(relation_map.get(&2).unwrap().contains(&4));
-        assert!(relation_map.get(&2).unwrap().contains(&6));
-        assert!(relation_map.get(&2).unwrap().contains(&12));
+        assert!(relation_map.get(&2).unwrap().0.contains(&4));
+        assert!(relation_map.get(&2).unwrap().0.contains(&6));
+        assert!(relation_map.get(&2).unwrap().0.contains(&12));
 
-        assert!(relation_map.get(&3).unwrap().contains(&6));
-        assert!(relation_map.get(&3).unwrap().contains(&12));
+        assert!(relation_map.get(&3).unwrap().0.contains(&6));
+        assert!(relation_map.get(&3).unwrap().0.contains(&12));
 
-        assert!(!relation_map.get(&3).unwrap().contains(&4));
-        assert!(!relation_map.get(&4).unwrap().contains(&6));
+        assert!(!relation_map.get(&3).unwrap().0.contains(&4));
+        assert!(!relation_map.get(&4).unwrap().0.contains(&6));
     }
 }
