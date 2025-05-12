@@ -1,4 +1,7 @@
-use crate::normal_forms::{self, EListBody, EMethodBody, ESetBody, ETupleBody, Expr, Par};
+use crate::normal_forms::{
+    self, EListBody, EMethodBody, ESetBody, ETupleBody, Expr, MyBitVec, Par,
+};
+use crate::sort_matcher::{ScoredTerm, Sorted};
 use crate::utils::{prepend_connective, prepend_expr};
 use bitvec::vec::BitVec;
 use models::rhoapi::connective::ConnectiveInstance;
@@ -31,8 +34,18 @@ use super::env::Env;
 use super::errors::InterpreterError;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/Substitute.scala
-pub trait SubstituteTrait<T> {
-    fn substitute(&self, term: T, depth: u32, env: &Env<Par>) -> T;
+
+pub trait SubstituteTrait<T>
+where
+    T: From<Sorted<T>>,
+{
+    fn substitute(&self, term: T, depth: u32, env: &Env<Par>) -> T {
+        let v = self.substitute_no_sort(term, depth, env);
+        let v = Self::sort_matcher(v.into());
+        v.term.into()
+    }
+
+    fn sort_matcher(value: T) -> ScoredTerm<T>;
 
     fn substitute_no_sort(&self, term: T, depth: u32, env: &Env<Par>) -> T;
 }
@@ -46,26 +59,24 @@ impl Substitute {
     pub fn substitute_and_charge<T>(&self, term: &T, depth: u32, env: &Env<Par>) -> T
     where
         Self: SubstituteTrait<T>,
-        T: Clone + prost::Message,
+        T: std::convert::From<Sorted<T>> + Clone + Default + prost::Message,
     {
         let substitute = self.substitute(term.clone(), depth, env);
         self.cost.charge(Cost::create_from_generic(
-            substitute.clone(),
+            &substitute,
             "substitution".to_string(),
         ));
         substitute
     }
 
-    pub fn substitute_no_sort_and_charge<T>(&self, term: &A, depth: u32, env: &Env<Par>) -> T
+    pub fn substitute_no_sort_and_charge<A, T>(&self, term: T, depth: u32, env: &Env<Par>) -> T
     where
         Self: SubstituteTrait<T>,
-        A: Clone + prost::Message,
+        T: std::convert::From<Sorted<T>> + Default + prost::Message,
     {
-        let subst_term = self.substitute_no_sort(term.clone(), depth, env);
-        self.cost.charge(Cost::create_from_generic(
-            subst_term.clone(),
-            "substitution".to_string(),
-        ));
+        let subst_term = self.substitute_no_sort(term, depth, env);
+        let amount = Cost::create_from_generic(&subst_term, "substitution".to_string());
+        self.cost.charge(amount);
         subst_term
     }
 
@@ -99,7 +110,7 @@ impl Substitute {
         env: &Env<Par>,
     ) -> Result<Either<EVar, Par>, InterpreterError> {
         match self.maybe_substitute_var(term.into(), depth, env)? {
-            Either::Left(v) => Ok(Either::Left(EVar { v: Some(v) })),
+            Either::Left(v) => Ok(Either::Left(EVar { v: Some(v.into()) })),
             Either::Right(p) => Ok(Either::Right(p)),
         }
     }
@@ -128,10 +139,11 @@ impl SubstituteTrait<normal_forms::Bundle> for Substitute {
         depth: u32,
         env: &Env<Par>,
     ) -> normal_forms::Bundle {
-        let sub_bundle = self.substitute(term.body.clone(), depth, env).into();
+        let term_body = term.body.clone();
+        let sub_bundle = self.substitute(term_body, depth, env);
         let term_clone = term.clone();
 
-        match single_bundle(&sub_bundle) {
+        match single_bundle(&sub_bundle.clone().into()) {
             None => {
                 let mut term_mut = term_clone;
                 term_mut.body = sub_bundle.into();
@@ -161,6 +173,10 @@ impl SubstituteTrait<normal_forms::Bundle> for Substitute {
             }
         }
     }
+
+    fn sort_matcher(_: normal_forms::Bundle) -> ScoredTerm<normal_forms::Bundle> {
+        unreachable!()
+    }
 }
 
 impl Substitute {
@@ -180,7 +196,7 @@ impl Substitute {
                     }
                 },
                 _ => self
-                    .substitute_no_sort(expr, depth, env)
+                    .substitute_no_sort(expr.into(), depth, env)
                     .map(|e| prepend_expr(par, e, depth)),
             })
     }
@@ -281,9 +297,9 @@ impl SubstituteTrait<Par> for Substitute {
     }
 
     fn substitute(&self, term: Par, depth: u32, env: &Env<Par>) -> Par {
-        self.substitute_no_sort(term, depth, env)
-            .map(|p| ParSortMatcher::sort_match(&p))
-            .map(|st| st.term)
+        let v = self.substitute_no_sort(term, depth, env);
+        let v = ParSortMatcher::sort_match(&(v.into()));
+        v.term.into()
     }
 }
 
@@ -301,110 +317,111 @@ impl SubstituteTrait<normal_forms::Send> for Substitute {
         let f = |p: &Par| self.substitute_no_sort(p.clone(), depth, env);
         let data = term.data.iter().map(f).collect();
 
-        let locally_free = set_bits_until(
-            term.locally_free.into_iter().map(|v| v as u8).collect(),
-            env.shift,
-        );
-        Send {
-            chan: Some(channels_sub),
+        let locally_free = set_bits_until(term.locally_free.into(), env.shift);
+        normal_forms::Send {
+            chan: channels_sub,
             data,
             persistent: term.persistent,
-            locally_free,
-            connective_used: term.connective_used,
-        }
-        .into()
-    }
-
-    fn substitute(&self, term: Send, depth: i32, env: &Env<Par>) -> Result<Send, InterpreterError> {
-        self.substitute_no_sort(term, depth, env)
-            .map(|s| SendSortMatcher::sort_match(&s))
-            .map(|st| st.term)
-    }
-}
-
-impl SubstituteTrait<normal_forms::Receive> for Substitute {
-    fn substitute_no_sort(&self, term: Receive, depth: u32, env: &Env<Par>) -> Receive {
-        let binds_sub = term
-            .binds
-            .into_iter()
-            .map(
-                |ReceiveBind {
-                     patterns,
-                     source,
-                     remainder,
-                     free_count,
-                 }| {
-                    let sub_channel =
-                        self.substitute_no_sort(unwrap_option_safe(source)?, depth, env)?;
-                    let sub_patterns = patterns
-                        .iter()
-                        .map(|p| self.substitute_no_sort(p.clone(), depth + 1, env))
-                        .collect::<Result<Vec<Par>, InterpreterError>>()?;
-
-                    Ok(ReceiveBind {
-                        patterns: sub_patterns,
-                        source: Some(sub_channel),
-                        remainder,
-                        free_count,
-                    })
-                },
-            )
-            .collect::<Result<Vec<ReceiveBind>, InterpreterError>>()?;
-
-        let body_sub = self.substitute_no_sort(
-            unwrap_option_safe(term.body)?,
-            depth,
-            &env.shift(term.bind_count),
-        )?;
-
-        normal_forms::Receive {
-            binds: binds_sub,
-            body: Some(body_sub),
-            persistent: term.persistent,
-            peek: term.peek,
-            bind_count: term.bind_count,
-            locally_free: set_bits_until(term.locally_free, env.shift),
+            locally_free: locally_free.into(),
             connective_used: term.connective_used,
         }
     }
 
     fn substitute(
         &self,
-        term: Receive,
+        term: normal_forms::Send,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<Receive, InterpreterError> {
-        self.substitute_no_sort(term, depth, env)
-            .map(|r| ReceiveSortMatcher::sort_match(&r))
-            .map(|st| st.term)
+    ) -> normal_forms::Send {
+        let v = self.substitute_no_sort(term, depth, env);
+        let v = SendSortMatcher::sort_match(&(v.into()));
+        v.term.into()
+    }
+}
+
+impl SubstituteTrait<normal_forms::Receive> for Substitute {
+    fn substitute_no_sort(
+        &self,
+        term: normal_forms::Receive,
+        depth: u32,
+        env: &Env<normal_forms::Par>,
+    ) -> normal_forms::Receive {
+        let binds_sub = term
+            .binds
+            .into_iter()
+            .map(
+                |normal_forms::ReceiveBind {
+                     patterns,
+                     source,
+                     remainder,
+                     free_count,
+                 }| {
+                    let source = self.substitute_no_sort(source, depth, env);
+                    let patterns = patterns
+                        .into_iter()
+                        .map(|p| self.substitute_no_sort(p, depth + 1, env))
+                        .collect::<Vec<normal_forms::Par>>();
+
+                    normal_forms::ReceiveBind {
+                        patterns,
+                        source,
+                        remainder: remainder.map(Into::into),
+                        free_count: free_count as u32,
+                    }
+                },
+            )
+            .collect::<Vec<normal_forms::ReceiveBind>>();
+
+        let body_sub = self.substitute_no_sort(term.body, depth, &env.shift(term.bind_count));
+
+        normal_forms::Receive {
+            binds: binds_sub.into_iter().map(Into::into).collect(),
+            body: body_sub,
+            persistent: term.persistent,
+            peek: term.peek,
+            bind_count: term.bind_count,
+            locally_free: set_bits_until(term.locally_free.into(), env.shift).into(),
+            connective_used: term.connective_used,
+        }
+    }
+
+    fn substitute(
+        &self,
+        term: normal_forms::Receive,
+        depth: u32,
+        env: &Env<Par>,
+    ) -> normal_forms::Receive {
+        let value = self.substitute_no_sort(term, depth, env);
+        let value = ReceiveSortMatcher::sort_match(&value.into());
+
+        value.term.into()
     }
 }
 
 impl SubstituteTrait<normal_forms::New> for Substitute {
     fn substitute_no_sort(
         &self,
-        term: New,
+        term: normal_forms::New,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<New, InterpreterError> {
-        self.substitute_no_sort(
-            unwrap_option_safe(term.p)?,
-            depth,
-            &env.shift(term.bind_count),
-        )
-        .map(|new_sub| New {
+    ) -> normal_forms::New {
+        let env = &env.shift(term.bind_count);
+        let par = self.substitute_no_sort(term.p, depth, env);
+        let locally_free = set_bits_until(term.locally_free.into(), env.shift.into()).into();
+
+        normal_forms::New {
             bind_count: term.bind_count,
-            p: Some(new_sub),
-            uri: term.uri,
+            p: par,
+            uris: term.uris,
             injections: term.injections,
-            locally_free: set_bits_until(term.locally_free, env.shift),
-        })
+            locally_free,
+        }
     }
 
-    fn substitute(&self, term: New, depth: i32, env: &Env<Par>) -> Result<New, InterpreterError> {
-        self.substitute_no_sort(term, depth, env)
-            .map(|n| NewSortMatcher::sort_match(&n))
-            .map(|st| st.term)
+    fn substitute(&self, term: normal_forms::New, depth: u32, env: &Env<Par>) -> normal_forms::New {
+        let v = self.substitute_no_sort(term, depth, env);
+        let v = NewSortMatcher::sort_match(&v.into());
+        v.term.into()
     }
 }
 
@@ -446,7 +463,7 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
             target: target_sub,
             cases,
             locally_free,
-            connective_used: term.connective_used,
+            ..term
         }
     }
 
@@ -456,9 +473,10 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
         depth: u32,
         env: &Env<Par>,
     ) -> normal_forms::Match {
-        self.substitute_no_sort(term, depth, env)
-            .map(|m| MatchSortMatcher::sort_match(&m))
-            .map(|st| st.term)
+        let value = self.substitute_no_sort(term, depth, env);
+        let value = value.into();
+        let value = MatchSortMatcher::sort_match(&value);
+        value.term.into()
     }
 }
 
@@ -661,16 +679,18 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                     .sorted_list
                     .into_iter()
                     .map(|(p1, p2)| {
-                        let p1: Par = p1.into();
-                        let p2 = p2.into();
-                        let p1 = self.substitute(p1, depth, env);
-                        let p2 = self.substitute(p2, depth, env);
+                        let p1 = self.substitute(p1.into(), depth, env);
+                        let p2 = self.substitute(p2.into(), depth, env);
                         (p1, p2)
                     })
                     .collect::<Vec<(Par, Par)>>();
 
                 let emap_body = ParMapTypeMapper::par_map_to_emap(ParMap {
-                    ps: SortedParMap::create_from_vec(ps),
+                    ps: SortedParMap::create_from_vec(
+                        ps.into_iter()
+                            .map(|(p1, p2)| (p1.into(), p2.into()))
+                            .collect(),
+                    ),
                     connective_used: par_map.connective_used,
                     locally_free: set_bits_until(par_map.locally_free, env.shift),
                     remainder: par_map.remainder,
@@ -687,17 +707,17 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                 locally_free,
                 connective_used,
             }) => {
-                let sub_target = self.substitute(unwrap_option_safe(target)?, depth, env)?;
+                let sub_target = self.substitute(target, depth, env);
                 let sub_arguments = arguments
                     .iter()
                     .map(|p| self.substitute(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .collect::<Vec<Par>>();
 
                 normal_forms::Expr::EMethod(normal_forms::EMethodBody {
                     method_name,
-                    target: Some(sub_target),
+                    target: sub_target,
                     arguments: sub_arguments,
-                    locally_free: set_bits_until(locally_free, env.shift),
+                    locally_free: set_bits_until(locally_free.into(), env.shift).into(),
                     connective_used,
                 })
             }
@@ -846,7 +866,8 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                     env.shift,
                 );
 
-                let locally_free = BitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
+                let locally_free =
+                    MyBitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
 
                 Expr::EList(normal_forms::EListBody {
                     ps,
@@ -871,7 +892,8 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                     env.shift,
                 );
 
-                let locally_free = BitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
+                let locally_free =
+                    MyBitVec::from_iter(locally_free.into_iter().map(|v| v as usize));
 
                 Expr::ETuple(ETupleBody {
                     ps,
@@ -881,11 +903,7 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
             }
 
             Expr::ESet(eset) => {
-                let ps = eset
-                    .ps
-                    .into_iter()
-                    .map(|p| self.substitute(p, depth, env))
-                    .collect();
+                let ps = eset.ps.into_iter().map(|p| self.substitute(p, depth, env));
 
                 let iter = set_bits_until(
                     eset.locally_free
@@ -899,7 +917,7 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                 .map(|v| v as usize)
                 .collect();
 
-                let locally_free = BitVec::from_iter::<Vec<usize>>(iter);
+                let locally_free = MyBitVec::from_iter::<Vec<usize>>(iter);
                 let ps =
                     SortedParHashSet::create_from_vec(ps.into_iter().map(Into::into).collect())
                         .ps
@@ -922,14 +940,17 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                     .sorted_list
                     .into_iter()
                     .map(|(p1, p2)| {
-                        let p1 = self.substitute(p1.into(), depth, env).into();
-                        let p2 = self.substitute(p2.into(), depth, env).into();
+                        let p1 = self.substitute(p1, depth, env);
+                        let p2 = self.substitute(p2, depth, env);
                         (p1, p2)
                     })
-                    .collect();
+                    .map(|(p1, p2)| (p1.into(), p2.into()))
+                    .collect::<Vec<(_, _)>>();
+
+                let ps = SortedParMap::create_from_vec(ps);
 
                 let emap_body = ParMapTypeMapper::par_map_to_emap(ParMap {
-                    ps: SortedParMap::create_from_vec(ps),
+                    ps,
                     connective_used: par_map.connective_used,
                     locally_free: set_bits_until(par_map.locally_free, env.shift),
                     remainder: par_map.remainder,

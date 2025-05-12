@@ -21,6 +21,12 @@ impl<T> ScoredTerm<T> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Sorted<T>(T);
 
+impl From<Sorted<Par>> for Par {
+    fn from(value: Sorted<Par>) -> Self {
+        value.0
+    }
+}
+
 impl From<Par> for Sorted<Par> {
     fn from(par: Par) -> Self {
         Sorted(par)

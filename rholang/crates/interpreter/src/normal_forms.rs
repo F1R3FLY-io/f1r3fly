@@ -9,6 +9,8 @@ use models::rhoapi::{
 };
 use prost::Message;
 
+use crate::sort_matcher::Sorted;
+
 use super::{sort_matcher::Sortable, sorter::*};
 
 pub const GUNFORGEABLE_SIZE: usize = 32;
@@ -653,6 +655,17 @@ pub struct Match {
     pub cases: Vec<MatchCase>,
     pub locally_free: MyBitVec,
     pub connective_used: bool,
+}
+
+impl From<Match> for models::rhoapi::Match {
+    fn from(value: Match) -> Self {
+        Self {
+            target: Some(value.target.into()),
+            cases: value.cases.into_iter().map(Into::into).collect(),
+            locally_free: value.locally_free.into(),
+            connective_used: value.connective_used,
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
