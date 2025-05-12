@@ -704,6 +704,16 @@ impl From<Vec<u8>> for MyBitVec {
     }
 }
 
+impl<T, O> AsRef<BitSlice<T, O>> for MyBitVec<T, O>
+where
+    T: bitvec::store::BitStore,
+    O: bitvec::order::BitOrder,
+{
+    fn as_ref(&self) -> &BitSlice<T, O> {
+        self.0.as_bitslice()
+    }
+}
+
 impl From<models::rhoapi::Match> for Match {
     fn from(value: models::rhoapi::Match) -> Self {
         Match {
@@ -1539,25 +1549,25 @@ pub(crate) fn union_inplace(this: &mut MyBitVec, that: &BitSlice) {
 }
 
 #[inline]
-pub(crate) fn union(this: impl AsRef<BitSlice>, that: impl AsRef<BitSlice>) -> BitVec {
+pub(crate) fn union(this: impl AsRef<BitSlice>, that: impl AsRef<BitSlice>) -> MyBitVec {
     let this_slice = this.as_ref();
     if this_slice.is_empty() {
         let that_slice = that.as_ref();
         if that_slice.is_empty() {
-            return BitVec::new();
+            return BitVec::new().into();
         }
-        return BitVec::from_bitslice(that_slice);
+        return BitVec::from_bitslice(that_slice).into();
     }
     let mut result = BitVec::from_bitslice(this_slice);
     result |= that.as_ref();
-    return result;
+    result.into()
 }
 
 #[inline]
 fn single_bit(pos: usize) -> MyBitVec {
-    let mut res = MyBitVec::repeat(false, pos + 1);
+    let mut res = BitVec::repeat(false, pos + 1);
     res.set(pos, true);
-    res
+    res.into()
 }
 
 #[inline]
