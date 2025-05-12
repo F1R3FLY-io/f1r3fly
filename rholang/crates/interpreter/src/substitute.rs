@@ -262,26 +262,22 @@ impl SubstituteTrait<Par> for Substitute {
             .iter()
             .map(|m| self.substitute_no_sort(m.clone(), depth, env))
             .map(Into::into)
-            .collect::<Vec<Match>>();
+            .collect::<Vec<normal_forms::Match>>();
 
-        Ok(concatenate_pars(
-            exprs,
-            concatenate_pars(
-                connectives,
-                Par {
-                    sends,
-                    receives,
-                    news,
-                    exprs: Vec::new(),
-                    matches,
-                    unforgeables: term.unforgeables,
-                    bundles,
-                    connectives: Vec::new(),
-                    locally_free: { set_bits_until(term.locally_free, env.shift) },
-                    connective_used: term.connective_used,
-                },
-            ),
-        ))
+        let right = Par {
+            sends,
+            receives,
+            news,
+            exprs: Vec::new(),
+            matches,
+            unforgeables: term.unforgeables,
+            bundles,
+            connectives: Vec::new(),
+            locally_free: { set_bits_until(term.locally_free, env.shift) },
+            connective_used: term.connective_used,
+        };
+        let right = concatenate_pars(connectives, right);
+        concatenate_pars(exprs, right)
     }
 
     fn substitute(&self, term: Par, depth: u32, env: &Env<Par>) -> Par {
@@ -431,23 +427,23 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
                      free_count,
                  }| {
                     let par =
-                        self.substitute_no_sort(source.clone(), depth, &env.shift(*free_count))?;
+                        self.substitute_no_sort(source.clone(), depth, &env.shift(*free_count));
 
-                    let sub_case = self.substitute_no_sort(pattern.clone(), depth + 1, env)?;
+                    let sub_case = self.substitute_no_sort(pattern.clone(), depth + 1, env);
 
-                    Ok(normal_forms::MatchCase {
-                        pattern: Some(sub_case),
-                        source: Some(par),
+                    normal_forms::MatchCase {
+                        pattern: sub_case,
+                        source: par,
                         free_count: *free_count,
-                    })
+                    }
                 },
             )
-            .collect::<Result<Vec<MatchCase>, InterpreterError>>()?;
+            .collect::<Vec<normal_forms::MatchCase>>();
 
         let locally_free = set_bits_until(term.locally_free, env.shift);
 
         normal_forms::Match {
-            target: Some(target_sub),
+            target: target_sub,
             cases,
             locally_free,
             connective_used: term.connective_used,

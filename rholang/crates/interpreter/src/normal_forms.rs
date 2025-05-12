@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::BTreeMap};
+use std::{cmp::Ordering, collections::BTreeMap, ops::Deref};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
@@ -58,7 +58,7 @@ impl<const N: usize> From<Par<N>> for models::rhoapi::Par {
                 .map(|v| models::rhoapi::Match {
                     target: Some(v.target.into()),
                     cases: v.cases.into_iter().map(Into::into).collect(),
-                    locally_free: v.locally_free.into_iter().map(Into::into).collect(),
+                    locally_free: v.locally_free.into(),
                     connective_used: v.connective_used,
                 })
                 .collect(),
@@ -651,8 +651,40 @@ impl From<MatchCase> for models::rhoapi::MatchCase {
 pub struct Match {
     pub target: Par,
     pub cases: Vec<MatchCase>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+struct MyBitVec<T = usize, O = Lsb0>(BitVec<T, O>)
+where
+    T: bitvec::store::BitStore,
+    O: bitvec::order::BitOrder;
+
+impl Deref for MyBitVec {
+    type Target = BitVec;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<MyBitVec> for Vec<u8> {
+    fn from(value: MyBitVec) -> Self {
+        value.iter().map(|v| *v as u8).collect()
+    }
+}
+
+impl FromIterator<usize> for MyBitVec {
+    fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
+        iter.into_iter().collect()
+    }
+}
+
+impl From<Vec<u8>> for MyBitVec {
+    fn from(value: Vec<u8>) -> Self {
+        value.into_iter().map(|v| v as usize).collect()
+    }
 }
 
 impl From<models::rhoapi::Match> for Match {
@@ -668,9 +700,7 @@ impl From<models::rhoapi::Match> for Match {
                     free_count: case.free_count as u32,
                 })
                 .collect(),
-            locally_free: BitVec::<usize, _>::from_iter(
-                value.locally_free.into_iter().map(|x| x as usize),
-            ),
+            locally_free: value.locally_free.into(),
             connective_used: value.connective_used,
         }
     }
