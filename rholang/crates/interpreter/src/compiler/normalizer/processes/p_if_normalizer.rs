@@ -144,7 +144,7 @@ mod tests {
                                     free_count: 0,
                                 },
                             ],
-                            locally_free: BitVec::EMPTY,
+                            locally_free: BitVec::EMPTY.into(),
                             connective_used: false,
                         }],
                         ..Default::default()
@@ -187,7 +187,7 @@ mod tests {
                                     free_count: 0,
                                 },
                             ],
-                            locally_free: BitVec::EMPTY,
+                            locally_free: BitVec::EMPTY.into(),
                             connective_used: false,
                         }],
                         exprs: vec![Expr::GInt(7)],
@@ -266,14 +266,14 @@ mod tests {
                                                 sends: vec![Send {
                                                     chan: Par::bound_var(0),
                                                     data: vec![Par::gint(47)],
-                                                    locally_free: bitvec![1],
+                                                    locally_free: bitvec![1].into(),
                                                     ..Default::default()
                                                 }],
-                                                locally_free: bitvec![1],
+                                                locally_free: bitvec![1].into(),
                                                 ..Default::default()
                                             },
                                             uris: vec![],
-                                            locally_free: BitVec::EMPTY,
+                                            locally_free: BitVec::EMPTY.into(),
                                         }],
                                         ..Default::default()
                                     },
@@ -288,21 +288,21 @@ mod tests {
                                                 sends: vec![Send {
                                                     chan: Par::bound_var(0),
                                                     data: vec![Par::gint(47)],
-                                                    locally_free: bitvec![1],
+                                                    locally_free: bitvec![1].into(),
                                                     ..Default::default()
                                                 }],
-                                                locally_free: bitvec![1],
+                                                locally_free: bitvec![1].into(),
                                                 ..Default::default()
                                             },
                                             uris: vec![],
-                                            locally_free: BitVec::EMPTY,
+                                            locally_free: BitVec::EMPTY.into(),
                                         }],
                                         ..Default::default()
                                     },
                                     free_count: 0,
                                 },
                             ],
-                            locally_free: BitVec::EMPTY,
+                            locally_free: BitVec::EMPTY.into(),
                             connective_used: false,
                         }],
                         exprs: vec![Expr::GInt(7)],

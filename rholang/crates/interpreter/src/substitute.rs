@@ -965,15 +965,13 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                         .map(|v| v as u8)
                         .collect(),
                     env.shift,
-                )
-                .into_iter()
-                .map(|v| v as usize);
+                );
 
                 Expr::EMethod(normal_forms::EMethodBody {
                     method_name,
                     target,
                     arguments,
-                    locally_free: BitVec::from_iter(locally_free),
+                    locally_free: locally_free.into(),
                     connective_used,
                 })
             }

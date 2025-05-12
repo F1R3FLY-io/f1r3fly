@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::BTreeMap, ops::Deref};
+use std::{cmp::Ordering, collections::BTreeMap, ops::Deref, ops::DerefMut};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
@@ -24,7 +24,7 @@ pub struct Par<const N: usize = GUNFORGEABLE_SIZE> {
     pub unforgeables: Vec<GUnforgeable<N>>,
     pub bundles: Vec<Bundle>,
     pub connectives: Vec<Connective>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
 }
 
@@ -39,7 +39,7 @@ impl<const N: usize> Default for Par<N> {
             unforgeables: Vec::new(),
             bundles: Vec::new(),
             connectives: Vec::new(),
-            locally_free: BitVec::EMPTY,
+            locally_free: BitVec::EMPTY.into(),
             connective_used: false,
         }
     }
@@ -65,7 +65,7 @@ impl<const N: usize> From<Par<N>> for models::rhoapi::Par {
             unforgeables: value.unforgeables.into_iter().map(|v| v.into()).collect(),
             bundles: value.bundles.into_iter().map(Into::into).collect(),
             connectives: value.connectives.into_iter().map(Into::into).collect(),
-            locally_free: value.locally_free.into_iter().map(Into::into).collect(),
+            locally_free: value.locally_free.into(),
             connective_used: value.connective_used,
         }
     }
@@ -282,7 +282,7 @@ impl<const N: usize> From<models::rhoapi::Par> for Par<N> {
             unforgeables: par.unforgeables.into_iter().map(Into::into).collect(),
             bundles: par.bundles.into_iter().map(Into::into).collect(),
             connectives: par.connectives.into_iter().map(Into::into).collect(),
-            locally_free: BitVec::<usize, _>::from_iter(
+            locally_free: MyBitVec::<usize, _>::from_iter(
                 par.locally_free.into_iter().map(|v| v as usize),
             ),
             connective_used: par.connective_used.into(),
@@ -367,10 +367,10 @@ impl Var {
         }
     }
 
-    pub fn locally_free(&self, depth: u32) -> BitVec {
+    pub fn locally_free(&self, depth: u32) -> MyBitVec {
         match self {
             Var::BoundVar(index) if depth == 0 => single_bit(*index as usize),
-            _ => BitVec::EMPTY,
+            _ => BitVec::EMPTY.into(),
         }
     }
 }
@@ -437,7 +437,7 @@ pub struct Send {
     pub chan: Par,
     pub data: Vec<Par>,
     pub persistent: bool,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
 }
 
@@ -447,7 +447,7 @@ impl From<Send> for models::rhoapi::Send {
             chan: Some(send.chan.into()),
             data: send.data.into_iter().map(Into::into).collect(),
             persistent: send.persistent,
-            locally_free: send.locally_free.into_iter().map(|v| v as u8).collect(),
+            locally_free: send.locally_free.into(),
             connective_used: send.connective_used.into(),
         }
     }
@@ -459,7 +459,7 @@ impl From<models::rhoapi::Send> for Send {
             chan: send.chan.map(Into::into).unwrap(),
             data: send.data.into_iter().map(Into::into).collect(),
             persistent: send.persistent,
-            locally_free: BitVec::<_, Lsb0>::from_iter(
+            locally_free: MyBitVec::<_, Lsb0>::from_iter(
                 send.locally_free.into_iter().map(|v| v as usize),
             ),
             connective_used: send.connective_used.into(),
@@ -503,7 +503,7 @@ pub struct Receive {
     pub persistent: bool,
     pub peek: bool,
     pub bind_count: u32,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
 }
 
@@ -515,7 +515,7 @@ impl From<Receive> for models::rhoapi::Receive {
             persistent: value.persistent,
             peek: value.peek,
             bind_count: value.bind_count as i32,
-            locally_free: value.locally_free.into_iter().map(|v| v as u8).collect(),
+            locally_free: value.locally_free.into(),
             connective_used: value.connective_used,
         }
     }
@@ -551,7 +551,7 @@ impl From<models::rhoapi::Receive> for Receive {
             persistent: receive.persistent,
             peek: receive.peek,
             bind_count: receive.bind_count as u32,
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 receive
                     .locally_free
                     .into_iter()
@@ -584,7 +584,7 @@ pub struct New {
     /// For normalization, uri-referenced variables come at the end, and in
     /// lexicographical order.
     pub uris: Vec<String>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub injections: BTreeMap<String, Par>,
 }
 
@@ -594,7 +594,7 @@ impl From<New> for models::rhoapi::New {
             bind_count: value.bind_count as i32,
             p: Some(value.p.into()),
             uri: value.uris,
-            locally_free: value.locally_free.into_iter().map(|v| v as u8).collect(),
+            locally_free: value.locally_free.into(),
             injections: value
                 .injections
                 .into_iter()
@@ -610,7 +610,7 @@ impl From<models::rhoapi::New> for New {
             bind_count: new.bind_count as u32,
             p: new.p.map(Into::into).unwrap(),
             uris: new.uri,
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 new.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
             injections: new
@@ -656,16 +656,33 @@ pub struct Match {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-struct MyBitVec<T = usize, O = Lsb0>(BitVec<T, O>)
+pub(crate) struct MyBitVec<T = usize, O = Lsb0>(BitVec<T, O>)
 where
     T: bitvec::store::BitStore,
     O: bitvec::order::BitOrder;
+impl MyBitVec {
+    pub(crate) fn from_vec(locally_free: _) -> MyBitVec {
+        Self(BitVec::from_vec(locally_free))
+    }
+}
+
+impl From<BitVec> for MyBitVec {
+    fn from(value: BitVec) -> Self {
+        Self(value)
+    }
+}
 
 impl Deref for MyBitVec {
     type Target = BitVec;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for MyBitVec {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -915,11 +932,7 @@ impl From<Expr> for models::rhoapi::Expr {
             }),
             Expr::EList(elist_body) => EListBody(models::rhoapi::EList {
                 ps: elist_body.ps.into_iter().map(Into::into).collect(),
-                locally_free: elist_body
-                    .locally_free
-                    .into_iter()
-                    .map(|v| v as u8)
-                    .collect(),
+                locally_free: elist_body.locally_free.into(),
                 connective_used: elist_body.connective_used,
                 remainder: elist_body.remainder.map(|var| match var {
                     Var::BoundVar(idx) => models::rhoapi::Var {
@@ -937,20 +950,12 @@ impl From<Expr> for models::rhoapi::Expr {
             }),
             Expr::ETuple(etuple_body) => ETupleBody(models::rhoapi::ETuple {
                 ps: etuple_body.ps.into_iter().map(Into::into).collect(),
-                locally_free: etuple_body
-                    .locally_free
-                    .into_iter()
-                    .map(|v| v as u8)
-                    .collect(),
+                locally_free: etuple_body.locally_free.into(),
                 connective_used: etuple_body.connective_used,
             }),
             Expr::ESet(eset_body) => ESetBody(models::rhoapi::ESet {
                 ps: eset_body.ps.into_iter().map(Into::into).collect(),
-                locally_free: eset_body
-                    .locally_free
-                    .into_iter()
-                    .map(|v| v as u8)
-                    .collect(),
+                locally_free: eset_body.locally_free.into(),
                 connective_used: eset_body.connective_used,
                 remainder: eset_body.remainder.map(|var| match var {
                     Var::BoundVar(idx) => models::rhoapi::Var {
@@ -975,11 +980,7 @@ impl From<Expr> for models::rhoapi::Expr {
                         value: Some(v.into()),
                     })
                     .collect(),
-                locally_free: emap_body
-                    .locally_free
-                    .into_iter()
-                    .map(|v| v as u8)
-                    .collect(),
+                locally_free: emap_body.locally_free.into(),
                 connective_used: emap_body.connective_used,
                 remainder: emap_body.remainder.map(|var| match var {
                     Var::BoundVar(idx) => models::rhoapi::Var {
@@ -999,11 +1000,7 @@ impl From<Expr> for models::rhoapi::Expr {
                 method_name: emethod_body.method_name,
                 target: Some(emethod_body.target.into()),
                 arguments: emethod_body.arguments.into_iter().map(Into::into).collect(),
-                locally_free: emethod_body
-                    .locally_free
-                    .into_iter()
-                    .map(|v| v as u8)
-                    .collect(),
+                locally_free: emethod_body.locally_free.into(),
                 connective_used: emethod_body.connective_used,
             }),
             Expr::EMatches(ematches_body) => EMatchesBody(models::rhoapi::EMatches {
@@ -1037,7 +1034,7 @@ impl From<Expr> for models::rhoapi::Expr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub(crate) struct ElistBody {
     pub ps: Vec<Par>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
 }
@@ -1046,7 +1043,7 @@ impl From<models::rhoapi::EList> for EListBody {
     fn from(body: models::rhoapi::EList) -> Self {
         Self {
             ps: body.ps.into_iter().map(Into::into).collect(),
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 body.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
             connective_used: body.connective_used,
@@ -1066,7 +1063,7 @@ impl Sortable for Expr {
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EListBody {
     pub ps: Vec<Par>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
 }
@@ -1074,7 +1071,7 @@ pub struct EListBody {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ETupleBody {
     pub ps: Vec<Par>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
 }
 
@@ -1082,7 +1079,7 @@ impl From<models::rhoapi::ETuple> for ETupleBody {
     fn from(tuple: models::rhoapi::ETuple) -> Self {
         ETupleBody {
             ps: tuple.ps.into_iter().map(Into::into).collect(),
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 tuple.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
             connective_used: tuple.connective_used,
@@ -1093,7 +1090,7 @@ impl From<models::rhoapi::ETuple> for ETupleBody {
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct ESetBody {
     pub ps: Vec<Par>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
 }
@@ -1102,7 +1099,7 @@ impl From<models::rhoapi::ESet> for ESetBody {
     fn from(set: models::rhoapi::ESet) -> Self {
         ESetBody {
             ps: set.ps.into_iter().map(Into::into).collect::<Vec<Par>>(),
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 set.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
             connective_used: set.connective_used,
@@ -1114,7 +1111,7 @@ impl From<models::rhoapi::ESet> for ESetBody {
 #[derive(Debug, PartialEq, Eq, Clone, Default, Hash)]
 pub struct EMapBody {
     pub ps: Vec<(Par, Par)>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
     pub remainder: Option<Var>,
 }
@@ -1132,7 +1129,7 @@ impl From<models::rhoapi::EMap> for EMapBody {
                     )
                 })
                 .collect::<Vec<(Par, Par)>>(),
-            locally_free: BitVec::<usize, _>::from_vec(
+            locally_free: MyBitVec::<usize, _>::from_vec(
                 map.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
             connective_used: map.connective_used,
@@ -1152,12 +1149,7 @@ impl From<EMapBody> for models::rhoapi::EMap {
                     value: Some(v.into()),
                 })
                 .collect(),
-            locally_free: value
-                .locally_free
-                .into_vec()
-                .into_iter()
-                .map(|v| v as u8)
-                .collect(),
+            locally_free: value.locally_free.into(),
             connective_used: value.connective_used,
             remainder: value.remainder.map(Into::into),
         }
@@ -1177,7 +1169,7 @@ pub struct EMethodBody {
     pub method_name: String,
     pub target: Par,
     pub arguments: Vec<Par>,
-    pub locally_free: BitVec,
+    pub locally_free: MyBitVec,
     pub connective_used: bool,
 }
 
@@ -1187,7 +1179,7 @@ impl From<models::rhoapi::EMethod> for EMethodBody {
             method_name: method.method_name,
             target: method.target.map(Into::into).unwrap(),
             arguments: method.arguments.into_iter().map(Into::into).collect(),
-            locally_free: BitVec::from_vec(
+            locally_free: MyBitVec::from_vec(
                 method
                     .locally_free
                     .into_iter()
@@ -1266,13 +1258,13 @@ impl Expr {
         }
     }
 
-    pub fn locally_free(&self, depth: u32) -> BitVec {
+    pub fn locally_free(&self, depth: u32) -> MyBitVec {
         match self {
             Expr::GBool(_)
             | Expr::GInt(_)
             | Expr::GString(_)
             | Expr::GUri(_)
-            | Expr::GByteArray(_) => BitVec::EMPTY,
+            | Expr::GByteArray(_) => BitVec::EMPTY.into(),
 
             Expr::EList(e) => e.locally_free.clone(),
             Expr::ETuple(e) => e.locally_free.clone(),
@@ -1406,13 +1398,13 @@ impl Connective {
             _ => true,
         }
     }
-    pub fn locally_free(&self, depth: u32) -> BitVec {
+    pub fn locally_free(&self, depth: u32) -> MyBitVec {
         match self {
             Connective::VarRef(VarRef {
                 index,
                 depth: var_depth,
             }) if depth == *var_depth => single_bit(*index as usize),
-            _ => BitVec::EMPTY,
+            _ => BitVec::EMPTY.into(),
         }
     }
 }
@@ -1534,7 +1526,7 @@ impl<const N: usize> Ord for GUnforgeable<N> {
 
 // helper functions
 #[inline]
-pub(crate) fn union_inplace(this: &mut BitVec, that: &BitSlice) {
+pub(crate) fn union_inplace(this: &mut MyBitVec, that: &BitSlice) {
     let that_slice = that.as_ref();
     if that_slice.len() == 0 {
         return;
@@ -1562,8 +1554,8 @@ pub(crate) fn union(this: impl AsRef<BitSlice>, that: impl AsRef<BitSlice>) -> B
 }
 
 #[inline]
-fn single_bit(pos: usize) -> BitVec {
-    let mut res = BitVec::repeat(false, pos + 1);
+fn single_bit(pos: usize) -> MyBitVec {
+    let mut res = MyBitVec::repeat(false, pos + 1);
     res.set(pos, true);
     res
 }

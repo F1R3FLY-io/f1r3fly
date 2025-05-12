@@ -87,7 +87,7 @@ mod tests {
                             read_flag: true,
                             write_flag: true,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 
@@ -189,7 +189,7 @@ mod tests {
                             read_flag: flags.read_flag,
                             write_flag: flags.write_flag,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 
@@ -229,7 +229,7 @@ mod tests {
                             read_flag: true,
                             write_flag: false,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 

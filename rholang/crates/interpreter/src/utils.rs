@@ -2,7 +2,7 @@ pub mod address_tools;
 pub mod base58;
 pub mod rev_address;
 pub mod test_utils;
-use crate::normal_forms::Par;
+use crate::normal_forms::{MyBitVec, Par};
 
 use bitvec::vec::BitVec;
 use models::rust::utils::union;
@@ -56,7 +56,7 @@ pub fn prepend_expr(mut p: Par, e: Expr, depth: u32) -> Par {
 
     Par {
         exprs: new_exprs,
-        locally_free: BitVec::from_vec(locally_free),
+        locally_free: MyBitVec::from_vec(locally_free),
         connective_used: p.connective_used || e.clone().connective_used(),
         ..p.clone()
     }

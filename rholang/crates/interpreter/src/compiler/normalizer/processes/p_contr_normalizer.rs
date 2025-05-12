@@ -181,19 +181,19 @@ mod tests {
                                         ..Default::default()
                                     }],
                                     persistent: false,
-                                    locally_free: bitvec![1, 1, 1],
+                                    locally_free: bitvec![1, 1, 1].into(),
                                     connective_used: false,
                                 }],
-                                locally_free: bitvec![1, 1, 1],
+                                locally_free: bitvec![1, 1, 1].into(),
                                 ..Default::default()
                             },
                             persistent: true,
                             peek: false,
                             bind_count: 3,
-                            locally_free: bitvec![1],
+                            locally_free: bitvec![1].into(),
                             connective_used: false,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 
@@ -261,19 +261,19 @@ mod tests {
                                     chan: Par::bound_var(0),
                                     data: vec![Par::gint(5)],
                                     persistent: false,
-                                    locally_free: bitvec![1],
+                                    locally_free: bitvec![1].into(),
                                     connective_used: false,
                                 }],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 ..Default::default()
                             },
                             persistent: true,
                             peek: false,
                             bind_count: 1,
-                            locally_free: bitvec![1],
+                            locally_free: bitvec![1].into(),
                             connective_used: false,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 

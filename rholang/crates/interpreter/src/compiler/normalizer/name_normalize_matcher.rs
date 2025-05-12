@@ -391,7 +391,7 @@ mod tests {
         );
         let expected_result = Par {
             exprs: vec![Expr::new_bound_var(0), Expr::new_bound_var(0)],
-            locally_free: bitvec![1],
+            locally_free: bitvec![1].into(),
             ..Default::default()
         };
         let actual_result = result.expect("expected not to collapse par of evals");

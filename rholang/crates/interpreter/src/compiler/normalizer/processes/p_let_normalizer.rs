@@ -46,7 +46,7 @@ pub fn normalize_p_let(
     for decl in decls {
         let proc_list = &decl.procs;
         let mut ps = Vec::with_capacity(proc_list.len());
-        let mut locally_free = BitVec::new();
+        let mut locally_free = BitVec::new().into();
         let mut connective_used = false;
 
         for proc in proc_list {

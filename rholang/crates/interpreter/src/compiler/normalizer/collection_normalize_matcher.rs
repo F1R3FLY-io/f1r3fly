@@ -5,10 +5,9 @@ use crate::compiler::exports::{BoundMapChain, FreeMap};
 use crate::compiler::rholang_ast::{AnnProc, KeyValuePair, ProcRemainder};
 use crate::errors::InterpreterError;
 use crate::normal_forms::{
-    EListBody, EMapBody, ESetBody, ETupleBody, Expr, Par, union, union_inplace,
+    EListBody, EMapBody, ESetBody, ETupleBody, Expr, MyBitVec, Par, union, union_inplace,
 };
 use crate::sort_matcher::Sortable;
-use bitvec::vec::BitVec;
 use std::result::Result;
 
 pub fn normalize_c_list(
@@ -55,7 +54,7 @@ pub fn normalize_c_tuple(
 ) -> Result<Expr, InterpreterError> {
     let mut tuple_body = ETupleBody {
         ps: Vec::with_capacity(elements.len()),
-        locally_free: BitVec::default(),
+        locally_free: MyBitVec::default(),
         connective_used: false,
     };
     for element in elements {
@@ -216,10 +215,10 @@ mod tests {
                 let expected_result = Par {
                     exprs: vec![Expr::EList(EListBody {
                         ps: vec![Par::bound_var(1), Par::bound_var(0), Par::gint(7)],
-                        locally_free: bitvec![1, 1],
+                        locally_free: bitvec![1, 1].into(),
                         ..Default::default()
                     })],
-                    locally_free: bitvec![1, 1],
+                    locally_free: bitvec![1, 1].into(),
                     ..Default::default()
                 };
 
@@ -292,7 +291,7 @@ mod tests {
                 let expected_result = Par {
                     exprs: vec![Expr::ETuple(ETupleBody {
                         ps: Par::free_vars(2),
-                        locally_free: BitVec::EMPTY,
+                        locally_free: BitVec::EMPTY.into(),
                         connective_used: false,
                     })],
                     ..Default::default()
@@ -419,7 +418,7 @@ mod tests {
                         ps: set(vec![
                             Par {
                                 exprs: vec![Expr::new_bound_var(0), Expr::new_free_var(0)],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 ..Default::default()
                             }, /* P | R */
                             Par::gint(7),
@@ -428,11 +427,11 @@ mod tests {
                                 ..Default::default()
                             }, /* 8 | Q */
                         ]),
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         remainder: Some(NormalizedVar::FreeVar(2)),
                         connective_used: true,
                     })],
-                    locally_free: bitvec![1],
+                    locally_free: bitvec![1].into(),
                     connective_used: true,
                     ..Default::default()
                 };
@@ -522,11 +521,11 @@ mod tests {
                             (Par::gint(7), Par::gstr("Seven".to_string())),
                             (Par::bound_var(0), Par::free_var(0)),
                         ]),
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         remainder: Some(NormalizedVar::FreeVar(1)),
                         connective_used: true,
                     })],
-                    locally_free: bitvec![1],
+                    locally_free: bitvec![1].into(),
                     connective_used: true,
                     ..Default::default()
                 };

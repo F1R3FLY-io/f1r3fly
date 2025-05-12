@@ -135,16 +135,16 @@ mod tests {
                                     index: 0,
                                     depth: 1,
                                 })],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 ..Default::default()
                             },
                             source: Par::default(),
                             free_count: 0,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         connective_used: false,
                     }],
-                    locally_free: bitvec![1],
+                    locally_free: bitvec![1].into(),
                     ..Default::default()
                 };
 
@@ -200,7 +200,7 @@ mod tests {
                                     index: 0,
                                     depth: 1,
                                 })],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 ..Default::default()
                             }],
                             source: Par::default(),
@@ -211,10 +211,10 @@ mod tests {
                         persistent: false,
                         peek: false,
                         bind_count: 0,
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         connective_used: false,
                     }],
-                    locally_free: bitvec![1],
+                    locally_free: bitvec![1].into(),
                     ..Default::default()
                 };
 

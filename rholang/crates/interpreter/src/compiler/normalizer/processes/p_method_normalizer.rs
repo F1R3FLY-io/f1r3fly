@@ -128,18 +128,18 @@ mod tests {
                                 method_name: "nth".to_string(),
                                 target: Par::bound_var(0),
                                 arguments: vec![Par::gint(0)],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 connective_used: false,
                             }),
                             Expr::EMethod(EMethodBody {
                                 method_name: "toByteArray".to_string(),
                                 target: Par::bound_var(0),
                                 arguments: Vec::new(),
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 connective_used: false,
                             }),
                         ],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 

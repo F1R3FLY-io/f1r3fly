@@ -182,16 +182,16 @@ mod tests {
                                             free_count: 1,
                                         },
                                     ],
-                                    locally_free: bitvec![1],
+                                    locally_free: bitvec![1].into(),
                                     connective_used: false,
                                 }],
-                                locally_free: bitvec![1],
+                                locally_free: bitvec![1].into(),
                                 ..Default::default()
                             },
                             persistent: false,
                             peek: false,
                             bind_count: 1,
-                            locally_free: BitVec::EMPTY,
+                            locally_free: BitVec::EMPTY.into(),
                             connective_used: false,
                         }],
                         ..Default::default()
@@ -264,10 +264,10 @@ mod tests {
                                     free_count: 0,
                                 },
                             ],
-                            locally_free: bitvec![1],
+                            locally_free: bitvec![1].into(),
                             connective_used: false,
                         }],
-                        locally_free: bitvec![1],
+                        locally_free: bitvec![1].into(),
                         ..Default::default()
                     };
 
@@ -371,7 +371,7 @@ mod tests {
                                             source: Par::default(),
                                             free_count: 0,
                                         }],
-                                        locally_free: BitVec::EMPTY,
+                                        locally_free: BitVec::EMPTY.into(),
                                         connective_used: true,
                                     }],
                                     connective_used: true,
@@ -385,7 +385,7 @@ mod tests {
                             persistent: false,
                             peek: false,
                             bind_count: 2,
-                            locally_free: BitVec::EMPTY,
+                            locally_free: BitVec::EMPTY.into(),
                             connective_used: false,
                         }],
                         ..Default::default()

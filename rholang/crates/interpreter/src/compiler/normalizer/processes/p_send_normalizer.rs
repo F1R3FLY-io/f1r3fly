@@ -146,7 +146,7 @@ mod tests {
                         data: vec![Par::gint(7), Par::gint(8)],
                         ..Default::default()
                     }],
-                    locally_free: bitvec![1],
+                    locally_free: bitvec![1].into(),
                     ..Default::default()
                 };
 
