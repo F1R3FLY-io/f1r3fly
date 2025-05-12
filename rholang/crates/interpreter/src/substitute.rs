@@ -298,22 +298,25 @@ impl SubstituteTrait<normal_forms::Send> for Substitute {
         depth: u32,
         env: &Env<Par>,
     ) -> normal_forms::Send {
-        let channels_sub = self.substitute_no_sort(term.clone().chan, depth, env);
+        let channels_sub = self
+            .substitute_no_sort(term.clone().chan, depth, env)
+            .into();
 
-        let pars_sub = term
-            .data
-            .iter()
-            .map(|p| self.substitute_no_sort(p.clone(), depth, env))
-            .map(Into::into)
-            .collect::<Vec<Par>>();
+        let f = |p: &Par| self.substitute_no_sort(p.clone(), depth, env);
+        let data = term.data.iter().map(f).collect();
 
+        let locally_free = set_bits_until(
+            term.locally_free.into_iter().map(|v| v as u8).collect(),
+            env.shift,
+        );
         Send {
             chan: Some(channels_sub),
-            data: pars_sub,
+            data,
             persistent: term.persistent,
-            locally_free: set_bits_until(term.locally_free, env.shift),
+            locally_free,
             connective_used: term.connective_used,
         }
+        .into()
     }
 
     fn substitute(&self, term: Send, depth: i32, env: &Env<Par>) -> Result<Send, InterpreterError> {
@@ -412,34 +415,27 @@ impl SubstituteTrait<normal_forms::New> for Substitute {
 impl SubstituteTrait<normal_forms::Match> for Substitute {
     fn substitute_no_sort(
         &self,
-        term: Match,
+        term: normal_forms::Match,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<Match, InterpreterError> {
-        let target_sub = self.substitute_no_sort(unwrap_option_safe(term.target)?, depth, env)?;
+    ) -> normal_forms::Match {
+        let target_sub = self.substitute_no_sort(term.target, depth, env);
 
-        let cases_sub = term
+        let cases = term
             .cases
             .iter()
             .map(
-                |MatchCase {
+                |normal_forms::MatchCase {
                      pattern,
                      source,
                      free_count,
                  }| {
-                    let par = self.substitute_no_sort(
-                        unwrap_option_safe(source.clone())?,
-                        depth,
-                        &env.shift(*free_count),
-                    )?;
+                    let par =
+                        self.substitute_no_sort(source.clone(), depth, &env.shift(*free_count))?;
 
-                    let sub_case = self.substitute_no_sort(
-                        unwrap_option_safe(pattern.clone())?,
-                        depth + 1,
-                        env,
-                    )?;
+                    let sub_case = self.substitute_no_sort(pattern.clone(), depth + 1, env)?;
 
-                    Ok(MatchCase {
+                    Ok(normal_forms::MatchCase {
                         pattern: Some(sub_case),
                         source: Some(par),
                         free_count: *free_count,
@@ -448,12 +444,14 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
             )
             .collect::<Result<Vec<MatchCase>, InterpreterError>>()?;
 
-        Ok(Match {
+        let locally_free = set_bits_until(term.locally_free, env.shift);
+
+        normal_forms::Match {
             target: Some(target_sub),
-            cases: cases_sub,
-            locally_free: set_bits_until(term.locally_free, env.shift),
+            cases,
+            locally_free,
             connective_used: term.connective_used,
-        })
+        }
     }
 
     fn substitute(
