@@ -440,7 +440,7 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
             )
             .collect::<Vec<normal_forms::MatchCase>>();
 
-        let locally_free = set_bits_until(term.locally_free, env.shift);
+        let locally_free = set_bits_until(term.locally_free.into(), env.shift).into();
 
         normal_forms::Match {
             target: target_sub,
@@ -455,7 +455,7 @@ impl SubstituteTrait<normal_forms::Match> for Substitute {
         term: normal_forms::Match,
         depth: u32,
         env: &Env<Par>,
-    ) -> Result<normal_forms::Match, InterpreterError> {
+    ) -> normal_forms::Match {
         self.substitute_no_sort(term, depth, env)
             .map(|m| MatchSortMatcher::sort_match(&m))
             .map(|st| st.term)
@@ -470,19 +470,9 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
         env: &Env<Par>,
     ) -> normal_forms::Expr {
         match term {
-            normal_forms::Expr::ENot(p) => self
-                .substitute(unwrap_option_safe(p)?, depth, env)
-                .map(|p| {
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::ENotBody(ENot { p: Some(p) })),
-                    })
-                })?,
+            normal_forms::Expr::ENot(p) => normal_forms::Expr::ENot(self.substitute(p, depth, env)),
 
-            normal_forms::Expr::ENeg(p) => self.substitute(p, depth, env).map(|p| {
-                Ok(Expr {
-                    expr_instance: Some(ExprInstance::ENegBody(ENeg { p: Some(p) })),
-                })
-            })?,
+            normal_forms::Expr::ENeg(p) => Expr::ENeg(self.substitute(p, depth, env)),
 
             normal_forms::Expr::EMult(p1, p2) => {
                 let p1 = self.substitute(p1, depth, env);
@@ -614,7 +604,7 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                     .map(|p| self.substitute(p.clone(), depth, env))
                     .collect::<Vec<Par>>();
 
-                let locally_free = set_bits_until(locally_free, env.shift);
+                let locally_free = set_bits_until(locally_free.into(), env.shift).into();
 
                 normal_forms::Expr::EList(normal_forms::EListBody {
                     ps,
@@ -632,9 +622,9 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
                 let ps = ps
                     .iter()
                     .map(|p| self.substitute(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .collect::<Vec<Par>>();
 
-                let new_locally_free = set_bits_until(locally_free, env.shift);
+                let new_locally_free = set_bits_until(locally_free.into(), env.shift);
 
                 normal_forms::Expr::ETuple(normal_forms::ETupleBody {
                     ps,
@@ -644,19 +634,20 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
             }
 
             normal_forms::Expr::ESet(eset) => {
-                let par_set = ParSetTypeMapper::eset_to_par_set(eset);
-                let ps = par_set
+                let ps = eset
                     .ps
-                    .sorted_pars
-                    .iter()
-                    .map(|p| self.substitute(p.clone(), depth, env))
-                    .collect::<Result<Vec<Par>, InterpreterError>>()?;
+                    .into_iter()
+                    .map(|p| self.substitute(p, depth, env))
+                    .map(Into::into)
+                    .collect();
+
+                let ps = SortedParHashSet::create_from_vec(ps);
 
                 let eset_body = ParSetTypeMapper::par_set_to_eset(ParSet {
-                    ps: SortedParHashSet::create_from_vec(ps),
-                    connective_used: par_set.connective_used,
-                    locally_free: set_bits_until(par_set.locally_free, env.shift),
-                    remainder: par_set.remainder,
+                    ps,
+                    connective_used: eset.connective_used,
+                    locally_free: set_bits_until(eset.locally_free.into(), env.shift).into(),
+                    remainder: eset.remainder.map(Into::into),
                 })
                 .into();
 
@@ -664,20 +655,22 @@ impl SubstituteTrait<normal_forms::Expr> for Substitute {
             }
 
             normal_forms::Expr::EMap(emap) => {
-                let par_map = ParMapTypeMapper::emap_to_par_map(emap);
-                let _ps = par_map
+                let par_map = ParMapTypeMapper::emap_to_par_map(emap.into());
+                let ps = par_map
                     .ps
                     .sorted_list
-                    .iter()
-                    .map(|p| {
-                        let p1 = self.substitute(p.0.clone(), depth, env)?;
-                        let p2 = self.substitute(p.1.clone(), depth, env)?;
-                        Ok((p1, p2))
+                    .into_iter()
+                    .map(|(p1, p2)| {
+                        let p1: Par = p1.into();
+                        let p2 = p2.into();
+                        let p1 = self.substitute(p1, depth, env);
+                        let p2 = self.substitute(p2, depth, env);
+                        (p1, p2)
                     })
-                    .collect::<Result<Vec<(Par, Par)>, InterpreterError>>()?;
+                    .collect::<Vec<(Par, Par)>>();
 
                 let emap_body = ParMapTypeMapper::par_map_to_emap(ParMap {
-                    ps: SortedParMap::create_from_vec(_ps),
+                    ps: SortedParMap::create_from_vec(ps),
                     connective_used: par_map.connective_used,
                     locally_free: set_bits_until(par_map.locally_free, env.shift),
                     remainder: par_map.remainder,

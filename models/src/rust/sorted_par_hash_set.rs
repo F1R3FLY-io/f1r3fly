@@ -24,8 +24,6 @@ impl SortedParHashSet {
         let sorted_pars = Ordering::sort_pars(&set.clone().into_iter().collect());
         let sorted_ps: HashSet<Par> = sorted_pars.clone().into_iter().collect();
 
-        // println!("\nsorted_ps in SortedParHashSet: {:?}", sorted_ps);
-
         SortedParHashSet {
             ps: set,
             sorted_pars,
