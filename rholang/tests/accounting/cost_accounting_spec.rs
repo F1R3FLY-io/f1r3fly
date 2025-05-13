@@ -21,26 +21,17 @@ use rspace_plus_plus::rspace::{
 };
 
 use rand::Rng;
-use std::collections::HashMap;
+use rholang::rust::interpreter::errors::InterpreterError;
+use std::collections::{HashMap, HashSet};
 use std::option::Option;
 use std::sync::{Arc, Mutex};
 
-async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> EvaluateResult {
+async fn evaluate_with_cost_log(
+    initial_phlo: i64,
+    contract: String,
+) -> (EvaluateResult, Vec<Cost>) {
     let mut kvm = InMemoryStoreManager::new();
-
-    //TODO costLog implementation
-    /*
-    We need to come up with an implementation of `costLog` in Rust (check how it works in Scala), because `costLog` is a kind of global tracker and in tests we have checks like this:
-    costLog.map(_.value).toList.sum shouldEqual expectedTotalCost
-
-    But first we need to finish everything else and port the tests without `costLog` assertions.
-
-    1. Port all the code
-    2. Ensure tests pass without `costLog` assertions
-    3. Implement `costLog` (global tracker) in Rust and make sure all tests work as they do in Scala
-    */
     let store = kvm.r_space_stores().await.unwrap();
-
     let (runtime, _, _) =
         create_runtimes_with_cost_log(store, Some(false), Some(&mut Vec::new())).await;
 
@@ -54,7 +45,9 @@ async fn evaluate_with_cost_log(initial_phlo: i64, contract: String) -> Evaluate
         .await;
 
     assert!(eval_result.is_ok());
-    eval_result.unwrap()
+    let eval_result = eval_result.unwrap();
+    let cost_log = runtime.lock().unwrap().get_cost_log();
+    (eval_result, cost_log)
 }
 
 async fn create_runtimes_with_cost_log(
@@ -235,22 +228,102 @@ fn contracts() -> Vec<(String, i64)> {
 ]
 }
 
+fn element_counts(list: &[Cost]) -> HashSet<(Cost, usize)> {
+    let mut counts = HashMap::new();
+    for c in list {
+        *counts.entry(c.clone()).or_insert(0) += 1;
+    }
+    counts.into_iter().collect()
+}
+
+async fn check_deterministic_cost<F, Fut>(block: F) -> bool
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = (EvaluateResult, Vec<Cost>)>,
+{
+    let repetitions = 20;
+    let (first_result, first_log) = block().await;
+
+    // Execute sequentially for now (could be parallel with join_all later)
+    for _ in 1..repetitions {
+        let (subsequent_result, subsequent_log) = block().await;
+        let expected = first_result.cost.value;
+        let actual = subsequent_result.cost.value;
+        if expected != actual {
+            assert_eq!(
+                subsequent_log, first_log,
+                "CostLog should be the same for deterministic cost"
+            );
+            panic!(
+                "Cost was not repeatable, expected {}, got {}.",
+                expected, actual
+            );
+        }
+    }
+
+    true
+}
+
+async fn check_phlo_limit_exceeded(
+    contract: String,
+    initial_phlo: i64,
+    expected_costs: Vec<Cost>,
+) -> bool {
+    let (evaluate_result, cost_log) = evaluate_with_cost_log(initial_phlo, contract).await;
+    let expected_sum: i64 = expected_costs.iter().map(|cost| cost.value).sum();
+
+    assert!(
+        expected_sum <= initial_phlo,
+        "We must not expect more costs than initialPhlo allows (duh!): {} > {}",
+        expected_sum,
+        initial_phlo
+    );
+
+    assert_eq!(
+        evaluate_result.errors,
+        vec![InterpreterError::OutOfPhlogistonsError],
+        "Expected list of OutOfPhlogistonsError"
+    );
+
+    for cost in &expected_costs {
+        assert!(
+            cost_log.contains(cost),
+            "CostLog does not contain expected cost: {:?}",
+            cost
+        );
+    }
+
+    assert_eq!(
+        {
+            element_counts(&cost_log)
+                .difference(&element_counts(&expected_costs))
+                .count()
+        },
+        1,
+        "Exactly one cost should be logged past the expected ones"
+    );
+    assert!(
+        evaluate_result.cost.value >= initial_phlo,
+        "Total cost value should be >= initialPhlo"
+    );
+
+    true
+}
+
 #[tokio::test]
 async fn total_cost_of_evaluation_should_be_equal_to_the_sum_of_all_costs_in_the_log() {
     for (contract, expected_total_cost) in contracts() {
         let initial_phlo = 10000i64;
-        let eval_result = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
-        println!(
-            "Contract: {}, Expected cost: {}, Actual cost: {}",
-            contract, expected_total_cost, eval_result.cost.value
-        );
+        let (eval_result, cost_log) = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
         assert_eq!(
             eval_result.cost,
             Cost::create(expected_total_cost, "subtraction".to_string())
         );
         assert_eq!(eval_result.errors, Vec::new());
-
-        //TODO add costLog asserts
+        assert_eq!(
+            cost_log.iter().map(|c| c.value).sum::<i64>(),
+            expected_total_cost
+        );
     }
 }
 
@@ -258,16 +331,16 @@ async fn total_cost_of_evaluation_should_be_equal_to_the_sum_of_all_costs_in_the
 async fn cost_should_be_deterministic() {
     for (contract, _) in contracts() {
         check_deterministic_cost(|| async {
-            let result = evaluate_with_cost_log(i32::MAX as i64, contract.clone()).await;
+            let (result, _log) = evaluate_with_cost_log(i32::MAX as i64, contract.clone()).await;
             assert!(result.errors.is_empty());
-            result
+            (result, _log)
         })
         .await;
     }
 }
 
 #[tokio::test]
-#[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed
+#[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed (13.05.2025 I can't find this ticket)
 async fn cost_should_be_repeatable_when_generated() {
     // Try contract fromLong(1716417707L) = @2!!(0) | @0!!(0) | for (_ <<- @2) { 0 } | @2!(0)
     // because the cost is nondeterministic
@@ -313,33 +386,6 @@ async fn cost_should_be_repeatable_when_generated() {
     }
 }
 
-async fn check_deterministic_cost<F, Fut>(block: F) -> bool
-where
-    F: Fn() -> Fut,
-    Fut: std::future::Future<Output = EvaluateResult>,
-{
-    let repetitions = 20;
-    let first = block().await;
-
-    // Execute sequentially for now (could be parallel with join_all later)
-    for _ in 1..repetitions {
-        let subsequent = block().await;
-
-        let expected = first.cost.value;
-        let actual = subsequent.cost.value;
-
-        if expected != actual {
-            // TODO implement when costLog will be ready!
-            panic!(
-                "Cost was not repeatable, expected {}, got {}.",
-                expected, actual
-            );
-        }
-    }
-
-    true
-}
-
 #[tokio::test]
 async fn running_out_of_phlogistons_should_stop_evaluation_upon_cost_depletion_in_a_single_execution_branch(
 ) {
@@ -360,35 +406,19 @@ async fn should_not_attempt_reduction_when_there_was_not_enough_phlo_for_parsing
     check_phlo_limit_exceeded("@1!(1)".to_string(), parsing_cost - 1, vec![]).await;
 }
 
-async fn check_phlo_limit_exceeded(
-    contract: String,
-    initial_phlo: i64,
-    expected_costs: Vec<Cost>,
-) -> bool {
-    let evaluate_result = evaluate_with_cost_log(initial_phlo, contract).await;
-    let expected_sum: i64 = expected_costs.iter().map(|cost| cost.value).sum();
-
-    assert!(
-        expected_sum <= initial_phlo,
-        "We must not expect more costs than initialPhlo allows (duh!): {} > {}",
-        expected_sum,
-        initial_phlo
-    );
-
-    //TODO add asserts for errors, costLog.
-    /*
-      errors shouldBe List(OutOfPhlogistonsError)
-      costLog.toList should contain allElementsOf expectedCosts
-      withClue("Exactly one cost should be logged past the expected ones, yet:\n") {
-      elementCounts(costLog.toList) diff elementCounts(expectedCosts) should have size 1
-      totalCost.value should be >= initialPhlo
-    */
-    assert!(
-        evaluate_result.cost.value >= initial_phlo,
-        "Total cost value should be >= initialPhlo"
-    );
-
-    true
+#[tokio::test]
+async fn should_stop_the_evaluation_of_all_execution_branches_when_one_of_them_runs_out_of_phlo() {
+    let parsing_cost = 24;
+    let first_step_cost = 11;
+    check_phlo_limit_exceeded(
+        "@1!(1) | @2!(2) | @3!(3)".to_string(),
+        parsing_cost + first_step_cost,
+        vec![
+            Cost::create(parsing_cost, "parsing".to_string()),
+            Cost::create(first_step_cost, "send eval".to_string()),
+        ],
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -399,14 +429,7 @@ async fn should_stop_the_evaluation_of_all_execution_branches_when_one_of_them_r
         for _ in 0..1 {
             let initial_phlo = rng.gen_range(1..expected_total_cost);
 
-            let result = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
-
-            //TODO add assertions when costLog will be ready
-
-            // errors shouldBe List(OutOfPhlogistonsError)
-            // val costs = costLog.map(_.value).toList
-            // costs.init.sum should be <= initialPhlo
-            // costs.sum > initialPhlo
+            let (result, cost_log) = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
 
             assert!(
                 result.cost.value >= initial_phlo,

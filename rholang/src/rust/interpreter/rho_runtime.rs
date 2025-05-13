@@ -257,6 +257,14 @@ impl RhoRuntimeImpl {
             merge_chs,
         }))
     }
+
+    pub fn get_cost_log(&self) -> Vec<Cost> {
+        self.cost.get_log()
+    }
+
+    pub fn clear_cost_log(&self) {
+        self.cost.clear_log()
+    }
 }
 
 impl RhoRuntime for RhoRuntimeImpl {
