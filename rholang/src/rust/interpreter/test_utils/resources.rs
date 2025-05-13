@@ -77,22 +77,6 @@ pub async fn create_runtimes(
 
     let (space, replay) = hrstores;
 
-    //TODO ask Steven
-
-    // Create Box with Replay to bypass the restriction of Orphan Rule or  create two runtimes separately
-    // let replay_box: Box<
-    //     dyn IReplayRSpace<Par, BindPattern, ListParWithRandom, TaggedContinuation>,
-    // > = Box::new(replay);
-    //
-    // let (rho_runtime, replay_runtime) = rho_runtime::_create_runtimes(
-    //     space.clone(),
-    //     replay_box,
-    //     init_registry,
-    //     additional_system_processes,
-    //     Par::default(),
-    // )
-    // .await;
-
     let rho_runtime = create_rho_runtime(
         space.clone(),
         Par::default(),
