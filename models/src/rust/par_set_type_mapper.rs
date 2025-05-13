@@ -25,3 +25,25 @@ impl ParSetTypeMapper {
         }
     }
 }
+
+impl From<ESet> for ParSet {
+    fn from(value: ESet) -> Self {
+        ParSet::new(
+            value.ps,
+            value.connective_used,
+            value.locally_free,
+            value.remainder,
+        )
+    }
+}
+
+impl From<ParSet> for ESet {
+    fn from(value: ParSet) -> Self {
+        ESet {
+            ps: value.ps.sorted_pars,
+            locally_free: value.locally_free,
+            connective_used: value.connective_used,
+            remainder: value.remainder,
+        }
+    }
+}

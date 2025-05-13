@@ -2,10 +2,13 @@ use std::{cmp::Ordering, collections::BTreeMap, ops::Deref, ops::DerefMut};
 
 use bitvec::{order::Lsb0, slice::BitSlice, vec::BitVec};
 use itertools::Itertools;
-use models::rhoapi::{
-    EMinusMinus, EMod, EPercentPercent, EPlusPlus, KeyValuePair,
-    expr::ExprInstance::*,
-    var::{VarInstance, WildcardMsg},
+use models::{
+    rhoapi::{
+        EMinusMinus, EMod, EPercentPercent, EPlusPlus, KeyValuePair,
+        expr::ExprInstance::*,
+        var::{VarInstance, WildcardMsg},
+    },
+    rust::par_set::ParSet,
 };
 use prost::Message;
 
@@ -1125,6 +1128,21 @@ impl From<models::rhoapi::ESet> for ESetBody {
             locally_free: MyBitVec::<usize, _>::from_vec(
                 set.locally_free.into_iter().map(|v| v as usize).collect(),
             ),
+            connective_used: set.connective_used,
+            remainder: set.remainder.map(Into::into),
+        }
+    }
+}
+
+impl From<ESetBody> for models::rhoapi::ESet {
+    fn from(set: ESetBody) -> Self {
+        models::rhoapi::ESet {
+            ps: set
+                .ps
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<models::rhoapi::Par>>(),
+            locally_free: set.locally_free.into(),
             connective_used: set.connective_used,
             remainder: set.remainder.map(Into::into),
         }
