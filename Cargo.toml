@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+	"casper",
+	"rspace++",
+	"rholang",
+	"shared",
+	"node-cli",
+	"models",
+	"crypto",
+]
+
+[profile.dev]
+debug = true
