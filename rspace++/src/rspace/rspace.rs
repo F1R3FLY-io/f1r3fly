@@ -86,7 +86,7 @@ where
 
         let history_reader = self
             .history_repository
-            .get_history_reader(self.history_repository.root())?;
+            .get_history_reader(&self.history_repository.root())?;
 
         self.create_new_hot_store(history_reader);
         self.restore_installs();
@@ -99,9 +99,9 @@ where
         })
     }
 
-    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+    fn reset(&mut self, root: &Blake2b256Hash) -> Result<(), RSpaceError> {
         // println!("\nhit rspace++ reset, root: {:?}", root);
-        let next_history = self.history_repository.reset(&root)?;
+        let next_history = self.history_repository.reset(root)?;
         self.history_repository = Arc::new(next_history);
 
         self.event_log = Vec::new();
@@ -135,7 +135,7 @@ where
     }
 
     fn clear(&mut self) -> Result<(), RSpaceError> {
-        self.reset(RadixHistory::empty_root_node_hash())
+        self.reset(&RadixHistory::empty_root_node_hash())
     }
 
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
@@ -165,7 +165,7 @@ where
         checkpoint: SoftCheckpoint<C, P, A, K>,
     ) -> Result<(), RSpaceError> {
         let history = &self.history_repository;
-        let history_reader = history.get_history_reader(history.root())?;
+        let history_reader = history.get_history_reader(&history.root())?;
         let hot_store = HotStoreInstances::create_from_mhs_and_hr(
             Arc::new(Mutex::new(checkpoint.cache_snapshot)),
             history_reader.base(),
@@ -379,7 +379,7 @@ where
         let space = Self::apply(history_repo_arc.clone(), store, matcher.clone());
         // Replay
         let history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>> =
-            history_repo_arc.get_history_reader(history_repo_arc.root())?;
+            history_repo_arc.get_history_reader(&history_repo_arc.root())?;
         let replay_store = HotStoreInstances::create_from_hr(history_reader.base());
         let replay =
             ReplayRSpace::apply(history_repo_arc.clone(), Arc::new(replay_store), matcher.clone());
@@ -413,7 +413,7 @@ where
         let history_repo =
             HistoryRepositoryInstances::lmdb_repository(store.history, store.roots, store.cold)?;
 
-        let history_reader = history_repo.get_history_reader(history_repo.root())?;
+        let history_reader = history_repo.get_history_reader(&history_repo.root())?;
 
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
 
@@ -693,7 +693,7 @@ where
     pub fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.history_repository;
         let next_history = history_repo.reset(&history_repo.root())?;
-        let history_reader = next_history.get_history_reader(next_history.root())?;
+        let history_reader = next_history.get_history_reader(&next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let mut rspace = RSpace::apply(Arc::new(next_history), hot_store, self.matcher.clone());
         rspace.restore_installs();

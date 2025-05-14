@@ -169,7 +169,7 @@ pub trait RhoRuntime: HasCost {
      * @param root the target state hash to reset
      * @return
      */
-    fn reset(&mut self, root: Blake2b256Hash) -> ();
+    fn reset(&mut self, root: &Blake2b256Hash) -> ();
 
     /**
      * Consume the result in the rspace.
@@ -347,7 +347,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         checkpoint
     }
 
-    fn reset(&mut self, root: Blake2b256Hash) -> () {
+    fn reset(&mut self, root: &Blake2b256Hash) -> () {
         self.reducer.space.try_lock().unwrap().reset(root).unwrap()
     }
 

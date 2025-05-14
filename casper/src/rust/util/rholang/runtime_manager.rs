@@ -134,7 +134,7 @@ impl RuntimeManager {
             sender.bytes,
             seq_num,
             mergeable_chs,
-            pre_state_hash,
+            &pre_state_hash,
         )?;
 
         Ok((state_hash, usr_processed, sys_processed))
@@ -164,7 +164,7 @@ impl RuntimeManager {
             prost::bytes::Bytes::new(),
             0,
             mergeable_chs,
-            pre_state_hash,
+            &pre_state_hash,
         )?;
 
         Ok((pre_state, state_hash, processed_deploys))
@@ -206,7 +206,7 @@ impl RuntimeManager {
             sender.bytes,
             seq_num,
             mergeable_chs,
-            pre_state_hash,
+            &pre_state_hash,
         )
         .unwrap_or_else(|e| panic!("Failed to save mergeable channels: {:?}", e));
 
@@ -256,7 +256,7 @@ impl RuntimeManager {
     pub async fn get_data(&self, hash: StateHash, channel: &Par) -> Result<Vec<Par>, CasperError> {
         let mut runtime = self.spawn_runtime().await;
 
-        runtime.reset(Blake2b256Hash::from_bytes_prost(&hash));
+        runtime.reset(&Blake2b256Hash::from_bytes_prost(&hash));
 
         let runtime_ops = RuntimeOps::new(runtime);
         let computed = runtime_ops.get_data_par(channel);
@@ -270,7 +270,7 @@ impl RuntimeManager {
     ) -> Result<Vec<(Vec<BindPattern>, Par)>, CasperError> {
         let mut runtime = self.spawn_runtime().await;
 
-        runtime.reset(Blake2b256Hash::from_bytes_prost(&hash));
+        runtime.reset(&Blake2b256Hash::from_bytes_prost(&hash));
 
         let runtime_ops = RuntimeOps::new(runtime);
         let computed = runtime_ops.get_continuation_par(channels);
@@ -340,7 +340,7 @@ impl RuntimeManager {
         seq_num: i32,
         channels_data: Vec<NumberChannelsEndVal>,
         // Used to calculate value difference from final values
-        pre_state_hash: Blake2b256Hash,
+        pre_state_hash: &Blake2b256Hash,
     ) -> Result<(), CasperError> {
         // Calculate difference values from final values on number channels
         let diffs = self.convert_number_channels_to_diff(channels_data, pre_state_hash);
@@ -381,16 +381,16 @@ impl RuntimeManager {
      * @param preStateHash Inital state
      * @return Map with values as difference on number channel
      */
-    fn convert_number_channels_to_diff(
+    pub fn convert_number_channels_to_diff(
         &self,
         channels_data: Vec<NumberChannelsEndVal>,
         // Used to calculate value difference from final values
-        pre_state_hash: Blake2b256Hash,
+        pre_state_hash: &Blake2b256Hash,
     ) -> Vec<NumberChannelsDiff> {
         let history_repo = self.history_repo.clone();
         let get_data_func = move |ch: &Blake2b256Hash| {
             history_repo
-                .get_history_reader(pre_state_hash.clone())
+                .get_history_reader(pre_state_hash)
                 .and_then(|reader| reader.get_data(ch))
         };
 

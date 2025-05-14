@@ -97,7 +97,7 @@ impl RuntimeOps {
      * fixed channels in the state.
      */
     pub async fn empty_state_hash(&mut self) -> Result<StateHash, CasperError> {
-        self.runtime.reset(RadixHistory::empty_root_node_hash());
+        self.runtime.reset(&RadixHistory::empty_root_node_hash());
 
         bootstrap_registry(&self.runtime).await;
         let checkpoint = self.runtime.create_checkpoint();
@@ -213,7 +213,7 @@ impl RuntimeOps {
         terms: Vec<Signed<DeployData>>,
     ) -> Result<(StateHash, Vec<(ProcessedDeploy, NumberChannelsEndVal)>), CasperError> {
         self.runtime
-            .reset(Blake2b256Hash::from_bytes_prost(start_hash));
+            .reset(&Blake2b256Hash::from_bytes_prost(start_hash));
 
         let mut res = Vec::new();
         for deploy in terms {
@@ -233,7 +233,7 @@ impl RuntimeOps {
         terms: Vec<Signed<DeployData>>,
     ) -> Result<(StateHash, Vec<(ProcessedDeploy, NumberChannelsEndVal)>), CasperError> {
         self.runtime
-            .reset(Blake2b256Hash::from_bytes_prost(start_hash));
+            .reset(&Blake2b256Hash::from_bytes_prost(start_hash));
 
         let mut res = Vec::new();
         for deploy in terms {
@@ -472,7 +472,7 @@ impl RuntimeOps {
         system_deploy: &mut S,
     ) -> Result<SystemDeployResult<S::Result>, CasperError> {
         self.runtime
-            .reset(Blake2b256Hash::from_bytes_prost(&state_hash));
+            .reset(&Blake2b256Hash::from_bytes_prost(&state_hash));
 
         let (event_log, result, mergeable_channels) =
             self.play_system_deploy_internal(system_deploy).await?;
@@ -705,7 +705,7 @@ impl RuntimeOps {
         deploy: &Signed<DeployData>,
         name: &Par,
     ) -> Result<Vec<Par>, CasperError> {
-        self.runtime.reset(Blake2b256Hash::from_bytes_prost(start));
+        self.runtime.reset(&Blake2b256Hash::from_bytes_prost(start));
 
         let eval_res = self.evaluate(deploy).await?;
         if !eval_res.errors.is_empty() {

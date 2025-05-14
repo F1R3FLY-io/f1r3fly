@@ -417,7 +417,7 @@ where
 
     fn get_history_reader(
         &self,
-        state_hash: Blake2b256Hash,
+        state_hash: &Blake2b256Hash,
     ) -> Result<Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>, HistoryError> {
         let history_lock = self
             .current_history

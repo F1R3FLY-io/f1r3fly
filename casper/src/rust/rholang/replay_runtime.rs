@@ -99,7 +99,7 @@ impl ReplayRuntimeOps {
     ) -> Result<(Blake2b256Hash, Vec<NumberChannelsEndVal>), CasperError> {
         self.runtime_ops
             .runtime
-            .reset(Blake2b256Hash::from_bytes_prost(start_hash));
+            .reset(&Blake2b256Hash::from_bytes_prost(start_hash));
 
         let mut deploy_results = Vec::new();
         for term in terms {

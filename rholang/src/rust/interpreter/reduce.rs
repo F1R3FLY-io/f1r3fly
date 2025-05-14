@@ -58,7 +58,7 @@ use super::util::GeneratedMessage;
 /**
  * Reduce is the interface for evaluating Rholang expressions.
  */
-
+// TODO: urn_map to use Arc to avoid deep clone
 #[derive(Clone)]
 pub struct DebruijnInterpreter {
     pub space: RhoISpace,

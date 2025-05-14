@@ -866,7 +866,7 @@ extern "C" fn reset(
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
     let runtime = unsafe { &mut (*runtime_ptr).runtime };
-    runtime.reset(root);
+    runtime.reset(&root);
 }
 
 #[no_mangle]

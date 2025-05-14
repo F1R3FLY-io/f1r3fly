@@ -1735,7 +1735,7 @@ pub extern "C" fn history_reader_root(
             .lock()
             .unwrap()
             .history_repository
-            .get_history_reader(state_hash)
+            .get_history_reader(&state_hash)
             .unwrap()
             .root()
     };
@@ -1770,7 +1770,7 @@ pub extern "C" fn get_history_data(
         let space = (*rspace).rspace.lock().unwrap();
         space
             .history_repository
-            .get_history_reader(state_hash)
+            .get_history_reader(&state_hash)
             .unwrap()
             .get_data(&key)
             .unwrap()
@@ -1822,7 +1822,7 @@ pub extern "C" fn get_history_waiting_continuations(
         let space = (*rspace).rspace.lock().unwrap();
         space
             .history_repository
-            .get_history_reader(state_hash)
+            .get_history_reader(&state_hash)
             .unwrap()
             .get_continuations(&key)
             .unwrap()
@@ -1885,7 +1885,7 @@ pub extern "C" fn get_history_joins(
         let space = (*rspace).rspace.lock().unwrap();
         space
             .history_repository
-            .get_history_reader(state_hash)
+            .get_history_reader(&state_hash)
             .unwrap()
             .get_joins(&key)
             .unwrap()

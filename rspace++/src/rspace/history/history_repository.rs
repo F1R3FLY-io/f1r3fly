@@ -43,7 +43,7 @@ pub trait HistoryRepository<C: Clone, P: Clone, A: Clone, K: Clone>: Send + Sync
 
     fn get_history_reader(
         &self,
-        state_hash: Blake2b256Hash,
+        state_hash: &Blake2b256Hash,
     ) -> Result<Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>, HistoryError>;
 
     fn get_history_reader_struct(

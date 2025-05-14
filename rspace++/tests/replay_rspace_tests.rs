@@ -63,10 +63,10 @@ async fn reset_to_a_checkpoint_from_a_different_branch_should_work() {
     let _ = space.produce("ch1".to_string(), "datum".to_string(), false);
     let root1 = space.create_checkpoint().unwrap().root;
 
-    let _ = replay_space.reset(root1);
+    let _ = replay_space.reset(&root1);
     assert!(replay_space.store.is_empty());
 
-    let _ = space.reset(root0);
+    let _ = space.reset(&root0);
     assert!(space.store.is_empty());
 }
 
@@ -1335,7 +1335,7 @@ async fn reset_should_empty_the_replay_store_and_reset_the_replay_trie_updates_l
         1
     );
 
-    let _ = replay_space.reset(empty_point.root);
+    let _ = replay_space.reset(&empty_point.root);
     assert!(replay_space.store.is_empty());
     assert!(replay_space.replay_data.is_empty());
 
@@ -1553,7 +1553,7 @@ async fn fixture() -> StateSetup {
 
     let cache: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let history_reader = history_repo
-        .get_history_reader(history_repo.root())
+        .get_history_reader(&history_repo.root())
         .unwrap();
 
     let hot_store = {

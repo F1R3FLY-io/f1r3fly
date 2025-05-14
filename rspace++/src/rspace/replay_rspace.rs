@@ -76,7 +76,7 @@ where
 
         let history_reader = self
             .history_repository
-            .get_history_reader(self.history_repository.root())?;
+            .get_history_reader(&self.history_repository.root())?;
 
         self.create_new_hot_store(history_reader);
         self.restore_installs();
@@ -87,9 +87,9 @@ where
         })
     }
 
-    fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+    fn reset(&mut self, root: &Blake2b256Hash) -> Result<(), RSpaceError> {
         // println!("\nhit rspace++ reset");
-        let next_history = self.history_repository.reset(&root)?;
+        let next_history = self.history_repository.reset(root)?;
         self.history_repository = Arc::new(next_history);
 
         self.event_log = Vec::new();
@@ -124,7 +124,7 @@ where
 
     fn clear(&mut self) -> Result<(), RSpaceError> {
         self.replay_data.clear();
-        self.reset(RadixHistory::empty_root_node_hash())
+        self.reset(&RadixHistory::empty_root_node_hash())
     }
 
     fn to_map(&self) -> HashMap<Vec<C>, Row<P, A, K>> {
@@ -154,7 +154,7 @@ where
         checkpoint: SoftCheckpoint<C, P, A, K>,
     ) -> Result<(), RSpaceError> {
         let history = &self.history_repository;
-        let history_reader = history.get_history_reader(history.root())?;
+        let history_reader = history.get_history_reader(&history.root())?;
         let hot_store = HotStoreInstances::create_from_mhs_and_hr(
             Arc::new(Mutex::new(checkpoint.cache_snapshot)),
             history_reader.base(),
@@ -219,7 +219,7 @@ where
 
     fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: Log) -> Result<(), RSpaceError> {
         self.rig(log)?;
-        self.reset(start_root)
+        self.reset(&start_root)
     }
 
     fn rig(&self, log: Log) -> Result<(), RSpaceError> {
@@ -852,7 +852,7 @@ where
     pub fn spawn(&self) -> Result<Self, RSpaceError> {
         let history_repo = &self.history_repository;
         let next_history = history_repo.reset(&history_repo.root())?;
-        let history_reader = next_history.get_history_reader(next_history.root())?;
+        let history_reader = next_history.get_history_reader(&next_history.root())?;
         let hot_store = HotStoreInstances::create_from_hr(history_reader.base());
         let mut rspace =
             Self::apply(Arc::new(next_history), Arc::new(hot_store), self.matcher.clone());

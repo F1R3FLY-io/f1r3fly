@@ -169,7 +169,7 @@ impl ChargingRSpace {
                 self.space.clear()
             }
 
-            fn reset(&mut self, root: Blake2b256Hash) -> Result<(), RSpaceError> {
+            fn reset(&mut self, root: &Blake2b256Hash) -> Result<(), RSpaceError> {
                 self.space.reset(root)
             }
 

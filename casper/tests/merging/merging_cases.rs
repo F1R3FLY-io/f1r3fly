@@ -99,7 +99,7 @@ async fn two_deploys_executed_inside_single_state_transition_should_be_dependent
                 block_index::create_event_log_index(
                     d.deploy_log,
                     runtime_manager.get_history_repo(),
-                    Blake2b256Hash::from_bytes_prost(&base_state),
+                    &Blake2b256Hash::from_bytes_prost(&base_state),
                     merge_chs,
                 )
             })

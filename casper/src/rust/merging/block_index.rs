@@ -13,11 +13,11 @@ use crate::rust::util::event_converter;
 pub fn create_event_log_index(
     events: Vec<Event>,
     history_repository: RhoHistoryRepository,
-    pre_state_hash: Blake2b256Hash,
+    pre_state_hash: &Blake2b256Hash,
     mergeable_chs: NumberChannelsDiff,
 ) -> EventLogIndex {
     let pre_state_reader = history_repository
-        .get_history_reader(pre_state_hash)
+        .get_history_reader(&pre_state_hash)
         .unwrap();
 
     let produce_exists_in_pre_state = |p: &Produce| {

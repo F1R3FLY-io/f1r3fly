@@ -1,1 +1,2 @@
 mod merging_cases;
+mod merge_number_channel_spec;

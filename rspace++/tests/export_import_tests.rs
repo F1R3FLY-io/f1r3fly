@@ -94,7 +94,7 @@ async fn export_and_import_of_one_page_should_works_correctly() {
     let _ = importer2_lock.set_history_items(history_items);
     let _ = importer2_lock.set_data_items(data_items);
     let _ = importer2_lock.set_root(&init_point.root);
-    let _ = space2.reset(init_point.root);
+    let _ = space2.reset(&init_point.root);
 
     // space2.store.print();
 
@@ -212,7 +212,7 @@ async fn multipage_export_should_work_correctly() {
     let _ = importer2_lock.set_history_items(history_items);
     let _ = importer2_lock.set_data_items(data_items);
     let _ = importer2_lock.set_root(&init_point.root);
-    let _ = space2.reset(init_point.root);
+    let _ = space2.reset(&init_point.root);
 
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
@@ -328,7 +328,7 @@ async fn multipage_export_with_skip_should_work_correctly() {
     let _ = importer2_lock.set_history_items(history_items);
     let _ = importer2_lock.set_data_items(data_items);
     let _ = importer2_lock.set_root(&init_point.root);
-    let _ = space2.reset(init_point.root);
+    let _ = space2.reset(&init_point.root);
 
     // Testing data in space2 (match all installed channels)
     for i in 0..data_size {
@@ -370,7 +370,7 @@ async fn test_setup() -> (
 
     let cache1: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let history_reader = history_repository1
-        .get_history_reader(history_repository1.root())
+        .get_history_reader(&history_repository1.root())
         .unwrap();
 
     let store1 = {
@@ -398,7 +398,7 @@ async fn test_setup() -> (
 
     let cache2: HotStoreState<String, Pattern, String, String> = HotStoreState::default();
     let history_reader = history_repository2
-        .get_history_reader(history_repository2.root())
+        .get_history_reader(&history_repository2.root())
         .unwrap();
 
     let store2 = {
