@@ -35,11 +35,11 @@ pub struct ConsumeAndJoinActions<C: Clone, P: Clone, A: Clone, K: Clone> {
 
 pub fn compute_trie_actions<C: Clone, P: Clone, A: Clone, K: Clone>(
     changes: &StateChange,
-    base_reader: &impl HistoryReader<Blake2b256Hash, C, P, A, K>,
+    base_reader: &Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>>,
     mergeable_chs: &NumberChannelsDiff,
     handle_channel_change: impl Fn(
         &Blake2b256Hash,
-        &ChannelChange<ByteVector>,
+        &ChannelChange<Vec<u8>>,
         &NumberChannelsDiff,
     ) -> Result<Option<HotStoreTrieAction<C, P, A, K>>, HistoryError>,
 ) -> Result<Vec<HotStoreTrieAction<C, P, A, K>>, HistoryError> {

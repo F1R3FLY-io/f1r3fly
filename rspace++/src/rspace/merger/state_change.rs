@@ -3,6 +3,7 @@
 use dashmap::DashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
 
 use crate::rspace::{
     errors::HistoryError,
@@ -25,17 +26,144 @@ use super::{
  * This is because only hashes of channels are available in log event, and computing a join binary to be
  * inserted or removed on merge requires channels before hashing.
  */
+#[derive(Debug, Clone)]
 pub struct StateChange {
     pub datums_changes: DashMap<Blake2b256Hash, ChannelChange<Vec<u8>>>,
     pub cont_changes: DashMap<Vec<Blake2b256Hash>, ChannelChange<Vec<u8>>>,
     pub consume_channels_to_join_serialized_map: DashMap<Vec<Blake2b256Hash>, Vec<u8>>,
 }
 
+impl Hash for StateChange {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Hash datums_changes
+        let mut datum_keys_and_values = Vec::new();
+        for entry in self.datums_changes.iter() {
+            let key = entry.key().clone();
+            let value = entry.value();
+            
+            let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
+            key.hash(&mut key_hasher);
+            let key_hash = key_hasher.finish();
+            
+            let added = value.added.clone();
+            let removed = value.removed.clone();
+            
+            datum_keys_and_values.push((key_hash, added, removed));
+        }
+        
+        // Sort for deterministic hashing
+        datum_keys_and_values.sort_by_key(|k| k.0);
+        for (key_hash, added, removed) in datum_keys_and_values {
+            key_hash.hash(state);
+            
+            // Hash added values
+            let mut added_hashes = Vec::new();
+            for item in added {
+                let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
+                item.hash(&mut item_hasher);
+                added_hashes.push(item_hasher.finish());
+            }
+            added_hashes.sort_unstable();
+            for h in added_hashes {
+                h.hash(state);
+            }
+            
+            // Hash removed values
+            let mut removed_hashes = Vec::new();
+            for item in removed {
+                let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
+                item.hash(&mut item_hasher);
+                removed_hashes.push(item_hasher.finish());
+            }
+            removed_hashes.sort_unstable();
+            for h in removed_hashes {
+                h.hash(state);
+            }
+        }
+        
+        // Hash cont_changes
+        let mut cont_keys_and_values = Vec::new();
+        for entry in self.cont_changes.iter() {
+            let key = entry.key().clone();
+            let value = entry.value();
+            
+            // Hash the collection of Blake2b256Hash
+            let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
+            for hash in &key {
+                hash.hash(&mut key_hasher);
+            }
+            let key_hash = key_hasher.finish();
+            
+            let added = value.added.clone();
+            let removed = value.removed.clone();
+            
+            cont_keys_and_values.push((key_hash, added, removed));
+        }
+        
+        // Sort for deterministic hashing
+        cont_keys_and_values.sort_by_key(|k| k.0);
+        for (key_hash, added, removed) in cont_keys_and_values {
+            key_hash.hash(state);
+            
+            // Hash added values
+            let mut added_hashes = Vec::new();
+            for item in added {
+                let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
+                item.hash(&mut item_hasher);
+                added_hashes.push(item_hasher.finish());
+            }
+            added_hashes.sort_unstable();
+            for h in added_hashes {
+                h.hash(state);
+            }
+            
+            // Hash removed values
+            let mut removed_hashes = Vec::new();
+            for item in removed {
+                let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
+                item.hash(&mut item_hasher);
+                removed_hashes.push(item_hasher.finish());
+            }
+            removed_hashes.sort_unstable();
+            for h in removed_hashes {
+                h.hash(state);
+            }
+        }
+        
+        // Hash consume_channels_to_join_serialized_map
+        let mut join_keys_and_values = Vec::new();
+        for entry in self.consume_channels_to_join_serialized_map.iter() {
+            let key = entry.key().clone();
+            let value = entry.value().clone();
+            
+            // Hash the collection of Blake2b256Hash
+            let mut key_hasher = std::collections::hash_map::DefaultHasher::new();
+            for hash in &key {
+                hash.hash(&mut key_hasher);
+            }
+            let key_hash = key_hasher.finish();
+            
+            let mut value_hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut value_hasher);
+            let value_hash = value_hasher.finish();
+            
+            join_keys_and_values.push((key_hash, value_hash));
+        }
+        
+        // Sort for deterministic hashing
+        join_keys_and_values.sort_by_key(|k| k.0);
+        for (key_hash, value_hash) in join_keys_and_values {
+            key_hash.hash(state);
+            value_hash.hash(state);
+        }
+    }
+}
+
 impl StateChange {
     pub fn new<C, P, A, K>(
         pre_state_reader: RSpaceHistoryReaderImpl<C, P, A, K>,
         post_state_reader: RSpaceHistoryReaderImpl<C, P, A, K>,
-        event_log_index: EventLogIndex,
+        event_log_index: &EventLogIndex,
     ) -> Result<Self, HistoryError>
     where
         C: Clone + for<'a> Deserialize<'a> + Serialize + 'static + Sync + Send,

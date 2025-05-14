@@ -5,6 +5,12 @@ use std::iter::FromIterator;
 #[derive(Debug, Clone)]
 pub struct HashableSet<T>(pub HashSet<T>);
 
+impl<T: Eq + Hash> HashableSet<T> {
+    pub fn new() -> Self {
+        Self(HashSet::new())
+    }
+}
+
 impl<T: Eq + Hash> PartialEq for HashableSet<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0

@@ -234,7 +234,7 @@ impl EventLogIndex {
         }
     }
 
-    pub fn combine(x: Self, y: Self) -> Self {
+    pub fn combine(x: &Self, y: &Self) -> Self {
         EventLogIndex {
             produces_linear: HashableSet(
                 x.produces_linear

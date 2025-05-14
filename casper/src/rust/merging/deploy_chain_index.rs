@@ -1,7 +1,8 @@
 // See casper/src/main/scala/coop/rchain/casper/merging/DeployChainIndex.scala
 
 use prost::bytes::Bytes;
-use std::collections::HashSet;
+use shared::rust::hashable_set::HashableSet;
+use std::{collections::HashSet, sync::Arc};
 
 use rspace_plus_plus::rspace::{
     errors::HistoryError,
@@ -12,19 +13,20 @@ use rspace_plus_plus::rspace::{
 
 use super::deploy_index::DeployIndex;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct DeployIdWithCost {
-    deploy_id: Bytes,
-    cost: u64,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DeployIdWithCost {
+    pub deploy_id: Bytes,
+    pub cost: u64,
 }
 
 /** index of deploys depending on each other inside a single block (state transition) */
+#[derive(Debug, Clone, Hash)]
 pub struct DeployChainIndex {
-    deploys_with_cost: HashSet<DeployIdWithCost>,
+    pub deploys_with_cost: HashableSet<DeployIdWithCost>,
     pre_state_hash: Blake2b256Hash,
     post_state_hash: Blake2b256Hash,
-    event_log_index: EventLogIndex,
-    state_changes: StateChange,
+    pub event_log_index: EventLogIndex,
+    pub state_changes: StateChange,
     // caching hash code helps a lot to increase performance of computing rejection options
     // TODO mysterious speedup of merging benchmark when setting this to some fixed value - OLD
     hash_code: i32,
@@ -32,10 +34,10 @@ pub struct DeployChainIndex {
 
 impl DeployChainIndex {
     pub fn new<C, P, A, K>(
-        deploys: HashSet<DeployIndex>,
-        pre_state_hash: Blake2b256Hash,
-        post_state_hash: Blake2b256Hash,
-        history_repository: impl HistoryRepository<C, P, A, K>,
+        deploys: &HashableSet<DeployIndex>,
+        pre_state_hash: &Blake2b256Hash,
+        post_state_hash: &Blake2b256Hash,
+        history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
     ) -> Result<Self, HistoryError>
     where
         C: std::clone::Clone
@@ -49,6 +51,7 @@ impl DeployChainIndex {
         K: std::clone::Clone + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
     {
         let deploys_with_cost: HashSet<DeployIdWithCost> = deploys
+            .0
             .iter()
             .map(|deploy| DeployIdWithCost {
                 deploy_id: deploy.deploy_id.clone(),
@@ -59,18 +62,16 @@ impl DeployChainIndex {
         let event_log_index = deploys
             .into_iter()
             .fold(EventLogIndex::empty(), |acc, deploy| {
-                EventLogIndex::combine(acc, deploy.event_log_index)
+                EventLogIndex::combine(&acc, &deploy.event_log_index)
             });
 
-        let pre_history_reader =
-            history_repository.get_history_reader_struct(&pre_state_hash)?;
-        let post_history_reader =
-            history_repository.get_history_reader_struct(&post_state_hash)?;
+        let pre_history_reader = history_repository.get_history_reader_struct(&pre_state_hash)?;
+        let post_history_reader = history_repository.get_history_reader_struct(&post_state_hash)?;
 
         let state_changes = StateChange::new(
             pre_history_reader,
             post_history_reader,
-            event_log_index.clone(),
+            &event_log_index,
         )?;
 
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -80,9 +81,9 @@ impl DeployChainIndex {
         let hash_code = std::hash::Hasher::finish(&hasher) as i32;
 
         Ok(Self {
-            deploys_with_cost,
-            pre_state_hash,
-            post_state_hash,
+            deploys_with_cost: HashableSet(deploys_with_cost),
+            pre_state_hash: pre_state_hash.clone(),
+            post_state_hash: post_state_hash.clone(),
             event_log_index,
             state_changes,
             hash_code,

@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::ListParWithRandom;
+use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rspace_plus_plus::rspace::hot_store_trie_action::TrieInsertAction;
 use rspace_plus_plus::rspace::hot_store_trie_action::TrieInsertBinaryProduce;
 use rspace_plus_plus::rspace::{
@@ -85,13 +85,11 @@ impl RholangMergingLogic {
      * @param getBaseData Base state value reader
      */
     pub fn calculate_number_channel_merge(
-        channel_hash: Blake2b256Hash,
+        channel_hash: &Blake2b256Hash,
         diff: i64,
-        changes: ChannelChange<prost::bytes::Bytes>,
-        get_base_data: impl Fn(&Blake2b256Hash) -> Result<Vec<Datum<ListParWithRandom>>, HistoryError>
-            + Send
-            + Sync,
-    ) -> HotStoreTrieAction<(), (), (), ()> {
+        changes: &ChannelChange<Vec<u8>>,
+        get_base_data: impl Fn(&Blake2b256Hash) -> Result<Vec<Datum<ListParWithRandom>>, HistoryError>,
+    ) -> HotStoreTrieAction<Par, BindPattern, ListParWithRandom, TaggedContinuation> {
         // Read initial value of number channel from base state
         let init_val_opt = Self::convert_to_read_number(get_base_data)(&channel_hash);
 
@@ -102,13 +100,13 @@ impl RholangMergingLogic {
         // Calculate merged random generator (use only unique changes as input)
         let new_rnd = if changes.added.iter().collect::<HashSet<_>>().len() == 1 {
             // Single branch, just use available random generator
-            Self::decode_rnd(changes.added.first().unwrap().as_ref().to_vec())
+            Self::decode_rnd(changes.added.first().unwrap().to_vec())
         } else {
             // Multiple branches, merge random generators
             let rnd_added_sorted = changes
                 .added
                 .iter()
-                .map(|bytes| Self::decode_rnd(bytes.as_ref().to_vec()))
+                .map(|bytes| Self::decode_rnd(bytes.to_vec()))
                 .collect::<HashSet<_>>()
                 .into_iter()
                 .map(|rnd| (rnd.clone(), rnd.to_bytes()))
@@ -131,7 +129,7 @@ impl RholangMergingLogic {
         // Create update store action
         HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryProduce(
             TrieInsertBinaryProduce {
-                hash: channel_hash,
+                hash: channel_hash.clone(),
                 data: vec![datum_encoded],
             },
         ))
