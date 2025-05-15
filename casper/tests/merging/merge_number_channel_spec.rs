@@ -205,7 +205,7 @@ async fn test_case(
         .map(|(i, term)| {
             let term = term.clone();
             let mut runtime_clone = runtime.clone();
-            let i = i; // Move i into the closure
+
             async move {
                 let base_res = runtime_clone
                     .evaluate(&term, Cost::unsafe_max(), HashMap::new(), base_rho_seed())

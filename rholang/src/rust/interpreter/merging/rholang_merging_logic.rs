@@ -1,7 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/merging/RholangMergingLogic.scala
 
 use indexmap::IndexSet;
-use prost::Message;
 use rspace_plus_plus::rspace::errors::HistoryError;
 use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
@@ -136,8 +135,8 @@ impl RholangMergingLogic {
     }
 
     fn decode_rnd(par_with_rnd_encoded: Vec<u8>) -> Blake2b512Random {
-        let pars_with_rnd = ListParWithRandom::decode(par_with_rnd_encoded.as_ref()).unwrap();
-        let rnd = Blake2b512Random::from_bytes(&pars_with_rnd.random_state);
+        let datum: Datum<ListParWithRandom> = serializers::decode_datum(&par_with_rnd_encoded);
+        let rnd = Blake2b512Random::from_bytes(&datum.a.random_state);
         rnd
     }
 
