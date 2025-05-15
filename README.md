@@ -131,6 +131,8 @@ A command-line interface for interacting with F1r3fly nodes is available in the 
 - **Full Deploy** operations (deploy + propose in one step)
 - **Checking finalization** of blocks with automatic retries
 - **Exploratory Deploy** to execute Rholang without committing to the blockchain (ideal for read-only nodes)
+- **Generating Public Keys** from private keys for identity and signature verification
+- **Generating Key Pairs** for creating new blockchain identities
 
 For detailed usage instructions and examples, see the [Node CLI README](node-cli/README.md).
 

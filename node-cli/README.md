@@ -92,6 +92,39 @@ cargo run -- exploratory-deploy -f ../rholang/examples/stdout.rho --block-hash B
 cargo run -- exploratory-deploy -f ../rholang/examples/stdout.rho --block-hash BLOCK_HASH --use-pre-state
 ```
 
+### Generate Public Key
+
+Generate a public key from a given private key.
+
+```bash
+# Using default private key
+cargo run -- generate-public-key
+
+# Provide your own private key
+cargo run -- generate-public-key --private-key YOUR_PRIVATE_KEY
+
+# Generate compressed format public key
+cargo run -- generate-public-key --private-key YOUR_PRIVATE_KEY --compressed
+```
+
+### Generate Key Pair
+
+Generate a new secp256k1 private/public key pair.
+
+```bash
+# Generate a new key pair and display on screen
+cargo run -- generate-key-pair
+
+# Generate a key pair with compressed public key
+cargo run -- generate-key-pair --compressed
+
+# Generate a key pair and save to files
+cargo run -- generate-key-pair --save
+
+# Save to a specific directory
+cargo run -- generate-key-pair --save --output-dir /path/to/keys
+```
+
 ## Using the Makefile
 
 For convenience, a Makefile is provided to simplify common operations. The Makefile uses the example Rholang file located at `../rholang/examples/stdout.rho`.
@@ -161,3 +194,14 @@ make help
 - `-p, --port <PORT>`: gRPC port number (default: 40402)
 - `-b, --block-hash <BLOCK_HASH>`: Optional block hash to use as reference
 - `-u, --use-pre-state`: Use pre-state hash instead of post-state hash
+
+### Generate-Public-Key Command
+
+- `--private-key <PRIVATE_KEY>`: Private key in hex format
+- `-c, --compressed`: Output public key in compressed format (shorter)
+
+### Generate-Key-Pair Command
+
+- `-c, --compressed`: Output public key in compressed format (shorter)
+- `-s, --save`: Save keys to files instead of displaying them
+- `-o, --output-dir <DIR>`: Output directory for saved keys (default: current directory)

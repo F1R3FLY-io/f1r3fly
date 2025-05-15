@@ -3,11 +3,8 @@ name = "rspace_plus_plus"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = ["libs/rspace_rhotypes"]
-
-[profile.dev]
-debug = true
+# [workspace]
+# members = ["libs/rspace_rhotypes"]
 
 [lib]
 doctest = false

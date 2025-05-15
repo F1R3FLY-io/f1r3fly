@@ -1094,8 +1094,6 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
       val invalidBlocksProto = InvalidBlocksProto(
         invalidBlocks.map {
           case (blockHash, validator) => {
-            println("\nblockHash: " + blockHash.toByteArray())
-            println("\nvalidator: " + validator.toByteArray())
             BlockHashValidator(
               blockHash,
               validator
