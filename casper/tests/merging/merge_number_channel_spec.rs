@@ -13,7 +13,7 @@ use casper::rust::{
 };
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{
-    g_unforgeable::UnfInstance, BindPattern, GDeployId, GUnforgeable, ListParWithRandom, Par,
+    g_unforgeable::UnfInstance, BindPattern, GPrivate, GUnforgeable, ListParWithRandom, Par,
     TaggedContinuation,
 };
 use rholang::rust::interpreter::{
@@ -107,8 +107,8 @@ fn base_rho_seed() -> Blake2b512Random {
 
 fn unforgeable_name_seed() -> Par {
     Par::default().with_unforgeables(vec![GUnforgeable {
-        unf_instance: Some(UnfInstance::GDeployIdBody(GDeployId {
-            sig: base_rho_seed()
+        unf_instance: Some(UnfInstance::GPrivateBody(GPrivate {
+            id: base_rho_seed()
                 .next()
                 .into_iter()
                 .map(|b| b as u8)
@@ -208,7 +208,7 @@ async fn test_case(
             let i = i; // Move i into the closure
             async move {
                 let base_res = runtime_clone
-                    .evaluate_with_env_and_phlo(&term, Cost::unsafe_max(), HashMap::new())
+                    .evaluate(&term, Cost::unsafe_max(), HashMap::new(), base_rho_seed())
                     .await
                     .unwrap();
 
