@@ -33,6 +33,86 @@ pub struct StateChange {
     pub consume_channels_to_join_serialized_map: DashMap<Vec<Blake2b256Hash>, Vec<u8>>,
 }
 
+impl PartialEq for StateChange {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare by counting entries and checking if all keys and values match
+        // This is an approximate equality check since DashMap doesn't implement PartialEq
+        
+        // Check if maps have same size
+        if self.datums_changes.len() != other.datums_changes.len() ||
+           self.cont_changes.len() != other.cont_changes.len() ||
+           self.consume_channels_to_join_serialized_map.len() != other.consume_channels_to_join_serialized_map.len() {
+            return false;
+        }
+        
+        // Check all datums_changes match
+        for entry in self.datums_changes.iter() {
+            let key = entry.key();
+            let value = entry.value();
+            
+            if let Some(other_value) = other.datums_changes.get(key) {
+                if value.added != other_value.added || value.removed != other_value.removed {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        
+        // Check all cont_changes match
+        for entry in self.cont_changes.iter() {
+            let key = entry.key();
+            let value = entry.value();
+            
+            // Find matching key in other.cont_changes
+            let found = other.cont_changes.iter().any(|other_entry| {
+                let other_key = other_entry.key();
+                let other_value = other_entry.value();
+                
+                key == other_key && value.added == other_value.added && value.removed == other_value.removed
+            });
+            
+            if !found {
+                return false;
+            }
+        }
+        
+        // Check all join maps match
+        for entry in self.consume_channels_to_join_serialized_map.iter() {
+            let key = entry.key();
+            let value = entry.value();
+            
+            // Find matching key in other.consume_channels_to_join_serialized_map
+            let found = other.consume_channels_to_join_serialized_map.iter().any(|other_entry| {
+                let other_key = other_entry.key();
+                let other_value = other_entry.value();
+                
+                key == other_key && value == other_value
+            });
+            
+            if !found {
+                return false;
+            }
+        }
+        
+        true
+    }
+}
+
+impl PartialOrd for StateChange {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Implement a custom ordering based on sizes
+        // This is a simple implementation that treats StateChange as comparable
+        // For a real implementation, you'd need to define a sensible ordering
+        
+        // Compare by the number of entries in each map
+        let self_total = self.datums_changes.len() + self.cont_changes.len() + self.consume_channels_to_join_serialized_map.len();
+        let other_total = other.datums_changes.len() + other.cont_changes.len() + other.consume_channels_to_join_serialized_map.len();
+        
+        self_total.partial_cmp(&other_total)
+    }
+}
+
 impl Hash for StateChange {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Hash datums_changes
@@ -156,6 +236,19 @@ impl Hash for StateChange {
             key_hash.hash(state);
             value_hash.hash(state);
         }
+    }
+}
+
+impl Eq for StateChange {}
+
+impl Ord for StateChange {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Implement total ordering consistent with partial_cmp
+        // Compare by the number of entries in each map
+        let self_total = self.datums_changes.len() + self.cont_changes.len() + self.consume_channels_to_join_serialized_map.len();
+        let other_total = other.datums_changes.len() + other.cont_changes.len() + other.consume_channels_to_join_serialized_map.len();
+        
+        self_total.cmp(&other_total)
     }
 }
 

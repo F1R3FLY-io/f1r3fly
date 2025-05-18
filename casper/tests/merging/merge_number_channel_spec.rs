@@ -244,7 +244,7 @@ async fn test_case(
     );
 
     let left_deploy_chains = left_deploy_indices
-        .iter()
+        .0.iter()
         .map(|deploy_index| {
             DeployChainIndex::new(
                 deploy_index,
@@ -257,7 +257,7 @@ async fn test_case(
         .collect::<Vec<_>>();
 
     let right_deploy_chains = right_deploy_indices
-        .iter()
+        .0.iter()
         .map(|deploy_index| {
             DeployChainIndex::new(
                 deploy_index,

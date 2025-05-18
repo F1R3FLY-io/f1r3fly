@@ -9,7 +9,7 @@ use crate::rspace::trace::event::{Consume, Event, IOEvent, Produce};
 
 use super::merging_logic::{NumberChannelsDiff, combine_produces_copied_by_peek};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EventLogIndex {
     pub produces_linear: HashableSet<Produce>,
     pub produces_persistent: HashableSet<Produce>,

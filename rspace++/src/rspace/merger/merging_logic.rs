@@ -1,8 +1,8 @@
 // See rspace/src/main/scala/coop/rchain/rspace/merger/MergingLogic.scala
 // See rspace/src/test/scala/coop/rchain/rspace/merging/MergingLogicSpec.scala
 
-use std::collections::{BTreeMap, HashMap, HashSet};
 use shared::rust::hashable_set::HashableSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash,
@@ -58,11 +58,11 @@ pub fn depends(target: &EventLogIndex, source: &EventLogIndex) -> bool {
 
 /// If two event logs are conflicting.
 pub fn are_conflicting(a: &EventLogIndex, b: &EventLogIndex) -> bool {
-    !conflicts(a, b).is_empty()
+    conflicts(a, b).0.is_empty() == false
 }
 
 /// Channels conflicting between a pair of event logs.
-pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
+pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> HashableSet<Blake2b256Hash> {
     // Check #1
     // If the same produce or consume is destroyed in COMM in both branches, this might be a race.
     // All events created in event logs are unique, this match can be identified by comparing case classes.
@@ -86,7 +86,7 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
                 .cloned()
                 .collect(),
         );
-        let consume_races: Vec<Consume> = shared_consumes
+        let consume_races: HashSet<Consume> = shared_consumes
             .0
             .difference(&mergeable_consumes.0)
             .filter(|c| !c.persistent)
@@ -107,19 +107,19 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
                 .cloned()
                 .collect(),
         );
-        let produce_races: Vec<Produce> = shared_produces
+        let produce_races: HashSet<Produce> = shared_produces
             .0
             .difference(&mergeable_produces.0)
             .filter(|p| !p.persistent)
             .cloned()
             .collect();
 
-        let mut result = Vec::new();
+        let mut result = HashSet::new();
         for consume in consume_races {
             result.extend(consume.channel_hashes.iter().cloned());
         }
         for produce in produce_races {
-            result.push(produce.channel_hash.clone());
+            result.insert(produce.channel_hash.clone());
         }
         result
     };
@@ -128,20 +128,20 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
     // Events that are created inside branch and has not been destroyed in branch's COMMs
     // can lead to potential COMM during merge.
     let potential_comms = {
-        // Helper function to check if consume matches produce
+        // TODO analyze joins to make less conflicts. Now plain channel intersection treated as a conflict - OLD
         fn match_found(consume: &Consume, produce: &Produce) -> bool {
             consume.channel_hashes.contains(&produce.channel_hash)
         }
 
         // Search for match in both directions
-        fn check(left: &EventLogIndex, right: &EventLogIndex) -> Vec<Blake2b256Hash> {
+        fn check(left: &EventLogIndex, right: &EventLogIndex) -> HashSet<Blake2b256Hash> {
             let p = produces_created_and_not_destroyed(left);
             let c = consumes_created_and_not_destroyed(right);
-            let mut result = Vec::new();
+            let mut result = HashSet::new();
             for produce in &p.0 {
                 for consume in &c.0 {
                     if match_found(consume, produce) {
-                        result.push(produce.channel_hash.clone());
+                        result.insert(produce.channel_hash.clone());
                     }
                 }
             }
@@ -156,24 +156,24 @@ pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> Vec<Blake2b256Hash> {
     // Now we don't analyze joins and declare conflicting cases when produce touch join because applying
     // produces from both event logs might trigger continuation of some join, so COMM event
     let produce_touch_base_join = {
-        let mut result = Vec::new();
+        let mut result = HashSet::new();
         for produce in a
             .produces_touching_base_joins
             .0
             .iter()
             .chain(b.produces_touching_base_joins.0.iter())
         {
-            result.push(produce.channel_hash.clone());
+            result.insert(produce.channel_hash.clone());
         }
         result
     };
 
     // Combine all conflicts
-    let mut all_conflicts = Vec::new();
+    let mut all_conflicts = HashSet::new();
     all_conflicts.extend(races_for_same_io_event);
     all_conflicts.extend(potential_comms);
     all_conflicts.extend(produce_touch_base_join);
-    all_conflicts
+    HashableSet(all_conflicts)
 }
 
 /// Produce created inside event log.
@@ -231,6 +231,7 @@ pub fn consumes_created_and_not_destroyed(e: &EventLogIndex) -> HashableSet<Cons
         .difference(&e.consumes_produced.0)
         .cloned()
         .collect();
+
     HashableSet(
         linear_not_produced
             .union(&e.consumes_persistent.0)
@@ -315,7 +316,7 @@ pub fn combine_produces_copied_by_peek(
 /// NOTE: predicate here is forced to be non directional.
 /// If either (a,b) or (b,a) is true, both relations are recorded as true.
 /// TODO: adjust once dependency graph is implemented for branch computing - OLD
-pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone>(
+pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone + PartialOrd>(
     items: &HashableSet<A>,
     relation: impl Fn(&A, &A) -> bool,
 ) -> HashMap<A, HashableSet<A>> {
@@ -325,18 +326,19 @@ pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone>(
         .map(|item| (item.clone(), HashableSet(HashSet::new())))
         .collect();
 
-    let items_vec: Vec<A> = items.0.iter().cloned().collect();
-    for i in 0..items_vec.len() {
-        for j in (i + 1)..items_vec.len() {
-            let l = &items_vec[i];
-            let r = &items_vec[j];
+    for item1 in items.0.iter() {
+        for item2 in items.0.iter() {
+            // Skip self-comparisons and duplicated comparisons
+            if std::ptr::eq(item1, item2) || item1 > item2 {
+                continue;
+            }
 
-            if relation(l, r) || relation(r, l) {
-                if let Some(l_set) = init.get_mut(l) {
-                    l_set.0.insert(r.clone());
+            if relation(item1, item2) || relation(item2, item1) {
+                if let Some(set1) = init.get_mut(item1) {
+                    set1.0.insert(item2.clone());
                 }
-                if let Some(r_set) = init.get_mut(r) {
-                    r_set.0.insert(l.clone());
+                if let Some(set2) = init.get_mut(item2) {
+                    set2.0.insert(item1.clone());
                 }
             }
         }
@@ -348,58 +350,75 @@ pub fn compute_relation_map<A: Eq + std::hash::Hash + Clone>(
 /// Given relation map, return sets of related items.
 pub fn gather_related_sets<A: Eq + std::hash::Hash + Clone>(
     relation_map: &HashMap<A, HashableSet<A>>,
-) -> Vec<HashableSet<A>> {
+) -> HashableSet<HashableSet<A>> {
     fn add_relations<A: Eq + std::hash::Hash + Clone>(
         to_add: &HashableSet<A>,
-        acc: &HashableSet<A>,
+        acc: HashSet<A>, // Take ownership instead of reference
         relation_map: &HashMap<A, HashableSet<A>>,
-    ) -> HashableSet<A> {
-        // stop if all new dependencies are already in set
-        let mut next = acc.clone();
+    ) -> HashSet<A> {
+        // Add all items to accumulator
+        let mut next = acc;
+        let initial_size = next.len();
+
         for item in &to_add.0 {
-            next.0.insert(item.clone());
+            next.insert(item.clone());
         }
 
-        let stop = next.0.len() == acc.0.len();
-        if stop {
-            acc.clone()
-        } else {
-            let mut n = HashSet::new();
-            for v in &to_add.0 {
-                if let Some(related) = relation_map.get(v) {
-                    for r in &related.0 {
+        // Stop if no new items were added
+        if next.len() == initial_size {
+            return next;
+        }
+
+        // Find new related items
+        let mut n = HashSet::new();
+        for v in to_add.0.iter() {
+            if let Some(related) = relation_map.get(v) {
+                for r in &related.0 {
+                    if !next.contains(r) {
+                        // Only collect items not already in next
                         n.insert(r.clone());
                     }
                 }
             }
-            add_relations(&HashableSet(n), &next, relation_map)
         }
+
+        if n.is_empty() {
+            return next;
+        }
+
+        // Continue with new items
+        add_relations(&HashableSet(n), next, relation_map)
     }
 
-    let mut result = Vec::new();
+    // Use a more efficient way to track processed nodes
+    let mut processed = HashSet::new();
+    let mut result = HashSet::new();
+
     for k in relation_map.keys() {
-        let related = relation_map.get(k).unwrap();
+        if processed.contains(k) {
+            continue; // Skip already processed nodes
+        }
+
         let mut start = HashSet::new();
         start.insert(k.clone());
-        let set = add_relations(&related, &HashableSet(start), relation_map);
+        let component = add_relations(relation_map.get(k).unwrap(), start, relation_map);
 
-        // Check if this set is already in result to avoid duplicates
-        if !result.iter().any(|existing_set: &HashableSet<A>| {
-            existing_set.0.len() == set.0.len()
-                && existing_set.0.iter().all(|item| set.0.contains(item))
-        }) {
-            result.push(set);
+        // Mark all nodes in this component as processed
+        for item in &component {
+            processed.insert(item.clone());
         }
+
+        result.insert(HashableSet(component));
     }
 
-    result
+    HashableSet(result)
 }
 
 /// Compute related sets directly from items and relation
-pub fn compute_related_sets<A: Eq + std::hash::Hash + Clone>(
+pub fn compute_related_sets<A: Eq + std::hash::Hash + Clone + PartialOrd>(
     items: &HashableSet<A>,
     relation: impl Fn(&A, &A) -> bool,
-) -> Vec<HashableSet<A>> {
+) -> HashableSet<HashableSet<A>> {
     let relation_map = compute_relation_map(items, relation);
     gather_related_sets(&relation_map)
 }
@@ -407,7 +426,7 @@ pub fn compute_related_sets<A: Eq + std::hash::Hash + Clone>(
 /// Given conflicts map, output possible rejection options.
 pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
     conflict_map: &HashMap<A, HashableSet<A>>,
-) -> Vec<HashableSet<A>> {
+) -> HashableSet<HashableSet<A>> {
     // Set of rejection paths with corresponding remaining conflicts map
     #[derive(Clone)]
     struct RejectionOption<A: Eq + std::hash::Hash + Clone> {
@@ -415,10 +434,26 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
         remaining_conflicts_map: HashMap<A, HashableSet<A>>,
     }
 
+    impl<A: Eq + std::hash::Hash + Clone> PartialEq for RejectionOption<A> {
+        fn eq(&self, other: &Self) -> bool {
+            // Only compare rejected_so_far for equality
+            self.rejected_so_far == other.rejected_so_far
+        }
+    }
+
+    impl<A: Eq + std::hash::Hash + Clone> Eq for RejectionOption<A> {}
+
+    impl<A: Eq + std::hash::Hash + Clone> std::hash::Hash for RejectionOption<A> {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            // Only hash rejected_so_far
+            self.rejected_so_far.hash(state);
+        }
+    }
+
     fn gather_rej_options<A: Eq + std::hash::Hash + Clone>(
         conflicts_map: &HashMap<A, HashableSet<A>>,
-    ) -> Vec<RejectionOption<A>> {
-        let mut result = Vec::new();
+    ) -> HashSet<RejectionOption<A>> {
+        let mut result = HashSet::new();
 
         for (_, to_reject) in conflicts_map {
             // keeping each key - reject conflicting values
@@ -446,12 +481,7 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
                 remaining_conflicts_map,
             };
 
-            // Only add if not already in result
-            if !result.iter().any(|existing: &RejectionOption<A>| {
-                existing.rejected_so_far.0 == option.rejected_so_far.0
-            }) {
-                result.push(option);
-            }
+            result.insert(option);
         }
 
         result
@@ -471,24 +501,30 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
         remaining_conflicts_map: conflicts_only_map,
     };
 
-    let mut result = Vec::new();
-    let mut current = vec![start];
+    let mut result = HashSet::new();
+    let mut current = {
+        let mut set = HashSet::new();
+        set.insert(start);
+        set
+    };
 
     while !current.is_empty() {
-        let mut next = Vec::new();
+        let mut next = HashSet::new();
 
         for option in current {
             if option.remaining_conflicts_map.is_empty() {
                 // No more conflicts, this is a valid rejection option
                 // Only add if not already in result
-                if !result.iter().any(|existing_set: &HashableSet<A>| {
+                let already_exists = result.iter().any(|existing_set: &HashableSet<A>| {
                     existing_set.0.len() == option.rejected_so_far.0.len()
                         && existing_set
                             .0
                             .iter()
                             .all(|item| option.rejected_so_far.0.contains(item))
-                }) {
-                    result.push(option.rejected_so_far);
+                });
+
+                if !already_exists {
+                    result.insert(option.rejected_so_far);
                 }
             } else {
                 // Continue resolving conflicts
@@ -497,7 +533,7 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
                     for item in &option.rejected_so_far.0 {
                         new_option.rejected_so_far.0.insert(item.clone());
                     }
-                    next.push(new_option);
+                    next.insert(new_option);
                 }
             }
         }
@@ -505,7 +541,7 @@ pub fn compute_rejection_options<A: Eq + std::hash::Hash + Clone>(
         current = next;
     }
 
-    result
+    HashableSet(result)
 }
 
 #[cfg(test)]
@@ -523,13 +559,14 @@ mod tests {
         map1.insert(4, HashableSet(HashSet::from_iter(vec![1])));
 
         let result1 = compute_rejection_options(&map1);
-        assert_eq!(result1.len(), 2);
+        assert_eq!(result1.0.len(), 2);
         assert!(
             result1
+                .0
                 .iter()
                 .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&2))
         );
-        assert!(result1.iter().any(|set| set.0.len() == 3
+        assert!(result1.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&2)
             && set.0.contains(&3)
             && set.0.contains(&4)));
@@ -542,20 +579,20 @@ mod tests {
         map2.insert(4, HashableSet(HashSet::from_iter(vec![1, 2, 3])));
 
         let result2 = compute_rejection_options(&map2);
-        assert_eq!(result2.len(), 4);
-        assert!(result2.iter().any(|set| set.0.len() == 3
+        assert_eq!(result2.0.len(), 4);
+        assert!(result2.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&2)
             && set.0.contains(&3)
             && set.0.contains(&4)));
-        assert!(result2.iter().any(|set| set.0.len() == 3
+        assert!(result2.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&1)
             && set.0.contains(&3)
             && set.0.contains(&4)));
-        assert!(result2.iter().any(|set| set.0.len() == 3
+        assert!(result2.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&1)
             && set.0.contains(&2)
             && set.0.contains(&4)));
-        assert!(result2.iter().any(|set| set.0.len() == 3
+        assert!(result2.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&1)
             && set.0.contains(&2)
             && set.0.contains(&3)));
@@ -568,18 +605,20 @@ mod tests {
         map3.insert(4, HashableSet(HashSet::from_iter(vec![1, 3])));
 
         let result3 = compute_rejection_options(&map3);
-        assert_eq!(result3.len(), 3);
-        assert!(result3.iter().any(|set| set.0.len() == 3
+        assert_eq!(result3.0.len(), 3);
+        assert!(result3.0.iter().any(|set| set.0.len() == 3
             && set.0.contains(&2)
             && set.0.contains(&3)
             && set.0.contains(&4)));
         assert!(
             result3
+                .0
                 .iter()
                 .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&3))
         );
         assert!(
             result3
+                .0
                 .iter()
                 .any(|set| set.0.len() == 2 && set.0.contains(&1) && set.0.contains(&4))
         );
@@ -592,14 +631,16 @@ mod tests {
         map4.insert(4, HashableSet(HashSet::from_iter(vec![3])));
 
         let result4 = compute_rejection_options(&map4);
-        assert_eq!(result4.len(), 2);
+        assert_eq!(result4.0.len(), 2);
         assert!(
             result4
+                .0
                 .iter()
                 .any(|set| set.0.len() == 1 && set.0.contains(&3))
         );
         assert!(
             result4
+                .0
                 .iter()
                 .any(|set| set.0.len() == 2 && set.0.contains(&2) && set.0.contains(&4))
         );
@@ -613,11 +654,11 @@ mod tests {
         }
 
         let result5 = compute_rejection_options(&map5);
-        assert_eq!(result5.len(), 1000);
+        assert_eq!(result5.0.len(), 1000);
         for i in 1..=1000 {
             let mut expected = all.clone();
             expected.remove(&i);
-            assert!(result5.iter().any(|set| {
+            assert!(result5.0.iter().any(|set| {
                 set.0.len() == 999
                     && !set.0.contains(&i)
                     && (1..=1000).filter(|j| *j != i).all(|j| set.0.contains(&j))
@@ -632,13 +673,13 @@ mod tests {
         let same_parity = |a: &i32, b: &i32| a % 2 == b % 2;
 
         let result = compute_related_sets(&items, same_parity);
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.0.len(), 2);
 
         // Should have one set with odd numbers and one with even numbers
         let mut found_odd = false;
         let mut found_even = false;
 
-        for set in result {
+        for set in &result.0 {
             if set.0.len() == 3 && set.0.contains(&1) && set.0.contains(&3) && set.0.contains(&5) {
                 found_odd = true;
             }
@@ -669,5 +710,400 @@ mod tests {
 
         assert!(!relation_map.get(&3).unwrap().0.contains(&4));
         assert!(!relation_map.get(&4).unwrap().0.contains(&6));
+    }
+
+    #[test]
+    fn test_depends() {
+        // Setup basic event indices
+        let mut source = EventLogIndex::empty();
+        let mut target = EventLogIndex::empty();
+
+        // Create test data
+        let channel_hash = Blake2b256Hash::from_bytes(vec![1]);
+        
+        let produce1 = Produce {
+            channel_hash: channel_hash.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let consume1 = Consume {
+            channel_hashes: vec![channel_hash.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![20]),
+        };
+
+        // Test 1: No dependency
+        assert!(!depends(&target, &source));
+
+        // Test 2: Dependency via produces
+        source.produces_linear.0.insert(produce1.clone());
+        target.produces_consumed.0.insert(produce1.clone());
+        assert!(depends(&target, &source));
+
+        // Test 3: No dependency when produce is mergeable
+        let mut source2 = source.clone();
+        source2.produces_mergeable.0.insert(produce1.clone());
+        assert!(!depends(&target, &source2));
+
+        // Test 4: Dependency via consumes
+        let mut source3 = EventLogIndex::empty();
+        let mut target3 = EventLogIndex::empty();
+        source3.consumes_linear_and_peeks.0.insert(consume1.clone());
+        target3.consumes_produced.0.insert(consume1.clone());
+        assert!(depends(&target3, &source3));
+    }
+
+    #[test]
+    fn test_conflicts_and_are_conflicting() {
+        // Setup basic event indices
+        let mut a = EventLogIndex::empty();
+        let mut b = EventLogIndex::empty();
+
+        // Create test channel hashes
+        let ch1 = Blake2b256Hash::from_bytes(vec![1]);
+        let ch2 = Blake2b256Hash::from_bytes(vec![2]);
+
+        // Create test data
+        let produce1 = Produce {
+            channel_hash: ch1.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let produce2 = Produce {
+            channel_hash: ch2.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![11]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+
+        // Test 1: No conflicts initially
+        assert!(!are_conflicting(&a, &b));
+        assert!(conflicts(&a, &b).0.is_empty());
+
+        // Test 2: Race conflict (same produce consumed in both)
+        a.produces_consumed.0.insert(produce1.clone());
+        b.produces_consumed.0.insert(produce1.clone());
+        assert!(are_conflicting(&a, &b));
+        assert!(conflicts(&a, &b).0.contains(&ch1));
+
+        // Test 3: No conflict when produce is mergeable
+        a.produces_mergeable.0.insert(produce1.clone());
+        b.produces_mergeable.0.insert(produce1.clone());
+        assert!(!are_conflicting(&a, &b));
+
+        // Test 4: Potential COMM conflict
+        let mut a2 = EventLogIndex::empty();
+        let mut b2 = EventLogIndex::empty();
+        a2.produces_linear.0.insert(produce2.clone());
+        
+        // Create a consume that includes ch2 in its channel_hashes
+        let consume_for_comm = Consume {
+            channel_hashes: vec![ch1.clone(), ch2.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![22]),
+        };
+        b2.consumes_linear_and_peeks.0.insert(consume_for_comm);
+        assert!(are_conflicting(&a2, &b2));
+
+        // Test 5: Conflict with produce touching base join
+        let mut a3 = EventLogIndex::empty();
+        let b3 = EventLogIndex::empty();
+        a3.produces_touching_base_joins.0.insert(produce1.clone());
+        assert!(are_conflicting(&a3, &b3));
+    }
+
+    #[test]
+    fn test_produces_and_consumes_created() {
+        let mut e = EventLogIndex::empty();
+
+        // Create test data
+        let ch = Blake2b256Hash::from_bytes(vec![1]);
+        
+        let produce_linear = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let produce_persistent = Produce {
+            channel_hash: ch.clone(),
+            persistent: true,
+            hash: Blake2b256Hash::from_bytes(vec![11]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let produce_peek = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![12]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let consume = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![20]),
+        };
+
+        // Test empty case
+        assert!(produces_created(&e).0.is_empty());
+        assert!(consumes_created(&e).0.is_empty());
+
+        // Add data and test
+        e.produces_linear.0.insert(produce_linear.clone());
+        e.produces_persistent.0.insert(produce_persistent.clone());
+        e.produces_copied_by_peek.0.insert(produce_peek.clone());
+        e.consumes_linear_and_peeks.0.insert(consume.clone());
+
+        // Check produces_created
+        let created = produces_created(&e);
+        assert_eq!(created.0.len(), 2);
+        assert!(created.0.contains(&produce_linear));
+        assert!(created.0.contains(&produce_persistent));
+        assert!(!created.0.contains(&produce_peek));
+
+        // Check consumes_created
+        let created_consumes = consumes_created(&e);
+        assert_eq!(created_consumes.0.len(), 1);
+        assert!(created_consumes.0.contains(&consume));
+    }
+
+    #[test]
+    fn test_produces_and_consumes_created_and_not_destroyed() {
+        let mut e = EventLogIndex::empty();
+
+        // Create test data
+        let ch = Blake2b256Hash::from_bytes(vec![1]);
+        
+        let produce_linear = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let produce_linear2 = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![11]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let produce_persistent = Produce {
+            channel_hash: ch.clone(),
+            persistent: true,
+            hash: Blake2b256Hash::from_bytes(vec![12]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        let consume = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![20]),
+        };
+        
+        let consume2 = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![21]),
+        };
+
+        // Add data
+        e.produces_linear.0.insert(produce_linear.clone());
+        e.produces_linear.0.insert(produce_linear2.clone());
+        e.produces_consumed.0.insert(produce_linear2.clone());
+        e.produces_persistent.0.insert(produce_persistent.clone());
+        e.consumes_linear_and_peeks.0.insert(consume.clone());
+        e.consumes_linear_and_peeks.0.insert(consume2.clone());
+        e.consumes_produced.0.insert(consume2.clone());
+
+        // Test produces_created_and_not_destroyed
+        let not_destroyed = produces_created_and_not_destroyed(&e);
+        assert_eq!(not_destroyed.0.len(), 2);
+        assert!(not_destroyed.0.contains(&produce_linear));
+        assert!(!not_destroyed.0.contains(&produce_linear2)); // consumed
+        assert!(not_destroyed.0.contains(&produce_persistent));
+
+        // Test consumes_created_and_not_destroyed
+        let consumes_not_destroyed = consumes_created_and_not_destroyed(&e);
+        assert_eq!(consumes_not_destroyed.0.len(), 1);
+        assert!(consumes_not_destroyed.0.contains(&consume));
+        assert!(!consumes_not_destroyed.0.contains(&consume2)); // produced
+    }
+
+    #[test]
+    fn test_produces_and_consumes_affected() {
+        let mut e = EventLogIndex::empty();
+
+        // Create test data
+        let ch = Blake2b256Hash::from_bytes(vec![1]);
+        
+        // Local produce
+        let local_produce = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        // External produce that is consumed
+        let external_produce = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![11]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+        
+        // Persistent external - shouldn't count as "affected"
+        let persistent_external = Produce {
+            channel_hash: ch.clone(),
+            persistent: true,
+            hash: Blake2b256Hash::from_bytes(vec![12]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+
+        // Set up similar consumes
+        let local_consume = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![20]),
+        };
+        
+        let external_consume = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![21]),
+        };
+        
+        let persistent_ext_consume = Consume {
+            channel_hashes: vec![ch.clone()].into_iter().collect(),
+            persistent: true,
+            hash: Blake2b256Hash::from_bytes(vec![22]),
+        };
+
+        // Set up index
+        e.produces_linear.0.insert(local_produce.clone());
+        e.produces_consumed.0.insert(external_produce.clone());
+        e.produces_consumed.0.insert(persistent_external.clone());
+
+        e.consumes_linear_and_peeks.0.insert(local_consume.clone());
+        e.consumes_produced.0.insert(external_consume.clone());
+        e.consumes_produced.0.insert(persistent_ext_consume.clone());
+
+        // Test produces_affected
+        let affected_produces = produces_affected(&e);
+        assert_eq!(affected_produces.0.len(), 2);
+        assert!(affected_produces.0.contains(&local_produce));
+        assert!(affected_produces.0.contains(&external_produce));
+        assert!(!affected_produces.0.contains(&persistent_external));
+
+        // Test consumes_affected
+        let affected_consumes = consumes_affected(&e);
+        assert_eq!(affected_consumes.0.len(), 2);
+        assert!(affected_consumes.0.contains(&local_consume));
+        assert!(affected_consumes.0.contains(&external_consume));
+        assert!(!affected_consumes.0.contains(&persistent_ext_consume));
+    }
+
+    #[test]
+    fn test_combine_produces_copied_by_peek() {
+        // Set up test indices
+        let mut x = EventLogIndex::empty();
+        let mut y = EventLogIndex::empty();
+
+        let ch1 = Blake2b256Hash::from_bytes(vec![1]);
+        let ch2 = Blake2b256Hash::from_bytes(vec![2]);
+
+        // Produce that's copied by peek in x and created in y
+        let p1 = Produce {
+            channel_hash: ch1.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![10]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+
+        // Produce that's copied by peek in both but not created in either
+        let p2 = Produce {
+            channel_hash: ch2.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![11]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+
+        // Set up data
+        x.produces_copied_by_peek.0.insert(p1.clone());
+        x.produces_copied_by_peek.0.insert(p2.clone());
+
+        y.produces_copied_by_peek.0.insert(p2.clone());
+        y.produces_linear.0.insert(p1.clone());
+
+        // Test combine_produces_copied_by_peek
+        let combined = combine_produces_copied_by_peek(&x, &y);
+
+        // p1 is created in y, so it shouldn't be in the result
+        // p2 is copied by peek in both but not created in either, so it should be in the result
+        assert_eq!(combined.0.len(), 1);
+        assert!(combined.0.contains(&p2));
+        assert!(!combined.0.contains(&p1));
+
+        // Test empty case
+        let empty_x = EventLogIndex::empty();
+        let empty_y = EventLogIndex::empty();
+        assert!(
+            combine_produces_copied_by_peek(&empty_x, &empty_y)
+                .0
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Test case with empty event logs
+        let empty = EventLogIndex::empty();
+        assert!(!depends(&empty, &empty));
+        assert!(!are_conflicting(&empty, &empty));
+        assert!(conflicts(&empty, &empty).0.is_empty());
+
+        // Test case with single produce that is consumed and created
+        let mut e = EventLogIndex::empty();
+        let ch = Blake2b256Hash::from_bytes(vec![1]);
+        let p = Produce {
+            channel_hash: ch.clone(),
+            persistent: false,
+            hash: Blake2b256Hash::from_bytes(vec![1]),
+            is_deterministic: true,
+            output_value: vec![],
+        };
+
+        e.produces_linear.0.insert(p.clone());
+        e.produces_consumed.0.insert(p.clone());
+
+        // Should be empty since the produce is both created and consumed
+        assert!(produces_created_and_not_destroyed(&e).0.is_empty());
+
+        // The produce is still "created" even if consumed
+        assert_eq!(produces_created(&e).0.len(), 1);
+
+        // Not affected since it's consumed but also created in the same log
+        assert!(produces_affected(&e).0.is_empty());
     }
 }

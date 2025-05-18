@@ -3,7 +3,7 @@
 use models::rust::casper::protocol::casper_message::Event;
 use rspace_plus_plus::rspace::merger::event_log_index::EventLogIndex;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub struct DeployIndex {
     pub deploy_id: prost::bytes::Bytes,
     pub cost: u64,

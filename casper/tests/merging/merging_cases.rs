@@ -121,7 +121,7 @@ async fn two_deploys_executed_inside_single_state_transition_should_be_dependent
         // second deploy depends on the first, as it consumes produce put by first one when updating per validator vault balance
         assert!(!second_depends);
         // deploys should be be put in separate deploy chains
-        assert_eq!(deploy_chains.len(), 2);
+        assert_eq!(deploy_chains.0.len(), 2);
     })
     .await
     .unwrap()

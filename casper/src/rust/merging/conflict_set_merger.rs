@@ -34,7 +34,7 @@ fn measure_result_time<T, E, F: FnOnce() -> Result<T, E>>(f: F) -> Result<(T, Du
     Ok((result, duration))
 }
 
-pub fn merge<R: Clone + Eq + std::hash::Hash, C: Clone, P: Clone, A: Clone, K: Clone>(
+pub fn merge<R: Clone + Eq + std::hash::Hash + PartialOrd + Ord, C: Clone, P: Clone, A: Clone, K: Clone>(
     actual_set: HashableSet<R>,
     late_set: HashableSet<R>,
     depends: impl Fn(&R, &R) -> bool,
@@ -74,7 +74,7 @@ pub fn merge<R: Clone + Eq + std::hash::Hash, C: Clone, P: Clone, A: Clone, K: C
 
     // Compute relation map for conflicting branches with timing
     use rspace_plus_plus::rspace::merger::merging_logic::compute_relation_map;
-    let branches_set = HashableSet(branches.iter().cloned().collect());
+    let branches_set = HashableSet(branches.0.iter().cloned().collect());
     let (conflict_map, conflicts_map_time) =
         measure_time(|| compute_relation_map(&branches_set, |a, b| conflicts(a, b)));
 
@@ -200,7 +200,7 @@ pub fn merge<R: Clone + Eq + std::hash::Hash, C: Clone, P: Clone, A: Clone, K: C
         branches_set.0.len(),
         branches_time,
         conflicts_map_time,
-        rejection_options.len(),
+        rejection_options.0.len(),
         rejection_options_time,
         optimal_rejection.0.len(),
         rejected_as_dependents.0.len(),
@@ -216,12 +216,12 @@ pub fn merge<R: Clone + Eq + std::hash::Hash, C: Clone, P: Clone, A: Clone, K: C
 }
 
 /** compute optimal rejection configuration */
-fn get_optimal_rejection<R: Eq + std::hash::Hash + Clone>(
-    options: Vec<HashableSet<Branch<R>>>,
+fn get_optimal_rejection<R: Eq + std::hash::Hash + Clone + Ord>(
+    options: HashableSet<HashableSet<Branch<R>>>,
     target_f: impl Fn(&Branch<R>) -> u64,
 ) -> HashableSet<Branch<R>> {
     assert!(
-        options.iter().map(|b| {
+        options.0.iter().map(|b| {
             let mut heads = HashSet::new();
             for branch in &b.0 {
                 if let Some(head) = branch.0.iter().next() {
@@ -229,14 +229,15 @@ fn get_optimal_rejection<R: Eq + std::hash::Hash + Clone>(
                 }
             }
             heads
-        }).collect::<Vec<_>>().len() == options.len(),
+        }).collect::<Vec<_>>().len() == options.0.len(),
         "Same rejection unit is found in two rejection options. Please report this to code maintainer."
     );
 
     // reject set with min sum of target function output,
     // if equal value - min size of a branch
-    // if equal size - use a deterministic tie-breaker
+    // if equal size - use a deterministic tie-breaker based on the first element of first branch (like Scala)
     options
+        .0
         .into_iter()
         .min_by(|a, b| {
             // First criterion: sum of target function values
@@ -255,9 +256,27 @@ fn get_optimal_rejection<R: Eq + std::hash::Hash + Clone>(
                 return a_size.cmp(&b_size);
             }
 
-            // Third criterion: For tie-breaking, use the count of branches
-            // This ensures deterministic results
-            a.0.len().cmp(&b.0.len())
+            // Third criterion: For tie-breaking, compare the first element of the first branch (as Scala does)
+            // This requires the R type to implement Ord
+            let a_first_branch = a.0.iter().next();
+            let b_first_branch = b.0.iter().next();
+            
+            match (a_first_branch, b_first_branch) {
+                (Some(a_branch), Some(b_branch)) => {
+                    let a_first_item = a_branch.0.iter().next();
+                    let b_first_item = b_branch.0.iter().next();
+                    
+                    match (a_first_item, b_first_item) {
+                        (Some(a_item), Some(b_item)) => a_item.cmp(b_item),
+                        (Some(_), None) => std::cmp::Ordering::Greater,
+                        (None, Some(_)) => std::cmp::Ordering::Less,
+                        (None, None) => std::cmp::Ordering::Equal,
+                    }
+                },
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
         })
         .unwrap_or_else(|| HashableSet(HashSet::new()))
 }
@@ -325,17 +344,20 @@ fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
 /** Get merged result rejection options */
 fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash>(
     branches: &HashableSet<Branch<R>>,
-    reject_options: &[HashableSet<Branch<R>>],
+    reject_options: &HashableSet<HashableSet<Branch<R>>>,
     base: HashMap<Blake2b256Hash, i64>,
     mergeable_channels: impl Fn(&R) -> NumberChannelsDiff,
-) -> Vec<HashableSet<Branch<R>>> {
-    if reject_options.is_empty() {
+) -> HashableSet<HashableSet<Branch<R>>> {
+    if reject_options.0.is_empty() {
         // If no rejection options, fold the branches and return as single option
         let rejected = fold_rejection(base, branches, &mergeable_channels);
-        vec![rejected]
+        let mut result = HashSet::new();
+        result.insert(rejected);
+        HashableSet(result)
     } else {
         // For each reject option, compute the difference and fold
-        reject_options
+        let result: HashSet<HashableSet<Branch<R>>> = reject_options
+            .0
             .iter()
             .map(|normal_reject_options| {
                 // Find branches that aren't in normal_reject_options
@@ -367,6 +389,8 @@ fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash>(
 
                 result
             })
-            .collect()
+            .collect();
+        
+        HashableSet(result)
     }
 }

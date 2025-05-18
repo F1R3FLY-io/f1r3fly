@@ -13,14 +13,14 @@ use rspace_plus_plus::rspace::{
 
 use super::deploy_index::DeployIndex;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DeployIdWithCost {
     pub deploy_id: Bytes,
     pub cost: u64,
 }
 
 /** index of deploys depending on each other inside a single block (state transition) */
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord)]
 pub struct DeployChainIndex {
     pub deploys_with_cost: HashableSet<DeployIdWithCost>,
     pre_state_hash: Blake2b256Hash,
