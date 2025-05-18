@@ -20,7 +20,7 @@ pub struct DeployIdWithCost {
 }
 
 /** index of deploys depending on each other inside a single block (state transition) */
-#[derive(Debug, Clone, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash)]
 pub struct DeployChainIndex {
     pub deploys_with_cost: HashableSet<DeployIdWithCost>,
     pre_state_hash: Blake2b256Hash,
@@ -98,3 +98,15 @@ impl PartialEq for DeployChainIndex {
 }
 
 impl Eq for DeployChainIndex {}
+
+impl PartialOrd for DeployChainIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DeployChainIndex {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.post_state_hash.cmp(&other.post_state_hash)
+    }
+}
