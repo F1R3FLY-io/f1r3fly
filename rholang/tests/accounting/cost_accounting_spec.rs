@@ -1,4 +1,4 @@
-//See rholang/src/test/scala/coop/rchain/rholang/interpreter/accounting/CostAccountingSpec.scala
+//See rholang/src/test/scala/coop/rchain/rholang/interpreter/accounting/CostAccountingSpec.scala from main branch
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
@@ -22,7 +22,7 @@ use rspace_plus_plus::rspace::{
 
 use rand::Rng;
 use rholang::rust::interpreter::errors::InterpreterError;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::option::Option;
 use std::sync::{Arc, Mutex};
 
@@ -188,7 +188,7 @@ fn from_long(index: i64) -> String {
 
                 let join_str = joins.join(" & ");
                 result.push(format!("for ({}) {{ 0 }}", join_str));
-                nonlinear_recv |= (arrow == "<=");
+                nonlinear_recv |= arrow == "<=";
             }
         }
     }
@@ -219,8 +219,8 @@ fn contracts() -> Vec<(String, i64)> {
       (String::from("@0!(0) | for (_ <<- @0) { 0 }"), 406i64),
       (String::from("@0!!(0) | for (_ <<- @0) { 0 }"), 343i64),
       (String::from("@0!!(0) | @0!!(0) | for (_ <<- @0) { 0 }"), 444i64),
-//       (String::from("new loop in {\n         contract loop(@n) = {\n           match n {\n             0 => Nil\n             _ => loop!(n-1)\n           }\n         } |\n         loop!(10)\n       }"),
-// 3892i64),
+      (String::from("new loop in {\n         contract loop(@n) = {\n           match n {\n             0 => Nil\n             _ => loop!(n-1)\n           }\n         } |\n         loop!(10)\n       }"),
+3892i64),
       (String::from("42 | @0!(2) | for (x <- @0) { Nil }"), 336i64),
       (String::from("@1!(1) |\n        for(x <- @1) { Nil } |\n        new x in { x!(10) | for(X <- x) { @2!(Set(X!(7)).add(*X).contains(10)) }} |\n        match 42 {\n          38 => Nil\n          42 =>
 @3!(42)\n        }\n     "), 1264i64),
@@ -340,7 +340,7 @@ async fn cost_should_be_deterministic() {
 }
 
 #[tokio::test]
-#[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed (13.05.2025 I can't find this ticket)
+#[ignore] // TODO: Remove ignore when bug RCHAIN-3917 is fixed (13.05.2025 I can't find this ticket), RCHAIN-4032 - which is indicated in the Scala side error is also unknown.
 async fn cost_should_be_repeatable_when_generated() {
     // Try contract fromLong(1716417707L) = @2!!(0) | @0!!(0) | for (_ <<- @2) { 0 } | @2!(0)
     // because the cost is nondeterministic
@@ -350,6 +350,10 @@ async fn cost_should_be_repeatable_when_generated() {
     )
     .await;
 
+    /*
+     Same to Scala, we get the same error - "Receiving on the same channels is currently not allowed"
+     Should it be fixed in Rholang - 1.2?
+    */
     assert!(result1.0.errors.is_empty());
     assert!(result1.1.errors.is_empty());
     assert_eq!(result1.0.cost, result1.1.cost);
@@ -379,6 +383,10 @@ async fn cost_should_be_repeatable_when_generated() {
             )
             .await;
 
+            /*
+              Same to Scala, we get the same error - "Receiving on the same channels is currently not allowed"
+              Should it be fixed in Rholang - 1.2?
+            */
             assert!(result.0.errors.is_empty());
             assert!(result.1.errors.is_empty());
             assert_eq!(result.0.cost, result.1.cost);
@@ -429,7 +437,7 @@ async fn should_stop_the_evaluation_of_all_execution_branches_when_one_of_them_r
         for _ in 0..1 {
             let initial_phlo = rng.gen_range(1..expected_total_cost);
 
-            let (result, cost_log) = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
+            let (result, _) = evaluate_with_cost_log(initial_phlo, contract.clone()).await;
 
             assert!(
                 result.cost.value >= initial_phlo,
