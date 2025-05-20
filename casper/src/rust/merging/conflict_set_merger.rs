@@ -34,7 +34,13 @@ fn measure_result_time<T, E, F: FnOnce() -> Result<T, E>>(f: F) -> Result<(T, Du
     Ok((result, duration))
 }
 
-pub fn merge<R: Clone + Eq + std::hash::Hash + PartialOrd + Ord, C: Clone, P: Clone, A: Clone, K: Clone>(
+pub fn merge<
+    R: Clone + Eq + std::hash::Hash + PartialOrd + Ord,
+    C: Clone,
+    P: Clone,
+    A: Clone,
+    K: Clone,
+>(
     actual_set: HashableSet<R>,
     late_set: HashableSet<R>,
     depends: impl Fn(&R, &R) -> bool,
@@ -260,19 +266,19 @@ fn get_optimal_rejection<R: Eq + std::hash::Hash + Clone + Ord>(
             // This requires the R type to implement Ord
             let a_first_branch = a.0.iter().next();
             let b_first_branch = b.0.iter().next();
-            
+
             match (a_first_branch, b_first_branch) {
                 (Some(a_branch), Some(b_branch)) => {
                     let a_first_item = a_branch.0.iter().next();
                     let b_first_item = b_branch.0.iter().next();
-                    
+
                     match (a_first_item, b_first_item) {
                         (Some(a_item), Some(b_item)) => a_item.cmp(b_item),
                         (Some(_), None) => std::cmp::Ordering::Greater,
                         (None, Some(_)) => std::cmp::Ordering::Less,
                         (None, None) => std::cmp::Ordering::Equal,
                     }
-                },
+                }
                 (Some(_), None) => std::cmp::Ordering::Greater,
                 (None, Some(_)) => std::cmp::Ordering::Less,
                 (None, None) => std::cmp::Ordering::Equal,
@@ -390,7 +396,7 @@ fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash>(
                 result
             })
             .collect();
-        
+
         HashableSet(result)
     }
 }

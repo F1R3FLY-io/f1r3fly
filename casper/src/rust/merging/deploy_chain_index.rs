@@ -68,11 +68,8 @@ impl DeployChainIndex {
         let pre_history_reader = history_repository.get_history_reader_struct(&pre_state_hash)?;
         let post_history_reader = history_repository.get_history_reader_struct(&post_state_hash)?;
 
-        let state_changes = StateChange::new(
-            pre_history_reader,
-            post_history_reader,
-            &event_log_index,
-        )?;
+        let state_changes =
+            StateChange::new(pre_history_reader, post_history_reader, &event_log_index)?;
 
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         for deploy in &deploys_with_cost {

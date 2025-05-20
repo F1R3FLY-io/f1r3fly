@@ -27,8 +27,6 @@ where
         (blocks, indexed_dag, runtime)
     }
 
-
-
     let storage_dir = resources::copy_storage(context.storage_directory);
     let (blocks, indexed_dag, runtime) = create(storage_dir).await;
     f(blocks, indexed_dag, runtime).await

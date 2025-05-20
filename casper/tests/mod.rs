@@ -1,8 +1,8 @@
 use std::sync::Once;
 
 mod helper;
-mod util;
 mod merging;
+mod util;
 
 static INIT: Once = Once::new();
 

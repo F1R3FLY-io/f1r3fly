@@ -1,2 +1,2 @@
-pub mod genesis;
 pub mod contracts;
+pub mod genesis;
