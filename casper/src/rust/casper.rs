@@ -49,8 +49,8 @@ impl CasperSnapshot {
 
 pub struct OnChainCasperState {
     pub shard_conf: CasperShardConf,
-    bonds_map: DashMap<Validator, u64>,
-    active_validators: Vec<Validator>,
+    pub bonds_map: DashMap<Validator, u64>,
+    pub active_validators: Vec<Validator>,
 }
 
 impl OnChainCasperState {
@@ -64,24 +64,24 @@ impl OnChainCasperState {
 }
 
 pub struct CasperShardConf {
-    fault_tolerance_threshold: f32,
-    shard_name: String,
-    parent_shard_id: String,
-    finalization_rate: i32,
-    max_number_of_parents: i32,
-    max_parent_depth: i32,
+    pub fault_tolerance_threshold: f32,
+    pub shard_name: String,
+    pub parent_shard_id: String,
+    pub finalization_rate: i32,
+    pub max_number_of_parents: i32,
+    pub max_parent_depth: i32,
     pub synchrony_constraint_threshold: f32,
-    height_constraint_threshold: i64,
+    pub height_constraint_threshold: i64,
     // Validators will try to put deploy in a block only for next `deployLifespan` blocks.
     // Required to enable protection from re-submitting duplicate deploys
-    deploy_lifespan: i32,
-    casper_version: i64,
-    config_version: i64,
-    bond_minimum: i64,
-    bond_maximum: i64,
-    epoch_length: i32,
-    quarantine_length: i32,
-    min_phlo_price: i64,
+    pub deploy_lifespan: i32,
+    pub casper_version: i64,
+    pub config_version: i64,
+    pub bond_minimum: i64,
+    pub bond_maximum: i64,
+    pub epoch_length: i32,
+    pub quarantine_length: i32,
+    pub min_phlo_price: i64,
 }
 
 impl CasperShardConf {

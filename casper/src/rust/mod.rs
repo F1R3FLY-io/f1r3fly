@@ -10,3 +10,4 @@ pub mod blocks;
 pub mod block_status;
 pub mod synchrony_constraint_checker;
 pub mod validator_identity;
+pub mod last_finalized_height_constraint_checker;

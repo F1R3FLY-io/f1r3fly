@@ -22,12 +22,12 @@ pub async fn check(
     block_store: &KeyValueBlockStore,
     validator_identity: ValidatorIdentity,
 ) -> Result<CheckProposeConstraintsResult, CasperError> {
+    let validator = validator_identity.public_key.bytes;
+    let main_parent_opt = snapshot.parents.first();
     let synchrony_constraint_threshold = snapshot
         .on_chain_state
         .shard_conf
         .synchrony_constraint_threshold;
-    let validator = validator_identity.public_key.bytes;
-    let main_parent_opt = snapshot.parents.first();
 
     match snapshot.dag.latest_message_hash(&validator) {
         Some(last_proposed_block_hash) => {
