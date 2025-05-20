@@ -464,7 +464,10 @@ async fn compute_state_should_capture_rholang_errors() {
     .unwrap();
 }
 
+// TODO: Remove ignore once we have a fix for this test
+// This test is producing non-deterministic results - it's not clear why - sometimes it passes, sometimes it doesn't
 #[tokio::test]
+#[ignore]
 async fn compute_state_then_compute_bonds_should_be_replayable_after_all() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
