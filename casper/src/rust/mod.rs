@@ -6,3 +6,7 @@ pub mod merging;
 pub mod rholang;
 pub mod storage;
 pub mod util;
+pub mod blocks;
+pub mod block_status;
+pub mod synchrony_constraint_checker;
+pub mod validator_identity;

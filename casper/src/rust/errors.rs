@@ -7,7 +7,7 @@ use super::util::rholang::{
     replay_failure::ReplayFailure, system_deploy_user_error::SystemDeployPlatformFailure,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CasperError {
     InterpreterError(InterpreterError),
     KvStoreError(KvStoreError),
@@ -15,6 +15,7 @@ pub enum CasperError {
     SystemRuntimeError(SystemDeployPlatformFailure),
     SigningError(String),
     ReplayFailure(ReplayFailure),
+    Other(String),
 }
 
 impl fmt::Display for CasperError {
@@ -26,6 +27,7 @@ impl fmt::Display for CasperError {
             CasperError::SystemRuntimeError(error) => write!(f, "System runtime error: {}", error),
             CasperError::SigningError(error) => write!(f, "Signing error: {}", error),
             CasperError::ReplayFailure(error) => write!(f, "Replay failure: {}", error),
+            CasperError::Other(error) => write!(f, "Other error: {}", error),
         }
     }
 }

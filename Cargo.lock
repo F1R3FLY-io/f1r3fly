@@ -377,6 +377,7 @@ dependencies = [
  "shared",
  "tempfile",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

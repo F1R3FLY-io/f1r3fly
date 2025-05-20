@@ -10,7 +10,6 @@ use crate::rust::{private_key::PrivateKey, public_key::PublicKey};
 
 use super::{secp256k1::Secp256k1, secp256k1_eth::Secp256k1Eth};
 
-// TODO: refactor to use PublicKey and PrivateKey instead of [u8]
 pub trait SignaturesAlg: std::fmt::Debug {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool;
 

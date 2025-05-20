@@ -19,7 +19,7 @@ impl SystemDeployUserError {
 /**
  * Fatal error - node should exit on these errors.
  */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SystemDeployPlatformFailure {
     UnexpectedResult(Vec<Par>),
     UnexpectedSystemErrors(Vec<InterpreterError>),

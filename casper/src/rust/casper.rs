@@ -16,17 +16,17 @@ use super::genesis::contracts::validator::Validator;
  * as well as for validating blocks.
  */
 pub struct CasperSnapshot {
-    dag: KeyValueDagRepresentation,
-    last_finalized_block: BlockHash,
-    lca: BlockHash,
-    tips: Vec<BlockHash>,
-    parents: Vec<BlockMessage>,
-    justifications: DashSet<Justification>,
-    invalid_blocks: DashMap<Validator, BlockHash>,
-    deploys_in_scope: DashSet<Signed<DeployData>>,
-    max_block_num: u64,
-    max_seq_nums: DashMap<Validator, u64>,
-    on_chain_state: OnChainCasperState,
+    pub dag: KeyValueDagRepresentation,
+    pub last_finalized_block: BlockHash,
+    pub lca: BlockHash,
+    pub tips: Vec<BlockHash>,
+    pub parents: Vec<BlockMessage>,
+    pub justifications: DashSet<Justification>,
+    pub invalid_blocks: DashMap<Validator, BlockHash>,
+    pub deploys_in_scope: DashSet<Signed<DeployData>>,
+    pub max_block_num: u64,
+    pub max_seq_nums: DashMap<Validator, u64>,
+    pub on_chain_state: OnChainCasperState,
 }
 
 impl CasperSnapshot {
@@ -48,7 +48,7 @@ impl CasperSnapshot {
 }
 
 pub struct OnChainCasperState {
-    shard_conf: CasperShardConf,
+    pub shard_conf: CasperShardConf,
     bonds_map: DashMap<Validator, u64>,
     active_validators: Vec<Validator>,
 }
@@ -70,7 +70,7 @@ pub struct CasperShardConf {
     finalization_rate: i32,
     max_number_of_parents: i32,
     max_parent_depth: i32,
-    synchrony_constraint_threshold: f32,
+    pub synchrony_constraint_threshold: f32,
     height_constraint_threshold: i64,
     // Validators will try to put deploy in a block only for next `deployLifespan` blocks.
     // Required to enable protection from re-submitting duplicate deploys
