@@ -15,3 +15,21 @@ Simply run `sbt comm/compile` to compile the project, `sbt comm/test` to run all
 `TransportLayer` - responsible for node2node communicaton
 `NodeDiscovery`  - responsible for node discovery within p2p network
 `Metrcis`        - responsible for storing metrics witin the running node
+
+## Rust
+
+Parts of this directory are ported to Rust.
+
+### Building
+
+To build the `comm` Rust library, run `cargo build --release`
+
+### Testing
+
+To run all tests: `cargo test`
+
+Run all tests in release mode: `cargo test --release`
+
+To run specific test file: `cargo test --test <test_file_name>`
+
+To run specific test in specific folder: `cargo test --test <test_folder_name>::<test_file_name>`

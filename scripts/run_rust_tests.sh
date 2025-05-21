@@ -23,4 +23,5 @@ cargo test --release
 cd ../block-storage
 cargo test --release
 
-
+cd ../comm
+cargo test --release

@@ -10,6 +10,7 @@ members = [
 	"crypto",
 	"block-storage",
 	"rspace++/libs/rspace_rhotypes",
+	"comm"
 ]
 
 [profile.dev]

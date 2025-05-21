@@ -1,0 +1,18 @@
+[package]
+name = "comm"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crypto = { path = "../crypto" }
+hex = "0.4.3"
+models = { path = "../models" }
+prost = "0.13.5"
+shared = { path = "../shared" }
+tonic = { version = "0.12.3", features = ["prost"] }
+url = "2.5.4"
+
+[build-dependencies]
+tonic-build = { version = "0.12.3", features = ["prost"] }
