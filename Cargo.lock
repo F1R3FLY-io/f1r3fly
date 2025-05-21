@@ -2385,6 +2385,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "rspace_plus_plus_rhotypes"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "dashmap",
+ "models",
+ "prost",
+ "rand 0.8.5",
+ "rholang",
+ "rspace_plus_plus",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "rstest"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
