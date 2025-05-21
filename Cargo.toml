@@ -8,6 +8,7 @@ members = [
 	"node-cli",
 	"models",
 	"crypto",
+	"rspace++/libs/rspace_rhotypes",
 ]
 
 [profile.dev]
