@@ -257,6 +257,14 @@ impl RhoRuntimeImpl {
             merge_chs,
         }))
     }
+
+    pub fn get_cost_log(&self) -> Vec<Cost> {
+        self.cost.get_log()
+    }
+
+    pub fn clear_cost_log(&self) {
+        self.cost.clear_log()
+    }
 }
 
 impl RhoRuntime for RhoRuntimeImpl {
@@ -1070,7 +1078,7 @@ where
     .await
 }
 
-async fn _create_runtimes<T, R>(
+pub(crate) async fn _create_runtimes<T, R>(
     space: T,
     replay_space: R,
     init_registry: bool,

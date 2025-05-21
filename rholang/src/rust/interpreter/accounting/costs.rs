@@ -9,7 +9,7 @@ use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Cost {
     pub value: i64,
     pub operation: String,
