@@ -76,8 +76,8 @@ async fn interpreter_should_restore_rspace_to_its_prior_state_after_evaluation_e
             .await
             .unwrap();
 
-        let finalContent = storage_contents(&runtime_lock);
-        println!("\nRust - Final storage:\n{}", finalContent);
+        let final_content = storage_contents(&runtime_lock);
+        println!("\nRust - Final storage:\n{}", final_content);
 
         // IMPORTANT: While the semantic state is identical between the initial and final state
         // (as verified by comparing checkpoint roots above), the textual representation produced

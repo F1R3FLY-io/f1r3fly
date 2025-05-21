@@ -22,7 +22,7 @@ use rspace_plus_plus::rspace::{
 
 use rand::Rng;
 use rholang::rust::interpreter::errors::InterpreterError;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::option::Option;
 use std::sync::{Arc, Mutex};
 
@@ -163,7 +163,7 @@ fn from_long(index: i64) -> String {
                 let ch = remainder % 4;
                 remainder /= 4;
                 result.push(format!("@{}{}(0)", ch, bang));
-                nonlinear_send |= (bang == "!!");
+                nonlinear_send |= bang == "!!";
             }
         } else {
             //receive
@@ -219,12 +219,14 @@ fn contracts() -> Vec<(String, i64)> {
       (String::from("@0!(0) | for (_ <<- @0) { 0 }"), 406i64),
       (String::from("@0!!(0) | for (_ <<- @0) { 0 }"), 343i64),
       (String::from("@0!!(0) | @0!!(0) | for (_ <<- @0) { 0 }"), 444i64),
+      // TODO: This fails due to a cost mismatch - needs fixing
 //       (String::from("new loop in {\n         contract loop(@n) = {\n           match n {\n             0 => Nil\n             _ => loop!(n-1)\n           }\n         } |\n         loop!(10)\n       }"),
 // 3892i64),
       (String::from("42 | @0!(2) | for (x <- @0) { Nil }"), 336i64),
       (String::from("@1!(1) |\n        for(x <- @1) { Nil } |\n        new x in { x!(10) | for(X <- x) { @2!(Set(X!(7)).add(*X).contains(10)) }} |\n        match 42 {\n          38 => Nil\n          42 =>
 @3!(42)\n        }\n     "), 1264i64),
-      //(String::from("new ret, keccak256Hash(`rho:crypto:keccak256Hash`) in {\n       |  keccak256Hash!(\"TEST\".toByteArray(), *ret) |\n       |  for (_ <- ret) { Nil }\n       |}"), 782i64),
+      // TODO: This fails due to a cost mismatch - needs fixing
+      // (String::from("new ret, keccak256Hash(`rho:crypto:keccak256Hash`) in {\n  keccak256Hash!(\"TEST\".toByteArray(), *ret) |\n  for (_ <- ret) { Nil }\n}"), 782i64),
 ]
 }
 
