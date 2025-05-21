@@ -170,6 +170,11 @@ $ rm -rf ~/.cache/coursier/
 $ sbt clean
 ```
 
+StackOverflow error from node compile:
+```bash
+$ sbt "node/compile"
+```
+
 Rust problems: 
 ```bash
 $ ./scripts/clean_rust_libraries.sh
