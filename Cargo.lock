@@ -2390,7 +2390,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "chrono",
- "dashmap",
+ "dashmap 5.5.3",
  "models",
  "prost",
  "rand 0.8.5",
@@ -2398,6 +2398,7 @@ dependencies = [
  "rspace_plus_plus",
  "serde",
  "serde_json",
+ "shared",
  "tokio",
 ]
 
@@ -2696,12 +2697,14 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "futures",
  "heed",
  "hex",
  "proptest",
  "prost",
  "serde",
  "serde_bytes",
+ "tokio",
 ]
 
 [[package]]
