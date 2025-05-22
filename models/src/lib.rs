@@ -23,6 +23,10 @@ pub mod servicemodelapi {
     include!(concat!(env!("OUT_DIR"), "/servicemodelapi.rs"));
 }
 
+pub mod routing {
+    include!(concat!(env!("OUT_DIR"), "/routing.rs"));
+}
+
 use shared::rust::BitSet;
 
 pub fn create_bit_vector(indices: &[usize]) -> BitSet {

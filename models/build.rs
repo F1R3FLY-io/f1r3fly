@@ -22,6 +22,7 @@ fn main() {
         "ServiceError.proto",
         "ExternalCommunicationServiceCommon.proto",
         "ExternalCommunicationServiceV1.proto",
+        "routing.proto",
     ];
 
     let absolute_proto_files: Vec<_> = proto_files.iter().map(|f| proto_src_dir.join(f)).collect();
@@ -39,7 +40,7 @@ fn main() {
         .enum_attribute(".rhoapi", "#[derive(serde::Serialize, serde::Deserialize)]")
         .enum_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")
         .enum_attribute(".rhoapi", "#[repr(C)]")
-        .bytes(&[".casper"])
+        .bytes(&[".casper", ".routing"])
         .compile_protos(
             &absolute_proto_files,
             &[

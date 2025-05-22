@@ -30,6 +30,7 @@ pub enum CommError {
     PongNotReceivedForPing(String),
     UnableToStorePacket(String, String),
     UnableToRestorePacket(String, String),
+    ConfigError(String),
 }
 
 impl fmt::Display for CommError {
@@ -49,6 +50,7 @@ impl fmt::Display for CommError {
                 write!(f, "Could not deserialize packet {}. Error message: {}", p, er),
             CommError::ProtocolException(msg) => write!(f, "Protocol error. {}", msg),
             CommError::ParseError(msg) => write!(f, "Parse error: {}", msg),
+            CommError::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
             _ => write!(f, "{:?}", self),
         }
     }

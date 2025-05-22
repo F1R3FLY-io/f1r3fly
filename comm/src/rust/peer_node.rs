@@ -6,6 +6,7 @@ use url::Url;
 use crate::rust::errors::{CommError, parse_error};
 use std::fmt;
 
+#[derive(Debug, Clone)]
 pub struct NodeIdentifier {
     pub key: Bytes,
 }
@@ -35,6 +36,7 @@ impl NodeIdentifier {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Endpoint {
     pub host: String,
     pub tcp_port: u32,
@@ -51,6 +53,7 @@ impl Endpoint {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PeerNode {
     pub id: NodeIdentifier,
     pub endpoint: Endpoint,
