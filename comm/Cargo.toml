@@ -6,11 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.74"
 crypto = { path = "../crypto" }
 hex = "0.4.3"
+log = "0.4"
 models = { path = "../models" }
 prost = "0.13.5"
+rand = "0.9.1"
 shared = { path = "../shared" }
+tokio = { version = "1", features = ["full"] }
 tonic = { version = "0.12.3", features = ["prost"] }
 url = "2.5.4"
 

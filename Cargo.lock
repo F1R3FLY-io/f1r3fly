@@ -459,11 +459,15 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 name = "comm"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "crypto",
  "hex",
+ "log",
  "models",
  "prost",
+ "rand 0.9.1",
  "shared",
+ "tokio",
  "tonic",
  "tonic-build",
  "url",

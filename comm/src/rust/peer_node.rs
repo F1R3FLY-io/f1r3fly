@@ -5,10 +5,25 @@ use prost::bytes::Bytes;
 use url::Url;
 use crate::rust::errors::{CommError, parse_error};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone)]
 pub struct NodeIdentifier {
     pub key: Bytes,
+}
+
+impl PartialEq for NodeIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for NodeIdentifier {}
+
+impl Hash for NodeIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
 }
 
 impl NodeIdentifier {
@@ -36,7 +51,7 @@ impl NodeIdentifier {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Endpoint {
     pub host: String,
     pub tcp_port: u32,
@@ -57,6 +72,20 @@ impl Endpoint {
 pub struct PeerNode {
     pub id: NodeIdentifier,
     pub endpoint: Endpoint,
+}
+
+impl PartialEq for PeerNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for PeerNode {}
+
+impl Hash for PeerNode {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl PeerNode {
