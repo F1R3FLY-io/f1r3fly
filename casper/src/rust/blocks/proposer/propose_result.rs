@@ -74,7 +74,9 @@ impl CheckProposeConstraintsResult {
     }
 
     pub fn too_far_ahead_of_last_finalized() -> Self {
-        CheckProposeConstraintsResult::Failure(CheckProposeConstraintsFailure::TooFarAheadOfLastFinalized)
+        CheckProposeConstraintsResult::Failure(
+            CheckProposeConstraintsFailure::TooFarAheadOfLastFinalized,
+        )
     }
 }
 
@@ -93,25 +95,25 @@ impl ProposeResult {
 
     pub fn not_bonded() -> Self {
         ProposeResult {
-            propose_status: ProposeStatus::Failure(
-                ProposeFailure::CheckConstraintsFailure(CheckProposeConstraintsFailure::NotBonded)
-            ),
+            propose_status: ProposeStatus::Failure(ProposeFailure::CheckConstraintsFailure(
+                CheckProposeConstraintsFailure::NotBonded,
+            )),
         }
     }
 
     pub fn not_enough_blocks() -> Self {
         ProposeResult {
-            propose_status: ProposeStatus::Failure(
-                ProposeFailure::CheckConstraintsFailure(CheckProposeConstraintsFailure::NotEnoughNewBlocks)
-            ),
+            propose_status: ProposeStatus::Failure(ProposeFailure::CheckConstraintsFailure(
+                CheckProposeConstraintsFailure::NotEnoughNewBlocks,
+            )),
         }
     }
 
     pub fn too_far_ahead_of_last_finalized() -> Self {
         ProposeResult {
-            propose_status: ProposeStatus::Failure(
-                ProposeFailure::CheckConstraintsFailure(CheckProposeConstraintsFailure::TooFarAheadOfLastFinalized)
-            ),
+            propose_status: ProposeStatus::Failure(ProposeFailure::CheckConstraintsFailure(
+                CheckProposeConstraintsFailure::TooFarAheadOfLastFinalized,
+            )),
         }
     }
 
@@ -144,17 +146,25 @@ impl fmt::Display for ProposeStatus {
             ProposeStatus::Success(r) => write!(f, "Propose succeed: {:?}", r.result),
             ProposeStatus::Failure(failure) => match failure {
                 ProposeFailure::NoNewDeploys => write!(f, "Proposal failed: NoNewDeploys"),
-                ProposeFailure::InternalDeployError => write!(f, "Proposal failed: internal deploy error"),
+                ProposeFailure::InternalDeployError => {
+                    write!(f, "Proposal failed: internal deploy error")
+                }
                 ProposeFailure::BugError => write!(f, "Proposal failed: BugError"),
                 ProposeFailure::CheckConstraintsFailure(check_failure) => match check_failure {
                     CheckProposeConstraintsFailure::NotBonded => {
                         write!(f, "Proposal failed: ReadOnlyMode")
                     }
                     CheckProposeConstraintsFailure::NotEnoughNewBlocks => {
-                        write!(f, "Proposal failed: Must wait for more blocks from other validators")
+                        write!(
+                            f,
+                            "Proposal failed: Must wait for more blocks from other validators"
+                        )
                     }
                     CheckProposeConstraintsFailure::TooFarAheadOfLastFinalized => {
-                        write!(f, "Proposal failed: too far ahead of the last finalized block")
+                        write!(
+                            f,
+                            "Proposal failed: too far ahead of the last finalized block"
+                        )
                     }
                 },
             },

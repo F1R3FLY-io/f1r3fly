@@ -2,6 +2,7 @@ use std::sync::Once;
 
 mod helper;
 mod merging;
+mod safety;
 mod util;
 
 static INIT: Once = Once::new();
