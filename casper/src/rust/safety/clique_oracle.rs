@@ -1,14 +1,13 @@
 // See casper/src/main/scala/coop/rchain/casper/safety/CliqueOracle.scala
 
-use futures::{stream, FutureExt};
 use itertools::Itertools;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::rust::safety_oracle::MIN_FAULT_TOLERANCE;
 use crate::rust::util::clique::Clique;
 use block_storage::rust::dag::block_dag_key_value_storage::KeyValueDagRepresentation;
 use models::rust::{block_hash::BlockHash, validator::Validator};
-use rholang::rust::interpreter::pretty_printer::PrettyPrinter;
+
 use shared::rust::store::key_value_store::KvStoreError;
 
 pub struct CliqueOracle;
@@ -157,12 +156,7 @@ impl CliqueOracle {
         }
 
         let edges = compute_agreeing_validator_pairs(target_msg, agreeing_weight_map, dag).await?;
-        //TODO (Nazar) - BlockMetadata weight_map: BTreeMap<Bytes, i64>, update Clique with BTreeMap to avoid this unnecessary conversion
-        let weights_hashmap: HashMap<V, i64> = agreeing_weight_map
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
-        let max_weight = Clique::find_maximum_clique_by_weight(&edges, &weights_hashmap);
+        let max_weight = Clique::find_maximum_clique_by_weight(&edges, agreeing_weight_map);
 
         Ok(max_weight)
     }
