@@ -125,7 +125,7 @@ async fn clique_oracle_should_detect_finality_as_appropriate() {
             &HashMap::from([(&v1, &b3), (&v2, &b2)]),
         );
 
-        let b6 = creator2(
+        let _b6 = creator2(
             &mut block_store,
             &mut block_dag_storage,
             &b4,
@@ -139,7 +139,7 @@ async fn clique_oracle_should_detect_finality_as_appropriate() {
             &HashMap::from([(&v1, &b5), (&v2, &b4)]),
         );
 
-        let b8 = creator1(
+        let _b8 = creator1(
             &mut block_store,
             &mut block_dag_storage,
             &b7,
@@ -248,14 +248,14 @@ async fn clique_oracle_should_detect_possible_disagreements_appropriately() {
             &HashMap::from([(&v1, &b3), (&v2, &b2), (&v3, &b4)]),
         );
 
-        let b7 = creator3(
+        let _b7 = creator3(
             &mut block_store,
             &mut block_dag_storage,
             &b5,
             &HashMap::from([(&v1, &b3), (&v2, &b5), (&v3, &b4)]),
         );
 
-        let b8 = creator2(
+        let _b8 = creator2(
             &mut block_store,
             &mut block_dag_storage,
             &b6,
@@ -457,7 +457,7 @@ async fn clique_oracle_should_identify_no_majority_fork_safe_after_union() {
         let j31 = creator3(&mut block_store, &mut block_dag_storage, &j21, &aj);
 
         aj.insert(&v3, &j31);
-        let j41 = creator4(&mut block_store, &mut block_dag_storage, &j31, &aj);
+        let _j41 = creator4(&mut block_store, &mut block_dag_storage, &j31, &aj);
 
         let dag2 = block_dag_storage.get_representation();
 
