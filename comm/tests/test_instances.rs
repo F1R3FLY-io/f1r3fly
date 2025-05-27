@@ -40,7 +40,7 @@ impl NodeDiscovery for NodeDiscoveryStub {
     }
 
     fn peers(&self) -> Result<Vec<PeerNode>, CommError> {
-        todo!()
+        Ok(self.nodes.clone())
     }
 }
 

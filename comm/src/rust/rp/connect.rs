@@ -245,14 +245,13 @@ pub fn reset_connections(connections_cell: &ConnectionsCell) -> Result<(), CommE
 }
 
 /// Find new peers and attempt to connect to them
-pub async fn find_and_connect<T: TransportLayer, N: NodeDiscovery, F, Fut>(
+pub async fn find_and_connect<N: NodeDiscovery, F, Fut>(
     connections_cell: &ConnectionsCell,
     node_discovery: &N,
     connect_fn: F,
-    transport: &T,
 ) -> Result<Vec<PeerNode>, CommError> 
 where
-    F: Fn(&PeerNode, &T) -> Fut,
+    F: Fn(&PeerNode) -> Fut,
     Fut: std::future::Future<Output = Result<(), CommError>>,
 {
     let current_connections = connections_cell.read()?.to_set();
@@ -268,7 +267,7 @@ where
 
     // Attempt to connect to each new peer
     for peer in new_peers {
-        match connect_fn(&peer, transport).await {
+        match connect_fn(&peer).await {
             Ok(()) => {
                 successful_connections.push(peer);
             }
