@@ -17,11 +17,11 @@ type V = Validator; // type for message creator/validator
 type WeightMap = BTreeMap<V, i64>; // stakes per message creator
 
 impl CliqueOracle {
-    /** weight map of main parent (fallbacks to message itself if no parents)
-     TODO - why not use local weight map but seek for parent?
-    P.S. This is related to the fact that we create latest message for newly bonded validator
-    equal to message where bonding deploy has been submitted. So stake from validator that did not create anything is
-    put behind this message. So here is one more place where this logic makes things more complex.*/
+    /// weight map of main parent (fallbacks to message itself if no parents)
+    /// TODO - why not use local weight map but seek for parent?
+    /// P.S. This is related to the fact that we create latest message for newly bonded validator
+    /// equal to message where bonding deploy has been submitted. So stake from validator that did not create anything is
+    /// put behind this message. So here is one more place where this logic makes things more complex.
     pub async fn get_corresponding_weight_map(
         target_msg: &M,
         dag: &KeyValueDagRepresentation,
@@ -35,25 +35,25 @@ impl CliqueOracle {
             })
     }
 
-    /**
-     * If two validators will never have disagreement on target message
-     *
-     * Prerequisite for this is that latest messages from a and b both are in main chain with target message
-     *
-     *     a    b
-     *     *    *  <- lmB
-     *      \   *
-     *       \  *
-     *        \ *
-     *         \*
-     *          *  <- lmAjB
-     *
-     * 1. get justification of validator b as per latest message of a (lmAjB)
-     * 2. check if any self justifications between latest message of b (lmB) and lmAjB are NOT in main chain
-     *    with target message.
-     *
-     *    If one found - this is a source of disagreement.
-     * */
+    /// If two validators will never have disagreement on target message
+    ///
+    /// Prerequisite for this is that latest messages from a and b both are in main chain with target message
+    ///
+    /// ```text
+    ///     a    b
+    ///     *    *  <- lmB
+    ///      \   *
+    ///       \  *
+    ///        \ *
+    ///         \*
+    ///          *  <- lmAjB
+    /// ```
+    ///
+    /// 1. get justification of validator b as per latest message of a (lmAjB)
+    /// 2. check if any self justifications between latest message of b (lmB) and lmAjB are NOT in main chain
+    ///    with target message.
+    ///
+    ///    If one found - this is a source of disagreement.
     async fn never_eventually_see_disagreement(
         validator_a: &V,
         validator_b: &V,
@@ -125,7 +125,7 @@ impl CliqueOracle {
         agreeing_weight_map: &WeightMap,
         dag: &KeyValueDagRepresentation,
     ) -> Result<i64, KvStoreError> {
-        /** across combination of validators compute pairs that do not have disagreement */
+        /// across combination of validators compute pairs that do not have disagreement
         async fn compute_agreeing_validator_pairs(
             target_msg: &M,
             agreeing_weight_map: &WeightMap,
@@ -191,7 +191,7 @@ impl CliqueOracle {
         target_msg: &M,
         dag: &KeyValueDagRepresentation,
     ) -> Result<f32, KvStoreError> {
-        /** weight map containing only validators that agree on the message */
+        /// weight map containing only validators that agree on the message
         async fn agreeing_weight_map_f(
             weight_map: &WeightMap,
             target_msg: &M,
