@@ -935,49 +935,6 @@ impl SystemProcesses {
     }
 
     /*
-
-    override def grpcTell: Contract[F] = {
-        case isContractCall(_, true, previous, args) =>
-          // args could be:
-          // - clientHost, clientPort, folderId, ack
-          // - clientHost, clientPort, folderId, error, ack if failed previously
-
-          // so using the last element as ack
-          println("grpcTell (replay): args: " + args)
-          F.delay(previous)
-
-        case isContractCall(
-            _,
-            false,
-            _,
-            Seq(
-              RhoType.String(clientHost),
-              RhoType.Number(clientPort),
-              RhoType.String(notificationPayload)
-            )
-            ) =>
-          //TODO: remove
-          println(
-            "grpcTell: clientHost: " + clientHost + ", clientPort: " + clientPort + ", notificationPayload: " + notificationPayload
-          )
-          (for {
-            _ <- GrpcClient.initClientAndTell(clientHost, clientPort, notificationPayload).recover {
-                  case e => println("GrpcClient crashed: " + e.getMessage)
-                }
-            output = Seq(RhoType.Nil())
-          } yield output).onError {
-            case e =>
-              println("grpcTell: error: " + e.getMessage)
-              e.raiseError
-          }
-        case isContractCall(_, isReplay, _, args) =>
-          println("grpcTell: isReplay " + isReplay + " invalid arguments: " + args)
-          F.delay(Seq(RhoType.Nil()))
-      }
-
-     */
-
-    /*
      * The following functions below can be removed once rust-casper calls create_rho_runtime.
      * Until then, they must remain in the rholang directory to avoid circular dependencies.
      */
