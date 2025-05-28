@@ -65,7 +65,7 @@ pub struct PeerTable<'a, T: KademliaRPC> {
     bucket_width: u32,
     kademlia_rpc: &'a T,
     width: usize,
-    table: Vec<Arc<Mutex<Vec<PeerTableEntry>>>>,
+    pub table: Vec<Arc<Mutex<Vec<PeerTableEntry>>>>,
 }
 
 impl<'a, T: KademliaRPC> PeerTable<'a, T> {
