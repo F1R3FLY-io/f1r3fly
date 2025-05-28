@@ -102,7 +102,7 @@ object Finalizer {
       * The goal here is to create stream of agreements breadth first, so on each step agreements by all
       * validator are recorded, and only after that next level of main parents is visited.
       */
-    val mkAgreementsStream: F[Stream[F, MessageAgreement]] = {
+    val mkAgreementsStream: F[Stream[F, MessageAgreement]] =
       dag.latestMessages.map { lms =>
         // sort latest messages by agreeing validator to ensure random ordering does not change output
         val sortedLatestMessages = lms.toList.sortBy { case (v, _) => v }
@@ -138,7 +138,6 @@ object Finalizer {
           .map(Stream.emits(_))
           .flatten
       }
-    }
 
     mkAgreementsStream.flatMap {
       // while recording each agreement in agreements map
