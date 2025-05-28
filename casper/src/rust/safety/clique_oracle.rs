@@ -161,7 +161,7 @@ impl CliqueOracle {
         Ok(max_weight)
     }
 
-    async fn compute_output(
+    pub async fn compute_output(
         target_msg: &M,
         message_weight_map: &WeightMap,
         agreeing_weight_map: &WeightMap,
