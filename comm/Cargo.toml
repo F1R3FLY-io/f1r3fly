@@ -11,6 +11,7 @@ crypto = { path = "../crypto" }
 hex = "0.4.3"
 log = "0.4"
 models = { path = "../models" }
+paste = "1.0"
 prost = "0.13.5"
 rand = "0.9.1"
 shared = { path = "../shared" }
