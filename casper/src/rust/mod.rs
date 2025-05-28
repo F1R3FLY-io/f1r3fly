@@ -2,6 +2,7 @@ pub mod block_status;
 pub mod blocks;
 pub mod casper;
 pub mod errors;
+pub mod finality;
 pub mod genesis;
 pub mod helper;
 pub mod last_finalized_height_constraint_checker;

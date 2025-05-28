@@ -1,5 +1,6 @@
 use std::sync::Once;
 
+mod finality;
 mod helper;
 mod merging;
 mod safety;
