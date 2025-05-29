@@ -145,7 +145,7 @@ pub fn create_persisted_temp_dir(prefix: &str) -> PathBuf {
         .expect("Failed to create temp dir");
 
     // Convert to PathBuf which will persist even after TempDir is dropped
-    let path = temp_dir.into_path();
+    let path = temp_dir.keep();
     path
 }
 

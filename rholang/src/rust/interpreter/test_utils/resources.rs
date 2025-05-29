@@ -19,7 +19,7 @@ pub fn mk_temp_dir(prefix: &str) -> PathBuf {
         .prefix(prefix)
         .tempdir()
         .expect("Failed to create temp dir");
-    temp_dir.into_path()
+    temp_dir.keep()
 }
 
 pub fn with_temp_dir<F, R>(prefix: &str, f: F) -> R
