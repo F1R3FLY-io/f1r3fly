@@ -4,3 +4,4 @@ pub mod rp;
 pub mod transport;
 pub mod discovery;
 pub mod p2p;
+pub mod utils;

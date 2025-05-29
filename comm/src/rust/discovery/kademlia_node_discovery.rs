@@ -30,7 +30,7 @@ impl<'a, T: KademliaRPC> KademliaNodeDiscovery<'a, T> {
      * function should be called with a relatively small `limit` parameter like
      * 10 to avoid making too many unproductive network calls.
      */
-    pub fn discover(&self, id: &NodeIdentifier) -> Result<Vec<PeerNode>, CommError> {
+    pub async fn discover(&self, id: &NodeIdentifier) -> Result<Vec<PeerNode>, CommError> {
         let peers = self.store.peers()?;
         let dists = self.store.sparseness()?;
 
@@ -39,11 +39,13 @@ impl<'a, T: KademliaRPC> KademliaNodeDiscovery<'a, T> {
         let mut rng = rand::rng();
         peer_list.shuffle(&mut rng);
 
-        let result = self.find(id, 10, &dists, &peer_list, &HashSet::new(), 0)?;
+        let result = self
+            .find(id, 10, &dists, &peer_list, &HashSet::new(), 0)
+            .await?;
 
         // Update last seen for all discovered peers
         for peer in &result {
-            self.store.update_last_seen(peer)?;
+            self.store.update_last_seen(peer).await?;
         }
 
         Ok(result)
@@ -53,7 +55,7 @@ impl<'a, T: KademliaRPC> KademliaNodeDiscovery<'a, T> {
         self.store.peers()
     }
 
-    fn find(
+    async fn find(
         &self,
         id: &NodeIdentifier,
         limit: usize,
@@ -74,13 +76,13 @@ impl<'a, T: KademliaRPC> KademliaNodeDiscovery<'a, T> {
             let different_bit = 1 << (dist % 8);
             target[byte_index] = target[byte_index] ^ different_bit; // A key at a distance dist from me
 
-            let peers = self.rpc.lookup(&target, peer_set.first().unwrap())?;
+            let peers = self.rpc.lookup(&target, peer_set.first().unwrap()).await?;
             let filtered = self.filter(&peers, potentials, id)?;
 
             let mut new_potentials = potentials.clone();
             new_potentials.extend(filtered);
 
-            self.find(id, limit, dists, &peer_set[1..], &new_potentials, i + 1)
+            Box::pin(self.find(id, limit, dists, &peer_set[1..], &new_potentials, i + 1)).await
         } else {
             Ok(potentials.iter().cloned().collect())
         }

@@ -40,7 +40,7 @@ impl<'a, T: KademliaRPC> KademliaStore<'a, T> {
         self.table.remove(key)
     }
 
-    pub fn update_last_seen(&self, peer_node: &PeerNode) -> Result<(), CommError> {
-        self.table.update_last_seen(peer_node)
+    pub async fn update_last_seen(&self, peer_node: &PeerNode) -> Result<(), CommError> {
+        self.table.update_last_seen(peer_node).await
     }
 }

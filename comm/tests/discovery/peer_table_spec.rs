@@ -2,6 +2,7 @@
 
 use prost::bytes::Bytes;
 use rand::RngCore;
+use async_trait::async_trait;
 
 use comm::rust::{
     discovery::{kademlia_rpc::KademliaRPC, peer_table::PeerTable},
@@ -24,12 +25,13 @@ fn endpoint() -> Endpoint {
 /// Test implementation of KademliaRPC that always succeeds
 struct KademliaRPCStub;
 
+#[async_trait]
 impl KademliaRPC for KademliaRPCStub {
-    fn ping(&self, _peer: &PeerNode) -> Result<(), CommError> {
-        Ok(()) // Always successful for tests
+    async fn ping(&self, _peer: &PeerNode) -> Result<bool, CommError> {
+        Ok(true) // Always successful for tests
     }
     
-    fn lookup(&self, _key: &[u8], _peer: &PeerNode) -> Result<Vec<PeerNode>, CommError> {
+    async fn lookup(&self, _key: &[u8], _peer: &PeerNode) -> Result<Vec<PeerNode>, CommError> {
         Ok(Vec::new()) // Return empty for tests
     }
 }
@@ -68,8 +70,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn peer_that_is_already_in_the_table_should_get_updated() {
+    #[tokio::test]
+    async fn peer_that_is_already_in_the_table_should_get_updated() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_peer = home();
@@ -90,7 +92,7 @@ mod tests {
         };
 
         // when - add first peer
-        table.update_last_seen(&peer0).unwrap();
+        table.update_last_seen(&peer0).await.unwrap();
         
         // then - should contain peer0
         let peers = table.peers().unwrap();
@@ -98,7 +100,7 @@ mod tests {
         assert_eq!(peers[0], peer0);
 
         // when - add second peer with same id but different endpoint
-        table.update_last_seen(&peer1).unwrap();
+        table.update_last_seen(&peer1).await.unwrap();
         
         // then - should now contain peer1 (updated endpoint)
         let peers = table.peers().unwrap();
@@ -133,8 +135,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn peers_should_be_added_to_correct_buckets() {
+    #[tokio::test]
+    async fn peers_should_be_added_to_correct_buckets() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -146,9 +148,9 @@ mod tests {
         let peer_distance_7 = create_peer_with_id(&[0b00000001u8]); // distance 7
 
         // when
-        table.update_last_seen(&peer_distance_0).unwrap();
-        table.update_last_seen(&peer_distance_1).unwrap();
-        table.update_last_seen(&peer_distance_7).unwrap();
+        table.update_last_seen(&peer_distance_0).await.unwrap();
+        table.update_last_seen(&peer_distance_1).await.unwrap();
+        table.update_last_seen(&peer_distance_7).await.unwrap();
 
         // then - all peers should be in the table
         let peers = table.peers().unwrap();
@@ -163,8 +165,8 @@ mod tests {
         assert_eq!(table.table[7].lock().unwrap().len(), 1);
     }
 
-    #[test]
-    fn lookup_should_return_closest_peers() {
+    #[tokio::test]
+    async fn lookup_should_return_closest_peers() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -180,7 +182,7 @@ mod tests {
         ];
 
         for peer in &peers {
-            table.update_last_seen(peer).unwrap();
+            table.update_last_seen(peer).await.unwrap();
         }
 
         // when - lookup a key close to one of the peers
@@ -195,8 +197,8 @@ mod tests {
         assert!(!result.iter().any(|p| p.key() == &lookup_key));
     }
 
-    #[test]
-    fn find_should_return_peer_if_exists() {
+    #[tokio::test]
+    async fn find_should_return_peer_if_exists() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -206,7 +208,7 @@ mod tests {
         let peer = create_peer_with_id(&peer_key);
 
         // when - add peer and then find it
-        table.update_last_seen(&peer).unwrap();
+        table.update_last_seen(&peer).await.unwrap();
         let found = table.find(&Bytes::from(peer_key.clone())).unwrap();
 
         // then
@@ -220,8 +222,8 @@ mod tests {
         assert!(not_found.is_none());
     }
 
-    #[test]
-    fn remove_should_delete_peer_from_table() {
+    #[tokio::test]
+    async fn remove_should_delete_peer_from_table() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -231,7 +233,7 @@ mod tests {
         let peer = create_peer_with_id(&peer_key);
 
         // when - add peer, verify it exists, then remove it
-        table.update_last_seen(&peer).unwrap();
+        table.update_last_seen(&peer).await.unwrap();
         assert!(table.find(&Bytes::from(peer_key.clone())).unwrap().is_some());
 
         table.remove(&Bytes::from(peer_key.clone())).unwrap();
@@ -241,17 +243,17 @@ mod tests {
         assert_eq!(table.peers().unwrap().len(), 0);
     }
 
-    #[test]
-    fn sparseness_should_return_distances_ordered_by_fill_level() {
+    #[tokio::test]
+    async fn sparseness_should_return_distances_ordered_by_fill_level() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
         let table = PeerTable::new(Bytes::from(home_key), None, None, &kademlia_rpc);
 
         // Add more peers to some buckets than others
-        table.update_last_seen(&create_peer_with_id(&[0b10000000u8])).unwrap(); // distance 0
-        table.update_last_seen(&create_peer_with_id(&[0b10000001u8])).unwrap(); // distance 0
-        table.update_last_seen(&create_peer_with_id(&[0b01000000u8])).unwrap(); // distance 1
+        table.update_last_seen(&create_peer_with_id(&[0b10000000u8])).await.unwrap(); // distance 0
+        table.update_last_seen(&create_peer_with_id(&[0b10000001u8])).await.unwrap(); // distance 0
+        table.update_last_seen(&create_peer_with_id(&[0b01000000u8])).await.unwrap(); // distance 1
 
         // when
         let sparseness = table.sparseness().unwrap();
@@ -263,8 +265,8 @@ mod tests {
         assert!(sparseness.contains(&1)); // distance 1 bucket
     }
 
-    #[test]
-    fn table_should_handle_multiple_peers_same_distance() {
+    #[tokio::test]
+    async fn table_should_handle_multiple_peers_same_distance() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -276,9 +278,9 @@ mod tests {
         let peer3 = create_peer_with_id(&[0b10000011u8]); // distance 0
 
         // when
-        table.update_last_seen(&peer1).unwrap();
-        table.update_last_seen(&peer2).unwrap();
-        table.update_last_seen(&peer3).unwrap();
+        table.update_last_seen(&peer1).await.unwrap();
+        table.update_last_seen(&peer2).await.unwrap();
+        table.update_last_seen(&peer3).await.unwrap();
 
         // then
         let peers = table.peers().unwrap();
@@ -324,8 +326,8 @@ mod tests {
         assert_eq!(table.distance_other_peer(&alternating), Some(1)); 
     }
 
-    #[test]
-    fn bucket_should_maintain_insertion_order() {
+    #[tokio::test]
+    async fn bucket_should_maintain_insertion_order() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -337,9 +339,9 @@ mod tests {
         let peer3 = create_peer_with_endpoint(&[0b10000011u8], "host3", 3000);
 
         // when
-        table.update_last_seen(&peer1).unwrap();
-        table.update_last_seen(&peer2).unwrap();
-        table.update_last_seen(&peer3).unwrap();
+        table.update_last_seen(&peer1).await.unwrap();
+        table.update_last_seen(&peer2).await.unwrap();
+        table.update_last_seen(&peer3).await.unwrap();
 
         // then - peers should be retrievable and in the table
         let peers = table.peers().unwrap();
@@ -351,8 +353,8 @@ mod tests {
         assert!(peers.contains(&peer3));
     }
 
-    #[test]
-    fn large_table_operations() {
+    #[tokio::test]
+    async fn large_table_operations() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -363,7 +365,7 @@ mod tests {
         for i in 0..64 {
             let key = vec![i as u8];
             let peer = create_peer_with_id(&key);
-            table.update_last_seen(&peer).unwrap();
+            table.update_last_seen(&peer).await.unwrap();
             added_peers.push(peer);
         }
 
@@ -390,8 +392,8 @@ mod tests {
         assert!(found_count > 0); // At least some peers should be findable
     }
 
-    #[test]
-    fn concurrent_operations_simulation() {
+    #[tokio::test]
+    async fn concurrent_operations_simulation() {
         // given
         let kademlia_rpc = KademliaRPCStub;
         let home_key = vec![0b00000000u8];
@@ -403,12 +405,12 @@ mod tests {
         let peer1_updated = create_peer_with_endpoint(&[0b10000001u8], "updated", 9999);
 
         // when - rapid operations
-        table.update_last_seen(&peer1).unwrap();
-        table.update_last_seen(&peer2).unwrap();
+        table.update_last_seen(&peer1).await.unwrap();
+        table.update_last_seen(&peer2).await.unwrap();
         
         let lookup1 = table.lookup(&Bytes::from(vec![0b11111111u8])).unwrap();
         
-        table.update_last_seen(&peer1_updated).unwrap(); // Update peer1
+        table.update_last_seen(&peer1_updated).await.unwrap(); // Update peer1
         
         let lookup2 = table.lookup(&Bytes::from(vec![0b11111111u8])).unwrap();
         

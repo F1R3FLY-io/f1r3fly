@@ -19,7 +19,7 @@ fn main() {
 
     tonic_build::configure()
         .build_client(true)
-        .build_server(false)
+        .build_server(true)
         .btree_map(&["."])
         .message_attribute(".", "#[repr(C)]")
         .enum_attribute(".", "#[repr(C)]")

@@ -128,7 +128,7 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
 
     /// Update the last seen time for a peer in the routing table.
     /// This function implements the same logic as the Scala version.
-    pub fn update_last_seen(&self, peer: &PeerNode) -> Result<(), CommError> {
+    pub async fn update_last_seen(&self, peer: &PeerNode) -> Result<(), CommError> {
         // Find appropriate bucket
         let bucket = self.get_bucket(peer)?;
         
@@ -138,7 +138,7 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
             
             // If we have an old peer to ping, do so
             if let Some(old_entry) = old_peer_candidate {
-                self.ping_and_update(&bucket_mutex, peer, old_entry)?;
+                self.ping_and_update(&bucket_mutex, peer, old_entry).await?;
             }
         }
         
@@ -198,14 +198,16 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     }
 
     /// Ping an old peer and update the bucket based on response
-    fn ping_and_update(
+    async fn ping_and_update(
         &self,
         bucket: &Arc<Mutex<Vec<PeerTableEntry>>>,
         new_peer: &PeerNode,
         mut old_entry: PeerTableEntry,
     ) -> Result<(), CommError> {
-        // Ping the old peer
-        let ping_successful = self.kademlia_rpc.ping(&old_entry.entry).is_ok();
+        // Ping the old peer and check if it returns true (successful ping)
+        let ping_successful = self.kademlia_rpc.ping(&old_entry.entry).await
+            .map(|result| result)
+            .unwrap_or(false);
 
         let mut entries = bucket.lock().map_err(|_| {
             CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
