@@ -7,16 +7,20 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1.74"
+chrono = { version = "0.4", features = ["serde"] }
 crypto = { path = "../crypto" }
+dashmap = "6.1"
 env_logger = "0.11.8"
 hex = "0.4.3"
 log = "0.4"
 models = { path = "../models" }
 paste = "1.0"
+proptest = "1.6.0"
 prost = "0.13.5"
 rand = "0.9.1"
 shared = { path = "../shared" }
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 tonic = { version = "0.13", features = ["prost"] }
 url = "2.5.4"
 
