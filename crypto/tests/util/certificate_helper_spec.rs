@@ -123,7 +123,6 @@ fn test_generate_key_pair_blocking_and_non_blocking() {
 
 #[test]
 fn test_public_address_coordinate_extraction() {
-    // Test that our coordinate extraction matches Scala's algorithm
     let (_, public_key) = CertificateHelper::generate_key_pair(false);
 
     // Get the SEC1 uncompressed point (what our Rust implementation uses)

@@ -1,4 +1,7 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/StreamObservable.scala
+// See comm/src/main/scala/coop/rchain/comm/transport/buffer/LimitedBufferObservable.scala
+// See comm/src/main/scala/coop/rchain/comm/transport/buffer/LimitedBuffer.scala
+// See comm/src/main/scala/coop/rchain/comm/transport/buffer/ConcurrentQueue.scala
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -14,7 +17,6 @@ use crate::rust::{
 };
 
 /// Stream message containing a cache key and sender peer
-/// Equivalent to Scala's final case class Stream(key: String, sender: PeerNode)
 #[derive(Debug, Clone)]
 pub struct Stream {
     pub key: String,
@@ -22,7 +24,6 @@ pub struct Stream {
 }
 
 /// StreamObservable provides bounded buffering for streaming messages with overflow handling
-/// Ports Scala's StreamObservable[F[_]: Sync: Log] class
 ///
 /// Implements "drop new" behavior - when buffer is full, new messages are dropped
 /// Uses flume bounded channels for lock-free performance
@@ -32,16 +33,15 @@ pub struct StreamObservable {
     cache: StreamCache,
     sender: flume::Sender<Stream>,
     receiver: Option<flume::Receiver<Stream>>,
-    // State management (like Scala's upstreamIsComplete/downstreamIsComplete)
+    // State management
     upstream_complete: Arc<AtomicBool>,
     downstream_complete: Arc<AtomicBool>,
 }
 
 impl StreamObservable {
     /// Create a new StreamObservable with the given peer, buffer size, and cache
-    /// Ports Scala constructor: StreamObservable[F[_]: Sync: Log](peer: PeerNode, bufferSize: Int, cache: TrieMap[String, Array[Byte]])
     pub fn new(peer: PeerNode, buffer_size: usize, cache: StreamCache) -> Self {
-        // Validate buffer size like Scala version
+        // Validate buffer size
         assert!(
             buffer_size > 0,
             "bufferSize must be a strictly positive number"
@@ -61,14 +61,6 @@ impl StreamObservable {
     }
 
     /// Enqueue a blob for streaming
-    /// Ports Scala's: def enque(blob: Blob): F[Unit]
-    ///
-    /// This method matches Scala semantics exactly:
-    /// 1. Logs stream information  
-    /// 2. Stores the blob's packet in cache
-    /// 3. Tries to push to the stream queue (non-blocking)
-    /// 4. If queue is full, logs warning and removes from cache (drop new behavior)
-    /// 5. Always returns F[Unit] equivalent - Result<(), CommError>
     pub async fn enque(&self, blob: &Blob) -> Result<(), CommError> {
         // Check completion states first
         if self.upstream_complete.load(Ordering::Acquire)
@@ -148,9 +140,6 @@ impl StreamObservable {
     }
 
     /// Get a stream subscription
-    /// Ports Scala's: def unsafeSubscribeFn(subscriber: Subscriber[Stream]): Cancelable
-    ///
-    /// Returns a StreamSubscription
     pub fn subscribe(&mut self) -> Option<StreamSubscription> {
         self.receiver.take().map(|receiver| StreamSubscription {
             receiver,
@@ -175,12 +164,6 @@ impl StreamObservable {
 }
 
 /// Subscription handle that automatically manages downstream completion state
-/// This is the Rust equivalent of Scala's Cancelable returned by unsafeSubscribeFn
-///
-/// Provides lifecycle management for stream subscriptions:
-/// - Implements Stream trait for message consumption
-/// - Automatically marks downstream as complete when dropped  
-/// - Provides explicit cancel() method like Scala's Cancelable
 pub struct StreamSubscription {
     receiver: flume::Receiver<Stream>,
     downstream_complete: Arc<AtomicBool>,
@@ -288,8 +271,6 @@ mod tests {
     async fn test_invalid_buffer_size() {
         let peer = create_test_peer();
         let cache = create_test_cache();
-
-        // Should panic like Scala version
         let _observable = StreamObservable::new(peer, 0, cache);
     }
 
@@ -307,7 +288,7 @@ mod tests {
         let blob = create_test_blob(sender.clone(), vec![1, 2, 3, 4, 5]);
 
         let result = observable.enque(&blob).await;
-        assert!(result.is_ok()); // Should return Ok(()) like Scala F[Unit]
+        assert!(result.is_ok());
 
         // Read from stream
         if let Some(stream_msg) = subscription.next().await {
@@ -338,11 +319,11 @@ mod tests {
         assert!(!observable.is_downstream_complete());
         assert!(!observable.is_complete());
 
-        // Try to enqueue after completion - should still return Ok(()) like Scala
+        // Try to enqueue after completion
         let sender = create_test_peer();
         let blob = create_test_blob(sender, vec![1, 2, 3]);
         let result = observable.enque(&blob).await;
-        assert!(result.is_ok()); // Scala F[Unit] always succeeds
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -385,13 +366,10 @@ mod tests {
             );
         }
 
-        // This should still return Ok(()) but drop the message (like Scala F[Unit])
+        // This should still return Ok(()) but drop the message
         let overflow_blob = create_test_blob(sender.clone(), vec![99; 10]);
         let result = observable.enque(&overflow_blob).await;
-        assert!(
-            result.is_ok(),
-            "Scala F[Unit] always returns success even when dropping"
-        );
+        assert!(result.is_ok(), "Always returns success even when dropping");
 
         // Cache should only contain the successfully stored items
         assert_eq!(cache.len(), buffer_size);
@@ -406,7 +384,7 @@ mod tests {
         let subscription = observable.subscribe().expect("Should get subscription");
         assert!(subscription.is_active());
 
-        // Cancel the subscription (like Scala Cancelable.cancel())
+        // Cancel the subscription
         subscription.cancel();
 
         // Downstream should be marked complete
@@ -426,7 +404,7 @@ mod tests {
         for i in 0..3 {
             let blob = create_test_blob(sender.clone(), vec![i; 10]);
             let result = observable.enque(&blob).await;
-            assert!(result.is_ok()); // All should return Ok(()) like Scala F[Unit]
+            assert!(result.is_ok());
         }
 
         // Read all messages

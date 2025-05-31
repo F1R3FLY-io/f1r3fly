@@ -43,11 +43,6 @@ impl CertificateHelper {
     pub const ELLIPTIC_CURVE_NAME: &'static str = "secp256r1";
 
     /// Validate that a public key uses the expected elliptic curve (secp256r1/P-256)
-    /// Ports Scala's: def isExpectedEllipticCurve(publicKey: PublicKey): Boolean
-    ///
-    /// The Scala version checks:
-    /// 1. That the key is an ECPublicKey (not RSA/DSA/etc.)
-    /// 2. That the curve parameters match secp256r1
     ///
     /// In Rust with p256::PublicKey, we know it's always P-256/secp256r1 by type,
     /// but we should still validate the key is well-formed and on the correct curve.
@@ -75,7 +70,6 @@ impl CertificateHelper {
     }
 
     /// Compute the public address from a secp256r1 public key using F1r3fly's algorithm
-    /// Ports Scala's: def publicAddress(publicKey: PublicKey): Option[Array[Byte]]
     ///
     /// Algorithm:
     /// 1. Extract x,y coordinates from EC public key (32 bytes each)
@@ -100,14 +94,12 @@ impl CertificateHelper {
     }
 
     /// Compute public address from raw 64-byte key data
-    /// Ports Scala's: def publicAddress(input: Array[Byte]): Array[Byte]
     pub fn public_address_from_bytes(input: &[u8]) -> Vec<u8> {
         let hash = Keccak256::hash(input.to_vec());
         hash[12..].to_vec() // Take last 20 bytes
     }
 
     /// Parse an X.509 certificate from DER bytes
-    /// Ports Scala's: def fromFile(certFile: File): X509Certificate
     pub fn parse_certificate(der_bytes: &[u8]) -> Result<X509Certificate, CertificateError> {
         X509Certificate::from_der(der_bytes).map_err(CertificateError::X509)
     }
@@ -118,7 +110,6 @@ impl CertificateHelper {
     }
 
     /// Read an X.509 certificate from a file path
-    /// Ports Scala's: def fromFile(certFile: File): X509Certificate
     pub fn from_file(cert_file_path: &str) -> Result<X509Certificate, CertificateError> {
         // Read the file contents
         let cert_bytes = std::fs::read(cert_file_path).map_err(CertificateError::Io)?;
@@ -140,7 +131,6 @@ impl CertificateHelper {
     }
 
     /// Read a key pair from a PEM file
-    /// Ports Scala's: def readKeyPair(keyFile: File): KeyPair
     ///
     /// The Scala version manually reconstructs the public key using:
     /// ```scala
@@ -180,7 +170,6 @@ impl CertificateHelper {
     }
 
     /// Generate a new secp256r1 key pair
-    /// Ports Scala's: def generateKeyPair(useNonBlockingRandom: Boolean): KeyPair
     ///
     /// When useNonBlockingRandom is true, uses a non-blocking random source (equivalent to /dev/urandom)
     /// When false, uses a blocking secure random source (equivalent to /dev/random)
@@ -202,7 +191,6 @@ impl CertificateHelper {
     }
 
     /// Generate a self-signed X.509 certificate from a key pair
-    /// Ports Scala's: def generate(keyPair: KeyPair): X509Certificate
     pub fn generate_certificate(
         secret_key: &P256SecretKey,
         public_key: &P256PublicKey,
@@ -212,17 +200,17 @@ impl CertificateHelper {
             .map(|addr| hex::encode(&addr))
             .unwrap_or_else(|| "local".to_string());
 
-        // Create certificate parameters (equivalent to Scala's X509V3CertificateGenerator setup)
+        // Create certificate parameters
         let mut params = CertificateParams::new(vec![]).map_err(|e| {
             CertificateError::CertificateGeneration(format!("Failed to create params: {}", e))
         })?;
 
-        // Set subject DN to CN=<address> (like Scala version)
+        // Set subject DN to CN=<address>
         let mut distinguished_name = DistinguishedName::new();
         distinguished_name.push(DnType::CommonName, &address);
         params.distinguished_name = distinguished_name;
 
-        // Set validity period to 365 days (like Scala version)
+        // Set validity period to 365 days
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -234,8 +222,8 @@ impl CertificateHelper {
         )
         .map_err(|e| CertificateError::CertificateGeneration(format!("Invalid time: {}", e)))?;
 
-        // Set serial number (like Scala's BigInteger(64, new SecureRandom()))
-        // Generate a 64-bit random serial number to match Scala exactly
+        // Set serial number
+        // Generate a 64-bit random serial number
         let mut serial_bytes = [0u8; 8];
         use rand::RngCore;
         rand::rngs::OsRng.fill_bytes(&mut serial_bytes);
@@ -272,7 +260,6 @@ impl CertificateHelper {
     }
 
     /// Encode signature from raw R,S format to DER format
-    /// Ports Scala's: def encodeSignatureRStoDER(signatureRS: Array[Byte]): Try[Array[Byte]]
     pub fn encode_signature_rs_to_der(signature_rs: &[u8]) -> Result<Vec<u8>, CertificateError> {
         if signature_rs.is_empty() {
             return Err(CertificateError::SignatureEncoding(
@@ -288,22 +275,21 @@ impl CertificateHelper {
 
         let (r_bytes, s_bytes) = signature_rs[..64].split_at(32);
 
-        // Create properly formatted DER sequence manually (like Scala's approach)
-        // This matches Scala's ASN1Integer and DERSequenceGenerator logic
+        // Create properly formatted DER sequence manually
         let mut der = Vec::new();
-        
+
         // ASN.1 SEQUENCE tag
         der.push(0x30);
-        
+
         // We'll build the content first, then add the length
         let mut content = Vec::new();
-        
+
         // Add R as ASN.1 INTEGER
         Self::add_asn1_integer(&mut content, r_bytes)?;
-        
-        // Add S as ASN.1 INTEGER  
+
+        // Add S as ASN.1 INTEGER
         Self::add_asn1_integer(&mut content, s_bytes)?;
-        
+
         // Add the content length to the sequence
         if content.len() < 128 {
             der.push(content.len() as u8);
@@ -317,7 +303,7 @@ impl CertificateHelper {
             der.push(0x80 | (4 - first_nonzero) as u8);
             der.extend_from_slice(&len_bytes[first_nonzero..]);
         }
-        
+
         // Add the content
         der.extend(content);
 
@@ -325,7 +311,6 @@ impl CertificateHelper {
     }
 
     /// Decode signature from DER format to raw R,S format  
-    /// Ports Scala's: def decodeSignatureDERtoRS(signatureDER: Array[Byte]): Try[Array[Byte]]
     pub fn decode_signature_der_to_rs(signature_der: &[u8]) -> Result<Vec<u8>, CertificateError> {
         if signature_der.is_empty() {
             return Err(CertificateError::SignatureEncoding(
@@ -340,10 +325,9 @@ impl CertificateHelper {
         // Extract R and S components and convert to bytes
         let (r, s) = signature.split_scalars();
 
-        // Convert to exactly 32-byte arrays (like Scala's BigIntegers.asUnsignedByteArray(32, value))
-        // This ensures left-padding with zeros to match Scala's behavior exactly
+        // Convert to exactly 32-byte arrays
         let mut result = Vec::with_capacity(64);
-        
+
         // Add R as exactly 32 bytes (left-padded with zeros if needed)
         let r_bytes = r.to_bytes();
         if r_bytes.len() <= 32 {
@@ -354,7 +338,7 @@ impl CertificateHelper {
             // Take the rightmost 32 bytes if somehow longer
             result.extend_from_slice(&r_bytes[r_bytes.len() - 32..]);
         }
-        
+
         // Add S as exactly 32 bytes (left-padded with zeros if needed)
         let s_bytes = s.to_bytes();
         if s_bytes.len() <= 32 {
@@ -382,15 +366,15 @@ impl CertificateHelper {
         // 1. If the first bit is 1, prepend 0x00 to indicate positive number
         // 2. Remove leading zeros (but not if it would make first bit 1)
         let mut trimmed_bytes = bytes;
-        
+
         // Remove leading zeros but keep at least one byte
         while trimmed_bytes.len() > 1 && trimmed_bytes[0] == 0 {
             trimmed_bytes = &trimmed_bytes[1..];
         }
-        
+
         // Check if we need to add a padding byte to indicate positive number
         let needs_padding = !trimmed_bytes.is_empty() && (trimmed_bytes[0] & 0x80) != 0;
-        
+
         if needs_padding {
             // Add length (trimmed bytes + 1 padding byte)
             content.push((trimmed_bytes.len() + 1) as u8);
@@ -410,12 +394,10 @@ impl CertificateHelper {
 }
 
 /// Certificate printing utilities
-/// Ports Scala's: object CertificatePrinter
 pub struct CertificatePrinter;
 
 impl CertificatePrinter {
     /// Format a certificate as PEM string
-    /// Ports Scala's: def print(certificate: X509Certificate): String
     pub fn print_certificate(cert_der: &[u8]) -> String {
         let base64_cert = general_purpose::STANDARD.encode(cert_der);
         let lines = Self::split_into_lines(&base64_cert, 64);
@@ -426,7 +408,6 @@ impl CertificatePrinter {
     }
 
     /// Format a private key as PEM string
-    /// Ports Scala's: def printPrivateKey(privateKey: PrivateKey): String
     pub fn print_private_key(key_der: &[u8]) -> String {
         let base64_key = general_purpose::STANDARD.encode(key_der);
         let lines = Self::split_into_lines(&base64_key, 64);
@@ -437,7 +418,6 @@ impl CertificatePrinter {
     }
 
     /// Split a string into lines of specified length
-    /// Ports Scala's: private def split(s: String, acc: List[String] = Nil): List[String]
     fn split_into_lines(s: &str, line_length: usize) -> Vec<String> {
         s.chars()
             .collect::<Vec<char>>()
