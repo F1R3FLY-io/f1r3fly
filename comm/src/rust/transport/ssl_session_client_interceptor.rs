@@ -14,7 +14,7 @@ use models::routing::{tl_response::Payload, Ack, Header, TlResponse};
 /// 1. Network ID validation - ensures responses are from the expected network
 /// 2. Certificate validation - verifies the sender's identity using TLS certificates
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SslSessionClientInterceptor {
     network_id: String,
 }

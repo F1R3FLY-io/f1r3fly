@@ -2,6 +2,9 @@
 
 use crypto::rust::util::certificate_helper::CertificateHelper;
 use p256::elliptic_curve::sec1::FromEncodedPoint;
+use rustls::client::danger::{ServerCertVerifier, ServerCertVerified, HandshakeSignatureValid};
+use rustls::{SignatureScheme, DigitallySignedStruct, Error as RustlsError};
+use rustls::pki_types::{CertificateDer, ServerName};
 use std::sync::Arc;
 
 /// Custom error type for certificate validation
@@ -55,6 +58,8 @@ impl HostnameTrustManagerFactory {
 }
 
 /// HostnameTrustManager - implements F1r3fly's custom certificate validation logic
+/// Directly implements rustls ServerCertVerifier for seamless integration
+#[derive(Debug)]
 pub struct HostnameTrustManager;
 
 impl HostnameTrustManager {
@@ -242,6 +247,70 @@ impl HostnameTrustManager {
     pub fn get_accepted_issuers(&self) -> Vec<Vec<u8>> {
         // Return empty list - we use custom validation, not CA-based
         Vec::new()
+    }
+}
+
+/// Implement rustls ServerCertVerifier directly
+impl ServerCertVerifier for HostnameTrustManager {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<ServerCertVerified, RustlsError> {
+        // Convert server_name to hostname string for our existing validation logic
+        let hostname = match server_name {
+            ServerName::DnsName(dns_name) => Some(dns_name.as_ref()),
+            ServerName::IpAddress(ip) => {
+                // Convert IP to string for hostname verification
+                let ip_str = match ip {
+                    rustls::pki_types::IpAddr::V4(ipv4) => {
+                        format!("{:?}", ipv4) // Use Debug format since Display isn't implemented
+                    },
+                    rustls::pki_types::IpAddr::V6(ipv6) => {
+                        format!("{:?}", ipv6) // Use Debug format since Display isn't implemented
+                    },
+                };
+                Some(ip_str.leak() as &str) // Leak string to get 'static lifetime
+            },
+            _ => None,
+        };
+        
+        // Use our existing server trust validation logic
+        self.check_server_trusted(end_entity.as_ref(), "RSA", hostname)
+            .map_err(|_| RustlsError::InvalidCertificate(
+                rustls::CertificateError::ApplicationVerificationFailure
+            ))?;
+        
+        Ok(ServerCertVerified::assertion())
+    }
+    
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+    
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+    
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA256,
+        ]
     }
 }
 

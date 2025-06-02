@@ -27,6 +27,7 @@ pub struct Stream {
 ///
 /// Implements "drop new" behavior - when buffer is full, new messages are dropped
 /// Uses flume bounded channels for lock-free performance
+#[derive(Debug)]
 pub struct StreamObservable {
     peer: PeerNode,
     buffer_size: usize,

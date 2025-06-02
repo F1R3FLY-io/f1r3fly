@@ -1,6 +1,7 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransport.scala
 
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 
@@ -11,7 +12,10 @@ use models::routing::{Protocol, TlRequest, TlResponse};
 use crate::rust::{
     errors::{self, CommError},
     peer_node::PeerNode,
-    transport::{chunker::Chunker, transport_layer::Blob},
+    transport::{
+        chunker::Chunker, ssl_session_client_interceptor::SslSessionClientInterceptor,
+        transport_layer::Blob,
+    },
 };
 
 /// GrpcTransport module providing send and stream functionality
@@ -81,27 +85,14 @@ impl GrpcTransport {
         })
     }
 
-    /// Create a transport layer client for the given peer
-    pub async fn create_client(
-        peer: &PeerNode,
-    ) -> Result<TransportLayerClient<Channel>, CommError> {
-        let endpoint = format!("http://{}:{}", peer.endpoint.host, peer.endpoint.tcp_port);
-
-        let channel = Channel::from_shared(endpoint)
-            .map_err(|e| errors::internal_communication_error(format!("Invalid endpoint: {}", e)))?
-            .connect()
-            .await
-            .map_err(|e| {
-                errors::internal_communication_error(format!("Connection failed: {}", e))
-            })?;
-
-        Ok(TransportLayerClient::new(channel))
-    }
-
     /// Send a Protocol message to a peer via gRPC
-    pub async fn send(peer: &PeerNode, msg: &Protocol) -> Result<(), CommError> {
-        let mut transport = Self::create_client(peer).await?;
-
+    pub async fn send(
+        transport: &mut TransportLayerClient<
+            InterceptedService<Channel, SslSessionClientInterceptor>,
+        >,
+        peer: &PeerNode,
+        msg: &Protocol,
+    ) -> Result<(), CommError> {
         // Create TLRequest with the protocol message
         let request = TlRequest {
             protocol: Some(msg.clone()),
@@ -119,13 +110,14 @@ impl GrpcTransport {
 
     /// Stream a Blob to a peer via gRPC using chunking
     pub async fn stream(
+        transport: &mut TransportLayerClient<
+            InterceptedService<Channel, SslSessionClientInterceptor>,
+        >,
         peer: &PeerNode,
         network_id: &str,
         blob: &Blob,
         packet_chunk_size: usize,
     ) -> Result<(), CommError> {
-        let mut transport = Self::create_client(peer).await?;
-
         // Generate chunks using our Chunker
         let chunks = Chunker::chunk_it(network_id, blob, packet_chunk_size);
 

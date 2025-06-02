@@ -22,7 +22,7 @@ rand = "0.9.1"
 shared = { path = "../shared" }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
-tonic = { version = "0.13", features = ["prost"] }
+tonic = { version = "0.13", features = ["prost", "transport", "tls-webpki-roots"] }
 url = "2.5.4"
 # TLS and certificate dependencies
 rustls = "0.23"
@@ -32,6 +32,7 @@ webpki = "0.22"
 rustls-webpki = "0.102"
 thiserror = "1.0"
 p256 = { version = "0.13", features = ["ecdsa"] }
+futures = "0.3.31"
 
 [build-dependencies]
 tonic-build = { version = "0.13", features = ["prost"] }
