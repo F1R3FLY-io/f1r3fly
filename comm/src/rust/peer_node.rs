@@ -1,11 +1,11 @@
 // See comm/src/main/scala/coop/rchain/comm/PeerNode.scala
 
-use crate::comm::Node;
+use crate::rust::errors::{parse_error, CommError};
+use models::routing::Node;
 use prost::bytes::Bytes;
-use url::Url;
-use crate::rust::errors::{CommError, parse_error};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct NodeIdentifier {
@@ -30,7 +30,7 @@ impl NodeIdentifier {
     pub fn new(name: String) -> Self {
         let mut bytes = Vec::new();
         let chars: Vec<char> = name.chars().collect();
-        
+
         for i in (0..chars.len()).step_by(2) {
             if i + 1 < chars.len() {
                 let pair: String = chars[i..=i + 1].iter().collect();
@@ -40,7 +40,7 @@ impl NodeIdentifier {
                 }
             }
         }
-        
+
         Self {
             key: Bytes::from(bytes),
         }
@@ -115,10 +115,7 @@ impl PeerNode {
 
         // Check scheme is 'rnode'
         if url.scheme() != "rnode" {
-            return Err(parse_error(format!(
-                "invalid scheme: {}",
-                url.scheme()
-            )));
+            return Err(parse_error(format!("invalid scheme: {}", url.scheme())));
         }
 
         let id = match url.username() {
@@ -135,9 +132,7 @@ impl PeerNode {
             .query_pairs()
             .find(|(name, _)| name == "discovery")
             .and_then(|(_, value)| value.parse::<u32>().ok())
-            .ok_or_else(|| {
-                parse_error("missing or invalid discovery port".to_string())
-            })?;
+            .ok_or_else(|| parse_error("missing or invalid discovery port".to_string()))?;
 
         let protocol_port = url
             .query_pairs()

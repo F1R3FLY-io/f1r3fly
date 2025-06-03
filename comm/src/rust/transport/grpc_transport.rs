@@ -20,7 +20,7 @@ use crate::rust::{
 
 /// Trait for transport layer operations
 #[async_trait]
-pub trait TransportLayerTrait {
+pub trait TransportLayerClientTrait {
     /// Send a single request and get a response
     async fn send(&mut self, request: TlRequest) -> Result<TlResponse, Status>;
 
@@ -32,7 +32,7 @@ pub trait TransportLayerTrait {
 
 /// Implementation for the real gRPC client
 #[async_trait]
-impl TransportLayerTrait
+impl TransportLayerClientTrait
     for TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>
 {
     async fn send(&mut self, request: TlRequest) -> Result<TlResponse, Status> {
@@ -121,7 +121,7 @@ impl GrpcTransport {
     }
 
     /// Send a Protocol message to a peer via gRPC
-    pub async fn send<T: TransportLayerTrait>(
+    pub async fn send<T: TransportLayerClientTrait>(
         transport: &mut T,
         peer: &PeerNode,
         msg: &Protocol,
@@ -139,7 +139,7 @@ impl GrpcTransport {
     }
 
     /// Stream a Blob to a peer via gRPC using chunking
-    pub async fn stream<T: TransportLayerTrait>(
+    pub async fn stream<T: TransportLayerClientTrait>(
         transport: &mut T,
         peer: &PeerNode,
         network_id: &str,

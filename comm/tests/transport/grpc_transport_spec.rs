@@ -18,7 +18,7 @@ use comm::rust::{
     rp::protocol_helper,
     transport::{
         chunker::Chunker,
-        grpc_transport::{GrpcTransport, TransportLayerTrait},
+        grpc_transport::{GrpcTransport, TransportLayerClientTrait},
         transport_layer::Blob,
     },
 };
@@ -91,7 +91,7 @@ impl TestTransportLayer {
 
 /// Implement TransportLayerTrait for TestTransportLayer
 #[async_trait]
-impl TransportLayerTrait for TestTransportLayer {
+impl TransportLayerClientTrait for TestTransportLayer {
     /// Simulate the send operation
     async fn send(&mut self, request: TlRequest) -> Result<TlResponse, Status> {
         // Track the request

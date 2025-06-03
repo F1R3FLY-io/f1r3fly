@@ -222,6 +222,41 @@ impl SslSessionServerInterceptor {
     pub fn network_id(&self) -> &str {
         &self.network_id
     }
+
+    /// Validate a streaming request against TLS session context
+    ///
+    /// For streaming requests, we can only validate the TLS session itself since
+    /// the request doesn't contain a TlRequest with protocol headers. The actual
+    /// message validation happens when processing the stream chunks.
+    ///
+    /// # Arguments
+    /// * `request` - The gRPC streaming request
+    ///
+    /// # Returns
+    /// * `Ok(())` if TLS validation passes
+    /// * `Err(Status)` with appropriate error code if validation fails
+    pub fn validate_stream_request<T>(request: &Request<T>) -> Result<(), Status> {
+        // Extract validation context from request extensions
+        let validation_context = request
+            .extensions()
+            .get::<CertificateValidationContext>()
+            .ok_or_else(|| {
+                log::warn!("No certificate validation context found in streaming request");
+                Status::internal("Missing certificate validation context")
+            })?;
+
+        // Check if TLS validation passed in interceptor phase
+        if !validation_context.tls_validation_passed {
+            log::warn!("TLS validation failed for streaming request");
+            return Err(Status::unauthenticated("TLS validation failed"));
+        }
+
+        // For streaming requests, we only validate the TLS session
+        // Message-level validation (network ID, sender verification) happens
+        // when processing individual chunks in the stream
+        log::debug!("TLS validation passed for streaming request");
+        Ok(())
+    }
 }
 
 impl Interceptor for SslSessionServerInterceptor {
