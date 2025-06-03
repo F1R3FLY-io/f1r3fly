@@ -242,7 +242,7 @@ pub fn create_block(
         .put(block.block_hash.clone(), &modified_block)
         .unwrap();
 
-    block
+    modified_block
 }
 
 pub fn create_block_fast(
