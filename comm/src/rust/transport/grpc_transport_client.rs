@@ -1,5 +1,4 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransportClient.scala
-// See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransport.scala
 
 use async_trait::async_trait;
 use rustls::pki_types::pem::PemObject;
@@ -35,7 +34,11 @@ pub struct BufferedGrpcStreamChannel {
     /// Underlying gRPC channel
     pub grpc_transport: Channel,
     /// Pre-created transport client with SSL interceptor applied (for reuse)
-    pub transport_client: Arc<tokio::sync::Mutex<TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>>>,
+    pub transport_client: Arc<
+        tokio::sync::Mutex<
+            TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>,
+        >,
+    >,
     /// Buffer implementing some kind of overflow policy
     pub buffer: StreamObservable,
     /// Buffer subscriber handle
@@ -48,7 +51,9 @@ impl BufferedGrpcStreamChannel {
     /// Create a new BufferedGrpcStreamChannel with pre-created client
     pub fn new(
         grpc_transport: Channel,
-        transport_client: TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>,
+        transport_client: TransportLayerClient<
+            InterceptedService<Channel, SslSessionClientInterceptor>,
+        >,
         buffer: StreamObservable,
         buffer_subscriber: tokio::task::JoinHandle<()>,
         max_message_size: i32,
@@ -63,20 +68,14 @@ impl BufferedGrpcStreamChannel {
     }
 
     /// Get a clone of the pre-created transport client (for use in tasks)
-    pub fn get_transport_client(&self) -> Arc<tokio::sync::Mutex<TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>>> {
-        self.transport_client.clone()
-    }
-
-    /// Create a pre-configured TransportLayer client with interceptor and message size limits
-    /// (Deprecated: use get_transport_client instead)
-    pub fn create_transport_client(
+    pub fn get_transport_client(
         &self,
-    ) -> TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>> {
-        let intercepted_service =
-            InterceptedService::new(self.grpc_transport.clone(), SslSessionClientInterceptor::new("".to_string()));
-        TransportLayerClient::new(intercepted_service)
-            .max_decoding_message_size(self.max_message_size as usize)
-            .max_encoding_message_size(self.max_message_size as usize)
+    ) -> Arc<
+        tokio::sync::Mutex<
+            TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>,
+        >,
+    > {
+        self.transport_client.clone()
     }
 }
 
@@ -367,7 +366,7 @@ impl GrpcTransportClient {
             let client_guard = channel.transport_client.lock().await;
             let client = client_guard.clone(); // Clone the client for use
             drop(client_guard); // Release the lock immediately
-            
+
             let result = request(client).await?;
 
             // Return control to caller thread
@@ -391,7 +390,7 @@ impl GrpcTransportClient {
 
     /// Stream a blob file from cache to a peer using pre-created client
     ///
-    /// This method uses a pre-created transport client, eliminating the need for 
+    /// This method uses a pre-created transport client, eliminating the need for
     /// complex connection management in spawned tasks.
     async fn stream_blob_file_with_client(
         key: &str,
@@ -401,7 +400,11 @@ impl GrpcTransportClient {
         network_id: &str,
         default_send_timeout: Duration,
         packet_chunk_size: i32,
-        client: Arc<tokio::sync::Mutex<TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>>>,
+        client: Arc<
+            tokio::sync::Mutex<
+                TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>,
+            >,
+        >,
     ) -> Result<(), CommError> {
         // Timeout calculation
         let calculate_timeout = |packet: &models::routing::Packet| -> Duration {
@@ -428,7 +431,14 @@ impl GrpcTransportClient {
 
                 // Use pre-created client directly (no connection management needed)
                 let mut client_guard = client.lock().await;
-                let stream_result = GrpcTransport::stream(&mut *client_guard, peer, network_id, &blob, packet_chunk_size as usize).await;
+                let stream_result = GrpcTransport::stream(
+                    &mut *client_guard,
+                    peer,
+                    network_id,
+                    &blob,
+                    packet_chunk_size as usize,
+                )
+                .await;
                 drop(client_guard); // Release lock
 
                 // Handle the result
@@ -473,7 +483,7 @@ impl GrpcTransportClient {
             Duration::from_millis(50), // Very short timeout for quick check
             async {
                 // Try to create a transport client - this will fail if channel is terminated
-                let _client = channel.create_transport_client();
+                let _client = channel.get_transport_client();
                 // If we got here, the channel is still functional
                 false
             },

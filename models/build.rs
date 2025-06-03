@@ -32,7 +32,7 @@ fn main() {
 
     tonic_build::configure()
         .build_client(true)
-        .build_server(false)
+        .build_server(true)
         .btree_map(&["."])
         .message_attribute(".rhoapi", "#[derive(serde::Serialize, serde::Deserialize)]")
         .message_attribute(".rhoapi", "#[derive(Eq, Ord, PartialOrd)]")

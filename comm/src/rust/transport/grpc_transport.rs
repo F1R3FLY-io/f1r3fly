@@ -1,13 +1,13 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransport.scala
 
-use tokio_stream::wrappers::ReceiverStream;
+use async_trait::async_trait;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 
 use models::routing::tl_response::Payload;
 use models::routing::transport_layer_client::TransportLayerClient;
-use models::routing::{Protocol, TlRequest, TlResponse};
+use models::routing::{Chunk, Protocol, TlRequest, TlResponse};
 
 use crate::rust::{
     errors::{self, CommError},
@@ -18,22 +18,57 @@ use crate::rust::{
     },
 };
 
+/// Trait for transport layer operations
+#[async_trait]
+pub trait TransportLayerTrait {
+    /// Send a single request and get a response
+    async fn send(&mut self, request: TlRequest) -> Result<TlResponse, Status>;
+
+    /// Stream chunks and get a response
+    async fn stream<S>(&mut self, input: S) -> Result<TlResponse, Status>
+    where
+        S: tokio_stream::Stream<Item = Chunk> + Send + Unpin + 'static;
+}
+
+/// Implementation for the real gRPC client
+#[async_trait]
+impl TransportLayerTrait
+    for TransportLayerClient<InterceptedService<Channel, SslSessionClientInterceptor>>
+{
+    async fn send(&mut self, request: TlRequest) -> Result<TlResponse, Status> {
+        self.send(Request::new(request))
+            .await
+            .map(|response| response.into_inner())
+            .map_err(|status| status)
+    }
+
+    async fn stream<S>(&mut self, input: S) -> Result<TlResponse, Status>
+    where
+        S: tokio_stream::Stream<Item = Chunk> + Send + Unpin + 'static,
+    {
+        self.stream(Request::new(input))
+            .await
+            .map(|response| response.into_inner())
+            .map_err(|status| status)
+    }
+}
+
 /// GrpcTransport module providing send and stream functionality
 pub struct GrpcTransport;
 
 impl GrpcTransport {
     /// Error pattern matching: Check if error indicates peer unavailable
-    fn is_peer_unavailable(error: &Status) -> bool {
+    pub fn is_peer_unavailable(error: &Status) -> bool {
         matches!(error.code(), tonic::Code::Unavailable)
     }
 
     /// Error pattern matching: Check if error indicates timeout
-    fn is_peer_timeout(error: &Status) -> bool {
+    pub fn is_peer_timeout(error: &Status) -> bool {
         matches!(error.code(), tonic::Code::DeadlineExceeded)
     }
 
     /// Error pattern matching: Check if error indicates wrong network
-    fn is_peer_wrong_network(error: &Status) -> Option<String> {
+    pub fn is_peer_wrong_network(error: &Status) -> Option<String> {
         if matches!(error.code(), tonic::Code::PermissionDenied) {
             Some(error.message().to_string())
         } else {
@@ -42,12 +77,12 @@ impl GrpcTransport {
     }
 
     /// Error pattern matching: Check if error indicates message too large
-    fn is_peer_message_too_large(error: &Status) -> bool {
+    pub fn is_peer_message_too_large(error: &Status) -> bool {
         matches!(error.code(), tonic::Code::ResourceExhausted)
     }
 
     /// Process TLResponse payload
-    fn process_response(
+    pub fn process_response(
         peer: &PeerNode,
         response: Result<TlResponse, Status>,
     ) -> Result<(), CommError> {
@@ -86,10 +121,8 @@ impl GrpcTransport {
     }
 
     /// Send a Protocol message to a peer via gRPC
-    pub async fn send(
-        transport: &mut TransportLayerClient<
-            InterceptedService<Channel, SslSessionClientInterceptor>,
-        >,
+    pub async fn send<T: TransportLayerTrait>(
+        transport: &mut T,
         peer: &PeerNode,
         msg: &Protocol,
     ) -> Result<(), CommError> {
@@ -100,19 +133,14 @@ impl GrpcTransport {
 
         // Send request with timeout and process response
         // TODO: Add metrics integration (incrementCounter("send"), timer("send-time"))
-        let response = transport
-            .send(Request::new(request))
-            .await
-            .map(|res| res.into_inner());
+        let response = transport.send(request).await;
 
         Self::process_response(peer, response)
     }
 
     /// Stream a Blob to a peer via gRPC using chunking
-    pub async fn stream(
-        transport: &mut TransportLayerClient<
-            InterceptedService<Channel, SslSessionClientInterceptor>,
-        >,
+    pub async fn stream<T: TransportLayerTrait>(
+        transport: &mut T,
         peer: &PeerNode,
         network_id: &str,
         blob: &Blob,
@@ -122,24 +150,10 @@ impl GrpcTransport {
         let chunks = Chunker::chunk_it(network_id, blob, packet_chunk_size);
 
         // Create a stream of chunks
-        let (tx, rx) = tokio::sync::mpsc::channel(chunks.len());
+        let chunk_stream = tokio_stream::iter(chunks);
 
-        // Send all chunks through the channel
-        for chunk in chunks {
-            if tx.send(chunk).await.is_err() {
-                return Err(errors::internal_communication_error(
-                    "Failed to send chunk to stream".to_string(),
-                ));
-            }
-        }
-        drop(tx); // Close the sender to signal end of stream
-
-        // Convert receiver to stream and send
-        let chunk_stream = ReceiverStream::new(rx);
-        let response = transport
-            .stream(Request::new(chunk_stream))
-            .await
-            .map(|res| res.into_inner());
+        // Send stream and process response
+        let response = transport.stream(chunk_stream).await;
 
         Self::process_response(peer, response)
     }
