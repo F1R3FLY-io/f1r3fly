@@ -2,9 +2,9 @@
 
 use crypto::rust::util::certificate_helper::CertificateHelper;
 use p256::elliptic_curve::sec1::FromEncodedPoint;
-use rustls::client::danger::{ServerCertVerifier, ServerCertVerified, HandshakeSignatureValid};
-use rustls::{SignatureScheme, DigitallySignedStruct, Error as RustlsError};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::{DigitallySignedStruct, DistinguishedName, Error as RustlsError, SignatureScheme};
 use std::sync::Arc;
 
 /// Custom error type for certificate validation
@@ -54,6 +54,15 @@ impl HostnameTrustManagerFactory {
     /// Create a hostname trust manager
     pub fn create_trust_manager(&self) -> Arc<HostnameTrustManager> {
         Arc::new(HostnameTrustManager::new())
+    }
+
+    /// Create a client certificate verifier
+    ///
+    /// This creates an F1r3flyClientCertVerifier that uses the same HostnameTrustManager
+    /// logic for client certificate validation on the server side.
+    pub fn create_client_cert_verifier(&self) -> Arc<F1r3flyClientCertVerifier> {
+        let trust_manager = self.create_trust_manager();
+        Arc::new(F1r3flyClientCertVerifier::with_trust_manager(trust_manager))
     }
 }
 
@@ -268,25 +277,27 @@ impl ServerCertVerifier for HostnameTrustManager {
                 let ip_str = match ip {
                     rustls::pki_types::IpAddr::V4(ipv4) => {
                         format!("{:?}", ipv4) // Use Debug format since Display isn't implemented
-                    },
+                    }
                     rustls::pki_types::IpAddr::V6(ipv6) => {
                         format!("{:?}", ipv6) // Use Debug format since Display isn't implemented
-                    },
+                    }
                 };
                 Some(ip_str.leak() as &str) // Leak string to get 'static lifetime
-            },
+            }
             _ => None,
         };
-        
+
         // Use our existing server trust validation logic
         self.check_server_trusted(end_entity.as_ref(), "RSA", hostname)
-            .map_err(|_| RustlsError::InvalidCertificate(
-                rustls::CertificateError::ApplicationVerificationFailure
-            ))?;
-        
+            .map_err(|_| {
+                RustlsError::InvalidCertificate(
+                    rustls::CertificateError::ApplicationVerificationFailure,
+                )
+            })?;
+
         Ok(ServerCertVerified::assertion())
     }
-    
+
     fn verify_tls12_signature(
         &self,
         _message: &[u8],
@@ -295,7 +306,7 @@ impl ServerCertVerifier for HostnameTrustManager {
     ) -> Result<HandshakeSignatureValid, RustlsError> {
         Ok(HandshakeSignatureValid::assertion())
     }
-    
+
     fn verify_tls13_signature(
         &self,
         _message: &[u8],
@@ -304,13 +315,99 @@ impl ServerCertVerifier for HostnameTrustManager {
     ) -> Result<HandshakeSignatureValid, RustlsError> {
         Ok(HandshakeSignatureValid::assertion())
     }
-    
+
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
         vec![
             SignatureScheme::ECDSA_NISTP256_SHA256,
             SignatureScheme::RSA_PSS_SHA256,
             SignatureScheme::RSA_PKCS1_SHA256,
         ]
+    }
+}
+
+/// Custom ClientCertVerifier that uses HostnameTrustManager for F1r3fly client certificate validation
+///
+/// This implements the server-side client certificate verification using the same HostnameTrustManager
+/// logic that's used for server certificate verification on the client side.
+#[derive(Debug)]
+pub struct F1r3flyClientCertVerifier {
+    trust_manager: Arc<HostnameTrustManager>,
+}
+
+impl F1r3flyClientCertVerifier {
+    pub fn new() -> Self {
+        let trust_manager = HostnameTrustManagerFactory::instance().create_trust_manager();
+        Self { trust_manager }
+    }
+
+    /// Create with existing trust manager
+    ///
+    /// This allows creating the verifier with a pre-existing trust manager,
+    /// following the same pattern as the client side SSL context creation.
+    pub fn with_trust_manager(trust_manager: Arc<HostnameTrustManager>) -> Self {
+        Self { trust_manager }
+    }
+}
+
+impl rustls::server::danger::ClientCertVerifier for F1r3flyClientCertVerifier {
+    fn verify_client_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::server::danger::ClientCertVerified, RustlsError> {
+        // Use HostnameTrustManager's client certificate validation
+        match self
+            .trust_manager
+            .check_client_trusted(end_entity.as_ref(), "RSA")
+        {
+            Ok(_f1r3fly_address) => {
+                // Client certificate is valid
+                Ok(rustls::server::danger::ClientCertVerified::assertion())
+            }
+            Err(_validation_error) => {
+                // Client certificate validation failed
+                Err(RustlsError::InvalidCertificate(
+                    rustls::CertificateError::ApplicationVerificationFailure,
+                ))
+            }
+        }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, RustlsError> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, RustlsError> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA256,
+        ]
+    }
+
+    fn client_auth_mandatory(&self) -> bool {
+        // Require client certificates (equivalent to ClientAuth.REQUIRE)
+        true
+    }
+
+    fn root_hint_subjects(&self) -> &[DistinguishedName] {
+        // Return empty list - we use custom F1r3fly validation, not CA-based
+        &[]
     }
 }
 

@@ -2,6 +2,8 @@
 
 use futures::stream::StreamExt;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::JoinHandle;
@@ -53,8 +55,16 @@ pub type MessageBuffers = (
 
 /// Type alias for message handlers
 pub type MessageHandlers = (
-    Arc<dyn Fn(CommSend) -> Result<(), CommError> + Send + Sync>,
-    Arc<dyn Fn(StreamMessage) -> Result<(), CommError> + Send + Sync>,
+    Arc<
+        dyn Fn(CommSend) -> Pin<Box<dyn Future<Output = Result<(), CommError>> + Send>>
+            + Send
+            + Sync,
+    >,
+    Arc<
+        dyn Fn(StreamMessage) -> Pin<Box<dyn Future<Output = Result<(), CommError>> + Send>>
+            + Send
+            + Sync,
+    >,
 );
 
 /// Transport Layer Service Implementation
@@ -173,7 +183,7 @@ impl TransportLayerService {
                 .map(|send_msg| {
                     let handler = tell_handler.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = handler(send_msg) {
+                        if let Err(e) = handler(send_msg).await {
                             log::error!("Error processing Send message: {}", e);
                         }
                     })
@@ -189,7 +199,7 @@ impl TransportLayerService {
                 .map(|stream_msg| {
                     let handler = blob_handler.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = handler(stream_msg) {
+                        if let Err(e) = handler(stream_msg).await {
                             log::error!("Error processing StreamMessage: {}", e);
                         }
                     })
@@ -479,8 +489,6 @@ impl GrpcTransportReceiver {
                 // Enables resource protection by freeing up connections quickly for new peers.
                 // Improves network efficiency by avoiding sends to unresponsive peers.
                 .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
-                // Add the transport layer service with SSL interceptor
-                //
                 // NOTE: max_message_size configuration is not available at this level in tonic.
                 // Unlike Scala's NettyServerBuilder.maxInboundMessageSize(), tonic requires
                 // message size limits to be configured per-service via Grpc<T>.max_decoding_message_size().
@@ -490,6 +498,8 @@ impl GrpcTransportReceiver {
                 // - Server uses tonic's default limits: 4MB decoding, unlimited encoding
                 // - HTTP/2 frame limits (if configured) provide some protection
                 // - Client-side limits (in GrpcTransportClient) work correctly
+                //
+                // Add the transport layer service with SSL interceptor
                 .add_service(TransportLayerServer::with_interceptor(
                     transport_service,
                     ssl_interceptor,
