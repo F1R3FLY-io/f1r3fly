@@ -5,6 +5,7 @@ use tonic::service::Interceptor;
 use tonic::{Request, Status};
 
 use crypto::rust::util::certificate_helper::CertificateHelper;
+use hex;
 use models::routing::{Header, Protocol, TlRequest};
 
 /// SSL Session Server Interceptor for validating incoming gRPC requests
@@ -17,11 +18,14 @@ use models::routing::{Header, Protocol, TlRequest};
 /// # Architecture Notes
 ///
 /// Unlike Scala's ServerInterceptor which can intercept the actual message content,
-/// tonic's Interceptor trait only operates on metadata. Therefore, this implementation
-/// uses a two-phase approach:
+/// tonic's Interceptor trait only operates on metadata. Our F1r3fly architecture
+/// solves this with a two-phase validation approach:
 ///
-/// 1. **Interceptor Phase**: Validates TLS certificates and stores validation context
-/// 2. **Service Phase**: Validates message content using helper methods
+/// 1. **Interceptor Phase**: F1r3flyServer extracts TLS certificates and stores validation context
+/// 2. **Service Phase**: This interceptor validates message content using the TLS context
+///
+/// This design enables full F1r3fly certificate verification while maintaining compatibility
+/// with tonic's interceptor system and providing the same security guarantees as the Scala implementation.
 ///
 #[derive(Clone, Debug)]
 pub struct SslSessionServerInterceptor {
@@ -177,12 +181,18 @@ impl SslSessionServerInterceptor {
                 Status::unauthenticated("Certificate verification failed")
             })?;
 
-        // Compare with sender ID
-        if calculated_address == sender.id.as_ref() {
+        // Compare with sender ID - ensure both are in bytes format
+        let sender_id_bytes = sender.id.as_ref();
+
+        if calculated_address == sender_id_bytes {
             log::debug!("Certificate verification successful for sender");
             Ok(())
         } else {
-            log::warn!("Certificate verification failed. Closing connection");
+            log::warn!(
+                "Certificate verification failed. Expected: {}, Got: {}",
+                hex::encode(sender_id_bytes),
+                hex::encode(&calculated_address)
+            );
             Err(Status::unauthenticated("Certificate verification failed"))
         }
     }
@@ -265,28 +275,43 @@ impl Interceptor for SslSessionServerInterceptor {
     /// Validates TLS certificates and stores validation context in request extensions
     /// for later use by the service implementation.
     fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
-        // Extract peer certificates from the request
-        let peer_certificates = request.peer_certs();
-
-        // Convert certificates to Vec<Vec<u8>> and perform basic TLS validation
-        let (peer_certificates, tls_validation_passed) =
-            if let Some(certificates) = peer_certificates {
-                if certificates.is_empty() {
-                    log::warn!("No TLS certificates found in session");
-                    (None, false)
-                } else {
-                    log::debug!("TLS session found with {} certificates", certificates.len());
+        // Extract peer certificates from F1r3fly connection info
+        let peer_certificates = if let Some(connect_info) =
+            request
+                .extensions()
+                .get::<crate::rust::transport::f1r3fly_server::F1r3flyConnectInfo>()
+        {
+            connect_info.peer_certificates.clone()
+        } else {
+            // Fallback to standard tonic peer_certs() method for compatibility
+            if let Some(certificates) = request.peer_certs() {
+                if !certificates.is_empty() {
                     // Convert CertificateDer to Vec<u8>
                     let cert_bytes: Vec<Vec<u8>> = certificates
                         .iter()
                         .map(|cert| cert.as_ref().to_vec())
                         .collect();
-                    (Some(cert_bytes), true)
+                    Some(cert_bytes)
+                } else {
+                    None
                 }
             } else {
-                log::warn!("No TLS session found");
-                (None, false)
-            };
+                None
+            }
+        };
+
+        // Determine if TLS validation passed
+        let tls_validation_passed = if let Some(ref certs) = peer_certificates {
+            if !certs.is_empty() {
+                true
+            } else {
+                log::warn!("No TLS certificates found in session");
+                false
+            }
+        } else {
+            log::warn!("No TLS session found");
+            false
+        };
 
         // Create validation context
         let validation_context = CertificateValidationContext {

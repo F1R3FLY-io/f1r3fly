@@ -1,7 +1,7 @@
 // See comm/src/test/scala/coop/rchain/p2p/EffectsTestInstances.scala
 
-use std::time::Duration;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use models::routing::Protocol;
@@ -10,7 +10,10 @@ use comm::rust::{
     discovery::node_discovery::NodeDiscovery,
     errors::CommError,
     peer_node::PeerNode,
-    rp::{protocol_helper, rp_conf::{ClearConnectionsConf, RPConf}},
+    rp::{
+        protocol_helper,
+        rp_conf::{ClearConnectionsConf, RPConf},
+    },
     transport::transport_layer::{Blob, TransportLayer},
 };
 
@@ -97,7 +100,9 @@ impl TransportLayerStub {
 
     pub fn get_request(&self, i: usize) -> Option<(PeerNode, Protocol)> {
         let requests = self.requests.lock().unwrap();
-        requests.get(i).map(|req| (req.peer.clone(), req.msg.clone()))
+        requests
+            .get(i)
+            .map(|req| (req.peer.clone(), req.msg.clone()))
     }
 
     pub fn request_count(&self) -> usize {

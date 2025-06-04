@@ -195,19 +195,23 @@ impl CertificateHelper {
         secret_key: &P256SecretKey,
         public_key: &P256PublicKey,
     ) -> Result<Vec<u8>, CertificateError> {
-        // Compute the address for the certificate CN
-        let address = Self::public_address(public_key)
+        // Compute the F1r3fly address for the certificate CN
+        let f1r3fly_address = Self::public_address(public_key)
             .map(|addr| hex::encode(&addr))
             .unwrap_or_else(|| "local".to_string());
 
-        // Create certificate parameters
-        let mut params = CertificateParams::new(vec![]).map_err(|e| {
+        // Create certificate parameters with F1r3fly address as CN and SAN
+        let mut params = CertificateParams::new(vec![
+            // Add F1r3fly address as DNS name for identity verification
+            f1r3fly_address.clone(),
+        ])
+        .map_err(|e| {
             CertificateError::CertificateGeneration(format!("Failed to create params: {}", e))
         })?;
 
-        // Set subject DN to CN=<address>
+        // Set subject DN to CN=<f1r3fly_address>
         let mut distinguished_name = DistinguishedName::new();
-        distinguished_name.push(DnType::CommonName, &address);
+        distinguished_name.push(DnType::CommonName, &f1r3fly_address);
         params.distinguished_name = distinguished_name;
 
         // Set validity period to 365 days

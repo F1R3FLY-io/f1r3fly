@@ -177,4 +177,4 @@ mod tests {
         assert!(is_multicast_address(&multicast_v4));
         assert!(!is_multicast_address(&public_v4));
     }
-} 
+}

@@ -249,7 +249,7 @@ pub async fn find_and_connect<N: NodeDiscovery, F, Fut>(
     connections_cell: &ConnectionsCell,
     node_discovery: &N,
     connect_fn: F,
-) -> Result<Vec<PeerNode>, CommError> 
+) -> Result<Vec<PeerNode>, CommError>
 where
     F: Fn(&PeerNode) -> Fut,
     Fut: std::future::Future<Output = Result<(), CommError>>,

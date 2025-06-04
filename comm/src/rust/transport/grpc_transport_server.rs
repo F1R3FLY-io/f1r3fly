@@ -1,9 +1,6 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransportServer.scala
 
 use async_trait::async_trait;
-use rustls::pki_types::pem::PemObject;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::ServerConfig;
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::Path;
@@ -22,7 +19,6 @@ use crate::rust::{
     transport::{
         communication_response::CommunicationResponse,
         grpc_transport_receiver::{GrpcTransportReceiver, MessageBuffers, MessageHandlers},
-        hostname_trust_manager_factory::HostnameTrustManagerFactory,
         packet_ops::StreamCache,
         stream_handler::StreamHandler,
         transport_layer::Blob,
@@ -143,52 +139,6 @@ impl GrpcTransportServer {
 
         Ok(TransportServer::new(server))
     }
-
-    /// Get certificate as input stream
-    pub fn cert_input_stream(&self) -> std::io::Cursor<Vec<u8>> {
-        std::io::Cursor::new(self.cert.as_bytes().to_vec())
-    }
-
-    /// Get private key as input stream
-    pub fn key_input_stream(&self) -> std::io::Cursor<Vec<u8>> {
-        std::io::Cursor::new(self.key.as_bytes().to_vec())
-    }
-
-    /// Get or create the server SSL context with F1r3fly hostname verification
-    ///
-    /// The verification process:
-    /// 1. Extracts F1r3fly public address from client certificate  
-    /// 2. Performs hostname/identity verification using "https" algorithm
-    /// 3. Validates certificate structure and public key format
-    /// 4. Requires client certificates
-    pub async fn get_server_ssl_context(&self) -> Result<ServerConfig, CommError> {
-        // Parse server certificate and key for mutual TLS
-        let cert_der: Vec<CertificateDer> =
-            CertificateDer::pem_reader_iter(&mut self.cert_input_stream())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| {
-                    CommError::ConfigError(format!("Failed to parse server certificate: {}", e))
-                })?;
-
-        let key_der =
-            PrivateKeyDer::from_pem_reader(&mut self.key_input_stream()).map_err(|e| {
-                CommError::ConfigError(format!("Failed to parse server private key: {}", e))
-            })?;
-
-        // Create client cert verifier using factory
-        let client_cert_verifier =
-            HostnameTrustManagerFactory::instance().create_client_cert_verifier();
-
-        // Build the server config with F1r3fly client authentication
-        let config = ServerConfig::builder()
-            .with_client_cert_verifier(client_cert_verifier)
-            .with_single_cert(cert_der, key_der)
-            .map_err(|e| {
-                CommError::ConfigError(format!("Failed to configure server TLS: {}", e))
-            })?;
-
-        Ok(config)
-    }
 }
 
 /// TransportServer manages the lifecycle of a GrpcTransportServer
@@ -296,9 +246,6 @@ impl TransportLayerServer for GrpcTransportServer {
         dispatch: DispatchFn,
         handle_streamed: HandleStreamedFn,
     ) -> Result<Cancelable, CommError> {
-        // Create SSL context for the server
-        let server_ssl_context = self.get_server_ssl_context().await?;
-
         // Create buffers map for per-peer message queues
         let buffers_map: Arc<Mutex<HashMap<PeerNode, Arc<OnceCell<MessageBuffers>>>>> =
             Arc::new(Mutex::new(HashMap::new()));
@@ -371,7 +318,6 @@ impl TransportLayerServer for GrpcTransportServer {
             self.network_id.clone(),
             self.local_peer.clone(),
             self.port,
-            server_ssl_context,
             self.cert.clone(),
             self.key.clone(),
             self.max_message_size,

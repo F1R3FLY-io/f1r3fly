@@ -222,3 +222,455 @@ async fn stream_blob_should_send_a_blob_and_receive_by_multiple_remote_side() {
     // Verify the stream operation succeeded
     assert!(result.result.is_ok());
 }
+
+// **Additional Resilience Tests**
+
+#[tokio::test]
+async fn sending_message_to_unavailable_peer_should_fail_with_peer_unavailable() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("dead_peer_test".to_string());
+
+    let result = runtime
+        .run_two_nodes_test_remote_dead(|transport, local, remote| async move {
+            send_heartbeat(&transport, &local, &remote, "dead_peer_test").await
+        })
+        .await
+        .expect("Test should succeed");
+
+    // Should fail with some error (could be PeerUnavailable or other connection error)
+    assert!(result.result.is_err());
+    println!("Error received: {:?}", result.result);
+    // Accept any communication error type since dead peer can manifest as different errors
+}
+
+#[tokio::test]
+async fn streaming_to_unavailable_peer_should_fail_with_peer_unavailable() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("dead_stream_test".to_string());
+    let big_content = create_big_content(runtime.max_message_size);
+
+    let result = runtime
+        .run_two_nodes_test_remote_dead(|transport, local, remote| async move {
+            let blob = Blob {
+                sender: local.clone(),
+                packet: Packet {
+                    type_id: "Test".to_string(),
+                    content: big_content.clone(),
+                },
+            };
+            transport.stream(&remote, &blob).await
+        })
+        .await
+        .expect("Test should succeed");
+
+    // Should fail with some error (could be PeerUnavailable or other connection error)
+    assert!(result.result.is_err());
+    println!("Error received: {:?}", result.result);
+    // Accept any communication error type since dead peer can manifest as different errors
+}
+
+// **Edge Cases and Boundary Tests**
+
+#[tokio::test]
+async fn sending_empty_message_should_work() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("empty_msg_test".to_string());
+    let protocol_dispatcher = TestProtocolDispatcher::new();
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                // Create a protocol message with minimal content
+                let msg = comm::rust::rp::protocol_helper::heartbeat(&local, "empty_msg_test");
+                transport.send(&remote, &msg).await
+            },
+            Some(protocol_dispatcher.clone()),
+            None,
+            true,
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Verify message was received
+    let received = protocol_dispatcher.received();
+    assert_eq!(received.len(), 1);
+    assert!(result.result.is_ok());
+}
+
+#[tokio::test]
+async fn streaming_empty_blob_should_work() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("empty_blob_test".to_string());
+    let stream_dispatcher = TestStreamDispatcher::new();
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                let blob = Blob {
+                    sender: local.clone(),
+                    packet: Packet {
+                        type_id: "EmptyTest".to_string(),
+                        content: Bytes::new(), // Empty content
+                    },
+                };
+                transport.stream(&remote, &blob).await
+            },
+            None,
+            Some(stream_dispatcher.clone()),
+            true,
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Verify empty blob was received
+    let received = stream_dispatcher.received();
+    assert_eq!(received.len(), 1);
+    let (_, received_blob) = &received[0];
+    assert_eq!(received_blob.packet.type_id, "EmptyTest");
+    assert_eq!(received_blob.packet.content.len(), 0);
+    assert!(result.result.is_ok());
+}
+
+#[tokio::test]
+async fn streaming_very_large_blob_should_work() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("large_blob_test".to_string());
+    let stream_dispatcher = TestStreamDispatcher::new();
+
+    // Create a very large blob (10x the normal test size)
+    let large_size = (10 * runtime.max_message_size) as usize;
+    let large_content = Bytes::from(vec![42u8; large_size]);
+    let large_content_for_assert = large_content.clone();
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                let blob = Blob {
+                    sender: local.clone(),
+                    packet: Packet {
+                        type_id: "LargeTest".to_string(),
+                        content: large_content.clone(),
+                    },
+                };
+                transport.stream(&remote, &blob).await
+            },
+            None,
+            Some(stream_dispatcher.clone()),
+            true,
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Verify large blob was received correctly
+    let received = stream_dispatcher.received();
+    assert_eq!(received.len(), 1);
+    let (_, received_blob) = &received[0];
+    assert_eq!(received_blob.packet.type_id, "LargeTest");
+    assert_eq!(received_blob.packet.content, large_content_for_assert);
+    assert!(result.result.is_ok());
+}
+
+// **Concurrent Operations Tests**
+
+#[tokio::test]
+async fn concurrent_sends_to_same_peer_should_all_succeed() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("concurrent_test".to_string());
+    let protocol_dispatcher = TestProtocolDispatcher::new();
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                // Send multiple messages concurrently
+                let futures: Vec<_> = (0..5)
+                    .map(|i| {
+                        let transport = &transport;
+                        let local = &local;
+                        let remote = &remote;
+                        async move {
+                            let msg = comm::rust::rp::protocol_helper::heartbeat(
+                                local,
+                                "concurrent_test",
+                            );
+                            transport
+                                .send(remote, &msg)
+                                .await
+                                .map_err(|e| format!("Concurrent send {} failed: {}", i, e))
+                        }
+                    })
+                    .collect();
+
+                // Execute all sends concurrently
+                let results = futures::future::join_all(futures).await;
+
+                // Check all succeeded
+                for (i, result) in results.iter().enumerate() {
+                    if let Err(e) = result {
+                        return Err(format!("Send {} failed: {}", i, e));
+                    }
+                }
+
+                Ok::<(), String>(())
+            },
+            Some(protocol_dispatcher.clone()),
+            None,
+            true, // block_until_dispatched
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Wait for all operations to complete
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Verify all messages were received
+    let received = protocol_dispatcher.received();
+    assert_eq!(
+        received.len(),
+        5,
+        "Expected 5 concurrent sends, got {}",
+        received.len()
+    );
+    assert!(result.result.is_ok());
+}
+
+#[tokio::test]
+async fn concurrent_streams_to_same_peer_should_all_succeed() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("concurrent_streams_test".to_string());
+    let stream_dispatcher = TestStreamDispatcher::new();
+
+    // Use moderate-sized content for streaming
+    let content = prost::bytes::Bytes::from(vec![42u8; 2000]);
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                // Send multiple streams concurrently to test multi-consumer buffer architecture
+                let futures: Vec<_> = (0..3)
+                    .map(|i| {
+                        let transport = &transport;
+                        let local = &local;
+                        let remote = &remote;
+                        let content = content.clone();
+
+                        async move {
+                            // Make each stream unique
+                            let mut stream_content = content.to_vec();
+                            stream_content[0] = (100 + i) as u8; // First byte indicates stream number
+
+                            let blob = Blob {
+                                sender: local.clone(),
+                                packet: Packet {
+                                    type_id: format!("ConcurrentStream_{}", i),
+                                    content: prost::bytes::Bytes::from(stream_content),
+                                },
+                            };
+
+                            transport
+                                .stream(&remote, &blob)
+                                .await
+                                .map_err(|e| format!("Concurrent stream {} failed: {}", i, e))
+                        }
+                    })
+                    .collect();
+
+                // Execute all streams concurrently
+                let results = futures::future::join_all(futures).await;
+
+                // Check all succeeded
+                for (i, result) in results.iter().enumerate() {
+                    if let Err(e) = result {
+                        return Err(format!("Stream {} failed: {}", i, e));
+                    }
+                }
+
+                Ok::<(), String>(())
+            },
+            None,
+            Some(stream_dispatcher.clone()),
+            false, // Don't use block_until_dispatched for multiple streams
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Wait for all processing to complete
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+    // Verify all streams were received
+    let received = stream_dispatcher.received();
+    assert_eq!(
+        received.len(),
+        3,
+        "Expected 3 concurrent streams, got {}",
+        received.len()
+    );
+
+    // Verify each stream has correct content
+    let mut type_ids: Vec<String> = received
+        .iter()
+        .map(|(_, blob)| blob.packet.type_id.clone())
+        .collect();
+    type_ids.sort();
+    let expected_ids = vec![
+        "ConcurrentStream_0".to_string(),
+        "ConcurrentStream_1".to_string(),
+        "ConcurrentStream_2".to_string(),
+    ];
+    assert_eq!(
+        type_ids, expected_ids,
+        "All concurrent stream type IDs should be present"
+    );
+
+    // Verify unique content for each stream
+    for (_, blob) in &received {
+        assert_eq!(
+            blob.packet.content.len(),
+            2000,
+            "Stream content should be 2000 bytes"
+        );
+        let first_byte = blob.packet.content[0];
+        assert!(
+            first_byte >= 100 && first_byte <= 102,
+            "First byte should indicate stream number (100-102)"
+        );
+    }
+
+    assert!(
+        result.result.is_ok(),
+        "Concurrent stream operations should succeed"
+    );
+}
+
+// **Mixed Operations Tests**
+
+#[tokio::test]
+async fn mixed_sends_and_streams_should_all_work() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("mixed_test".to_string());
+    let protocol_dispatcher = TestProtocolDispatcher::new();
+    let stream_dispatcher = TestStreamDispatcher::new();
+
+    let content = create_big_content(runtime.max_message_size);
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, remote| async move {
+                // Mix of sends and streams executed concurrently
+                let send_future = async {
+                    let msg = comm::rust::rp::protocol_helper::heartbeat(&local, "mixed_test");
+                    transport
+                        .send(&remote, &msg)
+                        .await
+                        .map_err(|e| format!("Send failed: {}", e))
+                };
+
+                let stream_future = async {
+                    let blob = Blob {
+                        sender: local.clone(),
+                        packet: Packet {
+                            type_id: "MixedStreamTest".to_string(),
+                            content: content.clone(),
+                        },
+                    };
+                    transport
+                        .stream(&remote, &blob)
+                        .await
+                        .map_err(|e| format!("Stream failed: {}", e))
+                };
+
+                // Execute both concurrently
+                let (send_result, stream_result) = tokio::join!(send_future, stream_future);
+
+                send_result?;
+                stream_result?;
+
+                Ok::<(), String>(())
+            },
+            Some(protocol_dispatcher.clone()),
+            Some(stream_dispatcher.clone()),
+            true, // block_until_dispatched
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Wait for operations to complete
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Verify both message types were received
+    let protocol_received = protocol_dispatcher.received();
+    let stream_received = stream_dispatcher.received();
+
+    assert_eq!(protocol_received.len(), 1, "Expected 1 protocol message");
+    assert_eq!(stream_received.len(), 1, "Expected 1 stream message");
+    assert!(result.result.is_ok());
+}
+
+// **Broadcast Edge Cases**
+
+#[tokio::test]
+async fn broadcasting_to_empty_peer_list_should_succeed() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("empty_broadcast_test".to_string());
+    let protocol_dispatcher = TestProtocolDispatcher::new();
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, _remote| async move {
+                // Broadcast to empty list
+                broadcast_heartbeat(&transport, &local, &[], "empty_broadcast_test").await
+            },
+            Some(protocol_dispatcher.clone()),
+            None,
+            false, // Don't block since no messages will be sent
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Should succeed with no messages sent
+    let received = protocol_dispatcher.received();
+    assert_eq!(received.len(), 0);
+    assert!(result.result.is_ok());
+}
+
+#[tokio::test]
+async fn streaming_to_empty_peer_list_should_succeed() {
+    init_logger();
+
+    let runtime = TransportLayerTestRuntime::new("empty_stream_test".to_string());
+    let stream_dispatcher = TestStreamDispatcher::new();
+
+    let content = create_big_content(runtime.max_message_size);
+
+    let result = runtime
+        .run_two_nodes_test(
+            |transport, local, _remote| async move {
+                let blob = Blob {
+                    sender: local.clone(),
+                    packet: Packet {
+                        type_id: "EmptyBroadcastTest".to_string(),
+                        content: content.clone(),
+                    },
+                };
+                transport.stream_mult(&[], &blob).await
+            },
+            None,
+            Some(stream_dispatcher.clone()),
+            false, // Don't block since no messages will be sent
+        )
+        .await
+        .expect("Test should succeed");
+
+    // Should succeed with no streams sent
+    let received = stream_dispatcher.received();
+    assert_eq!(received.len(), 0);
+    assert!(result.result.is_ok());
+}

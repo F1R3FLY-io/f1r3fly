@@ -75,8 +75,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prost::bytes::Bytes;
     use crate::rust::peer_node::{Endpoint, NodeIdentifier};
+    use prost::bytes::Bytes;
 
     fn test_peer() -> PeerNode {
         let id = NodeIdentifier {

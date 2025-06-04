@@ -1,22 +1,21 @@
 // See comm/src/main/scala/coop/rchain/comm/transport/GrpcTransportClient.scala
 
 use async_trait::async_trait;
-use rustls::pki_types::pem::PemObject;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::ClientConfig;
+use hex;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, OnceCell};
 use tonic::service::interceptor::InterceptedService;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint, Identity};
+use tonic::transport::Channel;
 
 use crate::rust::{
     errors::CommError,
     peer_node::PeerNode,
     transport::{
+        f1r3fly_connector::F1r3flyConnector,
         grpc_transport::GrpcTransport,
-        hostname_trust_manager_factory::HostnameTrustManagerFactory,
         packet_ops::PacketOps,
         ssl_session_client_interceptor::SslSessionClientInterceptor,
         stream_observable::StreamObservable,
@@ -103,8 +102,8 @@ impl GrpcTransportClient {
         packet_chunk_size: i32,
         client_queue_size: i32,
         channels_map: Arc<Mutex<HashMap<PeerNode, Arc<OnceCell<Arc<BufferedGrpcStreamChannel>>>>>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CommError> {
+        Ok(Self {
             network_id,
             cert,
             key,
@@ -114,104 +113,80 @@ impl GrpcTransportClient {
             channels_map,
             default_send_timeout: Duration::from_secs(5),
             cache: Arc::new(dashmap::DashMap::new()),
-        }
-    }
-
-    fn cert_input_stream(&self) -> std::io::Cursor<Vec<u8>> {
-        std::io::Cursor::new(self.cert.as_bytes().to_vec())
-    }
-
-    fn key_input_stream(&self) -> std::io::Cursor<Vec<u8>> {
-        std::io::Cursor::new(self.key.as_bytes().to_vec())
-    }
-
-    /// Get or create the SSL context and certificate data
-    async fn get_client_ssl_context(&self) -> Result<(ClientConfig, Vec<u8>, Vec<u8>), CommError> {
-        // NOTE: This creates a ClientConfig with HostnameTrustManager (matching Scala's approach)
-        // but the current implementation DOES NOT actually use this custom config due to
-        // tonic 0.13 limitations (no rustls_client_config() method available)
-
-        // Parse client certificate and key for mutual TLS
-        let cert_pem = self.cert.as_bytes().to_vec();
-        let key_pem = self.key.as_bytes().to_vec();
-
-        let cert_der: Vec<CertificateDer> =
-            CertificateDer::pem_reader_iter(&mut self.cert_input_stream())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| {
-                    CommError::ConfigError(format!("Failed to parse certificate: {}", e))
-                })?;
-
-        let key_der = PrivateKeyDer::from_pem_reader(&mut self.key_input_stream())
-            .map_err(|e| CommError::ConfigError(format!("Failed to parse private key: {}", e)))?;
-
-        let trust_manager = HostnameTrustManagerFactory::instance().create_trust_manager();
-
-        // Build the client config for future use
-        // TODO: This config with HostnameTrustManager should be used for TLS but currently isn't
-        let config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(trust_manager)
-            .with_client_auth_cert(cert_der, key_der)
-            .map_err(|e| CommError::ConfigError(format!("Failed to configure TLS: {}", e)))?;
-
-        Ok((config, cert_pem, key_pem))
+        })
     }
 
     async fn create_channel(
         &self,
         peer: &PeerNode,
     ) -> Result<BufferedGrpcStreamChannel, CommError> {
-        log::info!("Creating new channel to peer {}", peer.to_address());
-        let (_client_ssl_context, cert_pem, key_pem) = self.get_client_ssl_context().await?;
-        // ^^^^^^^^^^^^^^^^^^^^^
-        // PROBLEM: We create a ClientConfig with HostnameTrustManager but DON'T USE IT!
-        //
-        // Scala side does:
-        //   .sslContext(clientSslContext)  // Uses the custom SSL context with HostnameTrustManager
-        //
-        // Rust side does:
-        //   .tls_config(tls_config)       // Uses tonic's default certificate verification
-        //
-        // This means HostnameTrustManager is NOT doing TLS-level server certificate validation
-        // like it does in Scala. The verification logic would need to be handled elsewhere.
+        log::info!("Creating new F1r3fly channel to peer {}", peer.to_address());
 
-        // Create endpoint with explicit TLS configuration
-        // Note: Using http:// scheme since .tls_config() below will override it to use TLS
-        let endpoint = format!("http://{}:{}", peer.endpoint.host, peer.endpoint.tcp_port);
+        // **F1r3fly Custom TLS Integration Architecture**
+        // This method creates tonic gRPC channels using F1r3flyConnector with connect_with_connector()
+        // providing direct integration of F1r3fly TLS verification with tonic's gRPC layer
 
-        // ISSUE: This uses tonic's standard TLS instead of our custom ClientConfig with HostnameTrustManager
-        // Unlike Scala which uses: .sslContext(clientSslContext) where clientSslContext includes
-        // the HostnameTrustManagerFactory.Instance as the trust manager
-        let tls_config = ClientTlsConfig::new()
-            .domain_name(&peer.id.to_string()) // Override authority for verification
-            .identity(Identity::from_pem(&cert_pem, &key_pem)); // Client certificate for mutual TLS
-                                                                // Missing: Custom certificate verification via HostnameTrustManager
-                                                                // (would need .rustls_client_config(_client_ssl_context) but this method doesn't exist in tonic 0.13)
+        // Step 1: Create F1r3flyConnector with peer's F1r3fly address for TLS hostname verification
+        let f1r3fly_id_hex = hex::encode(&peer.id.key);
+        log::debug!(
+            "Creating F1r3flyConnector with F1r3fly address for TLS hostname: {}",
+            f1r3fly_id_hex
+        );
 
-        // Build the channel
-        let grpc_channel = Endpoint::from_shared(endpoint)
-            .map_err(|e| CommError::ConfigError(format!("Invalid endpoint: {}", e)))?
-            .tls_config(tls_config)
-            .map_err(|e| CommError::ConfigError(format!("TLS config failed: {}", e)))?
-            .connect()
+        let f1r3fly_connector = F1r3flyConnector::new(
+            self.network_id.clone(),
+            &self.cert,
+            &self.key,
+            f1r3fly_id_hex.clone(),
+        )
+        .map_err(|e| CommError::ConfigError(format!("Failed to create F1r3flyConnector: {}", e)))?;
+
+        // Step 2: Create tonic Endpoint with HTTP scheme (not HTTPS)
+        // since F1r3flyConnector handles TLS internally
+        let endpoint_uri = format!("http://{}:{}/", peer.endpoint.host, peer.endpoint.tcp_port);
+        log::debug!(
+            "Creating F1r3fly gRPC channel to {} with TLS hostname verification against: {}",
+            endpoint_uri,
+            f1r3fly_id_hex
+        );
+
+        let endpoint = Channel::from_shared(endpoint_uri.clone()).map_err(|e| {
+            log::error!("Failed to create gRPC endpoint: {}", e);
+            CommError::InternalCommunicationError(format!("Invalid endpoint URI: {}", e))
+        })?;
+
+        // Step 3: Use F1r3flyConnector with tonic's connect_with_connector API
+        // The F1r3flyConnector will handle TLS hostname verification against the F1r3fly address
+        let grpc_channel = endpoint
+            .connect_with_connector(f1r3fly_connector)
             .await
             .map_err(|e| {
-                CommError::InternalCommunicationError(format!("Connection failed: {}", e))
+                log::error!(
+                    "Failed to connect with F1r3flyConnector to {}: {}",
+                    endpoint_uri,
+                    e
+                );
+                if let Some(source) = e.source() {
+                    log::error!("Error source: {}", source);
+                }
+                CommError::InternalCommunicationError(format!(
+                    "Failed to establish gRPC connection: {}",
+                    e
+                ))
             })?;
 
-        // Create SSL session client interceptor
-        // NOTE: This matches Scala's SslSessionClientInterceptor(networkId) - takes only network_id
-        // and uses CertificateHelper directly for application-level validation
+        log::info!("gRPC channel created for {}", peer.to_address());
+
+        // Step 4: Create SSL session interceptor for application-level validation
         let ssl_interceptor = SslSessionClientInterceptor::new(self.network_id.clone());
+        let intercepted_channel = InterceptedService::new(grpc_channel.clone(), ssl_interceptor);
 
-        // Pre-create transport client with SSL interceptor applied
-        let intercepted_service = InterceptedService::new(grpc_channel.clone(), ssl_interceptor);
-        let transport_client = TransportLayerClient::new(intercepted_service)
-            .max_decoding_message_size(self.max_message_size as usize)
-            .max_encoding_message_size(self.max_message_size as usize);
+        // Step 5: Create transport client with interceptor
+        let transport_client = TransportLayerClient::new(intercepted_channel)
+            .max_encoding_message_size(self.max_message_size as usize)
+            .max_decoding_message_size(self.max_message_size as usize);
 
-        // Create buffer
+        // Step 6: Create stream buffer and handler
         let mut buffer = StreamObservable::new(
             peer.clone(),
             self.client_queue_size as usize,
@@ -270,16 +245,13 @@ impl GrpcTransportClient {
             })
         };
 
-        // Create channel with pre-created transport client
-        let channel = BufferedGrpcStreamChannel::new(
+        Ok(BufferedGrpcStreamChannel::new(
             grpc_channel,
             transport_client,
             buffer,
             buffer_subscriber,
             self.max_message_size,
-        );
-
-        Ok(channel)
+        ))
     }
 
     /// Get or create a channel for the specified peer
@@ -363,6 +335,7 @@ impl GrpcTransportClient {
         // Apply timeout to the entire operation
         let timed_operation = tokio::time::timeout(timeout, async {
             let channel = self.get_channel(peer).await?;
+
             let client_guard = channel.transport_client.lock().await;
             let client = client_guard.clone(); // Clone the client for use
             drop(client_guard); // Release the lock immediately
@@ -379,12 +352,23 @@ impl GrpcTransportClient {
         // Handle timeout and other errors
         match timed_operation.await {
             Ok(Ok(success)) => Ok(success),
-            Ok(Err(comm_error)) => Err(comm_error),
-            Err(_timeout_error) => Err(crate::rust::errors::protocol_exception(format!(
-                "Request to {} timed out after {}ms",
-                peer.to_address(),
-                timeout.as_millis()
-            ))),
+            Ok(Err(comm_error)) => {
+                log::error!(
+                    "Request failed for peer {}: {}",
+                    peer.to_address(),
+                    comm_error
+                );
+                Err(comm_error)
+            }
+            Err(_timeout_error) => {
+                let timeout_error = crate::rust::errors::protocol_exception(format!(
+                    "Request to {} timed out after {}ms",
+                    peer.to_address(),
+                    timeout.as_millis()
+                ));
+                log::error!("Request timeout: {}", timeout_error);
+                Err(timeout_error)
+            }
         }
     }
 

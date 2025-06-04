@@ -5,6 +5,7 @@ use tonic::service::Interceptor;
 use tonic::{Request, Response, Status};
 
 use crypto::rust::util::certificate_helper::CertificateHelper;
+use hex;
 use models::routing::{tl_response::Payload, Ack, Header, TlResponse};
 
 /// SSL Session Client Interceptor for validating TLS sessions and certificates
@@ -154,12 +155,25 @@ impl SslSessionClientInterceptor {
                 Status::unauthenticated("Certificate verification failed")
             })?;
 
-        // Compare with sender ID
-        if calculated_address == sender.id.as_ref() {
+        // Compare with sender ID - ensure both are in bytes format
+        let sender_id_bytes = sender.id.as_ref();
+
+        log::debug!(
+            "Certificate verification: calculated_address={}, sender_id_bytes={}, match={}",
+            hex::encode(&calculated_address),
+            hex::encode(sender_id_bytes),
+            calculated_address == sender_id_bytes
+        );
+
+        if calculated_address == sender_id_bytes {
             log::debug!("Certificate verification successful for sender");
             Ok(())
         } else {
-            log::warn!("Certificate verification failed. Closing connection");
+            log::warn!(
+                "Certificate verification failed. Expected: {}, Got: {}",
+                hex::encode(sender_id_bytes),
+                hex::encode(&calculated_address)
+            );
             Err(Status::unauthenticated("Certificate verification failed"))
         }
     }

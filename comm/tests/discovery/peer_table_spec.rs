@@ -1,8 +1,8 @@
 // See comm/src/test/scala/coop/rchain/comm/discovery/PeerTableSpec.scala
 
+use async_trait::async_trait;
 use prost::bytes::Bytes;
 use rand::RngCore;
-use async_trait::async_trait;
 
 use comm::rust::{
     discovery::{kademlia_rpc::KademliaRPC, peer_table::PeerTable},
@@ -30,7 +30,7 @@ impl KademliaRPC for KademliaRPCStub {
     async fn ping(&self, _peer: &PeerNode) -> Result<bool, CommError> {
         Ok(true) // Always successful for tests
     }
-    
+
     async fn lookup(&self, _key: &[u8], _peer: &PeerNode) -> Result<Vec<PeerNode>, CommError> {
         Ok(Vec::new()) // Return empty for tests
     }
@@ -76,7 +76,7 @@ mod tests {
         let kademlia_rpc = KademliaRPCStub;
         let home_peer = home();
         let table = PeerTable::new(home_peer.key().clone(), None, None, &kademlia_rpc);
-        
+
         let id = rand_bytes(ADDRESS_WIDTH);
         let peer0 = PeerNode {
             id: NodeIdentifier {
@@ -93,7 +93,7 @@ mod tests {
 
         // when - add first peer
         table.update_last_seen(&peer0).await.unwrap();
-        
+
         // then - should contain peer0
         let peers = table.peers().unwrap();
         assert_eq!(peers.len(), 1);
@@ -101,7 +101,7 @@ mod tests {
 
         // when - add second peer with same id but different endpoint
         table.update_last_seen(&peer1).await.unwrap();
-        
+
         // then - should now contain peer1 (updated endpoint)
         let peers = table.peers().unwrap();
         assert_eq!(peers.len(), 1);
@@ -130,8 +130,12 @@ mod tests {
 
         for (key, expected_distance) in test_cases {
             let peer = create_peer_with_id(&key);
-            assert_eq!(table.distance_other_peer(&peer), expected_distance, 
-                      "Failed for key {:08b}", key[0]);
+            assert_eq!(
+                table.distance_other_peer(&peer),
+                expected_distance,
+                "Failed for key {:08b}",
+                key[0]
+            );
         }
     }
 
@@ -192,7 +196,7 @@ mod tests {
         // then - should return at most k peers, excluding the lookup key itself
         assert!(result.len() <= 3);
         assert!(result.len() > 0);
-        
+
         // Should not return a peer with the exact lookup key
         assert!(!result.iter().any(|p| p.key() == &lookup_key));
     }
@@ -234,7 +238,10 @@ mod tests {
 
         // when - add peer, verify it exists, then remove it
         table.update_last_seen(&peer).await.unwrap();
-        assert!(table.find(&Bytes::from(peer_key.clone())).unwrap().is_some());
+        assert!(table
+            .find(&Bytes::from(peer_key.clone()))
+            .unwrap()
+            .is_some());
 
         table.remove(&Bytes::from(peer_key.clone())).unwrap();
 
@@ -251,9 +258,18 @@ mod tests {
         let table = PeerTable::new(Bytes::from(home_key), None, None, &kademlia_rpc);
 
         // Add more peers to some buckets than others
-        table.update_last_seen(&create_peer_with_id(&[0b10000000u8])).await.unwrap(); // distance 0
-        table.update_last_seen(&create_peer_with_id(&[0b10000001u8])).await.unwrap(); // distance 0
-        table.update_last_seen(&create_peer_with_id(&[0b01000000u8])).await.unwrap(); // distance 1
+        table
+            .update_last_seen(&create_peer_with_id(&[0b10000000u8]))
+            .await
+            .unwrap(); // distance 0
+        table
+            .update_last_seen(&create_peer_with_id(&[0b10000001u8]))
+            .await
+            .unwrap(); // distance 0
+        table
+            .update_last_seen(&create_peer_with_id(&[0b01000000u8]))
+            .await
+            .unwrap(); // distance 1
 
         // when
         let sparseness = table.sparseness().unwrap();
@@ -302,8 +318,17 @@ mod tests {
 
         // when/then - all operations on empty table should return empty results
         assert_eq!(table.peers().unwrap().len(), 0);
-        assert!(table.find(&Bytes::from(vec![0b11111111u8])).unwrap().is_none());
-        assert_eq!(table.lookup(&Bytes::from(vec![0b11111111u8])).unwrap().len(), 0);
+        assert!(table
+            .find(&Bytes::from(vec![0b11111111u8]))
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            table
+                .lookup(&Bytes::from(vec![0b11111111u8]))
+                .unwrap()
+                .len(),
+            0
+        );
     }
 
     #[test]
@@ -319,11 +344,11 @@ mod tests {
         let alternating = create_peer_with_id(&[0b10101010u8]);
 
         // XOR: 11111111 ^ 00000000 = 11111111 -> first bit (MSB) is set -> distance 0
-        assert_eq!(table.distance_other_peer(&all_zeros), Some(0)); 
+        assert_eq!(table.distance_other_peer(&all_zeros), Some(0));
         // Same key -> width * 8
-        assert_eq!(table.distance_other_peer(&all_ones), Some(8));   
+        assert_eq!(table.distance_other_peer(&all_ones), Some(8));
         // XOR: 11111111 ^ 10101010 = 01010101 -> first bit (MSB) is 0, second bit is 1 -> distance 1
-        assert_eq!(table.distance_other_peer(&alternating), Some(1)); 
+        assert_eq!(table.distance_other_peer(&alternating), Some(1));
     }
 
     #[tokio::test]
@@ -374,7 +399,7 @@ mod tests {
         // Note: Some peers might have the same distance and be in the same bucket,
         // and some distances might not be reachable with single-byte keys
         assert!(all_peers.len() <= 64); // Should be <= original count
-        assert!(all_peers.len() > 0);   // Should have some peers
+        assert!(all_peers.len() > 0); // Should have some peers
 
         // Test lookup with many peers
         let lookup_result = table.lookup(&Bytes::from(vec![0b10101010u8])).unwrap();
@@ -407,15 +432,15 @@ mod tests {
         // when - rapid operations
         table.update_last_seen(&peer1).await.unwrap();
         table.update_last_seen(&peer2).await.unwrap();
-        
+
         let lookup1 = table.lookup(&Bytes::from(vec![0b11111111u8])).unwrap();
-        
+
         table.update_last_seen(&peer1_updated).await.unwrap(); // Update peer1
-        
+
         let lookup2 = table.lookup(&Bytes::from(vec![0b11111111u8])).unwrap();
-        
+
         table.remove(peer2.key()).unwrap();
-        
+
         let final_peers = table.peers().unwrap();
 
         // then - operations should be consistent
@@ -425,4 +450,3 @@ mod tests {
         assert_eq!(final_peers[0], peer1_updated);
     }
 }
-

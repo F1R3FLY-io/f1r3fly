@@ -7,7 +7,8 @@ use std::{env, path::Path};
 
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let proto_src_dir = Path::new(&manifest_dir).join("src/main/protobuf/coop/rchain/comm/protocol");
+    let proto_src_dir =
+        Path::new(&manifest_dir).join("src/main/protobuf/coop/rchain/comm/protocol");
     let scala_proto_base_dir = Path::new(&manifest_dir).join("src");
 
     let proto_files = ["kademlia.proto"];

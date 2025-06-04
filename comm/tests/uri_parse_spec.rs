@@ -18,7 +18,7 @@ mod tests {
     fn well_formed_rnode_uri_should_parse_into_peer_node() {
         let uri = "rnode://abcdef@localhost?protocol=12345&discovery=12346";
         let result = PeerNode::from_address(uri);
-        
+
         let expected = PeerNode {
             id: NodeIdentifier {
                 key: Bytes::from(vec![0xAB, 0xCD, 0xEF]),

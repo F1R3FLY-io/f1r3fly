@@ -29,20 +29,24 @@ pub trait LimitedBufferObservable<T>: LimitedBuffer<T> {
     fn subscribe(&mut self) -> Option<Self::Subscription>;
 }
 
-/// FlumeLimitedBuffer: LimitedBuffer implementation using flume bounded channels
+/// FlumeLimitedBuffer: LimitedBuffer implementation with multi-consumer support
 ///
-/// Implements "drop new" overflow policy: when buffer is full, new items are rejected
-/// and push_next returns false.
+/// Uses a hybrid architecture:
+/// - Single flume bounded channel for backpressure control
+/// - tokio::broadcast for fan-out to multiple consumers
+/// - Background task to pump messages from flume to broadcast
 #[derive(Debug)]
 pub struct FlumeLimitedBuffer<T> {
     sender: flume::Sender<T>,
-    receiver: Option<flume::Receiver<T>>,
+    broadcast_tx: Arc<tokio::sync::broadcast::Sender<T>>,
     buffer_size: usize,
     // Completion state management
     complete: Arc<AtomicBool>,
+    // Background task handle for the fan-out pump
+    _pump_handle: Arc<tokio::task::JoinHandle<()>>,
 }
 
-impl<T> FlumeLimitedBuffer<T> {
+impl<T: Clone + Send + 'static> FlumeLimitedBuffer<T> {
     /// Create a new FlumeLimitedBuffer with the specified buffer size
     pub fn drop_new(buffer_size: usize) -> Self {
         assert!(
@@ -50,13 +54,58 @@ impl<T> FlumeLimitedBuffer<T> {
             "bufferSize must be a strictly positive number"
         );
 
-        let (sender, receiver) = flume::bounded(buffer_size);
+        let (flume_tx, flume_rx) = flume::bounded(buffer_size);
+
+        // Create broadcast channel with generous capacity for multiple consumers
+        // Use 2x buffer_size to handle multiple subscribers without dropping
+        let (broadcast_tx, _) = tokio::sync::broadcast::channel(buffer_size * 2);
+        let broadcast_tx = Arc::new(broadcast_tx);
+
+        let complete = Arc::new(AtomicBool::new(false));
+
+        // Start background pump task to move messages from flume to broadcast
+        let pump_handle = {
+            let flume_rx = flume_rx;
+            let broadcast_tx = broadcast_tx.clone();
+            let complete = complete.clone();
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        // Try to receive from flume channel
+                        result = flume_rx.recv_async() => {
+                            match result {
+                                Ok(item) => {
+                                    // Broadcast to all subscribers
+                                    // If no subscribers or all lagged, that's ok - we drop the message
+                                    let _ = broadcast_tx.send(item);
+                                }
+                                Err(_) => {
+                                    // Flume sender disconnected - end the pump
+                                    log::debug!("FlumeLimitedBuffer pump: flume sender disconnected");
+                                    break;
+                                }
+                            }
+                        }
+                        // Periodically check completion
+                        _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
+                            if complete.load(Ordering::Acquire) && flume_rx.is_empty() {
+                                log::debug!("FlumeLimitedBuffer pump: completed and empty");
+                                break;
+                            }
+                        }
+                    }
+                }
+                log::debug!("FlumeLimitedBuffer pump task ended");
+            })
+        };
 
         Self {
-            sender,
-            receiver: Some(receiver),
+            sender: flume_tx,
+            broadcast_tx,
             buffer_size,
-            complete: Arc::new(AtomicBool::new(false)),
+            complete,
+            _pump_handle: Arc::new(pump_handle),
         }
     }
 
@@ -71,7 +120,7 @@ impl<T> FlumeLimitedBuffer<T> {
     }
 }
 
-impl<T> LimitedBuffer<T> for FlumeLimitedBuffer<T> {
+impl<T: Clone + Send + 'static> LimitedBuffer<T> for FlumeLimitedBuffer<T> {
     fn push_next(&self, elem: T) -> bool {
         if self.complete.load(Ordering::Acquire) {
             return false;
@@ -92,9 +141,7 @@ impl<T> LimitedBuffer<T> for FlumeLimitedBuffer<T> {
 
     fn complete(&self) {
         self.complete.store(true, Ordering::Release);
-        // Closing the sender will signal EOF to receivers
-        // We don't actually close it here because we want pushNext to keep working
-        // The receiver will see completion when it's empty and complete flag is set
+        // The pump task will notice completion and stop
     }
 
     fn is_complete(&self) -> bool {
@@ -102,23 +149,23 @@ impl<T> LimitedBuffer<T> for FlumeLimitedBuffer<T> {
     }
 }
 
-/// Subscription handle for FlumeLimitedBuffer
+/// Subscription handle for FlumeLimitedBuffer using broadcast receiver
 pub struct FlumeLimitedBufferSubscription<T> {
-    receiver: flume::Receiver<T>,
+    receiver: tokio::sync::broadcast::Receiver<T>,
     complete: Arc<AtomicBool>,
 }
 
-impl<T: Send + 'static> Stream for FlumeLimitedBufferSubscription<T> {
+impl<T: Clone + Send + 'static> Stream for FlumeLimitedBufferSubscription<T> {
     type Item = T;
 
     fn poll_next(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         // Try to receive an item immediately
         match self.receiver.try_recv() {
             Ok(item) => std::task::Poll::Ready(Some(item)),
-            Err(flume::TryRecvError::Empty) => {
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
                 // Buffer is empty - check if we're complete
                 if self.complete.load(Ordering::Acquire) {
                     // Complete and empty - end the stream
@@ -126,19 +173,26 @@ impl<T: Send + 'static> Stream for FlumeLimitedBufferSubscription<T> {
                 } else {
                     // Not complete yet - register for future notification
                     let waker = cx.waker().clone();
-                    let receiver = self.receiver.clone();
+                    let mut receiver = self.receiver.resubscribe();
                     let complete = self.complete.clone();
 
                     tokio::spawn(async move {
-                        // Use flume's async API instead of polling
                         tokio::select! {
-                            _ = receiver.recv_async() => {
-                                // Either received a message or sender was disconnected
-                                waker.wake();
+                            result = receiver.recv() => {
+                                match result {
+                                    Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                                        // Got a message or lagged (both mean more data available)
+                                        waker.wake();
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                        // Channel closed
+                                        waker.wake();
+                                    }
+                                }
                             }
                             _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
                                 // Check completion status periodically
-                                if complete.load(Ordering::Acquire) && receiver.is_empty() {
+                                if complete.load(Ordering::Acquire) {
                                     waker.wake();
                                 }
                             }
@@ -148,29 +202,36 @@ impl<T: Send + 'static> Stream for FlumeLimitedBufferSubscription<T> {
                     std::task::Poll::Pending
                 }
             }
-            Err(flume::TryRecvError::Disconnected) => {
-                // Sender disconnected - end the stream
+            Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
+                // Channel closed - end the stream
                 std::task::Poll::Ready(None)
+            }
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
+                // We lagged behind - just continue and try to get the next message
+                // This is acceptable behavior for overloaded consumers
+                cx.waker().wake_by_ref();
+                std::task::Poll::Pending
             }
         }
     }
 }
 
-impl<T: Send + 'static> LimitedBufferObservable<T> for FlumeLimitedBuffer<T> {
+impl<T: Clone + Send + 'static> LimitedBufferObservable<T> for FlumeLimitedBuffer<T> {
     type Subscription = FlumeLimitedBufferSubscription<T>;
 
     fn subscribe(&mut self) -> Option<Self::Subscription> {
-        self.receiver
-            .take()
-            .map(|receiver| FlumeLimitedBufferSubscription {
-                receiver,
-                complete: self.complete.clone(),
-            })
+        // Create a new broadcast receiver - each subscription gets its own independent stream
+        let receiver = self.broadcast_tx.subscribe();
+
+        Some(FlumeLimitedBufferSubscription {
+            receiver,
+            complete: self.complete.clone(),
+        })
     }
 }
 
 /// Convenience constructor functions
-impl<T> FlumeLimitedBuffer<T> {
+impl<T: Clone + Send + 'static> FlumeLimitedBuffer<T> {
     /// Create a new drop-new limited buffer observable
     pub fn drop_new_observable(buffer_size: usize) -> Self {
         Self::drop_new(buffer_size)
@@ -221,6 +282,9 @@ mod tests {
         // Subscribe and read items
         let mut subscription = buffer.subscribe().expect("Should get subscription");
 
+        // Give the pump task time to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
         let items: Vec<i32> = vec![
             subscription.next().await.unwrap(),
             subscription.next().await.unwrap(),
@@ -239,6 +303,9 @@ mod tests {
         // Push an item and complete
         assert!(buffer.push_next(42));
         buffer.complete();
+
+        // Give the pump task time to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // Should receive the item
         assert_eq!(subscription.next().await, Some(42));
@@ -271,10 +338,42 @@ mod tests {
         // Subscribe and verify only first two items are present
         let mut subscription = buffer.subscribe().expect("Should get subscription");
 
+        // Give the pump task time to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
         assert_eq!(subscription.next().await, Some("first".to_string()));
         assert_eq!(subscription.next().await, Some("second".to_string()));
 
         buffer.complete();
+
+        // Give completion time to propagate
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
         assert_eq!(subscription.next().await, None);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_subscriptions() {
+        let mut buffer = FlumeLimitedBuffer::<i32>::drop_new(10);
+
+        // Create multiple subscriptions
+        let mut sub1 = buffer.subscribe().expect("Should get subscription 1");
+        let mut sub2 = buffer.subscribe().expect("Should get subscription 2");
+        let mut sub3 = buffer.subscribe().expect("Should get subscription 3");
+
+        // Push some items
+        assert!(buffer.push_next(100));
+        assert!(buffer.push_next(200));
+        assert!(buffer.push_next(300));
+
+        // Give the pump task time to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // All subscriptions should receive all items
+        for sub in [&mut sub1, &mut sub2, &mut sub3] {
+            assert_eq!(sub.next().await, Some(100));
+            assert_eq!(sub.next().await, Some(200));
+            assert_eq!(sub.next().await, Some(300));
+        }
     }
 }

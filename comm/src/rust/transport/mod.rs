@@ -1,5 +1,9 @@
 pub mod chunker;
 pub mod communication_response;
+pub mod f1r3fly_connector;
+pub mod f1r3fly_server;
+pub mod f1r3fly_tls_connector;
+pub mod f1r3fly_tls_transport;
 pub mod grpc_transport;
 pub mod grpc_transport_client;
 pub mod grpc_transport_receiver;

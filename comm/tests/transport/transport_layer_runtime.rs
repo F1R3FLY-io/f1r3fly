@@ -83,7 +83,10 @@ impl TransportLayerTestRuntime {
     }
 
     /// Create transport layer client
-    pub fn create_transport_layer(&self, env: &TlsEnvironment) -> GrpcTransportClient {
+    pub fn create_transport_layer(
+        &self,
+        env: &TlsEnvironment,
+    ) -> Result<GrpcTransportClient, CommError> {
         let channels_map = Arc::new(tokio::sync::Mutex::new(HashMap::<
             PeerNode,
             Arc<OnceCell<Arc<BufferedGrpcStreamChannel>>>,
@@ -143,7 +146,7 @@ impl TransportLayerTestRuntime {
         let env2 = self.create_environment(port2).await?;
 
         // Create transport layer and server
-        let local_transport = self.create_transport_layer(&env1);
+        let local_transport = self.create_transport_layer(&env1)?;
         let remote_transport_server = self.create_transport_layer_server(&env2);
 
         let local = env1.peer.clone();
@@ -223,7 +226,7 @@ impl TransportLayerTestRuntime {
         let env3 = self.create_environment(port3).await?;
 
         // Create transport layer and servers
-        let local_transport = self.create_transport_layer(&env1);
+        let local_transport = self.create_transport_layer(&env1)?;
         let remote_transport_server1 = self.create_transport_layer_server(&env2);
         let remote_transport_server2 = self.create_transport_layer_server(&env3);
 
@@ -317,7 +320,7 @@ impl TransportLayerTestRuntime {
         let env2 = self.create_environment(port2).await?;
 
         // Create transport layer (but NO server for remote - simulates dead peer)
-        let local_transport = self.create_transport_layer(&env1);
+        let local_transport = self.create_transport_layer(&env1)?;
 
         let local = env1.peer.clone();
         let remote = env2.peer.clone();

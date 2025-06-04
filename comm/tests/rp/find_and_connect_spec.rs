@@ -5,9 +5,7 @@ use prost::bytes::Bytes;
 use comm::rust::{
     errors::CommError,
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
-    rp::{
-        connect::{find_and_connect, Connections, ConnectionsCell},
-    },
+    rp::connect::{find_and_connect, Connections, ConnectionsCell},
 };
 
 use crate::test_instances::NodeDiscoveryStub;
@@ -60,16 +58,22 @@ mod tests {
             self.connect_called.lock().unwrap().clone()
         }
 
-        fn create_connect_fn(&self) -> impl Fn(&PeerNode) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), CommError>> + Send>> + '_ {
+        fn create_connect_fn(
+            &self,
+        ) -> impl Fn(
+            &PeerNode,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<(), CommError>> + Send>,
+        > + '_ {
             move |peer: &PeerNode| {
                 let peer = peer.clone();
                 let connect_called = self.connect_called.clone();
                 let will_connect_successfully = self.will_connect_successfully.clone();
-                
+
                 Box::pin(async move {
                     // Record that this peer was called
                     connect_called.lock().unwrap().push(peer.clone());
-                    
+
                     // Check if this peer should succeed
                     let successful_peers = will_connect_successfully.lock().unwrap();
                     if successful_peers.contains(&peer) {
@@ -101,14 +105,14 @@ mod tests {
             // then
             assert!(result.is_ok());
             let connected_peers = result.unwrap();
-            
+
             // Should have attempted to connect to all 3 peers
             let called_peers = test_state.get_called_peers();
             assert_eq!(called_peers.len(), 3);
             assert!(called_peers.contains(&peer("A")));
             assert!(called_peers.contains(&peer("B")));
             assert!(called_peers.contains(&peer("C")));
-            
+
             // Since all connections failed, no peers should be in the result
             assert_eq!(connected_peers.len(), 0);
         }
@@ -130,7 +134,7 @@ mod tests {
             // then
             assert!(result.is_ok());
             let connected_peers = result.unwrap();
-            
+
             // Should have successfully connected to A and C
             assert_eq!(connected_peers.len(), 2);
             assert!(connected_peers.contains(&peer("A")));
@@ -143,7 +147,8 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn should_ask_node_discovery_for_list_of_peers_and_try_to_connect_to_ones_not_connected_yet() {
+        async fn should_ask_node_discovery_for_list_of_peers_and_try_to_connect_to_ones_not_connected_yet(
+        ) {
             // given
             let connections = mk_connections(&[peer("B")]);
             let mut node_discovery = NodeDiscoveryStub::new();
@@ -157,7 +162,7 @@ mod tests {
 
             // then
             assert!(result.is_ok());
-            
+
             // Should have attempted to connect to only A and C (not B, since we're already connected)
             let called_peers = test_state.get_called_peers();
             assert_eq!(called_peers.len(), 2);
@@ -183,7 +188,7 @@ mod tests {
             // then
             assert!(result.is_ok());
             let connected_peers = result.unwrap();
-            
+
             // Should have successfully connected to only A
             assert_eq!(connected_peers.len(), 1);
             assert!(connected_peers.contains(&peer("A")));

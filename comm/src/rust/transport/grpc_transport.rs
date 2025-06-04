@@ -131,11 +131,11 @@ impl GrpcTransport {
             protocol: Some(msg.clone()),
         };
 
-        // Send request with timeout and process response
-        // TODO: Add metrics integration (incrementCounter("send"), timer("send-time"))
-        let response = transport.send(request).await;
+        // Send request and process errors properly
+        let response = Self::process_error(peer, transport.send(request).await)?;
 
-        Self::process_response(peer, response)
+        // Process the response payload
+        Self::process_response(peer, Ok(response))
     }
 
     /// Stream a Blob to a peer via gRPC using chunking

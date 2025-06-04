@@ -1,7 +1,7 @@
 // See comm/src/main/scala/coop/rchain/comm/errors.scala
 
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum CommError {
@@ -37,17 +37,29 @@ impl fmt::Display for CommError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CommError::PeerUnavailable(_) => write!(f, "Peer is currently unavailable"),
-            CommError::MessageToLarge(p) => write!(f, "Message rejected by peer {} because it was too large", p),
-            CommError::PongNotReceivedForPing(_) => 
-                write!(f, "Peer is behind a firewall and can't be accessed from outside"),
-            CommError::CouldNotConnectToBootstrap => write!(f, "Node could not connect to bootstrap node"),
+            CommError::MessageToLarge(p) => {
+                write!(f, "Message rejected by peer {} because it was too large", p)
+            }
+            CommError::PongNotReceivedForPing(_) => write!(
+                f,
+                "Peer is behind a firewall and can't be accessed from outside"
+            ),
+            CommError::CouldNotConnectToBootstrap => {
+                write!(f, "Node could not connect to bootstrap node")
+            }
             CommError::TimeOut => write!(f, "Timeout"),
-            CommError::InternalCommunicationError(msg) => write!(f, "Internal communication error. {}", msg),
+            CommError::InternalCommunicationError(msg) => {
+                write!(f, "Internal communication error. {}", msg)
+            }
             CommError::UnknownProtocolError(msg) => write!(f, "Unknown protocol error. {}", msg),
-            CommError::UnableToStorePacket(p, er) => 
-                write!(f, "Could not serialize packet {}. Error message: {}", p, er),
-            CommError::UnableToRestorePacket(p, er) => 
-                write!(f, "Could not deserialize packet {}. Error message: {}", p, er),
+            CommError::UnableToStorePacket(p, er) => {
+                write!(f, "Could not serialize packet {}. Error message: {}", p, er)
+            }
+            CommError::UnableToRestorePacket(p, er) => write!(
+                f,
+                "Could not deserialize packet {}. Error message: {}",
+                p, er
+            ),
             CommError::ProtocolException(msg) => write!(f, "Protocol error. {}", msg),
             CommError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             CommError::ConfigError(msg) => write!(f, "Configuration error: {}", msg),

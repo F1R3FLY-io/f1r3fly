@@ -45,10 +45,18 @@ impl std::error::Error for CertificateValidationError {}
 pub struct HostnameTrustManagerFactory;
 
 impl HostnameTrustManagerFactory {
-    /// Singleton instance
+    /// Get the singleton instance of HostnameTrustManagerFactory
     pub fn instance() -> &'static Self {
-        static INSTANCE: HostnameTrustManagerFactory = HostnameTrustManagerFactory;
-        &INSTANCE
+        static INSTANCE: std::sync::OnceLock<HostnameTrustManagerFactory> =
+            std::sync::OnceLock::new();
+        INSTANCE.get_or_init(|| {
+            // Initialize rustls crypto provider once
+            let _ = rustls::crypto::ring::default_provider().install_default();
+
+            HostnameTrustManagerFactory {
+                // Empty for now - singleton instance  
+            }
+        })
     }
 
     /// Create a hostname trust manager
@@ -63,6 +71,151 @@ impl HostnameTrustManagerFactory {
     pub fn create_client_cert_verifier(&self) -> Arc<F1r3flyClientCertVerifier> {
         let trust_manager = self.create_trust_manager();
         Arc::new(F1r3flyClientCertVerifier::with_trust_manager(trust_manager))
+    }
+
+    /// Create a rustls ClientConfig with F1r3fly's custom certificate verification
+    ///
+    /// # Arguments
+    /// * `cert_pem` - Client certificate in PEM format
+    /// * `key_pem` - Client private key in PEM format
+    ///
+    /// # Returns
+    /// * `Ok(ClientConfig)` with F1r3fly certificate verification
+    /// * `Err(CertificateValidationError)` if configuration fails
+    pub fn client_config(
+        cert_pem: &str,
+        key_pem: &str,
+    ) -> Result<rustls::ClientConfig, CertificateValidationError> {
+        // Parse certificate and key
+        let cert_der = Self::parse_pem_certificate(cert_pem)?;
+        let key_der = Self::parse_pem_private_key(key_pem)?;
+
+        // Create custom certificate verifier
+        let cert_verifier = HostnameTrustManagerFactory::instance().create_trust_manager();
+
+        // Build client configuration
+        let config = rustls::ClientConfig::builder_with_provider(
+            rustls::crypto::ring::default_provider().into(),
+        )
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .map_err(|e| {
+            CertificateValidationError::ValidationFailed(format!(
+                "Failed to create client config builder: {}",
+                e
+            ))
+        })?
+        .dangerous() // Enter dangerous mode to use custom verifier
+        .with_custom_certificate_verifier(cert_verifier)
+        .with_client_auth_cert(vec![cert_der], key_der)
+        .map_err(|e| {
+            CertificateValidationError::ValidationFailed(format!(
+                "Failed to configure client certificate: {}",
+                e
+            ))
+        })?;
+
+        Ok(config)
+    }
+
+    /// Create a rustls ServerConfig with F1r3fly's custom client certificate verification
+    ///
+    /// # Arguments
+    /// * `cert_pem` - Server certificate in PEM format
+    /// * `key_pem` - Server private key in PEM format
+    ///
+    /// # Returns
+    /// * `Ok(ServerConfig)` with F1r3fly client certificate verification
+    /// * `Err(CertificateValidationError)` if configuration fails
+    pub fn server_config(
+        cert_pem: &str,
+        key_pem: &str,
+    ) -> Result<rustls::ServerConfig, CertificateValidationError> {
+        // Parse certificate and key
+        let cert_der = Self::parse_pem_certificate(cert_pem)?;
+        let key_der = Self::parse_pem_private_key(key_pem)?;
+
+        // Create custom client certificate verifier
+        let client_cert_verifier =
+            HostnameTrustManagerFactory::instance().create_client_cert_verifier();
+
+        // Build server configuration
+        let config = rustls::ServerConfig::builder_with_provider(
+            rustls::crypto::ring::default_provider().into(),
+        )
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .map_err(|e| {
+            CertificateValidationError::ValidationFailed(format!(
+                "Failed to create server config builder: {}",
+                e
+            ))
+        })?
+        .with_client_cert_verifier(client_cert_verifier)
+        .with_single_cert(vec![cert_der], key_der)
+        .map_err(|e| {
+            CertificateValidationError::ValidationFailed(format!(
+                "Failed to configure server certificate: {}",
+                e
+            ))
+        })?;
+
+        Ok(config)
+    }
+
+    /// Parse a PEM certificate into DER format
+    fn parse_pem_certificate(
+        pem_data: &str,
+    ) -> Result<CertificateDer<'static>, CertificateValidationError> {
+        use rustls_pemfile::Item;
+
+        let mut cursor = std::io::Cursor::new(pem_data.as_bytes());
+
+        // rustls_pemfile::read_all returns an iterator, so we need to collect and handle errors
+        for item_result in rustls_pemfile::read_all(&mut cursor) {
+            let item = item_result.map_err(|e| {
+                CertificateValidationError::ParsingError(format!("Failed to parse PEM: {}", e))
+            })?;
+
+            if let Item::X509Certificate(cert_der) = item {
+                return Ok(cert_der);
+            }
+        }
+
+        Err(CertificateValidationError::ParsingError(
+            "No certificate found in PEM data".to_string(),
+        ))
+    }
+
+    /// Parse a PEM private key into DER format
+    fn parse_pem_private_key(
+        pem_data: &str,
+    ) -> Result<rustls::pki_types::PrivateKeyDer<'static>, CertificateValidationError> {
+        use rustls_pemfile::Item;
+
+        let mut cursor = std::io::Cursor::new(pem_data.as_bytes());
+
+        // rustls_pemfile::read_all returns an iterator, so we need to collect and handle errors
+        for item_result in rustls_pemfile::read_all(&mut cursor) {
+            let item = item_result.map_err(|e| {
+                CertificateValidationError::ParsingError(format!("Failed to parse PEM: {}", e))
+            })?;
+
+            match item {
+                Item::Pkcs1Key(key_der) => {
+                    return Ok(rustls::pki_types::PrivateKeyDer::Pkcs1(key_der))
+                }
+                Item::Pkcs8Key(key_der) => {
+                    return Ok(rustls::pki_types::PrivateKeyDer::Pkcs8(key_der))
+                }
+                Item::Sec1Key(key_der) => {
+                    return Ok(rustls::pki_types::PrivateKeyDer::Sec1(key_der))
+                }
+                _ => continue,
+            }
+        }
+
+        Err(CertificateValidationError::ParsingError(
+            "No private key found in PEM data".to_string(),
+        ))
     }
 }
 
@@ -82,13 +235,18 @@ impl HostnameTrustManager {
         cert_der: &[u8],
         _auth_type: &str,
     ) -> Result<String, CertificateValidationError> {
-        // Extract F1r3fly public address from certificate
-        let peer_host = self.extract_f1r3fly_address(cert_der)?;
+        // Extract public key from certificate
+        let public_key = self.extract_public_key_from_cert(cert_der)?;
 
-        // Perform identity check with HTTPS algorithm
-        self.check_identity(Some(&peer_host), cert_der, "https")?;
+        // Extract F1r3fly address
+        let f1r3fly_address = CertificateHelper::public_address(&public_key)
+            .map(|addr| hex::encode(&addr))
+            .ok_or(CertificateValidationError::WrongAlgorithm)?;
 
-        Ok(peer_host)
+        // Perform identity check with F1r3fly address as hostname
+        self.check_identity(Some(&f1r3fly_address), cert_der, "https")?;
+
+        Ok(f1r3fly_address)
     }
 
     /// Check server certificate trust  
@@ -98,37 +256,25 @@ impl HostnameTrustManager {
         _auth_type: &str,
         peer_hostname: Option<&str>,
     ) -> Result<(), CertificateValidationError> {
-        // Perform hostname verification
+        // Standard hostname identity verification
         self.check_identity(peer_hostname, cert_der, "https")?;
 
-        // Validate F1r3fly address matches hostname
-        if let Some(hostname) = peer_hostname {
-            let f1r3fly_address = self.extract_f1r3fly_address(cert_der)?;
-            if f1r3fly_address != hostname {
-                return Err(CertificateValidationError::AddressHostnameMismatch);
-            }
+        // Extract F1r3fly address from certificate
+        let public_key = self.extract_public_key_from_cert(cert_der)?;
+        let f1r3fly_address = CertificateHelper::public_address(&public_key)
+            .map(|addr| hex::encode(&addr))
+            .ok_or(CertificateValidationError::WrongAlgorithm)?;
+
+        // Verify F1r3fly address matches hostname
+        let peer_host = peer_hostname.unwrap_or("");
+        if f1r3fly_address != peer_host {
+            return Err(CertificateValidationError::AddressHostnameMismatch);
         }
 
         Ok(())
     }
 
-    /// Extract F1r3fly public address from certificate
-    fn extract_f1r3fly_address(
-        &self,
-        cert_der: &[u8],
-    ) -> Result<String, CertificateValidationError> {
-        // Parse the certificate to extract the public key
-        let public_key = self.extract_public_key_from_cert(cert_der)?;
-
-        // Use CertificateHelper to compute the F1r3fly address
-        let address = CertificateHelper::public_address(&public_key)
-            .ok_or(CertificateValidationError::WrongAlgorithm)?;
-
-        // Encode as hex (Base16)
-        Ok(hex::encode(&address))
-    }
-
-    /// Extract secp256r1 public key from X.509 certificate
+    /// Extract secp256r1 public key from DER-encoded X.509 certificate
     fn extract_public_key_from_cert(
         &self,
         cert_der: &[u8],
@@ -170,85 +316,67 @@ impl HostnameTrustManager {
                 if let Some(host) = hostname {
                     // Parse certificate to verify hostname against CN and SAN
                     let (_, cert) = x509_parser::parse_x509_certificate(cert_der).map_err(|e| {
+                        log::warn!("Certificate parsing failed: {}", e);
                         CertificateValidationError::ParsingError(format!(
                             "Invalid certificate: {}",
                             e
                         ))
                     })?;
 
-                    // Handle IPv6 brackets
-                    let normalized_host = if host.starts_with('[') && host.ends_with(']') {
-                        &host[1..host.len() - 1]
-                    } else {
-                        host
-                    };
-
-                    let mut hostname_match = false;
-
-                    // Check Common Name (CN) in subject
-                    if let Some(subject_cn) = cert.subject().iter_common_name().next() {
-                        if let Ok(cn_str) = subject_cn.as_str() {
-                            if cn_str == normalized_host {
-                                hostname_match = true;
-                            }
-                        }
-                    }
-
-                    // Check Subject Alternative Names (SAN) if CN didn't match
-                    if !hostname_match {
-                        for ext in cert.extensions() {
-                            if ext.oid == x509_parser::oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME {
-                                if let x509_parser::extensions::ParsedExtension::SubjectAlternativeName(san) = ext.parsed_extension() {
-                                    for name in &san.general_names {
-                                        match name {
-                                            x509_parser::extensions::GeneralName::DNSName(dns_name) => {
-                                                if dns_name.as_ref() as &str == normalized_host {
-                                                    hostname_match = true;
-                                                    break;
-                                                }
-                                            }
-                                            x509_parser::extensions::GeneralName::IPAddress(ip_bytes) => {
-                                                let ip_str = match ip_bytes.len() {
-                                                    4 => format!("{}.{}.{}.{}", ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]),
-                                                    16 => {
-                                                        // Format IPv6 as colon-separated hex groups
-                                                        let mut ipv6_parts = Vec::new();
-                                                        for chunk in ip_bytes.chunks(2) {
-                                                            let part = u16::from_be_bytes([chunk[0], chunk.get(1).copied().unwrap_or(0)]);
-                                                            ipv6_parts.push(format!("{:x}", part));
-                                                        }
-                                                        ipv6_parts.join(":")
-                                                    }
-                                                    _ => continue,
-                                                };
-                                                if ip_str == normalized_host {
-                                                    hostname_match = true;
-                                                    break;
-                                                }
-                                            }
-                                            _ => continue,
-                                        }
+                    // Check CN field for hostname match
+                    for attribute in cert.subject().iter() {
+                        for name in attribute.iter() {
+                            if name.attr_type() == &x509_parser::oid_registry::OID_X509_COMMON_NAME
+                            {
+                                if let Ok(cn_str) = name.attr_value().as_str() {
+                                    if cn_str == host {
+                                        return Ok(());
                                     }
                                 }
-                                if hostname_match {
-                                    break;
+                            }
+                        }
+                    }
+
+                    // Check SAN (Subject Alternative Names) for hostname match
+                    for extension in cert.extensions() {
+                        if extension.oid == x509_parser::oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME
+                        {
+                            if let x509_parser::extensions::ParsedExtension::SubjectAlternativeName(san) = &extension.parsed_extension() {
+                                for name in &san.general_names {
+                                    match name {
+                                        x509_parser::extensions::GeneralName::DNSName(dns_name) => {
+                                            if dns_name == &host {
+                                                return Ok(());
+                                            }
+                                        }
+                                        _ => {}
+                                    }
                                 }
                             }
                         }
                     }
 
-                    if !hostname_match {
-                        return Err(CertificateValidationError::ValidationFailed(format!(
-                            "Hostname '{}' does not match certificate",
-                            normalized_host
-                        )));
-                    }
+                    log::warn!(
+                        "Hostname verification failed: '{}' not found in certificate CN or SAN",
+                        host
+                    );
+                    Err(CertificateValidationError::ValidationFailed(format!(
+                        "Hostname '{}' not found in certificate CN or SAN",
+                        host
+                    )))
+                } else {
+                    log::warn!("No hostname provided for verification");
+                    Err(CertificateValidationError::ValidationFailed(
+                        "No hostname provided for verification".to_string(),
+                    ))
                 }
-                Ok(())
             }
-            _ => Err(CertificateValidationError::UnknownIdentificationAlgorithm(
-                algorithm.to_string(),
-            )),
+            _ => {
+                log::warn!("Unsupported algorithm: {}", algorithm);
+                Err(CertificateValidationError::UnknownIdentificationAlgorithm(
+                    algorithm.to_string(),
+                ))
+            }
         }
     }
 
@@ -273,15 +401,8 @@ impl ServerCertVerifier for HostnameTrustManager {
         let hostname = match server_name {
             ServerName::DnsName(dns_name) => Some(dns_name.as_ref()),
             ServerName::IpAddress(ip) => {
-                // Convert IP to string for hostname verification
-                let ip_str = match ip {
-                    rustls::pki_types::IpAddr::V4(ipv4) => {
-                        format!("{:?}", ipv4) // Use Debug format since Display isn't implemented
-                    }
-                    rustls::pki_types::IpAddr::V6(ipv6) => {
-                        format!("{:?}", ipv6) // Use Debug format since Display isn't implemented
-                    }
-                };
+                // Convert IP to string representation
+                let ip_str = format!("{:?}", ip);
                 Some(ip_str.leak() as &str) // Leak string to get 'static lifetime
             }
             _ => None,
@@ -433,29 +554,6 @@ mod tests {
     }
 
     #[test]
-    fn test_f1r3fly_address_extraction() {
-        let manager = HostnameTrustManager::new();
-
-        // Generate test certificate and address
-        let (secret_key, public_key) = CertificateHelper::generate_key_pair(false);
-
-        if let (Ok(cert_der), Some(expected_address)) = (
-            CertificateHelper::generate_certificate(&secret_key, &public_key),
-            CertificateHelper::public_address(&public_key),
-        ) {
-            let expected_hex = hex::encode(&expected_address);
-
-            // Test F1r3fly address extraction
-            let result = manager.extract_f1r3fly_address(&cert_der);
-            assert!(
-                result.is_ok(),
-                "Should extract F1r3fly address successfully"
-            );
-            assert_eq!(result.unwrap(), expected_hex);
-        }
-    }
-
-    #[test]
     fn test_client_trusted_validation() {
         let manager = HostnameTrustManager::new();
 
@@ -485,19 +583,35 @@ mod tests {
         ) {
             let expected_hex = hex::encode(&expected_address);
 
-            // Test server certificate validation with matching hostname
+            // Test server certificate validation with F1r3fly address as hostname (should pass)
             let result = manager.check_server_trusted(&cert_der, "RSA", Some(&expected_hex));
             assert!(
                 result.is_ok(),
-                "Should validate server certificate with matching hostname"
+                "Should validate server certificate when hostname matches F1r3fly address"
             );
 
-            // Test server certificate validation with non-matching hostname
+            // Test server certificate validation with wrong hostname (should fail)
             let result = manager.check_server_trusted(&cert_der, "RSA", Some("wrong_hostname"));
             assert!(
                 result.is_err(),
-                "Should reject server certificate with non-matching hostname"
+                "Should reject server certificate when hostname doesn't match certificate CN/SAN"
             );
+
+            // Verify the error is ValidationFailed (from hostname verification, not address mismatch)
+            if let Err(error) = result {
+                match error {
+                    CertificateValidationError::AddressHostnameMismatch => {
+                        // Expected - hostname doesn't match F1r3fly address
+                    }
+                    CertificateValidationError::ValidationFailed(msg) => {
+                        assert!(msg.contains("not found in certificate"));
+                    }
+                    _ => panic!(
+                        "Expected AddressHostnameMismatch or ValidationFailed error, got: {:?}",
+                        error
+                    ),
+                }
+            }
         }
     }
 }

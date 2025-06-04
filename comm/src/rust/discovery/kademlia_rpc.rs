@@ -1,7 +1,7 @@
 // See comm/src/main/scala/coop/rchain/comm/discovery/KademliaRPC.scala
 
-use async_trait::async_trait;
 use crate::rust::{errors::CommError, peer_node::PeerNode};
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait KademliaRPC {

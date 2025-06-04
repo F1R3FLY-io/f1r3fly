@@ -79,7 +79,9 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
             bucket_width: 1, // Standard Kademlia behavior - could be configurable in future
             kademlia_rpc,
             width,
-            table: (0..8 * width).map(|_| Arc::new(Mutex::new(Vec::new()))).collect(),
+            table: (0..8 * width)
+                .map(|_| Arc::new(Mutex::new(Vec::new())))
+                .collect(),
         }
     }
 
@@ -131,24 +133,27 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     pub async fn update_last_seen(&self, peer: &PeerNode) -> Result<(), CommError> {
         // Find appropriate bucket
         let bucket = self.get_bucket(peer)?;
-        
+
         if let Some(bucket_mutex) = bucket {
             // Try to add/update or pick old peer
             let old_peer_candidate = self.add_update_or_pick_old_peer(&bucket_mutex, peer)?;
-            
+
             // If we have an old peer to ping, do so
             if let Some(old_entry) = old_peer_candidate {
                 self.ping_and_update(&bucket_mutex, peer, old_entry).await?;
             }
         }
-        
+
         Ok(())
     }
 
     /// Find the appropriate bucket for a peer
-    fn get_bucket(&self, peer: &PeerNode) -> Result<Option<&Arc<Mutex<Vec<PeerTableEntry>>>>, CommError> {
+    fn get_bucket(
+        &self,
+        peer: &PeerNode,
+    ) -> Result<Option<&Arc<Mutex<Vec<PeerTableEntry>>>>, CommError> {
         let dist = self.distance(&self.local_key, peer.key());
-        
+
         match dist {
             Some(d) if d < 8 * self.width => {
                 if let Some(bucket) = self.table.get(d) {
@@ -205,7 +210,10 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
         mut old_entry: PeerTableEntry,
     ) -> Result<(), CommError> {
         // Ping the old peer and check if it returns true (successful ping)
-        let ping_successful = self.kademlia_rpc.ping(&old_entry.entry).await
+        let ping_successful = self
+            .kademlia_rpc
+            .ping(&old_entry.entry)
+            .await
             .map(|result| result)
             .unwrap_or(false);
 
@@ -233,21 +241,23 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     /// Remove a peer with the given key.
     pub fn remove(&self, key: &Bytes) -> Result<(), CommError> {
         let dist = self.distance(&self.local_key, key);
-        
+
         if let Some(index) = dist {
             if index < 8 * self.width {
                 if let Some(bucket) = self.table.get(index) {
                     let mut entries = bucket.lock().map_err(|_| {
-                        CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
+                        CommError::InternalCommunicationError(
+                            "Failed to acquire bucket lock".to_string(),
+                        )
                     })?;
-                    
+
                     if let Some(pos) = entries.iter().position(|entry| entry.key == *key) {
                         entries.remove(pos);
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -255,22 +265,24 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     /// sorted ascending by distance to `key`.
     pub fn lookup(&self, key: &Bytes) -> Result<Vec<PeerNode>, CommError> {
         let dist = self.distance(&self.local_key, key);
-        
+
         match dist {
             Some(index) => {
                 let mut entries = Vec::new();
-                
+
                 // Look in buckets from index onwards
                 for i in index..8 * self.width {
                     if entries.len() >= self.k as usize {
                         break;
                     }
-                    
+
                     if let Some(bucket) = self.table.get(i) {
                         let bucket_entries = bucket.lock().map_err(|_| {
-                            CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
+                            CommError::InternalCommunicationError(
+                                "Failed to acquire bucket lock".to_string(),
+                            )
                         })?;
-                        
+
                         for entry in bucket_entries.iter() {
                             if entry.entry.key() != key {
                                 entries.push(entry.entry.clone());
@@ -278,31 +290,33 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
                         }
                     }
                 }
-                
+
                 // Look in buckets before index
                 for i in (0..index).rev() {
                     if entries.len() >= self.k as usize {
                         break;
                     }
-                    
+
                     if let Some(bucket) = self.table.get(i) {
                         let bucket_entries = bucket.lock().map_err(|_| {
-                            CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
+                            CommError::InternalCommunicationError(
+                                "Failed to acquire bucket lock".to_string(),
+                            )
                         })?;
-                        
+
                         for entry in bucket_entries.iter() {
                             entries.push(entry.entry.clone());
                         }
                     }
                 }
-                
+
                 // Sort by distance to key
                 entries.sort_by(|a, b| {
                     let dist_a = self.distance(key, a.key()).unwrap_or(0);
                     let dist_b = self.distance(key, b.key()).unwrap_or(0);
                     dist_b.cmp(&dist_a) // Descending order (closer nodes have higher distance)
                 });
-                
+
                 // Take at most k entries
                 entries.truncate(self.k as usize);
                 Ok(entries)
@@ -314,13 +328,15 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     /// Return `Some[PeerNode]` if `key` names an entry in the table.
     pub fn find(&self, key: &Bytes) -> Result<Option<PeerNode>, CommError> {
         let dist = self.distance(&self.local_key, key);
-        
+
         if let Some(d) = dist {
             if let Some(bucket) = self.table.get(d) {
                 let entries = bucket.lock().map_err(|_| {
-                    CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
+                    CommError::InternalCommunicationError(
+                        "Failed to acquire bucket lock".to_string(),
+                    )
                 })?;
-                
+
                 for entry in entries.iter() {
                     if entry.entry.key() == key {
                         return Ok(Some(entry.entry.clone()));
@@ -328,24 +344,24 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
                 }
             }
         }
-        
+
         Ok(None)
     }
 
     /// Return a sequence of all the `PeerNode`s in the table.
     pub fn peers(&self) -> Result<Vec<PeerNode>, CommError> {
         let mut all_peers = Vec::new();
-        
+
         for bucket in &self.table {
             let entries = bucket.lock().map_err(|_| {
                 CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
             })?;
-            
+
             for entry in entries.iter() {
                 all_peers.push(entry.entry.clone());
             }
         }
-        
+
         Ok(all_peers)
     }
 
@@ -354,18 +370,18 @@ impl<'a, T: KademliaRPC> PeerTable<'a, T> {
     /// Optionally, ignore any distance closer than [[limit]].
     pub fn sparseness(&self) -> Result<Vec<usize>, CommError> {
         let mut distance_sizes: Vec<(usize, usize)> = Vec::new();
-        
+
         for (i, bucket) in self.table.iter().take(256).enumerate() {
             let entries = bucket.lock().map_err(|_| {
                 CommError::InternalCommunicationError("Failed to acquire bucket lock".to_string())
             })?;
-            
+
             distance_sizes.push((entries.len(), i));
         }
-        
+
         // Sort by size (least filled first)
         distance_sizes.sort_by_key(|(size, _)| *size);
-        
+
         Ok(distance_sizes.into_iter().map(|(_, idx)| idx).collect())
     }
 }
