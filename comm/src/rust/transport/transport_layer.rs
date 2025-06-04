@@ -25,6 +25,7 @@ use crate::rust::{
     rp::{connect::ConnectionsCell, protocol_helper, rp_conf::RPConf},
 };
 
+#[derive(Clone)]
 pub struct Blob {
     pub sender: PeerNode,
     pub packet: Packet,

@@ -407,7 +407,7 @@ impl CertificatePrinter {
         )
     }
 
-    /// Format a private key as PEM string
+    /// Format a private key as PEM string from DER bytes
     pub fn print_private_key(key_der: &[u8]) -> String {
         let base64_key = general_purpose::STANDARD.encode(key_der);
         let lines = Self::split_into_lines(&base64_key, 64);
@@ -415,6 +415,17 @@ impl CertificatePrinter {
             "-----BEGIN PRIVATE KEY-----\n{}\n-----END PRIVATE KEY-----",
             lines.join("\n")
         )
+    }
+
+    /// Format a private key as PEM string from P256SecretKey
+    /// Corresponds to CertificatePrinter.printPrivateKey(keyPair.getPrivate) in Scala
+    pub fn print_private_key_from_secret(
+        secret_key: &P256SecretKey,
+    ) -> Result<String, CertificateError> {
+        let key_der = secret_key.to_pkcs8_der().map_err(|e| {
+            CertificateError::CertificateGeneration(format!("Key serialization failed: {}", e))
+        })?;
+        Ok(Self::print_private_key(key_der.as_bytes()))
     }
 
     /// Split a string into lines of specified length

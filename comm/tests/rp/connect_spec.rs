@@ -1,16 +1,11 @@
 // See comm/src/test/scala/coop/rchain/comm/rp/ConnectSpec.scala
 
-use std::time::Duration;
-
 use prost::bytes::Bytes;
 
 use comm::rust::{
     errors::CommError,
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
-    rp::{
-        connect::connect,
-        rp_conf::{ClearConnectionsConf, RPConf},
-    },
+    rp::connect::connect,
     transport::transport_layer::TransportLayer,
 };
 
@@ -31,18 +26,6 @@ fn peer_node(name: &str, port: u32) -> PeerNode {
     }
 }
 
-/// Helper function to create RPConf for testing
-fn create_rp_conf_ask(local: PeerNode) -> RPConf {
-    RPConf {
-        local,
-        network_id: NETWORK_ID.to_string(),
-        bootstrap: None,
-        default_timeout: Duration::from_millis(1),
-        max_num_of_connections: 20,
-        clear_connections: ClearConnectionsConf::new(5),
-    }
-}
-
 /// Always successful response function
 fn always_success(
     _peer: &PeerNode,
@@ -53,6 +36,8 @@ fn always_success(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_instances::create_rp_conf_ask;
+
     use super::*;
 
     #[tokio::test]
@@ -60,7 +45,7 @@ mod tests {
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
         transport.set_responses(always_success);
 
@@ -80,7 +65,10 @@ mod tests {
             Some(models::routing::protocol::Message::ProtocolHandshake(_)) => {
                 // This is what we expect
             }
-            _ => panic!("Expected ProtocolHandshake message, got {:?}", sent_protocol.message),
+            _ => panic!(
+                "Expected ProtocolHandshake message, got {:?}",
+                sent_protocol.message
+            ),
         }
     }
 
@@ -89,7 +77,7 @@ mod tests {
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
 
         // Set transport to always fail
@@ -108,7 +96,7 @@ mod tests {
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src.clone());
+        let rp_conf = create_rp_conf_ask(src.clone(), None, None);
         let transport = TransportLayerStub::new();
         transport.set_responses(always_success);
 
@@ -128,7 +116,7 @@ mod tests {
         let src = peer_node("src", 40400);
         let remote1 = peer_node("remote1", 40401);
         let remote2 = peer_node("remote2", 40402);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
         transport.set_responses(always_success);
 
@@ -153,12 +141,12 @@ mod tests {
     async fn test_should_send_protocol_handshake_response_back_to_the_remote() {
         // This test simulates receiving a ProtocolHandshake and verifying we send back a response
         use comm::rust::rp::protocol_helper;
-        
+
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
         let transport = TransportLayerStub::new();
-        
+
         // Set up transport to simulate receiving a handshake and sending a response
         transport.set_responses(always_success);
 
@@ -170,16 +158,19 @@ mod tests {
         // then
         assert!(result.is_ok());
         assert_eq!(transport.request_count(), 1);
-        
+
         // Verify the message sent is a ProtocolHandshakeResponse
         let (_, sent_protocol) = transport.get_request(0).unwrap();
         match &sent_protocol.message {
             Some(models::routing::protocol::Message::ProtocolHandshakeResponse(_)) => {
                 // This is what we expect - a handshake response
             }
-            _ => panic!("Expected ProtocolHandshakeResponse message, got {:?}", sent_protocol.message),
+            _ => panic!(
+                "Expected ProtocolHandshakeResponse message, got {:?}",
+                sent_protocol.message
+            ),
         }
-        
+
         // Verify the header contains correct information
         let header = sent_protocol.header.as_ref().unwrap();
         assert_eq!(header.network_id, NETWORK_ID);
@@ -190,11 +181,11 @@ mod tests {
     async fn test_should_add_node_once_protocol_handshake_response_is_sent() {
         // This test verifies that after a successful handshake exchange, the node is added to connections
         use comm::rust::rp::connect::ConnectionsCell;
-        
+
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
         let connections_cell = ConnectionsCell::new();
         transport.set_responses(always_success);
@@ -205,19 +196,21 @@ mod tests {
 
         // when - simulate successful handshake and add peer to connections
         let result = connect(&remote, &rp_conf, &transport).await;
-        
+
         // Simulate what would happen after successful handshake response:
         // Add the peer to connections (this is what the real implementation would do)
-        connections_cell.flat_modify(|conns| conns.add_conn(remote.clone())).unwrap();
+        connections_cell
+            .flat_modify(|conns| conns.add_conn(remote.clone()))
+            .unwrap();
 
         // then
         assert!(result.is_ok());
-        
+
         // Verify that the connection attempt was made (handshake sent)
         assert_eq!(transport.request_count(), 1);
         let (connected_peer, _) = transport.get_request(0).unwrap();
         assert_eq!(connected_peer, remote);
-        
+
         // Verify the peer was added to the connections list
         let final_connections = connections_cell.read().unwrap();
         assert_eq!(final_connections.len(), 1);
@@ -230,12 +223,14 @@ mod tests {
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
-        
+
         // Set transport to simulate decryption failure
         transport.set_responses(|_peer, _protocol| {
-            Err(CommError::ParseError("Could not decrypt message".to_string()))
+            Err(CommError::ParseError(
+                "Could not decrypt message".to_string(),
+            ))
         });
 
         // when
@@ -257,12 +252,14 @@ mod tests {
         // given
         let src = peer_node("src", 40400);
         let remote = peer_node("remote", 40401);
-        let rp_conf = create_rp_conf_ask(src);
+        let rp_conf = create_rp_conf_ask(src, None, None);
         let transport = TransportLayerStub::new();
-        
+
         // Set transport to simulate missing public key
         transport.set_responses(|_peer, _protocol| {
-            Err(CommError::PublicKeyNotAvailable("Remote public key not available".to_string()))
+            Err(CommError::PublicKeyNotAvailable(
+                "Remote public key not available".to_string(),
+            ))
         });
 
         // when

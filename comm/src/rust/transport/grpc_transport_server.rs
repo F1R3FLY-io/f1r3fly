@@ -372,6 +372,8 @@ impl TransportLayerServer for GrpcTransportServer {
             self.local_peer.clone(),
             self.port,
             server_ssl_context,
+            self.cert.clone(),
+            self.key.clone(),
             self.max_message_size,
             self.max_stream_message_size,
             buffers_map,

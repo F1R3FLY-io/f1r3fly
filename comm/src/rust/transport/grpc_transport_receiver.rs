@@ -431,6 +431,8 @@ impl GrpcTransportReceiver {
         rp_config: RPConf,
         port: u16,
         server_ssl_context: rustls::ServerConfig,
+        cert_pem: String,
+        key_pem: String,
         max_message_size: i32,
         max_stream_message_size: u64,
         buffers_map: Arc<Mutex<HashMap<PeerNode, Arc<OnceCell<MessageBuffers>>>>>,
@@ -439,7 +441,7 @@ impl GrpcTransportReceiver {
         cache: StreamCache,
     ) -> Result<JoinHandle<()>, CommError> {
         use std::net::SocketAddr;
-        use tonic::transport::Server;
+        use tonic::transport::{Identity, Server, ServerTlsConfig};
 
         let addr: SocketAddr = format!("0.0.0.0:{}", port)
             .parse()
@@ -459,11 +461,18 @@ impl GrpcTransportReceiver {
             parallelism,
         );
 
-        // Create the gRPC server with SSL interceptor
-        let server_task = tokio::spawn(async move {
-            log::info!("Starting gRPC transport receiver on {}", addr);
+        // TODO: Use the provided server_ssl_context (contains HostnameTrustManager) for enhanced security
+        // Currently tonic's ServerTlsConfig doesn't support custom rustls::ServerConfig
+        // When tonic supports it, replace the basic configuration below with:
+        // .rustls_server_config(server_ssl_context)
+        let server_tls_config =
+            ServerTlsConfig::new().identity(Identity::from_pem(cert_pem, key_pem));
 
-            let _server = Server::builder()
+        // Create the gRPC server with TLS configuration
+        let server_task = tokio::spawn(async move {
+            log::info!("Starting TLS-enabled gRPC transport receiver on {}", addr);
+
+            let server_result = Server::builder()
                 // Request timeout (30s): Maximum time for a single gRPC request to complete.
                 // Prevents hanging requests from consuming resources indefinitely.
                 // Essential for blockchain P2P networks where nodes can be slow or unresponsive.
@@ -489,6 +498,8 @@ impl GrpcTransportReceiver {
                 // Enables resource protection by freeing up connections quickly for new peers.
                 // Improves network efficiency by avoiding sends to unresponsive peers.
                 .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
+                // Configure HTTP/2 max frame size
+                .max_frame_size(Some(max_message_size as u32))
                 // NOTE: max_message_size configuration is not available at this level in tonic.
                 // Unlike Scala's NettyServerBuilder.maxInboundMessageSize(), tonic requires
                 // message size limits to be configured per-service via Grpc<T>.max_decoding_message_size().
@@ -499,21 +510,29 @@ impl GrpcTransportReceiver {
                 // - HTTP/2 frame limits (if configured) provide some protection
                 // - Client-side limits (in GrpcTransportClient) work correctly
                 //
+                // Configure TLS (basic configuration - TODO: integrate HostnameTrustManager)
+                .tls_config(server_tls_config)
+                .map_err(|e| CommError::ConfigError(format!("TLS configuration failed: {}", e)))?
                 // Add the transport layer service with SSL interceptor
                 .add_service(TransportLayerServer::with_interceptor(
                     transport_service,
                     ssl_interceptor,
                 ))
-                // TODO: Add TLS configuration
-                // .tls_config(tls_config)
                 .serve(addr)
                 .await;
 
-            if let Err(e) = _server {
+            if let Err(e) = server_result {
                 log::error!("gRPC server error: {}", e);
             }
+
+            Ok::<(), CommError>(())
         });
 
-        Ok(server_task)
+        // Handle the Result from the spawn task
+        Ok(tokio::spawn(async move {
+            if let Err(e) = server_task.await {
+                log::error!("Server task join error: {}", e);
+            }
+        }))
     }
 }
