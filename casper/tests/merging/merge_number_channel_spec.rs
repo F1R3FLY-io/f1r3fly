@@ -1,7 +1,7 @@
 // See casper/src/test/scala/coop/rchain/casper/merging/MergeNumberChannelSpec.scala
 
 use futures::future::join_all;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Once};
 
 use casper::rust::{
     merging::{
@@ -36,6 +36,18 @@ use rspace_plus_plus::rspace::{
 use shared::rust::hashable_set::HashableSet;
 
 use crate::util::rholang::resources::mk_runtime_manager;
+
+static INIT: Once = Once::new();
+
+fn init_logger() {
+    INIT.call_once(|| {
+        env_logger::builder()
+            .is_test(true) // ensures logs show up in test output
+            .filter_level(log::LevelFilter::Debug)
+            .try_init()
+            .unwrap();
+    });
+}
 
 #[derive(Debug)]
 struct DeployTestInfo {
@@ -93,11 +105,15 @@ fn make_sig(hex: &str) -> Vec<u8> {
     } else {
         hex
     };
-    hex::decode(hex_str).unwrap()
+    let result = hex::decode(hex_str).unwrap();
+    println!("DEBUG: make_sig({}) -> {:?}", hex, result);
+    result
 }
 
 fn make_sig_pb(hex: &str) -> prost::bytes::Bytes {
-    prost::bytes::Bytes::from(make_sig(hex))
+    let result = prost::bytes::Bytes::from(make_sig(hex));
+    println!("DEBUG: make_sig_pb({}) -> {:?}", hex, result);
+    result
 }
 
 fn base_rho_seed() -> Blake2b512Random {
@@ -124,6 +140,16 @@ async fn test_case(
     expected_rejected: HashableSet<prost::bytes::Bytes>,
     expected_final_result: i64,
 ) {
+    init_logger();
+    
+    println!("DEBUG: Starting test case");
+    println!("DEBUG: Expected rejected: {:?}", expected_rejected);
+    
+    // Debug print the individual signatures we expect
+    for sig_bytes in &expected_rejected.0 {
+        println!("DEBUG: Expected rejected signature: {:?}", sig_bytes);
+    }
+
     let rm = mk_runtime_manager("merging-test", Some(unforgeable_name_seed())).await;
     let mut runtime = rm.spawn_runtime().await;
 
@@ -170,6 +196,13 @@ async fn test_case(
             .zip(num_chan_diffs)
             .zip(terms)
             .map(|((cp, number_chan_diff), deploy)| {
+                println!("DEBUG: Creating DeployIndex for sig {} -> number_chan_diff: {:?}", deploy.sig, number_chan_diff);
+                
+                println!("DEBUG: About to create event log index with mergeable channels:");
+                for (hash, diff) in &number_chan_diff {
+                    println!("DEBUG: Mergeable channel: {:?} -> {}", hash, diff);
+                }
+                
                 let event_log_index = block_index::create_event_log_index(
                     cp.log
                         .iter()
@@ -183,6 +216,8 @@ async fn test_case(
                 );
 
                 let sig_bs = make_sig_pb(deploy.sig.as_str());
+                println!("DEBUG: Creating DeployIndex for sig {} -> {:?}", deploy.sig, sig_bs);
+                
                 DeployIndex {
                     deploy_id: sig_bs,
                     cost: deploy.cost,
@@ -225,8 +260,15 @@ async fn test_case(
     join_all(futures).await;
     let base_cp = runtime.create_checkpoint();
 
+    println!("DEBUG: Running left terms: {:?}", left_terms);
     let (left_ev_indices, left_post_state) =
         run_rholang(&mut runtime, &rm, left_terms, base_cp.root.clone()).await;
+        
+    println!("DEBUG: Left deploy indices count: {}", left_ev_indices.0.len());
+    for (i, deploy_idx) in left_ev_indices.0.iter().enumerate() {
+        println!("DEBUG: Left deploy {}: id={:?}, cost={}", i, deploy_idx.deploy_id, deploy_idx.cost);
+    }
+        
     let left_deploy_indices = merging_logic::compute_related_sets(
         &left_ev_indices,
         |x: &DeployIndex, y: &DeployIndex| {
@@ -234,8 +276,15 @@ async fn test_case(
         },
     );
 
+    println!("DEBUG: Running right terms: {:?}", right_terms);
     let (right_ev_indices, right_post_state) =
         run_rholang(&mut runtime, &rm, right_terms, base_cp.root.clone()).await;
+        
+    println!("DEBUG: Right deploy indices count: {}", right_ev_indices.0.len());
+    for (i, deploy_idx) in right_ev_indices.0.iter().enumerate() {
+        println!("DEBUG: Right deploy {}: id={:?}, cost={}", i, deploy_idx.deploy_id, deploy_idx.cost);
+    }
+        
     let right_deploy_indices = merging_logic::compute_related_sets(
         &right_ev_indices,
         |x: &DeployIndex, y: &DeployIndex| {
@@ -274,20 +323,60 @@ async fn test_case(
     println!("LEFT DEPLOY CHAINS: {:?}", left_deploy_chains.len());
     println!("RIGHT DEPLOY CHAINS: {:?}", right_deploy_chains.len());
 
+    for (i, chain) in left_deploy_chains.iter().enumerate() {
+        println!("DEBUG: Left chain {}: deploys={:?}", i, 
+            chain.deploys_with_cost.0.iter().map(|d| &d.deploy_id).collect::<Vec<_>>());
+        println!("DEBUG: Left chain {} number channels: {:?}", i, chain.event_log_index.number_channels_data);
+        println!("DEBUG: Left chain {} post_state_hash: {:?}", i, chain.post_state_hash);
+        println!("DEBUG: Left chain {} produces_mergeable: {} items", i, chain.event_log_index.produces_mergeable.0.len());
+        println!("DEBUG: Left chain {} consumes_mergeable: {} items", i, chain.event_log_index.consumes_mergeable.0.len());
+        for produce in &chain.event_log_index.produces_mergeable.0 {
+            println!("DEBUG: Left chain {} mergeable produce: channel={:?}", i, produce.channel_hash);
+        }
+        for consume in &chain.event_log_index.consumes_mergeable.0 {
+            println!("DEBUG: Left chain {} mergeable consume: channels={:?}", i, consume.channel_hashes);
+        }
+    }
+    
+    for (i, chain) in right_deploy_chains.iter().enumerate() {
+        println!("DEBUG: Right chain {}: deploys={:?}", i, 
+            chain.deploys_with_cost.0.iter().map(|d| &d.deploy_id).collect::<Vec<_>>());
+        println!("DEBUG: Right chain {} number channels: {:?}", i, chain.event_log_index.number_channels_data);
+        println!("DEBUG: Right chain {} post_state_hash: {:?}", i, chain.post_state_hash);
+        println!("DEBUG: Right chain {} produces_mergeable: {} items", i, chain.event_log_index.produces_mergeable.0.len());
+        println!("DEBUG: Right chain {} consumes_mergeable: {} items", i, chain.event_log_index.consumes_mergeable.0.len());
+        for produce in &chain.event_log_index.produces_mergeable.0 {
+            println!("DEBUG: Right chain {} mergeable produce: channel={:?}", i, produce.channel_hash);
+        }
+        for consume in &chain.event_log_index.consumes_mergeable.0 {
+            println!("DEBUG: Right chain {} mergeable consume: channels={:?}", i, consume.channel_hashes);
+        }
+    }
+
     let branches_are_conflicting =
         |a: &HashableSet<DeployChainIndex>, b: &HashableSet<DeployChainIndex>| {
-            merging_logic::are_conflicting(
-                &a.0.iter()
-                    .map(|x| &x.event_log_index)
-                    .fold(EventLogIndex::empty(), |acc, x| {
-                        EventLogIndex::combine(&acc, x)
-                    }),
-                &b.0.iter()
-                    .map(|x| &x.event_log_index)
-                    .fold(EventLogIndex::empty(), |acc, x| {
-                        EventLogIndex::combine(&acc, x)
-                    }),
-            )
+            let a_combined = a.0.iter()
+                .map(|x| &x.event_log_index)
+                .fold(EventLogIndex::empty(), |acc, x| {
+                    EventLogIndex::combine(&acc, x)
+                });
+            let b_combined = b.0.iter()
+                .map(|x| &x.event_log_index)
+                .fold(EventLogIndex::empty(), |acc, x| {
+                    EventLogIndex::combine(&acc, x)
+                });
+            
+            let result = merging_logic::are_conflicting(&a_combined, &b_combined);
+            
+            if result {
+                println!("DEBUG CONFLICTS: Branches ARE conflicting");
+                println!("DEBUG CONFLICTS: Branch A event log: {:?}", a_combined);
+                println!("DEBUG CONFLICTS: Branch B event log: {:?}", b_combined);
+            } else {
+                println!("DEBUG CONFLICTS: Branches are NOT conflicting");
+            }
+            
+            result
         };
 
     let base_reader = history_repo.get_history_reader(&base_cp.root).unwrap();
@@ -356,6 +445,24 @@ async fn test_case(
         .flat_map(|r| r.deploys_with_cost.0.iter().map(|d| d.deploy_id.clone()))
         .collect();
 
+    println!("DEBUG: Rejected deploy chains: {:?}", rejected.0.len());
+    for (i, rej) in rejected.0.iter().enumerate() {
+        println!("DEBUG: Rejected chain {}: deploy_ids={:?}", i, 
+            rej.deploys_with_cost.0.iter().map(|d| &d.deploy_id).collect::<Vec<_>>());
+    }
+    
+    println!("DEBUG: Final rejected_sigs: {:?}", rejected_sigs);
+    println!("DEBUG: Expected rejected_sigs: {:?}", expected_rejected);
+    
+    // Debug individual bytes comparison
+    println!("DEBUG: Rejected sigs count: {}, Expected count: {}", rejected_sigs.0.len(), expected_rejected.0.len());
+    for (i, actual_sig) in rejected_sigs.0.iter().enumerate() {
+        println!("DEBUG: Actual rejected[{}]: {:?} (bytes: {:?})", i, actual_sig, actual_sig.as_ref());
+    }
+    for (i, expected_sig) in expected_rejected.0.iter().enumerate() {
+        println!("DEBUG: Expected rejected[{}]: {:?} (bytes: {:?})", i, expected_sig, expected_sig.as_ref());
+    }
+
     assert_eq!(rejected_sigs, expected_rejected);
 
     let mut runtime_ops = RuntimeOps::new(runtime);
@@ -370,7 +477,6 @@ async fn test_case(
 // TODO: Remove ignore once we have a fix for this test
 // This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_got_negative_number()
 {
     test_case(
@@ -394,7 +500,6 @@ async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_g
 // TODO: Remove ignore once we have a fix for this test
 // This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_got_overflow() {
     test_case(
         vec![RHO_ST.to_owned(), rho_change(10)],
@@ -417,7 +522,6 @@ async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_g
 // TODO: Remove ignore once we have a fix for this test
 // This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_with_normal_rejection_should_choose_from_normal_reject_options() {
     test_case(
         vec![RHO_ST.to_owned(), rho_change(100)],
@@ -454,7 +558,6 @@ async fn multiple_branches_with_normal_rejection_should_choose_from_normal_rejec
 // TODO: Remove ignore once we have a fix for this test
 // This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_merge_number_channels() {
     test_case(
         vec![RHO_ST.to_owned()],

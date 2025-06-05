@@ -181,13 +181,25 @@ class DebruijnInterpreter[M[_]: Sync: Parallel: Log: Concurrent: _cost](
 
   private def updateMergeableChannels(chan: Par) = Sync[M].defer {
     val isMergeable = isMergeableChannel(chan)
+    
+    println(s"SCALA DEBUG updateMergeableChannels: channel=${chan}, isMergeable=${isMergeable}")
+    if (isMergeable) {
+      println(s"SCALA DEBUG: Adding mergeable channel: ${chan}")
+    }
 
     mergeChs.update(_ + chan).whenA(isMergeable)
   }
 
   private def isMergeableChannel(chan: Par) = {
     val tupleElms = chan.exprs.flatMap(y => y.getETupleBody.ps)
-    tupleElms.headOption.contains(mergeableTagName)
+    val result = tupleElms.headOption.contains(mergeableTagName)
+    
+    println(s"SCALA DEBUG isMergeableChannel: channel=${chan}")
+    println(s"SCALA DEBUG isMergeableChannel: tupleElms=${tupleElms}")
+    println(s"SCALA DEBUG isMergeableChannel: mergeableTagName=${mergeableTagName}")
+    println(s"SCALA DEBUG isMergeableChannel: result=${result}")
+    
+    result
   }
 
   /**

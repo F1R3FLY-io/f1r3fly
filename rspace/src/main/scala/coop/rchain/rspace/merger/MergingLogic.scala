@@ -31,11 +31,22 @@ object MergingLogic {
   }
 
   /** If two event logs are conflicting. */
-  def areConflicting(a: EventLogIndex, b: EventLogIndex): Boolean =
-    conflicts(a: EventLogIndex, b: EventLogIndex).nonEmpty
+  def areConflicting(a: EventLogIndex, b: EventLogIndex): Boolean = {
+    val conflicts_result = conflicts(a, b)
+    val conflicts_list = conflicts_result.toList
+    println(s"SCALA DEBUG areConflicting: found ${conflicts_list.size} conflicts")
+    if (conflicts_list.nonEmpty) {
+      conflicts_list.take(3).foreach(c => println(s"SCALA DEBUG areConflicting: conflict channel = ${c}"))
+    }
+    val result = conflicts_list.nonEmpty
+    println(s"SCALA DEBUG areConflicting: returning ${result}")
+    result
+  }
 
   /** Channels conflicting between a pair of event logs. */
   def conflicts(a: EventLogIndex, b: EventLogIndex): Iterator[Blake2b256Hash] = {
+
+    println(s"SCALA DEBUG conflicts: checking conflicts between branches")
 
     /**
       * Check #1
@@ -56,7 +67,54 @@ object MergingLogic {
       val mergeableProduces = a.producesMergeable intersect b.producesMergeable
       val produceRaces      = (sharedProduces diff mergeableProduces).toIterator.filterNot(_.persistent)
 
-      consumeRaces.flatMap(_.channelsHashes) ++ produceRaces.map(_.channelsHash)
+      println("SCALA DEBUG conflicts check #1: shared consumes = " + sharedConsumes.size)
+      println("SCALA DEBUG conflicts check #1: mergeable consumes = " + mergeableConsumes.size)
+      println("SCALA DEBUG conflicts check #1: consume races = " + consumeRaces.size)
+      println("SCALA DEBUG conflicts check #1: shared produces = " + sharedProduces.size)
+      println("SCALA DEBUG conflicts check #1: mergeable produces = " + mergeableProduces.size)
+      println("SCALA DEBUG conflicts check #1: produce races = " + produceRaces.size)
+
+      // Show details of shared and mergeable consumes
+      println("SCALA DEBUG conflicts check #1: Shared consumes:")
+      sharedConsumes.zipWithIndex.foreach { case (consume, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   shared consume $i: channels=${consume.channelsHashes}, persistent=${consume.persistent}")
+      }
+      
+      println("SCALA DEBUG conflicts check #1: Mergeable consumes:")
+      mergeableConsumes.zipWithIndex.foreach { case (consume, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   mergeable consume $i: channels=${consume.channelsHashes}, persistent=${consume.persistent}")
+      }
+
+      println("SCALA DEBUG conflicts check #1: Race consumes (after filtering):")
+      consumeRaces.zipWithIndex.foreach { case (consume, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   race consume $i: channels=${consume.channelsHashes}, persistent=${consume.persistent}")
+      }
+
+      // Show details of shared and mergeable produces
+      println("SCALA DEBUG conflicts check #1: Shared produces:")
+      sharedProduces.zipWithIndex.foreach { case (produce, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   shared produce $i: channel=${produce.channelsHash}")
+      }
+      
+      println("SCALA DEBUG conflicts check #1: Mergeable produces:")
+      mergeableProduces.zipWithIndex.foreach { case (produce, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   mergeable produce $i: channel=${produce.channelsHash}")
+      }
+
+      println("SCALA DEBUG conflicts check #1: Race produces (after filtering):")
+      produceRaces.zipWithIndex.foreach { case (produce, i) =>
+        println(s"SCALA DEBUG conflicts check #1:   race produce $i: channel=${produce.channelsHash}")
+      }
+
+      val consumeRaceChannels = consumeRaces.flatMap(_.channelsHashes)
+      val produceRaceChannels = produceRaces.map(_.channelsHash)
+      
+      val racesResult = consumeRaceChannels ++ produceRaceChannels
+      val racesCount = racesResult.size
+      println(s"SCALA DEBUG conflicts check #1 (races): ${racesCount} conflicts")
+      racesResult.take(3).foreach(ch => println(s"SCALA DEBUG conflicts check #1: conflicting channel ${ch}"))
+      
+      racesResult
     }
 
     /**
@@ -79,16 +137,31 @@ object MergingLogic {
           .map(_._2.channelsHash)
       }
 
-      check(a, b) ++ check(b, a)
+      val comsResult = check(a, b) ++ check(b, a)
+      val comsCount = comsResult.size
+      println(s"SCALA DEBUG conflicts check #2 (potential COMs): ${comsCount} conflicts")
+      comsResult.take(3).foreach(ch => println(s"SCALA DEBUG conflicts check #2: conflicting channel ${ch}"))
+      
+      comsResult
     }
 
     // now we don't analyze joins and declare conflicting cases when produce touch join because applying
     // produces from both event logs might trigger continuation of some join, so COMM event
-    val produceTouchBaseJoin =
-      (a.producesTouchingBaseJoins.toIterator ++ b.producesTouchingBaseJoins.toIterator)
+    val produceTouchBaseJoin = {
+      val touchResult = (a.producesTouchingBaseJoins.toIterator ++ b.producesTouchingBaseJoins.toIterator)
         .map(_.channelsHash)
+      val touchCount = touchResult.size
+      println(s"SCALA DEBUG conflicts check #3 (produce touch base join): ${touchCount} conflicts")
+      touchResult.take(3).foreach(ch => println(s"SCALA DEBUG conflicts check #3: conflicting channel ${ch}"))
+      
+      touchResult
+    }
 
-    racesForSameIOEvent ++ potentialCOMMs ++ produceTouchBaseJoin
+    val allConflicts = racesForSameIOEvent ++ potentialCOMMs ++ produceTouchBaseJoin
+    val totalCount = allConflicts.size
+    println(s"SCALA DEBUG conflicts: TOTAL conflicts found: ${totalCount}")
+    
+    allConflicts
   }
 
   /** Produce created inside event log. */

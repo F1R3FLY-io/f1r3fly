@@ -75,6 +75,11 @@ impl Interpreter for InterpreterImpl {
                 Ok(()) => {
                     let phlos_left = self.c.get();
                     let mergeable_channels = self.merge_chs.read().unwrap().clone();
+                    
+                    println!("DEBUG RUST INTERPRETER: Found {} mergeable channels in evaluation result", mergeable_channels.len());
+                    for (i, channel) in mergeable_channels.iter().enumerate() {
+                        println!("DEBUG RUST INTERPRETER: Mergeable channel {}: {:?}", i, channel);
+                    }
 
                     Ok(EvaluateResult {
                         cost: initial_phlo.clone() - phlos_left,

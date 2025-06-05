@@ -34,6 +34,11 @@ fn measure_result_time<T, E, F: FnOnce() -> Result<T, E>>(f: F) -> Result<(T, Du
     Ok((result, duration))
 }
 
+// Helper function to extract deploy ID for debugging
+fn extract_deploy_id_debug<R: std::fmt::Debug>(item: &R) -> String {
+    format!("{:?}", item)
+}
+
 pub fn merge<
     R: Clone + Eq + std::hash::Hash + PartialOrd + Ord,
     C: Clone,
@@ -78,16 +83,36 @@ pub fn merge<
     let (branches, branches_time) =
         measure_time(|| compute_related_sets(&merge_set, |a, b| depends(a, b)));
 
+    println!("DEBUG CONFLICT DETECTION: Initial merge_set size: {}", merge_set.0.len());
+    for (i, item) in merge_set.0.iter().enumerate() {
+        println!("DEBUG CONFLICT DETECTION: merge_set item {}: (generic item)", i);
+    }
+
+    println!("DEBUG CONFLICT DETECTION: Computed {} branches", branches.0.len());
+    for (i, branch) in branches.0.iter().enumerate() {
+        println!("DEBUG CONFLICT DETECTION: Branch {}: {} items", i, branch.0.len());
+    }
+
     // Compute relation map for conflicting branches with timing
     use rspace_plus_plus::rspace::merger::merging_logic::compute_relation_map;
     let branches_set = HashableSet(branches.0.iter().cloned().collect());
     let (conflict_map, conflicts_map_time) =
         measure_time(|| compute_relation_map(&branches_set, |a, b| conflicts(a, b)));
 
+    println!("DEBUG CONFLICT DETECTION: Conflict map has {} entries", conflict_map.len());
+    for (key, conflicting_branches) in &conflict_map {
+        println!("DEBUG CONFLICT DETECTION: Branch conflicts with {} others", conflicting_branches.0.len());
+    }
+
     // Compute rejection options that leave only non-conflicting branches with timing
     use rspace_plus_plus::rspace::merger::merging_logic::compute_rejection_options;
     let (rejection_options, rejection_options_time) =
         measure_time(|| compute_rejection_options(&conflict_map));
+
+    println!("DEBUG CONFLICT DETECTION: Generated {} normal rejection options", rejection_options.0.len());
+    for (i, option) in rejection_options.0.iter().enumerate() {
+        println!("DEBUG CONFLICT DETECTION: Normal rejection option {}: {} branches", i, option.0.len());
+    }
 
     // Get base mergeable channel results
     let mut base_mergeable_ch_res = HashMap::new();
@@ -316,28 +341,60 @@ fn cal_merged_result<R: Clone + Eq + std::hash::Hash>(
                         ba.insert(channel.clone(), result);
                         Some(ba)
                     }
-                    _ => None, // Return None for overflow or negative result
+                    Some(_) => None, // Negative result
+                    None => None,    // Overflow
                 }
             })
         })
 }
 
 /** Evaluate branches and return the set of branches that should be rejected */
-fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
+fn fold_rejection<R: Clone + Eq + std::hash::Hash + Ord>(
     base_balance: HashMap<Blake2b256Hash, i64>,
     branches: &HashableSet<Branch<R>>,
     mergeable_channels: impl Fn(&R) -> NumberChannelsDiff,
 ) -> HashableSet<Branch<R>> {
-    // Fold branches to find which ones would result in negative or overflow balances
-    let (_, rejected) = branches.0.iter().fold(
+    // The Scala version processes branches in Set.foldLeft order and accumulates state
+    // Only branches that would cause overflow/underflow are rejected
+    // The key difference: accepted branches update the accumulated balance!
+    // 
+    // CRITICAL: Match Scala's processing order exactly
+    // Scala Set iteration order is deterministic based on hash codes
+    // We need to sort in a way that matches Scala's behavior
+    let mut sorted_branches: Vec<_> = branches.0.iter().collect();
+    
+    // Sort by the deployment ID (signature) to get deterministic order
+    // This should match how Scala processes the branches
+    sorted_branches.sort_by(|a, b| {
+        // Extract the first deploy ID from each branch for comparison
+        let a_first_deploy_id = a.0.iter().next().map(|item| {
+            // We need to extract the deploy ID somehow - let's use the item's hash
+            // Since we can't directly access DeployChainIndex fields, we'll use ordering
+            item
+        });
+        let b_first_deploy_id = b.0.iter().next().map(|item| item);
+        
+        match (a_first_deploy_id, b_first_deploy_id) {
+            (Some(a_item), Some(b_item)) => a_item.cmp(b_item),
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    });
+
+    let (_final_balances, rejected) = sorted_branches.iter().fold(
         (base_balance, HashableSet(HashSet::new())),
         |(balances, mut rejected), branch| {
             // Check if the branch can be merged without overflow or negative results
             match cal_merged_result(branch, balances.clone(), &mergeable_channels) {
-                Some(new_balances) => (new_balances, rejected),
+                Some(new_balances) => {
+                    // Branch is accepted - use the new balances for future calculations
+                    // This is the key: subsequent branches see the accumulated state
+                    (new_balances, rejected)
+                },
                 None => {
-                    // If merge calculation returns None, reject this branch
-                    rejected.0.insert(branch.clone());
+                    // Branch is rejected - keep the old balances and add branch to rejected set
+                    rejected.0.insert((*branch).clone());
                     (balances, rejected)
                 }
             }
@@ -348,7 +405,7 @@ fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
 }
 
 /** Get merged result rejection options */
-fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash>(
+fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash + Ord>(
     branches: &HashableSet<Branch<R>>,
     reject_options: &HashableSet<HashableSet<Branch<R>>>,
     base: HashMap<Blake2b256Hash, i64>,

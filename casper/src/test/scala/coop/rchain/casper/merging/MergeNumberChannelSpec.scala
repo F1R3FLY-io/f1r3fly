@@ -123,7 +123,14 @@ class MergeNumberChannelSpec extends FlatSpec {
                                 numChanFinal <- runtime
                                                  .getNumberChannelsData(evalResult.mergeable)
 
+                                _ = println(s"SCALA DEBUG: evalResult.mergeable=${evalResult.mergeable}")
+                                _ = println(s"SCALA DEBUG: numChanFinal=${numChanFinal}")
+
                                 softPoint <- runtime.createSoftCheckpoint
+                                _ = println(s"SCALA DEBUG: checkpoint log events for deploy ${deploy.sig}:")
+                                _ = softPoint.log.zipWithIndex.foreach { case (event, i) =>
+                                  println(s"SCALA DEBUG:   Event $i: $event")
+                                }
                               } yield (softPoint, numChanFinal)
                           }
             // Create checkpoint with state hash
@@ -196,11 +203,16 @@ class MergeNumberChannelSpec extends FlatSpec {
 
         // Detect rejections / number channel overflow/negative
 
-        branchesAreConflicting = (as: Set[DeployChainIndex], bs: Set[DeployChainIndex]) =>
-          MergingLogic.areConflicting(
-            as.map(_.eventLogIndex).toList.combineAll,
-            bs.map(_.eventLogIndex).toList.combineAll
-          )
+        branchesAreConflicting = (as: Set[DeployChainIndex], bs: Set[DeployChainIndex]) => {
+          val asCombined = as.map(_.eventLogIndex).toList.combineAll
+          val bsCombined = bs.map(_.eventLogIndex).toList.combineAll
+          val result = MergingLogic.areConflicting(asCombined, bsCombined)
+          println(s"SCALA DEBUG: branchesAreConflicting check:")
+          println(s"SCALA DEBUG:   Branch A event log: $asCombined")
+          println(s"SCALA DEBUG:   Branch B event log: $bsCombined")
+          println(s"SCALA DEBUG:   Are conflicting: $result")
+          result
+        }
 
         // Base state reader
         baseReader       <- rm.getHistoryRepo.getHistoryReader(baseCp.root)

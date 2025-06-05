@@ -502,31 +502,34 @@ impl DebruijnInterpreter {
     /* Collect mergeable channels */
 
     fn update_mergeable_channels(&self, chan: &Par) -> () {
+        let chan_hash = rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash::new(
+            &chan.encode_to_vec()
+        );
         let is_mergeable = self.is_mergeable_channel(chan);
-        // println!("\nis_mergeable: {:?}", is_mergeable);
-
+        
         if is_mergeable {
-            let mut merge_chs_write = self.merge_chs.try_write().unwrap();
-            merge_chs_write.insert(chan.clone());
+            println!("MERGEABLE: Found channel {:?}", chan_hash);
+            self.merge_chs.write().unwrap().insert(chan.clone());
         }
     }
 
     fn is_mergeable_channel(&self, chan: &Par) -> bool {
-        let tuple_elms: Vec<Par> = chan
-            .exprs
-            .iter()
-            .flat_map(|y| match &y.expr_instance {
-                Some(expr_instance) => match expr_instance {
-                    ExprInstance::ETupleBody(etuple) => etuple.ps.clone(),
-                    _ => ETuple::default().ps,
-                },
-                None => ETuple::default().ps,
-            })
-            .collect();
+        // Only show key debug info for mergeable channels
+        let result = if let Some(Expr {
+            expr_instance: Some(ExprInstance::ETupleBody(tuple)),
+        }) = chan.exprs.first()
+        {
+            if tuple.ps.len() == 2 {
+                let first_element = &tuple.ps[0];
+                first_element == &self.mergeable_tag_name
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
-        tuple_elms
-            .first()
-            .map_or(false, |head| head == &self.mergeable_tag_name)
+        result
     }
 
     fn aggregate_evaluator_errors(

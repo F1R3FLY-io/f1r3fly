@@ -442,15 +442,20 @@ impl SystemProcesses {
         &mut self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
     ) -> Result<Vec<Par>, InterpreterError> {
-        let Some((_, _, _, args)) = self.is_contract_call().unapply(contract_args) else {
+        // Fire-and-forget pattern: extract args directly without creating producer
+        if contract_args.0.len() != 1 {
             return Err(illegal_argument_error("std_out"));
-        };
+        }
+        
+        let args = &contract_args.0[0].pars;
+        println!("STDOUT: Fire-and-forget - NO PRODUCER CREATED");
 
         let [arg] = args.as_slice() else {
             return Err(illegal_argument_error("std_out"));
         };
 
         let str = self.pretty_printer.build_string_from_message(&arg.clone());
+        println!("{}", str);
         self.print_std_out(&str)
     }
 
@@ -458,11 +463,15 @@ impl SystemProcesses {
         &mut self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
     ) -> Result<Vec<Par>, InterpreterError> {
-        let Some((produce, _, _, args)) = self.is_contract_call().unapply(contract_args) else {
+        // Fire-and-forget pattern: extract args directly without creating producer
+        if contract_args.0.len() != 1 {
             return Err(illegal_argument_error("std_out_ack"));
-        };
+        }
+        
+        let args = &contract_args.0[0].pars;
+        println!("STDOUT_ACK: Fire-and-forget - NO PRODUCER CREATED");
 
-        let [arg, ack] = args.as_slice() else {
+        let [arg, _ack] = args.as_slice() else {
             return Err(illegal_argument_error("std_out_ack"));
         };
 
@@ -470,7 +479,7 @@ impl SystemProcesses {
         self.print_std_out(&str)?;
 
         let output = vec![Par::default()];
-        produce(output.clone(), ack.clone()).await?;
+        // No producer function call - fire and forget
         Ok(output)
     }
 
@@ -478,9 +487,12 @@ impl SystemProcesses {
         &mut self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
     ) -> Result<Vec<Par>, InterpreterError> {
-        let Some((_, _, _, args)) = self.is_contract_call().unapply(contract_args) else {
+        // Fire-and-forget pattern: extract args directly without creating producer
+        if contract_args.0.len() != 1 {
             return Err(illegal_argument_error("std_err"));
-        };
+        }
+        
+        let args = &contract_args.0[0].pars;
 
         let [arg] = args.as_slice() else {
             return Err(illegal_argument_error("std_err"));
@@ -494,11 +506,14 @@ impl SystemProcesses {
         &mut self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
     ) -> Result<Vec<Par>, InterpreterError> {
-        let Some((produce, _, _, args)) = self.is_contract_call().unapply(contract_args) else {
+        // Fire-and-forget pattern: extract args directly without creating producer
+        if contract_args.0.len() != 1 {
             return Err(illegal_argument_error("std_err_ack"));
-        };
+        }
+        
+        let args = &contract_args.0[0].pars;
 
-        let [arg, ack] = args.as_slice() else {
+        let [arg, _ack] = args.as_slice() else {
             return Err(illegal_argument_error("std_err_ack"));
         };
 
@@ -506,7 +521,7 @@ impl SystemProcesses {
         self.print_std_err(&str)?;
 
         let output = vec![Par::default()];
-        produce(output.clone(), ack.clone()).await?;
+        // No producer function call - fire and forget
         Ok(output)
     }
 

@@ -1,5 +1,6 @@
 use models::rhoapi::{ListParWithRandom, Par};
 use prost::Message;
+use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use std::pin::Pin;
 
 use super::{
@@ -45,7 +46,6 @@ impl ContractCall {
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
     ) -> Option<(Producer, bool, Vec<Par>, Vec<Par>)> {
-        // println!("\ncontract_call unapply");
         if contract_args.0.len() == 1 {
             let (args, rand, is_replay, previous) = (
                 contract_args.0[0].pars.clone(),
@@ -59,9 +59,19 @@ impl ContractCall {
             let produce = Box::new(move |values: Vec<Par>, ch: Par| {
                 let space = space.clone();
                 let rand = rand.clone();
+                
+                // DEBUG: Track what channel we're producing to
+                println!("DEBUG SPACE CALL: ContractCall::unapply producer called");
+                println!("DEBUG SPACE CALL: Channel: {:?}", ch);
+                println!("DEBUG SPACE CALL: Values: {:?}", values);
+                
                 Box::pin(async move {
                     let mut space_lock = space.try_lock().unwrap();
-                    // println!("\nhit produce in contract_call, values: {:?}", values);
+                    
+                    // DEBUG: Confirm we're actually calling space.produce
+                    println!("DEBUG SPACE CALL: About to call space.produce()");
+                    println!("DEBUG SPACE CALL: Channel hash: {:?}", Blake2b256Hash::new(&ch.encode_to_vec()));
+                    
                     let produce_result = space_lock.produce(
                         ch,
                         ListParWithRandom {
@@ -73,8 +83,6 @@ impl ContractCall {
 
                     let is_replay = space_lock.is_replay();
                     drop(space_lock);
-
-                    // println!("\nproduce_result in contract_call: {:?}", produce_result);
 
                     let dispatch_result = match produce_result {
                         Some((cont, channels, produce)) => {
@@ -99,7 +107,9 @@ impl ContractCall {
                             res
                         }
 
-                        None => Ok(DispatchType::Skip),
+                        None => {
+                            Ok(DispatchType::Skip)
+                        },
                     };
 
                     match dispatch_result {

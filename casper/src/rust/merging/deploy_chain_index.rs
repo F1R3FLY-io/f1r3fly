@@ -24,7 +24,7 @@ pub struct DeployIdWithCost {
 pub struct DeployChainIndex {
     pub deploys_with_cost: HashableSet<DeployIdWithCost>,
     pre_state_hash: Blake2b256Hash,
-    post_state_hash: Blake2b256Hash,
+    pub post_state_hash: Blake2b256Hash,
     pub event_log_index: EventLogIndex,
     pub state_changes: StateChange,
     // caching hash code helps a lot to increase performance of computing rejection options

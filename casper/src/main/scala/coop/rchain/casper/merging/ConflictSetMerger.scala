@@ -48,13 +48,39 @@ object ConflictSetMerger {
         options.map(_.map(_.head)).size == options.size,
         "Same rejection unit is found in two rejection options. Please report this to code maintainer."
       )
-      options.toList
+
+      println(s"SCALA DEBUG: getOptimalRejection called with ${options.size} options")
+      options.zipWithIndex.foreach {
+        case (option, i) =>
+          println(s"SCALA DEBUG: Option $i has ${option.size} branches")
+          option.zipWithIndex.foreach {
+            case (branch, j) =>
+              println(s"SCALA DEBUG:   Branch $j has ${branch.size} items")
+              branch.foreach { item =>
+                println(s"SCALA DEBUG:     Item: $item")
+              }
+          }
+      }
+
+      val sortedOptions = options.toList
       // reject set with min sum of target function output,
       // if equal value - min size of a branch,
       // if equal size - sorted by head of rejection set option
         .sortBy(b => (b.map(targetF).sum, b.size, b.head.head))
-        .headOption
-        .getOrElse(Set.empty)
+
+      println("SCALA DEBUG: Sorted options:")
+      sortedOptions.zipWithIndex.foreach {
+        case (option, i) =>
+          val cost     = option.map(targetF).sum
+          val size     = option.size
+          val headHead = option.head.head
+          println(s"SCALA DEBUG: Sorted option $i: cost=$cost, size=$size, head.head=$headHead")
+      }
+
+      val result = sortedOptions.headOption.getOrElse(Set.empty)
+      println(s"SCALA DEBUG: Selected option for rejection: $result")
+
+      result
     }
 
     def calMergedResult(

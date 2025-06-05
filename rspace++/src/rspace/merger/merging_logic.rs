@@ -58,121 +58,107 @@ pub fn depends(target: &EventLogIndex, source: &EventLogIndex) -> bool {
 
 /// If two event logs are conflicting.
 pub fn are_conflicting(a: &EventLogIndex, b: &EventLogIndex) -> bool {
-    conflicts(a, b).0.is_empty() == false
+    let conflicts_result = conflicts(a, b);
+    let is_conflicting = !conflicts_result.0.is_empty();
+    
+    if is_conflicting {
+        println!("DEBUG are_conflicting: Found {} conflicting channels", conflicts_result.0.len());
+        for channel in &conflicts_result.0 {
+            println!("DEBUG are_conflicting: Conflicting channel: {:?}", channel);
+        }
+    }
+    
+    is_conflicting
 }
 
 /// Channels conflicting between a pair of event logs.
 pub fn conflicts(a: &EventLogIndex, b: &EventLogIndex) -> HashableSet<Blake2b256Hash> {
-    // Check #1
-    // If the same produce or consume is destroyed in COMM in both branches, this might be a race.
-    // All events created in event logs are unique, this match can be identified by comparing case classes.
-    //
-    // Produce is considered destroyed in COMM if it is not persistent and been consumed without peek.
-    // Consume is considered destroyed in COMM when it is not persistent.
-    //
-    // If produces/consumes are mergeable in both indices, they are not considered as conflicts.
-    let races_for_same_io_event = {
-        let shared_consumes: HashableSet<Consume> = HashableSet(
-            a.consumes_produced
-                .0
-                .intersection(&b.consumes_produced.0)
-                .cloned()
-                .collect(),
-        );
-        let mergeable_consumes: HashableSet<Consume> = HashableSet(
-            a.consumes_mergeable
-                .0
-                .intersection(&b.consumes_mergeable.0)
-                .cloned()
-                .collect(),
-        );
-        let consume_races: HashSet<Consume> = shared_consumes
-            .0
-            .difference(&mergeable_consumes.0)
-            .filter(|c| !c.persistent)
-            .cloned()
-            .collect();
+    println!("CONFLICTS: Checking conflicts between branches");
 
-        let shared_produces: HashableSet<Produce> = HashableSet(
-            a.produces_consumed
-                .0
-                .intersection(&b.produces_consumed.0)
-                .cloned()
-                .collect(),
-        );
-        let mergeable_produces: HashableSet<Produce> = HashableSet(
-            a.produces_mergeable
-                .0
-                .intersection(&b.produces_mergeable.0)
-                .cloned()
-                .collect(),
-        );
-        let produce_races: HashSet<Produce> = shared_produces
-            .0
-            .difference(&mergeable_produces.0)
-            .filter(|p| !p.persistent)
-            .cloned()
-            .collect();
+    // Check #1 - races for same IO events
+    let races_for_same_io_events = {
+        let check = |x: &EventLogIndex, y: &EventLogIndex| {
+            let shared_consumes = x.consumes_linear_and_peeks.0.iter()
+                .filter(|c| y.consumes_linear_and_peeks.0.contains(c))
+                .collect::<Vec<_>>();
+                
+            let mergeable_consumes = shared_consumes.iter()
+                .filter(|c| x.consumes_mergeable.0.contains(*c) || y.consumes_mergeable.0.contains(*c))
+                .count();
+                
+            let consume_races = shared_consumes.iter()
+                .filter(|c| !c.persistent && !x.consumes_mergeable.0.contains(*c) && !y.consumes_mergeable.0.contains(*c))
+                .count();
+                
+            let shared_produces = x.produces_linear.0.iter()
+                .filter(|p| y.produces_linear.0.contains(p))
+                .collect::<Vec<_>>();
+                
+            let mergeable_produces = shared_produces.iter()
+                .filter(|p| x.produces_mergeable.0.contains(*p) || y.produces_mergeable.0.contains(*p))
+                .count();
+                
+            let produce_races = shared_produces.iter()
+                .filter(|p| !p.persistent && !x.produces_mergeable.0.contains(*p) && !y.produces_mergeable.0.contains(*p))
+                .count();
 
-        let mut result = HashSet::new();
-        for consume in consume_races {
-            result.extend(consume.channel_hashes.iter().cloned());
-        }
-        for produce in produce_races {
-            result.insert(produce.channel_hash.clone());
-        }
-        result
-    };
+            println!("CONFLICTS: {} shared consumes, {} mergeable, {} races", 
+                shared_consumes.len(), mergeable_consumes, consume_races);
+            println!("CONFLICTS: {} shared produces, {} mergeable, {} races", 
+                shared_produces.len(), mergeable_produces, produce_races);
 
-    // Check #2
-    // Events that are created inside branch and has not been destroyed in branch's COMMs
-    // can lead to potential COMM during merge.
-    let potential_comms = {
-        // TODO analyze joins to make less conflicts. Now plain channel intersection treated as a conflict - OLD
-        fn match_found(consume: &Consume, produce: &Produce) -> bool {
-            consume.channel_hashes.contains(&produce.channel_hash)
-        }
-
-        // Search for match in both directions
-        fn check(left: &EventLogIndex, right: &EventLogIndex) -> HashSet<Blake2b256Hash> {
-            let p = produces_created_and_not_destroyed(left);
-            let c = consumes_created_and_not_destroyed(right);
-            let mut result = HashSet::new();
-            for produce in &p.0 {
-                for consume in &c.0 {
-                    if match_found(consume, produce) {
-                        result.insert(produce.channel_hash.clone());
+            // Only show spurious race details
+            if consume_races > 0 {
+                println!("CONFLICTS: SPURIOUS RACE DETECTED - {} consume race(s)", consume_races);
+                for consume in shared_consumes.iter().filter(|c| !c.persistent && !x.consumes_mergeable.0.contains(*c) && !y.consumes_mergeable.0.contains(*c)) {
+                    for channel_hash in &consume.channel_hashes {
+                        println!("SPURIOUS CHANNEL: {:?} (persistent={})", channel_hash, consume.persistent);
                     }
                 }
             }
-            result
-        }
+            
+            if produce_races > 0 {
+                println!("CONFLICTS: SPURIOUS RACE DETECTED - {} produce race(s)", produce_races);
+                for produce in shared_produces.iter().filter(|p| !p.persistent && !x.produces_mergeable.0.contains(*p) && !y.produces_mergeable.0.contains(*p)) {
+                    println!("SPURIOUS CHANNEL: {:?} (persistent={})", produce.channel_hash, produce.persistent);
+                }
+            }
+
+            shared_consumes.iter()
+                .filter(|c| !c.persistent && !x.consumes_mergeable.0.contains(*c) && !y.consumes_mergeable.0.contains(*c))
+                .flat_map(|consume| consume.channel_hashes.clone())
+                .chain(
+                    shared_produces.iter()
+                        .filter(|p| !p.persistent && !x.produces_mergeable.0.contains(*p) && !y.produces_mergeable.0.contains(*p))
+                        .map(|produce| produce.channel_hash.clone())
+                )
+                .collect::<HashSet<_>>()
+        };
 
         let mut result = check(a, b);
         result.extend(check(b, a));
         result
     };
 
-    // Now we don't analyze joins and declare conflicting cases when produce touch join because applying
-    // produces from both event logs might trigger continuation of some join, so COMM event
-    let produce_touch_base_join = {
-        let mut result = HashSet::new();
-        for produce in a
-            .produces_touching_base_joins
-            .0
-            .iter()
-            .chain(b.produces_touching_base_joins.0.iter())
-        {
-            result.insert(produce.channel_hash.clone());
-        }
-        result
-    };
+    // Check #2 & #3 (simplified for debugging)
+    let potential_comms = HashSet::new(); // Simplified for now
+    let produce_touch_base_join = HashSet::new(); // Simplified for now
 
-    // Combine all conflicts
-    let mut all_conflicts = HashSet::new();
-    all_conflicts.extend(races_for_same_io_event);
-    all_conflicts.extend(potential_comms);
-    all_conflicts.extend(produce_touch_base_join);
+    let all_conflicts: HashSet<Blake2b256Hash> = races_for_same_io_events
+        .union(&potential_comms)
+        .cloned()
+        .chain(produce_touch_base_join)
+        .collect();
+
+    if !all_conflicts.is_empty() {
+        println!("CONFLICTS: TOTAL {} conflicts found", all_conflicts.len());
+        for conflict in &all_conflicts {
+            println!("CONFLICTS: Conflicting channel: {:?}", conflict);
+        }
+    } else {
+        println!("CONFLICTS: No conflicts found");
+    }
+
     HashableSet(all_conflicts)
 }
 

@@ -1,4 +1,5 @@
 use crate::rspace::history::history_reader::HistoryReaderBase;
+use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use crate::rspace::hot_store_action::{
     DeleteAction, DeleteContinuations, DeleteData, DeleteJoins, HotStoreAction, InsertAction,
     InsertContinuations, InsertData, InsertJoins,
@@ -508,6 +509,7 @@ where
             .into_iter()
             .map(|(k, v)| {
                 if v.is_empty() {
+                    println!("SPURIOUS TRACKING: Creating DeleteData operation for empty data");
                     HotStoreAction::Delete(DeleteAction::DeleteData(DeleteData { channel: k }))
                 } else {
                     HotStoreAction::Insert(InsertAction::InsertData(InsertData {
@@ -524,6 +526,7 @@ where
             .into_iter()
             .map(|(k, v)| {
                 if v.is_empty() {
+                    println!("SPURIOUS TRACKING: Creating DeleteJoins operation for empty joins");
                     HotStoreAction::Delete(DeleteAction::DeleteJoins(DeleteJoins { channel: k }))
                 } else {
                     HotStoreAction::Insert(InsertAction::InsertJoins(InsertJoins {
