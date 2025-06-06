@@ -1,9 +1,11 @@
 use std::sync::Once;
 
+mod engine;
 mod finality;
 mod helper;
 mod merging;
 mod safety;
+mod sync;
 mod util;
 
 static INIT: Once = Once::new();

@@ -14,3 +14,5 @@ pub mod storage;
 pub mod synchrony_constraint_checker;
 pub mod util;
 pub mod validator_identity;
+pub mod engine;
+pub mod protocol;

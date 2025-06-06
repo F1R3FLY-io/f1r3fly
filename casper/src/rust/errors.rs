@@ -1,5 +1,6 @@
 use std::fmt;
 
+use comm::rust::errors::CommError;
 use rholang::rust::interpreter::errors::InterpreterError;
 use shared::rust::store::key_value_store::KvStoreError;
 
@@ -15,6 +16,7 @@ pub enum CasperError {
     SystemRuntimeError(SystemDeployPlatformFailure),
     SigningError(String),
     ReplayFailure(ReplayFailure),
+    CommError(CommError),
     Other(String),
 }
 
@@ -27,6 +29,7 @@ impl fmt::Display for CasperError {
             CasperError::SystemRuntimeError(error) => write!(f, "System runtime error: {}", error),
             CasperError::SigningError(error) => write!(f, "Signing error: {}", error),
             CasperError::ReplayFailure(error) => write!(f, "Replay failure: {}", error),
+            CasperError::CommError(error) => write!(f, "Comm error: {}", error),
             CasperError::Other(error) => write!(f, "Other error: {}", error),
         }
     }
@@ -47,5 +50,11 @@ impl From<KvStoreError> for CasperError {
 impl From<ReplayFailure> for CasperError {
     fn from(error: ReplayFailure) -> Self {
         CasperError::ReplayFailure(error)
+    }
+}
+
+impl From<CommError> for CasperError {
+    fn from(error: CommError) -> Self {
+        CasperError::CommError(error)
     }
 }

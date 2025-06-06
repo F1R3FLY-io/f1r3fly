@@ -130,7 +130,7 @@ impl Connections {
 }
 
 pub struct ConnectionsCell {
-    peers: Arc<Mutex<Connections>>,
+    pub peers: Arc<Mutex<Connections>>,
 }
 
 impl ConnectionsCell {

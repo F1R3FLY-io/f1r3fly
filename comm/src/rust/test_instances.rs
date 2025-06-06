@@ -6,16 +6,12 @@ use std::time::Duration;
 use async_trait::async_trait;
 use models::routing::Protocol;
 
-use comm::rust::{
-    discovery::node_discovery::NodeDiscovery,
-    errors::CommError,
-    peer_node::PeerNode,
-    rp::{
-        protocol_helper,
-        rp_conf::{ClearConnectionsConf, RPConf},
-    },
-    transport::transport_layer::{Blob, TransportLayer},
-};
+use crate::rust::discovery::node_discovery::NodeDiscovery;
+use crate::rust::errors::CommError;
+use crate::rust::peer_node::PeerNode;
+use crate::rust::rp::protocol_helper;
+use crate::rust::rp::rp_conf::{ClearConnectionsConf, RPConf};
+use crate::rust::transport::transport_layer::{Blob, TransportLayer};
 
 pub const NETWORK_ID: &str = "test";
 
