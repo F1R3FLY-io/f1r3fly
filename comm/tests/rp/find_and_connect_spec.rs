@@ -2,13 +2,12 @@
 
 use prost::bytes::Bytes;
 
+use comm::rust::test_instances::NodeDiscoveryStub;
 use comm::rust::{
     errors::CommError,
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
     rp::connect::{find_and_connect, Connections, ConnectionsCell},
 };
-
-use crate::test_instances::NodeDiscoveryStub;
 
 /// Helper function to create a peer with given name
 fn peer(name: &str) -> PeerNode {

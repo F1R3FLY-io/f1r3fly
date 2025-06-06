@@ -1,7 +1,6 @@
 // See comm/src/test/scala/coop/rchain/comm/transport/TransportLayerRuntime.scala
 // See comm/src/test/scala/coop/rchain/comm/transport/TcpTransportLayerSpec.scala
 
-use crypto::rust::util::certificate_helper::{CertificateHelper, CertificatePrinter};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -10,6 +9,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::OnceCell;
 
+use comm::rust::test_instances::create_rp_conf_ask;
 use comm::rust::{
     errors::CommError,
     peer_node::PeerNode,
@@ -23,9 +23,8 @@ use comm::rust::{
         transport_layer::{Blob, TransportLayer},
     },
 };
+use crypto::rust::util::certificate_helper::{CertificateHelper, CertificatePrinter};
 use models::routing::Protocol;
-
-use crate::test_instances::create_rp_conf_ask;
 
 /// TLS Environment for transport layer testing
 pub struct TlsEnvironment {

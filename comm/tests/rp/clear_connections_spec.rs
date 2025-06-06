@@ -3,6 +3,7 @@
 use prost::bytes::Bytes;
 use std::time::Duration;
 
+use comm::rust::test_instances::{TransportLayerStub, NETWORK_ID};
 use comm::rust::{
     errors::{timeout, CommError},
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
@@ -11,8 +12,6 @@ use comm::rust::{
         rp_conf::{ClearConnectionsConf, RPConf},
     },
 };
-
-use crate::test_instances::{TransportLayerStub, NETWORK_ID};
 
 /// Helper function to create a peer with given name and default host/port
 fn peer(name: &str) -> PeerNode {

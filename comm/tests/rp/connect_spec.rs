@@ -2,14 +2,13 @@
 
 use prost::bytes::Bytes;
 
+use comm::rust::test_instances::{TransportLayerStub, NETWORK_ID};
 use comm::rust::{
     errors::CommError,
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
     rp::connect::connect,
     transport::transport_layer::TransportLayer,
 };
-
-use crate::test_instances::{TransportLayerStub, NETWORK_ID};
 
 /// Helper function to create an endpoint with given port
 fn endpoint(port: u32) -> Endpoint {
@@ -36,7 +35,7 @@ fn always_success(
 
 #[cfg(test)]
 mod tests {
-    use crate::test_instances::create_rp_conf_ask;
+    use comm::rust::test_instances::create_rp_conf_ask;
 
     use super::*;
 
