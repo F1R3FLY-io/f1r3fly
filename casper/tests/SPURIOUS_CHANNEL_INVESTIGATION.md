@@ -24,127 +24,112 @@ The failing test `multiple_branches_should_reject_deploy_when_mergeable_number_c
 3. **Analyzed RSpace events**: Fundamental building blocks tracking communication operations (Produce, Consume, COMM)
 4. **Examined Scala RSpace implementation**: Found fire-and-forget pattern for system processes
 
-## Key Discovery: ContractCall::unapply() Issue
+## BREAKTHROUGH: System Processes Are NOT the Source
 
-### Problem Identified
-**ContractCall::unapply()** creates producer functions for system processes:
-- Every system process call triggers `space.produce()` creating spurious RSpace events
-- Scala's system processes use fire-and-forget pattern with no RSpace operations
-- Rust's pattern: `unapply() → Producer → space.produce() → Spurious RSpace events`
+### Critical Finding ❌
+**System processes using ContractCall::unapply() are NOT causing the spurious channel!**
 
-### Debug Evidence
-```rust
-DEBUG SPACE CALL: ContractCall::unapply producer called
-DEBUG SPACE CALL: About to call space.produce()
-SPURIOUS TRACKING: Creating DeleteData operation for empty data
-SPURIOUS TRACKING: Creating DeleteJoins operation for empty joins
+**Evidence:**
+1. **Converted ALL system processes** to fire-and-forget pattern (stdout, stderr, hash, verify, registry, etc.)
+2. **No system process debug messages** appeared during test execution
+3. **Spurious channel STILL persists** even with all system processes fixed
+4. **Many spurious operations** - over 40 `DeleteData` and `DeleteJoins` operations detected
+
+### Debug Results
+```
+SPURIOUS CHANNEL: Blake2b256Hash(ddda25f6fc83fffd4f970978411c78f59839ddd01f7c661fb9e1a6aee9b01be8) (persistent=false)
+SPURIOUS TRACKING: Creating DeleteData operation for empty data [repeated 40+ times]
+SPURIOUS TRACKING: Creating DeleteJoins operation for empty joins [repeated 40+ times]
+CONFLICTS: SPURIOUS RACE DETECTED - 1 consume race(s)
 ```
 
-## Attempted Fixes
+**Result**: Test still fails with identical spurious channel after eliminating ALL system process sources.
 
-### 1. Fixed stdout/stderr System Processes ✅
-**Modified**: `std_out()`, `std_err()`, `std_out_ack()`, `std_err_ack()`
+## Revised Analysis: Source Must Be Elsewhere
 
-**Before**:
-```rust
-let Some((produce, _, _, args)) = self.is_contract_call().unapply(contract_args) else {
-    return Err(illegal_argument_error("std_out"));
-};
-// ... process args ...
-produce(output.clone(), ack.clone()).await?; // Creates spurious RSpace events
-```
+### Eliminated Sources ✅
+- ✅ **stdout/stderr system processes**: Fixed to fire-and-forget 
+- ✅ **verify_signature_contract**: Fixed to fire-and-forget
+- ✅ **hash_contract**: Fixed to fire-and-forget  
+- ✅ **rev_address**: Fixed to fire-and-forget
+- ✅ **deployer_id_ops**: Fixed to fire-and-forget
+- ✅ **registry_ops**: Fixed to fire-and-forget
+- ✅ **sys_auth_token_ops**: Fixed to fire-and-forget
+- ✅ **get_block_data**: Fixed to fire-and-forget
+- ✅ **invalid_blocks**: Fixed to fire-and-forget
+- ✅ **random**: Fixed to fire-and-forget
 
-**After**:
-```rust
-// Fire-and-forget pattern: extract args directly without creating producer
-if contract_args.0.len() != 1 {
-    return Err(illegal_argument_error("std_out"));
-}
-let args = &contract_args.0[0].pars;
-// ... process args directly ...
-// No producer function call - fire and forget
-```
+### Likely Sources to Investigate 🔍
 
-**Result**: Eliminated producer function creation from stdout/stderr, but spurious channel persists.
+Since the spurious channel persists despite fixing all system processes, the source must be:
 
-### 2. Added Targeted Debug Tracking ✅
-**Modified**: `hot_store.rs`, `merging_logic.rs`, `reduce.rs`
+1. **Core RSpace operations**: Something in the fundamental RSpace implementation creating extra events
+2. **Interpreter differences**: Rust interpreter creating events that Scala doesn't
+3. **Deploy processing**: Different event creation during deploy execution
+4. **Communication patterns**: Basic `produce`/`consume` operations behaving differently
 
-- Added debug tracking for `DeleteData` and `DeleteJoins` operations
-- Focused on spurious channel `ddda25f6fc83fffd4f970978411c78f59839ddd01f7c661fb9e1a6aee9b01be8`
-- Simplified verbose debug output for cleaner analysis
+### Key Observations
 
-## Current Status
+1. **Frequency**: 40+ spurious operations suggest it's happening during basic RSpace operations, not just system processes
+2. **Timing**: Both branches create the same spurious channel, indicating it's during shared processing
+3. **Pattern**: `DeleteData` and `DeleteJoins` operations for "empty" data/joins
+4. **Scope**: The spurious operations happen throughout the test execution
 
-### Partial Success
-- ✅ **Fixed stdout/stderr**: No more producer functions created
-- ✅ **Identified pattern**: ContractCall::unapply is the root cause
-- ✅ **Clear debugging**: Focused tracking on exact spurious operations
+## Next Investigation Steps
 
-### Remaining Issues
-- ❌ **Spurious channel persists**: Still detecting conflicts from the same channel hash
-- ❌ **Multiple sources**: Other system processes still using ContractCall::unapply pattern
-- ❌ **Test failing**: Wrong deployment still being rejected
+### 1. Compare Core RSpace Implementations
+- **Scala RSpace**: `casper/src/main/scala/coop/rchain/rspace/`
+- **Rust RSpace**: `rspace++/src/rspace/`
+- Look for differences in `produce()`, `consume()`, and `install()` operations
 
-### System Processes Still Using unapply()
-The following system processes are still creating producer functions via `ContractCall::unapply`:
+### 2. Analyze Event Creation Patterns
+- Investigate when `DeleteData` and `DeleteJoins` events are created
+- Compare Rust vs Scala event creation logic
+- Focus on "empty" data/joins conditions
 
-1. `verify_signature_contract` (ed25519_verify, secp256k1_verify)
-2. `hash_contract` (sha256_hash, keccak256_hash, blake2b256_hash)
-3. `rev_address`
-4. `deployer_id_ops`
-5. `registry_ops` 
-6. `sys_auth_token_ops`
-7. `get_block_data`
-8. `invalid_blocks`
-9. `random`
-10. `gpt4`
-11. `dalle3`
-12. `text_to_audio`
-13. `grpc_tell`
-14. Various test framework contracts
+### 3. Trace Deploy Execution
+- Add debug tracking to core interpreter operations
+- Compare event sequences between Rust and Scala
+- Identify where extra events are being generated
 
-## Next Steps
+### 4. Examine Communication Semantics
+- Review how `new` channels, `send`, and `receive` operations create events
+- Look for differences in persistent vs transient channel handling
+- Compare continuation and data storage patterns
 
-### Immediate Actions Required
-1. **Apply fire-and-forget pattern** to remaining system processes that don't need acknowledgment
-2. **Identify which system processes** in the failing test are being called
-3. **Fix only the relevant ones** that are triggered during the test execution
+## Files Modified During Investigation
 
-### Long-term Strategy
-1. **Systematic refactoring**: Convert all appropriate system processes to fire-and-forget
-2. **Preserve acknowledgment logic**: Only for processes that genuinely need to return values to callers
-3. **Pattern documentation**: Establish clear guidelines for when to use unapply vs fire-and-forget
+### System Process Fixes (Now Reverted)
+- `rholang/src/rust/interpreter/system_processes.rs`: Converted all processes to fire-and-forget (REVERTED)
 
-### Technical Approach
-- **Pattern matching**: Identify processes by their arity and usage patterns
-- **Selective fixing**: Focus on processes called in mergeable channel tests first
-- **Validation**: Ensure fixed processes don't break other functionality
-
-## Files Modified
-
-### Core Changes
-- `rholang/src/rust/interpreter/system_processes.rs`: Applied fire-and-forget to stdout/stderr
+### Debug Infrastructure (Kept)
 - `rholang/src/rust/interpreter/contract_call.rs`: Added debug tracking for producer calls
-- `rspace++/src/rspace/hot_store.rs`: Added spurious channel operation tracking
+- `rspace++/src/rspace/hot_store.rs`: Added spurious channel operation tracking  
 - `rspace++/src/rspace/merger/merging_logic.rs`: Focused conflict detection debugging
 - `rholang/src/rust/interpreter/reduce.rs`: Simplified mergeable channel detection
 
-### Debug Infrastructure
-- Added targeted tracking for spurious channel hash
-- Implemented fire-and-forget confirmation logging
-- Enhanced conflict detection debug output
+## Current Understanding
 
-## Expected Resolution
+### What We Know ✅
+- Spurious channel hash: `ddda25f6fc83fffd4f970978411c78f59839ddd01f7c661fb9e1a6aee9b01be8`
+- Test creates custom contracts `@"SET"` and `@"READ"` (not system processes)
+- Only uses `rho:io:stdout` system process (already fixed)
+- Both branches generate identical spurious operations
+- 40+ `DeleteData`/`DeleteJoins` operations for "empty" data
 
-Once all relevant system processes are converted to fire-and-forget pattern:
-- Spurious channel creation should stop
-- Rust implementation should match Scala's behavior
-- Number channel merging logic should work correctly
-- Test should pass with expected rejection (0x22 instead of 0x11)
+### What We Need to Find 🔍
+- **Where** in the core RSpace implementation the extra events are created
+- **Why** Rust creates events that Scala doesn't
+- **How** to make Rust behavior match Scala's event generation patterns
+
+### Expected Resolution Path
+1. **Identify the core difference** in RSpace event creation between Rust and Scala
+2. **Fix the fundamental issue** causing extra DeleteData/DeleteJoins operations  
+3. **Verify spurious channel elimination** and correct test behavior
+4. **Ensure no regression** in other RSpace functionality
 
 ---
 
-**Investigation Status**: In Progress  
-**Last Updated**: 2025-06-05  
-**Priority**: High - Blocking merge functionality tests 
+**Investigation Status**: System processes eliminated as source - investigating core RSpace differences  
+**Last Updated**: Current investigation session  
+**Priority**: High - Fundamental RSpace behavior discrepancy identified 
