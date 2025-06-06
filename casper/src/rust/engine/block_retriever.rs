@@ -341,47 +341,28 @@ impl<T: TransportLayer + Send + Sync> BlockRetriever<T> {
                 self.transport
                     .request_for_block(&self.conf, &next_peer, hash.clone())
                     .await?;
+
+                // If this was the last peer in the waiting list, also broadcast HasBlockRequest
+                if remaining_waiting.is_empty() {
+                    debug!(
+                        "Last peer in waiting list for block {}. Broadcasting HasBlockRequest.",
+                        PrettyPrinter::build_string_bytes(hash)
+                    );
+
+                    // Broadcast request for the block
+                    self.transport
+                        .broadcast_has_block_request(&self.connections_cell, &self.conf, hash)
+                        .await?;
+                }
             }
             None => {
-                // No more peers in waiting list, get peers that were already tried
-                let tried_peers = {
-                    let state = self.requested_blocks.lock().map_err(|_| {
-                        CasperError::RuntimeError(
-                            "Failed to acquire requested_blocks lock".to_string(),
-                        )
-                    })?;
-
-                    state
-                        .get(hash)
-                        .map(|rs| {
-                            rs.peers
-                                .iter()
-                                .map(|p| p.endpoint.host.clone())
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default()
-                };
-
-                log::warn!(
-                    "Could not retrieve requested block {} from {}. Asking peers again.",
-                    PrettyPrinter::build_string_bytes(hash),
-                    tried_peers.join(", ")
+                // No more peers in waiting list - do nothing
+                // The HasBlockRequest broadcast is now only sent when exhausting the last peer,
+                // not when the waiting list is already empty
+                debug!(
+                    "No peers in waiting list for block {}. No action taken.",
+                    PrettyPrinter::build_string_bytes(hash)
                 );
-
-                // Remove from RequestedBlocks and broadcast HasBlockRequest
-                {
-                    let mut state = self.requested_blocks.lock().map_err(|_| {
-                        CasperError::RuntimeError(
-                            "Failed to acquire requested_blocks lock".to_string(),
-                        )
-                    })?;
-                    state.remove(hash);
-                }
-
-                // Broadcast request for the block
-                self.transport
-                    .broadcast_has_block_request(&self.connections_cell, &self.conf, hash)
-                    .await?;
             }
         }
 
@@ -462,5 +443,59 @@ impl<T: TransportLayer + Send + Sync> BlockRetriever<T> {
             Some(request_state) => Ok(request_state.received),
             None => Ok(false),
         }
+    }
+
+    /// Get the number of peers in the waiting list for a specific hash
+    /// Returns 0 if the hash is not in requested blocks
+    pub async fn get_waiting_list_size(&self, hash: &BlockHash) -> Result<usize, CasperError> {
+        let state = self.requested_blocks.lock().map_err(|_| {
+            CasperError::RuntimeError("Failed to acquire requested_blocks lock".to_string())
+        })?;
+
+        match state.get(hash) {
+            Some(request_state) => Ok(request_state.waiting_list.len()),
+            None => Ok(0),
+        }
+    }
+
+    /// Get the total number of hashes being tracked in requested blocks
+    pub async fn get_requested_blocks_count(&self) -> Result<usize, CasperError> {
+        let state = self.requested_blocks.lock().map_err(|_| {
+            CasperError::RuntimeError("Failed to acquire requested_blocks lock".to_string())
+        })?;
+
+        Ok(state.len())
+    }
+
+    /// Test-only helper methods for setting up specific test scenarios
+    pub async fn set_request_state_for_test(
+        &self,
+        hash: BlockHash,
+        request_state: RequestState,
+    ) -> Result<(), CasperError> {
+        let mut state = self.requested_blocks.lock().map_err(|_| {
+            CasperError::RuntimeError("Failed to acquire requested_blocks lock".to_string())
+        })?;
+
+        state.insert(hash, request_state);
+        Ok(())
+    }
+
+    /// Test-only helper to get request state for verification
+    pub async fn get_request_state_for_test(
+        &self,
+        hash: &BlockHash,
+    ) -> Result<Option<RequestState>, CasperError> {
+        let state = self.requested_blocks.lock().map_err(|_| {
+            CasperError::RuntimeError("Failed to acquire requested_blocks lock".to_string())
+        })?;
+
+        Ok(state.get(hash).cloned())
+    }
+
+    /// Test-only helper to create a timed out timestamp
+    pub fn create_timed_out_timestamp(timeout: std::time::Duration) -> u64 {
+        let now = Self::current_millis();
+        now.saturating_sub((2 * timeout.as_millis()) as u64)
     }
 }

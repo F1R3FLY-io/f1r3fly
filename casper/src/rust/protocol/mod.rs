@@ -1,4 +1,5 @@
 // See casper/src/main/scala/coop/rchain/casper/protocol/package.scala
+// See models/src/main/scala/coop/rchain/casper/protocol/PacketTypeTag.scala
 
 use comm::rust::rp::protocol_helper;
 use models::{
@@ -213,7 +214,6 @@ pub fn extract_and_verify_block_request(
 mod tests {
     use super::*;
     use models::rust::casper::protocol::packet_type_tag::ToPacket;
-    use prost::bytes::Bytes;
 
     #[test]
     fn test_parse_has_block_request() {
