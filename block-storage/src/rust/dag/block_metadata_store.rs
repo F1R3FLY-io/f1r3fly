@@ -214,16 +214,20 @@ impl BlockMetadataStore {
         state_guard.dag_set.insert(hash.clone());
 
         // Update children relation map
+        // Create entry for current block (with empty children set initially)
         state_guard
             .child_map
             .entry(hash.clone())
             .or_insert_with(|| Arc::new(DashSet::new()));
 
+        // Add current block as child to all its parents
         for parent in block_info.parents.iter() {
-            state_guard
+            let children_set = state_guard
                 .child_map
                 .entry(parent.clone())
-                .or_insert_with(|| Arc::new(DashSet::new()));
+                .or_insert_with(|| Arc::new(DashSet::new()))
+                .clone();
+            children_set.insert(hash.clone());
         }
 
         // Update height map

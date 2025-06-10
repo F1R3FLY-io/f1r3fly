@@ -75,8 +75,7 @@ pub enum CasperMessageProto {
 
 /// Extract a Packet from a Protocol message
 pub fn extract_packet_from_protocol(protocol: &Protocol) -> Result<Packet, String> {
-    protocol_helper::to_packet(protocol)
-        .map_err(|e| format!("Failed to extract packet: {:?}", e))
+    protocol_helper::to_packet(protocol).map_err(|e| format!("Failed to extract packet: {:?}", e))
 }
 
 /// Convert a Packet to a CasperMessageProto based on type ID
@@ -92,17 +91,13 @@ pub fn to_casper_message_proto(packet: &Packet) -> PacketParseResult<CasperMessa
         "BlockApproval" => convert_block_approval(packet),
         "UnapprovedBlock" => convert_unapproved_block(packet),
         "NoApprovedBlockAvailable" => convert_no_approved_block_available(packet),
-        _ => PacketParseResult::IllegalPacket(format!(
-            "Unrecognized typeId: {}",
-            packet.type_id
-        )),
+        _ => PacketParseResult::IllegalPacket(format!("Unrecognized typeId: {}", packet.type_id)),
     }
 }
 
 // Individual conversion functions for each message type
 fn convert_block_hash_message(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
-    parse_packet::<BlockHashMessageProto>(packet)
-        .map(CasperMessageProto::BlockHashMessage)
+    parse_packet::<BlockHashMessageProto>(packet).map(CasperMessageProto::BlockHashMessage)
 }
 
 fn convert_block_message(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
@@ -114,8 +109,7 @@ fn convert_approved_block(packet: &Packet) -> PacketParseResult<CasperMessagePro
 }
 
 fn convert_approved_block_request(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
-    parse_packet::<ApprovedBlockRequestProto>(packet)
-        .map(CasperMessageProto::ApprovedBlockRequest)
+    parse_packet::<ApprovedBlockRequestProto>(packet).map(CasperMessageProto::ApprovedBlockRequest)
 }
 
 fn convert_block_request(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
@@ -127,8 +121,7 @@ fn convert_has_block_request(packet: &Packet) -> PacketParseResult<CasperMessage
 }
 
 fn convert_fork_choice_tip_request(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
-    parse_packet::<ForkChoiceTipRequestProto>(packet)
-        .map(CasperMessageProto::ForkChoiceTipRequest)
+    parse_packet::<ForkChoiceTipRequestProto>(packet).map(CasperMessageProto::ForkChoiceTipRequest)
 }
 
 fn convert_block_approval(packet: &Packet) -> PacketParseResult<CasperMessageProto> {
