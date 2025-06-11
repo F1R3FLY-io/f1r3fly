@@ -26,6 +26,7 @@ use super::{
 
 type DeployId = shared::rust::ByteString;
 
+#[derive(Clone)]
 pub struct KeyValueDagRepresentation {
     dag_set: Arc<DashSet<BlockHash>>,
     latest_messages_map: Arc<DashMap<Validator, BlockHash>>,

@@ -1,27 +1,26 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/InterpreterUtil.scala
 
+use dashmap::DashMap;
 use prost::bytes::Bytes;
-use std::{collections::HashMap, sync::Arc};
 
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use crypto::rust::signatures::signed::Signed;
-use models::{
-    casper::system_deploy_data_proto::SystemDeploy,
-    rust::{
-        block::state_hash::StateHash,
-        block_hash::BlockHash,
-        casper::{
-            pretty_printer::PrettyPrinter,
-            protocol::casper_message::{
-                BlockMessage, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
-            },
+use models::rust::{
+    block::state_hash::StateHash,
+    block_hash::BlockHash,
+    casper::{
+        pretty_printer::PrettyPrinter,
+        protocol::casper_message::{
+            BlockMessage, DeployData, ProcessedDeploy, ProcessedSystemDeploy,
         },
-        validator::Validator,
     },
+    validator::Validator,
 };
 use rholang::rust::interpreter::{errors::InterpreterError, system_processes::BlockData};
 
-use crate::rust::{casper::CasperSnapshot, errors::CasperError};
+use crate::rust::{
+    casper::CasperSnapshot, errors::CasperError, util::rholang::system_deploy::SystemDeployTrait,
+};
 
 use super::runtime_manager::RuntimeManager;
 
@@ -41,12 +40,12 @@ pub fn print_deploy_errors(deploy_sig: &Bytes, errors: &[InterpreterError]) {
 pub fn compute_deploys_checkpoint(
     block_store: &mut KeyValueBlockStore,
     parents: Vec<BlockMessage>,
-    deploys: Vec<Arc<Signed<DeployData>>>,
-    system_deploys: Vec<SystemDeploy>,
+    deploys: Vec<Signed<DeployData>>,
+    system_deploys: Vec<impl SystemDeployTrait>,
     s: &CasperSnapshot,
     runtime_manager: &RuntimeManager,
     block_data: BlockData,
-    invalid_blocks: HashMap<BlockHash, Validator>,
+    invalid_blocks: DashMap<BlockHash, Validator>,
 ) -> Result<
     (
         StateHash,

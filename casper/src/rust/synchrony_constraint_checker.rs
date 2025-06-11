@@ -17,12 +17,12 @@ use super::{
 };
 
 pub async fn check(
-    snapshot: CasperSnapshot,
-    runtime_manager: RuntimeManager,
+    snapshot: &CasperSnapshot,
+    runtime_manager: &RuntimeManager,
     block_store: &KeyValueBlockStore,
-    validator_identity: ValidatorIdentity,
+    validator_identity: &ValidatorIdentity,
 ) -> Result<CheckProposeConstraintsResult, CasperError> {
-    let validator = validator_identity.public_key.bytes;
+    let validator = validator_identity.public_key.bytes.clone();
     let main_parent_opt = snapshot.parents.first();
     let synchrony_constraint_threshold = snapshot
         .on_chain_state
@@ -63,7 +63,7 @@ pub async fn check(
 
                 // Guaranteed to be present since last proposed block was present
                 let seen_senders =
-                    calculate_seen_senders_since(last_proposed_block_meta, snapshot.dag);
+                    calculate_seen_senders_since(last_proposed_block_meta, snapshot.dag.clone());
 
                 let seen_senders_weight: i64 = seen_senders
                     .iter()

@@ -6,10 +6,10 @@ use super::{
 };
 
 pub fn check(
-    snapshot: CasperSnapshot,
-    validator_identity: ValidatorIdentity,
+    snapshot: &CasperSnapshot,
+    validator_identity: &ValidatorIdentity,
 ) -> Result<CheckProposeConstraintsResult, CasperError> {
-    let validator = validator_identity.public_key.bytes;
+    let validator = validator_identity.public_key.bytes.clone();
     let last_finalized_block_hash = snapshot.dag.last_finalized_block();
     let height_constraint_threshold = snapshot
         .on_chain_state
