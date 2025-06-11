@@ -346,7 +346,7 @@ lazy val models = (project in file("models"))
 lazy val runCargoBuildDocker = taskKey[Unit]("Builds Rust library for RSpace++ Docker")
 lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
+  .enablePlugins(JavaAppPackaging, DockerPlugin, RpmPlugin, BuildInfoPlugin)
   .settings(
     // Universal / javaOptions ++= Seq("-J-Xmx2g"),
     runCargoBuildDocker := {
@@ -367,6 +367,33 @@ lazy val node = (project in file("node"))
     maintainer := "F1r3fly.io LCA https://f1r3fly.io/",
     packageSummary := "F1R3FLY Node",
     packageDescription := "F1R3FLY Node - blockchain node server software.",
+    // Universal packaging settings
+    executableScriptName := "rnode",
+    bashScriptConfigLocation := Some("${app_home}/../conf/rnode.conf"),
+    // RPM-specific settings
+    rpmVendor := "f1r3fly-io",
+    rpmLicense := Some("Apache-2.0"),
+    rpmUrl := Some("https://f1r3fly.io"),
+    rpmRelease := "1",
+    rpmRequirements ++= Seq("java-17-openjdk"),
+    rpmChangelogFile := Some("CHANGELOG.md"),
+    // Debian-specific settings
+    debianPackageDependencies ++= Seq("java17-runtime-headless"),
+    maintainer in Debian := "F1R3FLY.io LCA <support@f1r3fly.io>",
+    packageArchitecture in Debian := "all",
+    debianChangelog := Some(file("CHANGELOG.md")),
+    // File mappings for Linux (Debian and RPM)
+    linuxPackageMappings ++= Seq(
+      packageMapping(
+        (Compile / packageBin).value -> "/usr/share/rnode/rnode.jar"
+      ) withPerms "0644" withUser "daemon" withGroup "daemon"
+    ) ++ (Universal / mappings).value.collect {
+      case (file, "bin/rnode") =>
+        packageMapping(file -> "/usr/bin/rnode") withPerms "0755" withUser "daemon" withGroup "daemon"
+    },
+    // Ensure version is compatible
+    version in Rpm := version.value.replace("+", "-").replace("-SNAPSHOT", ""),
+    version in Debian := version.value.replace("+", "-").replace("-SNAPSHOT", ""),
     libraryDependencies ++=
       apiServerDependencies ++ commonDependencies ++ kamonDependencies ++ protobufDependencies ++ Seq(
         catsCore,

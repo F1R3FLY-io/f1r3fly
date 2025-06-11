@@ -66,27 +66,117 @@ This code has not yet completed a security review. We strongly recommend that yo
 2. Install direnv: https://direnv.net/#basic-installation
    - For more information about direnv and how it works see: https://direnv.net/
 
-3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this. 
+3. Clone this repository and after entering the repository, run `direnv allow`. There should be a message asking you to do this.
    - You may run into the following error: `error: experimental Nix feature 'nix-command' is disabled; add '--extra-experimental-features nix-command' to enable it`. To fix this, first create the following file: `~/.config/nix/nix.conf`. Add the following line to the file you just created: `experimental-features = flakes nix-command`. Then run `direnv allow` again.
    - This will do a one-time compile of all our libraries which will take a couple of minutes. After completion, your environment will be setup.
-   
+
 ### Docker
 
-``docker pull f1r3flyindustries/f1r3fly-rust-node``
+To run F1r3fly using Docker, pull the official image from Docker Hub and start a container:
 
-- Please see https://hub.docker.com/r/f1r3flyindustries/f1r3fly-rust-node for more information on how to run image from Docker Hub.
+```sh
+docker pull f1r3flyindustries/f1r3fly-rust-node:latest
+docker run -it -p 40400:40400 -p 40401:40401 -p 40402:40402 -p 40403:40403 -p 40404:40404 f1r3flyindustries/f1r3fly-rust-node:latest run -s
+```
+
+- The `-p` flags expose the necessary ports (40400 for protocol server, 40401-40402 for gRPC, 40403 for HTTP, 40404 for peer discovery).
+- To persist data, bind a host directory to `/var/lib/rnode`:
+  ```sh
+  docker run -v $HOME/rnode:/var/lib/rnode -it -p 40400:40400 -p 40401:40401 -p 40402:40402 -p 40403:40403 -p 40404:40404 f1r3flyindustries/f1r3fly-rust-node:latest run -s
+  ```
+- For multi-node setups, refer to the [Running](#running) section for instructions on using `docker compose` or connecting peer nodes.
+- See https://hub.docker.com/r/f1r3flyindustries/f1r3fly-rust-node for additional details and available tags.
+
+Alternatively, build the Docker image locally after setting up the [development environment](#installation):
+
+```sh
+docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+```
+
+This creates the image `f1r3flyindustries/f1r3fly-rust-node:latest`, which you can run as shown above.
 
 ### Debian/Ubuntu
 
-(Coming Soon)
+F1r3fly provides Debian packages (`.deb`) for Ubuntu and Debian-based systems. These packages include the RNode binary and required Rust libraries, with a dependency on `java17-runtime-headless`.
+
+1. **Download the Package**:
+   - Visit the [GitHub Releases page](https://github.com/F1R3FLY-io/f1r3fly/releases) for the latest release.
+   - Download the `.deb` package (e.g., `rnode_X.Y.Z_all.deb`, where `X.Y.Z` is the version number).
+
+2. **Install the Package**:
+   ```sh
+   sudo apt update
+   sudo apt install ./rnode_X.Y.Z_all.deb
+   ```
+   - Replace `X.Y.Z` with the actual version number.
+   - This installs RNode to `/usr/share/rnode/rnode.jar` and the executable to `/usr/bin/rnode`.
+
+3. **Run RNode**:
+   ```sh
+   rnode run -s
+   ```
+   - The `-s` flag runs RNode in standalone mode. See the [Running](#running) section for additional options.
+
+4. **Optional: Build Locally**:
+   If you prefer to build the `.deb` package yourself:
+   - Set up the [development environment](#installation).
+   - Run:
+     ```sh
+     sbt "project node;debian:packageBin"
+     ```
+   - The package will be generated in `node/target/rnode_X.Y.Z_all.deb`.
+   - Install as described above.
 
 ### RedHat/Fedora
 
-(Coming Soon)
+F1r3fly provides RPM packages (`.rpm`) for RedHat, Fedora, and other RPM-based systems. These packages include the RNode binary and required Rust libraries, with a dependency on `java-17-openjdk`.
+
+1. **Download the Package**:
+   - Visit the [GitHub Releases page](https://github.com/F1R3FLY-io/f1r3fly/releases) for the latest release.
+   - Download the `.rpm` package (e.g., `rnode-X.Y.Z-1.noarch.rpm`, where `X.Y.Z` is the version number).
+
+2. **Install the Package**:
+   ```sh
+   sudo dnf install ./rnode-X.Y.Z-1.noarch.rpm
+   ```
+   - Replace `X.Y.Z` with the actual version number.
+   - Alternatively, use `yum` on older systems:
+     ```sh
+     sudo yum install ./rnode-X.Y.Z-1.noarch.rpm
+     ```
+   - This installs RNode to `/usr/share/rnode/rnode.jar` and the executable to `/usr/bin/rnode`.
+
+3. **Run RNode**:
+   ```sh
+   rnode run -s
+   ```
+   - The `-s` flag runs RNode in standalone mode. See the [Running](#running) section for additional options.
+
+4. **Optional: Build Locally**:
+   If you prefer to build the `.rpm` package yourself:
+   - Set up the [development environment](#installation).
+   - Run:
+     ```sh
+     sbt "project node;rpm:packageBin"
+     ```
+   - The package will be generated in `node/target/rpm/RPMS/noarch/rnode-X.Y.Z-1.noarch.rpm`.
+   - Install as described above.
 
 ### macOS
 
-(Coming Soon)
+Currently, macOS is not officially supported for direct package installation. However, you can run F1r3fly using Docker (see [Docker](#docker) section) or build from source:
+
+1. Set up the [development environment](#installation) using Nix and direnv.
+2. Build the fat JAR:
+   ```sh
+   sbt ";compile ;project node ;assembly ;project rchain"
+   ```
+3. Run RNode:
+   ```sh
+   java -Djna.library.path=./rust_libraries/release --add-opens java.base/sun.security.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar node/target/scala-2.12/rnode-assembly-1.0.0-SNAPSHOT.jar run -s
+   ```
+
+Support for macOS native packages may be added in future releases.
 
 ## Building
 
