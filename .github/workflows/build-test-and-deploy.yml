@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - dev
-      - main
+      - preston/rholang_rust
       - 'feature/**'
 
 env:
@@ -204,7 +204,7 @@ jobs:
         shell: bash -ex {0}
         run: |
           pushd ${{ matrix.tests }}
-          cargo test
+          cargo test --release
           popd
 
 
