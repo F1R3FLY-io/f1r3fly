@@ -116,9 +116,12 @@ jobs:
           VERSION="$(git describe --tags --always)"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-          # Find latest tag on dev branch
-          # dev_latest_tag="`git describe --tags --abbrev=0 origin/dev`"
-          DEV_LATEST_TAG="$(git describe --tags --abbrev=0 origin/dev)"
+          # Find latest tag on dev branch, with fallback
+          if git ls-remote --heads origin dev | grep -q "refs/heads/dev"; then
+            DEV_LATEST_TAG="$(git describe --tags --abbrev=0 origin/dev 2>/dev/null || echo 'unknown')"
+          else
+            DEV_LATEST_TAG="unknown"
+          fi
           echo "DEV_LATEST_TAG=$DEV_LATEST_TAG" >> $GITHUB_ENV
 
           # Find related HEAD branch
