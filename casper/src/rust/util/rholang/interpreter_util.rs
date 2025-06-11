@@ -1,5 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/InterpreterUtil.scala
 
+use std::sync::Arc;
+
 use dashmap::DashMap;
 use prost::bytes::Bytes;
 
@@ -40,7 +42,7 @@ pub fn print_deploy_errors(deploy_sig: &Bytes, errors: &[InterpreterError]) {
 pub fn compute_deploys_checkpoint(
     block_store: &mut KeyValueBlockStore,
     parents: Vec<BlockMessage>,
-    deploys: Vec<Signed<DeployData>>,
+    deploys: Vec<Arc<Signed<DeployData>>>,
     system_deploys: Vec<impl SystemDeployTrait>,
     s: &CasperSnapshot,
     runtime_manager: &RuntimeManager,

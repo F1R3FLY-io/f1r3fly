@@ -1,9 +1,6 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/BlockGenerator.scala
 
-use std::{
-    collections::HashMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::KeyValueDagRepresentation,
@@ -15,9 +12,14 @@ use casper::rust::{
     errors::CasperError,
     util::{
         construct_deploy, proto_util,
-        rholang::{interpreter_util::compute_deploys_checkpoint, runtime_manager::RuntimeManager},
+        rholang::{
+            costacc::close_block_deploy::CloseBlockDeploy,
+            interpreter_util::compute_deploys_checkpoint, 
+            runtime_manager::RuntimeManager
+        },
     },
 };
+use dashmap::DashMap;
 use models::rust::{
     block::state_hash::StateHash,
     block_hash::BlockHash,
@@ -70,11 +72,11 @@ fn compute_block_checkpoint(
         block_store,
         parents,
         deploys,
-        vec![],
+        Vec::<CloseBlockDeploy>::new(),
         casper_snapshot,
         runtime_manager,
         BlockData::from_block(block),
-        HashMap::new(),
+        DashMap::new(),
     )?;
 
     Ok((post_state_hash, processed_deploys))

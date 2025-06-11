@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/blocks/proposer/BlockCreator.scala
 
+use std::sync::Arc;
 use std::{collections::HashSet, time::SystemTime};
 
 use block_storage::rust::{
@@ -222,7 +223,7 @@ pub async fn create(
     let checkpoint_data = interpreter_util::compute_deploys_checkpoint(
         block_store,
         parents.clone(),
-        all_deploys.into_iter().collect(),
+        all_deploys.into_iter().map(|d| Arc::new(d)).collect(),
         system_deploys_converted,
         casper_snapshot,
         runtime_manager,
