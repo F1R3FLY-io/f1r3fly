@@ -48,7 +48,13 @@ lazy_static! {
     })
   };
 
-  static ref DEFAULT_VALIDATOR_PKS: [PublicKey; 4] = {
+  // Equivalent to defaultValidatorSks in Scala
+  pub static ref DEFAULT_VALIDATOR_SKS: [PrivateKey; 4] = {
+    std::array::from_fn(|i| DEFAULT_VALIDATOR_KEY_PAIRS[i].0.clone())
+  };
+
+  // Equivalent to defaultValidatorPks in Scala  
+  pub static ref DEFAULT_VALIDATOR_PKS: [PublicKey; 4] = {
     std::array::from_fn(|i| DEFAULT_VALIDATOR_KEY_PAIRS[i].1.clone())
   };
 
@@ -59,13 +65,13 @@ lazy_static! {
   ];
 }
 
-pub struct GenessisBuilder {
+pub struct GenesisBuilder {
     genesis_cache: DashMap<GenesisParameters, GenesisContext>,
     cache_accesses: u64,
     cache_misses: u64,
 }
 
-impl GenessisBuilder {
+impl GenesisBuilder {
     pub fn new() -> Self {
         Self {
             genesis_cache: DashMap::new(),

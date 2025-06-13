@@ -1,14 +1,23 @@
 // See casper/src/test/scala/coop/rchain/casper/util/rholang/Resources.scala
 
+use block_storage::rust::dag::block_dag_key_value_storage::KeyValueDagRepresentation;
+use block_storage::rust::dag::block_metadata_store::BlockMetadataStore;
+use casper::rust::casper::{CasperShardConf, CasperSnapshot, OnChainCasperState};
 use casper::rust::errors::CasperError;
+use dashmap::{DashMap, DashSet};
+use models::rust::block_hash::BlockHash;
 use models::rust::casper::protocol::casper_message::BlockMessage;
+use prost::bytes::Bytes;
+use rspace_plus_plus::rspace::shared::in_mem_key_value_store::InMemoryKeyValueStore;
+use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
+use std::collections::BTreeMap;
 use std::fs;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Once;
+use std::sync::{Arc, RwLock};
 use tempfile::Builder;
 
 use casper::rust::{
@@ -25,8 +34,8 @@ use rspace_plus_plus::rspace::shared::{
 };
 
 use crate::init_logger;
+use crate::util::genesis_builder::GenesisBuilder;
 use crate::util::genesis_builder::GenesisContext;
-use crate::util::genesis_builder::GenessisBuilder;
 
 static GENESIS_INIT: Once = Once::new();
 static mut CACHED_GENESIS: Option<Arc<Mutex<Option<GenesisContext>>>> = None;
@@ -41,7 +50,7 @@ pub async fn genesis_context() -> Result<GenesisContext, CasperError> {
         let mut genesis_guard = genesis_arc.lock().unwrap();
 
         if genesis_guard.is_none() {
-            let mut genesis_builder = GenessisBuilder::new();
+            let mut genesis_builder = GenesisBuilder::new();
             let new_genesis = genesis_builder.build_genesis_with_parameters(None).await?;
             *genesis_guard = Some(new_genesis);
         }
@@ -180,4 +189,44 @@ fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dest: Q) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn new_key_value_dag_representation() -> KeyValueDagRepresentation {
+    let block_metadata_store = KeyValueTypedStoreImpl::new(Box::new(InMemoryKeyValueStore::new()));
+
+    KeyValueDagRepresentation {
+        dag_set: Arc::new(DashSet::new()),
+        latest_messages_map: Arc::new(DashMap::new()),
+        child_map: Arc::new(DashMap::new()),
+        height_map: Arc::new(RwLock::new(BTreeMap::new())),
+        invalid_blocks_set: Arc::new(DashSet::new()),
+        last_finalized_block_hash: BlockHash::new(),
+        finalized_blocks_set: Arc::new(DashSet::new()),
+        block_metadata_index: Arc::new(RwLock::new(BlockMetadataStore::new(block_metadata_store))),
+        deploy_index: Arc::new(RwLock::new(KeyValueTypedStoreImpl::new(Box::new(
+            InMemoryKeyValueStore::new(),
+        )))),
+    }
+}
+
+pub fn mk_dummy_casper_snapshot() -> CasperSnapshot {
+    let dag = new_key_value_dag_representation();
+
+    CasperSnapshot {
+        dag,
+        last_finalized_block: Bytes::new(),
+        lca: Bytes::new(),
+        tips: Vec::new(),
+        parents: Vec::new(),
+        justifications: DashSet::new(),
+        invalid_blocks: DashMap::new(),
+        deploys_in_scope: DashSet::new(),
+        max_block_num: 0,
+        max_seq_nums: DashMap::new(),
+        on_chain_state: OnChainCasperState {
+            shard_conf: CasperShardConf::new(),
+            bonds_map: DashMap::new(),
+            active_validators: Vec::new(),
+        },
+    }
 }

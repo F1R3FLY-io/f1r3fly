@@ -8,6 +8,7 @@ mod merging;
 mod safety;
 mod sync;
 mod util;
+mod add_block;
 
 static INIT: Once = Once::new();
 

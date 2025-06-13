@@ -36,7 +36,7 @@ impl DagState {
             dag_set: Arc::new(DashSet::new()),
             child_map: Arc::new(DashMap::new()),
             height_map: Arc::new(RwLock::new(BTreeMap::new())),
-            last_finalized_block: None,
+            last_finalized_block: Some((BlockHash::new(), 0)),
             finalized_block_set: Arc::new(DashSet::new()),
         }
     }

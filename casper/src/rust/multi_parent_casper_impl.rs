@@ -19,7 +19,6 @@ use crate::rust::{
     block_status::{BlockError, ValidBlock},
     casper::{Casper, CasperShardConf, CasperSnapshot, DeployError, MultiParentCasper},
     errors::CasperError,
-    util::rholang::runtime_manager::RuntimeManager,
     validator_identity::ValidatorIdentity,
 };
 
@@ -100,10 +99,6 @@ impl Casper for MultiParentCasperImpl {
 }
 
 impl MultiParentCasper for MultiParentCasperImpl {
-    fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError> {
-        todo!()
-    }
-
     fn fetch_dependencies(&self) -> Result<(), CasperError> {
         todo!()
     }
@@ -116,10 +111,6 @@ impl MultiParentCasper for MultiParentCasperImpl {
     }
 
     fn last_finalized_block(&self) -> Result<BlockMessage, CasperError> {
-        todo!()
-    }
-
-    fn get_runtime_manager(&self) -> Result<RuntimeManager, CasperError> {
         todo!()
     }
 }

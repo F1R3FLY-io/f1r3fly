@@ -17,7 +17,6 @@ use crate::rust::{
     block_status::{BlockError, InvalidBlock, ValidBlock},
     errors::CasperError,
     multi_parent_casper_impl::MultiParentCasperImpl,
-    util::rholang::runtime_manager::RuntimeManager,
     validator_identity::ValidatorIdentity,
 };
 
@@ -109,8 +108,6 @@ pub trait Casper {
 }
 
 pub trait MultiParentCasper: Casper {
-    fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError>;
-
     fn fetch_dependencies(&self) -> Result<(), CasperError>;
 
     // This is the weight of faults that have been accumulated so far.
@@ -122,8 +119,6 @@ pub trait MultiParentCasper: Casper {
     ) -> Result<f32, CasperError>;
 
     fn last_finalized_block(&self) -> Result<BlockMessage, CasperError>;
-
-    fn get_runtime_manager(&self) -> Result<RuntimeManager, CasperError>;
 }
 
 pub fn hash_set_casper(
@@ -213,7 +208,7 @@ pub struct CasperShardConf {
 }
 
 impl CasperShardConf {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             fault_tolerance_threshold: 0.0,
             shard_name: "".to_string(),

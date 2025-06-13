@@ -341,3 +341,9 @@ pub fn get_random_block(
     .unwrap()
     .current()
 }
+
+pub fn get_random_block_default() -> BlockMessage {
+    get_random_block(
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    )
+}

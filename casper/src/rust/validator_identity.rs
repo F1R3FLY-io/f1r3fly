@@ -12,6 +12,7 @@ use models::{casper::Signature, rust::casper::protocol::casper_message::BlockMes
 
 use super::util::proto_util;
 
+#[derive(Clone)]
 pub struct ValidatorIdentity {
     pub public_key: PublicKey,
     pub private_key: PrivateKey,

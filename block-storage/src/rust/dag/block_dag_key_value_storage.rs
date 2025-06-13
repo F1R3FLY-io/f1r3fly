@@ -28,15 +28,15 @@ type DeployId = shared::rust::ByteString;
 
 #[derive(Clone)]
 pub struct KeyValueDagRepresentation {
-    dag_set: Arc<DashSet<BlockHash>>,
-    latest_messages_map: Arc<DashMap<Validator, BlockHash>>,
-    child_map: Arc<DashMap<BlockHash, Arc<DashSet<BlockHash>>>>,
-    height_map: Arc<RwLock<BTreeMap<i64, DashSet<BlockHash>>>>,
-    invalid_blocks_set: Arc<DashSet<BlockMetadata>>,
-    last_finalized_block_hash: BlockHash,
-    finalized_blocks_set: Arc<DashSet<BlockHash>>,
-    block_metadata_index: Arc<RwLock<BlockMetadataStore>>,
-    deploy_index: Arc<RwLock<KeyValueTypedStoreImpl<DeployId, BlockHashSerde>>>,
+    pub dag_set: Arc<DashSet<BlockHash>>,
+    pub latest_messages_map: Arc<DashMap<Validator, BlockHash>>,
+    pub child_map: Arc<DashMap<BlockHash, Arc<DashSet<BlockHash>>>>,
+    pub height_map: Arc<RwLock<BTreeMap<i64, DashSet<BlockHash>>>>,
+    pub invalid_blocks_set: Arc<DashSet<BlockMetadata>>,
+    pub last_finalized_block_hash: BlockHash,
+    pub finalized_blocks_set: Arc<DashSet<BlockHash>>,
+    pub block_metadata_index: Arc<RwLock<BlockMetadataStore>>,
+    pub deploy_index: Arc<RwLock<KeyValueTypedStoreImpl<DeployId, BlockHashSerde>>>,
 }
 
 impl KeyValueDagRepresentation {
