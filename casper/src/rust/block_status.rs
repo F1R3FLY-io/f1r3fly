@@ -64,120 +64,124 @@ pub enum InvalidBlock {
 }
 
 impl BlockStatus {
-    pub fn valid() -> Self {
-        BlockStatus::Valid(ValidBlock::Valid)
+    pub fn valid() -> ValidBlock {
+        ValidBlock::Valid
     }
 
-    pub fn processed() -> Self {
-        BlockStatus::Error(BlockError::Processed)
+    pub fn processed() -> BlockError {
+        BlockError::Processed
     }
 
-    pub fn casper_is_busy() -> Self {
-        BlockStatus::Error(BlockError::CasperIsBusy)
+    pub fn casper_is_busy() -> BlockError {
+        BlockError::CasperIsBusy
     }
 
-    pub fn exception(ex: CasperError) -> Self {
-        BlockStatus::Error(BlockError::BlockException(ex))
+    pub fn exception(ex: CasperError) -> BlockError {
+        BlockError::BlockException(ex)
     }
 
-    pub fn missing_blocks() -> Self {
-        BlockStatus::Error(BlockError::MissingBlocks)
+    pub fn missing_blocks() -> BlockError {
+        BlockError::MissingBlocks
     }
 
-    pub fn admissible_equivocation() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::AdmissibleEquivocation))
+    pub fn admissible_equivocation() -> BlockError {
+        BlockError::Invalid(InvalidBlock::AdmissibleEquivocation)
     }
 
-    pub fn ignorable_equivocation() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::IgnorableEquivocation))
+    pub fn ignorable_equivocation() -> BlockError {
+        BlockError::Invalid(InvalidBlock::IgnorableEquivocation)
     }
 
-    pub fn invalid_format() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidFormat))
+    pub fn invalid_format() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidFormat)
     }
 
-    pub fn invalid_signature() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidSignature))
+    pub fn invalid_signature() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidSignature)
     }
 
-    pub fn invalid_sender() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidSender))
+    pub fn invalid_sender() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidSender)
     }
 
-    pub fn invalid_version() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidVersion))
+    pub fn invalid_version() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidVersion)
     }
 
-    pub fn invalid_timestamp() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidTimestamp))
+    pub fn invalid_timestamp() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidTimestamp)
     }
 
-    pub fn deploy_not_signed() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::DeployNotSigned))
+    pub fn deploy_not_signed() -> BlockError {
+        BlockError::Invalid(InvalidBlock::DeployNotSigned)
     }
 
-    pub fn invalid_block_number() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidBlockNumber))
+    pub fn invalid_block_number() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidBlockNumber)
     }
 
-    pub fn invalid_repeat_deploy() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidRepeatDeploy))
+    pub fn invalid_repeat_deploy() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidRepeatDeploy)
     }
 
-    pub fn invalid_parents() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidParents))
+    pub fn invalid_parents() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidParents)
     }
 
-    pub fn invalid_follows() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidFollows))
+    pub fn invalid_follows() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidFollows)
     }
 
-    pub fn invalid_sequence_number() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidSequenceNumber))
+    pub fn invalid_sequence_number() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidSequenceNumber)
     }
 
-    pub fn invalid_shard_id() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidShardId))
+    pub fn invalid_shard_id() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidShardId)
     }
 
-    pub fn justification_regression() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::JustificationRegression))
+    pub fn justification_regression() -> BlockError {
+        BlockError::Invalid(InvalidBlock::JustificationRegression)
     }
 
-    pub fn neglected_invalid_block() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::NeglectedInvalidBlock))
+    pub fn neglected_invalid_block() -> BlockError {
+        BlockError::Invalid(InvalidBlock::NeglectedInvalidBlock)
     }
 
-    pub fn neglected_equivocation() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::NeglectedEquivocation))
+    pub fn neglected_equivocation() -> BlockError {
+        BlockError::Invalid(InvalidBlock::NeglectedEquivocation)
     }
 
-    pub fn invalid_transaction() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidTransaction))
+    pub fn invalid_transaction() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidTransaction)
     }
 
-    pub fn invalid_bonds_cache() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidBondsCache))
+    pub fn invalid_bonds_cache() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidBondsCache)
     }
 
-    pub fn invalid_block_hash() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::InvalidBlockHash))
+    pub fn invalid_block_hash() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidBlockHash)
     }
 
-    pub fn contains_expired_deploy() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::ContainsExpiredDeploy))
+    pub fn invalid_rejected_deploy() -> BlockError {
+        BlockError::Invalid(InvalidBlock::InvalidRejectedDeploy)
     }
 
-    pub fn contains_future_deploy() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::ContainsFutureDeploy))
+    pub fn contains_expired_deploy() -> BlockError {
+        BlockError::Invalid(InvalidBlock::ContainsExpiredDeploy)
     }
 
-    pub fn not_of_interest() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::NotOfInterest))
+    pub fn contains_future_deploy() -> BlockError {
+        BlockError::Invalid(InvalidBlock::ContainsFutureDeploy)
     }
 
-    pub fn low_deploy_cost() -> Self {
-        BlockStatus::Error(BlockError::Invalid(InvalidBlock::LowDeployCost))
+    pub fn not_of_interest() -> BlockError {
+        BlockError::Invalid(InvalidBlock::NotOfInterest)
+    }
+
+    pub fn low_deploy_cost() -> BlockError {
+        BlockError::Invalid(InvalidBlock::LowDeployCost)
     }
 
     pub fn is_in_dag(&self) -> bool {
