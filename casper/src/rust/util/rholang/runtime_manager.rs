@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
+use dashmap::DashMap;
 
 use crypto::rust::signatures::signed::Signed;
 use hex::ToHex;
@@ -33,6 +34,7 @@ use shared::rust::ByteVector;
 use crate::rust::errors::CasperError;
 use crate::rust::rholang::replay_runtime::ReplayRuntimeOps;
 use crate::rust::rholang::runtime::RuntimeOps;
+use crate::rust::merging::block_index::BlockIndex;
 
 use super::system_deploy::SystemDeployTrait;
 
@@ -52,6 +54,8 @@ pub struct RuntimeManager {
     pub history_repo: RhoHistoryRepository,
     pub mergeable_store: MergeableStore,
     pub mergeable_tag_name: Par,
+    // TODO: make proper storage for block indices
+    pub block_index_cache: Arc<DashMap<BlockHash, BlockIndex>>,
 }
 
 impl RuntimeManager {
@@ -285,6 +289,43 @@ impl RuntimeManager {
         self.mergeable_store
     }
 
+    /// Get or compute BlockIndex with caching
+    pub fn get_or_compute_block_index(
+        &self,
+        block_hash: &BlockHash,
+        usr_processed_deploys: &Vec<ProcessedDeploy>,
+        sys_processed_deploys: &Vec<ProcessedSystemDeploy>,
+        pre_state_hash: &Blake2b256Hash,
+        post_state_hash: &Blake2b256Hash,
+        mergeable_chs: &Vec<NumberChannelsDiff>,
+    ) -> Result<BlockIndex, CasperError> {
+        // Try cache first
+        if let Some(cached) = self.block_index_cache.get(block_hash) {
+            return Ok((*cached.value()).clone());
+        }
+
+        // Cache miss - compute the BlockIndex
+        let block_index = crate::rust::merging::block_index::new(
+            block_hash,
+            usr_processed_deploys,
+            sys_processed_deploys,
+            pre_state_hash,
+            post_state_hash,
+            &self.history_repo,
+            mergeable_chs,
+        )?;
+
+        // Cache the result
+        self.block_index_cache.insert(block_hash.clone(), block_index.clone());
+
+        Ok(block_index)
+    }
+
+    /// Remove BlockIndex from cache (used during finalization)
+    pub fn remove_block_index_cache(&self, block_hash: &BlockHash) {
+        self.block_index_cache.remove(block_hash);
+    }
+
     /**
      * Load mergeable channels from store
      */
@@ -425,6 +466,7 @@ impl RuntimeManager {
             history_repo,
             mergeable_store,
             mergeable_tag_name,
+            block_index_cache: Arc::new(DashMap::new()),
         }
     }
 

@@ -2,6 +2,7 @@ use std::fmt;
 
 use comm::rust::errors::CommError;
 use rholang::rust::interpreter::errors::InterpreterError;
+use rspace_plus_plus::rspace::errors::HistoryError;
 use shared::rust::store::key_value_store::KvStoreError;
 
 use super::util::rholang::{
@@ -17,6 +18,7 @@ pub enum CasperError {
     SigningError(String),
     ReplayFailure(ReplayFailure),
     CommError(CommError),
+    HistoryError(HistoryError),
     Other(String),
 }
 
@@ -30,6 +32,7 @@ impl fmt::Display for CasperError {
             CasperError::SigningError(error) => write!(f, "Signing error: {}", error),
             CasperError::ReplayFailure(error) => write!(f, "Replay failure: {}", error),
             CasperError::CommError(error) => write!(f, "Comm error: {}", error),
+            CasperError::HistoryError(error) => write!(f, "History error: {}", error),
             CasperError::Other(error) => write!(f, "Other error: {}", error),
         }
     }
