@@ -1,10 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/util/ConstructDeploy.scala
 
 use lazy_static::lazy_static;
-use std::{
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crypto::rust::{
     private_key::PrivateKey,
@@ -127,7 +124,7 @@ pub fn basic_processed_deploy(
     shard_id: Option<String>,
 ) -> Result<ProcessedDeploy, CasperError> {
     basic_deploy_data(id, None, shard_id).map(|deploy| ProcessedDeploy {
-        deploy: Arc::new(deploy),
+        deploy,
         cost: PCost { cost: 0 },
         deploy_log: Vec::new(),
         is_failed: false,

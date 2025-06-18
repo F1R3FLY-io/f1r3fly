@@ -395,7 +395,7 @@ impl RuntimeOps {
         let deploy_sig = deploy.sig.clone();
 
         let deploy_result = ProcessedDeploy {
-            deploy: Arc::new(deploy),
+            deploy,
             cost: Cost::to_proto(eval_result.cost),
             deploy_log: checkpoint
                 .log

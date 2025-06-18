@@ -1,7 +1,5 @@
 // See models/src/main/scala/coop/rchain/casper/protocol/CasperMessage.scala
 
-use std::sync::Arc;
-
 use crypto::rust::{
     public_key::PublicKey,
     signatures::{signatures_alg::SignaturesAlgFactory, signed::Signed},
@@ -489,7 +487,7 @@ impl F1r3flyState {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProcessedDeploy {
-    pub deploy: Arc<Signed<DeployData>>,
+    pub deploy: Signed<DeployData>,
     pub cost: PCost,
     pub deploy_log: Vec<Event>,
     pub is_failed: bool,
@@ -503,7 +501,7 @@ impl ProcessedDeploy {
 
     pub fn empty(deploy: Signed<DeployData>) -> Self {
         Self {
-            deploy: Arc::new(deploy),
+            deploy,
             cost: PCost { cost: 0 },
             deploy_log: Vec::new(),
             is_failed: false,
@@ -529,11 +527,11 @@ impl ProcessedDeploy {
 
     pub fn from_proto(proto: ProcessedDeployProto) -> Result<Self, String> {
         Ok(Self {
-            deploy: Arc::new(DeployData::from_proto(
+            deploy: DeployData::from_proto(
                 proto
                     .deploy
                     .ok_or_else(|| "Missing deploy field".to_string())?,
-            )?),
+            )?,
             cost: proto.cost.ok_or_else(|| "Missing cost field".to_string())?,
             deploy_log: proto
                 .deploy_log
@@ -777,7 +775,7 @@ impl DeployData {
         }
     }
 
-    pub fn to_proto(dd: Arc<Signed<DeployData>>) -> DeployDataProto {
+    pub fn to_proto(dd: Signed<DeployData>) -> DeployDataProto {
         DeployDataProto {
             term: dd.data.term.clone(),
             timestamp: dd.data.time_stamp,

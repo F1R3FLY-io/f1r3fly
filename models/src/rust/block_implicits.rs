@@ -1,12 +1,11 @@
 // See models/src/test/scala/coop/rchain/models/blockImplicits.scala
 
+use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use rand::prelude::*;
-use std::sync::Arc;
 
 use crypto::rust::signatures::{
     secp256k1::Secp256k1, signatures_alg::SignaturesAlg, signed::Signed,
 };
-use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 
 use crate::rhoapi::PCost;
 
@@ -84,7 +83,7 @@ pub fn signed_deploy_data_gen() -> impl Strategy<Value = Signed<DeployData>> {
 pub fn processed_deploy_gen() -> impl Strategy<Value = ProcessedDeploy> {
     let deploy_data_gen = signed_deploy_data_gen();
     deploy_data_gen.prop_map(|deploy_data| ProcessedDeploy {
-        deploy: Arc::new(deploy_data),
+        deploy: deploy_data,
         cost: PCost { cost: 0 },
         deploy_log: Vec::new(),
         is_failed: false,

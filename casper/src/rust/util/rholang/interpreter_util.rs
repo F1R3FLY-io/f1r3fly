@@ -1,12 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/InterpreterUtil.scala
 
-use dashmap::DashMap;
 use prost::bytes::Bytes;
-use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::KeyValueDagRepresentation,
@@ -30,6 +25,7 @@ use models::{
 use rholang::rust::interpreter::{
     compiler::compiler::Compiler, errors::InterpreterError, system_processes::BlockData,
 };
+use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
 
 use crate::rust::{
     block_status::BlockStatus,
@@ -322,15 +318,15 @@ pub fn print_deploy_errors(deploy_sig: &Bytes, errors: &[InterpreterError]) {
     log::warn!("Deploy ({}) errors: {}", deploy_info, error_messages);
 }
 
-pub fn compute_deploys_checkpoint(
+pub async fn compute_deploys_checkpoint(
     block_store: &mut KeyValueBlockStore,
     parents: Vec<BlockMessage>,
-    deploys: Vec<Arc<Signed<DeployData>>>,
+    deploys: Vec<Signed<DeployData>>,
     system_deploys: Vec<impl SystemDeployTrait>,
     s: &CasperSnapshot,
-    runtime_manager: &RuntimeManager,
+    runtime_manager: &mut RuntimeManager,
     block_data: BlockData,
-    invalid_blocks: DashMap<BlockHash, Validator>,
+    invalid_blocks: HashMap<BlockHash, Validator>,
 ) -> Result<
     (
         StateHash,
@@ -341,7 +337,38 @@ pub fn compute_deploys_checkpoint(
     ),
     CasperError,
 > {
-    todo!()
+    // Ensure parents are not empty
+    if parents.is_empty() {
+        return Err(CasperError::RuntimeError(
+            "Parents must not be empty".to_string(),
+        ));
+    }
+
+    // Compute parents post state
+    let computed_parents_info =
+        compute_parents_post_state(block_store, parents, s, runtime_manager)?;
+    let (pre_state_hash, rejected_deploys) = computed_parents_info;
+
+    // Compute state using runtime manager
+    let result = runtime_manager
+        .compute_state(
+            &pre_state_hash,
+            deploys,
+            system_deploys,
+            block_data,
+            Some(invalid_blocks),
+        )
+        .await?;
+
+    let (post_state_hash, processed_deploys, processed_system_deploys) = result;
+
+    Ok((
+        pre_state_hash,
+        post_state_hash,
+        processed_deploys,
+        rejected_deploys,
+        processed_system_deploys,
+    ))
 }
 
 fn compute_parents_post_state(

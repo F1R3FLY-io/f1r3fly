@@ -341,7 +341,7 @@ pub fn new_proposer<T: TransportLayer + Send + Sync>(
     event_publisher: F1r3flyEvents,
 ) -> ProductionProposer<T> {
     let validator_arc = Arc::new(validator);
-    let runtime_manager_arc = Arc::new(runtime_manager);
+    let runtime_manager_arc = Arc::new(Mutex::new(runtime_manager));
     let block_store_arc = Arc::new(Mutex::new(block_store));
     let deploy_storage_arc = Arc::new(deploy_storage);
 
@@ -400,14 +400,14 @@ impl ActiveValidatorChecker for ProductionActiveValidatorChecker {
 }
 
 pub struct ProductionStakeChecker {
-    runtime_manager: Arc<RuntimeManager>,
+    runtime_manager: Arc<Mutex<RuntimeManager>>,
     block_store: Arc<Mutex<KeyValueBlockStore>>,
     validator: Arc<ValidatorIdentity>,
 }
 
 impl ProductionStakeChecker {
     pub fn new(
-        runtime_manager: Arc<RuntimeManager>,
+        runtime_manager: Arc<Mutex<RuntimeManager>>,
         block_store: Arc<Mutex<KeyValueBlockStore>>,
         validator: Arc<ValidatorIdentity>,
     ) -> Self {
@@ -429,9 +429,13 @@ impl StakeChecker for ProductionStakeChecker {
             .lock()
             .map_err(|e| CasperError::RuntimeError(e.to_string()))?;
 
+        let mut runtime_manager = self.runtime_manager.lock().map_err(|e| {
+            CasperError::RuntimeError(format!("Failed to lock runtime manager: {}", e))
+        })?;
+
         synchrony_constraint_checker::check(
             casper_snapshot,
-            &self.runtime_manager,
+            &mut runtime_manager,
             &block_store,
             &self.validator,
         )
@@ -460,14 +464,14 @@ impl HeightChecker for ProductionHeightChecker {
 
 pub struct ProductionBlockCreator {
     deploy_storage: Arc<KeyValueDeployStorage>,
-    runtime_manager: Arc<RuntimeManager>,
+    runtime_manager: Arc<Mutex<RuntimeManager>>,
     block_store: Arc<Mutex<KeyValueBlockStore>>,
 }
 
 impl ProductionBlockCreator {
     pub fn new(
         deploy_storage: Arc<KeyValueDeployStorage>,
-        runtime_manager: Arc<RuntimeManager>,
+        runtime_manager: Arc<Mutex<RuntimeManager>>,
         block_store: Arc<Mutex<KeyValueBlockStore>>,
     ) -> Self {
         Self {
@@ -490,12 +494,16 @@ impl BlockCreator for ProductionBlockCreator {
             .lock()
             .map_err(|e| CasperError::RuntimeError(e.to_string()))?;
 
+        let mut runtime_manager = self.runtime_manager.lock().map_err(|e| {
+            CasperError::RuntimeError(format!("Failed to lock runtime manager: {}", e))
+        })?;
+
         block_creator::create(
             casper_snapshot,
             validator_identity,
             dummy_deploy_opt,
             &self.deploy_storage,
-            &self.runtime_manager,
+            &mut runtime_manager,
             &mut block_store,
         )
         .await

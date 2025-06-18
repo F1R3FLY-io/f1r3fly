@@ -10,7 +10,7 @@ use models::rust::casper::protocol::casper_message::BlockMessage;
 use prost::bytes::Bytes;
 use rspace_plus_plus::rspace::shared::in_mem_key_value_store::InMemoryKeyValueStore;
 use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::future::Future;
 use std::io;
@@ -219,7 +219,7 @@ pub fn mk_dummy_casper_snapshot() -> CasperSnapshot {
         tips: Vec::new(),
         parents: Vec::new(),
         justifications: DashSet::new(),
-        invalid_blocks: DashMap::new(),
+        invalid_blocks: HashMap::new(),
         deploys_in_scope: DashSet::new(),
         max_block_num: 0,
         max_seq_nums: DashMap::new(),

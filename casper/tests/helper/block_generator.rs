@@ -1,6 +1,9 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/BlockGenerator.scala
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::KeyValueDagRepresentation,
@@ -14,12 +17,10 @@ use casper::rust::{
         construct_deploy, proto_util,
         rholang::{
             costacc::close_block_deploy::CloseBlockDeploy,
-            interpreter_util::compute_deploys_checkpoint, 
-            runtime_manager::RuntimeManager
+            interpreter_util::compute_deploys_checkpoint, runtime_manager::RuntimeManager,
         },
     },
 };
-use dashmap::DashMap;
 use models::rust::{
     block::state_hash::StateHash,
     block_hash::BlockHash,
@@ -33,10 +34,10 @@ pub fn mk_casper_snapshot(dag: KeyValueDagRepresentation) -> CasperSnapshot {
     CasperSnapshot::new(dag)
 }
 
-pub fn step(
+pub async fn step(
     block_dag_storage: &mut IndexedBlockDagStorage,
     block_store: &mut KeyValueBlockStore,
-    runtime_manager: &RuntimeManager,
+    runtime_manager: &mut RuntimeManager,
     block: &BlockMessage,
 ) -> Result<(), CasperError> {
     let dag = block_dag_storage.get_representation();
@@ -45,7 +46,8 @@ pub fn step(
         block,
         &mk_casper_snapshot(dag),
         runtime_manager,
-    )?;
+    )
+    .await?;
 
     inject_post_state_hash(
         block_store,
@@ -56,11 +58,11 @@ pub fn step(
     )
 }
 
-fn compute_block_checkpoint(
+async fn compute_block_checkpoint(
     block_store: &mut KeyValueBlockStore,
     block: &BlockMessage,
     casper_snapshot: &CasperSnapshot,
-    runtime_manager: &RuntimeManager,
+    runtime_manager: &mut RuntimeManager,
 ) -> Result<(StateHash, Vec<ProcessedDeploy>), CasperError> {
     let parents = proto_util::get_parents(block_store, block);
     let deploys = proto_util::deploys(block)
@@ -76,8 +78,9 @@ fn compute_block_checkpoint(
         casper_snapshot,
         runtime_manager,
         BlockData::from_block(block),
-        DashMap::new(),
-    )?;
+        HashMap::new(),
+    )
+    .await?;
 
     Ok((post_state_hash, processed_deploys))
 }

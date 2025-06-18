@@ -1,6 +1,5 @@
 // See casper/src/main/scala/coop/rchain/casper/blocks/proposer/BlockCreator.scala
 
-use std::sync::Arc;
 use std::{collections::HashSet, time::SystemTime};
 
 use block_storage::rust::{
@@ -146,7 +145,7 @@ pub async fn create(
     validator_identity: &ValidatorIdentity,
     dummy_deploy_opt: Option<(PrivateKey, String)>,
     deploy_storage: &KeyValueDeployStorage,
-    runtime_manager: &RuntimeManager,
+    runtime_manager: &mut RuntimeManager,
     block_store: &mut KeyValueBlockStore,
 ) -> Result<BlockCreatorResult, CasperError> {
     let next_seq_num = casper_snapshot
@@ -223,13 +222,14 @@ pub async fn create(
     let checkpoint_data = interpreter_util::compute_deploys_checkpoint(
         block_store,
         parents.clone(),
-        all_deploys.into_iter().map(|d| Arc::new(d)).collect(),
+        all_deploys.into_iter().collect(),
         system_deploys_converted,
         casper_snapshot,
         runtime_manager,
         block_data.clone(),
         invalid_blocks,
-    )?;
+    )
+    .await?;
 
     let (
         pre_state_hash,
