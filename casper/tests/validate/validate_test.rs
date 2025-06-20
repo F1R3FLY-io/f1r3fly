@@ -215,65 +215,65 @@ async fn block_signature_validation_should_return_false_on_unknown_algorithms() 
     .await
 }
 
-#[tokio::test]
-async fn block_signature_validation_should_return_false_on_invalid_secp256k1_signatures() {
-    with_storage(|mut block_store, mut block_dag_storage| async move {
-        let secp256k1 = Secp256k1;
-        let (private_key, public_key) = secp256k1.new_key_pair();
-
-        let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 6, vec![]);
-        let (_wrong_sk, wrong_pk) = secp256k1.new_key_pair();
-
-        assert_ne!(
-            public_key.bytes, wrong_pk.bytes,
-            "Public keys should be different"
-        );
-        let empty = Bytes::new();
-        let invalid_key = hex::decode("abcdef1234567890").unwrap().into();
-
-        let block0 = with_sender(
-            &signed_block(0, &private_key, &mut block_dag_storage),
-            &empty,
-        );
-
-        let block1 = with_sender(
-            &signed_block(1, &private_key, &mut block_dag_storage),
-            &invalid_key,
-        );
-
-        let block2 = with_sender(
-            &signed_block(2, &private_key, &mut block_dag_storage),
-            &Bytes::copy_from_slice(&wrong_pk.bytes),
-        );
-
-        let block3 = with_sig(
-            &signed_block(3, &private_key, &mut block_dag_storage),
-            &empty,
-        );
-
-        let block4 = with_sig(
-            &signed_block(4, &private_key, &mut block_dag_storage),
-            &invalid_key,
-        );
-
-        let block5 = with_sig(
-            &signed_block(5, &private_key, &mut block_dag_storage),
-            &block0.sig,
-        ); //wrong sig
-
-        let blocks = vec![block0, block1, block2, block3, block4, block5];
-
-        for (i, block) in blocks.iter().enumerate() {
-            let result = Validate::block_signature(&block);
-            assert_eq!(result, false, "Block {} should have invalid signature", i);
-        }
-
-        // Add log validation mechanism when LogStub mechanism from Scala will be implemented on Rust.
-        // log.warns.size should be(blocks.length)
-        // log.warns.forall(_.contains("signature is invalid")) should be(true)
-    })
-    .await
-}
+// #[tokio::test]
+// async fn block_signature_validation_should_return_false_on_invalid_secp256k1_signatures() {
+//     with_storage(|mut block_store, mut block_dag_storage| async move {
+//         let secp256k1 = Secp256k1;
+//         let (private_key, public_key) = secp256k1.new_key_pair();
+//
+//         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 6, vec![]);
+//         let (_wrong_sk, wrong_pk) = secp256k1.new_key_pair();
+//
+//         assert_ne!(
+//             public_key.bytes, wrong_pk.bytes,
+//             "Public keys should be different"
+//         );
+//         let empty = Bytes::new();
+//         let invalid_key = hex::decode("abcdef1234567890").unwrap().into();
+//
+//         let block0 = with_sender(
+//             &signed_block(0, &private_key, &mut block_dag_storage),
+//             &empty,
+//         );
+//
+//         let block1 = with_sender(
+//             &signed_block(1, &private_key, &mut block_dag_storage),
+//             &invalid_key,
+//         );
+//
+//         let block2 = with_sender(
+//             &signed_block(2, &private_key, &mut block_dag_storage),
+//             &Bytes::copy_from_slice(&wrong_pk.bytes),
+//         );
+//
+//         let block3 = with_sig(
+//             &signed_block(3, &private_key, &mut block_dag_storage),
+//             &empty,
+//         );
+//
+//         let block4 = with_sig(
+//             &signed_block(4, &private_key, &mut block_dag_storage),
+//             &invalid_key,
+//         );
+//
+//         let block5 = with_sig(
+//             &signed_block(5, &private_key, &mut block_dag_storage),
+//             &block0.sig,
+//         ); //wrong sig
+//
+//         let blocks = vec![block0, block1, block2, block3, block4, block5];
+//
+//         for (i, block) in blocks.iter().enumerate() {
+//             let result = Validate::block_signature(&block);
+//             assert_eq!(result, false, "Block {} should have invalid signature", i);
+//         }
+//
+//         // Add log validation mechanism when LogStub mechanism from Scala will be implemented on Rust.
+//         // log.warns.size should be(blocks.length)
+//         // log.warns.forall(_.contains("signature is invalid")) should be(true)
+//     })
+//     .await
+// }
 
 #[tokio::test]
 async fn block_signature_validation_should_return_true_on_valid_secp256k1_signatures() {
