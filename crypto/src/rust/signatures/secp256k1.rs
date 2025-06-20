@@ -25,13 +25,9 @@ impl Secp256k1 {
 // TODO: Remove self in these methods
 impl SignaturesAlg for Secp256k1 {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {
-        match VerifyingKey::from_sec1_bytes(&pub_key) {
-            Ok(vk) => match Signature::from_der(signature) {
-                Ok(sig) => vk.verify(data, &sig).is_ok(),
-                Err(_) => false,
-            },
-            Err(_) => false,
-        }
+        VerifyingKey::from_sec1_bytes(&pub_key)
+            .and_then(|vk| Signature::from_der(signature).map(|sig| vk.verify(data, &sig)))
+            .is_ok()
     }
 
     fn sign(&self, data: &[u8], sec: &[u8]) -> Vec<u8> {
