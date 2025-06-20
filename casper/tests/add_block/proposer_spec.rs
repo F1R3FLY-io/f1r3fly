@@ -121,7 +121,7 @@ impl BlockValidator for TestBlockValidator {
         _: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError> {
         use casper::rust::block_status::ValidBlock;
-        Ok(ValidBlockProcessing::Right(ValidBlock::Valid))
+        Ok(Ok(ValidBlock::Valid))
     }
 }
 
@@ -134,9 +134,7 @@ impl BlockValidator for AlwaysUnsuccessfulValidator {
         _: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError> {
         use casper::rust::block_status::{BlockError, InvalidBlock};
-        Ok(ValidBlockProcessing::Left(BlockError::Invalid(
-            InvalidBlock::InvalidFormat,
-        )))
+        Ok(Err(BlockError::Invalid(InvalidBlock::InvalidFormat)))
     }
 }
 

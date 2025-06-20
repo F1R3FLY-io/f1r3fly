@@ -43,6 +43,7 @@ use crate::rust::{
         rholang::{interpreter_util, runtime_manager::RuntimeManager},
     },
     validator_identity::ValidatorIdentity,
+    ValidBlockProcessing,
 };
 
 pub struct MultiParentCasperImpl<T: TransportLayer + Send + Sync> {
@@ -132,11 +133,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
             // Use bf_traverse to collect all deploys within the deploy lifespan
             let neighbor_fn = |block_metadata: &models::rust::block_metadata::BlockMetadata| -> Vec<models::rust::block_metadata::BlockMetadata> {
-                match proto_util::get_parent_metadatas_above_block_number(
-                    &mut dag,
-                    block_metadata,
-                    earliest_block_number,
-                ) {
+                match proto_util::get_parent_metadatas_above_block_number(block_metadata, earliest_block_number, &mut dag) {
                     Ok(parents) => parents,
                     Err(_) => vec![],
                 }
@@ -221,7 +218,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         &self,
         block: &BlockMessage,
         snapshot: &CasperSnapshot,
-    ) -> Result<Either<BlockError, ValidBlock>, CasperError> {
+    ) -> Result<ValidBlockProcessing, CasperError> {
         todo!()
     }
 

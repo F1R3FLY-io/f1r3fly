@@ -78,7 +78,7 @@ pub async fn validate_block_checkpoint(
                     PrettyPrinter::build_string_bytes(&incoming_pre_state_hash)
                 );
 
-                return Ok(Either::Right(None));
+                return Ok(Ok(None));
             } else if rejected_deploy_ids != block_rejected_deploy_sigs {
                 log::warn!(
                     "Computed rejected deploys {} does not equal block's rejected deploys {}.",
@@ -96,7 +96,7 @@ pub async fn validate_block_checkpoint(
                         .join(",")
                 );
 
-                return Ok(Either::Left(BlockStatus::invalid_rejected_deploy()));
+                return Ok(Err(BlockStatus::invalid_rejected_deploy()));
             } else {
                 let replay_result =
                     replay_block(incoming_pre_state_hash, block, &mut s.dag, runtime_manager)
@@ -106,7 +106,7 @@ pub async fn validate_block_checkpoint(
             }
         }
         Err(ex) => {
-            return Ok(Either::Left(BlockStatus::exception(ex)));
+            return Ok(Err(BlockStatus::exception(ex)));
         }
     }
 }
@@ -229,7 +229,7 @@ fn handle_errors(
                     "Internal errors encountered while processing deploy: {}",
                     msg
                 ));
-                Ok(Either::Left(BlockStatus::exception(exception)))
+                Ok(Err(BlockStatus::exception(exception)))
             }
 
             ReplayFailure::ReplayStatusMismatch {
@@ -245,13 +245,13 @@ fn handle_errors(
                     replay_failed,
                     initial_failed
                 );
-                Ok(Either::Right(None))
+                Ok(Ok(None))
             }
 
             ReplayFailure::UnusedCOMMEvent { msg } => {
                 println!("Found replay exception: {}", msg);
                 log::warn!("Found replay exception: {}", msg);
-                Ok(Either::Right(None))
+                Ok(Ok(None))
             }
 
             ReplayFailure::ReplayCostMismatch {
@@ -267,7 +267,7 @@ fn handle_errors(
                     initial_cost,
                     replay_cost
                 );
-                Ok(Either::Right(None))
+                Ok(Ok(None))
             }
 
             ReplayFailure::SystemDeployErrorMismatch {
@@ -278,14 +278,14 @@ fn handle_errors(
                         "Found system deploy error mismatch: initial deploy error message = {}, replay deploy error message = {}",
                         play_error, replay_error
                     );
-                Ok(Either::Right(None))
+                Ok(Ok(None))
             }
         },
 
         Either::Right(computed_state_hash) => {
             if ts_hash == computed_state_hash {
                 // State hash in block matches computed hash!
-                Ok(Either::Right(Some(computed_state_hash)))
+                Ok(Ok(Some(computed_state_hash)))
             } else {
                 // State hash in block does not match computed hash -- invalid!
                 // return no state hash, do not update the state hash set
@@ -299,7 +299,7 @@ fn handle_errors(
                     PrettyPrinter::build_string_bytes(&ts_hash),
                     PrettyPrinter::build_string_bytes(&computed_state_hash)
                 );
-                Ok(Either::Right(None))
+                Ok(Ok(None))
             }
         }
     }

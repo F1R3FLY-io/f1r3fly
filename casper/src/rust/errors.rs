@@ -9,7 +9,7 @@ use super::util::rholang::{
     replay_failure::ReplayFailure, system_deploy_user_error::SystemDeployPlatformFailure,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CasperError {
     InterpreterError(InterpreterError),
     KvStoreError(KvStoreError),

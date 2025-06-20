@@ -11,6 +11,7 @@ use casper::rust::{
     casper::{Casper, CasperSnapshot, DeployError, MultiParentCasper},
     errors::CasperError,
     util::rholang::runtime_manager::RuntimeManager,
+    ValidBlockProcessing,
 };
 use crypto::rust::signatures::signed::Signed;
 use models::rust::{
@@ -103,7 +104,7 @@ impl Casper for NoOpsCasperEffect {
         &self,
         _block: &BlockMessage,
         _snapshot: &CasperSnapshot,
-    ) -> Result<Either<BlockError, ValidBlock>, CasperError> {
+    ) -> Result<ValidBlockProcessing, CasperError> {
         todo!()
     }
 
