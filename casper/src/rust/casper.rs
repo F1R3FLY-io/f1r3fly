@@ -32,7 +32,6 @@ use crate::rust::{
     multi_parent_casper_impl::MultiParentCasperImpl,
     util::rholang::runtime_manager::RuntimeManager,
     validator_identity::ValidatorIdentity,
-    ValidBlockProcessing,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,7 +98,7 @@ pub trait Casper {
         &self,
         block: &BlockMessage,
         snapshot: &CasperSnapshot,
-    ) -> Result<ValidBlockProcessing, CasperError>;
+    ) -> Result<Either<BlockError, ValidBlock>, CasperError>;
 
     async fn handle_valid_block(
         &mut self,

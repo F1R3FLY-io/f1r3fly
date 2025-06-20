@@ -53,7 +53,7 @@ lazy_static! {
     std::array::from_fn(|i| DEFAULT_VALIDATOR_KEY_PAIRS[i].0.clone())
   };
 
-  // Equivalent to defaultValidatorPks in Scala
+  // Equivalent to defaultValidatorPks in Scala  
   pub static ref DEFAULT_VALIDATOR_PKS: [PublicKey; 4] = {
     std::array::from_fn(|i| DEFAULT_VALIDATOR_KEY_PAIRS[i].1.clone())
   };

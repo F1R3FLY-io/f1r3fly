@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum CommError {
     UnknownCommError(String),
     DatagramSizeError(usize),

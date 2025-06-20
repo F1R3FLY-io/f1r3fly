@@ -17,7 +17,6 @@ pub mod safety_oracle;
 pub mod storage;
 pub mod synchrony_constraint_checker;
 pub mod util;
-pub mod validate;
 pub mod validator_identity;
 
 // See casper/src/main/scala/coop/rchain/casper/package.scala
@@ -34,7 +33,8 @@ use crate::rust::{
 
 pub type TopoSort = Vec<Vec<BlockHash>>;
 
-pub type BlockProcessing<A> = Result<A, BlockError>;
+pub type BlockProcessing<A> = Either<BlockError, A>;
+
 pub type ValidBlockProcessing = BlockProcessing<ValidBlock>;
 
 pub type ProposeFunction = dyn Fn(dyn Casper, bool) -> Result<ProposerResult, CasperError>;

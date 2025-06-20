@@ -1,7 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/BlockStatus.scala
 
 use super::errors::CasperError;
-use shared::rust::store::key_value_store::KvStoreError;
 
 /// Represents the status of a block in the system
 #[derive(Debug, Clone)]
@@ -11,13 +10,13 @@ pub enum BlockStatus {
 }
 
 /// Represents a valid block
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ValidBlock {
     Valid,
 }
 
 /// Represents an error with a block
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum BlockError {
     Processed,
     CasperIsBusy,
@@ -215,11 +214,5 @@ impl InvalidBlock {
             | InvalidBlock::ContainsFutureDeploy => true,
             _ => false,
         }
-    }
-}
-
-impl From<KvStoreError> for BlockError {
-    fn from(error: KvStoreError) -> Self {
-        BlockError::BlockException(CasperError::from(error))
     }
 }

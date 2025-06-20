@@ -1,6 +1,5 @@
 use std::sync::Once;
 
-mod add_block;
 mod engine;
 mod estimator;
 mod finality;
@@ -9,7 +8,7 @@ mod merging;
 mod safety;
 mod sync;
 mod util;
-mod validate;
+mod add_block;
 
 static INIT: Once = Once::new();
 

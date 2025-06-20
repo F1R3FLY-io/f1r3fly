@@ -207,13 +207,13 @@ where
                                 .validate_block(casper, casper_snapshot, &block)?;
 
                         match validation_result {
-                            Ok(valid_status) => {
+                            ValidBlockProcessing::Right(valid_status) => {
                                 self.propose_effect_handler
                                     .handle_propose_effect(casper, &block)
                                     .await?;
                                 Ok((ProposeResult::success(valid_status), Some(block)))
                             }
-                            Err(invalid_reason) => {
+                            ValidBlockProcessing::Left(invalid_reason) => {
                                 return Err(CasperError::RuntimeError(format!(
                                     "Validation of self created block failed with reason: {:?}, cancelling propose.",
                                     invalid_reason

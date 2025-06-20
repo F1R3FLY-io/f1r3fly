@@ -243,7 +243,7 @@ pub fn get_parents(
 }
 
 pub fn get_parents_metadata(
-    dag: &KeyValueDagRepresentation,
+    dag: &mut KeyValueDagRepresentation,
     block: &BlockMetadata,
 ) -> Result<Vec<BlockMetadata>, KvStoreError> {
     block
@@ -254,9 +254,9 @@ pub fn get_parents_metadata(
 }
 
 pub fn get_parent_metadatas_above_block_number(
+    dag: &mut KeyValueDagRepresentation,
     block: &BlockMetadata,
     block_number: i64,
-    dag: &KeyValueDagRepresentation,
 ) -> Result<Vec<BlockMetadata>, KvStoreError> {
     get_parents_metadata(dag, block).map(|parents| {
         parents
