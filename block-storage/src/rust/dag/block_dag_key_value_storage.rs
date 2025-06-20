@@ -24,7 +24,7 @@ use super::{
     block_metadata_store::BlockMetadataStore, equivocation_tracker_store::EquivocationTrackerStore,
 };
 
-type DeployId = shared::rust::ByteString;
+pub type DeployId = shared::rust::ByteString;
 
 #[derive(Clone)]
 pub struct KeyValueDagRepresentation {
@@ -688,7 +688,7 @@ impl BlockDagKeyValueStorage {
     pub fn record_directly_finalized(
         &self,
         directly_finalized_hash: BlockHash,
-        finalization_effect: impl Fn(&HashSet<BlockHash>) -> Result<(), KvStoreError>,
+        mut finalization_effect: impl FnMut(&HashSet<BlockHash>) -> Result<(), KvStoreError>,
     ) -> Result<(), KvStoreError> {
         let dag = self.get_representation();
         if !dag.contains(&directly_finalized_hash) {

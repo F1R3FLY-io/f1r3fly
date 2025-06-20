@@ -1,9 +1,9 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManager.scala
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/RuntimeManagerSyntax.scala
 
+use dashmap::DashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use dashmap::DashMap;
 
 use crypto::rust::signatures::signed::Signed;
 use hex::ToHex;
@@ -32,9 +32,9 @@ use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
 use shared::rust::ByteVector;
 
 use crate::rust::errors::CasperError;
+use crate::rust::merging::block_index::BlockIndex;
 use crate::rust::rholang::replay_runtime::ReplayRuntimeOps;
 use crate::rust::rholang::runtime::RuntimeOps;
-use crate::rust::merging::block_index::BlockIndex;
 
 use super::system_deploy::SystemDeployTrait;
 
@@ -285,10 +285,6 @@ impl RuntimeManager {
         self.history_repo.clone()
     }
 
-    pub fn get_mergeable_store(self) -> MergeableStore {
-        self.mergeable_store
-    }
-
     /// Get or compute BlockIndex with caching
     pub fn get_or_compute_block_index(
         &self,
@@ -316,7 +312,8 @@ impl RuntimeManager {
         )?;
 
         // Cache the result
-        self.block_index_cache.insert(block_hash.clone(), block_index.clone());
+        self.block_index_cache
+            .insert(block_hash.clone(), block_index.clone());
 
         Ok(block_index)
     }

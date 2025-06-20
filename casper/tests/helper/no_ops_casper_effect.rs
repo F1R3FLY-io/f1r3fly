@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use block_storage::rust::{
-    dag::block_dag_key_value_storage::KeyValueDagRepresentation,
+    dag::block_dag_key_value_storage::{DeployId, KeyValueDagRepresentation},
     key_value_block_store::KeyValueBlockStore,
 };
 use casper::rust::{
@@ -11,17 +11,13 @@ use casper::rust::{
     casper::{Casper, CasperSnapshot, DeployError, MultiParentCasper},
     errors::CasperError,
     util::rholang::runtime_manager::RuntimeManager,
-    validator_identity::ValidatorIdentity,
 };
 use crypto::rust::signatures::signed::Signed;
-use models::{
-    rhoapi::DeployId,
-    rust::{
-        block_hash::BlockHash,
-        block_implicits::get_random_block_default,
-        casper::protocol::casper_message::{BlockMessage, DeployData},
-        validator::Validator,
-    },
+use models::rust::{
+    block_hash::BlockHash,
+    block_implicits::get_random_block_default,
+    casper::protocol::casper_message::{BlockMessage, DeployData},
+    validator::Validator,
 };
 use rspace_plus_plus::rspace::history::Either;
 
@@ -52,7 +48,7 @@ impl NoOpsCasperEffect {
 }
 
 impl MultiParentCasper for NoOpsCasperEffect {
-    fn fetch_dependencies(&self) -> Result<(), CasperError> {
+    async fn fetch_dependencies(&self) -> Result<(), CasperError> {
         Ok(())
     }
 
@@ -63,49 +59,44 @@ impl MultiParentCasper for NoOpsCasperEffect {
         Ok(0.0)
     }
 
-    fn last_finalized_block(&self) -> Result<BlockMessage, CasperError> {
+    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError> {
         Ok(get_random_block_default())
     }
 }
 
 impl Casper for NoOpsCasperEffect {
-    fn get_snapshot(&self) -> Result<CasperSnapshot, CasperError> {
+    async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError> {
         todo!()
     }
 
-    fn contains(&self, hash: &BlockHash) -> Result<bool, CasperError> {
-        Ok(self.store.contains_key(hash))
+    fn contains(&self, hash: &BlockHash) -> bool {
+        self.store.contains_key(hash)
     }
 
-    fn dag_contains(&self, _hash: &BlockHash) -> Result<bool, CasperError> {
-        Ok(false)
+    fn dag_contains(&self, _hash: &BlockHash) -> bool {
+        false
     }
 
-    fn buffer_contains(&self, _hash: &BlockHash) -> Result<bool, CasperError> {
-        Ok(false)
+    fn buffer_contains(&self, _hash: &BlockHash) -> bool {
+        false
     }
 
     fn deploy(
-        &self,
+        &mut self,
         _deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError> {
         Ok(Either::Right(DeployId::default()))
     }
 
-    fn estimator(&self, _dag: &KeyValueDagRepresentation) -> Result<Vec<BlockHash>, CasperError> {
+    async fn estimator(
+        &self,
+        _dag: &mut KeyValueDagRepresentation,
+    ) -> Result<Vec<BlockHash>, CasperError> {
         Ok(self.estimator_func.clone())
     }
 
-    fn get_approved_block(&self) -> Result<BlockMessage, CasperError> {
-        Ok(get_random_block_default())
-    }
-
-    fn get_validator(&self) -> Result<Option<ValidatorIdentity>, CasperError> {
-        Ok(None)
-    }
-
-    fn get_version(&self) -> Result<i64, CasperError> {
-        Ok(1)
+    fn get_version(&self) -> i64 {
+        1
     }
 
     fn validate(
@@ -116,15 +107,15 @@ impl Casper for NoOpsCasperEffect {
         todo!()
     }
 
-    fn handle_valid_block(
-        &self,
+    async fn handle_valid_block(
+        &mut self,
         _block: &BlockMessage,
     ) -> Result<KeyValueDagRepresentation, CasperError> {
         todo!()
     }
 
     fn handle_invalid_block(
-        &self,
+        &mut self,
         _block: &BlockMessage,
         _status: &InvalidBlock,
         _dag: &KeyValueDagRepresentation,

@@ -1,28 +1,37 @@
 // See casper/src/main/scala/coop/rchain/casper/Casper.scala
 
-use block_storage::rust::dag::block_dag_key_value_storage::KeyValueDagRepresentation;
-use crypto::rust::signatures::signed::Signed;
+use comm::rust::transport::transport_layer::TransportLayer;
 use dashmap::{DashMap, DashSet};
-use models::{
-    rhoapi::DeployId,
-    rust::{
-        block_hash::BlockHash,
-        casper::protocol::casper_message::{BlockMessage, DeployData, Justification},
-        validator::Validator,
+use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
+
+use block_storage::rust::{
+    casperbuffer::casper_buffer_key_value_storage::CasperBufferKeyValueStorage,
+    dag::block_dag_key_value_storage::{
+        BlockDagKeyValueStorage, DeployId, KeyValueDagRepresentation,
     },
+    deploy::key_value_deploy_storage::KeyValueDeployStorage,
+    key_value_block_store::KeyValueBlockStore,
+};
+use crypto::rust::signatures::signed::Signed;
+use models::rust::{
+    block_hash::BlockHash,
+    casper::protocol::casper_message::{BlockMessage, DeployData, Justification},
+    validator::Validator,
 };
 use rspace_plus_plus::rspace::history::Either;
 
 use crate::rust::{
     block_status::{BlockError, InvalidBlock, ValidBlock},
+    engine::block_retriever::BlockRetriever,
     errors::CasperError,
+    estimator::Estimator,
     multi_parent_casper_impl::MultiParentCasperImpl,
+    util::rholang::runtime_manager::RuntimeManager,
     validator_identity::ValidatorIdentity,
-};
-
-use std::{
-    collections::HashMap,
-    fmt::{self, Display},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,26 +74,25 @@ impl Display for DeployError {
 }
 
 pub trait Casper {
-    fn get_snapshot(&self) -> Result<CasperSnapshot, CasperError>;
+    async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError>;
 
-    fn contains(&self, hash: &BlockHash) -> Result<bool, CasperError>;
+    fn contains(&self, hash: &BlockHash) -> bool;
 
-    fn dag_contains(&self, hash: &BlockHash) -> Result<bool, CasperError>;
+    fn dag_contains(&self, hash: &BlockHash) -> bool;
 
-    fn buffer_contains(&self, hash: &BlockHash) -> Result<bool, CasperError>;
+    fn buffer_contains(&self, hash: &BlockHash) -> bool;
 
     fn deploy(
-        &self,
+        &mut self,
         deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError>;
 
-    fn estimator(&self, dag: &KeyValueDagRepresentation) -> Result<Vec<BlockHash>, CasperError>;
+    async fn estimator(
+        &self,
+        dag: &mut KeyValueDagRepresentation,
+    ) -> Result<Vec<BlockHash>, CasperError>;
 
-    fn get_approved_block(&self) -> Result<BlockMessage, CasperError>;
-
-    fn get_validator(&self) -> Result<Option<ValidatorIdentity>, CasperError>;
-
-    fn get_version(&self) -> Result<i64, CasperError>;
+    fn get_version(&self) -> i64;
 
     fn validate(
         &self,
@@ -92,13 +100,13 @@ pub trait Casper {
         snapshot: &CasperSnapshot,
     ) -> Result<Either<BlockError, ValidBlock>, CasperError>;
 
-    fn handle_valid_block(
-        &self,
+    async fn handle_valid_block(
+        &mut self,
         block: &BlockMessage,
     ) -> Result<KeyValueDagRepresentation, CasperError>;
 
     fn handle_invalid_block(
-        &self,
+        &mut self,
         block: &BlockMessage,
         status: &InvalidBlock,
         dag: &KeyValueDagRepresentation,
@@ -108,7 +116,7 @@ pub trait Casper {
 }
 
 pub trait MultiParentCasper: Casper {
-    fn fetch_dependencies(&self) -> Result<(), CasperError>;
+    async fn fetch_dependencies(&self) -> Result<(), CasperError>;
 
     // This is the weight of faults that have been accumulated so far.
     // We want the clique oracle to give us a fault tolerance that is greater than
@@ -118,15 +126,31 @@ pub trait MultiParentCasper: Casper {
         weights: HashMap<Validator, u64>,
     ) -> Result<f32, CasperError>;
 
-    fn last_finalized_block(&self) -> Result<BlockMessage, CasperError>;
+    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError>;
 }
 
-pub fn hash_set_casper(
+pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
+    block_retriever: BlockRetriever<T>,
+    event_publisher: F1r3flyEvents,
+    runtime_manager: RuntimeManager,
+    estimator: Estimator,
+    block_store: KeyValueBlockStore,
+    block_dag_storage: BlockDagKeyValueStorage,
+    deploy_storage: KeyValueDeployStorage,
+    casper_buffer_storage: CasperBufferKeyValueStorage,
     validator_id: Option<ValidatorIdentity>,
     casper_shard_conf: CasperShardConf,
     approved_block: BlockMessage,
 ) -> Result<impl MultiParentCasper, CasperError> {
     Ok(MultiParentCasperImpl {
+        block_retriever,
+        event_publisher,
+        runtime_manager,
+        estimator,
+        block_store,
+        block_dag_storage,
+        deploy_storage,
+        casper_buffer_storage,
         validator_id,
         casper_shard_conf,
         approved_block,
@@ -172,7 +196,7 @@ impl CasperSnapshot {
 
 pub struct OnChainCasperState {
     pub shard_conf: CasperShardConf,
-    pub bonds_map: DashMap<Validator, u64>,
+    pub bonds_map: HashMap<Validator, i64>,
     pub active_validators: Vec<Validator>,
 }
 
@@ -180,12 +204,13 @@ impl OnChainCasperState {
     pub fn new(shard_conf: CasperShardConf) -> Self {
         Self {
             shard_conf,
-            bonds_map: DashMap::new(),
+            bonds_map: HashMap::new(),
             active_validators: vec![],
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CasperShardConf {
     pub fault_tolerance_threshold: f32,
     pub shard_name: String,

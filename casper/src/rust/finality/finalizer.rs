@@ -99,10 +99,10 @@ impl Finalizer {
         dag: &KeyValueDagRepresentation,
         fault_tolerance_threshold: f32,
         curr_lfb_height: i64,
-        new_lfb_found_effect: F,
+        mut new_lfb_found_effect: F,
     ) -> Result<Option<BlockHash>, KvStoreError>
     where
-        F: Fn(BlockHash) -> Result<(), KvStoreError>,
+        F: FnMut(BlockHash) -> Result<(), KvStoreError>,
     {
         /*
          * Stream of agreements passed down from all latest messages to main parents.

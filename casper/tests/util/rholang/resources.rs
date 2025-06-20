@@ -225,7 +225,7 @@ pub fn mk_dummy_casper_snapshot() -> CasperSnapshot {
         max_seq_nums: DashMap::new(),
         on_chain_state: OnChainCasperState {
             shard_conf: CasperShardConf::new(),
-            bonds_map: DashMap::new(),
+            bonds_map: HashMap::new(),
             active_validators: Vec::new(),
         },
     }

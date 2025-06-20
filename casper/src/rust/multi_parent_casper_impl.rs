@@ -1,72 +1,220 @@
 // See casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
-use block_storage::rust::dag::block_dag_key_value_storage::KeyValueDagRepresentation;
-use crypto::rust::signatures::signed::Signed;
-use models::{
-    rhoapi::DeployId,
-    rust::{
-        block_hash::BlockHash,
-        casper::protocol::casper_message::{BlockMessage, DeployData},
-        validator::Validator,
+use block_storage::rust::{
+    casperbuffer::casper_buffer_key_value_storage::CasperBufferKeyValueStorage,
+    dag::block_dag_key_value_storage::{
+        BlockDagKeyValueStorage, DeployId, KeyValueDagRepresentation,
     },
+    deploy::key_value_deploy_storage::KeyValueDeployStorage,
+    key_value_block_store::KeyValueBlockStore,
 };
-use rspace_plus_plus::rspace::history::Either;
-use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
+use comm::rust::transport::transport_layer::TransportLayer;
+use crypto::rust::signatures::signed::Signed;
+use models::rust::{
+    block_hash::{BlockHash, BlockHashSerde},
+    casper::{
+        pretty_printer::PrettyPrinter,
+        protocol::casper_message::{BlockMessage, DeployData, Justification},
+    },
+    equivocation_record::EquivocationRecord,
+    normalizer_env::normalizer_env_from_deploy,
+    validator::Validator,
+};
+use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
+use shared::rust::{
+    dag::dag_ops,
+    shared::{f1r3fly_event::F1r3flyEvent, f1r3fly_events::F1r3flyEvents},
+    store::{key_value_store::KvStoreError, key_value_typed_store::KeyValueTypedStore},
+};
 
 use crate::rust::{
-    block_status::{BlockError, ValidBlock},
-    casper::{Casper, CasperShardConf, CasperSnapshot, DeployError, MultiParentCasper},
+    block_status::{BlockError, InvalidBlock, ValidBlock},
+    casper::{
+        Casper, CasperShardConf, CasperSnapshot, DeployError, MultiParentCasper, OnChainCasperState,
+    },
+    engine::block_retriever::{AdmitHashReason, BlockRetriever},
     errors::CasperError,
+    estimator::{Estimator, ForkChoice},
+    finality::finalizer::Finalizer,
+    util::{
+        proto_util,
+        rholang::{interpreter_util, runtime_manager::RuntimeManager},
+    },
     validator_identity::ValidatorIdentity,
 };
 
-pub struct MultiParentCasperImpl {
+pub struct MultiParentCasperImpl<T: TransportLayer + Send + Sync> {
+    pub block_retriever: BlockRetriever<T>,
+    pub event_publisher: F1r3flyEvents,
+    pub runtime_manager: RuntimeManager,
+    pub estimator: Estimator,
+    pub block_store: KeyValueBlockStore,
+    pub block_dag_storage: BlockDagKeyValueStorage,
+    pub deploy_storage: KeyValueDeployStorage,
+    pub casper_buffer_storage: CasperBufferKeyValueStorage,
     pub validator_id: Option<ValidatorIdentity>,
     // TODO: this should be read from chain, for now read from startup options - OLD
     pub casper_shard_conf: CasperShardConf,
     pub approved_block: BlockMessage,
 }
 
-impl Casper for MultiParentCasperImpl {
-    fn get_snapshot(&self) -> Result<CasperSnapshot, CasperError> {
-        todo!()
+impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
+    async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError> {
+        let mut dag = self.block_dag_storage.get_representation();
+        let ForkChoice { lca, tips } = self.estimator.tips(&mut dag, &self.approved_block).await?;
+
+        // Before block merge, `EstimatorHelper.chooseNonConflicting` were used to filter parents, as we could not
+        // have conflicting parents. With introducing block merge, all parents that share the same bonds map
+        // should be parents. Parents that have different bond maps are only one that cannot be merged in any way.
+        let parents = {
+            // For now main parent bonds map taken as a reference, but might be we want to pick a subset with equal
+            // bond maps that has biggest cumulative stake.
+            let blocks = tips
+                .iter()
+                .map(|b| self.block_store.get_unsafe(b))
+                .collect::<Vec<_>>();
+
+            let parents = blocks
+                .iter()
+                .filter(|b| {
+                    if let Some(first_block) = blocks.first() {
+                        b.body.state.bonds == first_block.body.state.bonds
+                    } else {
+                        false
+                    }
+                })
+                .map(|b| b.clone())
+                .collect::<Vec<_>>();
+
+            parents
+        };
+
+        let on_chain_state = self.get_on_chain_state(&self.approved_block).await?;
+
+        // We ensure that only the justifications given in the block are those
+        // which are bonded validators in the chosen parent. This is safe because
+        // any latest message not from a bonded validator will not change the
+        // final fork-choice.
+        let justifications = {
+            let latest_messages = dag.latest_messages()?;
+            let bonded_validators = &on_chain_state.bonds_map;
+
+            latest_messages
+                .into_iter()
+                .filter(|(validator, _)| bonded_validators.contains_key(validator))
+                .map(|(validator, block_metadata)| Justification {
+                    validator,
+                    latest_block_hash: block_metadata.block_hash,
+                })
+                .collect::<dashmap::DashSet<_>>()
+        };
+
+        let parent_hashes: Vec<BlockHash> = parents.iter().map(|b| b.block_hash.clone()).collect();
+        let parent_metas = dag.lookups_unsafe(parent_hashes)?;
+        let max_block_num = proto_util::max_block_number_metadata(parent_metas.clone());
+
+        let max_seq_nums = {
+            let latest_messages = dag.latest_messages()?;
+            latest_messages
+                .into_iter()
+                .map(|(validator, block_metadata)| {
+                    (validator, block_metadata.sequence_number as u64)
+                })
+                .collect::<dashmap::DashMap<_, _>>()
+        };
+
+        let deploys_in_scope = {
+            let current_block_number = max_block_num + 1;
+            let earliest_block_number =
+                current_block_number - on_chain_state.shard_conf.deploy_lifespan;
+
+            // Use bf_traverse to collect all deploys within the deploy lifespan
+            let neighbor_fn = |block_metadata: &models::rust::block_metadata::BlockMetadata| -> Vec<models::rust::block_metadata::BlockMetadata> {
+                match proto_util::get_parent_metadatas_above_block_number(
+                    &mut dag,
+                    block_metadata,
+                    earliest_block_number,
+                ) {
+                    Ok(parents) => parents,
+                    Err(_) => vec![],
+                }
+            };
+
+            let traversal_result = dag_ops::bf_traverse(parent_metas, neighbor_fn);
+
+            let all_deploys = dashmap::DashSet::new();
+            for block_metadata in traversal_result {
+                let block = self.block_store.get_unsafe(&block_metadata.block_hash);
+                let block_deploys = proto_util::deploys(&block);
+                for processed_deploy in block_deploys {
+                    all_deploys.insert(processed_deploy.deploy);
+                }
+            }
+            all_deploys
+        };
+
+        let invalid_blocks = dag.invalid_blocks_map()?;
+        let last_finalized_block = dag.last_finalized_block();
+
+        Ok(CasperSnapshot {
+            dag,
+            last_finalized_block,
+            lca,
+            tips,
+            parents,
+            justifications,
+            invalid_blocks,
+            deploys_in_scope,
+            max_block_num,
+            max_seq_nums,
+            on_chain_state,
+        })
     }
 
-    fn contains(&self, hash: &BlockHash) -> Result<bool, CasperError> {
-        todo!()
+    fn contains(&self, hash: &BlockHash) -> bool {
+        self.buffer_contains(hash) || self.dag_contains(hash)
     }
 
-    fn dag_contains(&self, hash: &BlockHash) -> Result<bool, CasperError> {
-        todo!()
+    fn dag_contains(&self, hash: &BlockHash) -> bool {
+        self.block_dag_storage.get_representation().contains(hash)
     }
 
-    fn buffer_contains(&self, hash: &BlockHash) -> Result<bool, CasperError> {
-        todo!()
+    fn buffer_contains(&self, hash: &BlockHash) -> bool {
+        let block_hash_serde = BlockHashSerde(hash.clone());
+        self.casper_buffer_storage.contains(&block_hash_serde)
     }
 
     fn deploy(
-        &self,
+        &mut self,
         deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError> {
-        todo!()
+        // Create normalizer environment from deploy
+        let normalizer_env = normalizer_env_from_deploy(&deploy);
+
+        // Try to parse the deploy term
+        match interpreter_util::mk_term(&deploy.data.term, normalizer_env) {
+            // Parse failed - return parsing error
+            Err(interpreter_error) => Ok(Either::Left(DeployError::parsing_error(format!(
+                "Error in parsing term: \n{}",
+                interpreter_error
+            )))),
+            // Parse succeeded - call add_deploy
+            Ok(_parsed_term) => Ok(Either::Right(self.add_deploy(deploy)?)),
+        }
     }
 
-    fn estimator(&self, dag: &KeyValueDagRepresentation) -> Result<Vec<BlockHash>, CasperError> {
-        todo!()
+    async fn estimator(
+        &self,
+        dag: &mut KeyValueDagRepresentation,
+    ) -> Result<Vec<BlockHash>, CasperError> {
+        let fork_choice = self.estimator.tips(dag, &self.approved_block).await?;
+        Ok(fork_choice.tips)
     }
 
-    fn get_approved_block(&self) -> Result<BlockMessage, CasperError> {
-        todo!()
-    }
-
-    fn get_validator(&self) -> Result<Option<ValidatorIdentity>, CasperError> {
-        todo!()
-    }
-
-    fn get_version(&self) -> Result<i64, CasperError> {
-        todo!()
+    fn get_version(&self) -> i64 {
+        self.casper_shard_conf.casper_version
     }
 
     fn validate(
@@ -77,41 +225,344 @@ impl Casper for MultiParentCasperImpl {
         todo!()
     }
 
-    fn handle_valid_block(
-        &self,
+    async fn handle_valid_block(
+        &mut self,
         block: &BlockMessage,
     ) -> Result<KeyValueDagRepresentation, CasperError> {
-        todo!()
+        // Insert block as valid into DAG storage
+        let updated_dag = self.block_dag_storage.insert(block, false, false)?;
+
+        // Remove block from casper buffer
+        let block_hash_serde = BlockHashSerde(block.block_hash.clone());
+        self.casper_buffer_storage.remove(block_hash_serde)?;
+
+        // Update last finalized block if needed
+        self.update_last_finalized_block(block).await?;
+
+        Ok(updated_dag)
     }
 
     fn handle_invalid_block(
-        &self,
+        &mut self,
         block: &BlockMessage,
-        status: &super::block_status::InvalidBlock,
+        status: &InvalidBlock,
         dag: &KeyValueDagRepresentation,
     ) -> Result<KeyValueDagRepresentation, CasperError> {
-        todo!()
+        // Helper function to handle invalid block effect (logging + storage operations)
+        let handle_invalid_block_effect =
+            |block_dag_storage: &mut BlockDagKeyValueStorage,
+             casper_buffer_storage: &mut CasperBufferKeyValueStorage,
+             status: &InvalidBlock,
+             block: &BlockMessage|
+             -> Result<KeyValueDagRepresentation, CasperError> {
+                log::warn!(
+                    "Recording invalid block {} for {:?}.",
+                    PrettyPrinter::build_string_bytes(&block.block_hash),
+                    status
+                );
+
+                // TODO: should be nice to have this transition of a block from casper buffer to dag storage atomic
+                let updated_dag = block_dag_storage.insert(block, true, false)?;
+                let block_hash_serde = BlockHashSerde(block.block_hash.clone());
+                casper_buffer_storage.remove(block_hash_serde)?;
+                Ok(updated_dag)
+            };
+
+        match status {
+            InvalidBlock::AdmissibleEquivocation => {
+                let base_equivocation_block_seq_num = block.seq_num - 1;
+
+                // Check if equivocation record already exists for this validator and sequence number
+                let equivocation_records = self.block_dag_storage.equivocation_records()?;
+                let record_exists = equivocation_records.iter().any(|record| {
+                    record.equivocator == block.sender
+                        && record.equivocation_base_block_seq_num == base_equivocation_block_seq_num
+                });
+
+                if !record_exists {
+                    // Create and insert new equivocation record
+                    let new_equivocation_record = EquivocationRecord::new(
+                        block.sender.clone(),
+                        base_equivocation_block_seq_num,
+                        BTreeSet::new(),
+                    );
+                    self.block_dag_storage
+                        .insert_equivocation_record(new_equivocation_record)?;
+                }
+
+                // We can only treat admissible equivocations as invalid blocks if
+                // casper is single threaded.
+                handle_invalid_block_effect(
+                    &mut self.block_dag_storage,
+                    &mut self.casper_buffer_storage,
+                    status,
+                    block,
+                )
+            }
+
+            InvalidBlock::IgnorableEquivocation => {
+                /*
+                 * We don't have to include these blocks to the equivocation tracker because if any validator
+                 * will build off this side of the equivocation, we will get another attempt to add this block
+                 * through the admissible equivocations.
+                 */
+                log::info!(
+                    "Did not add block {} as that would add an equivocation to the BlockDAG",
+                    PrettyPrinter::build_string_bytes(&block.block_hash)
+                );
+                Ok(dag.clone())
+            }
+
+            status if status.is_slashable() => {
+                // TODO: Slash block for status except InvalidUnslashableBlock
+                // This should implement actual slashing mechanism (reducing stake, etc.)
+                handle_invalid_block_effect(
+                    &mut self.block_dag_storage,
+                    &mut self.casper_buffer_storage,
+                    status,
+                    block,
+                )
+            }
+
+            _ => {
+                let block_hash_serde = BlockHashSerde(block.block_hash.clone());
+                self.casper_buffer_storage.remove(block_hash_serde)?;
+                log::warn!(
+                    "Recording invalid block {} for {:?}.",
+                    PrettyPrinter::build_string_bytes(&block.block_hash),
+                    status
+                );
+                Ok(dag.clone())
+            }
+        }
     }
 
     fn get_dependency_free_from_buffer(&self) -> Result<Vec<BlockMessage>, CasperError> {
-        todo!()
+        // Get pendants from CasperBuffer
+        let pendants = self.casper_buffer_storage.get_pendants();
+
+        // Filter to pendants that exist in block store
+        let mut pendants_stored = Vec::new();
+        for pendant_serde in pendants.iter() {
+            let pendant_hash = BlockHash::from(pendant_serde.0.clone());
+            if self.block_store.get(&pendant_hash)?.is_some() {
+                pendants_stored.push(pendant_hash);
+            }
+        }
+
+        // Filter to dependency-free pendants
+        let mut dep_free_pendants = Vec::new();
+        for pendant_hash in pendants_stored {
+            let block = self.block_store.get_unsafe(&pendant_hash);
+            let justifications = &block.justifications;
+
+            // Check if all justifications are in DAG
+            // If even one justification is not in DAG - block is not dependency free
+            let all_deps_in_dag = justifications
+                .iter()
+                .all(|j| self.dag_contains(&j.latest_block_hash));
+
+            if all_deps_in_dag {
+                dep_free_pendants.push(pendant_hash);
+            }
+        }
+
+        // Get the actual BlockMessages
+        let result = dep_free_pendants
+            .into_iter()
+            .map(|hash| self.block_store.get_unsafe(&hash))
+            .collect();
+
+        Ok(result)
     }
 }
 
-impl MultiParentCasper for MultiParentCasperImpl {
-    fn fetch_dependencies(&self) -> Result<(), CasperError> {
-        todo!()
+impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImpl<T> {
+    async fn fetch_dependencies(&self) -> Result<(), CasperError> {
+        // Get pendants from CasperBuffer
+        let pendants = self.casper_buffer_storage.get_pendants();
+
+        // Filter to get unseen pendants (not in block store)
+        let mut pendants_unseen = Vec::new();
+        for pendant_serde in pendants.iter() {
+            let pendant_hash = BlockHash::from(pendant_serde.0.clone());
+            if self.block_store.get(&pendant_hash)?.is_none() {
+                pendants_unseen.push(pendant_hash);
+            }
+        }
+
+        // Log debug info about pendant count
+        log::debug!(
+            "Requesting CasperBuffer pendant hashes, {} items.",
+            pendants_unseen.len()
+        );
+
+        // Send each unseen pendant to BlockRetriever
+        for dependency in pendants_unseen {
+            log::debug!(
+                "Sending dependency {} to BlockRetriever",
+                PrettyPrinter::build_string_bytes(&dependency)
+            );
+
+            self.block_retriever
+                .admit_hash(
+                    dependency,
+                    None,
+                    AdmitHashReason::MissingDependencyRequested,
+                )
+                .await?;
+        }
+
+        Ok(())
     }
 
     fn normalized_initial_fault(
         &self,
         weights: HashMap<Validator, u64>,
     ) -> Result<f32, CasperError> {
-        todo!()
+        // Access equivocations tracker to get equivocation records
+        let equivocating_weight =
+            self.block_dag_storage
+                .access_equivocations_tracker(|tracker| {
+                    let equivocation_records = tracker.data()?;
+
+                    // Extract equivocators and sum their weights
+                    let equivocating_weight: u64 = equivocation_records
+                        .iter()
+                        .map(|record| &record.equivocator)
+                        .filter_map(|equivocator| weights.get(equivocator))
+                        .sum();
+
+                    Ok(equivocating_weight)
+                })?;
+
+        // Calculate total weight from the weights map
+        let total_weight: u64 = weights.values().sum();
+
+        // Return normalized fault (equivocating weight / total weight)
+        if total_weight == 0 {
+            Ok(0.0)
+        } else {
+            Ok(equivocating_weight as f32 / total_weight as f32)
+        }
     }
 
-    fn last_finalized_block(&self) -> Result<BlockMessage, CasperError> {
-        todo!()
+    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError> {
+        // Get current LFB hash and height
+        let dag = self.block_dag_storage.get_representation();
+        let last_finalized_block_hash = dag.last_finalized_block();
+        let last_finalized_block_height =
+            dag.lookup_unsafe(&last_finalized_block_hash)?.block_number;
+
+        // Create simple finalization effect closure
+        let new_lfb_found_effect = |new_lfb: BlockHash| -> Result<(), KvStoreError> {
+            self.block_dag_storage.record_directly_finalized(
+                new_lfb.clone(),
+                |finalized_set: &HashSet<BlockHash>| -> Result<(), KvStoreError> {
+                    // process_finalized
+                    for block_hash in finalized_set {
+                        let block = self.block_store.get_unsafe(block_hash);
+                        let deploys: Vec<_> = block
+                            .body
+                            .deploys
+                            .iter()
+                            .map(|pd| pd.deploy.clone())
+                            .collect();
+
+                        // Remove block deploys from persistent store
+                        let deploys_count = deploys.len();
+                        self.deploy_storage.remove(deploys)?;
+                        let finalized_set_str = PrettyPrinter::build_string_hashes(
+                            &finalized_set.iter().map(|h| h.to_vec()).collect::<Vec<_>>(),
+                        );
+                        let removed_deploy_msg = format!(
+                            "Removed {} deploys from deploy history as we finalized block {}.",
+                            deploys_count, finalized_set_str
+                        );
+                        log::info!("{}", removed_deploy_msg);
+
+                        // Remove block index from cache
+                        self.runtime_manager.remove_block_index_cache(block_hash);
+
+                        // TODO: Review the deletion process here and compare with Scala version
+                        let state_hash =
+                            Blake2b256Hash::from_bytes_prost(&block.body.state.post_state_hash);
+                        self.runtime_manager
+                            .mergeable_store
+                            .delete(vec![state_hash.bytes()])?;
+                    }
+                    Ok(())
+                },
+            )?;
+
+            self.event_publisher
+                .publish(F1r3flyEvent::block_finalised(hex::encode(new_lfb)))
+                .map_err(|e| KvStoreError::IoError(e.to_string()))
+        };
+
+        // Run finalizer
+        let new_finalized_hash_opt = Finalizer::run(
+            &dag,
+            self.casper_shard_conf.fault_tolerance_threshold,
+            last_finalized_block_height,
+            new_lfb_found_effect,
+        )
+        .await
+        .map_err(|e| CasperError::KvStoreError(e))?;
+
+        // Get the final LFB hash (either new or existing)
+        let final_lfb_hash = new_finalized_hash_opt.unwrap_or(last_finalized_block_hash);
+
+        // Return the finalized block
+        let block_message = self.block_store.get_unsafe(&final_lfb_hash);
+        Ok(block_message)
+    }
+}
+
+impl<T: TransportLayer + Send + Sync> MultiParentCasperImpl<T> {
+    async fn update_last_finalized_block(
+        &mut self,
+        new_block: &BlockMessage,
+    ) -> Result<(), CasperError> {
+        if new_block.body.state.block_number % self.casper_shard_conf.finalization_rate as i64 == 0
+        {
+            self.last_finalized_block().await?;
+        }
+        Ok(())
+    }
+
+    async fn get_on_chain_state(
+        &self,
+        block: &BlockMessage,
+    ) -> Result<OnChainCasperState, CasperError> {
+        let av = self
+            .runtime_manager
+            .get_active_validators(&block.body.state.post_state_hash)
+            .await?;
+
+        // bonds are available in block message, but please remember this is just a cache, source of truth is RSpace.
+        let bm = &block.body.state.bonds;
+
+        Ok(OnChainCasperState {
+            shard_conf: self.casper_shard_conf.clone(),
+            bonds_map: bm
+                .iter()
+                .map(|v| (v.validator.clone(), v.stake))
+                .collect::<HashMap<_, _>>(),
+            active_validators: av,
+        })
+    }
+
+    fn add_deploy(&mut self, deploy: Signed<DeployData>) -> Result<DeployId, CasperError> {
+        // Add deploy to storage
+        self.deploy_storage.add(vec![deploy.clone()])?;
+
+        // Log the received deploy
+        let deploy_info = PrettyPrinter::build_string_signed_deploy_data(&deploy);
+        log::info!("Received {}", deploy_info);
+
+        // Return deploy signature as DeployId
+        Ok(deploy.sig.to_vec())
     }
 }
 

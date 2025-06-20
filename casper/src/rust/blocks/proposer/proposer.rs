@@ -1,6 +1,8 @@
 // See casper/src/main/scala/coop/rchain/casper/blocks/proposer/Proposer.scala
 
+use log;
 use std::sync::{Arc, Mutex};
+use tokio::sync::oneshot;
 
 use block_storage::rust::{
     deploy::key_value_deploy_storage::KeyValueDeployStorage,
@@ -11,10 +13,8 @@ use comm::rust::{
     transport::transport_layer::TransportLayer,
 };
 use crypto::rust::private_key::PrivateKey;
-use log;
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
-use tokio::sync::oneshot;
 
 use crate::rust::{
     blocks::proposer::{
@@ -39,7 +39,10 @@ use super::propose_result::ProposeStatus;
 
 // Traits for dependency injection and testing
 pub trait CasperSnapshotProvider {
-    fn get_casper_snapshot(&self, casper: &dyn Casper) -> Result<CasperSnapshot, CasperError>;
+    async fn get_casper_snapshot(
+        &self,
+        casper: &mut impl Casper,
+    ) -> Result<CasperSnapshot, CasperError>;
 }
 
 pub trait ActiveValidatorChecker {
@@ -76,7 +79,7 @@ pub trait BlockCreator {
 pub trait BlockValidator {
     fn validate_block(
         &self,
-        casper: &dyn Casper,
+        casper: &impl Casper,
         casper_snapshot: &CasperSnapshot,
         block: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError>;
@@ -85,7 +88,7 @@ pub trait BlockValidator {
 pub trait ProposeEffectHandler {
     async fn handle_propose_effect(
         &mut self,
-        casper: &dyn Casper,
+        casper: &mut impl Casper,
         block: &BlockMessage,
     ) -> Result<(), CasperError>;
 }
@@ -174,7 +177,7 @@ where
     async fn do_propose(
         &mut self,
         casper_snapshot: &CasperSnapshot,
-        casper: &dyn Casper,
+        casper: &mut impl Casper,
     ) -> Result<(ProposeResult, Option<BlockMessage>), CasperError> {
         // check if node is allowed to propose a block
         let constraint_check = self.check_propose_constraints(casper_snapshot).await?;
@@ -262,7 +265,7 @@ where
 
     pub async fn propose(
         &mut self,
-        casper: &dyn Casper,
+        casper: &mut impl Casper,
         is_async: bool,
         propose_id_sender: oneshot::Sender<ProposerResult>,
     ) -> Result<(ProposeResult, Option<BlockMessage>), CasperError> {
@@ -280,7 +283,10 @@ where
         let start_time = std::time::Instant::now();
 
         // get snapshot to serve as a base for propose
-        let casper_snapshot = self.casper_snapshot_provider.get_casper_snapshot(casper)?;
+        let casper_snapshot = self
+            .casper_snapshot_provider
+            .get_casper_snapshot(casper)
+            .await?;
 
         let elapsed = start_time.elapsed();
         log::info!("getCasperSnapshot [{}ms]", elapsed.as_millis());
@@ -375,8 +381,11 @@ pub fn new_proposer<T: TransportLayer + Send + Sync>(
 
 pub struct ProductionCasperSnapshotProvider;
 impl CasperSnapshotProvider for ProductionCasperSnapshotProvider {
-    fn get_casper_snapshot(&self, casper: &dyn Casper) -> Result<CasperSnapshot, CasperError> {
-        casper.get_snapshot()
+    async fn get_casper_snapshot(
+        &self,
+        casper: &mut impl Casper,
+    ) -> Result<CasperSnapshot, CasperError> {
+        casper.get_snapshot().await
     }
 }
 
@@ -514,7 +523,7 @@ pub struct ProductionBlockValidator;
 impl BlockValidator for ProductionBlockValidator {
     fn validate_block(
         &self,
-        casper: &dyn Casper,
+        casper: &impl Casper,
         casper_snapshot: &CasperSnapshot,
         block: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError> {
@@ -554,7 +563,7 @@ impl<T: TransportLayer + Send + Sync> ProductionProposeEffectHandler<T> {
 impl<T: TransportLayer + Send + Sync> ProposeEffectHandler for ProductionProposeEffectHandler<T> {
     async fn handle_propose_effect(
         &mut self,
-        casper: &dyn Casper,
+        casper: &mut impl Casper,
         block: &BlockMessage,
     ) -> Result<(), CasperError> {
         // store block
@@ -564,7 +573,7 @@ impl<T: TransportLayer + Send + Sync> ProposeEffectHandler for ProductionPropose
             .put_block_message(block)?;
 
         // save changes to Casper
-        casper.handle_valid_block(block)?;
+        casper.handle_valid_block(block).await?;
 
         // inform block retriever about block
         self.block_retriever
