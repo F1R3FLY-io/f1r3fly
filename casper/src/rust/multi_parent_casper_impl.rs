@@ -113,7 +113,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
         let parent_hashes: Vec<BlockHash> = parents.iter().map(|b| b.block_hash.clone()).collect();
         let parent_metas = dag.lookups_unsafe(parent_hashes)?;
-        let max_block_num = proto_util::max_block_number_metadata(parent_metas.clone());
+        let max_block_num = proto_util::max_block_number_metadata(&parent_metas);
 
         let max_seq_nums = {
             let latest_messages = dag.latest_messages()?;
@@ -132,11 +132,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
             // Use bf_traverse to collect all deploys within the deploy lifespan
             let neighbor_fn = |block_metadata: &models::rust::block_metadata::BlockMetadata| -> Vec<models::rust::block_metadata::BlockMetadata> {
-                match proto_util::get_parent_metadatas_above_block_number(
-                    &mut dag,
-                    block_metadata,
-                    earliest_block_number,
-                ) {
+                match proto_util::get_parent_metadatas_above_block_number(block_metadata, earliest_block_number, &mut dag) {
                     Ok(parents) => parents,
                     Err(_) => vec![],
                 }

@@ -1,6 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/util/rholang/ReplayFailure.scala
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ReplayFailure {
     InternalError {
         msg: String,

@@ -243,7 +243,7 @@ pub fn get_parents(
 }
 
 pub fn get_parents_metadata(
-    dag: &mut KeyValueDagRepresentation,
+    dag: &KeyValueDagRepresentation,
     block: &BlockMetadata,
 ) -> Result<Vec<BlockMetadata>, KvStoreError> {
     block
@@ -254,9 +254,9 @@ pub fn get_parents_metadata(
 }
 
 pub fn get_parent_metadatas_above_block_number(
-    dag: &mut KeyValueDagRepresentation,
     block: &BlockMetadata,
     block_number: i64,
+    dag: &KeyValueDagRepresentation,
 ) -> Result<Vec<BlockMetadata>, KvStoreError> {
     get_parents_metadata(dag, block).map(|parents| {
         parents
@@ -297,7 +297,7 @@ pub fn bond_to_bond_info(bond: &Bond) -> BondInfo {
     }
 }
 
-pub fn max_block_number_metadata(blocks: Vec<BlockMetadata>) -> i64 {
+pub fn max_block_number_metadata(blocks: &Vec<BlockMetadata>) -> i64 {
     blocks
         .iter()
         .fold(-1, |acc, block| std::cmp::max(acc, block.block_number))
