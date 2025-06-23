@@ -27,8 +27,7 @@ pub struct Estimator {
 }
 
 impl Estimator {
-    #[allow(dead_code)]
-    const UNLIMITED_PARENTS: i32 = i32::MAX;
+    pub const UNLIMITED_PARENTS: i32 = i32::MAX;
     const LATEST_MESSAGE_MAX_DEPTH: i64 = 1000;
 
     pub fn apply(max_number_of_parents: i32, max_parent_depth_opt: Option<i32>) -> Self {
