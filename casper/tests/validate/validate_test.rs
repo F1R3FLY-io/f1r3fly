@@ -39,27 +39,6 @@ use models::rust::casper::protocol::casper_message;
 use rspace_plus_plus::rspace::history::Either;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 
-// Custom macro for tests that need larger stack size due to Rholang runtime deep recursion
-macro_rules! tokio_test_with_stack {
-    ($stack_size:expr, $test_name:ident, $test_body:expr) => {
-        #[tokio::test]
-        async fn $test_name() {
-            let builder = std::thread::Builder::new()
-                .name(stringify!($test_name).to_string())
-                .stack_size($stack_size);
-
-            let handle = builder
-                .spawn(|| {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on($test_body)
-                })
-                .unwrap();
-
-            handle.join().unwrap();
-        }
-    };
-}
-
 const SHARD_ID: &str = "root-shard";
 
 fn mk_casper_snapshot(dag: KeyValueDagRepresentation) -> CasperSnapshot {
@@ -1736,189 +1715,173 @@ async fn justification_regression_validation_should_return_valid_for_regressive_
     .await
 }
 
-// Test 25: bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modified_bonds
-tokio_test_with_stack!(
-    8 * 1024 * 1024, // 8MB stack to handle Rholang runtime deep recursion
-    bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modified_bonds,
-    async {
-        with_storage(|mut block_store, mut block_dag_storage| async move {
-            let genesis = GenesisBuilder::new().create_genesis().await.unwrap();
+#[tokio::test]
+async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modified_bonds() {
+    with_storage(|mut block_store, mut block_dag_storage| async move {
+        let genesis = GenesisBuilder::new().create_genesis().await.unwrap();
 
-            let storage_directory = Builder::new()
-                .prefix("hash-set-casper-test-genesis-")
-                .tempdir()
-                .expect("Failed to create temporary directory");
-            let storage_directory_path = storage_directory.keep();
+        let storage_directory = Builder::new()
+            .prefix("hash-set-casper-test-genesis-")
+            .tempdir()
+            .expect("Failed to create temporary directory");
+        let storage_directory_path = storage_directory.keep();
 
-            block_dag_storage.insert(&genesis, false, true).unwrap();
+        block_dag_storage.insert(&genesis, false, true).unwrap();
 
-            let mut kvm = mk_test_rnode_store_manager(storage_directory_path.clone());
+        let mut kvm = mk_test_rnode_store_manager(storage_directory_path.clone());
 
-            let m_store = RuntimeManager::mergeable_store(&mut kvm).await.unwrap();
+        let m_store = RuntimeManager::mergeable_store(&mut kvm).await.unwrap();
 
-            let mut runtime_manager = RuntimeManager::create_with_store(
-                kvm.r_space_stores().await.unwrap(),
-                m_store,
-                Genesis::non_negative_mergeable_tag_name(),
-            );
+        let mut runtime_manager = RuntimeManager::create_with_store(
+            kvm.r_space_stores().await.unwrap(),
+            m_store,
+            Genesis::non_negative_mergeable_tag_name(),
+        );
 
-            let dag = block_dag_storage.get_representation();
-            let mut casper_snapshot = mk_casper_snapshot(dag);
+        let dag = block_dag_storage.get_representation();
+        let mut casper_snapshot = mk_casper_snapshot(dag);
 
-            interpreter_util::validate_block_checkpoint(
-                &genesis,
-                &mut block_store,
-                &mut casper_snapshot,
-                &mut runtime_manager,
-            )
+        interpreter_util::validate_block_checkpoint(
+            &genesis,
+            &mut block_store,
+            &mut casper_snapshot,
+            &mut runtime_manager,
+        )
+        .await
+        .unwrap();
+
+        let result_valid = Validate::bonds_cache(&genesis, &runtime_manager).await;
+        assert_eq!(result_valid, Either::Right(ValidBlock::Valid));
+
+        let modified_bonds = vec![];
+
+        let mut modified_post_state = genesis.body.state.clone();
+        modified_post_state.bonds = modified_bonds;
+
+        let mut modified_body = genesis.body.clone();
+        modified_body.state = modified_post_state;
+
+        let mut modified_genesis = genesis.clone();
+        modified_genesis.body = modified_body;
+
+        let result_invalid = Validate::bonds_cache(&modified_genesis, &runtime_manager).await;
+        assert_eq!(
+            result_invalid,
+            Either::Left(BlockError::Invalid(InvalidBlock::InvalidBondsCache))
+        );
+
+        // Manual cleanup
+        std::fs::remove_dir_all(&storage_directory_path).ok();
+    })
+    .await
+}
+
+#[tokio::test]
+async fn field_format_validation_should_succeed_on_a_valid_block_and_fail_on_empty_fields() {
+    with_storage(|_block_store, mut block_dag_storage| async move {
+        let context = GenesisBuilder::new()
+            .build_genesis_with_parameters(None)
             .await
             .unwrap();
+        let (sk, pk) = &context.validator_key_pairs[0];
 
-            let result_valid = Validate::bonds_cache(&genesis, &runtime_manager).await;
-            assert_eq!(result_valid, Either::Right(ValidBlock::Valid));
+        block_dag_storage
+            .insert(&context.genesis_block, false, true)
+            .unwrap();
+        let dag = block_dag_storage.get_representation();
+        let sender = Bytes::copy_from_slice(&pk.bytes);
+        let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
+        let seq_num =
+            latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
 
-            let modified_bonds = vec![];
+        let genesis =
+            ValidatorIdentity::new(sk).sign_block(&with_seq_num(&context.genesis_block, seq_num));
 
-            let mut modified_post_state = genesis.body.state.clone();
-            modified_post_state.bonds = modified_bonds;
+        let result = Validate::format_of_fields(&genesis);
+        assert_eq!(result, true);
 
-            let mut modified_body = genesis.body.clone();
-            modified_body.state = modified_post_state;
+        let invalid_block = with_sig(&genesis, &Bytes::new());
+        let result = Validate::format_of_fields(&invalid_block);
+        assert_eq!(result, false);
 
-            let mut modified_genesis = genesis.clone();
-            modified_genesis.body = modified_body;
+        let invalid_block = with_sig_algorithm(&genesis, "");
+        let result = Validate::format_of_fields(&invalid_block);
+        assert_eq!(result, false);
 
-            let result_invalid = Validate::bonds_cache(&modified_genesis, &runtime_manager).await;
-            assert_eq!(
-                result_invalid,
-                Either::Left(BlockError::Invalid(InvalidBlock::InvalidBondsCache))
-            );
+        let invalid_block = with_shard_id(&genesis, "");
+        let result = Validate::format_of_fields(&invalid_block);
+        assert_eq!(result, false);
 
-            // Manual cleanup
-            std::fs::remove_dir_all(&storage_directory_path).ok();
-        })
-        .await
-    }
-);
-
-// Test 26: "Field format validation" should "succeed on a valid block and fail on empty fields"
-tokio_test_with_stack!(
-    8 * 1024 * 1024, // 8MB stack to handle genesis creation
-    field_format_validation_should_succeed_on_a_valid_block_and_fail_on_empty_fields,
-    async {
-        with_storage(|_block_store, mut block_dag_storage| async move {
-            let context = GenesisBuilder::new()
-                .build_genesis_with_parameters(None)
-                .await
-                .unwrap();
-            let (sk, pk) = &context.validator_key_pairs[0];
-
-            block_dag_storage
-                .insert(&context.genesis_block, false, true)
-                .unwrap();
-            let dag = block_dag_storage.get_representation();
-            let sender = Bytes::copy_from_slice(&pk.bytes);
-            let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
-            let seq_num =
-                latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
-
-            let genesis = ValidatorIdentity::new(sk)
-                .sign_block(&with_seq_num(&context.genesis_block, seq_num));
-
-            let result = Validate::format_of_fields(&genesis);
-            assert_eq!(result, true);
-
-            let invalid_block = with_sig(&genesis, &Bytes::new());
-            let result = Validate::format_of_fields(&invalid_block);
-            assert_eq!(result, false);
-
-            let invalid_block = with_sig_algorithm(&genesis, "");
-            let result = Validate::format_of_fields(&invalid_block);
-            assert_eq!(result, false);
-
-            let invalid_block = with_shard_id(&genesis, "");
-            let result = Validate::format_of_fields(&invalid_block);
-            assert_eq!(result, false);
-
-            let invalid_block = with_post_state_hash(&genesis, &Bytes::new());
-            let result = Validate::format_of_fields(&invalid_block);
-            assert_eq!(result, false);
-        })
-        .await
-    }
-);
+        let invalid_block = with_post_state_hash(&genesis, &Bytes::new());
+        let result = Validate::format_of_fields(&invalid_block);
+        assert_eq!(result, false);
+    })
+    .await
+}
 
 // Test 27: "Block hash format validation" should "fail on invalid hash"
-tokio_test_with_stack!(
-    8 * 1024 * 1024, // 8MB stack to handle genesis creation
-    block_hash_format_validation_should_fail_on_invalid_hash,
-    async {
-        with_storage(|_block_store, mut block_dag_storage| async move {
-            let context = GenesisBuilder::new()
-                .build_genesis_with_parameters(None)
-                .await
-                .unwrap();
-            let (sk, pk) = &context.validator_key_pairs[0];
-            let sender = Bytes::copy_from_slice(&pk.bytes);
+#[tokio::test]
+async fn block_hash_format_validation_should_fail_on_invalid_hash() {
+    with_storage(|_block_store, mut block_dag_storage| async move {
+        let context = GenesisBuilder::new()
+            .build_genesis_with_parameters(None)
+            .await
+            .unwrap();
+        let (sk, pk) = &context.validator_key_pairs[0];
+        let sender = Bytes::copy_from_slice(&pk.bytes);
 
-            block_dag_storage
-                .insert(&context.genesis_block, false, true)
-                .unwrap();
-            let dag = block_dag_storage.get_representation();
+        block_dag_storage
+            .insert(&context.genesis_block, false, true)
+            .unwrap();
+        let dag = block_dag_storage.get_representation();
 
-            let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
-            let seq_num =
-                latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
+        let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
+        let seq_num =
+            latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
 
-            let genesis = ValidatorIdentity::new(sk)
-                .sign_block(&with_seq_num(&context.genesis_block, seq_num));
+        let genesis =
+            ValidatorIdentity::new(sk).sign_block(&with_seq_num(&context.genesis_block, seq_num));
 
-            let result = Validate::block_hash(&genesis);
-            assert_eq!(result, Either::Right(ValidBlock::Valid));
+        let result = Validate::block_hash(&genesis);
+        assert_eq!(result, Either::Right(ValidBlock::Valid));
 
-            let invalid_block =
-                with_block_hash(&genesis, &Bytes::copy_from_slice("123".as_bytes()));
-            let result = Validate::block_hash(&invalid_block);
-            assert_eq!(
-                result,
-                Either::Left(BlockError::Invalid(InvalidBlock::InvalidBlockHash))
-            );
-        })
-        .await
-    }
-);
+        let invalid_block = with_block_hash(&genesis, &Bytes::copy_from_slice("123".as_bytes()));
+        let result = Validate::block_hash(&invalid_block);
+        assert_eq!(
+            result,
+            Either::Left(BlockError::Invalid(InvalidBlock::InvalidBlockHash))
+        );
+    })
+    .await
+}
 
-// Test 28: "Block version validation" should "work"
-tokio_test_with_stack!(
-    8 * 1024 * 1024, // 8MB stack to handle genesis creation
-    block_version_validation_should_work,
-    async {
-        with_storage(|_block_store, mut block_dag_storage| async move {
-            let context = GenesisBuilder::new()
-                .build_genesis_with_parameters(None)
-                .await
-                .unwrap();
-            let (sk, pk) = &context.validator_key_pairs[0];
-            let sender = Bytes::copy_from_slice(&pk.bytes);
+#[tokio::test]
+async fn block_version_validation_should_work() {
+    with_storage(|_block_store, mut block_dag_storage| async move {
+        let context = GenesisBuilder::new()
+            .build_genesis_with_parameters(None)
+            .await
+            .unwrap();
+        let (sk, pk) = &context.validator_key_pairs[0];
+        let sender = Bytes::copy_from_slice(&pk.bytes);
 
-            block_dag_storage
-                .insert(&context.genesis_block, false, true)
-                .unwrap();
-            let dag = block_dag_storage.get_representation();
+        block_dag_storage
+            .insert(&context.genesis_block, false, true)
+            .unwrap();
+        let dag = block_dag_storage.get_representation();
 
-            let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
-            let seq_num =
-                latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
+        let latest_message_opt = dag.latest_message(&sender).unwrap_or(None);
+        let seq_num =
+            latest_message_opt.map_or(0, |block_metadata| block_metadata.sequence_number) + 1;
 
-            let genesis = ValidatorIdentity::new(sk)
-                .sign_block(&with_seq_num(&context.genesis_block, seq_num));
+        let genesis =
+            ValidatorIdentity::new(sk).sign_block(&with_seq_num(&context.genesis_block, seq_num));
 
-            let result = Validate::version(&genesis, -1);
-            assert_eq!(result, false);
+        let result = Validate::version(&genesis, -1);
+        assert_eq!(result, false);
 
-            let result = Validate::version(&genesis, 1);
-            assert_eq!(result, true);
-        })
-        .await
-    }
-);
+        let result = Validate::version(&genesis, 1);
+        assert_eq!(result, true);
+    })
+    .await
+}
