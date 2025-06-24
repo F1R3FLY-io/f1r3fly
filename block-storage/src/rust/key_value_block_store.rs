@@ -59,7 +59,7 @@ impl KeyValueBlockStore {
 
     /**
      * See block-storage/src/main/scala/coop/rchain/blockstorage/BlockStoreSyntax.scala
-     * 
+     *
      * Get block, "unsafe" because method expects block already in the block store.
      */
     pub fn get_unsafe(&self, block_hash: &BlockHash) -> BlockMessage {
@@ -78,6 +78,14 @@ impl KeyValueBlockStore {
 
     pub fn put_block_message(&mut self, block: &BlockMessage) -> Result<(), KvStoreError> {
         self.put(block.block_hash.clone(), block)
+    }
+
+    pub fn contains(&self, block_hash: &BlockHash) -> Result<bool, KvStoreError> {
+        match self.get(block_hash) {
+            Ok(Some(_)) => Ok(true),
+            Ok(None) => Ok(false),
+            Err(err) => Err(err),
+        }
     }
 
     fn error_approved_block(cause: String) -> String {

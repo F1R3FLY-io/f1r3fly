@@ -25,7 +25,7 @@ impl RSpaceExporterStore {
     }
 }
 
-struct RSpaceExporterImpl {
+pub struct RSpaceExporterImpl {
     source_history_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     source_value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     source_roots_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
@@ -59,7 +59,7 @@ impl RSpaceExporter for RSpaceExporterImpl {
         let maybe_root = roots_store.current_root()?;
         match maybe_root {
             Some(root) => Ok(root),
-            None => panic!("RSpace Exporter Store: No root found"),
+            None => Err(RootError::UnknownRootError("No root found".to_string())),
         }
     }
 }

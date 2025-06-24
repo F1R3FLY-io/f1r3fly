@@ -29,5 +29,9 @@ rand = "0.9.0"
 futures = "0.3.31"
 uuid = "1.16.0"
 itertools = "0.13.0"
+# LFS Block Requester dependencies
+num_cpus = "1.0"
+async-stream = "0.3"
+tokio-stream = "0.1"
 
 [build-dependencies]

@@ -19,6 +19,7 @@ pub enum CasperError {
     ReplayFailure(ReplayFailure),
     CommError(CommError),
     HistoryError(HistoryError),
+    StreamError(String),
     Other(String),
 }
 
@@ -33,6 +34,7 @@ impl fmt::Display for CasperError {
             CasperError::ReplayFailure(error) => write!(f, "Replay failure: {}", error),
             CasperError::CommError(error) => write!(f, "Comm error: {}", error),
             CasperError::HistoryError(error) => write!(f, "History error: {}", error),
+            CasperError::StreamError(error) => write!(f, "Stream error: {}", error),
             CasperError::Other(error) => write!(f, "Other error: {}", error),
         }
     }
