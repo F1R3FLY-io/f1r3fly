@@ -3,7 +3,7 @@
 use crate::rust::{
     block_status::{BlockError, InvalidBlock, ValidBlock},
     casper::CasperSnapshot,
-    estimator, ValidBlockProcessing,
+    ValidBlockProcessing,
 };
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use bytes::Bytes;
@@ -54,6 +54,7 @@ impl Validate {
         map
     }
 
+    #[allow(dead_code)]
     fn signature(d: &Data, sig: &ProtoSignature) -> bool {
         Self::signature_verifiers()
             .get(&sig.algorithm)

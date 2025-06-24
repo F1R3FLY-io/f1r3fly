@@ -10,4 +10,4 @@ impl UnlimitedParentsEstimatorFixture {
     pub fn create_estimator() -> Estimator {
         Estimator::apply(Estimator::UNLIMITED_PARENTS, None)
     }
-} 
+}
