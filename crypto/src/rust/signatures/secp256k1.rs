@@ -25,9 +25,13 @@ impl Secp256k1 {
 // TODO: Remove self in these methods
 impl SignaturesAlg for Secp256k1 {
     fn verify(&self, data: &[u8], signature: &[u8], pub_key: &[u8]) -> bool {
-        VerifyingKey::from_sec1_bytes(&pub_key)
-            .and_then(|vk| Signature::from_der(signature).map(|sig| vk.verify(data, &sig)))
-            .is_ok()
+        match VerifyingKey::from_sec1_bytes(pub_key) {
+            Ok(vk) => match Signature::from_der(signature) {
+                Ok(sig) => vk.verify(data, &sig).is_ok(),
+                Err(_) => false,
+            },
+            Err(_) => false,
+        }
     }
 
     fn sign(&self, data: &[u8], sec: &[u8]) -> Vec<u8> {
@@ -186,17 +190,131 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn generate_keys_and_signature_for_hashed_data() {
-    //   let secp256k1 = Secp256k1;
-    //
-    //   let (private_key, public_key) = secp256k1.new_key_pair();
-    //   let data = Sha256::digest(b"testing");
-    //
-    //   let signature = secp256k1.sign(&data, &private_key.bytes);
-    //   println!("Private key: {}", hex::encode(&private_key.bytes));
-    //   println!("Public key: {}", hex::encode(&public_key.bytes));
-    //   println!("Signature: {}", hex::encode(&signature));
-    //   println!("Hashed data: {}", hex::encode(data));
-    // }
+    #[test]
+    fn verify_should_return_false_for_invalid_signatures() {
+        let secp256k1 = Secp256k1;
+        let (private_key, public_key) = secp256k1.new_key_pair();
+        let data = Sha256::digest(b"testing");
+        let signature = secp256k1.sign(&data, &private_key.bytes);
+
+        // Valid signature should return true
+        assert!(secp256k1.verify(&data, &signature, &public_key.bytes));
+
+        // Test with wrong data
+        let wrong_data = Sha256::digest(b"wrong data");
+        assert!(!secp256k1.verify(&wrong_data, &signature, &public_key.bytes));
+
+        // Test with wrong public key
+        let (_, wrong_public_key) = secp256k1.new_key_pair();
+        assert!(!secp256k1.verify(&data, &signature, &wrong_public_key.bytes));
+
+        // Test with malformed signature
+        let malformed_signature = vec![0u8; 10];
+        assert!(!secp256k1.verify(&data, &malformed_signature, &public_key.bytes));
+
+        // Test with empty signature
+        let empty_signature = vec![];
+        assert!(!secp256k1.verify(&data, &empty_signature, &public_key.bytes));
+
+        // Test with malformed public key
+        let malformed_public_key = vec![0u8; 10];
+        assert!(!secp256k1.verify(&data, &signature, &malformed_public_key));
+
+        // Test with empty public key
+        let empty_public_key = vec![];
+        assert!(!secp256k1.verify(&data, &signature, &empty_public_key));
+    }
+
+    #[test]
+    fn verify_should_return_false_for_signature_from_different_key() {
+        let secp256k1 = Secp256k1;
+        let (private_key1, public_key1) = secp256k1.new_key_pair();
+        let (private_key2, _public_key2) = secp256k1.new_key_pair();
+        let data = Sha256::digest(b"testing");
+
+        // Sign with private_key1
+        let signature1 = secp256k1.sign(&data, &private_key1.bytes);
+        // Sign with private_key2
+        let signature2 = secp256k1.sign(&data, &private_key2.bytes);
+
+        // Verify signature1 with public_key1 should succeed
+        assert!(secp256k1.verify(&data, &signature1, &public_key1.bytes));
+
+        // Verify signature2 with public_key1 should fail
+        assert!(!secp256k1.verify(&data, &signature2, &public_key1.bytes));
+    }
+
+    #[test]
+    fn verify_should_handle_various_invalid_der_signatures() {
+        let secp256k1 = Secp256k1;
+        let (_, public_key) = secp256k1.new_key_pair();
+        let data = Sha256::digest(b"testing");
+
+        // Test various invalid DER signatures
+        let invalid_signatures = vec![
+            // Too short
+            vec![0x30, 0x02, 0x01, 0x00],
+            // Invalid DER tag
+            vec![0x31, 0x44, 0x02, 0x20],
+            // Random bytes
+            vec![0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff],
+            // Valid DER structure but invalid signature values  
+            hex::decode("3044022000000000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000000").unwrap_or_else(|_| vec![0x30, 0x44, 0x02, 0x20]),
+        ];
+
+        for invalid_sig in invalid_signatures {
+            assert!(
+                !secp256k1.verify(&data, &invalid_sig, &public_key.bytes),
+                "Should reject invalid signature: {:?}",
+                invalid_sig
+            );
+        }
+    }
+
+    #[test]
+    fn verify_should_handle_various_invalid_public_keys() {
+        let secp256k1 = Secp256k1;
+        let (private_key, _) = secp256k1.new_key_pair();
+        let data = Sha256::digest(b"testing");
+        let signature = secp256k1.sign(&data, &private_key.bytes);
+
+        // Test various invalid public keys
+        let invalid_public_keys = vec![
+            // Too short
+            vec![0x04],
+            // Wrong prefix
+            vec![0x05; 65],
+            // Wrong length
+            vec![0x04; 64],
+            vec![0x04; 66],
+            // Random bytes
+            vec![0xaa; 65],
+            // Empty
+            vec![],
+        ];
+
+        for invalid_key in invalid_public_keys {
+            assert!(
+                !secp256k1.verify(&data, &signature, &invalid_key),
+                "Should reject invalid public key: {:?}",
+                invalid_key
+            );
+        }
+    }
+
+    #[test]
+    fn verify_edge_cases() {
+        let secp256k1 = Secp256k1;
+        let (private_key, public_key) = secp256k1.new_key_pair();
+        let data = Sha256::digest(b"testing");
+        let signature = secp256k1.sign(&data, &private_key.bytes);
+
+        // Test with empty data - should still work with proper signature
+        let empty_data = vec![];
+        let empty_data_signature = secp256k1.sign(&empty_data, &private_key.bytes);
+        assert!(secp256k1.verify(&empty_data, &empty_data_signature, &public_key.bytes));
+
+        // But original signature should not work with empty data
+        assert!(!secp256k1.verify(&empty_data, &signature, &public_key.bytes));
+    }
 }

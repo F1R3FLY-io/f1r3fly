@@ -61,7 +61,7 @@ impl<T: TransportLayer + Sync> Initializing<T> {
 
         // Create channel for incoming block messages (equivalent to Scala's blockMessageQueue)
         let (response_message_tx, response_message_rx) = tokio::sync::mpsc::unbounded_channel();
-        
+
         let block_request_stream = lfs_block_requester::stream(
             approved_block,
             // TODO: just use self.block_message_queue instead of clone?

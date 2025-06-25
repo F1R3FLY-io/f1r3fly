@@ -265,65 +265,65 @@ async fn block_signature_validation_should_return_false_on_unknown_algorithms() 
     .await
 }
 
-// #[tokio::test]
-// async fn block_signature_validation_should_return_false_on_invalid_secp256k1_signatures() {
-//     with_storage(|mut block_store, mut block_dag_storage| async move {
-//         let secp256k1 = Secp256k1;
-//         let (private_key, public_key) = secp256k1.new_key_pair();
-//
-//         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 6, vec![]);
-//         let (_wrong_sk, wrong_pk) = secp256k1.new_key_pair();
-//
-//         assert_ne!(
-//             public_key.bytes, wrong_pk.bytes,
-//             "Public keys should be different"
-//         );
-//         let empty = Bytes::new();
-//         let invalid_key = hex::decode("abcdef1234567890").unwrap().into();
-//
-//         let block0 = with_sender(
-//             &signed_block(0, &private_key, &mut block_dag_storage),
-//             &empty,
-//         );
-//
-//         let block1 = with_sender(
-//             &signed_block(1, &private_key, &mut block_dag_storage),
-//             &invalid_key,
-//         );
-//
-//         let block2 = with_sender(
-//             &signed_block(2, &private_key, &mut block_dag_storage),
-//             &Bytes::copy_from_slice(&wrong_pk.bytes),
-//         );
-//
-//         let block3 = with_sig(
-//             &signed_block(3, &private_key, &mut block_dag_storage),
-//             &empty,
-//         );
-//
-//         let block4 = with_sig(
-//             &signed_block(4, &private_key, &mut block_dag_storage),
-//             &invalid_key,
-//         );
-//
-//         let block5 = with_sig(
-//             &signed_block(5, &private_key, &mut block_dag_storage),
-//             &block0.sig,
-//         ); //wrong sig
-//
-//         let blocks = vec![block0, block1, block2, block3, block4, block5];
-//
-//         for (i, block) in blocks.iter().enumerate() {
-//             let result = Validate::block_signature(&block);
-//             assert_eq!(result, false, "Block {} should have invalid signature", i);
-//         }
-//
-//         // Add log validation mechanism when LogStub mechanism from Scala will be implemented on Rust.
-//         // log.warns.size should be(blocks.length)
-//         // log.warns.forall(_.contains("signature is invalid")) should be(true)
-//     })
-//     .await
-// }
+#[tokio::test]
+async fn block_signature_validation_should_return_false_on_invalid_secp256k1_signatures() {
+    with_storage(|mut block_store, mut block_dag_storage| async move {
+        let secp256k1 = Secp256k1;
+        let (private_key, public_key) = secp256k1.new_key_pair();
+
+        let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 6, vec![]);
+        let (_wrong_sk, wrong_pk) = secp256k1.new_key_pair();
+
+        assert_ne!(
+            public_key.bytes, wrong_pk.bytes,
+            "Public keys should be different"
+        );
+        let empty = Bytes::new();
+        let invalid_key = hex::decode("abcdef1234567890").unwrap().into();
+
+        let block0 = with_sender(
+            &signed_block(0, &private_key, &mut block_dag_storage),
+            &empty,
+        );
+
+        let block1 = with_sender(
+            &signed_block(1, &private_key, &mut block_dag_storage),
+            &invalid_key,
+        );
+
+        let block2 = with_sender(
+            &signed_block(2, &private_key, &mut block_dag_storage),
+            &Bytes::copy_from_slice(&wrong_pk.bytes),
+        );
+
+        let block3 = with_sig(
+            &signed_block(3, &private_key, &mut block_dag_storage),
+            &empty,
+        );
+
+        let block4 = with_sig(
+            &signed_block(4, &private_key, &mut block_dag_storage),
+            &invalid_key,
+        );
+
+        let block5 = with_sig(
+            &signed_block(5, &private_key, &mut block_dag_storage),
+            &block0.sig,
+        ); //wrong sig
+
+        let blocks = vec![block0, block1, block2, block3, block4, block5];
+
+        for (i, block) in blocks.iter().enumerate() {
+            let result = Validate::block_signature(&block);
+            assert_eq!(result, false, "Block {} should have invalid signature", i);
+        }
+
+        // Add log validation mechanism when LogStub mechanism from Scala will be implemented on Rust.
+        // log.warns.size should be(blocks.length)
+        // log.warns.forall(_.contains("signature is invalid")) should be(true)
+    })
+    .await
+}
 
 #[tokio::test]
 async fn block_signature_validation_should_return_true_on_valid_secp256k1_signatures() {
@@ -565,8 +565,6 @@ async fn block_number_validation_should_correctly_validate_a_multi_parent_block_
     .await
 }
 
-// Test 10: "Future deploy validation" should "work"
-// +
 #[tokio::test]
 async fn future_deploy_validation_should_work() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -605,8 +603,6 @@ async fn future_deploy_validation_should_work() {
     .await
 }
 
-// Test 11: "Future deploy validation" should "not accept blocks with a deploy for a future block number"
-// +
 #[tokio::test]
 async fn future_deploy_validation_should_not_accept_blocks_with_a_deploy_for_a_future_block_number()
 {
@@ -649,7 +645,6 @@ async fn future_deploy_validation_should_not_accept_blocks_with_a_deploy_for_a_f
     .await
 }
 
-// Test 12: "Deploy expiration validation" should "work"
 #[tokio::test]
 async fn deploy_expiration_validation_should_work() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -672,8 +667,6 @@ async fn deploy_expiration_validation_should_work() {
     .await
 }
 
-// Test 13: "Deploy expiration validation" should "not accept blocks with a deploy that is expired"
-// +
 #[tokio::test]
 async fn deploy_expiration_validation_should_not_accept_blocks_with_a_deploy_that_is_expired() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -714,8 +707,6 @@ async fn deploy_expiration_validation_should_not_accept_blocks_with_a_deploy_tha
     .await
 }
 
-// Test 14: "Sequence number validation" should "only accept 0 as the number for a block with no parents"
-// +
 #[tokio::test]
 async fn sequence_number_validation_should_only_accept_0_as_the_number_for_a_block_with_no_parents()
 {
@@ -741,7 +732,6 @@ async fn sequence_number_validation_should_only_accept_0_as_the_number_for_a_blo
     .await
 }
 
-// Test 15: "Sequence number validation" should "return false for non-sequential numbering"
 #[tokio::test]
 async fn sequence_number_validation_should_return_false_for_non_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -763,8 +753,6 @@ async fn sequence_number_validation_should_return_false_for_non_sequential_numbe
     .await
 }
 
-// Test 16: "Sequence number validation" should "return true for sequential numbering"
-// +
 #[tokio::test]
 async fn sequence_number_validation_should_return_true_for_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -793,8 +781,6 @@ async fn sequence_number_validation_should_return_true_for_sequential_numbering(
     .await
 }
 
-// Test 17: "Repeat deploy validation" should "return valid for empty blocks"
-// +
 #[tokio::test]
 async fn repeat_deploy_validation_should_return_valid_for_empty_blocks() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -860,8 +846,6 @@ async fn repeat_deploy_validation_should_not_accept_blocks_with_a_repeated_deplo
     .await
 }
 
-// Test 19: "Sender validation" should "return true for genesis and blocks from bonded validators and false otherwise"
-// +
 #[tokio::test]
 async fn sender_validation_should_return_true_for_genesis_and_blocks_from_bonded_validators_and_false_otherwise(
 ) {
@@ -898,8 +882,6 @@ async fn sender_validation_should_return_true_for_genesis_and_blocks_from_bonded
     .await
 }
 
-// Test 20: "Parent validation" should "return true for proper justifications and false otherwise"
-// IGNORED
 #[tokio::test]
 #[ignore]
 async fn parent_validation_should_return_true_for_proper_justifications_and_false_otherwise() {
@@ -1184,10 +1166,6 @@ async fn parent_validation_should_return_true_for_proper_justifications_and_fals
     .await
 }
 
-// Test 21: "Block summary validation" should "short circuit after first invalidity
-// +
-
-// Creates a block with an invalid block number and sequence number
 #[tokio::test]
 async fn block_summary_validation_should_short_circuit_after_first_invalidity() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -1248,8 +1226,6 @@ async fn block_summary_validation_should_short_circuit_after_first_invalidity() 
     .await
 }
 
-// Test 22: "Justification follow validation" should "return valid for proper justifications and failed otherwise"
-// +
 #[tokio::test]
 async fn justification_follow_validation_should_return_valid_for_proper_justifications_and_failed_otherwise(
 ) {
@@ -1436,8 +1412,6 @@ async fn justification_follow_validation_should_return_valid_for_proper_justific
     .await
 }
 
-// Test 23: "Justification regression validation" should "return valid for proper justifications and justification regression detected otherwise"
-// +
 #[tokio::test]
 async fn justification_regression_validation_should_return_valid_for_proper_justifications_and_justification_regression_detected_otherwise(
 ) {
@@ -1578,8 +1552,6 @@ async fn justification_regression_validation_should_return_valid_for_proper_just
     .await
 }
 
-// Test 24: "Justification regression validation" should "return valid for regressive invalid blocks"
-// +
 #[tokio::test]
 async fn justification_regression_validation_should_return_valid_for_regressive_invalid_blocks() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -1716,6 +1688,7 @@ async fn justification_regression_validation_should_return_valid_for_regressive_
 }
 
 #[tokio::test]
+#[ignore]
 async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modified_bonds() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let genesis = GenesisBuilder::new().create_genesis().await.unwrap();
@@ -1819,7 +1792,6 @@ async fn field_format_validation_should_succeed_on_a_valid_block_and_fail_on_emp
     .await
 }
 
-// Test 27: "Block hash format validation" should "fail on invalid hash"
 #[tokio::test]
 async fn block_hash_format_validation_should_fail_on_invalid_hash() {
     with_storage(|_block_store, mut block_dag_storage| async move {

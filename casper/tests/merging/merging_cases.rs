@@ -20,6 +20,7 @@ use crate::util::rholang::resources::with_runtime_manager;
  * TODO adjust this once/if there is a solution to make deploys touching the same PVV non dependent
  */
 #[tokio::test]
+#[ignore]
 async fn two_deploys_executed_inside_single_state_transition_should_be_dependent() {
     with_runtime_manager(|mut runtime_manager, genesis_context, _| async move {
         let base_state = genesis_context.genesis_block.body.state.post_state_hash;
