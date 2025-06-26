@@ -2023,6 +2023,21 @@ dependencies = [
 [[package]]
 name = "node"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "casper",
+ "crypto",
+ "hex",
+ "itertools 0.12.1",
+ "models",
+ "prost",
+ "rand 0.8.5",
+ "rholang",
+ "rspace_plus_plus",
+ "serde",
+ "shared",
+ "tokio",
+]
 
 [[package]]
 name = "node_cli"
