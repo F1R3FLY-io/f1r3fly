@@ -105,7 +105,7 @@ pub fn block_element_gen(
     set_sys_deploys: Option<Vec<ProcessedSystemDeploy>>,
     set_bonds: Option<Vec<Bond>>,
     set_shard_id: Option<String>,
-    hash_f: Option<fn(BlockMessage) -> BlockHash>,
+    hash_f: Option<Box<dyn Fn(BlockMessage) -> BlockHash>>,
 ) -> impl Strategy<Value = BlockMessage> {
     // Generate individual components using existing or provided values
     let pre_state_hash_gen = match set_pre_state_hash {
@@ -219,7 +219,7 @@ pub fn block_element_gen(
                 };
 
                 // Apply custom hash function if provided, otherwise generate random hash
-                let block_hash = match hash_f {
+                let block_hash = match hash_f.as_ref() {
                     Some(f) => f(block.clone()),
                     None => block_hash_gen()
                         .new_tree(&mut TestRunner::default())
@@ -318,7 +318,7 @@ pub fn get_random_block(
     set_sys_deploys: Option<Vec<ProcessedSystemDeploy>>,
     set_bonds: Option<Vec<Bond>>,
     set_shard_id: Option<String>,
-    hash_f: Option<fn(BlockMessage) -> BlockHash>,
+    hash_f: Option<Box<dyn Fn(BlockMessage) -> BlockHash>>,
 ) -> BlockMessage {
     block_element_gen(
         set_block_number,

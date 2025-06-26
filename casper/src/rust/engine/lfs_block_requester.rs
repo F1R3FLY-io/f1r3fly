@@ -1,25 +1,40 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/LfsBlockRequester.scala
 
+use async_stream::stream;
+use async_trait::async_trait;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-use comm::rust::transport::transport_layer::TransportLayer;
-use models::rust::block_hash::BlockHash;
-use models::rust::casper::protocol::casper_message::{ApprovedBlock, BlockMessage};
 use tokio::sync::mpsc;
-
-// LFS Block Requester additional imports for stream implementation
-use async_stream::stream;
 use tokio::sync::Semaphore;
 
-use crate::rust::engine::initializing::Initializing;
+use models::rust::block_hash::BlockHash;
+use models::rust::casper::pretty_printer::PrettyPrinter;
+use models::rust::casper::protocol::casper_message::{ApprovedBlock, BlockMessage};
+
 use crate::rust::errors::CasperError;
 use crate::rust::util::proto_util;
-use models::rust::casper::pretty_printer::PrettyPrinter;
 
 // Last Finalized State processor for receiving blocks.
+
+/// Trait that abstracts the operations needed by the LFS block requester
+#[async_trait]
+pub trait BlockRequesterOps {
+    async fn request_for_block(&self, block_hash: &BlockHash) -> Result<(), CasperError>;
+
+    fn contains_block(&self, block_hash: &BlockHash) -> Result<bool, CasperError>;
+
+    fn get_block_from_store(&self, block_hash: &BlockHash) -> BlockMessage;
+
+    fn put_block_to_store(
+        &mut self,
+        block_hash: BlockHash,
+        block: &BlockMessage,
+    ) -> Result<(), CasperError>;
+
+    fn validate_block(&self, block: &BlockMessage) -> bool;
+}
 
 /// Possible request statuses
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -254,16 +269,16 @@ impl<Key: Hash + Eq + Clone> ST<Key> {
     }
 }
 
-struct StreamProcessor<'a, T: TransportLayer + Sync> {
-    requester: &'a mut Initializing<T>,
+struct StreamProcessor<'a, T: BlockRequesterOps> {
+    requester: &'a mut T,
     st: Arc<Mutex<ST<BlockHash>>>,
     latest_messages: HashSet<BlockHash>,
     response_hash_sender: mpsc::UnboundedSender<BlockHash>,
 }
 
-impl<'a, T: TransportLayer + Sync> StreamProcessor<'a, T> {
+impl<'a, T: BlockRequesterOps> StreamProcessor<'a, T> {
     fn new(
-        requester: &'a mut Initializing<T>,
+        requester: &'a mut T,
         st: Arc<Mutex<ST<BlockHash>>>,
         latest_messages: HashSet<BlockHash>,
         response_hash_sender: mpsc::UnboundedSender<BlockHash>,
@@ -601,7 +616,6 @@ impl<'a, T: TransportLayer + Sync> StreamProcessor<'a, T> {
             .collect();
 
         // Send all requests in parallel for missing blocks
-        // Note: This inlines the Scala broadcastStreams method for direct parallel execution
         if !is_end && !missing_blocks.is_empty() {
             let request_start = std::time::Instant::now();
             log::info!(
@@ -642,21 +656,13 @@ impl<'a, T: TransportLayer + Sync> StreamProcessor<'a, T> {
 }
 
 /// Create a stream to receive blocks needed for Last Finalized State.
-///
-/// Maps to Scala: LfsBlockRequester.stream with the following parameter correspondence:
-/// - approved_block: approvedBlock (Last finalized block)
-/// - initial_response_messages: equivalent to initial response queue state
-/// - response_message_receiver: responseQueue (Handler of block messages)  
-/// - initial_minimum_height: initialMinimumHeight (Required minimum block height)
-/// - request_timeout: requestTimeout (Time after request will be resent)
-/// - initializing: provides requestForBlock, containsBlock, putBlockToStore, validateBlock
-pub async fn stream<T: TransportLayer + Sync>(
+pub async fn stream<T: BlockRequesterOps>(
     approved_block: ApprovedBlock,
     initial_response_messages: VecDeque<BlockMessage>,
     response_message_receiver: mpsc::UnboundedReceiver<BlockMessage>,
     initial_minimum_height: i64,
     request_timeout: Duration,
-    initializing: &mut Initializing<T>,
+    block_ops: &mut T,
 ) -> Result<impl futures::stream::Stream<Item = ST<BlockHash>> + use<'_, T>, CasperError> {
     let block = approved_block.candidate.block;
 
@@ -693,8 +699,7 @@ pub async fn stream<T: TransportLayer + Sync>(
         .await
         .map_err(|_| CasperError::StreamError("Failed to send initial request".to_string()))?;
 
-    let processor =
-        StreamProcessor::new(initializing, st.clone(), latest_messages, response_hash_tx);
+    let processor = StreamProcessor::new(block_ops, st.clone(), latest_messages, response_hash_tx);
 
     // Task 6.2: Enhanced resource cleanup with proper channel management
     log::info!("LFS Block Requester stream initialized - starting processing");
@@ -729,36 +734,33 @@ pub async fn stream<T: TransportLayer + Sync>(
     stream_result
 }
 
-async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
+async fn create_stream_with_processor<'a, T: BlockRequesterOps>(
     mut processor: StreamProcessor<'a, T>,
-    mut request_queue: mpsc::Receiver<bool>, // Scala: requestQueue - receives resend flags
-    request_queue_sender: mpsc::Sender<bool>, // Scala: requestQueue.enqueue1(true) - for timeout resends
+    mut request_queue: mpsc::Receiver<bool>,
+    request_queue_sender: mpsc::Sender<bool>,
     mut response_hash_queue: mpsc::UnboundedReceiver<BlockHash>,
     initial_response_messages: VecDeque<BlockMessage>,
     mut response_message_receiver: mpsc::UnboundedReceiver<BlockMessage>,
     request_timeout: Duration,
 ) -> Result<impl futures::stream::Stream<Item = ST<BlockHash>> + use<'a, T>, CasperError> {
-    // Scala: parEvalMapProcBounded - bounded by available processors
     let processor_count = num_cpus::get();
     log::info!(
         "LFS Block Requester using {} processor-bounded workers (parEvalMapProcBounded equivalent)",
         processor_count
     );
 
-    // Create semaphore for bounded concurrency - maps to Scala's parEvalMapProcBounded behavior
+    // Create semaphore for bounded concurrency
     let response_semaphore = Arc::new(Semaphore::new(processor_count));
 
-    // Scala: .onIdle(requestTimeout, resendRequests) - timeout interval for resending requests
-    let mut timeout_interval = tokio::time::interval(request_timeout);
-    timeout_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    // We reset this timeout every time there's activity (request/response processing)
+    let mut idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
 
-    // Scala: val timeoutMsg = s"No block responses for $requestTimeout. Resending requests."
     let timeout_msg = format!(
         "No block responses for {:?}. Resending requests.",
         request_timeout
     );
 
-    // Task 5.2: Process all initial messages immediately and merge with regular message stream
+    // Process all initial messages immediately and merge with regular message stream
     // This ensures proper ordering and efficient processing of pre-existing messages
     let (initial_messages_tx, mut initial_messages_rx) = mpsc::unbounded_channel();
 
@@ -780,18 +782,16 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
     // Close the sender to indicate no more initial messages
     drop(initial_messages_tx);
 
-    // Create the actual stream using async_stream::stream! - avoids Send issues
+    // Create the actual stream using async_stream::stream!
     let stream = stream! {
         // Track consecutive errors for potential circuit breaking
         let mut consecutive_errors = 0;
         const MAX_CONSECUTIVE_ERRORS: u32 = 5;
 
-        // Main stream processing loop - equivalent to Scala's concurrent streams
+        // Main stream processing loop
         loop {
             tokio::select! {
-                // Scala: requestQueue.dequeueChunk(maxSize = 1).evalTap(requestNext)
                 Some(resend_flag) = request_queue.recv() => {
-                    // Scala: .evalTap(requestNext) - call requestNext with the dequeued value
                     match processor.request_next(resend_flag).await {
                         Ok(()) => {
                             consecutive_errors = 0; // Reset error counter on success
@@ -810,7 +810,7 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         }
                     }
 
-                    // Scala: .evalMap(_ => st.get) - map to current state after requestNext
+                    // Map to current state after requestNext
                     let current_state = {
                         match processor.st.lock() {
                             Ok(state) => state.clone(),
@@ -822,27 +822,28 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         }
                     };
 
-                    // Scala: .terminateAfter(_.isFinished) - terminate when state is finished
+                    // Terminate when state is finished
                     if current_state.is_finished() {
                         log::info!("Request processing completed - all blocks downloaded");
                         yield current_state;
                         break;
                     }
 
+                    // Reset idle timeout due to activity
+                    idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
+
                     // Emit state to stream
                     yield current_state;
                 }
 
-                // Scala: .onIdle(requestTimeout, resendRequests)
-                // where resendRequests = requestQueue.enqueue1(true) <* Log[F].warn(timeoutMsg)
-                _ = timeout_interval.tick() => {
-                    // Scala: Log[F].warn(timeoutMsg) part of resendRequests
+                _ = &mut idle_timeout => {
                     log::warn!("{}", timeout_msg);
 
-                    // Scala: requestQueue.enqueue1(true) part of resendRequests
                     match request_queue_sender.send(true).await {
                         Ok(()) => {
                             log::debug!("Timeout triggered - resend request enqueued successfully");
+                            // Reset the timeout for next idle period
+                            idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
                         }
                         Err(e) => {
                             log::error!("Failed to enqueue resend request - channel error: {:?}", e);
@@ -863,14 +864,15 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                                 log::info!("Stream terminating gracefully - processing appears complete");
                                 break;
                             }
+                            // Reset timeout even on error to continue monitoring
+                            idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
                         }
                     }
                 }
 
-                // Task 5.2: Process initial messages with highest priority (before network messages)
+                // Process initial messages with highest priority (before network messages)
                 // This ensures initial messages are handled first, which is often more efficient
                 Some(initial_block) = initial_messages_rx.recv() => {
-                    // Scala: parEvalMapProcBounded - acquire semaphore permit for bounded concurrency
                     let permit = match response_semaphore.clone().acquire_owned().await {
                         Ok(permit) => permit,
                         Err(e) => {
@@ -921,13 +923,14 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         break;
                     }
 
+                    // Reset idle timeout due to activity
+                    idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
+
                     // Emit state to stream
                     yield current_state;
                 }
 
-                // Scala: responseQueue.dequeue.parEvalMapProcBounded(processBlock)
                 Some(block_message) = response_message_receiver.recv() => {
-                    // Scala: parEvalMapProcBounded - acquire semaphore permit for bounded concurrency
                     let permit = match response_semaphore.clone().acquire_owned().await {
                         Ok(permit) => permit,
                         Err(e) => {
@@ -936,10 +939,9 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         }
                     };
 
-                    // Process with bounded concurrency - equivalent to Scala's parEvalMapProcBounded
+                    // Process with bounded concurrency
                     let _permit = permit; // Hold permit during processing
 
-                    // Scala: processBlock(block_message) - process incoming block message
                     match processor.process_block(block_message).await {
                         Ok(()) => {
                             consecutive_errors = 0; // Reset error counter on success
@@ -974,13 +976,14 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         break;
                     }
 
+                    // Reset idle timeout due to activity
+                    idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
+
                     // Emit state to stream
                     yield current_state;
                 }
 
-                // Scala: responseHashQueue.dequeue.parEvalMapProcBounded { hash => ... }
                 Some(block_hash) = response_hash_queue.recv() => {
-                    // Scala: parEvalMapProcBounded - acquire semaphore permit for bounded concurrency
                     let permit = match response_semaphore.clone().acquire_owned().await {
                         Ok(permit) => permit,
                         Err(e) => {
@@ -989,16 +992,13 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         }
                     };
 
-                    // Process with bounded concurrency - equivalent to Scala's parEvalMapProcBounded
+                    // Process with bounded concurrency
                     let _permit = permit; // Hold permit during processing
 
-                    // Scala: block <- getBlockFromStore(hash)
                     let block = processor.requester.get_block_from_store(&block_hash);
 
-                    // Scala: Log[F].info(s"Process existing ${PrettyPrinter.buildString(block)}")
                     log::info!("Process existing {}", PrettyPrinter::build_string_block_message(&block, false));
 
-                    // Scala: processBlock(block)
                     match processor.process_block(block).await {
                         Ok(()) => {
                             consecutive_errors = 0; // Reset error counter on success
@@ -1033,13 +1033,16 @@ async fn create_stream_with_processor<'a, T: TransportLayer + Sync>(
                         break;
                     }
 
+                    // Reset idle timeout due to activity
+                    idle_timeout = Box::pin(tokio::time::sleep(request_timeout));
+
                     // Emit state to stream
                     yield current_state;
                 }
             }
-                }
+        }
 
-        // Task 6.4: Integration testing and final state validation
+        // Integration testing and final state validation
         let final_state = {
             match processor.st.lock() {
                 Ok(state) => {

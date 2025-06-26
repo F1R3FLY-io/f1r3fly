@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/Initializing.scala
 
+use async_trait::async_trait;
 use std::{
     collections::{HashSet, VecDeque},
     sync::{Arc, Mutex},
@@ -21,8 +22,12 @@ use models::rust::{
 use rspace_plus_plus::rspace::{history::Either, state::rspace_state_manager::RSpaceStateManager};
 
 use crate::rust::{
-    block_status::ValidBlock, casper::CasperShardConf, engine::lfs_block_requester,
-    errors::CasperError, util::proto_util, validate::Validate,
+    block_status::ValidBlock,
+    casper::CasperShardConf,
+    engine::lfs_block_requester::{self, BlockRequesterOps},
+    errors::CasperError,
+    util::proto_util,
+    validate::Validate,
     validator_identity::ValidatorIdentity,
 };
 
@@ -39,7 +44,7 @@ pub struct Initializing<T: TransportLayer> {
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper_shard_conf: CasperShardConf,
     validator_id: Option<ValidatorIdentity>,
-    the_init: Box<dyn FnOnce() -> ()>,
+    the_init: Box<dyn FnOnce() -> () + Send + Sync>,
     block_message_queue: VecDeque<BlockMessage>,
     tuple_space_queue: VecDeque<StoreItemsMessage>,
     trim_state: Option<bool>,
@@ -77,23 +82,25 @@ impl<T: TransportLayer + Sync> Initializing<T> {
     }
 }
 
-impl<T: TransportLayer + Sync> Initializing<T> {
-    pub async fn request_for_block(&self, block_hash: &BlockHash) -> Result<(), CasperError> {
+// Implement BlockRequesterOps trait for Initializing
+#[async_trait]
+impl<T: TransportLayer + Sync> BlockRequesterOps for Initializing<T> {
+    async fn request_for_block(&self, block_hash: &BlockHash) -> Result<(), CasperError> {
         self.transport_layer
             .broadcast_request_for_block(&self.connections_cell, &self.rp_conf_ask, block_hash)
             .await?;
         Ok(())
     }
 
-    pub fn contains_block(&self, block_hash: &BlockHash) -> Result<bool, CasperError> {
+    fn contains_block(&self, block_hash: &BlockHash) -> Result<bool, CasperError> {
         Ok(self.block_store.contains(block_hash)?)
     }
 
-    pub fn get_block_from_store(&self, block_hash: &BlockHash) -> BlockMessage {
+    fn get_block_from_store(&self, block_hash: &BlockHash) -> BlockMessage {
         self.block_store.get_unsafe(block_hash)
     }
 
-    pub fn put_block_to_store(
+    fn put_block_to_store(
         &mut self,
         block_hash: BlockHash,
         block: &BlockMessage,
@@ -101,7 +108,7 @@ impl<T: TransportLayer + Sync> Initializing<T> {
         Ok(self.block_store.put(block_hash, &block)?)
     }
 
-    pub fn validate_block(&self, block: &BlockMessage) -> bool {
+    fn validate_block(&self, block: &BlockMessage) -> bool {
         let block_number = proto_util::block_number(block);
         if block_number == 0 {
             // TODO: validate genesis (zero) block correctly - OLD

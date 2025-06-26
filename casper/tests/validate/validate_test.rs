@@ -510,7 +510,7 @@ async fn block_number_validation_should_correctly_validate_a_multi_parent_block_
                     None,
                     None,
                     None,
-                    Some(|block| proto_util::hash_block(&block)),
+                    Some(Box::new(|block| proto_util::hash_block(&block))),
                 );
 
                 block_store
@@ -1205,7 +1205,7 @@ async fn block_summary_validation_should_short_circuit_after_first_invalidity() 
                 None,
                 None,
                 None,
-                Some(|block| proto_util::hash_block(&block)),
+                Some(Box::new(|block| proto_util::hash_block(&block))),
             ),
             &mut casper_snapshot,
             "root",
@@ -1531,7 +1531,7 @@ async fn justification_regression_validation_should_return_valid_for_proper_just
             None,
             None,
             None,
-            Some(|block| proto_util::hash_block(&block)),
+            Some(Box::new(|block| proto_util::hash_block(&block))),
         );
 
         let dag = block_dag_storage.get_representation();
