@@ -449,6 +449,9 @@ lazy val node = (project in file("node"))
       "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
       "-J-Xms6G -J-Xmx8G -J-Xss256m -J-XX:MaxMetaspaceSize=3G"
     ),
+    javaOptions in Test ++= Seq(
+      s"-Djna.library.path=../$releaseJnaLibraryPath"
+    ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
     mappings in Docker ++= {
