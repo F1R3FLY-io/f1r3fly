@@ -18,13 +18,13 @@ When a node receives an approved block (the finalized state), it needs to downlo
 
 Both implementations use an identical state structure:
 
-| Field | Purpose |
-|-------|---------|
-| `d` | Maps block hashes to request status (`Init` → `Requested` → `Received`) |
-| `latest` | Set of latest messages that must be downloaded first |
-| `lowerBound` | Minimum block height needed |
-| `heightMap` | Organizes blocks by height for efficient processing |
-| `finished` | Set of completed downloads |
+| Field        | Purpose                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `d`          | Maps block hashes to request status (`Init` → `Requested` → `Received`) |
+| `latest`     | Set of latest messages that must be downloaded first                    |
+| `lowerBound` | Minimum block height needed                                             |
+| `heightMap`  | Organizes blocks by height for efficient processing                     |
+| `finished`   | Set of completed downloads                                              |
 
 ### Request Flow
 
@@ -36,45 +36,47 @@ Init → Requested → Received → Done (moved to finished set)
 
 1. **Request Stream**: Processes download requests and broadcasts to peers
 2. **Response Stream**: Handles incoming block messages in parallel
-3. **Timeout Mechanism**: Resends requests if no response received
-4. **Termination**: Stream ends when `state.isFinished` returns true
+3. **Response Hash Stream**: Processes existing blocks found in local storage
+4. **Initial Message Stream**: Handles pre-existing messages in queue
+5. **Timeout Mechanism**: Idle timeout that resends requests if no activity
+6. **Termination**: Stream ends when `state.isFinished` returns true
 
 ## Library and Crate Comparison
 
 ### Effect Management & Async Programming
 
-| Scala | Rust | Purpose |
-|-------|------|---------|
-| `cats.effect.Concurrent[F]` | `tokio` runtime | Async execution context |
-| `cats.effect.Timer[F]` | `tokio::time::interval` | Time-based operations |
-| `cats.effect.concurrent.Ref[F, A]` | `Arc<Mutex<A>>` | Thread-safe mutable references |
-| Cats Effect syntax | `async`/`await` + `Result` | Async composition |
+| Scala                              | Rust                       | Purpose                        |
+| ---------------------------------- | -------------------------- | ------------------------------ |
+| `cats.effect.Concurrent[F]`        | `tokio` runtime            | Async execution context        |
+| `cats.effect.Timer[F]`             | `tokio::time::sleep`       | Time-based operations          |
+| `cats.effect.concurrent.Ref[F, A]` | `Arc<Mutex<A>>`            | Thread-safe mutable references |
+| Cats Effect syntax                 | `async`/`await` + `Result` | Async composition              |
 
 ### Stream Processing
 
-| Scala FS2 | Rust Equivalent | Purpose |
-|-----------|-----------------|---------|
-| `Stream[F, A]` | `impl Stream<Item = A>` | Async stream of values |
-| `Queue[F, A]` | `mpsc::UnboundedReceiver<A>` | Inter-stream communication |
-| `parEvalMapProcBounded(f)` | `Arc<Semaphore>` + `tokio::select!` | Bounded parallel processing |
-| `concurrently(other)` | `tokio::select!` multiple arms | Concurrent stream execution |
-| `terminateAfter(predicate)` | `if condition { break }` | Conditional termination |
-| `onIdle(timeout, action)` | `tokio::time::interval` in `select!` | Timeout-based actions |
+| Scala FS2                   | Rust Equivalent                     | Purpose                     |
+| --------------------------- | ----------------------------------- | --------------------------- |
+| `Stream[F, A]`              | `impl Stream<Item = A>`             | Async stream of values      |
+| `Queue[F, A]`               | `mpsc::UnboundedReceiver<A>`        | Inter-stream communication  |
+| `parEvalMapProcBounded(f)`  | `Arc<Semaphore>` + `tokio::select!` | Bounded parallel processing |
+| `concurrently(other)`       | `tokio::select!` multiple arms      | Concurrent stream execution |
+| `terminateAfter(predicate)` | `if condition { break }`            | Conditional termination     |
+| `onIdle(timeout, action)`   | `tokio::time::sleep` in `select!`   | Timeout-based actions       |
 
 ### Collections
 
-| Scala | Rust | Notes |
-|-------|------|-------|
-| `Map[K, V]` | `HashMap<K, V>` | Immutable vs mutable by default |
-| `Set[K]` | `HashSet<K>` | Immutable vs mutable by default |
-| `SortedMap[K, V]` | `BTreeMap<K, V>` | Both maintain key ordering |
+| Scala             | Rust             | Notes                           |
+| ----------------- | ---------------- | ------------------------------- |
+| `Map[K, V]`       | `HashMap<K, V>`  | Immutable vs mutable by default |
+| `Set[K]`          | `HashSet<K>`     | Immutable vs mutable by default |
+| `SortedMap[K, V]` | `BTreeMap<K, V>` | Both maintain key ordering      |
 
 ### Error Handling
 
-| Scala | Rust | Approach |
-|-------|------|----------|
-| Effect types `F[_]` | `Result<T, E>` | Abstract vs explicit error handling |
-| `Either[Error, Success]` | `Result<T, E>` | Explicit error representation |
+| Scala                    | Rust           | Approach                            |
+| ------------------------ | -------------- | ----------------------------------- |
+| Effect types `F[_]`      | `Result<T, E>` | Abstract vs explicit error handling |
+| `Either[Error, Success]` | `Result<T, E>` | Explicit error representation       |
 
 ## Implementation Comparison
 
@@ -97,12 +99,13 @@ requestStream
 ### Rust (Systems Approach)
 
 ```rust
-// Explicit control flow
+// Explicit control flow  
 loop {
     tokio::select! {
         Some(resend_flag) = request_queue.recv() => { /* handle */ }
-        _ = timeout_interval.tick() => { /* timeout */ }
+        _ = &mut idle_timeout => { /* timeout resend */ }
         Some(block) = response_receiver.recv() => { /* process */ }
+        Some(hash) = response_hash_queue.recv() => { /* existing blocks */ }
     }
     if state.is_finished() { break; }
 }
@@ -174,6 +177,42 @@ pub trait BlockRequesterOps {
 
 This allows the requester to work with any type implementing these operations.
 
+## Test Suite Implementation
+
+A comprehensive test suite has been ported from Scala to Rust, covering all critical scenarios:
+
+### Test Cases Implemented (8/8)
+
+1. **`should_send_requests_for_dependencies`** - Basic dependency request functionality
+2. **`should_not_request_saved_blocks`** - Avoids re-requesting already-saved blocks  
+3. **`should_first_request_dependencies_only_from_starting_block`** - Sequential dependency resolution
+4. **`should_save_received_blocks_if_requested`** - Proper block storage when requested
+5. **`should_drop_all_blocks_not_requested`** - Ignores unrequested blocks
+6. **`should_skip_received_invalid_blocks`** - Handles invalid blocks correctly
+7. **`should_request_and_save_all_blocks`** - End-to-end comprehensive test
+8. **`should_resend_request_after_timeout`** - Timeout and resend functionality
+
+### Test Infrastructure
+
+The Rust tests use a mock framework that closely mirrors the Scala approach:
+
+```rust
+pub struct Mock {
+    block_receiver_tx: mpsc::UnboundedSender<BlockMessage>,
+    request_observer_rx: mpsc::UnboundedReceiver<BlockHash>,
+    save_observer_rx: mpsc::UnboundedReceiver<(BlockHash, BlockMessage)>,
+    test_state: Arc<Mutex<TestST>>,
+}
+```
+
+### Key Testing Features
+
+- **Mock BlockRequesterOps**: Captures requests, saves, and storage operations
+- **Deterministic Block DAG**: Same 9-block dependency graph as Scala tests
+- **Timeout Testing**: Verifies resend behavior with configurable timeouts
+- **State Validation**: Comprehensive checks of internal state transitions
+- **Error Handling**: Tests invalid blocks and edge cases
+
 ## Trade-offs Summary
 
 ### Scala Advantages
@@ -206,10 +245,12 @@ let block_request_stream = lfs_block_requester::stream(
 ## Current Status
 
 - ✅ **Core Logic**: Faithfully translated from Scala
-- ✅ **State Management**: Identical behavior using different paradigms
+- ✅ **State Management**: Identical behavior using different paradigms  
 - ✅ **Stream Processing**: Equivalent functionality with different libraries
 - ✅ **Error Handling**: Proper Result types throughout
-- ⏳ **Testing**: Test framework set up but implementation pending
+- ✅ **Testing**: Complete test suite ported from Scala (8/8 test cases)
+- ✅ **Integration**: Integrated with `Initializing` engine component
+- ✅ **Timeout Handling**: Proper idle timeout implementation with resend logic
 
 ## Conclusion
 

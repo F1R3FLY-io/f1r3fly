@@ -17,14 +17,19 @@ use comm::rust::{
 };
 use models::rust::{
     block_hash::BlockHash,
-    casper::protocol::casper_message::{ApprovedBlock, BlockMessage, StoreItemsMessage},
+    casper::protocol::casper_message::{
+        ApprovedBlock, BlockMessage, StoreItemsMessage, StoreItemsMessageRequest,
+    },
 };
 use rspace_plus_plus::rspace::{history::Either, state::rspace_state_manager::RSpaceStateManager};
 
 use crate::rust::{
     block_status::ValidBlock,
     casper::CasperShardConf,
-    engine::lfs_block_requester::{self, BlockRequesterOps},
+    engine::{
+        lfs_block_requester::{self, BlockRequesterOps},
+        lfs_tuple_space_requester::{self, StatePartPath, TupleSpaceRequesterOps},
+    },
     errors::CasperError,
     util::proto_util,
     validate::Validate,
@@ -46,7 +51,7 @@ pub struct Initializing<T: TransportLayer> {
     validator_id: Option<ValidatorIdentity>,
     the_init: Box<dyn FnOnce() -> () + Send + Sync>,
     block_message_queue: VecDeque<BlockMessage>,
-    tuple_space_queue: VecDeque<StoreItemsMessage>,
+    tuple_space_message_receiver: tokio::sync::mpsc::UnboundedReceiver<StoreItemsMessage>,
     trim_state: Option<bool>,
     disable_state_exporter: bool,
 }
@@ -67,24 +72,51 @@ impl<T: TransportLayer + Sync> Initializing<T> {
         // Create channel for incoming block messages (equivalent to Scala's blockMessageQueue)
         let (response_message_tx, response_message_rx) = tokio::sync::mpsc::unbounded_channel();
 
+        // Create block requester wrapper with needed components
+        let mut block_requester = BlockRequesterWrapper::new(
+            &self.transport_layer,
+            &self.connections_cell,
+            &self.rp_conf_ask,
+            &mut self.block_store,
+        );
+
         let block_request_stream = lfs_block_requester::stream(
-            approved_block,
+            approved_block.clone(),
             // TODO: just use self.block_message_queue instead of clone?
             self.block_message_queue.clone(),
             response_message_rx,
             min_block_number_for_deploy_lifespan,
             Duration::from_secs(30),
-            self,
+            &mut block_requester,
         )
         .await?;
 
-        todo!()
+        // Create channel for incoming tuple space messages
+        let (tuple_space_tx, tuple_space_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Create tuple space requester wrapper with needed components
+        let tuple_space_requester =
+            TupleSpaceRequester::new(&self.transport_layer, &self.rp_conf_ask);
+
+        let tuple_space_stream = lfs_tuple_space_requester::stream(
+            approved_block,
+            tuple_space_rx,
+            Duration::from_secs(120),
+            tuple_space_requester,
+            self.rspace_state_manager.importer.clone(),
+        )
+        .await?;
+
+        // TODO: Actually process both streams in parallel
+        log::info!("Both LFS streams created successfully (processing not yet implemented)");
+
+        Ok(())
     }
 }
 
-// Implement BlockRequesterOps trait for Initializing
+// Implement BlockRequesterOps trait for the wrapper struct
 #[async_trait]
-impl<T: TransportLayer + Sync> BlockRequesterOps for Initializing<T> {
+impl<T: TransportLayer + Sync> BlockRequesterOps for BlockRequesterWrapper<'_, T> {
     async fn request_for_block(&self, block_hash: &BlockHash) -> Result<(), CasperError> {
         self.transport_layer
             .broadcast_request_for_block(&self.connections_cell, &self.rp_conf_ask, block_hash)
@@ -119,5 +151,67 @@ impl<T: TransportLayer + Sync> BlockRequesterOps for Initializing<T> {
                 _ => false,
             }
         }
+    }
+}
+
+/// Wrapper struct for block request operations
+pub struct BlockRequesterWrapper<'a, T: TransportLayer> {
+    transport_layer: &'a T,
+    connections_cell: &'a ConnectionsCell,
+    rp_conf_ask: &'a RPConf,
+    block_store: &'a mut KeyValueBlockStore,
+}
+
+impl<'a, T: TransportLayer> BlockRequesterWrapper<'a, T> {
+    pub fn new(
+        transport_layer: &'a T,
+        connections_cell: &'a ConnectionsCell,
+        rp_conf_ask: &'a RPConf,
+        block_store: &'a mut KeyValueBlockStore,
+    ) -> Self {
+        Self {
+            transport_layer,
+            connections_cell,
+            rp_conf_ask,
+            block_store,
+        }
+    }
+}
+
+/// Wrapper struct for tuple space request operations
+pub struct TupleSpaceRequester<'a, T: TransportLayer> {
+    transport_layer: &'a T,
+    rp_conf_ask: &'a RPConf,
+}
+
+impl<'a, T: TransportLayer> TupleSpaceRequester<'a, T> {
+    pub fn new(transport_layer: &'a T, rp_conf_ask: &'a RPConf) -> Self {
+        Self {
+            transport_layer,
+            rp_conf_ask,
+        }
+    }
+}
+
+// Implement TupleSpaceRequesterOps trait for the wrapper struct
+#[async_trait]
+impl<T: TransportLayer + Sync> TupleSpaceRequesterOps for TupleSpaceRequester<'_, T> {
+    async fn request_for_store_item(
+        &self,
+        path: &StatePartPath,
+        page_size: i32,
+    ) -> Result<(), CasperError> {
+        let message = StoreItemsMessageRequest {
+            start_path: path.clone(),
+            skip: 0,
+            take: page_size,
+        };
+
+        let message_proto = message.to_proto();
+
+        self.transport_layer
+            .send_to_bootstrap(&self.rp_conf_ask, &message_proto)
+            .await?;
+        Ok(())
     }
 }

@@ -28,6 +28,7 @@ impl RSpaceImporterStore {
     }
 }
 
+#[derive(Clone)]
 pub struct RSpaceImporterImpl {
     history_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
     value_store: Arc<Mutex<Box<dyn KeyValueStore>>>,
