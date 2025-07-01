@@ -1,6 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/Initializing.scala
 
 use async_trait::async_trait;
+use shared::rust::ByteVector;
 use std::{
     collections::{HashSet, VecDeque},
     sync::{Arc, Mutex},
@@ -21,7 +22,11 @@ use models::rust::{
         ApprovedBlock, BlockMessage, StoreItemsMessage, StoreItemsMessageRequest,
     },
 };
-use rspace_plus_plus::rspace::{history::Either, state::rspace_state_manager::RSpaceStateManager};
+use rspace_plus_plus::rspace::{
+    hashing::blake2b256_hash::Blake2b256Hash,
+    history::Either,
+    state::{rspace_importer::RSpaceImporterInstance, rspace_state_manager::RSpaceStateManager},
+};
 
 use crate::rust::{
     block_status::ValidBlock,
@@ -213,5 +218,24 @@ impl<T: TransportLayer + Sync> TupleSpaceRequesterOps for TupleSpaceRequester<'_
             .send_to_bootstrap(&self.rp_conf_ask, &message_proto)
             .await?;
         Ok(())
+    }
+
+    fn validate_tuple_space_items(
+        &self,
+        history_items: Vec<(Blake2b256Hash, Vec<u8>)>,
+        data_items: Vec<(Blake2b256Hash, Vec<u8>)>,
+        start_path: StatePartPath,
+        page_size: i32,
+        skip: i32,
+        get_from_history: impl Fn(Blake2b256Hash) -> Option<ByteVector> + Send + 'static,
+    ) -> Result<(), CasperError> {
+        Ok(RSpaceImporterInstance::validate_state_items(
+            history_items,
+            data_items,
+            start_path,
+            page_size,
+            skip,
+            get_from_history,
+        ))
     }
 }

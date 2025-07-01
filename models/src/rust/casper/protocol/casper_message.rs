@@ -1028,6 +1028,7 @@ impl StoreItemsMessageRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct StoreItemsMessage {
     pub start_path: Vec<(Blake2b256Hash, Option<Byte>)>,
     pub last_path: Vec<(Blake2b256Hash, Option<Byte>)>,
