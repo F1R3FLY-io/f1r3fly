@@ -2,14 +2,14 @@
 // 1:1 conversion of the "traverse the TreeHashMap" test
 
 use casper::rust::util::construct_deploy;
-use models::rhoapi::{expr::ExprInstance, Par};
+use models::rhoapi::{expr::ExprInstance};
 use node::rust::rho_trie_traverser::RhoTrieTraverser;
 use rand::prelude::*;
 use rholang::rust::interpreter::test_utils::resources::with_runtime;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use casper::rust::rholang::runtime::RuntimeOps;
 use rholang::rust::interpreter::rho_runtime::RhoRuntime; // Import trait for runtime methods
-use casper::rust::{genesis::contracts::standard_deploys, util::rholang::tools::Tools};
+use casper::rust::{genesis::contracts::standard_deploys};
 use hex;
 
 const _SHARD_ID: &str = "root-shard";
