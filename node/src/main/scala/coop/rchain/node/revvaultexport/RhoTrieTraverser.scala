@@ -141,64 +141,36 @@ object RhoTrieTraverser {
       readParams: ReadParams[F]
   ): F[Either[ReadParams[F], Vector[ParMap]]] = {
     val (keys, depth, mapPar, runtime, collectedResults) = readParams
-    println(
-      s"DEEP DEBUG: traverseTrieRec called with keys.size=${keys.size}, depth=$depth, collectedResults.size=${collectedResults.size}"
-    )
-    keys.zipWithIndex.foreach {
-      case (key, i) =>
-        println(s"DEEP DEBUG: key[$i] = $key")
-    }
-
     keys match {
       case key +: keyRests =>
-        println(s"DEEP DEBUG: Processing key: $key (keyRests.size=${keyRests.size})")
         for {
           currentNode <- TreeHashMapGetter(mapPar, key, runtime)
-          result <- {
-            println(s"DEEP DEBUG: TreeHashMapGetter returned: $currentNode")
-            currentNode match {
-              case Some(Left(i)) =>
-                println(s"DEEP DEBUG: Got integer value: $i")
-                if (key.isEmpty) {
-                  val extended = extendKey(key, i)
-                  println(s"DEEP DEBUG: key.isEmpty, extending with $extended")
-                  Left(
-                    keyRests ++ extended,
-                    depth,
-                    mapPar,
-                    runtime,
-                    collectedResults
-                  ).pure[F]
-                } else if (depth == key.length) {
-                  println(
-                    s"DEEP DEBUG: depth == key.length ($depth == ${key.length}), not extending"
-                  )
-                  Left(keyRests, depth, mapPar, runtime, collectedResults).pure[F]
-                } else {
-                  val extended = extendKey(key, i)
-                  println(s"DEEP DEBUG: depth != key.length, extending with $extended")
-                  Left(
-                    keyRests ++ extended,
-                    depth,
-                    mapPar,
-                    runtime,
-                    collectedResults
-                  ).pure[F]
-                }
-              case Some(Right(map)) =>
-                println(s"DEEP DEBUG: Found ParMap: $map")
-                Left(keyRests, depth, mapPar, runtime, map +: collectedResults).pure[F]
-              case _ =>
-                println("DEEP DEBUG: No data found for key")
-                Left(keyRests, depth, mapPar, runtime, collectedResults).pure[F]
-            }
-          }
+          result <- currentNode match {
+                     case Some(Left(i)) =>
+                       if (key.isEmpty)
+                         Left(
+                           keyRests ++ extendKey(key, i),
+                           depth,
+                           mapPar,
+                           runtime,
+                           collectedResults
+                         ).pure[F]
+                       else if (depth == key.length)
+                         Left(keyRests, depth, mapPar, runtime, collectedResults).pure[F]
+                       else
+                         Left(
+                           keyRests ++ extendKey(key, i),
+                           depth,
+                           mapPar,
+                           runtime,
+                           collectedResults
+                         ).pure[F]
+                     case Some(Right(map)) =>
+                       Left(keyRests, depth, mapPar, runtime, map +: collectedResults).pure[F]
+                     case _ => Left(keyRests, depth, mapPar, runtime, collectedResults).pure[F]
+                   }
         } yield result
-      case _ =>
-        println(
-          s"DEEP DEBUG: No more keys, returning ${collectedResults.size} collected results"
-        )
-        collectedResults.asRight[ReadParams[F]].pure[F]
+      case _ => collectedResults.asRight[ReadParams[F]].pure[F]
     }
 
   }

@@ -11,7 +11,6 @@ use rholang::rust::interpreter::rho_runtime::RhoRuntime;
 use rholang::rust::interpreter::errors::InterpreterError;
 use std::collections::HashMap;
 use casper::rust::{genesis::contracts::standard_deploys, util::rholang::tools::Tools};
-use hex;
 
 pub type ReadParams = (Vec<Vec<i32>>, i32, Par, Vec<ParMap>);
 
@@ -45,62 +44,6 @@ impl RhoTrieTraverser {
     const POWERS: [i64; 17] = [
         1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536,
     ];
-
-    /// Convert Par to a consistent string representation for debugging
-    fn par_to_debug_string(par: &Par) -> String {
-        if par.exprs.is_empty() && par.unforgeables.is_empty() {
-            return "Par()".to_string();
-        }
-        
-        let mut parts = Vec::new();
-        
-        if !par.exprs.is_empty() {
-            let expr_strs: Vec<String> = par.exprs.iter().map(|expr| {
-                match &expr.expr_instance {
-                    Some(ExprInstance::GString(s)) => format!("GString({})", s),
-                    Some(ExprInstance::GInt(i)) => format!("GInt({})", i),
-                    Some(ExprInstance::GByteArray(bytes)) => {
-                        format!("GByteArray({})", hex::encode(bytes))
-                    },
-                    Some(ExprInstance::EListBody(elist)) => {
-                        format!("EList(ps={})", elist.ps.len())
-                    },
-                    Some(ExprInstance::EMapBody(emap)) => {
-                        format!("EMap(ps={})", emap.kvs.len())
-                    },
-                    Some(ExprInstance::ETupleBody(etuple)) => {
-                        format!("ETuple(ps={})", etuple.ps.len())
-                    },
-                    _ => "Expr(?)".to_string(),
-                }
-            }).collect();
-            parts.push(format!("exprs=Seq({})", expr_strs.join(", ")));
-        }
-        
-        if !par.unforgeables.is_empty() {
-            let unf_strs: Vec<String> = par.unforgeables.iter().map(|unf| {
-                match &unf.unf_instance {
-                    Some(UnfInstance::GPrivateBody(private)) => {
-                        format!("GPrivate(id={})", hex::encode(&private.id))
-                    },
-                    _ => "GUnforgeable(?)".to_string(),
-                }
-            }).collect();
-            parts.push(format!("unforgeables=Seq({})", unf_strs.join(", ")));
-        }
-        
-        format!("Par({})", parts.join(", "))
-    }
-
-    /// Convert hash bytes to consistent hex string format
-    fn hash_to_debug_string(hash: &[u8]) -> String {
-        hex::encode(hash)
-    }
-
-    /// Convert ParMap to a consistent string representation for debugging
-    fn par_map_to_debug_string(par_map: &ParMap) -> String {
-        format!("ParMap(ps={})", par_map.ps.sorted_list.len())
-    }
 
     /// Create a Keccak256 hash and wrap it in a Par with GByteArray
     fn keccak_hash(input: &[u8]) -> Par {
@@ -161,7 +104,7 @@ impl RhoTrieTraverser {
                 }
             }
         }
-        panic!("Par {} is not valid for nthOfPar method", Self::par_to_debug_string(p));
+        panic!("Par {:?} is not valid for nth_of_par method", p);
     }
 
     /// Create a Par containing a string
@@ -409,53 +352,31 @@ impl RhoTrieTraverser {
         runtime: &R,
     ) -> Result<Vec<ParMap>, InterpreterError> {
         let (mut keys, depth, map_par, mut collected_results) = read_params;
-        
-        println!("DEEP DEBUG: traverseTrieRec called with keys.size={}, depth={}, collectedResults.size={}",
-            keys.len(), depth, collected_results.len());
-        for (i, key) in keys.iter().enumerate() {
-            println!("DEEP DEBUG: key[{}] = Vector({})", i, key.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "));
-        }
 
         while let Some(key) = keys.pop() {
-            let key_rests_size = keys.len();
-            println!("DEEP DEBUG: Processing key: Vector({}) (keyRests.size={})", 
-                key.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "), 
-                key_rests_size);
-            
             let current_node = Self::tree_hash_map_getter(&map_par, &key, runtime)?;
-            println!("DEEP DEBUG: TreeHashMapGetter returned: {:?}", current_node);
 
             match current_node {
                 Some(Ok(i)) => {
-                    println!("DEEP DEBUG: Got integer value: {}", i);
                     if key.is_empty() {
-                        let extended = Self::extend_key(&key, i);
-                        println!("DEEP DEBUG: key.isEmpty, extending with Vector({})", 
-                            extended.iter().map(|v| format!("Vector({})", v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))).collect::<Vec<_>>().join(", "));
-                        keys.extend(extended);
+                        let mut extended = Self::extend_key(&key, i);
+                        keys.append(&mut extended);
                     } else if depth == key.len() as i32 {
-                        println!("DEEP DEBUG: depth == key.length ({} == {}), not extending", depth, key.len());
                         // Skip this key - we've reached max depth
                     } else {
-                        let extended = Self::extend_key(&key, i);
-                        println!("DEEP DEBUG: depth != key.length, extending with Vector({})", 
-                            extended.iter().map(|v| format!("Vector({})", v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))).collect::<Vec<_>>().join(", "));
-                        keys.extend(extended);
+                        let mut extended = Self::extend_key(&key, i);
+                        keys.append(&mut extended);
                     }
                 }
                 Some(Err(map)) => {
-                    println!("DEEP DEBUG: Found ParMap: {}", Self::par_map_to_debug_string(&map));
                     // Found a ParMap - collect it
                     collected_results.push(map);
                 }
                 None => {
-                    println!("DEEP DEBUG: No data found for key");
                     // No data found for this key - skip
                 }
             }
         }
-        
-        println!("DEEP DEBUG: No more keys, returning {} collected results", collected_results.len());
         Ok(collected_results)
     }
 }
