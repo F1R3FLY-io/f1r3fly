@@ -452,9 +452,6 @@ lazy val node = (project in file("node"))
     javaOptions in Test ++= Seq(
       s"-Djna.library.path=../$releaseJnaLibraryPath"
     ),
-    javaOptions in run ++= Seq(
-      s"-Djna.library.path=../$releaseJnaLibraryPath"
-    ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
     mappings in Docker ++= {
