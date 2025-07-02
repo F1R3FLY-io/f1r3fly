@@ -5,6 +5,7 @@ members = [
 	"rspace++",
 	"rholang",
 	"shared",
+	"node",
 	"node-cli",
 	"models",
 	"crypto",

@@ -25,3 +25,6 @@ cargo test --release
 
 cd ../comm
 cargo test --release
+
+cd ../node
+cargo test --release

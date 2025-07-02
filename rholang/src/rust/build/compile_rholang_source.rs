@@ -33,9 +33,26 @@ impl CompiledRholangSource {
     }
 
     pub fn load_source(filepath: &str) -> Result<String, InterpreterError> {
-        let content = fs::read_to_string(format!("src/main/resources/{}", filepath))?;
-        log::debug!("Loaded from resource file <<{}>>{}", filepath, content);
-        Ok(content)
+        // Try multiple possible resource locations
+        let possible_paths = [
+            format!("casper/src/main/resources/{}", filepath),
+            format!("src/main/resources/{}", filepath),
+            format!("../casper/src/main/resources/{}", filepath),
+        ];
+        
+        for path in &possible_paths {
+            if let Ok(content) = fs::read_to_string(path) {
+                log::debug!("Loaded from resource file <<{}>> at path: {}", filepath, path);
+                return Ok(content);
+            }
+        }
+        
+        // If all paths fail, return the original error with the first path
+        Err(InterpreterError::from(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Could not find resource file '{}' in any of the expected locations: {:?}", 
+                   filepath, possible_paths)
+        )))
     }
 
     pub fn apply(classpath: &str) -> Result<CompiledRholangSource, InterpreterError> {
@@ -83,7 +100,28 @@ impl CompiledRholangTemplate {
         classpath: &str,
         macros: &[(&str, &str)],
     ) -> Result<String, InterpreterError> {
-        let original_content = fs::read_to_string(format!("src/main/resources/{}", classpath))?;
+        // Try multiple possible resource locations
+        let possible_paths = [
+            format!("casper/src/main/resources/{}", classpath),
+            format!("src/main/resources/{}", classpath),
+            format!("../casper/src/main/resources/{}", classpath),
+        ];
+        
+        let mut original_content = None;
+        for path in &possible_paths {
+            if let Ok(content) = fs::read_to_string(path) {
+                original_content = Some(content);
+                break;
+            }
+        }
+        
+        let original_content = original_content.ok_or_else(|| {
+            InterpreterError::from(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Could not find template file '{}' in any of the expected locations: {:?}", 
+                       classpath, possible_paths)
+            ))
+        })?;
 
         let final_content = macros
             .iter()
