@@ -59,14 +59,14 @@ docker compose -f ./observer.yml down # stop observer
 # Check status of each node:
 CURL each node by GET /api/status
 ```shell
-for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/blocks" | jq '.' && echo ; done
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/status" | jq '.' && echo ; done
 ```
 ## Get blocks info of each node:
 ```shell
-for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/blocks" | jq '.' && echo ; done
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/blocks" |  jq '.[0] | {number: .blockNumber, faultTolerance: .faultTolerance, hash: .blockHash}' && echo ; done
 ```
 
 ## Check a fault tolerance of last finalized block of each node:
 ```shell
-for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/last-finalized-block" | jq '.blockInfo.faultTolerance' && echo ; done
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/last-finalized-block" | jq '{ number: .blockInfo.seqNum, faultTolerance: .blockInfo.faultTolerance }' && echo ; done
 ```
