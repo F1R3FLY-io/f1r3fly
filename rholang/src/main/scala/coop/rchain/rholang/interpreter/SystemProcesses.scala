@@ -22,6 +22,7 @@ import coop.rchain.rholang.interpreter.RhoRuntime.RhoTuplespace
 import coop.rchain.rholang.interpreter.registry.Registry
 import coop.rchain.rholang.interpreter.RholangAndScalaDispatcher.RhoDispatch
 import coop.rchain.rholang.interpreter.util.RevAddress
+import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rspace.{ContResult, Result}
 import coop.rchain.shared.Base16
 import io.cequence.openaiscala.domain.ModelId
@@ -62,6 +63,7 @@ trait SystemProcesses[F[_]] {
   def textToAudio: Contract[F]
   def dumpFile: Contract[F]
   def grpcTell: Contract[F]
+  def abort: Contract[F]
 }
 
 object SystemProcesses {
@@ -121,6 +123,7 @@ object SystemProcesses {
     val DUMP: Par               = byteName(23)
     val RANDOM: Par             = byteName(24)
     val GRPC_TELL: Par          = byteName(25)
+    val ABORT: Par              = byteName(26)
   }
   object BodyRefs {
     val STDOUT: Long             = 0L
@@ -145,6 +148,7 @@ object SystemProcesses {
     val DUMP: Long               = 21L
     val RANDOM: Long             = 22L
     val GRPC_TELL: Long          = 23L
+    val ABORT: Long              = 24L
   }
 
   val nonDeterministicCalls: Set[Long] = Set(
@@ -161,7 +165,7 @@ object SystemProcesses {
       blockData: Ref[F, BlockData],
       invalidBlocks: InvalidBlocks[F],
       openAIService: OpenAIService
-  ) {
+  )(implicit cost: _cost[F]) {
     val systemProcesses = SystemProcesses[F](dispatcher, space, openAIService)
   }
   final case class Definition[F[_]](
@@ -201,7 +205,7 @@ object SystemProcesses {
       dispatcher: Dispatch[F, ListParWithRandom, TaggedContinuation],
       space: RhoTuplespace[F],
       openAIService: OpenAIService
-  )(implicit F: Concurrent[F], spanF: Span[F]): SystemProcesses[F] =
+  )(implicit F: Concurrent[F], spanF: Span[F], cost: _cost[F]): SystemProcesses[F] =
     new SystemProcesses[F] {
 
       type ContWithMetaData = ContResult[Par, BindPattern, TaggedContinuation]
@@ -580,5 +584,19 @@ object SystemProcesses {
         case _ =>
           illegalArgumentException("invalidBlocks expects only a return channel")
       }
+
+      def abort: Contract[F] = {
+        case isContractCall(_, _, _, Seq(RhoType.String(errorMessage))) =>
+          for {
+            _ <- {
+              implicit val error: _error[F] = F
+              accounting.charge[F](Cost.UNSAFE_MAX.copy(operation = errorMessage))
+            }
+          } yield Seq(RhoType.Nil())
+        case isContractCall(_, _, _, args) =>
+          println(s"abort expects only a string, but got $args")
+          F.delay(Seq(RhoType.Nil()))
+      }
+
     }
 }

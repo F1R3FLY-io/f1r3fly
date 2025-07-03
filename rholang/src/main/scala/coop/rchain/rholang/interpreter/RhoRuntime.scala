@@ -330,6 +330,14 @@ object RhoRuntime {
       }
     ),
     Definition[F](
+      "rho:io:abort",
+      FixedChannels.ABORT,
+      1,
+      BodyRefs.ABORT, { ctx =>
+        ctx.systemProcesses.abort
+      }
+    ),
+    Definition[F](
       "rho:block:data",
       FixedChannels.GET_BLOCK_DATA,
       1,
@@ -472,7 +480,7 @@ object RhoRuntime {
       invalidBlocks: InvalidBlocks[F],
       extraSystemProcesses: Seq[Definition[F]],
       openAIService: OpenAIService
-  ): RhoDispatchMap[F] =
+  )(implicit cost: _cost[F]): RhoDispatchMap[F] =
     (stdSystemProcesses[F] ++ stdRhoCryptoProcesses[F] ++ stdRhoAIProcesses[F] ++ extraSystemProcesses)
       .map(
         _.toDispatchTable(
