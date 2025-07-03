@@ -106,9 +106,8 @@ class MultiParentCasperImpl[F[_]
 
   def addDeploy(deploy: Signed[DeployData]): F[DeployId] =
     for {
-      _       <- DeployStorage[F].add(List(deploy))
-      message = PrettyPrinter.buildString(deploy)
-      _       <- Log[F].info(s"Received ${message.substring(0, math.min(message.length, 1000))}") // TODO: 1000? or less? or remove?
+      _ <- DeployStorage[F].add(List(deploy))
+      _ <- Log[F].info(s"Received ${PrettyPrinter.buildString(deploy)}")
     } yield deploy.sig
 
   def estimator(dag: BlockDagRepresentation[F]): F[IndexedSeq[BlockHash]] =
