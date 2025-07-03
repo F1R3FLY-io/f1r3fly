@@ -21,6 +21,13 @@ Should see something like this:
 }
 ```
 
+# Observer (Readonly) Node
+The additional observer node that will connect to the shard network and will be able to read the state of the network:
+```sh
+docker compose -f ./observer.yml up # start observer
+docker compose -f ./observer.yml down # stop observer
+```
+
 # Configuration needed for 4 nodes to run in shard mode 
 
 - `standalone = false` in `conf/*.conf` files to run in shard mode
@@ -48,4 +55,18 @@ Should see something like this:
       - ./conf/bootstrap.certificate.pem:/var/lib/rnode/node.certificate.pem # Node can regenerate cert if this line missed. Bootstrap address depends on a cert, validator won't be able to connect to the bootstrap node if cert is changed.
       - ./conf/bootstrap.key.pem:/var/lib/rnode/node.key.pem
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+```
+# Check status of each node:
+CURL each node by GET /api/status
+```shell
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/blocks" | jq '.' && echo ; done
+```
+## Get blocks info of each node:
+```shell
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/blocks" | jq '.' && echo ; done
+```
+
+## Check a fault tolerance of last finalized block of each node:
+```shell
+for port in 40403 40413 40423 40433 40443; do echo "Node: localhost:$port" && curl -s "http://localhost:${port}/api/last-finalized-block" | jq '.blockInfo.faultTolerance' && echo ; done
 ```
