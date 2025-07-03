@@ -232,6 +232,7 @@ jobs:
           - "'casper/test:testOnly coop.rchain.casper.batch1.MultiParentCasperRholangSpec'"
           - "'casper/test:testOnly coop.rchain.casper.addblock.MultiParentCasperAddBlockSpec'"
           - "'casper/test:testOnly coop.rchain.casper.addblock.ProposerSpec'"
+          - "'casper/test:testOnly coop.rchain.node.api.LspServiceSpec'"
     env:
       TESTS: ${{ matrix.tests }}
     steps:
