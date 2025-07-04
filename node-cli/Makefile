@@ -76,6 +76,62 @@ generate-key-pair:
 		fi; \
 	fi
 
+# Node inspection commands
+
+# Get node status
+status:
+	cargo run -- status
+
+# Get recent blocks
+blocks:
+	cargo run -- blocks
+
+# Get validator bonds
+bonds:
+	cargo run -- bonds
+
+# Get active validators
+active-validators:
+	cargo run -- active-validators
+
+# Check wallet balance (requires ADDRESS parameter)
+wallet-balance:
+	@echo "Usage: make wallet-balance ADDRESS=<wallet address>"
+	@[ "$(ADDRESS)" ] && cargo run -- wallet-balance --address $(ADDRESS) || echo "Please provide a wallet address: make wallet-balance ADDRESS=<address>"
+
+# Check bond status (requires PUBLIC_KEY parameter)
+bond-status:
+	@echo "Usage: make bond-status PUBLIC_KEY=<public key>"
+	@[ "$(PUBLIC_KEY)" ] && cargo run -- bond-status --public-key $(PUBLIC_KEY) || echo "Please provide a public key: make bond-status PUBLIC_KEY=<public_key>"
+
+# Get node metrics
+metrics:
+	cargo run -- metrics
+
+# Get last finalized block
+last-finalized-block:
+	cargo run -- last-finalized-block
+
+# Dynamic validator addition commands
+
+# Bond a new validator (optionally STAKE)
+bond-validator:
+	@echo "Usage: make bond-validator [STAKE=<stake amount>]"
+	@if [ "$(STAKE)" ]; then \
+		cargo run -- bond-validator --stake $(STAKE); \
+	else \
+		cargo run -- bond-validator; \
+	fi
+
+# Check network health across multiple nodes
+network-health:
+	cargo run -- network-health
+
+# Check network health with custom ports
+network-health-custom:
+	@echo "Usage: make network-health-custom CUSTOM_PORTS=<port1,port2,port3>"
+	@[ "$(CUSTOM_PORTS)" ] && cargo run -- network-health --custom-ports $(CUSTOM_PORTS) || echo "Please provide custom ports: make network-health-custom CUSTOM_PORTS=<port1,port2,port3>"
+
 # Help message
 help:
 	@echo "F1r3fly Node CLI Makefile"
@@ -92,5 +148,20 @@ help:
 	@echo "  make exploratory-deploy-at-block BLOCK_HASH=<hash> - Execute Rholang at a specific block"
 	@echo "  make generate-key [PRIVATE_KEY=<key>] [COMPRESSED=true] - Generate public key from private key"
 	@echo "  make generate-key-pair [COMPRESSED=true] [SAVE=true] [OUTPUT_DIR=<dir>] - Generate new key pair"
+	@echo ""
+	@echo "Node inspection commands:"
+	@echo "  make status         - Get node status and peer information"
+	@echo "  make blocks         - Get recent blocks"
+	@echo "  make bonds          - Get current validator bonds"
+	@echo "  make active-validators - Get active validators"
+	@echo "  make wallet-balance ADDRESS=<address> - Check wallet balance"
+	@echo "  make bond-status PUBLIC_KEY=<key> - Check validator bond status"
+	@echo "  make metrics        - Get node metrics"
+	@echo "  make last-finalized-block - Get last finalized block"
+	@echo ""
+	@echo "Dynamic validator addition commands:"
+	@echo "  make bond-validator [STAKE=<amount>] - Bond a new validator to the network (deploy only)"
+	@echo "  make network-health - Check health across standard F1r3fly shard ports"
+	@echo "  make network-health-custom CUSTOM_PORTS=<port1,port2> - Check health on custom ports"
 
-.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block generate-key generate-key-pair help 
+.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block generate-key generate-key-pair status blocks bonds active-validators wallet-balance bond-status metrics last-finalized-block bond-validator network-health network-health-custom help 

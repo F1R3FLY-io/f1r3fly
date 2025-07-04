@@ -125,6 +125,155 @@ cargo run -- generate-key-pair --save
 cargo run -- generate-key-pair --save --output-dir /path/to/keys
 ```
 
+## Node Inspection Commands
+
+The CLI provides several commands for inspecting and monitoring F1r3fly nodes using HTTP endpoints:
+
+### Status
+
+Get node status and peer information.
+
+```bash
+# Get status from default node (localhost:40403)
+cargo run -- status
+
+# Get status from custom node
+cargo run -- status -H node.example.com -p 40403
+```
+
+### Blocks
+
+Get recent blocks or specific block information.
+
+```bash
+# Get 5 recent blocks (default)
+cargo run -- blocks
+
+# Get 10 recent blocks
+cargo run -- blocks -n 10
+
+# Get specific block by hash
+cargo run -- blocks --block-hash BLOCK_HASH_HERE
+
+# Get blocks from custom node
+cargo run -- blocks -H node.example.com -p 40403 -n 3
+```
+
+### Bonds
+
+Get current validator bonds from the PoS contract.
+
+```bash
+# Get validator bonds (uses HTTP port for explore-deploy endpoint)
+cargo run -- bonds
+
+# Get bonds from custom node
+cargo run -- bonds -H node.example.com -p 40403
+```
+
+### Active Validators
+
+Get active validators from the PoS contract.
+
+```bash
+# Get active validators (uses HTTP port for explore-deploy endpoint)
+cargo run -- active-validators
+
+# Get active validators from custom node
+cargo run -- active-validators -H node.example.com -p 40403
+```
+
+### Wallet Balance
+
+Check wallet balance for a specific address.
+
+```bash
+# Check wallet balance for an address
+cargo run -- wallet-balance --address "1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g"
+
+# Check balance from custom node (uses gRPC port)
+cargo run -- wallet-balance -a "1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g" -H node.example.com -p 40402
+```
+
+### Bond Status
+
+Check if a validator is bonded by public key.
+
+```bash
+# Check bond status for a public key
+cargo run -- bond-status --public-key "04ffc016579a68050d655d55df4e09f04605164543e257c8e6df10361e6068a5336588e9b355ea859c5ab4285a5ef0efdf62bc28b80320ce99e26bb1607b3ad93d"
+
+# Check from custom node (uses HTTP port like other inspection commands)
+cargo run -- bond-status -k "PUBLIC_KEY_HERE" -H node.example.com -p 40403
+```
+
+### Metrics
+
+Get node metrics for monitoring.
+
+```bash
+# Get node metrics (filtered to show key metrics)
+cargo run -- metrics
+
+# Get metrics from custom node
+cargo run -- metrics -H node.example.com -p 40403
+```
+
+### Last Finalized Block
+
+Get the last finalized block from the node.
+
+```bash
+# Get last finalized block from default node (localhost:40403)
+cargo run -- last-finalized-block
+
+# Get last finalized block from custom node
+cargo run -- last-finalized-block -H node.example.com -p 40403
+```
+
+## Dynamic Validator Addition Commands
+
+The CLI provides commands for dynamically adding validators to a running F1r3fly network, based on the procedures outlined in the `add-validator-dynamically.md` guide.
+
+### Bond Validator
+
+Deploy a bonding transaction to add a new validator to the network.
+
+```bash
+# Bond a new validator with default stake (50 trillion REV)
+cargo run -- bond-validator
+
+# Bond with custom stake amount
+cargo run -- bond-validator --stake 25000000000000
+
+# Bond and also propose a block (auto-propose)
+cargo run -- bond-validator --propose true
+
+# Explicitly disable auto-propose (same as default)
+cargo run -- bond-validator --propose false
+
+# Bond using custom node and private key
+cargo run -- bond-validator -H node.example.com -p 40402 --private-key YOUR_PRIVATE_KEY
+```
+
+### Network Health
+
+Check the health and connectivity of multiple nodes in your F1r3fly shard.
+
+```bash
+# Check standard F1r3fly shard ports (bootstrap, validator1, validator2, observer)
+cargo run -- network-health
+
+# Check network health with custom additional ports (e.g., after adding validator3)
+cargo run -- network-health --custom-ports "60503"
+
+# Check only custom ports (disable standard ports)
+cargo run -- network-health --standard-ports false --custom-ports "60503,70503"
+
+# Check network health on different host
+cargo run -- network-health -H node.example.com --custom-ports "60503"
+```
+
 ## Using the Makefile
 
 For convenience, a Makefile is provided to simplify common operations. The Makefile uses the example Rholang file located at `../rholang/examples/stdout.rho`.
@@ -159,6 +308,22 @@ make exploratory-deploy-at-block BLOCK_HASH=your_block_hash_here
 
 # Show help information
 make help
+
+# Node inspection commands
+make status
+make blocks
+make bonds
+make active-validators
+make wallet-balance ADDRESS=your_wallet_address_here
+make bond-status PUBLIC_KEY=your_public_key_here
+make metrics
+make last-finalized-block
+
+# Dynamic validator addition commands
+make bond-validator
+make bond-validator STAKE=25000000000000
+make network-health
+make network-health-custom CUSTOM_PORTS=60503,70503
 ```
 
 ## Command Line Options
@@ -205,3 +370,61 @@ make help
 - `-c, --compressed`: Output public key in compressed format (shorter)
 - `-s, --save`: Save keys to files instead of displaying them
 - `-o, --output-dir <DIR>`: Output directory for saved keys (default: current directory)
+
+### Status Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Blocks Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+- `-n, --number <NUMBER>`: Number of recent blocks to fetch (default: 5)
+- `-b, --block-hash <BLOCK_HASH>`: Specific block hash to fetch (optional)
+
+### Bonds Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Active-Validators Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Wallet-Balance Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: gRPC port number (default: 40402)
+- `-a, --address <ADDRESS>`: Wallet address to check balance for (required)
+
+### Bond-Status Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+- `-k, --public-key <PUBLIC_KEY>`: Public key to check bond status for (required)
+
+### Metrics Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Last-Finalized-Block Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Bond-Validator Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: gRPC port number for deploy (default: 40402)
+- `-s, --stake <STAKE>`: Stake amount for the validator (default: 50000000000000)
+- `--private-key <PRIVATE_KEY>`: Private key for signing the deploy (hex format)
+- `--propose <PROPOSE>`: Also propose a block after bonding (default: false)
+
+### Network-Health Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-s, --standard-ports <STANDARD_PORTS>`: Check standard F1r3fly shard ports (default: true)
+- `-c, --custom-ports <CUSTOM_PORTS>`: Additional custom ports to check (comma-separated)
