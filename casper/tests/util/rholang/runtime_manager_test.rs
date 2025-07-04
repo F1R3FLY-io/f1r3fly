@@ -278,7 +278,6 @@ async fn exec_replay_system_deploy<S: SystemDeployTrait>(
 }
 
 #[tokio::test]
-#[ignore]
 async fn pre_charge_deploy_should_reduce_user_account_balance_by_correct_amount() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -359,7 +358,6 @@ async fn pre_charge_deploy_should_reduce_user_account_balance_by_correct_amount(
 }
 
 #[tokio::test]
-#[ignore]
 async fn close_block_should_make_epoch_change_and_reward_validator() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -384,7 +382,6 @@ async fn close_block_should_make_epoch_change_and_reward_validator() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn close_block_replay_should_fail_with_different_random_seed() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -410,7 +407,6 @@ async fn close_block_replay_should_fail_with_different_random_seed() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn balance_deploy_should_compute_rev_balances() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -438,7 +434,6 @@ async fn balance_deploy_should_compute_rev_balances() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn compute_state_should_capture_rholang_errors() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -630,7 +625,6 @@ async fn compute_state_then_compute_bonds_should_be_replayable_after_all() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn compute_state_should_capture_rholang_parsing_errors_and_charge_for_parsing() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -663,7 +657,6 @@ async fn compute_state_should_capture_rholang_parsing_errors_and_charge_for_pars
 }
 
 #[tokio::test]
-#[ignore]
 async fn compute_state_should_charge_for_parsing_and_execution() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -706,7 +699,6 @@ async fn compute_state_should_charge_for_parsing_and_execution() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn capture_result_should_return_the_value_at_the_specified_channel_after_a_rholang_computation(
 ) {
     with_runtime_manager(
@@ -854,7 +846,6 @@ async fn empty_state_hash_should_not_remember_previous_hot_store_state() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn compute_state_should_be_replayed_by_replay_compute_state() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -937,7 +928,6 @@ async fn compute_state_should_be_replayed_by_replay_compute_state() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn compute_state_should_charge_deploys_separately() {
     with_runtime_manager(
         |mut runtime_manager, genesis_context, genesis_block| async move {
@@ -1199,6 +1189,7 @@ async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
             };
 
             let invalid_blocks = HashMap::new();
+
             let (_, processed_deploys, processed_system_deploys) = runtime_manager
                 .compute_state(
                     &gen_post_state,
@@ -1214,7 +1205,6 @@ async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
                 )
                 .await
                 .unwrap();
-
             let processed_deploy = processed_deploys.into_iter().next().unwrap();
             let processed_deploy_cost = processed_deploy.cost.cost;
 
@@ -1243,7 +1233,6 @@ async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn replaycomputestate_should_catch_discrepancies_in_initial_and_replay_cost_when_no_errors_are_thrown(
 ) {
     let result = invalid_replay("@0!(0) | for(@0 <- @0){ Nil }".to_string()).await;
@@ -1260,7 +1249,6 @@ async fn replaycomputestate_should_catch_discrepancies_in_initial_and_replay_cos
 }
 
 #[tokio::test]
-#[ignore]
 async fn replaycomputestate_should_not_catch_discrepancies_in_initial_and_replay_cost_when_user_errors_are_thrown(
 ) {
     let result = invalid_replay("@0!(0) | for(@x <- @0){ x.undefined() }".to_string()).await;
