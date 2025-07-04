@@ -1190,7 +1190,6 @@ async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
 
             let invalid_blocks = HashMap::new();
 
-            println!("step 1 before runtime_manager.compute_state");
             let (_, processed_deploys, processed_system_deploys) = runtime_manager
                 .compute_state(
                     &gen_post_state,
@@ -1206,7 +1205,6 @@ async fn invalid_replay(source: String) -> Result<StateHash, CasperError> {
                 )
                 .await
                 .unwrap();
-            println!("step1 after runtime_manager.compute_state");
             let processed_deploy = processed_deploys.into_iter().next().unwrap();
             let processed_deploy_cost = processed_deploy.cost.cost;
 
