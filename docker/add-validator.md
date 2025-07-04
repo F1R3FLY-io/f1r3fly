@@ -28,4 +28,4 @@ Repo - https://github.com/F1R3FLY-io/f1r3fly
 Branch - `debug-finalize-issue`
 
 1. In separate terminal, run validator4 node: `docker compose -f docker/validator4.yml up`.
-2. Wait ~10 seconds. In initial shard logs, should see 4 peers.
+2. Wait ~10 seconds. In initial shard logs, should see 5 peers.
