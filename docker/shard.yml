@@ -1,7 +1,5 @@
-version: "3.4"
-
 x-rnode: &default-rnode
-  image: ghcr.io/f1r3fly-io/rnode
+  image: f1r3flyindustries/f1r3fly-scala-node
   user: root
   networks:
     - f1r3fly
@@ -143,7 +141,7 @@ networks:
 # REV
 # 111129p33f7vaRrpLqK8Nr35Y2aacAjrR5pd6PCzqcdrMuPHzymczH
 
-# extra
+# Validator_3
 # Private key
 # b67533f1f99c0ecaedb7d829e430b1c0e605bda10f339f65d5567cb5bd77cbcb
 # Public key
@@ -153,7 +151,7 @@ networks:
 # REV
 # 1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP
 
-# extra
+# Validator_4
 # Private key
 # 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd
 # Public key
