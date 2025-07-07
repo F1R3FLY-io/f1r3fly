@@ -65,7 +65,7 @@ impl RholangMergingLogic {
 
                 for (ch, end_val) in end_val_map {
                     if let Some(prev_val) = state.get(&ch) {
-                        let diff = end_val - prev_val;
+                        let diff = end_val.wrapping_sub(*prev_val);
                         diffs.insert(ch.clone(), diff);
                         state.insert(ch, end_val);
                     }

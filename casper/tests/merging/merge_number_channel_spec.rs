@@ -394,7 +394,6 @@ async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_g
 // TODO: Remove ignore once we have a fix for this test
 // This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_got_overflow() {
     test_case(
         vec![RHO_ST.to_owned(), rho_change(10)],

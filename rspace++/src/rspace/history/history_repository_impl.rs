@@ -17,9 +17,7 @@ use crate::rspace::hot_store_trie_action::{
     HotStoreTrieAction, TrieDeleteAction, TrieDeleteConsume, TrieDeleteJoins, TrieDeleteProduce,
     TrieInsertAction, TrieInsertConsume, TrieInsertJoins, TrieInsertProduce,
 };
-use crate::rspace::serializers::serializers::{
-    encode_binary, encode_continuations, encode_datums, encode_joins,
-};
+use crate::rspace::serializers::serializers::{encode_continuations, encode_datums, encode_joins};
 use crate::rspace::state::rspace_exporter::RSpaceExporter;
 use crate::rspace::state::rspace_importer::RSpaceImporter;
 use log::debug;
@@ -148,7 +146,7 @@ where
                 )
             }
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryProduce(i)) => {
-                let data = encode_binary(&i.data);
+                let data = bincode::serialize(&i.data).expect("Failed to serialize Vec<Vec<u8>>");
                 let data_leaf = DataLeaf { bytes: data };
                 let data_leaf_encoded = bincode::serialize(&data_leaf)
                     .expect("History Repository Impl: Unable to serialize DataLeaf");
@@ -163,7 +161,8 @@ where
                 )
             }
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryConsume(i)) => {
-                let data = encode_binary(&i.continuations);
+                let data =
+                    bincode::serialize(&i.continuations).expect("Failed to serialize Vec<Vec<u8>>");
                 let continuations_leaf = ContinuationsLeaf { bytes: data };
                 let continuations_leaf_encoded = bincode::serialize(&continuations_leaf)
                     .expect("History Repository Impl: Unable to serialize ContinuationsLeaf");
@@ -181,7 +180,7 @@ where
                 )
             }
             HotStoreTrieAction::TrieInsertAction(TrieInsertAction::TrieInsertBinaryJoins(i)) => {
-                let data = encode_binary(&i.joins);
+                let data = bincode::serialize(&i.joins).expect("Failed to serialize Vec<Vec<u8>>");
                 let joins_leaf = JoinsLeaf { bytes: data };
                 let joins_leaf_encoded = bincode::serialize(&joins_leaf)
                     .expect("History Repository Impl: Unable to serialize JoinsLeaf");
