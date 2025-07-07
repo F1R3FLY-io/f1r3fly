@@ -790,6 +790,7 @@ dependencies = [
  "getrandom 0.2.16",
  "hex",
  "k256",
+ "log",
  "nanorand",
  "num-bigint",
  "p256",
