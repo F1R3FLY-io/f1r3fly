@@ -222,10 +222,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            BondsParserError::InvalidPublicKey { key } => {
-                assert_eq!(key, "invalidhexkey");
+            BondsParserError::InvalidLineFormat { line } => {
+                assert_eq!(line, "invalidhexkey 1000");
             }
-            _ => panic!("Expected InvalidPublicKey error"),
+            _ => panic!("Expected InvalidLineFormat error"),
         }
     }
 
@@ -241,10 +241,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            BondsParserError::InvalidStake { stake } => {
-                assert_eq!(stake, "notanumber");
+            BondsParserError::InvalidLineFormat { line } => {
+                assert_eq!(line, "04f026cc75502aa420f589ba1437d52eb9055ba26701f112ff1b9a0b98cadec54bc3e77bdef9094b33f6afacd59eb1aed78bc1e1320ce714ec9debaabaf0f37ba3 notanumber");
             }
-            _ => panic!("Expected InvalidStake error"),
+            _ => panic!("Expected InvalidLineFormat error"),
         }
     }
 
