@@ -299,8 +299,12 @@ fn create_approval(
 fn create_invalid_approval(candidate: &ApprovedBlockCandidate) -> BlockApproval {
     let secp256k1 = Secp256k1;
     let (private_key, public_key) = secp256k1.new_key_pair();
-    let wrong_data = b"wrong data";
-    let signature_bytes = secp256k1.sign_with_private_key(wrong_data, &private_key);
+
+    let mut data_to_sign = candidate.clone().to_proto().encode_to_vec();
+    data_to_sign.extend_from_slice(b"wrong data");
+    let sig_data = Blake2b256::hash(data_to_sign);
+
+    let signature_bytes = secp256k1.sign_with_private_key(&sig_data, &private_key);
 
     let signature = ProtoSignature {
         public_key: public_key.bytes.clone(),
