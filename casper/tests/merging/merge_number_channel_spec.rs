@@ -367,10 +367,7 @@ async fn test_case(
     assert_eq!(RhoNumber::unapply(&res[0]).unwrap(), expected_final_result);
 }
 
-// TODO: Remove ignore once we have a fix for this test
-// This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_got_negative_number()
 {
     test_case(
@@ -391,8 +388,6 @@ async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_g
     .await;
 }
 
-// TODO: Remove ignore once we have a fix for this test
-// This test should be passing. Just commenting out for now.
 #[tokio::test]
 async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_got_overflow() {
     test_case(
@@ -413,8 +408,6 @@ async fn multiple_branches_should_reject_deploy_when_mergeable_number_channels_g
     .await;
 }
 
-// TODO: Remove ignore once we have a fix for this test
-// This test should be passing. Just commenting out for now.
 #[tokio::test]
 async fn multiple_branches_with_normal_rejection_should_choose_from_normal_reject_options() {
     test_case(
@@ -449,10 +442,7 @@ async fn multiple_branches_with_normal_rejection_should_choose_from_normal_rejec
     .await;
 }
 
-// TODO: Remove ignore once we have a fix for this test
-// This test should be passing. Just commenting out for now.
 #[tokio::test]
-#[ignore]
 async fn multiple_branches_should_merge_number_channels() {
     test_case(
         vec![RHO_ST.to_owned()],
