@@ -62,6 +62,7 @@ trait SystemProcesses[F[_]] {
   def textToAudio: Contract[F]
   def dumpFile: Contract[F]
   def grpcTell: Contract[F]
+  def devNull: Contract[F]
 }
 
 object SystemProcesses {
@@ -105,22 +106,23 @@ object SystemProcesses {
     val KECCAK256_HASH: Par     = byteName(6)
     val BLAKE2B256_HASH: Par    = byteName(7)
     val SECP256K1_VERIFY: Par   = byteName(8)
-    val GET_BLOCK_DATA: Par     = byteName(10)
-    val GET_INVALID_BLOCKS: Par = byteName(11)
-    val REV_ADDRESS: Par        = byteName(12)
-    val DEPLOYER_ID_OPS: Par    = byteName(13)
-    val REG_LOOKUP: Par         = byteName(14)
-    val REG_INSERT_RANDOM: Par  = byteName(15)
-    val REG_INSERT_SIGNED: Par  = byteName(16)
-    val REG_OPS: Par            = byteName(17)
-    val SYS_AUTHTOKEN_OPS: Par  = byteName(18)
-    val GPT3: Par               = byteName(19)
-    val GPT4: Par               = byteName(20)
-    val DALLE3: Par             = byteName(21)
-    val TEXT_TO_AUDIO: Par      = byteName(22)
-    val DUMP: Par               = byteName(23)
-    val RANDOM: Par             = byteName(24)
-    val GRPC_TELL: Par          = byteName(25)
+    val GET_BLOCK_DATA: Par     = byteName(9)
+    val GET_INVALID_BLOCKS: Par = byteName(10)
+    val REV_ADDRESS: Par        = byteName(11)
+    val DEPLOYER_ID_OPS: Par    = byteName(12)
+    val REG_LOOKUP: Par         = byteName(13)
+    val REG_INSERT_RANDOM: Par  = byteName(14)
+    val REG_INSERT_SIGNED: Par  = byteName(15)
+    val REG_OPS: Par            = byteName(16)
+    val SYS_AUTHTOKEN_OPS: Par  = byteName(17)
+    val GPT3: Par               = byteName(18)
+    val GPT4: Par               = byteName(19)
+    val DALLE3: Par             = byteName(20)
+    val TEXT_TO_AUDIO: Par      = byteName(21)
+    val DUMP: Par               = byteName(22)
+    val RANDOM: Par             = byteName(23)
+    val GRPC_TELL: Par          = byteName(24)
+    val DEV_NULL: Par           = byteName(25)
   }
   object BodyRefs {
     val STDOUT: Long             = 0L
@@ -131,20 +133,21 @@ object SystemProcesses {
     val SHA256_HASH: Long        = 5L
     val KECCAK256_HASH: Long     = 6L
     val BLAKE2B256_HASH: Long    = 7L
-    val SECP256K1_VERIFY: Long   = 9L
-    val GET_BLOCK_DATA: Long     = 11L
-    val GET_INVALID_BLOCKS: Long = 12L
-    val REV_ADDRESS: Long        = 13L
-    val DEPLOYER_ID_OPS: Long    = 14L
-    val REG_OPS: Long            = 15L
-    val SYS_AUTHTOKEN_OPS: Long  = 16L
-    val GPT3: Long               = 17L
-    val GPT4: Long               = 18L
-    val DALLE3: Long             = 19L
-    val TEXT_TO_AUDIO: Long      = 20L
-    val DUMP: Long               = 21L
-    val RANDOM: Long             = 22L
-    val GRPC_TELL: Long          = 23L
+    val SECP256K1_VERIFY: Long   = 8L
+    val GET_BLOCK_DATA: Long     = 9L
+    val GET_INVALID_BLOCKS: Long = 10L
+    val REV_ADDRESS: Long        = 11L
+    val DEPLOYER_ID_OPS: Long    = 12L
+    val REG_OPS: Long            = 16L
+    val SYS_AUTHTOKEN_OPS: Long  = 17L
+    val GPT3: Long               = 18L
+    val GPT4: Long               = 19L
+    val DALLE3: Long             = 20L
+    val TEXT_TO_AUDIO: Long      = 21L
+    val DUMP: Long               = 22L
+    val RANDOM: Long             = 23L
+    val GRPC_TELL: Long          = 24L
+    val DEV_NULL: Long           = 25L
   }
 
   val nonDeterministicCalls: Set[Long] = Set(
@@ -548,6 +551,11 @@ object SystemProcesses {
           } yield output
         case isContractCall(_, isReplay, _, args) =>
           F.delay(Seq(RhoType.Nil()))
+      }
+
+      override def devNull: Contract[F] = {
+        case isContractCall(_, _, _, _) =>
+          F.pure(Seq.empty[Par])
       }
 
       def getBlockData(
