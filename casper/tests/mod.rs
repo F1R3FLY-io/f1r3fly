@@ -1,6 +1,7 @@
 use std::sync::Once;
 
 mod add_block;
+mod blocks;
 mod engine;
 mod estimator;
 mod finality;

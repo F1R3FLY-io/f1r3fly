@@ -1,2 +1,2 @@
 pub mod proposer;
-mod block_processor;
+pub mod block_processor;
