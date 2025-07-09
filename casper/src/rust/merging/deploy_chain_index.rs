@@ -104,6 +104,65 @@ impl PartialOrd for DeployChainIndex {
 
 impl Ord for DeployChainIndex {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // 1. PRIMARY: Highest total cost first (economic incentive)
+        //    Higher-paying transactions get priority in conflict resolution
+        let self_total_cost: u64 = self.deploys_with_cost.0.iter().map(|d| d.cost).sum();
+        let other_total_cost: u64 = other.deploys_with_cost.0.iter().map(|d| d.cost).sum();
+
+        let cost_cmp = self_total_cost.cmp(&other_total_cost).reverse(); // Higher cost first
+        if cost_cmp != std::cmp::Ordering::Equal {
+            return cost_cmp;
+        }
+
+        // 2. SECONDARY: Highest single deploy cost (prioritize high-value individual transactions)
+        let self_max_cost = self
+            .deploys_with_cost
+            .0
+            .iter()
+            .map(|d| d.cost)
+            .max()
+            .unwrap_or(0);
+        let other_max_cost = other
+            .deploys_with_cost
+            .0
+            .iter()
+            .map(|d| d.cost)
+            .max()
+            .unwrap_or(0);
+
+        let max_cost_cmp = self_max_cost.cmp(&other_max_cost).reverse(); // Higher max cost first
+        if max_cost_cmp != std::cmp::Ordering::Equal {
+            return max_cost_cmp;
+        }
+
+        // 3. TERTIARY: Lexicographically smallest deploy signature (deterministic)
+        //    This ensures consistent ordering across all nodes when costs are equal
+        let self_min_deploy = self
+            .deploys_with_cost
+            .0
+            .iter()
+            .min_by(|a, b| a.deploy_id.cmp(&b.deploy_id));
+        let other_min_deploy = other
+            .deploys_with_cost
+            .0
+            .iter()
+            .min_by(|a, b| a.deploy_id.cmp(&b.deploy_id));
+
+        let signature_cmp = match (self_min_deploy, other_min_deploy) {
+            (Some(self_deploy), Some(other_deploy)) => {
+                self_deploy.deploy_id.cmp(&other_deploy.deploy_id)
+            }
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (None, None) => std::cmp::Ordering::Equal,
+        };
+
+        if signature_cmp != std::cmp::Ordering::Equal {
+            return signature_cmp;
+        }
+
+        // 4. QUATERNARY: Post-state hash as final fallback
+        //    Ensures total ordering even for identical deploys (should be rare)
         self.post_state_hash.cmp(&other.post_state_hash)
     }
 }

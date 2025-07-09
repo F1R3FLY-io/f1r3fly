@@ -102,7 +102,7 @@ pub trait RhoRuntime: HasCost {
         initial_phlo: Cost,
         normalizer_env: HashMap<String, Par>,
     ) -> Result<EvaluateResult, InterpreterError> {
-        let rand = Blake2b512Random::create_from_bytes(&[0; 128]);
+        let rand = Blake2b512Random::create_from_length(128);
         let checkpoint = self.create_soft_checkpoint();
         match self
             .evaluate(term, initial_phlo, normalizer_env, rand)
