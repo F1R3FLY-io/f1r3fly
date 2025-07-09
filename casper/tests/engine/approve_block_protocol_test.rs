@@ -6,12 +6,8 @@ use std::time::{Duration, SystemTime};
 use tokio::time::{sleep, timeout};
 
 use casper::rust::engine::approve_block_protocol::{
-    ApproveBlockProtocol, ApproveBlockProtocolFactory, Metrics, EventLog,
+    ApproveBlockProtocolImpl, ApproveBlockProtocolFactory, Metrics,
 };
-use casper::rust::genesis::contracts::{
-    proof_of_stake::ProofOfStake, validator::Validator,
-};
-use casper::rust::genesis::genesis::Genesis;
 use casper::rust::errors::CasperError;
 use comm::rust::{
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
@@ -28,10 +24,16 @@ use models::casper::Signature as ProtoSignature;
 use models::rust::casper::protocol::casper_message::{
     ApprovedBlockCandidate, BlockApproval, BlockMessage,
 };
+use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
+use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 use async_trait::async_trait;
 use prost::{bytes, Message};
+use casper::rust::genesis::contracts::{
+    proof_of_stake::ProofOfStake, validator::Validator,
+};
+use casper::rust::genesis::genesis::Genesis;
 
-// Test implementations
+// Test implementations for an isolated environment
 #[derive(Clone)]
 struct MetricsTestImpl {
     counters: Arc<Mutex<HashMap<String, i32>>>,
@@ -51,6 +53,11 @@ impl MetricsTestImpl {
             .copied()
             .unwrap_or(0)
     }
+
+    fn has_counter(&self, name: &str) -> bool {
+        let counters = self.counters.lock().unwrap();
+        counters.contains_key(&format!("approve-block.{}", name))
+    }
 }
 
 impl Metrics for MetricsTestImpl {
@@ -63,51 +70,7 @@ impl Metrics for MetricsTestImpl {
     }
 }
 
-#[derive(Clone)]
-struct EventLogTestImpl {
-    events: Arc<Mutex<Vec<String>>>,
-}
-
-impl EventLogTestImpl {
-    fn new() -> Self {
-        Self {
-            events: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-    
-    fn get_events(&self) -> Vec<String> {
-        self.events.lock().unwrap().clone()
-    }
-}
-
-impl EventLog for EventLogTestImpl {
-    fn publish_block_approval_received(&self, block_hash: &str, sender: &str) -> Result<(), CasperError> {
-        let mut events = self.events.lock().unwrap();
-        events.push(format!("BlockApprovalReceived({}, {})", block_hash, sender));
-        Ok(())
-    }
-
-    fn publish_sent_unapproved_block(&self, candidate_hash: &str) -> Result<(), CasperError> {
-        let mut events = self.events.lock().unwrap();
-        events.push(format!("SentUnapprovedBlock({})", candidate_hash));
-        Ok(())
-    }
-    
-    fn publish_sent_approved_block(&self, candidate_hash: &str) -> Result<(), CasperError> {
-        let mut events = self.events.lock().unwrap();
-        events.push(format!("SentApprovedBlock({})", candidate_hash));
-        Ok(())
-    }
-}
-
-impl EventLogTestImpl {
-    fn events_contain(&self, event_prefix: &str, expected_count: usize) -> bool {
-        let events = self.events.lock().unwrap();
-        let count = events.iter().filter(|e| e.starts_with(event_prefix)).count();
-        count == expected_count
-    }
-}
-
+// A transport layer stub that only tracks messages for verification
 #[derive(Default)]
 struct TransportLayerTestImpl {
     messages: Arc<Mutex<Vec<Blob>>>,
@@ -142,18 +105,26 @@ impl TransportLayer for TransportLayerTestImpl {
     }
 
     async fn stream_mult(&self, _peers: &[PeerNode], blob: &Blob) -> Result<(), comm::rust::errors::CommError> {
-        let mut messages = self.messages.lock().unwrap();
-        messages.push(blob.clone());
-        Ok(())
+        let default_peer = PeerNode {
+            id: NodeIdentifier { 
+                key: bytes::Bytes::from("default_peer".as_bytes().to_vec()) 
+            },
+            endpoint: Endpoint {
+                host: "localhost".to_string(),
+                tcp_port: 0,
+                udp_port: 0,
+            },
+        };
+        self.stream(&default_peer, blob).await
     }
 }
 
+// An isolated test fixture created for each test
 struct TestFixture {
-    protocol: Box<dyn ApproveBlockProtocol>,
+    protocol: Arc<ApproveBlockProtocolImpl<TransportLayerTestImpl>>,
     metrics: Arc<MetricsTestImpl>,
-    event_log: Arc<EventLogTestImpl>,
+    event_log: Arc<F1r3flyEvents>,
     transport: Arc<TransportLayerTestImpl>,
-    genesis_block: BlockMessage,
     candidate: ApprovedBlockCandidate,
     last_approved_block: Arc<Mutex<Option<models::rust::casper::protocol::casper_message::ApprovedBlock>>>,
 }
@@ -165,11 +136,9 @@ impl TestFixture {
         interval: Duration,
         key_pairs: Vec<(PrivateKey, PublicKey)>,
     ) -> Self {
-        // Create a simple test case
         let genesis_block = create_test_genesis_block(&key_pairs);
-
         let metrics = Arc::new(MetricsTestImpl::new());
-        let event_log = Arc::new(EventLogTestImpl::new());
+        let event_log = Arc::new(F1r3flyEvents::new(Some(100)));
         let transport = Arc::new(TransportLayerTestImpl::new());
         let last_approved_block = Arc::new(Mutex::new(None));
         
@@ -197,7 +166,7 @@ impl TestFixture {
             default_timeout: Duration::from_secs(30),
         });
 
-        let protocol = ApproveBlockProtocolFactory::unsafe_new_with_infrastructure(
+        let protocol_impl = ApproveBlockProtocolFactory::unsafe_new_with_infrastructure(
             genesis_block.clone(),
             required_sigs,
             duration,
@@ -216,15 +185,53 @@ impl TestFixture {
         };
 
         Self {
-            protocol,
+            protocol: Arc::new(protocol_impl),
             metrics,
             event_log,
             transport,
-            genesis_block,
             candidate,
             last_approved_block,
         }
     }
+
+    // Isolated event verification using the new get_events() method
+    fn events_contain(&self, event_name: &str, expected_count: usize) -> bool {
+        let events = self.event_log.get_events();
+        let actual_count = events.iter()
+            .filter(|event| {
+                match event {
+                    F1r3flyEvent::SentUnapprovedBlock(_) if event_name == "SentUnapprovedBlock" => true,
+                    F1r3flyEvent::SentApprovedBlock(_) if event_name == "SentApprovedBlock" => true,
+                    F1r3flyEvent::BlockApprovalReceived(_) if event_name == "BlockApprovalReceived" => true,
+                    _ => false,
+                }
+            })
+            .count();
+        actual_count == expected_count
+    }
+
+    fn signature_count(&self) -> usize {
+        self.metrics.get_counter("genesis") as usize
+    }
+
+    fn has_approved_block(&self) -> bool {
+        self.last_approved_block.lock().unwrap().is_some()
+    }
+}
+
+// Helper function to wait for an assertion to be true with a timeout
+async fn wait_for<F>(f: F, timeout_duration: Duration) -> bool
+where
+    F: Fn() -> bool,
+{
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout_duration {
+        if f() {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    f() // Final check
 }
 
 fn create_test_genesis_block(validator_key_pairs: &[(PrivateKey, PublicKey)]) -> BlockMessage {
@@ -327,26 +334,22 @@ async fn should_add_valid_signatures_to_state() {
     let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
-    // Start the protocol in the background using a different approach
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Initially no metrics counter
-    assert_eq!(fixture.metrics.get_counter("genesis"), 0);
+    assert!(!fixture.metrics.has_counter("genesis"));
+    assert_eq!(fixture.signature_count(), 0);
 
-    // Add approval
     protocol.add_approval(approval).await.unwrap();
-
-    // Give some time for processing
     sleep(Duration::from_millis(10)).await;
 
-    // Verify metrics were incremented like in Scala test
-    assert_eq!(fixture.metrics.get_counter("genesis"), 1);
+    assert!(fixture.metrics.has_counter("genesis"));
+    assert_eq!(fixture.signature_count(), 1);
+    assert!(fixture.events_contain("BlockApprovalReceived", 1));
 
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -360,26 +363,25 @@ async fn should_not_change_signatures_on_duplicate_approval() {
     let approval1 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     let approval2 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Initially no metrics counter
-    assert_eq!(fixture.metrics.get_counter("genesis"), 0);
-
-    // Add approval twice
     protocol.add_approval(approval1).await.unwrap();
-    sleep(Duration::from_millis(10)).await;
+
+    assert!(
+        wait_for(|| fixture.events_contain("BlockApprovalReceived", 1), Duration::from_millis(50)).await,
+        "First BlockApprovalReceived event not found"
+    );
+
     protocol.add_approval(approval2).await.unwrap();
     sleep(Duration::from_millis(10)).await;
 
-    // Verify counter only incremented once (duplicate ignored)
-    assert_eq!(fixture.metrics.get_counter("genesis"), 1);
+    assert_eq!(fixture.signature_count(), 1);
+    assert!(fixture.events_contain("BlockApprovalReceived", 1), "Duplicate approval should not generate a new event");
 
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -392,21 +394,18 @@ async fn should_not_add_invalid_signatures() {
     let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
     let invalid_approval = create_invalid_approval(&fixture.candidate);
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Add invalid approval
     protocol.add_approval(invalid_approval).await.unwrap();
     sleep(Duration::from_millis(10)).await;
 
-    // Verify no metrics counter incremented for invalid signature
-    assert_eq!(fixture.metrics.get_counter("genesis"), 0);
+    assert!(!fixture.metrics.has_counter("genesis"));
+    assert!(fixture.events_contain("BlockApprovalReceived", 0));
 
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -423,34 +422,25 @@ async fn should_create_approved_block_when_enough_signatures_collected() {
         key_pairs.clone(),
     );
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Add all approvals
     for (private_key, public_key) in &key_pairs {
         let approval = create_approval(&fixture.candidate, private_key, public_key);
         protocol.add_approval(approval).await.unwrap();
         sleep(Duration::from_millis(1)).await;
     }
 
-    // Wait for the duration to elapse
     sleep(Duration::from_millis(35)).await;
 
-    // Verify all approvals were counted
-    assert_eq!(fixture.metrics.get_counter("genesis"), n as i32);
+    assert_eq!(fixture.signature_count(), n);
+    assert!(fixture.has_approved_block());
+    assert!(fixture.events_contain("BlockApprovalReceived", n));
+    assert!(fixture.events_contain("SentApprovedBlock", 1));
 
-    // Verify approved block was created
-    let approved_block = {
-        let last_approved = fixture.last_approved_block.lock().unwrap();
-        last_approved.clone()
-    };
-    assert!(approved_block.is_some());
-
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -467,36 +457,32 @@ async fn should_continue_collecting_if_not_enough_signatures() {
         key_pairs.clone(),
     );
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Add only half the required approvals
     for (private_key, public_key) in key_pairs.iter().take(n / 2) {
         let approval = create_approval(&fixture.candidate, private_key, public_key);
         protocol.add_approval(approval).await.unwrap();
         sleep(Duration::from_millis(1)).await;
     }
 
-    // Should not have approved block yet
     sleep(Duration::from_millis(35)).await;
-    assert_eq!(fixture.metrics.get_counter("genesis"), (n / 2) as i32);
+    assert_eq!(fixture.signature_count(), n / 2);
+    assert!(!fixture.has_approved_block());
 
-    // Add the remaining approvals
     for (private_key, public_key) in key_pairs.iter().skip(n / 2) {
         let approval = create_approval(&fixture.candidate, private_key, public_key);
         protocol.add_approval(approval).await.unwrap();
         sleep(Duration::from_millis(1)).await;
     }
 
-    // Now should create approved block
     sleep(Duration::from_millis(35)).await;
-    assert_eq!(fixture.metrics.get_counter("genesis"), n as i32);
+    assert_eq!(fixture.signature_count(), n);
+    assert!(fixture.has_approved_block());
 
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -507,26 +493,21 @@ async fn should_skip_duration_when_required_signatures_is_zero() {
     let key_pairs = vec![key_pair];
 
     let fixture = TestFixture::new(
-        0, // Zero required signatures
+        0,
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs,
     );
 
-    // Start the protocol
     let start = std::time::Instant::now();
-
-    // Use timeout to ensure the protocol completes quickly
     let result = timeout(Duration::from_millis(100), fixture.protocol.run()).await;
 
     let elapsed = start.elapsed();
-
-    // Should complete immediately, not wait for duration
     assert!(elapsed < Duration::from_millis(10));
     assert!(result.is_ok());
-    
-    // Should have no metrics counter for zero required sigs
-    assert_eq!(fixture.metrics.get_counter("genesis"), 0);
+    assert!(!fixture.metrics.has_counter("genesis"));
+    assert!(fixture.has_approved_block());
+    assert!(fixture.events_contain("SentApprovedBlock", 1));
 }
 
 #[tokio::test]
@@ -535,29 +516,22 @@ async fn should_not_accept_approval_from_untrusted_validator() {
     let trusted_key_pair = secp256k1.new_key_pair();
     let untrusted_key_pair = secp256k1.new_key_pair();
 
-    // Only the trusted key pair is in the genesis block
     let key_pairs = vec![trusted_key_pair];
-
     let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
-
-    // Create approval from untrusted validator
     let approval = create_approval(&fixture.candidate, &untrusted_key_pair.0, &untrusted_key_pair.1);
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Add approval from untrusted validator
     protocol.add_approval(approval).await.unwrap();
     sleep(Duration::from_millis(10)).await;
 
-    // Verify no metrics counter incremented for untrusted validator
-    assert_eq!(fixture.metrics.get_counter("genesis"), 0);
+    assert!(!fixture.metrics.has_counter("genesis"));
+    assert!(fixture.events_contain("BlockApprovalReceived", 0));
 
-    // Cancel the background task
     protocol_handle.abort();
 }
 
@@ -570,45 +544,37 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
     let fixture = TestFixture::new(
         10, 
         Duration::from_millis(100), 
-        Duration::from_millis(5), // 5ms interval for testing
+        Duration::from_millis(5),
         key_pairs
     );
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Wait for several intervals to pass
-    sleep(Duration::from_millis(20)).await;
+    assert!(
+        wait_for(|| fixture.events_contain("SentUnapprovedBlock", 1), Duration::from_millis(50)).await,
+        "SentUnapprovedBlock event not found"
+    );
+    assert!(fixture.transport.get_messages().len() >= 1);
+    assert!(!fixture.metrics.has_counter("genesis"));
 
-    let events = fixture.event_log.get_events();
-    let message_count = fixture.transport.get_messages().len();
-
-    // Verify that UnapprovedBlock messages are being sent at intervals
-    // Should have at least 1 message, likely several due to the 5ms interval
-    assert!(message_count >= 1, "Expected at least 1 message to be sent, got {}", message_count);
-    
-    // Verify that SentUnapprovedBlock events were published
-    let unapproved_events_count = events.iter()
-        .filter(|e| e.starts_with("SentUnapprovedBlock"))
-        .count();
-    assert!(unapproved_events_count >= 1, "Expected at least 1 SentUnapprovedBlock event, got {}", unapproved_events_count);
-
-    // Add one approval to test the behavior continues
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     protocol.add_approval(approval).await.unwrap();
     
-    // Wait for another interval cycle  
-    sleep(Duration::from_millis(15)).await;
-
-    // Should continue broadcasting - verify more messages were sent
-    let new_message_count = fixture.transport.get_messages().len();
-    assert!(new_message_count > message_count, "Expected more messages after adding approval");
+    assert!(
+        wait_for(|| fixture.events_contain("BlockApprovalReceived", 1), Duration::from_millis(50)).await,
+        "BlockApprovalReceived event not found"
+    );
     
-    // Cancel the background task
+    assert!(
+        wait_for(|| fixture.transport.get_messages().len() >= 2, Duration::from_millis(50)).await,
+        "Second UnapprovedBlock was not sent"
+    );
+    assert_eq!(fixture.signature_count(), 1);
+    
     protocol_handle.abort();
 }
 
@@ -619,37 +585,31 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
     let key_pairs = vec![key_pair.clone()];
 
     let fixture = TestFixture::new(
-        1, // Only need 1 signature
+        1,
         Duration::from_millis(2), 
         Duration::from_millis(1),
         key_pairs
     );
 
-    // Start the protocol in the background
-    let protocol = Arc::new(fixture.protocol);
-    let protocol_clone = protocol.clone();
+    let protocol = fixture.protocol.clone();
+    let protocol_clone = fixture.protocol.clone();
     let protocol_handle = tokio::spawn(async move {
         let _ = protocol_clone.run().await;
     });
 
-    // Add the required approval
+    sleep(Duration::from_millis(1)).await;
+    assert!(fixture.events_contain("SentApprovedBlock", 0));
+    assert!(!fixture.metrics.has_counter("genesis"));
+
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     protocol.add_approval(approval).await.unwrap();
 
-    // Wait for the duration to complete the ceremony
-    sleep(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(5)).await;
 
-    // Verify that approved block was created
-    let approved_block = {
-        let last_approved = fixture.last_approved_block.lock().unwrap();
-        last_approved.clone()
-    };
+    assert!(fixture.has_approved_block());
+    assert_eq!(fixture.signature_count(), 1);
+    assert!(fixture.transport.get_messages().len() >= 1);
+    assert!(fixture.events_contain("SentApprovedBlock", 1));
     
-    assert!(approved_block.is_some(), "ApprovedBlock should have been created");
-    
-    // Verify ApprovedBlock event was published
-    assert!(fixture.event_log.events_contain("SentApprovedBlock", 1));
-    
-    // Cancel the background task
     protocol_handle.abort();
 }

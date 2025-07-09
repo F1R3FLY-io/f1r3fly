@@ -7,13 +7,23 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use tokio::sync::broadcast;
 
-use super::f1r3fly_event::F1r3flyEvent;
+pub use super::f1r3fly_event::F1r3flyEvent;
 
 /// Structure to publish and consume F1r3flyEvents
 pub struct F1r3flyEvents {
     queue: Arc<Mutex<VecDeque<F1r3flyEvent>>>,
     capacity: usize,
     sender: broadcast::Sender<F1r3flyEvent>,
+}
+
+impl Clone for F1r3flyEvents {
+    fn clone(&self) -> Self {
+        Self {
+            queue: self.queue.clone(),
+            capacity: self.capacity,
+            sender: self.sender.clone(),
+        }
+    }
 }
 
 impl F1r3flyEvents {
@@ -59,6 +69,12 @@ impl F1r3flyEvents {
         EventStream {
             receiver: self.sender.subscribe(),
         }
+    }
+
+    /// Get all events currently in the queue.
+    /// NOTE: This is intended for testing purposes.
+    pub fn get_events(&self) -> Vec<F1r3flyEvent> {
+        self.queue.lock().unwrap().iter().cloned().collect()
     }
 }
 
