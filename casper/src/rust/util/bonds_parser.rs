@@ -4,8 +4,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crypto::rust::{
-    public_key::PublicKey,
     private_key::PrivateKey,
+    public_key::PublicKey,
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
 use models::rust::string_ops::StringOps;
@@ -38,10 +38,11 @@ impl BondsParser {
     pub fn parse(bonds_path: &Path) -> Result<HashMap<PublicKey, i64>, BondsParserError> {
         log::info!("Parsing bonds file {:?}.", bonds_path);
 
-        let content = fs::read_to_string(bonds_path).map_err(|e| BondsParserError::ParsingFailed {
-            path: bonds_path.to_string_lossy().to_string(),
-            source: Box::new(e),
-        })?;
+        let content =
+            fs::read_to_string(bonds_path).map_err(|e| BondsParserError::ParsingFailed {
+                path: bonds_path.to_string_lossy().to_string(),
+                source: Box::new(e),
+            })?;
 
         let line_regex = Regex::new(r"^([0-9a-fA-F]+) ([0-9]+)").unwrap();
         let mut bonds = HashMap::new();
@@ -53,11 +54,11 @@ impl BondsParser {
             }
 
             // Parse line format
-            let captures = line_regex
-                .captures(trimmed_line)
-                .ok_or_else(|| BondsParserError::InvalidLineFormat {
+            let captures = line_regex.captures(trimmed_line).ok_or_else(|| {
+                BondsParserError::InvalidLineFormat {
                     line: trimmed_line.to_string(),
-                })?;
+                }
+            })?;
 
             let public_key_str = captures
                 .get(1)
@@ -83,11 +84,11 @@ impl BondsParser {
             let public_key = PublicKey::from_bytes(&public_key_bytes);
 
             // Parse stake
-            let stake = stake_str.parse::<i64>().map_err(|_| {
-                BondsParserError::InvalidStake {
+            let stake = stake_str
+                .parse::<i64>()
+                .map_err(|_| BondsParserError::InvalidStake {
                     stake: stake_str.to_string(),
-                }
-            })?;
+                })?;
 
             log::info!(
                 "Bond loaded {} => {}",
@@ -123,12 +124,12 @@ impl BondsParser {
         autogen_shard_size: usize,
         bonds_file_path: &Path,
     ) -> Result<HashMap<PublicKey, i64>, BondsParserError> {
-        let genesis_folder = bonds_file_path
-            .parent()
-            .ok_or_else(|| BondsParserError::IoError(std::io::Error::new(
+        let genesis_folder = bonds_file_path.parent().ok_or_else(|| {
+            BondsParserError::IoError(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "bonds file path has no parent directory",
-            )))?;
+            ))
+        })?;
 
         // Generate private/public key pairs
         let secp256k1 = Secp256k1;
@@ -299,4 +300,4 @@ mod tests {
         let bonds = result.unwrap();
         assert_eq!(bonds.len(), 2);
     }
-} 
+}

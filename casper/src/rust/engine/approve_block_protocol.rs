@@ -2,16 +2,16 @@
 
 use comm::rust::{
     rp::{connect::ConnectionsCell, rp_conf::RPConf},
-    transport::transport_layer::TransportLayer,
     test_instances::TransportLayerStub,
+    transport::transport_layer::TransportLayer,
 };
 use crypto::rust::hash::blake2b256::Blake2b256;
 use models::casper::Signature as ProtoSignature;
+use models::rust::casper::pretty_printer::PrettyPrinter;
 use models::rust::casper::protocol::casper_message::{
     ApprovedBlock, ApprovedBlockCandidate, BlockApproval, BlockMessage, UnapprovedBlock,
 };
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
-use models::rust::casper::pretty_printer::PrettyPrinter;
 use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_events::{F1r3flyEvent, F1r3flyEvents};
 use std::collections::HashSet;
@@ -22,15 +22,11 @@ use tokio::time::sleep;
 use crate::rust::{
     errors::CasperError,
     genesis::{
+        contracts::{proof_of_stake::ProofOfStake, validator::Validator},
         genesis::Genesis,
-        contracts::{
-            proof_of_stake::ProofOfStake,
-            validator::Validator,
-        },
     },
     util::{
-        bonds_parser::BondsParser,
-        rholang::runtime_manager::RuntimeManager,
+        bonds_parser::BondsParser, rholang::runtime_manager::RuntimeManager,
         vault_parser::VaultParser,
     },
     validate::Validate,
@@ -50,8 +46,8 @@ impl std::hash::Hash for SignatureWrapper {
 
 impl PartialEq for SignatureWrapper {
     fn eq(&self, other: &Self) -> bool {
-        self.0.public_key == other.0.public_key 
-            && self.0.algorithm == other.0.algorithm 
+        self.0.public_key == other.0.public_key
+            && self.0.algorithm == other.0.algorithm
             && self.0.sig == other.0.sig
     }
 }
@@ -172,7 +168,10 @@ impl ApproveBlockProtocolFactory {
 
         let validators: Vec<Validator> = bonds
             .into_iter()
-            .map(|(public_key, stake)| Validator { pk: public_key, stake })
+            .map(|(public_key, stake)| Validator {
+                pk: public_key,
+                stake,
+            })
             .collect();
 
         let genesis = Genesis {
@@ -229,14 +228,14 @@ pub struct ApproveBlockProtocolImpl<T: TransportLayer + Send + Sync> {
     interval: Duration,
     sigs: Arc<Mutex<HashSet<SignatureWrapper>>>,
     last_approved_block: Arc<Mutex<Option<ApprovedBlock>>>,
-    
+
     // Infrastructure - matching Scala implicits
     metrics: Option<Arc<dyn Metrics>>,
     event_log: Option<F1r3flyEvents>,
     transport: Arc<T>,
     connections_cell: Option<Arc<ConnectionsCell>>,
     conf: Option<Arc<RPConf>>,
-    
+
     // Derived fields
     trusted_validators: HashSet<bytes::Bytes>,
     candidate: ApprovedBlockCandidate,
@@ -273,7 +272,7 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
         };
 
         let candidate_hash = PrettyPrinter::build_string_bytes(&genesis_block.block_hash);
-        
+
         // Clone needed: to_proto() takes ownership but candidate is stored in struct
         let sig_data = Blake2b256::hash(candidate.clone().to_proto().encode_to_vec());
 
@@ -301,11 +300,9 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
         self.trusted_validators.contains(&approval.sig.public_key)
     }
 
-
-
     async fn send_unapproved_block(&self) -> Result<(), CasperError> {
         log::info!("Broadcasting UnapprovedBlock {}...", self.candidate_hash);
-        
+
         if let (Some(connections_cell), Some(conf)) = (&self.connections_cell, &self.conf) {
             // Recreate UnapprovedBlock from its components
             let unapproved_block = UnapprovedBlock {
@@ -314,44 +311,60 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
                 duration: self.duration.as_millis() as i64,
             };
             let packet = unapproved_block.to_proto().mk_packet();
-            
-            self.transport.stream_packet_to_peers(connections_cell, conf, packet, None)
+
+            self.transport
+                .stream_packet_to_peers(connections_cell, conf, packet, None)
                 .await
-                .map_err(|e| CasperError::RuntimeError(format!("Failed to broadcast UnapprovedBlock: {}", e)))?;
+                .map_err(|e| {
+                    CasperError::RuntimeError(format!("Failed to broadcast UnapprovedBlock: {}", e))
+                })?;
         }
-        
+
         // Publish event
         if let Some(event_log) = &self.event_log {
-            event_log.publish(F1r3flyEvent::SentUnapprovedBlock(self.candidate_hash.clone()))
+            event_log
+                .publish(F1r3flyEvent::SentUnapprovedBlock(
+                    self.candidate_hash.clone(),
+                ))
                 .map_err(|e| CasperError::RuntimeError(e))?;
         }
-        
+
         Ok(())
     }
 
     async fn send_approved_block(&self, approved_block: &ApprovedBlock) -> Result<(), CasperError> {
         log::info!("Sending ApprovedBlock {} to peers...", self.candidate_hash);
-        
+
         if let (Some(connections_cell), Some(conf)) = (&self.connections_cell, &self.conf) {
             let packet = approved_block.clone().to_proto().mk_packet();
-            
-            self.transport.stream_packet_to_peers(connections_cell, conf, packet, None)
+
+            self.transport
+                .stream_packet_to_peers(connections_cell, conf, packet, None)
                 .await
-                .map_err(|e| CasperError::RuntimeError(format!("Failed to send ApprovedBlock: {}", e)))?;
+                .map_err(|e| {
+                    CasperError::RuntimeError(format!("Failed to send ApprovedBlock: {}", e))
+                })?;
         }
-        
+
         // Publish event
         if let Some(event_log) = &self.event_log {
-            event_log.publish(F1r3flyEvent::SentApprovedBlock(self.candidate_hash.clone()))
+            event_log
+                .publish(F1r3flyEvent::SentApprovedBlock(self.candidate_hash.clone()))
                 .map_err(|e| CasperError::RuntimeError(e))?;
         }
-        
+
         Ok(())
     }
 
-    async fn complete_if(&self, time: u64, signatures: &HashSet<SignatureWrapper>) -> Result<(), CasperError> {
-        if (time >= self.start + self.duration.as_millis() as u64 && signatures.len() >= self.required_sigs as usize) 
-            || self.required_sigs == 0 {
+    async fn complete_if(
+        &self,
+        time: u64,
+        signatures: &HashSet<SignatureWrapper>,
+    ) -> Result<(), CasperError> {
+        if (time >= self.start + self.duration.as_millis() as u64
+            && signatures.len() >= self.required_sigs as usize)
+            || self.required_sigs == 0
+        {
             Box::pin(self.complete_genesis_ceremony(signatures.clone())).await
         } else {
             log::info!(
@@ -368,7 +381,10 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
         }
     }
 
-    async fn complete_genesis_ceremony(&self, signatures: HashSet<SignatureWrapper>) -> Result<(), CasperError> {
+    async fn complete_genesis_ceremony(
+        &self,
+        signatures: HashSet<SignatureWrapper>,
+    ) -> Result<(), CasperError> {
         let approved_block = ApprovedBlock {
             candidate: self.candidate.clone(),
             sigs: signatures.into_iter().map(|s| s.0).collect(),
@@ -381,7 +397,7 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
             })?;
             *last_approved = Some(approved_block.clone());
         }
-        
+
         self.send_approved_block(&approved_block).await?;
         Ok(())
     }
@@ -397,12 +413,12 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
             })?;
             sigs_guard.clone()
         };
-        
+
         self.complete_if(current_time, &signatures).await
     }
 
     pub async fn add_approval(&self, approval: BlockApproval) -> Result<(), CasperError> {
-        let valid_sig = approval.candidate == self.candidate 
+        let valid_sig = approval.candidate == self.candidate
             && Validate::signature(&self.sig_data, &approval.sig);
 
         let sender = hex::encode(&approval.sig.public_key);
@@ -418,7 +434,7 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
                     let before_size = sigs_guard.len();
                     sigs_guard.insert(SignatureWrapper(approval.sig.clone()));
                     let after_size = sigs_guard.len();
-                    
+
                     (before_size, after_size)
                 };
 
@@ -431,13 +447,14 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
                     }
                     // Publish BlockApprovalReceived event only for new signatures
                     if let Some(event_log) = &self.event_log {
-                        event_log.publish(F1r3flyEvent::BlockApprovalReceived(
-                            shared::rust::shared::f1r3fly_event::BlockApprovalReceived {
-                                block_hash: self.candidate_hash.clone(),
-                                sender: sender.clone(),
-                            }
-                        ))
-                        .map_err(|e| CasperError::RuntimeError(e))?;
+                        event_log
+                            .publish(F1r3flyEvent::BlockApprovalReceived(
+                                shared::rust::shared::f1r3fly_event::BlockApprovalReceived {
+                                    block_hash: self.candidate_hash.clone(),
+                                    sender: sender.clone(),
+                                },
+                            ))
+                            .map_err(|e| CasperError::RuntimeError(e))?;
                     }
                 } else {
                     log::info!("No new sigs received");
@@ -450,12 +467,12 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
                     let sigs_guard = self.sigs.lock().map_err(|_| {
                         CasperError::RuntimeError("Failed to acquire signatures lock".to_string())
                     })?;
-                    
+
                     let sig_strings: Vec<String> = sigs_guard
                         .iter()
                         .map(|sig| PrettyPrinter::build_string_bytes(&sig.0.public_key))
                         .collect();
-                    
+
                     (sigs_guard.len(), sig_strings.join(", "))
                 };
 
@@ -470,7 +487,7 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
         } else {
             log::warn!("Received BlockApproval from untrusted validator.");
         }
-        
+
         Ok(())
     }
 
@@ -490,4 +507,4 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
             Ok(())
         }
     }
-} 
+}

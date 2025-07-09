@@ -1,17 +1,23 @@
 // See casper/src/test/scala/coop/rchain/casper/engine/ApproveBlockProtocolTest.scala
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use tokio::time::{sleep, timeout};
 
+use async_trait::async_trait;
 use casper::rust::engine::approve_block_protocol::{
-    ApproveBlockProtocolImpl, ApproveBlockProtocolFactory, Metrics,
+    ApproveBlockProtocolFactory, ApproveBlockProtocolImpl, Metrics,
 };
 use casper::rust::errors::CasperError;
+use casper::rust::genesis::contracts::{proof_of_stake::ProofOfStake, validator::Validator};
+use casper::rust::genesis::genesis::Genesis;
 use comm::rust::{
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
-    rp::{connect::{Connections, ConnectionsCell}, rp_conf::{ClearConnectionsConf, RPConf}},
+    rp::{
+        connect::{Connections, ConnectionsCell},
+        rp_conf::{ClearConnectionsConf, RPConf},
+    },
     transport::transport_layer::{Blob, TransportLayer},
 };
 use crypto::rust::{
@@ -24,14 +30,9 @@ use models::casper::Signature as ProtoSignature;
 use models::rust::casper::protocol::casper_message::{
     ApprovedBlockCandidate, BlockApproval, BlockMessage,
 };
+use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
-use async_trait::async_trait;
-use prost::{bytes, Message};
-use casper::rust::genesis::contracts::{
-    proof_of_stake::ProofOfStake, validator::Validator,
-};
-use casper::rust::genesis::genesis::Genesis;
 
 // Test implementations for an isolated environment
 #[derive(Clone)]
@@ -45,7 +46,7 @@ impl MetricsTestImpl {
             counters: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-    
+
     fn get_counter(&self, name: &str) -> i32 {
         let counters = self.counters.lock().unwrap();
         counters
@@ -82,7 +83,7 @@ impl TransportLayerTestImpl {
             messages: Arc::new(Mutex::new(Vec::new())),
         }
     }
-    
+
     fn get_messages(&self) -> Vec<Blob> {
         self.messages.lock().unwrap().clone()
     }
@@ -90,24 +91,40 @@ impl TransportLayerTestImpl {
 
 #[async_trait]
 impl TransportLayer for TransportLayerTestImpl {
-    async fn send(&self, _peer: &PeerNode, _msg: &models::routing::Protocol) -> Result<(), comm::rust::errors::CommError> {
+    async fn send(
+        &self,
+        _peer: &PeerNode,
+        _msg: &models::routing::Protocol,
+    ) -> Result<(), comm::rust::errors::CommError> {
         Ok(())
     }
 
-    async fn broadcast(&self, _peers: &[PeerNode], _msg: &models::routing::Protocol) -> Result<(), comm::rust::errors::CommError> {
+    async fn broadcast(
+        &self,
+        _peers: &[PeerNode],
+        _msg: &models::routing::Protocol,
+    ) -> Result<(), comm::rust::errors::CommError> {
         Ok(())
     }
 
-    async fn stream(&self, _peer: &PeerNode, blob: &Blob) -> Result<(), comm::rust::errors::CommError> {
+    async fn stream(
+        &self,
+        _peer: &PeerNode,
+        blob: &Blob,
+    ) -> Result<(), comm::rust::errors::CommError> {
         let mut messages = self.messages.lock().unwrap();
         messages.push(blob.clone());
         Ok(())
     }
 
-    async fn stream_mult(&self, _peers: &[PeerNode], blob: &Blob) -> Result<(), comm::rust::errors::CommError> {
+    async fn stream_mult(
+        &self,
+        _peers: &[PeerNode],
+        blob: &Blob,
+    ) -> Result<(), comm::rust::errors::CommError> {
         let default_peer = PeerNode {
-            id: NodeIdentifier { 
-                key: bytes::Bytes::from("default_peer".as_bytes().to_vec()) 
+            id: NodeIdentifier {
+                key: bytes::Bytes::from("default_peer".as_bytes().to_vec()),
             },
             endpoint: Endpoint {
                 host: "localhost".to_string(),
@@ -126,7 +143,8 @@ struct TestFixture {
     event_log: Arc<F1r3flyEvents>,
     transport: Arc<TransportLayerTestImpl>,
     candidate: ApprovedBlockCandidate,
-    last_approved_block: Arc<Mutex<Option<models::rust::casper::protocol::casper_message::ApprovedBlock>>>,
+    last_approved_block:
+        Arc<Mutex<Option<models::rust::casper::protocol::casper_message::ApprovedBlock>>>,
 }
 
 impl TestFixture {
@@ -141,10 +159,10 @@ impl TestFixture {
         let event_log = Arc::new(F1r3flyEvents::new(Some(100)));
         let transport = Arc::new(TransportLayerTestImpl::new());
         let last_approved_block = Arc::new(Mutex::new(None));
-        
+
         let test_peer = PeerNode {
-            id: NodeIdentifier { 
-                key: bytes::Bytes::from("test_peer".as_bytes().to_vec()) 
+            id: NodeIdentifier {
+                key: bytes::Bytes::from("test_peer".as_bytes().to_vec()),
             },
             endpoint: Endpoint {
                 host: "localhost".to_string(),
@@ -161,7 +179,9 @@ impl TestFixture {
             local: test_peer.clone(),
             network_id: "test_network".to_string(),
             bootstrap: None,
-            clear_connections: ClearConnectionsConf { num_of_connections_pinged: 0 },
+            clear_connections: ClearConnectionsConf {
+                num_of_connections_pinged: 0,
+            },
             max_num_of_connections: 100,
             default_timeout: Duration::from_secs(30),
         });
@@ -197,14 +217,15 @@ impl TestFixture {
     // Isolated event verification using the new get_events() method
     fn events_contain(&self, event_name: &str, expected_count: usize) -> bool {
         let events = self.event_log.get_events();
-        let actual_count = events.iter()
-            .filter(|event| {
-                match event {
-                    F1r3flyEvent::SentUnapprovedBlock(_) if event_name == "SentUnapprovedBlock" => true,
-                    F1r3flyEvent::SentApprovedBlock(_) if event_name == "SentApprovedBlock" => true,
-                    F1r3flyEvent::BlockApprovalReceived(_) if event_name == "BlockApprovalReceived" => true,
-                    _ => false,
+        let actual_count = events
+            .iter()
+            .filter(|event| match event {
+                F1r3flyEvent::SentUnapprovedBlock(_) if event_name == "SentUnapprovedBlock" => true,
+                F1r3flyEvent::SentApprovedBlock(_) if event_name == "SentApprovedBlock" => true,
+                F1r3flyEvent::BlockApprovalReceived(_) if event_name == "BlockApprovalReceived" => {
+                    true
                 }
+                _ => false,
             })
             .count();
         actual_count == expected_count
@@ -236,7 +257,7 @@ where
 
 fn create_test_genesis_block(validator_key_pairs: &[(PrivateKey, PublicKey)]) -> BlockMessage {
     // Create a simplified test genesis block
-    use models::rust::casper::protocol::casper_message::{Body, F1r3flyState, Header, Bond};
+    use models::rust::casper::protocol::casper_message::{Body, Bond, F1r3flyState, Header};
 
     let bonds: Vec<Bond> = validator_key_pairs
         .iter()
@@ -331,7 +352,12 @@ async fn should_add_valid_signatures_to_state() {
     let key_pair = secp256k1.new_key_pair();
     let key_pairs = vec![key_pair.clone()];
 
-    let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
+    let fixture = TestFixture::new(
+        10,
+        Duration::from_millis(100),
+        Duration::from_millis(1),
+        key_pairs,
+    );
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
     let protocol = fixture.protocol.clone();
@@ -359,7 +385,12 @@ async fn should_not_change_signatures_on_duplicate_approval() {
     let key_pair = secp256k1.new_key_pair();
     let key_pairs = vec![key_pair.clone()];
 
-    let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
+    let fixture = TestFixture::new(
+        10,
+        Duration::from_millis(100),
+        Duration::from_millis(1),
+        key_pairs,
+    );
     let approval1 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     let approval2 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
@@ -372,7 +403,11 @@ async fn should_not_change_signatures_on_duplicate_approval() {
     protocol.add_approval(approval1).await.unwrap();
 
     assert!(
-        wait_for(|| fixture.events_contain("BlockApprovalReceived", 1), Duration::from_millis(50)).await,
+        wait_for(
+            || fixture.events_contain("BlockApprovalReceived", 1),
+            Duration::from_millis(50)
+        )
+        .await,
         "First BlockApprovalReceived event not found"
     );
 
@@ -380,7 +415,10 @@ async fn should_not_change_signatures_on_duplicate_approval() {
     sleep(Duration::from_millis(10)).await;
 
     assert_eq!(fixture.signature_count(), 1);
-    assert!(fixture.events_contain("BlockApprovalReceived", 1), "Duplicate approval should not generate a new event");
+    assert!(
+        fixture.events_contain("BlockApprovalReceived", 1),
+        "Duplicate approval should not generate a new event"
+    );
 
     protocol_handle.abort();
 }
@@ -391,7 +429,12 @@ async fn should_not_add_invalid_signatures() {
     let key_pair = secp256k1.new_key_pair();
     let key_pairs = vec![key_pair];
 
-    let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
+    let fixture = TestFixture::new(
+        10,
+        Duration::from_millis(100),
+        Duration::from_millis(1),
+        key_pairs,
+    );
     let invalid_approval = create_invalid_approval(&fixture.candidate);
 
     let protocol = fixture.protocol.clone();
@@ -517,8 +560,17 @@ async fn should_not_accept_approval_from_untrusted_validator() {
     let untrusted_key_pair = secp256k1.new_key_pair();
 
     let key_pairs = vec![trusted_key_pair];
-    let fixture = TestFixture::new(10, Duration::from_millis(100), Duration::from_millis(1), key_pairs);
-    let approval = create_approval(&fixture.candidate, &untrusted_key_pair.0, &untrusted_key_pair.1);
+    let fixture = TestFixture::new(
+        10,
+        Duration::from_millis(100),
+        Duration::from_millis(1),
+        key_pairs,
+    );
+    let approval = create_approval(
+        &fixture.candidate,
+        &untrusted_key_pair.0,
+        &untrusted_key_pair.1,
+    );
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -542,10 +594,10 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
     let key_pairs = vec![key_pair.clone()];
 
     let fixture = TestFixture::new(
-        10, 
-        Duration::from_millis(100), 
+        10,
+        Duration::from_millis(100),
         Duration::from_millis(5),
-        key_pairs
+        key_pairs,
     );
 
     let protocol = fixture.protocol.clone();
@@ -555,7 +607,11 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
     });
 
     assert!(
-        wait_for(|| fixture.events_contain("SentUnapprovedBlock", 1), Duration::from_millis(50)).await,
+        wait_for(
+            || fixture.events_contain("SentUnapprovedBlock", 1),
+            Duration::from_millis(50)
+        )
+        .await,
         "SentUnapprovedBlock event not found"
     );
     assert!(fixture.transport.get_messages().len() >= 1);
@@ -563,18 +619,26 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
 
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     protocol.add_approval(approval).await.unwrap();
-    
+
     assert!(
-        wait_for(|| fixture.events_contain("BlockApprovalReceived", 1), Duration::from_millis(50)).await,
+        wait_for(
+            || fixture.events_contain("BlockApprovalReceived", 1),
+            Duration::from_millis(50)
+        )
+        .await,
         "BlockApprovalReceived event not found"
     );
-    
+
     assert!(
-        wait_for(|| fixture.transport.get_messages().len() >= 2, Duration::from_millis(50)).await,
+        wait_for(
+            || fixture.transport.get_messages().len() >= 2,
+            Duration::from_millis(50)
+        )
+        .await,
         "Second UnapprovedBlock was not sent"
     );
     assert_eq!(fixture.signature_count(), 1);
-    
+
     protocol_handle.abort();
 }
 
@@ -586,9 +650,9 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
 
     let fixture = TestFixture::new(
         1,
-        Duration::from_millis(2), 
+        Duration::from_millis(2),
         Duration::from_millis(1),
-        key_pairs
+        key_pairs,
     );
 
     let protocol = fixture.protocol.clone();
@@ -610,6 +674,6 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
     assert_eq!(fixture.signature_count(), 1);
     assert!(fixture.transport.get_messages().len() >= 1);
     assert!(fixture.events_contain("SentApprovedBlock", 1));
-    
+
     protocol_handle.abort();
 }

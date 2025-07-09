@@ -37,10 +37,11 @@ impl VaultParser {
     pub fn parse(vaults_path: &Path) -> Result<Vec<Vault>, VaultParserError> {
         log::info!("Parsing wallets file {:?}.", vaults_path);
 
-        let content = fs::read_to_string(vaults_path).map_err(|e| VaultParserError::ParsingFailed {
-            path: vaults_path.to_string_lossy().to_string(),
-            source: Box::new(e),
-        })?;
+        let content =
+            fs::read_to_string(vaults_path).map_err(|e| VaultParserError::ParsingFailed {
+                path: vaults_path.to_string_lossy().to_string(),
+                source: Box::new(e),
+            })?;
 
         let line_regex = Regex::new(r"^([1-9a-zA-Z]+),([0-9]+)").unwrap();
         let mut vaults = Vec::new();
@@ -52,11 +53,11 @@ impl VaultParser {
             }
 
             // Parse line format
-            let captures = line_regex
-                .captures(trimmed_line)
-                .ok_or_else(|| VaultParserError::InvalidLineFormat {
+            let captures = line_regex.captures(trimmed_line).ok_or_else(|| {
+                VaultParserError::InvalidLineFormat {
                     line: trimmed_line.to_string(),
-                })?;
+                }
+            })?;
 
             let rev_address_str = captures
                 .get(1)
@@ -73,19 +74,19 @@ impl VaultParser {
                 .as_str();
 
             // Parse REV address
-            let rev_address = RevAddress::parse(rev_address_str).map_err(|err| {
-                VaultParserError::ParseError {
+            let rev_address =
+                RevAddress::parse(rev_address_str).map_err(|err| VaultParserError::ParseError {
                     line: trimmed_line.to_string(),
                     source: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
-                }
-            })?;
+                })?;
 
             // Parse balance
-            let initial_balance = balance_str.parse::<u64>().map_err(|_| {
-                VaultParserError::InvalidBalance {
-                    balance: balance_str.to_string(),
-                }
-            })?;
+            let initial_balance =
+                balance_str
+                    .parse::<u64>()
+                    .map_err(|_| VaultParserError::InvalidBalance {
+                        balance: balance_str.to_string(),
+                    })?;
 
             log::info!("Wallet loaded: {}", trimmed_line);
 
@@ -183,7 +184,7 @@ mod tests {
     fn test_parse_invalid_balance() {
         // First test: Try with a known good address pattern that might parse successfully
         // If RevAddress validation fails, we'll create a simpler case
-        
+
         // Create a test that bypasses RevAddress parsing issues by creating our own scenario
         let temp_dir = TempDir::new().unwrap();
         let wallets_file = temp_dir.path().join("wallets.txt");
@@ -207,19 +208,23 @@ mod tests {
                 // Let's create a simpler test that ensures we hit the balance parsing
                 let temp_dir2 = TempDir::new().unwrap();
                 let wallets_file2 = temp_dir2.path().join("wallets.txt");
-                
+
                 // Create a mock test where we know the balance parsing will fail
                 // by ensuring the line format is correct but balance is clearly invalid
-                let invalid_content2 = "1abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789,xyz\n";
+                let invalid_content2 =
+                    "1abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789,xyz\n";
                 fs::write(&wallets_file2, invalid_content2).unwrap();
-                
+
                 let result2 = VaultParser::parse(&wallets_file2);
                 assert!(result2.is_err()); // Should fail somewhere, either on address or balance
             }
             _ => {
                 // If we get here, the test reveals an issue with our assumptions
                 // Let's just assert that we get some error and document the behavior
-                assert!(true, "Got an error as expected, though not the specific type");
+                assert!(
+                    true,
+                    "Got an error as expected, though not the specific type"
+                );
             }
         }
     }
@@ -229,7 +234,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let wallets_file = temp_dir.path().join("wallets.txt");
 
-        let wallets_content = "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP,50000000000000\n";
+        let wallets_content =
+            "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP,50000000000000\n";
         fs::write(&wallets_file, wallets_content).unwrap();
 
         let result = VaultParser::parse_from_path_str(wallets_file.to_str().unwrap());
@@ -271,7 +277,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let wallets_file = temp_dir.path().join("wallets.txt");
 
-        let wallets_content = "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP,50000000000000\n";
+        let wallets_content =
+            "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP,50000000000000\n";
         fs::write(&wallets_file, wallets_content).unwrap();
 
         let result = VaultParser::parse(&wallets_file);
@@ -287,4 +294,4 @@ mod tests {
             "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP"
         );
     }
-} 
+}
