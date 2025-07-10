@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
-use async_trait::async_trait;
+
 use casper::rust::engine::approve_block_protocol::{
     ApproveBlockProtocolFactory, ApproveBlockProtocolImpl,
 };
@@ -14,7 +14,7 @@ use comm::rust::{
         connect::{Connections, ConnectionsCell},
         rp_conf::{ClearConnectionsConf, RPConf},
     },
-    transport::transport_layer::{Blob, TransportLayer},
+    test_instances::TransportLayerStub,
 };
 use crypto::rust::{
     hash::blake2b256::Blake2b256,
@@ -31,77 +31,14 @@ use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 use shared::rust::shared::metrics_test::MetricsTestImpl;
 
-// A transport layer stub that only tracks messages for verification
-#[derive(Default)]
-struct TransportLayerTestImpl {
-    messages: Arc<Mutex<Vec<Blob>>>,
-}
 
-impl TransportLayerTestImpl {
-    fn new() -> Self {
-        Self {
-            messages: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    fn get_messages(&self) -> Vec<Blob> {
-        self.messages.lock().unwrap().clone()
-    }
-}
-
-#[async_trait]
-impl TransportLayer for TransportLayerTestImpl {
-    async fn send(
-        &self,
-        _peer: &PeerNode,
-        _msg: &models::routing::Protocol,
-    ) -> Result<(), comm::rust::errors::CommError> {
-        Ok(())
-    }
-
-    async fn broadcast(
-        &self,
-        _peers: &[PeerNode],
-        _msg: &models::routing::Protocol,
-    ) -> Result<(), comm::rust::errors::CommError> {
-        Ok(())
-    }
-
-    async fn stream(
-        &self,
-        _peer: &PeerNode,
-        blob: &Blob,
-    ) -> Result<(), comm::rust::errors::CommError> {
-        let mut messages = self.messages.lock().unwrap();
-        messages.push(blob.clone());
-        Ok(())
-    }
-
-    async fn stream_mult(
-        &self,
-        _peers: &[PeerNode],
-        blob: &Blob,
-    ) -> Result<(), comm::rust::errors::CommError> {
-        let default_peer = PeerNode {
-            id: NodeIdentifier {
-                key: bytes::Bytes::from("default_peer".as_bytes().to_vec()),
-            },
-            endpoint: Endpoint {
-                host: "localhost".to_string(),
-                tcp_port: 0,
-                udp_port: 0,
-            },
-        };
-        self.stream(&default_peer, blob).await
-    }
-}
 
 // An isolated test fixture created for each test
 struct TestFixture {
-    protocol: Arc<ApproveBlockProtocolImpl<TransportLayerTestImpl>>,
+    protocol: Arc<ApproveBlockProtocolImpl<TransportLayerStub>>,
     metrics: Arc<MetricsTestImpl>,
     event_log: Arc<F1r3flyEvents>,
-    transport: Arc<TransportLayerTestImpl>,
+    transport: Arc<TransportLayerStub>,
     candidate: ApprovedBlockCandidate,
     last_approved_block:
         Arc<Mutex<Option<models::rust::casper::protocol::casper_message::ApprovedBlock>>>,
@@ -117,7 +54,7 @@ impl TestFixture {
         let genesis_block = create_test_genesis_block(&key_pairs);
         let metrics = Arc::new(MetricsTestImpl::new());
         let event_log = Arc::new(F1r3flyEvents::new(Some(100)));
-        let transport = Arc::new(TransportLayerTestImpl::new());
+        let transport = Arc::new(TransportLayerStub::new());
         let last_approved_block = Arc::new(Mutex::new(None));
 
         let test_peer = PeerNode {
@@ -574,7 +511,7 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
         .await,
         "SentUnapprovedBlock event not found"
     );
-    assert!(fixture.transport.get_messages().len() >= 1);
+    assert!(fixture.transport.request_count() >= 1);
     assert!(!fixture.metrics.has_counter("genesis"));
 
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
@@ -591,7 +528,7 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
 
     assert!(
         wait_for(
-            || fixture.transport.get_messages().len() >= 2,
+            || fixture.transport.request_count() >= 2,
             Duration::from_millis(50)
         )
         .await,
@@ -632,7 +569,7 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
 
     assert!(fixture.has_approved_block());
     assert_eq!(fixture.signature_count(), 1);
-    assert!(fixture.transport.get_messages().len() >= 1);
+    assert!(fixture.transport.request_count() >= 1);
     assert!(fixture.events_contain("SentApprovedBlock", 1));
 
     protocol_handle.abort();
