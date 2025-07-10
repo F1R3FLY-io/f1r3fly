@@ -14,7 +14,7 @@ use comm::rust::{
         connect::{Connections, ConnectionsCell},
         rp_conf::{ClearConnectionsConf, RPConf},
     },
-    test_instances::TransportLayerStub,
+    test_instances::{create_rp_conf_ask, TransportLayerStub},
 };
 use crypto::rust::{
     hash::blake2b256::Blake2b256,
@@ -72,16 +72,13 @@ impl TestFixture {
             peers: Arc::new(Mutex::new(Connections(vec![test_peer.clone()]))),
         });
 
-        let conf = Arc::new(RPConf {
-            local: test_peer.clone(),
-            network_id: "test_network".to_string(),
-            bootstrap: None,
-            clear_connections: ClearConnectionsConf {
+        let conf = Arc::new(create_rp_conf_ask(
+            test_peer.clone(),
+            Some(Duration::from_secs(30)),
+            Some(ClearConnectionsConf {
                 num_of_connections_pinged: 0,
-            },
-            max_num_of_connections: 100,
-            default_timeout: Duration::from_secs(30),
-        });
+            }),
+        ));
 
         let protocol_impl = ApproveBlockProtocolFactory::unsafe_new_with_infrastructure(
             genesis_block.clone(),
