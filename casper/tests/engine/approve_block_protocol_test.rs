@@ -1,17 +1,13 @@
 // See casper/src/test/scala/coop/rchain/casper/engine/ApproveBlockProtocolTest.scala
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
 use async_trait::async_trait;
 use casper::rust::engine::approve_block_protocol::{
-    ApproveBlockProtocolFactory, ApproveBlockProtocolImpl, Metrics,
+    ApproveBlockProtocolFactory, ApproveBlockProtocolImpl,
 };
-use casper::rust::errors::CasperError;
-use casper::rust::genesis::contracts::{proof_of_stake::ProofOfStake, validator::Validator};
-use casper::rust::genesis::genesis::Genesis;
 use comm::rust::{
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
     rp::{
@@ -33,43 +29,7 @@ use models::rust::casper::protocol::casper_message::{
 use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
-
-// Test implementations for an isolated environment
-#[derive(Clone)]
-struct MetricsTestImpl {
-    counters: Arc<Mutex<HashMap<String, i32>>>,
-}
-
-impl MetricsTestImpl {
-    fn new() -> Self {
-        Self {
-            counters: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    fn get_counter(&self, name: &str) -> i32 {
-        let counters = self.counters.lock().unwrap();
-        counters
-            .get(&format!("approve-block.{}", name))
-            .copied()
-            .unwrap_or(0)
-    }
-
-    fn has_counter(&self, name: &str) -> bool {
-        let counters = self.counters.lock().unwrap();
-        counters.contains_key(&format!("approve-block.{}", name))
-    }
-}
-
-impl Metrics for MetricsTestImpl {
-    fn increment_counter(&self, name: &str) -> Result<(), CasperError> {
-        let mut counters = self.counters.lock().unwrap();
-        let full_name = format!("approve-block.{}", name);
-        let current = counters.get(&full_name).copied().unwrap_or(0);
-        counters.insert(full_name, current + 1);
-        Ok(())
-    }
-}
+use shared::rust::shared::metrics_test::MetricsTestImpl;
 
 // A transport layer stub that only tracks messages for verification
 #[derive(Default)]

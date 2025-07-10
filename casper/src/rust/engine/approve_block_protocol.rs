@@ -14,6 +14,7 @@ use models::rust::casper::protocol::casper_message::{
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
 use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_events::{F1r3flyEvent, F1r3flyEvents};
+use shared::rust::shared::metrics::Metrics;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -53,11 +54,6 @@ impl PartialEq for SignatureWrapper {
 }
 
 impl Eq for SignatureWrapper {}
-
-/// Metrics trait to match Scala implementation
-pub trait Metrics: Send + Sync {
-    fn increment_counter(&self, name: &str) -> Result<(), CasperError>;
-}
 
 pub struct ApproveBlockProtocolFactory;
 
@@ -443,7 +439,9 @@ impl<T: TransportLayer + Send + Sync> ApproveBlockProtocolImpl<T> {
                     log::info!("New signature received");
                     // Increment metrics counter like Scala does
                     if let Some(metrics) = &self.metrics {
-                        let _ = metrics.increment_counter("genesis");
+                        let _ = metrics.increment_counter("genesis").map_err(|e| {
+                            log::warn!("Failed to increment metrics counter: {}", e);
+                        });
                     }
                     // Publish BlockApprovalReceived event only for new signatures
                     if let Some(event_log) = &self.event_log {
