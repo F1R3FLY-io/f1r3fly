@@ -4,4 +4,3 @@ pub mod test;
 pub mod deploy;
 pub mod util;
 pub mod casperbuffer;
-pub mod block_store;
