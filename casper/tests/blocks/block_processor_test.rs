@@ -8,7 +8,8 @@ use block_storage::rust::{
     dag::block_dag_key_value_storage::BlockDagKeyValueStorage,
 };
 use casper::rust::{
-    blocks::block_processor::BlockProcessorDependencies, engine::block_retriever::BlockRetriever,
+    blocks::block_processor::BlockProcessorDependencies,
+    engine::block_retriever::BlockRetriever,
 };
 use comm::rust::{
     peer_node::PeerNode,
@@ -17,7 +18,7 @@ use comm::rust::{
 };
 use models::rust::{
     block_hash::BlockHash,
-    casper::protocol::casper_message::{BlockMessage, Bond},
+    casper::protocol::casper_message::{BlockMessage, Bond, Header},
 };
 use rspace_plus_plus::rspace::shared::{
     in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
@@ -304,31 +305,67 @@ async fn buffer_manager_should_handle_concurrent_operations() {
 async fn block_processor_components_should_work_together() {
     let mut fixture = TestFixture::new().await;
 
-    // Test that all components work together
-    let deps = HashSet::from([fixture.genesis.block_hash.clone()]);
-
-    // 1. Request missing dependencies
+    // Test CasperBuffer logic correctly:
+    // 1. Add block as pendant (no dependencies)
+    // 2. Add another block that depends on the first one
+    // 3. Remove the first block (which is now a parent)
+    
+    // 1. Add test_block as pendant (no dependencies) 
     let result = fixture
         .dependencies
-        .request_missing_dependencies(&deps)
+        .commit_to_buffer(&fixture.test_block, None)
+        .await;
+    assert!(result.is_ok());
+    
+    // Verify test_block is pendant
+    let buffer = fixture.dependencies.casper_buffer().lock().unwrap();
+    let block_hash_serde = 
+        models::rust::block_hash::BlockHashSerde(fixture.test_block.block_hash.clone());
+    assert!(buffer.is_pendant(&block_hash_serde));
+    drop(buffer);
+
+    // 2. Create another block that depends on test_block
+    let dependent_block = BlockMessage {
+        block_hash: prost::bytes::Bytes::from(b"dependent_block".to_vec()),
+        header: Header {
+            parents_hash_list: vec![fixture.test_block.block_hash.clone()],
+            timestamp: 0,
+            version: 1,
+            extra_bytes: prost::bytes::Bytes::new(),
+        },
+        body: fixture.test_block.body.clone(), // Use same body as test block
+        justifications: vec![],
+        sender: prost::bytes::Bytes::new(),
+        seq_num: 0,
+        sig: prost::bytes::Bytes::new(),
+        sig_algorithm: String::new(),
+        shard_id: String::new(),
+        extra_bytes: prost::bytes::Bytes::new(),
+    };
+    
+    let deps = HashSet::from([fixture.test_block.block_hash.clone()]);
+    let result = fixture
+        .dependencies
+        .commit_to_buffer(&dependent_block, Some(deps))
         .await;
     assert!(result.is_ok());
 
-    // 2. Commit block to buffer
-    let result = fixture
-        .dependencies
-        .commit_to_buffer(&fixture.test_block, Some(deps))
-        .await;
-    assert!(result.is_ok());
-
-    // 3. Remove block from buffer
+    // 3. Now test_block is a parent, so we can remove it
     let result = fixture
         .dependencies
         .remove_from_buffer(&fixture.test_block)
         .await;
     assert!(result.is_ok());
 
-    // 4. Acknowledge processing
+    // 4. Test other operations
+    let deps = HashSet::from([fixture.genesis.block_hash.clone()]);
+    let result = fixture
+        .dependencies
+        .request_missing_dependencies(&deps)
+        .await;
+    assert!(result.is_ok());
+
+    // 5. Acknowledge processing
     let result = fixture
         .dependencies
         .ack_processed(&fixture.test_block)
