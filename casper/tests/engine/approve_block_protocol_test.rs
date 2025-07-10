@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
-
 use casper::rust::engine::approve_block_protocol::{
     ApproveBlockProtocolFactory, ApproveBlockProtocolImpl,
 };
@@ -12,7 +11,7 @@ use comm::rust::{
     peer_node::{Endpoint, NodeIdentifier, PeerNode},
     rp::{
         connect::{Connections, ConnectionsCell},
-        rp_conf::{ClearConnectionsConf, RPConf},
+        rp_conf::ClearConnectionsConf,
     },
     test_instances::{create_rp_conf_ask, TransportLayerStub},
 };
@@ -24,14 +23,15 @@ use crypto::rust::{
 };
 use models::casper::Signature as ProtoSignature;
 use models::rust::casper::protocol::casper_message::{
-    ApprovedBlockCandidate, BlockApproval, BlockMessage,
+    ApprovedBlockCandidate, BlockApproval,
 };
 use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 use shared::rust::shared::metrics_test::MetricsTestImpl;
 
-
+// Import GenesisBuilder functionality for bonds creation
+use crate::util::genesis_builder::GenesisBuilder;
 
 // An isolated test fixture created for each test
 struct TestFixture {
@@ -45,13 +45,13 @@ struct TestFixture {
 }
 
 impl TestFixture {
-    fn new(
+    async fn new(
         required_sigs: i32,
         duration: Duration,
         interval: Duration,
         key_pairs: Vec<(PrivateKey, PublicKey)>,
     ) -> Self {
-        let genesis_block = create_test_genesis_block(&key_pairs);
+        let genesis_block = GenesisBuilder::build_test_genesis(key_pairs.clone());
         let metrics = Arc::new(MetricsTestImpl::new());
         let event_log = Arc::new(F1r3flyEvents::new(Some(100)));
         let transport = Arc::new(TransportLayerStub::new());
@@ -149,54 +149,6 @@ where
     f() // Final check
 }
 
-fn create_test_genesis_block(validator_key_pairs: &[(PrivateKey, PublicKey)]) -> BlockMessage {
-    // Create a simplified test genesis block
-    use models::rust::casper::protocol::casper_message::{Body, Bond, F1r3flyState, Header};
-
-    let bonds: Vec<Bond> = validator_key_pairs
-        .iter()
-        .map(|(_, public_key)| Bond {
-            validator: public_key.bytes.clone(),
-            stake: 1000000,
-        })
-        .collect();
-
-    let state = F1r3flyState {
-        pre_state_hash: bytes::Bytes::new(),
-        post_state_hash: bytes::Bytes::new(),
-        block_number: 0,
-        bonds,
-    };
-
-    let body = Body {
-        state,
-        deploys: vec![],
-        rejected_deploys: vec![],
-        system_deploys: vec![],
-        extra_bytes: bytes::Bytes::new(),
-    };
-
-    let header = Header {
-        parents_hash_list: vec![],
-        timestamp: 1559156071321,
-        version: 1,
-        extra_bytes: bytes::Bytes::new(),
-    };
-
-    BlockMessage {
-        block_hash: bytes::Bytes::from(vec![1, 2, 3, 4]), // Dummy hash for testing
-        header,
-        body,
-        justifications: vec![],
-        sender: bytes::Bytes::new(),
-        seq_num: 0,
-        sig: bytes::Bytes::new(),
-        sig_algorithm: "secp256k1".to_string(),
-        shard_id: "test".to_string(),
-        extra_bytes: bytes::Bytes::new(),
-    }
-}
-
 fn create_approval(
     candidate: &ApprovedBlockCandidate,
     private_key: &PrivateKey,
@@ -251,7 +203,7 @@ async fn should_add_valid_signatures_to_state() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
     let protocol = fixture.protocol.clone();
@@ -284,7 +236,7 @@ async fn should_not_change_signatures_on_duplicate_approval() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
     let approval1 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     let approval2 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
@@ -328,7 +280,7 @@ async fn should_not_add_invalid_signatures() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
     let invalid_approval = create_invalid_approval(&fixture.candidate);
 
     let protocol = fixture.protocol.clone();
@@ -357,7 +309,7 @@ async fn should_create_approved_block_when_enough_signatures_collected() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs.clone(),
-    );
+    ).await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -392,7 +344,7 @@ async fn should_continue_collecting_if_not_enough_signatures() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs.clone(),
-    );
+    ).await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -434,7 +386,7 @@ async fn should_skip_duration_when_required_signatures_is_zero() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
 
     let start = std::time::Instant::now();
     let result = timeout(Duration::from_millis(100), fixture.protocol.run()).await;
@@ -459,7 +411,7 @@ async fn should_not_accept_approval_from_untrusted_validator() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
     let approval = create_approval(
         &fixture.candidate,
         &untrusted_key_pair.0,
@@ -492,7 +444,7 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
         Duration::from_millis(100),
         Duration::from_millis(5),
         key_pairs,
-    );
+    ).await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -547,7 +499,7 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
         Duration::from_millis(2),
         Duration::from_millis(1),
         key_pairs,
-    );
+    ).await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
