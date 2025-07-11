@@ -82,6 +82,8 @@ pub trait Casper {
 
     fn buffer_contains(&self, hash: &BlockHash) -> bool;
 
+    fn get_approved_block(&self) -> Result<&BlockMessage, CasperError>;
+
     fn deploy(
         &mut self,
         deploy: Signed<DeployData>,
