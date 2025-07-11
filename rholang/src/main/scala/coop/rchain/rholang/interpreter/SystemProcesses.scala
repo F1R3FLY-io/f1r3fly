@@ -12,6 +12,7 @@ import coop.rchain.crypto.PublicKey
 import coop.rchain.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import coop.rchain.crypto.signatures.{Ed25519, Secp256k1}
 import coop.rchain.metrics.Span
+import coop.rchain.rholang.interpreter.errors
 import coop.rchain.models.Expr.ExprInstance.GString
 import coop.rchain.models.GUnforgeable.UnfInstance
 import coop.rchain.models.GUnforgeable.UnfInstance.GPrivateBody
@@ -62,6 +63,9 @@ trait SystemProcesses[F[_]] {
   def textToAudio: Contract[F]
   def dumpFile: Contract[F]
   def grpcTell: Contract[F]
+
+  /** Terminates execution with UserAbortError when called */
+  def abort: Contract[F]
 }
 
 object SystemProcesses {
@@ -121,6 +125,7 @@ object SystemProcesses {
     val DUMP: Par               = byteName(23)
     val RANDOM: Par             = byteName(24)
     val GRPC_TELL: Par          = byteName(25)
+    val ABORT: Par              = byteName(26) // Execution termination
   }
   object BodyRefs {
     val STDOUT: Long             = 0L
@@ -145,6 +150,7 @@ object SystemProcesses {
     val DUMP: Long               = 21L
     val RANDOM: Long             = 22L
     val GRPC_TELL: Long          = 23L
+    val ABORT: Long              = 24L // Execution termination
   }
 
   val nonDeterministicCalls: Set[Long] = Set(
@@ -548,6 +554,36 @@ object SystemProcesses {
           } yield output
         case isContractCall(_, isReplay, _, args) =>
           F.delay(Seq(RhoType.Nil()))
+      }
+
+      /**
+        * Execution abort system process.
+        *
+        * Terminates the current Rholang computation immediately when called.
+        * This allows users to explicitly halt program execution, useful for
+        * error handling and controlled termination scenarios.
+        *
+        * Usage:
+        *   - `rho:execution:abort!()`
+        *   - `rho:execution:abort!(reason)`
+        *   - `rho:execution:abort!(code, message, details)`
+        *
+        * @param args Any number of arguments (logged for debugging before termination)
+        * @return Never returns - raises UserAbortError to terminate execution
+        */
+      def abort: Contract[F] = {
+        case isContractCall(_, _, _, args) =>
+          for {
+            _ <- if (args.nonEmpty) {
+                  F.delay {
+                    val argsString = args.map(prettyPrinter.buildString).mkString(", ")
+                    stdErrLogger.warn(s"Execution aborted with arguments: $argsString")
+                  }
+                } else {
+                  F.delay(stdErrLogger.warn("Execution aborted (no arguments provided)"))
+                }
+            _ <- errors.UserAbortError.raiseError[F, Seq[Par]]
+          } yield Seq.empty[Par] // This will never be reached
       }
 
       def getBlockData(
