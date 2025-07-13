@@ -159,12 +159,14 @@ impl TransportLayer for TransportLayerTestImpl {
         self.test_network.send(peer, msg)
     }
 
-    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Result<(), CommError> {
-        // Send to each peer individually
+    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Vec<Result<(), CommError>> {
+        // Send to each peer individually and collect results
+        let mut results = Vec::new();
         for peer in peers {
-            self.send(peer, msg).await?;
+            let result = self.send(peer, msg).await;
+            results.push(result);
         }
-        Ok(())
+        results
     }
 
     async fn stream(&self, peer: &PeerNode, blob: &Blob) -> Result<(), CommError> {
@@ -175,8 +177,17 @@ impl TransportLayer for TransportLayerTestImpl {
         // Convert blob to protocol message using protocol_helper
         let protocol_msg = protocol_helper::packet(&blob.sender, "test", blob.packet.clone());
 
-        // Broadcast the protocol message
-        self.broadcast(peers, &protocol_msg).await
+        // Broadcast the protocol message and handle individual peer results
+        let results = self.broadcast(peers, &protocol_msg).await;
+
+        // Log individual peer failures but don't fail the entire operation
+        for (peer, result) in peers.iter().zip(results.iter()) {
+            if let Err(e) = result {
+                log::warn!("Failed to stream to peer {}: {}", peer.endpoint.host, e);
+            }
+        }
+
+        Ok(())
     }
 }
 

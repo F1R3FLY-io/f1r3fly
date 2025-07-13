@@ -496,9 +496,9 @@ impl TransportLayer for GrpcTransportClient {
     }
 
     /// Broadcast a Protocol message to multiple peers in parallel
-    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Result<(), CommError> {
+    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Vec<Result<(), CommError>> {
         if peers.is_empty() {
-            return Ok(());
+            return Vec::new();
         }
 
         // Create a vector of futures for parallel execution
@@ -507,12 +507,8 @@ impl TransportLayer for GrpcTransportClient {
         // Execute all sends in parallel and collect results
         let results = futures::future::join_all(send_futures).await;
 
-        // Check if any send failed - if so, return the first error
-        for result in results {
-            result?; // Return early on first error
-        }
-
-        Ok(())
+        // Return all results - both successes and failures
+        results
     }
 
     /// Stream a blob to a peer by enqueueing it in the buffer

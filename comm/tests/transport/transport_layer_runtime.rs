@@ -564,7 +564,14 @@ pub async fn broadcast_heartbeat(
     network_id: &str,
 ) -> Result<(), CommError> {
     let msg = protocol_helper::heartbeat(local, network_id);
-    transport.broadcast(remotes, &msg).await
+    let results = transport.broadcast(remotes, &msg).await;
+    
+    // Check if all peers succeeded - return error if any failed
+    for result in results {
+        result?;
+    }
+    
+    Ok(())
 }
 
 pub struct TwoNodesResult<T> {

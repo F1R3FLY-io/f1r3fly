@@ -134,7 +134,7 @@ impl TransportLayer for TransportLayerStub {
         }
     }
 
-    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Result<(), CommError> {
+    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Vec<Result<(), CommError>> {
         // Add all requests to the list
         {
             let mut requests = self.requests.lock().unwrap();
@@ -146,8 +146,15 @@ impl TransportLayer for TransportLayerStub {
             }
         }
 
-        // For broadcast, we return success for all peers in the stub
-        Ok(())
+        // Execute response function for each peer if available
+        let reqresp = self.reqresp.lock().unwrap();
+        if let Some(ref response_fn) = *reqresp {
+            // Return individual results for each peer
+            peers.iter().map(|peer| response_fn(peer, msg)).collect()
+        } else {
+            // Default to success for all peers if no response function is set
+            peers.iter().map(|_| Ok(())).collect()
+        }
     }
 
     async fn stream(&self, peer: &PeerNode, blob: &Blob) -> Result<(), CommError> {
@@ -156,6 +163,15 @@ impl TransportLayer for TransportLayerStub {
 
     async fn stream_mult(&self, peers: &[PeerNode], blob: &Blob) -> Result<(), CommError> {
         let protocol_msg = protocol_helper::packet(&blob.sender, NETWORK_ID, blob.packet.clone());
-        self.broadcast(peers, &protocol_msg).await
+        let results = self.broadcast(peers, &protocol_msg).await;
+        
+        // Log individual peer failures but don't fail the entire operation
+        for (peer, result) in peers.iter().zip(results.iter()) {
+            if let Err(e) = result {
+                log::warn!("Failed to stream to peer {}: {}", peer.endpoint.host, e);
+            }
+        }
+        
+        Ok(())
     }
 }

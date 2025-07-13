@@ -35,7 +35,7 @@ pub struct Blob {
 pub trait TransportLayer {
     async fn send(&self, peer: &PeerNode, msg: &Protocol) -> Result<(), CommError>;
 
-    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Result<(), CommError>;
+    async fn broadcast(&self, peers: &[PeerNode], msg: &Protocol) -> Vec<Result<(), CommError>>;
 
     async fn stream(&self, peer: &PeerNode, blob: &Blob) -> Result<(), CommError>;
 
@@ -110,7 +110,16 @@ pub trait TransportLayer {
         let max = scope_size.unwrap_or(conf.max_num_of_connections);
         let peers = connections_cell.random(max)?;
         let protocol_msg = protocol_helper::packet(&conf.local, &conf.network_id, message);
-        self.broadcast(&peers.0, &protocol_msg).await
+        let results = self.broadcast(&peers.0, &protocol_msg).await;
+        
+        // Log individual peer failures but don't fail the entire operation
+        for (peer, result) in peers.0.iter().zip(results.iter()) {
+            if let Err(e) = result {
+                log::warn!("Failed to send packet to peer {}: {}", peer.endpoint.host, e);
+            }
+        }
+        
+        Ok(())
     }
 
     async fn stream_packet_to_peers(
