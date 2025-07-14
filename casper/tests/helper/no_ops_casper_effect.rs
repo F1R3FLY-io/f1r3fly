@@ -126,4 +126,12 @@ impl Casper for NoOpsCasperEffect {
     fn get_dependency_free_from_buffer(&self) -> Result<Vec<BlockMessage>, CasperError> {
         todo!()
     }
+
+    fn get_approved_block(&self) -> Result<&BlockMessage, CasperError> {
+        // For test purposes, return a reference to any block from our store
+        // or create a default block if store is empty
+        self.store.values().next().ok_or_else(|| {
+            CasperError::RuntimeError("No approved block available in test".to_string())
+        })
+    }
 }

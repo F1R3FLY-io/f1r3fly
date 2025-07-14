@@ -182,6 +182,9 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         self.casper_buffer_storage.contains(&block_hash_serde)
     }
 
+    fn get_approved_block(&self) -> Result<&BlockMessage, CasperError> {
+        Ok(&self.approved_block)
+    }
     fn deploy(
         &mut self,
         deploy: Signed<DeployData>,
@@ -371,6 +374,8 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
         Ok(result)
     }
+
+
 }
 
 impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImpl<T> {
