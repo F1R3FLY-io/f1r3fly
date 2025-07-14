@@ -7,11 +7,18 @@ description = "Bitcoin L1 anchoring for F1r3fly RSpace state"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-# Step 1: Error handling
+# Error handling and serialization
 thiserror = "1.0"
-
-# Step 1: Configuration serialization
 serde = { version = "1.0", features = ["derive"] }
 
-# Step 2: Cryptographic hashing for commitments
+# Cryptographic primitives
 blake2 = "0.10"
+hex = "0.4"
+
+# RGB ecosystem integration
+rgb-std = { version = "0.12.0-rc.2", features = ["bitcoin"] }
+bp-core = "0.12"
+commit_verify = { version = "0.12.0", features = ["rand"] }
+
+# Bitcoin transaction handling
+bitcoin = "0.32"
