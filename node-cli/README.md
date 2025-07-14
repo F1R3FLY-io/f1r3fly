@@ -125,6 +125,27 @@ cargo run -- generate-key-pair --save
 cargo run -- generate-key-pair --save --output-dir /path/to/keys
 ```
 
+### Generate REV Address
+
+Generate a REV address from a public key. You can either provide a public key directly or use a private key (from which the public key will be derived).
+
+```bash
+# Using default private key
+cargo run -- generate-rev-address
+
+# Provide your own private key
+cargo run -- generate-rev-address --private-key YOUR_PRIVATE_KEY
+
+# Provide a public key directly
+cargo run -- generate-rev-address --public-key YOUR_PUBLIC_KEY
+```
+
+Example output:
+```
+🔑 Public key: 04a936f4e0cda4688ec61fa17cf3cbaed6a450ac8e633490596587ce22b78fe6621861d4fa442f7c9f8070acb846f40d8844dca94fda398722d6a4664041a7b39b
+🏦 REV address: 111129tt6TzcaUQ8QkEUSark5MzaN814bBq1atM7cDr2SVAdriuNS4
+```
+
 ## Node Inspection Commands
 
 The CLI provides several commands for inspecting and monitoring F1r3fly nodes using HTTP endpoints:

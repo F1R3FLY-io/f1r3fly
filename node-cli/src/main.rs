@@ -8,6 +8,8 @@ use hex;
 use rand::rngs::OsRng;
 use reqwest;
 use serde_json;
+use rholang::rust::interpreter::util::rev_address::RevAddress;
+use crypto::rust::public_key::PublicKey;
 
 /// Command-line interface for interacting with F1r3fly nodes
 #[derive(Parser)]
@@ -39,6 +41,9 @@ enum Commands {
     
     /// Generate a new secp256k1 private/public key pair
     GenerateKeyPair(GenerateKeyPairArgs),
+
+    /// Generate a REV address from a public key
+    GenerateRevAddress(GenerateRevAddressArgs),
 
     /// Get node status and peer information
     Status(HttpArgs),
@@ -211,6 +216,22 @@ struct GenerateKeyPairArgs {
     output_dir: String,
 }
 
+/// Arguments for generate-rev-address command
+#[derive(Parser)]
+struct GenerateRevAddressArgs {
+    /// Public key in hex format (uncompressed format preferred)
+    #[arg(short, long, conflicts_with = "private_key")]
+    public_key: Option<String>,
+    
+    /// Private key in hex format (will derive public key from this)
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1",
+        conflicts_with = "public_key"
+    )]
+    private_key: Option<String>,
+}
+
 /// Arguments for HTTP-based commands (status, bonds, metrics)
 #[derive(Parser)]
 struct HttpArgs {
@@ -330,6 +351,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::ExploratoryDeploy(args) => exploratory_deploy_command(args).await,
         Commands::GeneratePublicKey(args) => generate_public_key_command(args),
         Commands::GenerateKeyPair(args) => generate_key_pair_command(args),
+        Commands::GenerateRevAddress(args) => generate_rev_address_command(args),
         Commands::Status(args) => status_command(args).await,
         Commands::Blocks(args) => blocks_command(args).await,
         Commands::Bonds(args) => bonds_command(args).await,
@@ -628,6 +650,48 @@ fn generate_key_pair_command(args: &GenerateKeyPairArgs) -> Result<(), Box<dyn s
         println!("Public key ({}): {}", 
             if args.compressed { "compressed" } else { "uncompressed" }, 
             public_key_hex);
+    }
+    
+    Ok(())
+}
+
+fn generate_rev_address_command(args: &GenerateRevAddressArgs) -> Result<(), Box<dyn std::error::Error>> {
+    // Get the public key either from direct input or by deriving from private key
+    let public_key_bytes = if let Some(public_key_hex) = &args.public_key {
+        // Use provided public key
+        hex::decode(public_key_hex)
+            .map_err(|e| format!("Failed to decode public key: {}", e))?
+    } else if let Some(private_key_hex) = &args.private_key {
+        // Derive public key from private key
+        let private_key_bytes = hex::decode(private_key_hex)
+            .map_err(|e| format!("Failed to decode private key: {}", e))?;
+        
+        let secret_key = SecretKey::from_slice(&private_key_bytes)
+            .map_err(|e| format!("Invalid private key: {}", e))?;
+        
+        let secp = Secp256k1::new();
+        let public_key = secret_key.public_key(&secp);
+        
+        // Use uncompressed format for REV address generation
+        public_key.serialize_uncompressed().to_vec()
+    } else {
+        return Err("Either public_key or private_key must be provided".into());
+    };
+    
+    // Create PublicKey struct for RevAddress
+    let public_key = PublicKey {
+        bytes: public_key_bytes,
+    };
+    
+    // Generate REV address
+    match RevAddress::from_public_key(&public_key) {
+        Some(rev_address) => {
+            println!("🔑 Public key: {}", hex::encode(&public_key.bytes));
+            println!("🏦 REV address: {}", rev_address.to_base58());
+        }
+        None => {
+            return Err("Failed to generate REV address from public key".into());
+        }
     }
     
     Ok(())
