@@ -189,7 +189,7 @@ Get current validator bonds from the PoS contract.
 cargo run -- bonds
 
 # Get bonds from custom node
-cargo run -- bonds -H node.example.com -p 40403
+cargo run -- bonds -H node.example.com -p 40453
 ```
 
 ### Active Validators

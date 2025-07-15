@@ -230,7 +230,7 @@ pub struct HttpArgs {
     pub host: String,
 
     /// HTTP port number (not gRPC port)
-    #[arg(short, long, default_value_t = 40403)]
+    #[arg(short, long, default_value_t = 40453)]
     pub port: u16,
 }
 
@@ -242,7 +242,7 @@ pub struct BlocksArgs {
     pub host: String,
 
     /// HTTP port number (not gRPC port)
-    #[arg(short, long, default_value_t = 40403)]
+    #[arg(short, long, default_value_t = 40453)]
     pub port: u16,
 
     /// Number of recent blocks to fetch (default: 5)

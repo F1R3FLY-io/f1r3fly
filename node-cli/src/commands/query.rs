@@ -117,8 +117,6 @@ pub async fn bonds_command(args: &HttpArgs) -> Result<(), Box<dyn std::error::Er
         "term": rholang_query
     });
 
-    let start_time = Instant::now();
-
     match client
         .post(&url)
         .header("Content-Type", "application/json")
@@ -127,15 +125,20 @@ pub async fn bonds_command(args: &HttpArgs) -> Result<(), Box<dyn std::error::Er
         .await
     {
         Ok(response) => {
-            let duration = start_time.elapsed();
             if response.status().is_success() {
                 let bonds_text = response.text().await?;
                 let bonds_json: serde_json::Value = serde_json::from_str(&bonds_text)?;
 
-                println!("✅ Validator bonds retrieved successfully!");
-                println!("⏱️  Time taken: {:.2?}", duration);
-                println!("🔗 Current Validator Bonds:");
-                println!("{}", serde_json::to_string_pretty(&bonds_json)?);
+                // Extract bonds from the block data
+                if let Some(block) = bonds_json.get("block") {
+                    if let Some(bonds) = block.get("bonds") {
+                        println!("{}", serde_json::to_string_pretty(bonds)?);
+                    } else {
+                        println!("No bonds found in response");
+                    }
+                } else {
+                    println!("No block data found in response");
+                }
             } else {
                 println!("❌ Failed to get bonds: HTTP {}", response.status());
                 println!("Error: {}", response.text().await?);
