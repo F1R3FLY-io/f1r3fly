@@ -1,4 +1,5 @@
 use crate::args::*;
+use crate::f1r3fly_api::F1r3flyApi;
 use reqwest;
 use serde_json;
 use std::time::Instant;
@@ -207,47 +208,51 @@ pub async fn wallet_balance_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Checking wallet balance for address: {}", args.address);
 
-    let url = format!("http://{}:{}/api/explore-deploy", args.host, args.port);
-    let client = reqwest::Client::new();
+    // Use F1r3fly API with gRPC (like exploratory-deploy)
+    let f1r3fly_api = F1r3flyApi::new(
+        "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1", // Default private key
+        &args.host,
+        args.port,
+    );
 
     let rholang_query = format!(
-        r#"new return, rl(`rho:registry:lookup`), revVaultCh in {{ rl!(`rho:rchain:revVault`, *revVaultCh) | for(@(_, RevVault) <- revVaultCh) {{ @RevVault!("findOrCreate", "{}", *return) }} }}"#,
+        r#"new return, rl(`rho:registry:lookup`), revVaultCh, vaultCh, balanceCh in {{
+            rl!(`rho:rchain:revVault`, *revVaultCh) |
+            for (@(_, RevVault) <- revVaultCh) {{
+                @RevVault!("findOrCreate", "{}", *vaultCh) |
+                for (@either <- vaultCh) {{
+                    match either {{
+                        (true, vault) => {{
+                            @vault!("balance", *balanceCh) |
+                            for (@balance <- balanceCh) {{
+                                return!(balance)
+                            }}
+                        }}
+                        (false, errorMsg) => {{
+                            return!(errorMsg)
+                        }}
+                    }}
+                }}
+            }}
+        }}"#,
         args.address
     );
 
-    let body = serde_json::json!({
-        "term": rholang_query
-    });
-
     let start_time = Instant::now();
 
-    match client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
+    match f1r3fly_api
+        .exploratory_deploy(&rholang_query, None, false)
         .await
     {
-        Ok(response) => {
+        Ok((result, block_info)) => {
             let duration = start_time.elapsed();
-            if response.status().is_success() {
-                let balance_text = response.text().await?;
-                let balance_json: serde_json::Value = serde_json::from_str(&balance_text)?;
-
-                println!("✅ Wallet balance retrieved successfully!");
-                println!("⏱️  Time taken: {:.2?}", duration);
-                println!("💰 Wallet Balance for {}:", args.address);
-                println!("{}", serde_json::to_string_pretty(&balance_json)?);
-            } else {
-                println!(
-                    "❌ Failed to get wallet balance: HTTP {}",
-                    response.status()
-                );
-                println!("Error: {}", response.text().await?);
-            }
+            println!("✅ Wallet balance retrieved successfully!");
+            println!("⏱️  Time taken: {:.2?}", duration);
+            println!("💰 Balance for {}: {} REV", args.address, result);
+            println!("📊 {}", block_info);
         }
         Err(e) => {
-            println!("❌ Connection failed!");
+            println!("❌ Failed to get wallet balance!");
             println!("Error: {}", e);
             return Err(e.into());
         }

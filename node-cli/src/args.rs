@@ -261,8 +261,8 @@ pub struct WalletBalanceArgs {
     #[arg(short = 'H', long, default_value = "localhost")]
     pub host: String,
 
-    /// gRPC port number
-    #[arg(short, long, default_value_t = 40402)]
+    /// gRPC port number (requires read-only node)
+    #[arg(short, long, default_value_t = 40452)]
     pub port: u16,
 
     /// Wallet address to check balance for

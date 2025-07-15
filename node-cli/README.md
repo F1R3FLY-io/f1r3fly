@@ -209,11 +209,11 @@ cargo run -- active-validators -H node.example.com -p 40403
 Check wallet balance for a specific address.
 
 ```bash
-# Check wallet balance for an address
+# Check wallet balance for an address (requires read-only node on port 40452)
 cargo run -- wallet-balance --address "1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g"
 
-# Check balance from custom node (uses gRPC port)
-cargo run -- wallet-balance -a "1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g" -H node.example.com -p 40402
+# Check balance from custom node (uses gRPC, requires read-only node)
+cargo run -- wallet-balance -a "1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g" -H node.example.com -p 40452
 ```
 
 ### Bond Status
@@ -417,7 +417,7 @@ make network-health-custom CUSTOM_PORTS=60503,70503
 ### Wallet-Balance Command
 
 - `-H, --host <HOST>`: Host address (default: "localhost")
-- `-p, --port <PORT>`: gRPC port number (default: 40402)
+- `-p, --port <PORT>`: gRPC port number (default: 40452, requires read-only node)
 - `-a, --address <ADDRESS>`: Wallet address to check balance for (required)
 
 ### Bond-Status Command
