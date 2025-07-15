@@ -5,6 +5,9 @@ pub enum F1r3flyEvent {
     BlockCreated(BlockCreated),
     BlockAdded(BlockAdded),
     BlockFinalised(BlockFinalised),
+    SentUnapprovedBlock(String),
+    SentApprovedBlock(String),
+    BlockApprovalReceived(BlockApprovalReceived),
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +33,12 @@ pub struct BlockAdded {
 #[derive(Debug, Clone)]
 pub struct BlockFinalised {
     pub block_hash: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockApprovalReceived {
+    pub block_hash: String,
+    pub sender: String,
 }
 
 impl F1r3flyEvent {

@@ -327,9 +327,22 @@ fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
     base_balance: HashMap<Blake2b256Hash, i64>,
     branches: &HashableSet<Branch<R>>,
     mergeable_channels: impl Fn(&R) -> NumberChannelsDiff,
-) -> HashableSet<Branch<R>> {
+) -> HashableSet<Branch<R>> 
+where 
+    R: Ord,
+{
+    // Sort branches for deterministic processing order
+    // For DeployChainIndex, we'll sort by the smallest deploy signature in each branch
+    let mut sorted_branches: Vec<&Branch<R>> = branches.0.iter().collect();
+    sorted_branches.sort_by(|a, b| {
+        // For deterministic ordering, find the lexicographically smallest element in each branch
+        let a_min = a.0.iter().min();
+        let b_min = b.0.iter().min();
+        a_min.cmp(&b_min)
+    });
+    
     // Fold branches to find which ones would result in negative or overflow balances
-    let (_, rejected) = branches.0.iter().fold(
+    let (_, rejected) = sorted_branches.iter().fold(
         (base_balance, HashableSet(HashSet::new())),
         |(balances, mut rejected), branch| {
             // Check if the branch can be merged without overflow or negative results
@@ -337,7 +350,7 @@ fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
                 Some(new_balances) => (new_balances, rejected),
                 None => {
                     // If merge calculation returns None, reject this branch
-                    rejected.0.insert(branch.clone());
+                    rejected.0.insert((*branch).clone());
                     (balances, rejected)
                 }
             }
@@ -348,7 +361,7 @@ fn fold_rejection<R: Clone + Eq + std::hash::Hash>(
 }
 
 /** Get merged result rejection options */
-fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash>(
+fn get_merged_result_rejection<R: Clone + Eq + std::hash::Hash + Ord>(
     branches: &HashableSet<Branch<R>>,
     reject_options: &HashableSet<HashableSet<Branch<R>>>,
     base: HashMap<Blake2b256Hash, i64>,
