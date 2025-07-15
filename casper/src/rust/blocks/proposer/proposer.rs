@@ -77,9 +77,9 @@ pub trait BlockCreator {
 }
 
 pub trait BlockValidator {
-    fn validate_block(
+    async fn validate_block(
         &self,
-        casper: &impl Casper,
+        casper: &mut impl Casper,
         casper_snapshot: &mut CasperSnapshot,
         block: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError>;
@@ -202,9 +202,10 @@ where
                         Ok((ProposeResult::failure(ProposeFailure::NoNewDeploys), None))
                     }
                     BlockCreatorResult::Created(block) => {
-                        let validation_result =
-                            self.block_validator
-                                .validate_block(casper, casper_snapshot, &block)?;
+                        let validation_result = self
+                            .block_validator
+                            .validate_block(casper, casper_snapshot, &block)
+                            .await?;
 
                         match validation_result {
                             ValidBlockProcessing::Right(valid_status) => {
@@ -521,13 +522,13 @@ impl BlockCreator for ProductionBlockCreator {
 
 pub struct ProductionBlockValidator;
 impl BlockValidator for ProductionBlockValidator {
-    fn validate_block(
+    async fn validate_block(
         &self,
-        casper: &impl Casper,
+        casper: &mut impl Casper,
         casper_snapshot: &mut CasperSnapshot,
         block: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError> {
-        casper.validate(block, casper_snapshot)
+        casper.validate(block, casper_snapshot).await
     }
 }
 
