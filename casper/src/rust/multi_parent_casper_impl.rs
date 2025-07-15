@@ -324,7 +324,6 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
                     block.seq_num,
                 )?;
 
-                // Use RuntimeManager's caching mechanism (equivalent to Scala's putIfAbsent)
                 let _index_block = self.runtime_manager.get_or_compute_block_index(
                     &block.block_hash,
                     &block.body.deploys,
