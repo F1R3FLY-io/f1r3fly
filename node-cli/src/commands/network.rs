@@ -277,12 +277,6 @@ pub async fn bond_validator_command(
                         println!("✅ Block proposed successfully!");
                         println!("⏱️  Propose time: {:.2?}", propose_duration);
                         println!("🧱 Block hash: {}", block_hash);
-
-                        println!("\n📋 Next Steps:");
-                        println!("1. Wait for block finalization");
-                        println!("2. Verify bond status with bonds command: cargo run -- bonds");
-                        println!("3. Start the new validator node");
-                        println!("4. Check network health: cargo run -- network-health");
                     }
                     Err(e) => {
                         println!("❌ Block proposal failed!");
@@ -290,13 +284,6 @@ pub async fn bond_validator_command(
                         return Err(e);
                     }
                 }
-            } else {
-                println!("\n📋 Next Steps:");
-                println!("1. Propose a block: cargo run -- propose");
-                println!("2. Wait for block finalization");
-                println!("3. Verify bond status with bonds command: cargo run -- bonds");
-                println!("4. Start the new validator node");
-                println!("5. Check network health: cargo run -- network-health");
             }
         }
         Err(e) => {
