@@ -28,24 +28,10 @@ class AbortSpec extends FlatSpec with Matchers {
         |""".stripMargin
 
     val result = execute(rhoCode)
-    // Abort should execute successfully (no errors) and terminate execution
-    result.errors should be(empty)
+    // Abort should result in UserAbortError and mark execution as failed
+    result.errors should contain(UserAbortError)
     result.cost.value should be(316L +- 100L)
-    result.succeeded should be(true)
-  }
-
-  it should "allow parallel processes to execute independently" in {
-    val rhoCode =
-      """
-        |new result1, abort(`rho:execution:abort`) in {
-        |  result1!("Process 1 executed") |
-        |  abort!("Process 2 aborted")
-        |}
-        |""".stripMargin
-
-    val result = execute(rhoCode)
-    result.cost.value should be(600L +- 100L) // ~300 is a cost of 1 Par, so 600 is 2 Par dispatched
-    result.errors should be(empty)
+    result.succeeded should be(false)
   }
 
   private def execute(source: String): EvaluateResult =

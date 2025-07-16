@@ -97,9 +97,9 @@ class InterpreterImpl[F[_]: Sync: Span](implicit C: _cost[F], mergeChs: Ref[F, S
       case AggregateError(ipErrs, errs) if errs.isEmpty =>
         EvaluateResult(initialCost, ipErrs, Set()).pure[F]
 
-      // User triggered abort - successful, cost already consumed
+      // User triggered abort - execution failed, propagate error in result
       case UserAbortError =>
-        EvaluateResult(evalCost, Vector(), Set()).pure[F]
+        EvaluateResult(evalCost, Vector(UserAbortError), Set()).pure[F]
 
       // Aggregated fatal errors are rethrown
       case error: AggregateError =>
