@@ -580,6 +580,7 @@ dependencies = [
  "bitcoin",
  "blake2",
  "bp-core",
+ "bp-std",
  "commit_verify",
  "hex",
  "rgb-std",
@@ -743,6 +744,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bp-derive"
+version = "0.12.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9868177dbd5f58895b1e75487f51c3aa42b6362958d1a4f8fc17e4885cc668b3"
+dependencies = [
+ "amplify",
+ "bp-consensus",
+ "bp-invoice",
+ "commit_verify",
+ "hmac",
+ "indexmap",
+ "sha2",
+]
+
+[[package]]
 name = "bp-invoice"
 version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -769,6 +785,25 @@ dependencies = [
  "getrandom 0.3.3",
  "single_use_seals",
  "strict_encoding",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "bp-std"
+version = "0.12.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c69f38f9656b94b7241a9219523306fd3ed1aaefe5bd931da079a86dfeda025"
+dependencies = [
+ "amplify",
+ "bp-consensus",
+ "bp-core",
+ "bp-derive",
+ "bp-invoice",
+ "descriptors",
+ "getrandom 0.2.16",
+ "getrandom 0.3.3",
+ "psbt",
+ "secp256k1 0.30.0",
  "wasm-bindgen",
 ]
 
@@ -1239,6 +1274,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c9e6a11ca8224451684bc0d7d5a7adbf8f2fd6887261a1cfc3c0432f9d4068e"
 dependencies = [
  "powerfmt",
+]
+
+[[package]]
+name = "descriptors"
+version = "0.12.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d3679f0c2ca4e9c071e963c42695b6180b854ca0eba20cec8168363b169d1e0"
+dependencies = [
+ "amplify",
+ "bp-derive",
+ "commit_verify",
+ "indexmap",
 ]
 
 [[package]]
@@ -2911,6 +2958,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
 dependencies = [
  "prost",
+]
+
+[[package]]
+name = "psbt"
+version = "0.12.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25159222184ff955caf54e457079287c3f0dc3ce40dc556d9f565ffeb5c8139e"
+dependencies = [
+ "amplify",
+ "base64",
+ "bp-consensus",
+ "bp-core",
+ "bp-derive",
+ "commit_verify",
+ "descriptors",
+ "indexmap",
+ "strict_encoding",
 ]
 
 [[package]]

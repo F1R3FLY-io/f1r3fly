@@ -19,6 +19,7 @@ hex = "0.4"
 rgb-std = { version = "0.12.0-rc.2", features = ["bitcoin"] }
 bp-core = "0.12"
 commit_verify = { version = "0.12.0", features = ["rand"] }
+bp-std = { version = "0.12.0-rc.3", features = ["client-side-validation"] }
 
 # Bitcoin transaction handling
 bitcoin = "0.32"
