@@ -454,11 +454,13 @@ impl EquivocationDetector {
         };
 
         let traversal_result = dag_ops::bf_traverse(start_nodes, neighbors);
+        let target_validator = &block.sender;
 
         for candidate_hash in traversal_result {
             match dag.lookup_unsafe(&candidate_hash) {
                 Ok(candidate_metadata) => {
-                    if i64::from(candidate_metadata.sequence_number) == seq_num {
+                    if i64::from(candidate_metadata.sequence_number) == seq_num
+                        && candidate_metadata.sender == *target_validator
                         return Ok(Some(candidate_hash));
                     }
                 }
