@@ -96,10 +96,10 @@ pub trait Casper {
 
     fn get_version(&self) -> i64;
 
-    fn validate(
-        &self,
+    async fn validate(
+        &mut self,
         block: &BlockMessage,
-        snapshot: &CasperSnapshot,
+        snapshot: &mut CasperSnapshot,
     ) -> Result<Either<BlockError, ValidBlock>, CasperError>;
 
     async fn handle_valid_block(

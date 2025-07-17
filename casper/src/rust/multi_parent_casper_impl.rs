@@ -35,13 +35,18 @@ use crate::rust::{
         Casper, CasperShardConf, CasperSnapshot, DeployError, MultiParentCasper, OnChainCasperState,
     },
     engine::block_retriever::{AdmitHashReason, BlockRetriever},
+    equivocation_detector::EquivocationDetector,
     errors::CasperError,
     estimator::{Estimator, ForkChoice},
     finality::finalizer::Finalizer,
     util::{
         proto_util,
-        rholang::{interpreter_util, runtime_manager::RuntimeManager},
+        rholang::{
+            interpreter_util::{self, validate_block_checkpoint},
+            runtime_manager::RuntimeManager,
+        },
     },
+    validate::Validate,
     validator_identity::ValidatorIdentity,
 };
 
@@ -216,12 +221,124 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         self.casper_shard_conf.casper_version
     }
 
-    fn validate(
-        &self,
+    async fn validate(
+        &mut self,
         block: &BlockMessage,
-        snapshot: &CasperSnapshot,
+        snapshot: &mut CasperSnapshot,
     ) -> Result<Either<BlockError, ValidBlock>, CasperError> {
-        todo!()
+        log::info!(
+            "Validating block {}",
+            PrettyPrinter::build_string_block_message(block, true)
+        );
+
+        let start = std::time::Instant::now();
+        let val_result = {
+            let block_summary_result = Validate::block_summary(
+                block,
+                &self.approved_block,
+                snapshot,
+                &self.casper_shard_conf.shard_name,
+                self.casper_shard_conf.deploy_lifespan as i32,
+                &self.estimator,
+                &mut self.block_store,
+            )
+            .await;
+
+            if let Either::Left(block_error) = block_summary_result {
+                return Ok(Either::Left(block_error));
+            }
+
+            let validate_block_checkpoint_result = validate_block_checkpoint(
+                block,
+                &mut self.block_store,
+                snapshot,
+                &mut self.runtime_manager,
+            )
+            .await?;
+
+            if let Either::Left(block_error) = validate_block_checkpoint_result {
+                return Ok(Either::Left(block_error));
+            }
+
+            if let Either::Right(None) = validate_block_checkpoint_result {
+                return Ok(Either::Left(BlockError::Invalid(
+                    InvalidBlock::InvalidTransaction,
+                )));
+            }
+
+            let bonds_cache_result = Validate::bonds_cache(block, &self.runtime_manager).await;
+            if let Either::Left(block_error) = bonds_cache_result {
+                return Ok(Either::Left(block_error));
+            }
+
+            let neglected_invalid_block_result = Validate::neglected_invalid_block(block, snapshot);
+            if let Either::Left(block_error) = neglected_invalid_block_result {
+                return Ok(Either::Left(block_error));
+            }
+
+            let equivocation_detector_result =
+                EquivocationDetector::check_neglected_equivocations_with_update(
+                    block,
+                    &snapshot.dag,
+                    &self.block_store,
+                    &self.approved_block,
+                    &mut self.block_dag_storage,
+                )
+                .await?;
+
+            if let Either::Left(block_error) = equivocation_detector_result {
+                return Ok(Either::Left(block_error));
+            }
+
+            // This validation is only to punish validator which accepted lower price deploys.
+            // And this can happen if not configured correctly.
+            let phlo_price_result =
+                Validate::phlo_price(block, self.casper_shard_conf.min_phlo_price);
+
+            if let Either::Left(_) = phlo_price_result {
+                log::warn!(
+                    "One or more deploys has phloPrice lower than {}",
+                    self.casper_shard_conf.min_phlo_price
+                );
+            }
+
+            let dep_dag = self.casper_buffer_storage.to_doubly_linked_dag();
+
+            EquivocationDetector::check_equivocations(&dep_dag, block, &snapshot.dag).await?
+        };
+
+        let elapsed = start.elapsed();
+
+        if let Either::Right(ref status) = val_result {
+            let block_info = PrettyPrinter::build_string_block_message(block, true);
+            let deploy_count = block.body.deploys.len();
+            log::info!(
+                "Block replayed: {} ({}d) ({:?}) [{:?}]",
+                block_info,
+                deploy_count,
+                status,
+                elapsed
+            );
+
+            if self.casper_shard_conf.max_number_of_parents > 1 {
+                let mergeable_chs = self.runtime_manager.load_mergeable_channels(
+                    &block.body.state.post_state_hash,
+                    block.sender.clone(),
+                    block.seq_num,
+                )?;
+
+                let _index_block = self.runtime_manager.get_or_compute_block_index(
+                    &block.block_hash,
+                    &block.body.deploys,
+                    &block.body.system_deploys,
+                    &Blake2b256Hash::from_bytes_prost(&block.body.state.pre_state_hash),
+                    &Blake2b256Hash::from_bytes_prost(&block.body.state.post_state_hash),
+                    &mergeable_chs,
+                )?;
+            }
+        }
+
+        Ok(val_result)
     }
 
     async fn handle_valid_block(

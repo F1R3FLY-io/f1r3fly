@@ -99,10 +99,10 @@ impl Casper for NoOpsCasperEffect {
         1
     }
 
-    fn validate(
-        &self,
+    async fn validate(
+        &mut self,
         _block: &BlockMessage,
-        _snapshot: &CasperSnapshot,
+        _snapshot: &mut CasperSnapshot,
     ) -> Result<Either<BlockError, ValidBlock>, CasperError> {
         todo!()
     }
