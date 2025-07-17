@@ -7,3 +7,4 @@ pub mod system_deploy_result;
 pub mod system_deploy_user_error;
 pub mod system_deploy_util;
 pub mod tools;
+pub mod registry_sig_gen;
