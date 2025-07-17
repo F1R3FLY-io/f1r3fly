@@ -159,7 +159,8 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
         };
 
         // Expected blessed contracts
-        let genesis_blessed_contracts = crate::rust::genesis::genesis::Genesis::default_blessed_terms(
+        let genesis_blessed_contracts = crate::rust::genesis::genesis::Genesis::default_blessed_terms_with_timestamp(
+            self.deploy_timestamp,
             &pos_params,
             &self.vaults,
             i64::MAX,
