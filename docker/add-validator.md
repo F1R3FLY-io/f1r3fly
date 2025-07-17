@@ -1,6 +1,6 @@
 Repo - https://github.com/F1R3FLY-io/f1r3fly
 
-Branch - `preston/rholang_rust`
+Branch - `add-validator`
 
 ----
 
