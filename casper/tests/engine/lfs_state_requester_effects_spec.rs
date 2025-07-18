@@ -1200,4 +1200,4 @@ mod tests {
         .await
         .expect("Test should complete successfully");
     }
-	}
+}

@@ -22,9 +22,7 @@ use crypto::rust::{
     signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
 use models::casper::Signature as ProtoSignature;
-use models::rust::casper::protocol::casper_message::{
-    ApprovedBlockCandidate, BlockApproval,
-};
+use models::rust::casper::protocol::casper_message::{ApprovedBlockCandidate, BlockApproval};
 use prost::{bytes, Message};
 use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
@@ -203,7 +201,8 @@ async fn should_add_valid_signatures_to_state() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
     let approval = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
     let protocol = fixture.protocol.clone();
@@ -236,7 +235,8 @@ async fn should_not_change_signatures_on_duplicate_approval() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
     let approval1 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
     let approval2 = create_approval(&fixture.candidate, &key_pair.0, &key_pair.1);
 
@@ -280,7 +280,8 @@ async fn should_not_add_invalid_signatures() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
     let invalid_approval = create_invalid_approval(&fixture.candidate);
 
     let protocol = fixture.protocol.clone();
@@ -309,7 +310,8 @@ async fn should_create_approved_block_when_enough_signatures_collected() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs.clone(),
-    ).await;
+    )
+    .await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -344,7 +346,8 @@ async fn should_continue_collecting_if_not_enough_signatures() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs.clone(),
-    ).await;
+    )
+    .await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -386,7 +389,8 @@ async fn should_skip_duration_when_required_signatures_is_zero() {
         Duration::from_millis(30),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
 
     let start = std::time::Instant::now();
     let result = timeout(Duration::from_millis(100), fixture.protocol.run()).await;
@@ -411,7 +415,8 @@ async fn should_not_accept_approval_from_untrusted_validator() {
         Duration::from_millis(100),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
     let approval = create_approval(
         &fixture.candidate,
         &untrusted_key_pair.0,
@@ -444,7 +449,8 @@ async fn should_send_unapproved_block_message_to_peers_at_every_interval() {
         Duration::from_millis(100),
         Duration::from_millis(5),
         key_pairs,
-    ).await;
+    )
+    .await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
@@ -499,7 +505,8 @@ async fn should_send_approved_block_message_to_peers_once_approved_block_is_crea
         Duration::from_millis(2),
         Duration::from_millis(1),
         key_pairs,
-    ).await;
+    )
+    .await;
 
     let protocol = fixture.protocol.clone();
     let protocol_clone = fixture.protocol.clone();
