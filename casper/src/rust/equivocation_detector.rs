@@ -461,6 +461,7 @@ impl EquivocationDetector {
                 Ok(candidate_metadata) => {
                     if i64::from(candidate_metadata.sequence_number) == seq_num
                         && candidate_metadata.sender == *target_validator
+                    {
                         return Ok(Some(candidate_hash));
                     }
                 }
