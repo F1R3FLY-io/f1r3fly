@@ -92,19 +92,25 @@ async fn creating_a_comm_event_should_replay_correctly() {
 
     assert!(result_consume.unwrap().is_none());
     assert!(result_produce.clone().unwrap().is_some());
-    assert_eq!(result_produce.clone().unwrap().unwrap().0, ContResult {
-        continuation: continuation.clone(),
-        persistent: false,
-        channels: channels.clone(),
-        patterns: patterns.clone(),
-        peek: false,
-    });
-    assert_eq!(result_produce.clone().unwrap().unwrap().1, vec![RSpaceResult {
-        channel: channels[0].clone(),
-        matched_datum: datum.clone(),
-        removed_datum: datum.clone(),
-        persistent: false
-    }]);
+    assert_eq!(
+        result_produce.clone().unwrap().unwrap().0,
+        ContResult {
+            continuation: continuation.clone(),
+            persistent: false,
+            channels: channels.clone(),
+            patterns: patterns.clone(),
+            peek: false,
+        }
+    );
+    assert_eq!(
+        result_produce.clone().unwrap().unwrap().1,
+        vec![RSpaceResult {
+            channel: channels[0].clone(),
+            matched_datum: datum.clone(),
+            removed_datum: datum.clone(),
+            persistent: false
+        }]
+    );
 
     let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let replay_result_consume = replay_space.consume(
@@ -150,19 +156,25 @@ async fn creating_a_comm_event_with_peek_consume_first_should_replay_correctly()
 
     assert!(result_consume.unwrap().is_none());
     assert!(result_produce.clone().unwrap().is_some());
-    assert_eq!(result_produce.clone().unwrap().unwrap().0, ContResult {
-        continuation: continuation.clone(),
-        persistent: false,
-        channels: channels.clone(),
-        patterns: patterns.clone(),
-        peek: true,
-    });
-    assert_eq!(result_produce.clone().unwrap().unwrap().1, vec![RSpaceResult {
-        channel: channels[0].clone(),
-        matched_datum: datum.clone(),
-        removed_datum: datum.clone(),
-        persistent: false
-    }]);
+    assert_eq!(
+        result_produce.clone().unwrap().unwrap().0,
+        ContResult {
+            continuation: continuation.clone(),
+            persistent: false,
+            channels: channels.clone(),
+            patterns: patterns.clone(),
+            peek: true,
+        }
+    );
+    assert_eq!(
+        result_produce.clone().unwrap().unwrap().1,
+        vec![RSpaceResult {
+            channel: channels[0].clone(),
+            matched_datum: datum.clone(),
+            removed_datum: datum.clone(),
+            persistent: false
+        }]
+    );
 
     let _ = replay_space.rig_and_reset(empty_point.root, rig_point.log);
     let replay_result_consume = replay_space.consume(

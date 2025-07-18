@@ -530,11 +530,15 @@ where
         //     grouped_channels
         // );
         let _ = self.log_produce(produce_ref.clone(), &channel, &data, persist);
-        let extracted = self.extract_produce_candidate(grouped_channels, channel.clone(), Datum {
-            a: data.clone(),
-            persist,
-            source: produce_ref.clone(),
-        });
+        let extracted = self.extract_produce_candidate(
+            grouped_channels,
+            channel.clone(),
+            Datum {
+                a: data.clone(),
+                persist,
+                source: produce_ref.clone(),
+            },
+        );
 
         // println!("extracted in lockedProduce: {:?}", extracted);
 
@@ -732,11 +736,14 @@ where
     ) -> MaybeProduceResult<C, P, A, K> {
         // println!("\nHit store_data");
         // println!("\nHit store_data, data: {:?}", data);
-        self.store.put_datum(channel, Datum {
-            a: data,
-            persist,
-            source: produce_ref,
-        });
+        self.store.put_datum(
+            channel,
+            Datum {
+                a: data,
+                persist,
+                source: produce_ref,
+            },
+        );
         // println!(
         //     "produce: persisted <data: {:?}> at <channel: {:?}>",
         //     data, channel
@@ -822,22 +829,24 @@ where
 
             match options {
                 None => {
-                    self.installs
-                        .lock()
-                        .unwrap()
-                        .insert(channels.clone(), Install {
+                    self.installs.lock().unwrap().insert(
+                        channels.clone(),
+                        Install {
                             patterns: patterns.clone(),
                             continuation: continuation.clone(),
-                        });
+                        },
+                    );
 
-                    self.store
-                        .install_continuation(channels.clone(), WaitingContinuation {
+                    self.store.install_continuation(
+                        channels.clone(),
+                        WaitingContinuation {
                             patterns,
                             continuation,
                             persist: true,
                             peeks: BTreeSet::default(),
                             source: consume_ref,
-                        });
+                        },
+                    );
 
                     for channel in channels.iter() {
                         self.store.install_join(channel.clone(), channels.clone());

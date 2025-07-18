@@ -1,6 +1,6 @@
+use crate::rust::shared::metrics::Metrics;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::rust::shared::metrics::Metrics;
 
 /// Test implementation of Metrics for isolated testing environment
 #[derive(Clone)]
@@ -30,11 +30,14 @@ impl MetricsTestImpl {
 }
 
 impl Metrics for MetricsTestImpl {
-    fn increment_counter(&self, name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn increment_counter(
+        &self,
+        name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut counters = self.counters.lock().unwrap();
         let full_name = format!("approve-block.{}", name);
         let current = counters.get(&full_name).copied().unwrap_or(0);
         counters.insert(full_name, current + 1);
         Ok(())
     }
-} 
+}

@@ -19,7 +19,7 @@ use models::rust::{
 
 use crate::init_logger;
 
-/// This creates a reverse lexicographic ordering for BlockHash 
+/// This creates a reverse lexicographic ordering for BlockHash
 fn reverse_lexicographic_sort(hashes: &mut Vec<BlockHash>) {
     hashes.sort_by(|a, b| {
         // Convert to bytes and compare in reverse lexicographic order
@@ -28,7 +28,10 @@ fn reverse_lexicographic_sort(hashes: &mut Vec<BlockHash>) {
 }
 
 fn as_map(blocks: &[BlockMessage]) -> HashMap<BlockHash, BlockMessage> {
-    blocks.iter().map(|b| (b.block_hash.clone(), b.clone())).collect()
+    blocks
+        .iter()
+        .map(|b| (b.block_hash.clone(), b.clone()))
+        .collect()
 }
 
 /// Create a hash from a string
@@ -322,7 +325,6 @@ where
     if !run_processing_stream {
         test_fn(mock).await
     } else {
-
         // Create mock operations implementation
         let mut mock_ops = MockBlockRequesterOps::new(test_state, request_tx, save_tx);
 
@@ -331,10 +333,11 @@ where
             std::collections::VecDeque::new(),
             response_rx,
             0,
-            request_timeout,                 
-            &mut mock_ops,                     
+            request_timeout,
+            &mut mock_ops,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
 
         use futures::stream::StreamExt;
 
@@ -407,9 +410,9 @@ mod tests {
     #[tokio::test]
     async fn should_not_request_saved_blocks() {
         init_logger();
-        
+
         let (_, b8, b7, b6, b5, _, _, _, _) = get_blocks();
-        
+
         dag_from_block(
             b8,
             true, // runProcessingStream = true
@@ -503,9 +506,9 @@ mod tests {
     #[tokio::test]
     async fn should_first_request_dependencies_only_from_starting_block() {
         init_logger();
-        
+
         let (_, b8, b7, _, b5, _, _, _, _) = get_blocks();
-        
+
         dag_from_block(
             b8,
             true, // runProcessingStream = true
@@ -580,12 +583,12 @@ mod tests {
     #[tokio::test]
     async fn should_save_received_blocks_if_requested() {
         init_logger();
-        
+
         let (b9, b8, b7, _, _, _, _, _, _) = get_blocks();
-        
+
         dag_from_block(
-            b9, // Starting with b9 this time
-            true, // runProcessingStream = true
+            b9,                                             // Starting with b9 this time
+            true,                                           // runProcessingStream = true
             std::time::Duration::from_secs(10 * 24 * 3600), // Use very long timeout
             |mut mock| async move {
                 // Wait for initial request to be sent
@@ -596,29 +599,32 @@ mod tests {
                         None => panic!("Expected 1 initial request but channel closed early"),
                     }
                 }
-                
+
                 // Check initial request is for hash8
                 reverse_lexicographic_sort(&mut initial_requests);
                 let (_, hash8, _, _, _, _, _, _, _) = get_hashes();
                 let expected_initial = vec![hash8];
-                
+
                 assert_eq!(
                     initial_requests, expected_initial,
                     "Should initially request hash8 (dependency of b9)"
                 );
-                
+
                 // Store block hashes before moving blocks
                 let b8_hash = b8.block_hash.clone();
                 let b7_hash = b7.block_hash.clone();
-                
+
                 // Receive first block dependencies
                 mock.receive_block(&[b8]).await.expect("Should receive b8");
-                
+
                 // Received blocks should be saved
                 let first_save = mock.next_save().await.expect("Should save b8");
                 assert_eq!(first_save.0, b8_hash, "Should save b8 with correct hash");
-                assert_eq!(first_save.1.block_hash, b8_hash, "Should save correct b8 block");
-                
+                assert_eq!(
+                    first_save.1.block_hash, b8_hash,
+                    "Should save correct b8 block"
+                );
+
                 // Wait for requests to be sent (dependencies of b8)
                 let mut new_requests = Vec::new();
                 for _ in 0..2 {
@@ -627,17 +633,17 @@ mod tests {
                         None => panic!("Expected 2 new requests but channel closed early"),
                     }
                 }
-                
+
                 // Check new requests are for hash7 and hash5
                 reverse_lexicographic_sort(&mut new_requests);
                 let (_, _, hash7, _, hash5, _, _, _, _) = get_hashes();
                 let expected_new = vec![hash7, hash5];
-                
+
                 assert_eq!(
                     new_requests, expected_new,
                     "Should request hash7 and hash5 (dependencies of b8)"
                 );
-                
+
                 // No other requests should be sent immediately
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -653,21 +659,21 @@ mod tests {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 // Receive one dependency
                 mock.receive_block(&[b7]).await.expect("Should receive b7");
-                
+
                 // Block should be saved
                 let second_save = mock.next_save().await.expect("Should save b7");
                 assert_eq!(second_save.0, b7_hash, "Should save b7 with correct hash");
-                assert_eq!(second_save.1.block_hash, b7_hash, "Should save correct b7 block");
-                
+                assert_eq!(
+                    second_save.1.block_hash, b7_hash,
+                    "Should save correct b7 block"
+                );
+
                 // No other blocks should be saved immediately
-                match tokio::time::timeout(
-                    std::time::Duration::from_millis(100),
-                    mock.next_save(),
-                )
-                .await
+                match tokio::time::timeout(std::time::Duration::from_millis(100), mock.next_save())
+                    .await
                 {
                     Ok(Some(unexpected_save)) => {
                         panic!("Unexpected additional save: {:?}", unexpected_save)
@@ -677,7 +683,7 @@ mod tests {
                         // Timeout is expected - no additional saves should happen
                     }
                 }
-                
+
                 Ok(())
             },
         )
@@ -689,12 +695,12 @@ mod tests {
     #[tokio::test]
     async fn should_drop_all_blocks_not_requested() {
         init_logger();
-        
+
         let (b9, _, b7, b6, b5, b4, b3, b2, b1) = get_blocks();
-        
+
         dag_from_block(
-            b9, // Starting with b9 this time
-            true, // runProcessingStream = true
+            b9,                                             // Starting with b9 this time
+            true,                                           // runProcessingStream = true
             std::time::Duration::from_secs(10 * 24 * 3600), // Use very long timeout
             |mut mock| async move {
                 // Wait for initial request to be sent
@@ -705,21 +711,23 @@ mod tests {
                         None => panic!("Expected 1 initial request but channel closed early"),
                     }
                 }
-                
+
                 // Check initial request is for hash8
                 reverse_lexicographic_sort(&mut initial_requests);
                 let (_, hash8, _, _, _, _, _, _, _) = get_hashes();
                 let expected_initial = vec![hash8];
-                
+
                 assert_eq!(
                     initial_requests, expected_initial,
                     "Should initially request hash8 (dependency of b9)"
                 );
-                
+
                 // Receive blocks not requested (b7, b6, b5, b4, b3, b2, b1)
                 // None of these blocks were requested, so they should be dropped
-                mock.receive_block(&[b7, b6, b5, b4, b3, b2, b1]).await.expect("Should receive unrequested blocks");
-                
+                mock.receive_block(&[b7, b6, b5, b4, b3, b2, b1])
+                    .await
+                    .expect("Should receive unrequested blocks");
+
                 // No other requests should be sent
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(200),
@@ -728,30 +736,33 @@ mod tests {
                 .await
                 {
                     Ok(Some(unexpected_req)) => {
-                        panic!("Unexpected request after receiving unrequested blocks: {:?}", unexpected_req)
+                        panic!(
+                            "Unexpected request after receiving unrequested blocks: {:?}",
+                            unexpected_req
+                        )
                     }
                     Ok(None) => panic!("Request channel closed unexpectedly"),
                     Err(_) => {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 // Nothing else should be saved
-                match tokio::time::timeout(
-                    std::time::Duration::from_millis(200),
-                    mock.next_save(),
-                )
-                .await
+                match tokio::time::timeout(std::time::Duration::from_millis(200), mock.next_save())
+                    .await
                 {
                     Ok(Some(unexpected_save)) => {
-                        panic!("Unexpected save after receiving unrequested blocks: {:?}", unexpected_save)
+                        panic!(
+                            "Unexpected save after receiving unrequested blocks: {:?}",
+                            unexpected_save
+                        )
                     }
                     Ok(None) => panic!("Save channel closed unexpectedly"),
                     Err(_) => {
                         // Timeout is expected - no saves should happen for unrequested blocks
                     }
                 }
-                
+
                 Ok(())
             },
         )
@@ -763,9 +774,9 @@ mod tests {
     #[tokio::test]
     async fn should_skip_received_invalid_blocks() {
         init_logger();
-        
+
         let (b9, b8, b7, _, b5, _, _, _, _) = get_blocks();
-        
+
         dag_from_block(
             b9, // Starting with b9 this time
             true, // runProcessingStream = true
@@ -897,12 +908,12 @@ mod tests {
     #[tokio::test]
     async fn should_request_and_save_all_blocks() {
         init_logger();
-        
+
         let (b9, b8, b7, b6, b5, b4, b3, b2, b1) = get_blocks();
-        
+
         dag_from_block(
-            b9, // Starting with b9
-            true, // runProcessingStream = true
+            b9,                                             // Starting with b9
+            true,                                           // runProcessingStream = true
             std::time::Duration::from_secs(10 * 24 * 3600), // Use very long timeout
             |mut mock| async move {
                 // === ROUND 1: Starting block dependencies should be requested ===
@@ -913,16 +924,16 @@ mod tests {
                         None => panic!("Expected 1 initial request but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut initial_requests);
                 let (_, hash8, _, _, _, _, _, _, _) = get_hashes();
                 let expected_initial = vec![hash8];
-                
+
                 assert_eq!(
                     initial_requests, expected_initial,
                     "Starting block dependencies should be requested (hash8)"
                 );
-                
+
                 // Store block hashes for later comparisons
                 let b8_hash = b8.block_hash.clone();
                 let b7_hash = b7.block_hash.clone();
@@ -932,10 +943,10 @@ mod tests {
                 let b4_hash = b4.block_hash.clone();
                 let b1_hash = b1.block_hash.clone();
                 let b2_hash = b2.block_hash.clone();
-                
+
                 // === ROUND 2: Receive starting block dependencies (latest blocks) ===
                 mock.receive_block(&[b8]).await.expect("Should receive b8");
-                
+
                 // Dependencies of b8 should be in requests also
                 let mut round2_requests = Vec::new();
                 for _ in 0..2 {
@@ -944,24 +955,26 @@ mod tests {
                         None => panic!("Expected 2 round2 requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut round2_requests);
                 let (_, _, hash7, _, hash5, _, _, _, _) = get_hashes();
                 let expected_round2 = vec![hash7, hash5];
-                
+
                 assert_eq!(
                     round2_requests, expected_round2,
                     "Dependencies of b8 should be requested (hash7, hash5)"
                 );
-                
+
                 // Starting block dependencies should be saved
                 let round2_save = mock.next_save().await.expect("Should save b8");
                 assert_eq!(round2_save.0, b8_hash, "Should save b8");
-                
+
                 // === ROUND 3: Receive blocks b7 and b5 ===
                 let b5_clone = b5.clone(); // Clone for later use in round 4
-                mock.receive_block(&[b7, b5]).await.expect("Should receive b7 and b5");
-                
+                mock.receive_block(&[b7, b5])
+                    .await
+                    .expect("Should receive b7 and b5");
+
                 // All blocks should be requested
                 let mut round3_requests = Vec::new();
                 for _ in 0..2 {
@@ -970,16 +983,16 @@ mod tests {
                         None => panic!("Expected 2 round3 requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut round3_requests);
                 let (_, _, _, hash6, _, _, hash3, _, _) = get_hashes();
                 let expected_round3 = vec![hash6, hash3];
-                
+
                 assert_eq!(
                     round3_requests, expected_round3,
                     "Dependencies should be requested (hash6, hash3)"
                 );
-                
+
                 // Received blocks should be saved
                 let mut round3_saves = Vec::new();
                 for _ in 0..2 {
@@ -988,19 +1001,27 @@ mod tests {
                         None => panic!("Expected 2 round3 saves but channel closed early"),
                     }
                 }
-                
+
                 // Sort saves by hash for consistent comparison
                 round3_saves.sort_by(|a, b| a.0.cmp(&b.0));
                 let mut expected_hashes = vec![b7_hash.clone(), b5_hash.clone()];
                 expected_hashes.sort();
-                
-                assert_eq!(round3_saves[0].0, expected_hashes[0], "Should save first block");
-                assert_eq!(round3_saves[1].0, expected_hashes[1], "Should save second block");
-                
+
+                assert_eq!(
+                    round3_saves[0].0, expected_hashes[0],
+                    "Should save first block"
+                );
+                assert_eq!(
+                    round3_saves[1].0, expected_hashes[1],
+                    "Should save second block"
+                );
+
                 // === ROUND 4: Receive blocks b6, b5 and b3 ===
                 // Note: b5 is sent again but should be handled gracefully
-                mock.receive_block(&[b6, b5_clone, b3]).await.expect("Should receive b6, b5, b3");
-                
+                mock.receive_block(&[b6, b5_clone, b3])
+                    .await
+                    .expect("Should receive b6, b5, b3");
+
                 // All blocks should be requested
                 let mut round4_requests = Vec::new();
                 for _ in 0..2 {
@@ -1009,16 +1030,16 @@ mod tests {
                         None => panic!("Expected 2 round4 requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut round4_requests);
                 let (_, _, _, _, _, hash4, _, _, hash1) = get_hashes();
                 let expected_round4 = vec![hash4, hash1];
-                
+
                 assert_eq!(
                     round4_requests, expected_round4,
                     "Dependencies should be requested (hash4, hash1)"
                 );
-                
+
                 // All blocks should be saved (excluding duplicate b5)
                 let mut round4_saves = Vec::new();
                 for _ in 0..2 {
@@ -1027,18 +1048,26 @@ mod tests {
                         None => panic!("Expected 2 round4 saves but channel closed early"),
                     }
                 }
-                
+
                 // Sort saves by hash for consistent comparison
                 round4_saves.sort_by(|a, b| a.0.cmp(&b.0));
                 let mut expected_round4_hashes = vec![b6_hash.clone(), b3_hash.clone()];
                 expected_round4_hashes.sort();
-                
-                assert_eq!(round4_saves[0].0, expected_round4_hashes[0], "Should save first block");
-                assert_eq!(round4_saves[1].0, expected_round4_hashes[1], "Should save second block");
-                
+
+                assert_eq!(
+                    round4_saves[0].0, expected_round4_hashes[0],
+                    "Should save first block"
+                );
+                assert_eq!(
+                    round4_saves[1].0, expected_round4_hashes[1],
+                    "Should save second block"
+                );
+
                 // === ROUND 5: Receive blocks b4 and b1 ===
-                mock.receive_block(&[b4, b1]).await.expect("Should receive b4 and b1");
-                
+                mock.receive_block(&[b4, b1])
+                    .await
+                    .expect("Should receive b4 and b1");
+
                 // All blocks should be requested
                 let mut round5_requests = Vec::new();
                 for _ in 0..1 {
@@ -1047,16 +1076,16 @@ mod tests {
                         None => panic!("Expected 1 round5 request but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut round5_requests);
                 let (_, _, _, _, _, _, _, hash2, _) = get_hashes();
                 let expected_round5 = vec![hash2];
-                
+
                 assert_eq!(
                     round5_requests, expected_round5,
                     "Dependencies should be requested (hash2)"
                 );
-                
+
                 // All blocks should be saved
                 let mut round5_saves = Vec::new();
                 for _ in 0..2 {
@@ -1065,18 +1094,24 @@ mod tests {
                         None => panic!("Expected 2 round5 saves but channel closed early"),
                     }
                 }
-                
+
                 // Sort saves by hash for consistent comparison
                 round5_saves.sort_by(|a, b| a.0.cmp(&b.0));
                 let mut expected_round5_hashes = vec![b4_hash.clone(), b1_hash.clone()];
                 expected_round5_hashes.sort();
-                
-                assert_eq!(round5_saves[0].0, expected_round5_hashes[0], "Should save first block");
-                assert_eq!(round5_saves[1].0, expected_round5_hashes[1], "Should save second block");
-                
+
+                assert_eq!(
+                    round5_saves[0].0, expected_round5_hashes[0],
+                    "Should save first block"
+                );
+                assert_eq!(
+                    round5_saves[1].0, expected_round5_hashes[1],
+                    "Should save second block"
+                );
+
                 // === ROUND 6: Receive block b2 ===
                 mock.receive_block(&[b2]).await.expect("Should receive b2");
-                
+
                 // All blocks should already be requested, no new requests
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -1092,17 +1127,14 @@ mod tests {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 // All blocks should be saved
                 let final_save = mock.next_save().await.expect("Should save b2");
                 assert_eq!(final_save.0, b2_hash, "Should save b2");
-                
+
                 // Nothing else should be saved
-                match tokio::time::timeout(
-                    std::time::Duration::from_millis(100),
-                    mock.next_save(),
-                )
-                .await
+                match tokio::time::timeout(std::time::Duration::from_millis(100), mock.next_save())
+                    .await
                 {
                     Ok(Some(unexpected_save)) => {
                         panic!("Unexpected additional save after b2: {:?}", unexpected_save)
@@ -1112,7 +1144,7 @@ mod tests {
                         // Timeout is expected - no additional saves should happen
                     }
                 }
-                
+
                 Ok(())
             },
         )
@@ -1124,9 +1156,9 @@ mod tests {
     #[tokio::test]
     async fn should_resend_request_after_timeout() {
         init_logger();
-        
+
         let (b9, _, _, _, _, _, _, _, _) = get_blocks();
-        
+
         dag_from_block(
             b9,
             true, // runProcessingStream = true - we need the stream to run for timeout testing
