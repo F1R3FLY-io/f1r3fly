@@ -1,5 +1,6 @@
 pub mod costacc;
 pub mod interpreter_util;
+pub mod registry_sig_gen;
 pub mod replay_failure;
 pub mod runtime_manager;
 pub mod system_deploy;
@@ -7,4 +8,3 @@ pub mod system_deploy_result;
 pub mod system_deploy_user_error;
 pub mod system_deploy_util;
 pub mod tools;
-pub mod registry_sig_gen;

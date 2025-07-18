@@ -15,9 +15,9 @@ use models::{
 };
 use prost::Message;
 
-use rholang::rust::interpreter::registry::registry::Registry;
 use super::tools::Tools;
 use rholang::rust::interpreter::pretty_printer::PrettyPrinter;
+use rholang::rust::interpreter::registry::registry::Registry;
 
 /// Helper wrapper providing hex string formatting for byte arrays.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -203,13 +203,17 @@ impl Args {
             4 => Self::new(
                 Some(argv[0].clone()),
                 Some(argv[1].parse().expect("timestamp")),
-                Some(PrivateKey::from_bytes(&hex::decode(&argv[2]).expect("hex private key"))),
+                Some(PrivateKey::from_bytes(
+                    &hex::decode(&argv[2]).expect("hex private key"),
+                )),
                 Some(hex::decode(&argv[3]).expect("unforgeable name")),
             ),
             3 => Self::new(
                 Some(argv[0].clone()),
                 Some(argv[1].parse().expect("timestamp")),
-                Some(PrivateKey::from_bytes(&hex::decode(&argv[2]).expect("hex private key"))),
+                Some(PrivateKey::from_bytes(
+                    &hex::decode(&argv[2]).expect("hex private key"),
+                )),
                 None,
             ),
             2 => Self::new(
@@ -281,4 +285,4 @@ impl RegistrySigGen {
             uri,
         }
     }
-} 
+}
