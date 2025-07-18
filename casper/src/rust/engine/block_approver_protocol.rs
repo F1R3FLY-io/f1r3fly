@@ -98,10 +98,7 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
 
     /// Corresponds to Scala `BlockApproverProtocol.getBlockApproval` / `getApproval` –
     /// signs candidate ApprovedBlockCandidate and creates `BlockApproval`.
-    fn get_block_approval(
-        &self,
-        candidate: &ApprovedBlockCandidate,
-    ) -> BlockApproval {
+    fn get_block_approval(&self, candidate: &ApprovedBlockCandidate) -> BlockApproval {
         let sig_data = Blake2b256::hash(candidate.clone().to_proto().encode_to_vec());
         let sig = self.validator_id.signature(&sig_data);
         BlockApproval {
@@ -161,18 +158,22 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
         };
 
         // Expected blessed contracts
-        let genesis_blessed_contracts = crate::rust::genesis::genesis::Genesis::default_blessed_terms_with_timestamp(
-            self.deploy_timestamp,
-            &pos_params,
-            &self.vaults,
-            i64::MAX,
-            shard_id,
-        );
+        let genesis_blessed_contracts =
+            crate::rust::genesis::genesis::Genesis::default_blessed_terms_with_timestamp(
+                self.deploy_timestamp,
+                &pos_params,
+                &self.vaults,
+                i64::MAX,
+                shard_id,
+            );
 
         let block_deploys: &Vec<ProcessedDeploy> = &block.body.deploys;
 
         if block_deploys.len() != genesis_blessed_contracts.len() {
-            return Err("Mismatch between number of candidate deploys and expected number of deploys.".to_string());
+            return Err(
+                "Mismatch between number of candidate deploys and expected number of deploys."
+                    .to_string(),
+            );
         }
 
         // Check deploys equality (order matters)
@@ -259,15 +260,12 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
                     packet,
                 };
 
-                self.transport
-                    .stream(peer, &blob)
-                    .await
-                    .map_err(|e| {
-                        CasperError::RuntimeError(format!(
-                            "Failed to stream BlockApproval to peer: {}",
-                            e
-                        ))
-                    })?;
+                self.transport.stream(peer, &blob).await.map_err(|e| {
+                    CasperError::RuntimeError(format!(
+                        "Failed to stream BlockApproval to peer: {}",
+                        e
+                    ))
+                })?;
 
                 info!(
                     "Approved genesis block candidate from {}. Approval sent in response.",
@@ -284,4 +282,4 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
 
         Ok(())
     }
-} 
+}
