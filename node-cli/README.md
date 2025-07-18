@@ -160,9 +160,14 @@ cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYV
 # Transfer and auto-propose a block
 cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 --propose true
 
+# Transfer with standard phlo limit (not recommended - may run out of gas)
+cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 --bigger-phlo false
+
 # Transfer to custom node
 cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 -H node.example.com -p 40412
 ```
+
+**Note**: The transfer command uses a high phlo limit by default (`--bigger-phlo true`) because transfer contracts require more computational resources than simple deployments. This helps prevent "out of phlogistons" errors.
 ## Node Inspection Commands
 
 The CLI provides several commands for inspecting and monitoring F1r3fly nodes using HTTP endpoints:
@@ -363,7 +368,7 @@ make bond-validator STAKE=25000000000000
 make network-health
 make network-health-custom CUSTOM_PORTS=60503,70503
 
-# REV transfer commands
+# REV transfer commands (uses high phlo limit by default)
 make transfer TO_ADDRESS=your_recipient_address AMOUNT=100
 make transfer TO_ADDRESS=your_recipient_address AMOUNT=100 PRIVATE_KEY=your_private_key PROPOSE=true
 ```
@@ -478,4 +483,5 @@ make transfer TO_ADDRESS=your_recipient_address AMOUNT=100 PRIVATE_KEY=your_priv
 - `--private-key <PRIVATE_KEY>`: Private key for signing the transfer (hex format)
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-p, --port <PORT>`: gRPC port number for deploy (default: 40412)
+- `-b, --bigger-phlo`: Use bigger phlo limit (default: true, recommended for transfers)
 - `--propose <PROPOSE>`: Also propose a block after transfer (default: false)

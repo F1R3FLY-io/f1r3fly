@@ -245,7 +245,7 @@ pub struct BlocksArgs {
     pub host: String,
 
     /// HTTP port number (not gRPC port)
-    #[arg(short, long, default_value_t = 40453)]
+    #[arg(short, long, default_value_t = 40403)]
     pub port: u16,
 
     /// Number of recent blocks to fetch (default: 5)
@@ -357,6 +357,10 @@ pub struct TransferArgs {
     /// gRPC port number for deploy
     #[arg(short, long, default_value_t = 40412)]
     pub port: u16,
+
+    /// Use bigger phlo limit (recommended for transfers)
+    #[arg(short, long, default_value_t = true)]
+    pub bigger_phlo: bool,
 
     /// Also propose a block after transfer
     #[arg(long, default_value_t = false, action = ArgAction::Set, value_parser = clap::value_parser!(bool))]

@@ -44,7 +44,7 @@ pub async fn blocks_command(args: &BlocksArgs) -> Result<(), Box<dyn std::error:
 
     if let Some(block_hash) = &args.block_hash {
         println!("🔍 Getting specific block: {}", block_hash);
-        let url = format!("http://{}:{}/block/{}", args.host, args.port, block_hash);
+        let url = format!("http://{}:{}/api/block/{}", args.host, args.port, block_hash);
 
         match client.get(&url).send().await {
             Ok(response) => {
@@ -73,7 +73,7 @@ pub async fn blocks_command(args: &BlocksArgs) -> Result<(), Box<dyn std::error:
             "🔍 Getting {} recent blocks from {}:{}",
             args.number, args.host, args.port
         );
-        let url = format!("http://{}:{}/blocks/{}", args.host, args.port, args.number);
+        let url = format!("http://{}:{}/api/blocks/{}", args.host, args.port, args.number);
 
         match client.get(&url).send().await {
             Ok(response) => {

@@ -33,3 +33,17 @@ At this point, you have stood up a shard with one bootstrap node, three validato
 
 1. In separate terminal, run validator4 node: `docker compose -f docker/validator4.yml up`.
 2. Wait until you see `Making a transition to Running state.`. In initial shard logs, you should now see 5 peers.
+
+////////////////
+
+1. Remove validator4 from wallets.txt '1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP'
+2. Proceed with first round of steps
+3. Check bonds
+4. Transfer 10000 rev from bootstrap to validator4 `cargo run -- transfer --to-address "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP" --amount 10000 --private-key 5f668a7ee96d944a4494cc947e4005e1
+72d7ab3461ee5538f1f2a45a835e9657` via validator1
+5. deploy to validator3 and 4
+6. propose via validator1
+7. Should see `("? Transfer successful:", 100000000000, "REV")`
+8. Check block is finalized
+9. Check balance: `cargo run -- wallet-balance --address "1111LAd2PWaHsw84gxarNx99YVK2aZhCThhrPsWTV7cs1BPcvHftP"`. Should see 10000
+10. Proceed with bonding steps
