@@ -65,9 +65,11 @@ impl<T: TransportLayer + Send + Sync + 'static> BlockApproverProtocol<T> {
         conf: Arc<RPConf>,
     ) -> Result<Self, CasperError> {
         if bonds.len() <= required_sigs as usize {
-            return Err(CasperError::RuntimeError(
-                "Required sigs must be smaller than the number of bonded validators".to_string(),
-            ));
+            return Err(CasperError::RuntimeError(format!(
+                "Required sigs ({}) must be smaller than the number of bonded validators ({})",
+                required_sigs,
+                bonds.len()
+            )));
         }
 
         let bonds_bytes: HashMap<Bytes, i64> = bonds
