@@ -1,3 +1,4 @@
+pub mod api;
 pub mod block_status;
 pub mod blocks;
 pub mod casper;
