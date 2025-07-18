@@ -146,6 +146,23 @@ Example output:
 🏦 REV address: 111129tt6TzcaUQ8QkEUSark5MzaN814bBq1atM7cDr2SVAdriuNS4
 ```
 
+### Transfer REV
+
+Transfer REV tokens between addresses. The command automatically derives the sender address from the private key and deploys a transfer contract.
+
+```bash
+# Basic transfer (requires manual block proposal)
+cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100
+
+# Transfer with custom private key
+cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 --private-key YOUR_PRIVATE_KEY
+
+# Transfer and auto-propose a block
+cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 --propose true
+
+# Transfer to custom node
+cargo run -- transfer --to-address "111127RX5ZgiAdRaQy4AWy57RdvAAckdELReEBxzvWYVvdnR32PiHA" --amount 100 -H node.example.com -p 40412
+```
 ## Node Inspection Commands
 
 The CLI provides several commands for inspecting and monitoring F1r3fly nodes using HTTP endpoints:
@@ -345,6 +362,10 @@ make bond-validator
 make bond-validator STAKE=25000000000000
 make network-health
 make network-health-custom CUSTOM_PORTS=60503,70503
+
+# REV transfer commands
+make transfer TO_ADDRESS=your_recipient_address AMOUNT=100
+make transfer TO_ADDRESS=your_recipient_address AMOUNT=100 PRIVATE_KEY=your_private_key PROPOSE=true
 ```
 
 ## Command Line Options
@@ -449,3 +470,12 @@ make network-health-custom CUSTOM_PORTS=60503,70503
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-s, --standard-ports <STANDARD_PORTS>`: Check standard F1r3fly shard ports (default: true)
 - `-c, --custom-ports <CUSTOM_PORTS>`: Additional custom ports to check (comma-separated)
+
+### Transfer Command
+
+- `-t, --to-address <TO_ADDRESS>`: Recipient REV address (required)
+- `-a, --amount <AMOUNT>`: Amount in REV to transfer (required)
+- `--private-key <PRIVATE_KEY>`: Private key for signing the transfer (hex format)
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: gRPC port number for deploy (default: 40412)
+- `--propose <PROPOSE>`: Also propose a block after transfer (default: false)

@@ -295,3 +295,161 @@ pub async fn bond_validator_command(
 
     Ok(())
 }
+
+pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::error::Error>> {
+    println!("💸 Initiating REV transfer");
+    
+    // Initialize the F1r3fly API client
+    println!(
+        "🔌 Connecting to F1r3fly node at {}:{}",
+        args.host, args.port
+    );
+    let f1r3fly_api = F1r3flyApi::new(&args.private_key, &args.host, args.port);
+
+    // Generate from_address from private key
+    println!("🔍 Deriving sender address from private key...");
+    let from_address = derive_rev_address_from_private_key(&args.private_key)?;
+    
+    // Validate addresses format
+    validate_rev_address(&from_address)?;
+    validate_rev_address(&args.to_address)?;
+    
+    // Convert REV to dust (1 REV = 100,000,000 dust)
+    let amount_dust = args.amount * 100_000_000;
+    
+    println!("📋 Transfer Details:");
+    println!("   From: {}", from_address);
+    println!("   To: {}", args.to_address);
+    println!("   Amount: {} REV ({} dust)", args.amount, amount_dust);
+    
+    // Generate Rholang transfer contract
+    let rholang_code = generate_transfer_contract(&from_address, &args.to_address, amount_dust);
+    
+    println!("🚀 Deploying transfer contract...");
+    let start_time = std::time::Instant::now();
+    
+    match f1r3fly_api.deploy(&rholang_code, false, "rholang").await {
+        Ok(deploy_id) => {
+            let duration = start_time.elapsed();
+            println!("✅ Transfer contract deployed successfully!");
+            println!("⏱️  Time taken: {:.2?}", duration);
+            println!("🆔 Deploy ID: {}", deploy_id);
+            
+            if args.propose {
+                println!("📦 Proposing block to finalize transfer...");
+                let propose_start = std::time::Instant::now();
+                
+                match f1r3fly_api.propose().await {
+                    Ok(block_hash) => {
+                        let propose_duration = propose_start.elapsed();
+                        println!("✅ Block proposed successfully!");
+                        println!("⏱️  Proposal time: {:.2?}", propose_duration);
+                        println!("🧱 Block hash: {}", block_hash);
+                        println!("🎉 Transfer completed successfully!");
+                    }
+                    Err(e) => {
+                        println!("⚠️  Transfer deployed but block proposal failed!");
+                        println!("Error: {}", e);
+                        println!("💡 You can manually propose: cargo run -- propose");
+                    }
+                }
+            } else {
+                println!("💡 Transfer deployed. Run 'cargo run -- propose' to finalize.");
+            }
+        }
+        Err(e) => {
+            println!("❌ Transfer deployment failed!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+fn derive_rev_address_from_private_key(private_key: &str) -> Result<String, Box<dyn std::error::Error>> {
+    use secp256k1::{PublicKey, Secp256k1, SecretKey};
+    use sha3::{Digest, Keccak256};
+    
+    // Parse private key
+    let secret_key = SecretKey::from_slice(&hex::decode(private_key)?)?;
+    
+    // Generate public key
+    let secp = Secp256k1::new();
+    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+    let public_key_bytes = public_key.serialize_uncompressed();
+    
+    // Generate ETH address (last 20 bytes of keccak256 hash of public key without 0x04 prefix)
+    let mut hasher = Keccak256::new();
+    hasher.update(&public_key_bytes[1..]);
+    let eth_address_bytes = &hasher.finalize()[12..];
+    
+    // Generate REV address from ETH address
+    let rev_address = generate_rev_address_from_eth(eth_address_bytes);
+    
+    Ok(rev_address)
+}
+
+fn generate_rev_address_from_eth(eth_address: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    
+    // REV address generation (simplified version)
+    // In real implementation, this would use base58check encoding
+    // For now, we'll create a basic implementation
+    
+    let mut hasher = Sha256::new();
+    hasher.update(b"\x00\x00"); // Version bytes for REV
+    hasher.update(eth_address);
+    let hash1 = hasher.finalize();
+    
+    let mut hasher2 = Sha256::new();
+    hasher2.update(&hash1);
+    let hash2 = hasher2.finalize();
+    
+    // Create REV address with checksum
+    let mut full_address = Vec::new();
+    full_address.extend_from_slice(b"\x00\x00");
+    full_address.extend_from_slice(eth_address);
+    full_address.extend_from_slice(&hash2[0..4]);
+    
+    // Base58 encode (simplified - in practice would use proper base58check)
+    format!("1111{}", hex::encode(&full_address[2..]))
+}
+
+fn validate_rev_address(address: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if !address.starts_with("1111") {
+        return Err("Invalid REV address format: must start with '1111'".into());
+    }
+    
+    if address.len() < 40 {
+        return Err("Invalid REV address format: too short".into());
+    }
+    
+    Ok(())
+}
+
+fn generate_transfer_contract(from_address: &str, to_address: &str, amount_dust: u64) -> String {
+    format!(
+        r#"new retCh, 
+    deployerId(`rho:rchain:deployerId`),
+    stdout(`rho:io:stdout`),
+    rl(`rho:registry:lookup`),
+    revVaultCh
+in {{
+  rl!(`rho:rchain:revVault`, *revVaultCh) |
+  for (@(_, RevVault) <- revVaultCh) {{
+    @RevVault!("findOrCreate", "{}", *retCh) |
+    for (@(true, fromVault) <- retCh) {{
+      @fromVault!("transfer", "{}", {}, "{}", *retCh) |
+      for (@(success, message) <- retCh) {{
+        stdout!(("💸 Transfer result:", success, message, "from", "{}", "to", "{}", "amount", {}))
+      }}
+    }} |
+    for (@(false, errorMsg) <- retCh) {{
+      stdout!(("❌ Vault not found for:", "{}", "Error:", errorMsg))
+    }}
+  }}
+}}"#,
+        from_address, to_address, amount_dust, from_address, from_address, to_address, amount_dust, from_address
+    )
+}

@@ -411,12 +411,13 @@ pub async fn network_health_command(
     let mut ports_to_check = Vec::new();
 
     if args.standard_ports {
-        // Standard F1r3fly shard ports from the documentation
+        // Standard F1r3fly shard ports from the docker configuration
         ports_to_check.extend_from_slice(&[
             (40403, "Bootstrap"),
-            (50403, "Validator1"),
-            (60403, "Validator2"),
-            (7043, "Observer"),
+            (40413, "Validator1"),
+            (40423, "Validator2"),
+            (40433, "Validator3"),
+            (40453, "Observer"),
         ]);
     }
 
@@ -502,15 +503,6 @@ pub async fn network_health_command(
         println!("❌ No healthy nodes found - check if network is running");
     }
 
-    println!("\n💡 Tips:");
-    println!(
-        "- For a {}-node network, each node should have {} peers",
-        total_nodes,
-        total_nodes - 1
-    );
-    println!("- Check bonds: cargo run -- bonds");
-    println!("- Check active validators: cargo run -- active-validators");
-
     Ok(())
 }
 
@@ -539,8 +531,48 @@ pub async fn last_finalized_block_command(
 
                 println!("✅ Last finalized block retrieved successfully!");
                 println!("⏱️  Time taken: {:.2?}", duration);
-                println!("🧱 Last Finalized Block:");
-                println!("{}", serde_json::to_string_pretty(&block_json)?);
+                
+                // Extract key information from blockInfo
+                let block_info = block_json.get("blockInfo");
+                
+                let block_hash = block_info
+                    .and_then(|info| info.get("blockHash"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                
+                let block_number = block_info
+                    .and_then(|info| info.get("blockNumber"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                
+                let timestamp = block_info
+                    .and_then(|info| info.get("timestamp"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                
+                // Get deploy count from blockInfo (it's already calculated)
+                let deploy_count = block_info
+                    .and_then(|info| info.get("deployCount"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                
+                let shard_id = block_info
+                    .and_then(|info| info.get("shardId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                
+                let fault_tolerance = block_info
+                    .and_then(|info| info.get("faultTolerance"))
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+
+                println!("🧱 Last Finalized Block Summary:");
+                println!("   📋 Block Number: {}", block_number);
+                println!("   🔗 Block Hash: {}", block_hash);
+                println!("   ⏰ Timestamp: {}", timestamp);
+                println!("   📦 Deploy Count: {}", deploy_count);
+                println!("   🔧 Shard ID: {}", shard_id);
+                println!("   ⚖️  Fault Tolerance: {:.6}", fault_tolerance);
             } else {
                 println!(
                     "❌ Failed to get last finalized block: HTTP {}",

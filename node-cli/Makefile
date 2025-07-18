@@ -132,6 +132,27 @@ network-health-custom:
 	@echo "Usage: make network-health-custom CUSTOM_PORTS=<port1,port2,port3>"
 	@[ "$(CUSTOM_PORTS)" ] && cargo run -- network-health --custom-ports $(CUSTOM_PORTS) || echo "Please provide custom ports: make network-health-custom CUSTOM_PORTS=<port1,port2,port3>"
 
+# Transfer REV between addresses
+transfer:
+	@echo "Usage: make transfer TO_ADDRESS=<address> AMOUNT=<amount> [PRIVATE_KEY=<key>] [PROPOSE=<true/false>]"
+	@if [ "$(TO_ADDRESS)" ] && [ "$(AMOUNT)" ]; then \
+		if [ "$(PRIVATE_KEY)" ]; then \
+			if [ "$(PROPOSE)" ]; then \
+				cargo run -- transfer --to-address $(TO_ADDRESS) --amount $(AMOUNT) --private-key $(PRIVATE_KEY) --propose $(PROPOSE); \
+			else \
+				cargo run -- transfer --to-address $(TO_ADDRESS) --amount $(AMOUNT) --private-key $(PRIVATE_KEY); \
+			fi; \
+		else \
+			if [ "$(PROPOSE)" ]; then \
+				cargo run -- transfer --to-address $(TO_ADDRESS) --amount $(AMOUNT) --propose $(PROPOSE); \
+			else \
+				cargo run -- transfer --to-address $(TO_ADDRESS) --amount $(AMOUNT); \
+			fi; \
+		fi; \
+	else \
+		echo "Please provide TO_ADDRESS and AMOUNT: make transfer TO_ADDRESS=<address> AMOUNT=<amount>"; \
+	fi
+
 # Help message
 help:
 	@echo "F1r3fly Node CLI Makefile"
@@ -163,5 +184,8 @@ help:
 	@echo "  make bond-validator [STAKE=<amount>] - Bond a new validator to the network (deploy only)"
 	@echo "  make network-health - Check health across standard F1r3fly shard ports"
 	@echo "  make network-health-custom CUSTOM_PORTS=<port1,port2> - Check health on custom ports"
+	@echo ""
+	@echo "REV transfer commands:"
+	@echo "  make transfer TO_ADDRESS=<address> AMOUNT=<amount> [PRIVATE_KEY=<key>] [PROPOSE=<true/false>] - Transfer REV between addresses"
 
-.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block generate-key generate-key-pair status blocks bonds active-validators wallet-balance bond-status metrics last-finalized-block bond-validator network-health network-health-custom help 
+.PHONY: build deploy deploy-big propose full-deploy full-deploy-big check-finalized exploratory-deploy exploratory-deploy-at-block generate-key generate-key-pair status blocks bonds active-validators wallet-balance bond-status metrics last-finalized-block bond-validator network-health network-health-custom transfer help 

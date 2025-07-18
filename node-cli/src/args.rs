@@ -64,6 +64,9 @@ pub enum Commands {
 
     /// Get the last finalized block
     LastFinalizedBlock(HttpArgs),
+
+    /// Transfer REV tokens between addresses
+    Transfer(TransferArgs),
 }
 
 /// Arguments for deploy and full-deploy commands
@@ -317,7 +320,7 @@ pub struct BondValidatorArgs {
 #[derive(Parser)]
 pub struct NetworkHealthArgs {
     /// Check standard F1r3fly shard ports (bootstrap, validator1, validator2, observer)
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = true, action = ArgAction::Set, value_parser = clap::value_parser!(bool))]
     pub standard_ports: bool,
 
     /// Additional custom ports to check (comma-separated, e.g. "60503,70503")
@@ -327,4 +330,35 @@ pub struct NetworkHealthArgs {
     /// Host address
     #[arg(short = 'H', long, default_value = "localhost")]
     pub host: String,
+}
+
+/// Arguments for transfer command
+#[derive(Parser)]
+pub struct TransferArgs {
+    /// Recipient REV address
+    #[arg(short, long)]
+    pub to_address: String,
+
+    /// Amount in REV to transfer
+    #[arg(short, long)]
+    pub amount: u64,
+
+    /// Private key for signing the transfer (hex format)
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    pub private_key: String,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    pub host: String,
+
+    /// gRPC port number for deploy
+    #[arg(short, long, default_value_t = 40412)]
+    pub port: u16,
+
+    /// Also propose a block after transfer
+    #[arg(long, default_value_t = false, action = ArgAction::Set, value_parser = clap::value_parser!(bool))]
+    pub propose: bool,
 }
