@@ -97,14 +97,11 @@ impl GenesisBuilder {
     /// but using a simplified approach for testing to avoid heavy infrastructure
     pub fn build_test_genesis(validator_key_pairs: Vec<(PrivateKey, PublicKey)>) -> BlockMessage {
         // Extract validator public keys (equivalent to validatorKeyPairs.map(_._2))
-        let validator_pks: Vec<PublicKey> = validator_key_pairs
-            .iter()
-            .map(|(_, pk)| pk.clone())
-            .collect();
-
+        let validator_pks: Vec<PublicKey> = validator_key_pairs.iter().map(|(_, pk)| pk.clone()).collect();
+        
         // Create bonds using GenesisBuilder.createBonds logic (equivalent to createBonds(validatorKeyPairs.map(_._2)))
         let bonds_map = Self::create_bonds(validator_pks);
-
+        
         // Convert to the Bond format used in genesis block
         let bonds: Vec<Bond> = bonds_map
             .into_iter()
