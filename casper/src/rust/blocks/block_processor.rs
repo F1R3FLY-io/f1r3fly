@@ -133,14 +133,14 @@ impl<T: TransportLayer + Send + Sync> BlockProcessor<T> {
         // CasperSnapshot cannot be constructed
         snapshot_opt: Option<CasperSnapshot>,
     ) -> Result<ValidBlockProcessing, CasperError> {
-        let snapshot = match snapshot_opt {
+        let mut snapshot = match snapshot_opt {
             Some(snapshot) => snapshot,
             None => self.dependencies.get_casper_state_snapshot(casper).await?,
         };
 
         let status = self
             .dependencies
-            .validate_block(casper, &snapshot, block)
+            .validate_block(casper, &mut snapshot, block)
             .await?;
 
         let _ = match &status {
@@ -422,10 +422,10 @@ impl<T: TransportLayer + Send + Sync> BlockProcessorDependencies<T> {
     pub async fn validate_block(
         &self,
         casper: &mut impl Casper,
-        snapshot: &CasperSnapshot,
+        snapshot: &mut CasperSnapshot,
         block: &BlockMessage,
     ) -> Result<ValidBlockProcessing, CasperError> {
-        casper.validate(block, snapshot)
+        casper.validate(block, snapshot).await
     }
 
     /// Equivalent to Scala's: ackProcessed = (b: BlockMessage) => BlockRetriever[F].ackInCasper(b.blockHash)
