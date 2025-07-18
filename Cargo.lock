@@ -528,6 +528,7 @@ dependencies = [
  "dashmap 6.1.0",
  "env_logger",
  "futures",
+ "graphz",
  "hex",
  "itertools 0.13.0",
  "lazy_static",
