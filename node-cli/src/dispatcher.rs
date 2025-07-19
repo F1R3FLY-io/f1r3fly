@@ -52,6 +52,9 @@ impl Dispatcher {
             Commands::LastFinalizedBlock(args) => last_finalized_block_command(args)
                 .await
                 .map_err(NodeCliError::from),
+            Commands::ShowMainChain(args) => show_main_chain_command(args)
+                .await
+                .map_err(NodeCliError::from),
             Commands::Transfer(args) => transfer_command(args)
                 .await
                 .map_err(NodeCliError::from),
@@ -118,6 +121,7 @@ impl Dispatcher {
             Commands::BondValidator(_) => "bond-validator",
             Commands::NetworkHealth(_) => "network-health",
             Commands::LastFinalizedBlock(_) => "last-finalized-block",
+            Commands::ShowMainChain(_) => "show-main-chain",
             Commands::Transfer(_) => "transfer",
         }
     }

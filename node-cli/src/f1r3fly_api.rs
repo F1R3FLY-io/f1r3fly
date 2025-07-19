@@ -5,7 +5,7 @@ use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeplo
 use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
 use models::casper::v1::propose_response::Message as ProposeResponseMessage;
 use models::casper::v1::propose_service_client::ProposeServiceClient;
-use models::casper::{DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, ProposeQuery};
+use models::casper::{BlocksQuery, DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, LightBlockInfo, ProposeQuery};
 use models::rhoapi::Par;
 use models::ByteString;
 use prost::Message;
@@ -301,6 +301,52 @@ impl<'a> F1r3flyApi<'a> {
             // Wait before retrying
             sleep(retry_delay).await;
         }
+    }
+
+    /// Gets blocks in the main chain (finalized consensus path)
+    ///
+    /// # Arguments
+    ///
+    /// * `depth` - Number of blocks to retrieve from the main chain
+    ///
+    /// # Returns
+    ///
+    /// A vector of LightBlockInfo representing blocks in the main chain
+    pub async fn show_main_chain(
+        &self,
+        depth: u32,
+    ) -> Result<Vec<LightBlockInfo>, Box<dyn std::error::Error>> {
+        use models::casper::v1::deploy_service_client::DeployServiceClient;
+        use models::casper::v1::block_info_response::Message;
+
+        // Connect to the F1r3fly node
+        let mut deploy_service_client =
+            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
+
+        // Create the query
+        let query = BlocksQuery {
+            depth: depth as i32,
+        };
+
+        // Send the query and collect streaming response
+        let mut stream = deploy_service_client.show_main_chain(query).await?.into_inner();
+
+        let mut blocks = Vec::new();
+        while let Some(response) = stream.message().await? {
+            if let Some(message) = response.message {
+                match message {
+                    Message::Error(service_error) => {
+                        return Err(format!("gRPC Error: {}", service_error.messages.join("; ")).into());
+                    }
+                    Message::BlockInfo(block_info) => {
+                        blocks.push(block_info);
+                    }
+                }
+            }
+        }
+
+        Ok(blocks)
     }
 
     /// Builds and signs a deploy message

@@ -65,6 +65,9 @@ pub enum Commands {
     /// Get the last finalized block
     LastFinalizedBlock(HttpArgs),
 
+    /// Get blocks in the main chain (finalized consensus path)
+    ShowMainChain(ShowMainChainArgs),
+
     /// Transfer REV tokens between addresses
     Transfer(TransferArgs),
 }
@@ -255,6 +258,29 @@ pub struct BlocksArgs {
     /// Specific block hash to fetch (optional)
     #[arg(short, long)]
     pub block_hash: Option<String>,
+}
+
+/// Arguments for show-main-chain command
+#[derive(Parser)]
+pub struct ShowMainChainArgs {
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    pub host: String,
+
+    /// gRPC port number
+    #[arg(short, long, default_value_t = 40402)]
+    pub port: u16,
+
+    /// Number of blocks to fetch from main chain (default: 10)
+    #[arg(short, long, default_value_t = 10)]
+    pub depth: u32,
+
+    /// Private key in hex format (required for gRPC)
+    #[arg(
+        long,
+        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+    )]
+    pub private_key: String,
 }
 
 /// Arguments for wallet-balance command

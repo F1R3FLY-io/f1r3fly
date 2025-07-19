@@ -140,12 +140,6 @@ cargo run -- generate-rev-address --private-key YOUR_PRIVATE_KEY
 cargo run -- generate-rev-address --public-key YOUR_PUBLIC_KEY
 ```
 
-Example output:
-```
-🔑 Public key: 04a936f4e0cda4688ec61fa17cf3cbaed6a450ac8e633490596587ce22b78fe6621861d4fa442f7c9f8070acb846f40d8844dca94fda398722d6a4664041a7b39b
-🏦 REV address: 111129tt6TzcaUQ8QkEUSark5MzaN814bBq1atM7cDr2SVAdriuNS4
-```
-
 ### Transfer REV
 
 Transfer REV tokens between addresses. The command automatically derives the sender address from the private key and deploys a transfer contract.
@@ -272,6 +266,24 @@ cargo run -- last-finalized-block
 
 # Get last finalized block from custom node
 cargo run -- last-finalized-block -H node.example.com -p 40403
+```
+
+### Show Main Chain
+
+Get blocks from the main chain (finalized consensus path) in sequential order.
+
+```bash
+# Get last 10 blocks from main chain (default depth)
+cargo run -- show-main-chain
+
+# Get specific number of blocks from main chain
+cargo run -- show-main-chain -d 5
+
+# Get main chain blocks from custom node
+cargo run -- show-main-chain -H node.example.com -p 40402 -d 20
+
+# Use custom private key for authentication
+cargo run -- show-main-chain --private-key YOUR_PRIVATE_KEY
 ```
 
 ## Dynamic Validator Addition Commands
@@ -461,6 +473,13 @@ make transfer TO_ADDRESS=your_recipient_address AMOUNT=100 PRIVATE_KEY=your_priv
 
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-p, --port <PORT>`: HTTP port number (default: 40403)
+
+### Show-Main-Chain Command
+
+- `-H, --host <HOST>`: Host address (default: "localhost")
+- `-p, --port <PORT>`: gRPC port number (default: 40402)
+- `-d, --depth <DEPTH>`: Number of blocks to fetch from main chain (default: 10)
+- `--private-key <PRIVATE_KEY>`: Private key in hex format (required for gRPC)
 
 ### Bond-Validator Command
 

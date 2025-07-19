@@ -590,3 +590,59 @@ pub async fn last_finalized_block_command(
 
     Ok(())
 }
+
+pub async fn show_main_chain_command(
+    args: &ShowMainChainArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "🔗 Getting main chain blocks from {}:{}",
+        args.host, args.port
+    );
+    println!("📊 Depth: {} blocks", args.depth);
+
+    // Initialize the F1r3fly API client
+    let f1r3fly_api = F1r3flyApi::new(&args.private_key, &args.host, args.port);
+
+    let start_time = Instant::now();
+
+    match f1r3fly_api.show_main_chain(args.depth).await {
+        Ok(blocks) => {
+            let duration = start_time.elapsed();
+            println!("✅ Main chain blocks retrieved successfully!");
+            println!("⏱️  Time taken: {:.2?}", duration);
+            println!("📋 Found {} blocks in main chain", blocks.len());
+            println!();
+
+            if blocks.is_empty() {
+                println!("🔍 No blocks found in main chain");
+            } else {
+                println!("🧱 Main Chain Blocks (finalized consensus path):");
+                for (index, block) in blocks.iter().enumerate() {
+                    println!("📦 Block {} (#{}):", index + 1, block.block_number);
+                    println!("   🔗 Hash: {}", block.block_hash);
+                    let sender_display = if block.sender.len() >= 16 {
+                        format!("{}...", &block.sender[..16])
+                    } else if block.sender.is_empty() {
+                        "(genesis)".to_string()
+                    } else {
+                        block.sender.clone()
+                    };
+                    println!("   👤 Sender: {}", sender_display);
+                    println!("   ⏰ Timestamp: {}", block.timestamp);
+                    println!("   📦 Deploy Count: {}", block.deploy_count);
+                    println!("   ⚖️  Fault Tolerance: {:.6}", block.fault_tolerance);
+                    if index < blocks.len() - 1 {
+                        println!("   ⬇️");
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("❌ Failed to get main chain blocks!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
