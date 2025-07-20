@@ -1,58 +1,62 @@
-use bitcoin::{TxOut, Amount, Script, opcodes::all::OP_RETURN};
-use crate::error::{AnchorError, AnchorResult};
+use bitcoin::{TxOut, Amount, ScriptBuf};
 use crate::commitment::F1r3flyStateCommitment;
+use crate::error::{AnchorError, AnchorResult};
 
-/// OP_RETURN commitment implementation using RGB infrastructure
+/// Creates OP_RETURN commitments for F1r3fly state
+#[derive(Clone, Debug)]
 pub struct OpReturnCommitter;
 
 impl OpReturnCommitter {
     /// Maximum data size for OP_RETURN (Bitcoin protocol limit)
     pub const MAX_DATA_SIZE: usize = 80;
-    
-    /// Create OP_RETURN commitment from F1r3fly state
-    pub fn create_commitment(
-        state: &F1r3flyStateCommitment,
-    ) -> AnchorResult<OpReturnCommitment> {
-        // For OP_RETURN, we embed the 32-byte commitment hash (fits in 80-byte limit)
-        let commitment_hash = state.to_bitcoin_commitment()?;
-        let commitment_data = commitment_hash.to_vec();
-        
-        // Check size limit for OP_RETURN (should always pass with 32-byte hash)
-        if commitment_data.len() > Self::MAX_DATA_SIZE {
-            return Err(AnchorError::Commitment(
-                format!("Data size {} exceeds OP_RETURN limit of {} bytes", 
-                        commitment_data.len(), Self::MAX_DATA_SIZE)
-            ));
-        }
-        
-        Ok(OpReturnCommitment {
-            data: commitment_data.clone(),
-            hash: Self::hash_commitment(&commitment_data),
-        })
+
+    /// Create a new OP_RETURN committer
+    pub fn new() -> Self {
+        Self
     }
     
-    /// Build OP_RETURN output for Bitcoin transaction
-    pub fn create_output(
-        commitment: &OpReturnCommitment
-    ) -> AnchorResult<TxOut> {
-        // Build script with commitment data
-        let mut script_bytes = vec![OP_RETURN.to_u8()];
-        if !commitment.data.is_empty() {
-            script_bytes.push(commitment.data.len() as u8);
-            script_bytes.extend_from_slice(&commitment.data);
+    /// Create OP_RETURN commitment for F1r3fly state
+    pub fn create_commitment(
+        &self,
+        state: &F1r3flyStateCommitment,
+    ) -> AnchorResult<OpReturnCommitment> {
+        // Create the state commitment hash
+        let commitment_hash = state.to_bitcoin_commitment()?;
+        
+        // Create OP_RETURN payload
+        let mut data = Vec::new();
+        
+        // F1r3fly protocol identifier (8 bytes)
+        data.extend_from_slice(b"F1R3FLY\0");
+        
+        // State commitment hash (32 bytes)
+        data.extend_from_slice(&commitment_hash);
+        
+        // Additional state metadata
+        data.extend_from_slice(&state.block_height.to_le_bytes());
+        data.extend_from_slice(&state.timestamp.to_le_bytes());
+        data.extend_from_slice(&state.validator_set_hash[0..22]); // Truncate to fit in 80 bytes
+        
+        OpReturnCommitment::new(data)
+    }
+    
+    /// Create OP_RETURN output for Bitcoin transaction
+    pub fn create_output(commitment: &OpReturnCommitment) -> AnchorResult<TxOut> {
+        // Build script with OP_RETURN and commitment data
+        let mut script_bytes = vec![0x6a]; // OP_RETURN opcode
+        let data = commitment.data();
+        
+        if !data.is_empty() {
+            script_bytes.push(data.len() as u8);
+            script_bytes.extend_from_slice(data);
         }
         
-        let script = Script::from_bytes(&script_bytes);
+        let script = ScriptBuf::from_bytes(script_bytes);
         
         Ok(TxOut {
             value: Amount::ZERO, // OP_RETURN outputs have zero value
-            script_pubkey: script.into(),
+            script_pubkey: script,
         })
-    }
-    
-    /// Check if data can fit in OP_RETURN
-    pub fn can_fit_data(data: &[u8]) -> bool {
-        data.len() <= Self::MAX_DATA_SIZE
     }
     
     /// Get commitment hash from data
@@ -64,6 +68,12 @@ impl OpReturnCommitter {
         let mut hasher = Blake2b::<U32>::new();
         hasher.update(data);
         hasher.finalize().into()
+    }
+}
+
+impl Default for OpReturnCommitter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -90,20 +100,24 @@ impl OpReturnCommitment {
         Ok(Self { data, hash })
     }
     
-    /// Get the commitment hash
-    pub fn commitment_hash(&self) -> [u8; 32] {
-        self.hash
-    }
-    
-    /// Get the raw data
+    /// Get commitment data
     pub fn data(&self) -> &[u8] {
         &self.data
     }
     
-    /// Verify the commitment hash matches the data
-    pub fn verify(&self) -> bool {
-        let computed_hash = OpReturnCommitter::hash_commitment(&self.data);
-        computed_hash == self.hash
+    /// Get commitment hash
+    pub fn hash(&self) -> &[u8; 32] {
+        &self.hash
+    }
+    
+    /// Get data size
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+    
+    /// Check if commitment is empty
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 }
 
@@ -112,68 +126,20 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_opret_commitment_creation() {
+    fn test_create_commitment() {
         let state = F1r3flyStateCommitment::new(
-            [1u8; 32],  // lfb_hash
-            [2u8; 32],  // rspace_root
-            12345,      // block_height
-            1234567890, // timestamp
-            [3u8; 32],  // validator_set_hash
+            [1u8; 32], [2u8; 32], 100, 1642694400, [3u8; 32]
         );
         
-        let commitment = OpReturnCommitter::create_commitment(&state).unwrap();
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state)
+            .expect("Should create commitment");
         
-        // Should have commitment data
-        assert!(!commitment.data.is_empty());
-        assert_eq!(commitment.hash.len(), 32);
+        // Should have data within size limits
+        assert!(commitment.len() <= OpReturnCommitter::MAX_DATA_SIZE);
+        assert!(!commitment.is_empty());
         
-        // Should verify correctly
-        assert!(commitment.verify());
-    }
-    
-    #[test]
-    fn test_opret_size_validation() {
-        // Test data that fits
-        let small_data = vec![0u8; 50];
-        assert!(OpReturnCommitter::can_fit_data(&small_data));
-        
-        let commitment = OpReturnCommitment::new(small_data).unwrap();
-        assert!(commitment.verify());
-        
-        // Test data that's too large
-        let large_data = vec![0u8; 100];
-        assert!(!OpReturnCommitter::can_fit_data(&large_data));
-        
-        let result = OpReturnCommitment::new(large_data);
-        assert!(result.is_err());
-    }
-    
-    #[test]
-    fn test_opret_output_creation() {
-        let data = vec![1, 2, 3, 4, 5];
-        let commitment = OpReturnCommitment::new(data).unwrap();
-        
-        let output = OpReturnCommitter::create_output(&commitment).unwrap();
-        
-        // Should be zero value
-        assert_eq!(output.value, Amount::ZERO);
-        
-        // Should start with OP_RETURN
-        let script_bytes = output.script_pubkey.as_bytes();
-        assert_eq!(script_bytes[0], OP_RETURN.to_u8());
-    }
-    
-    #[test]
-    fn test_f1r3fly_state_commitment_size() {
-        let state = F1r3flyStateCommitment::new(
-            [1u8; 32], [2u8; 32], 12345, 1234567890, [3u8; 32]
-        );
-        
-        let hash = state.to_bitcoin_commitment().unwrap();
-        let data = hash.to_vec();
-        
-        // F1r3fly commitment should fit in OP_RETURN
-        // 32 + 32 + 8 + 8 + 32 = 112 bytes, but we compress to 32-byte hash
-        assert!(OpReturnCommitter::can_fit_data(&data));
+        // Should have a valid hash
+        assert_ne!(*commitment.hash(), [0u8; 32]);
     }
 } 

@@ -2,6 +2,9 @@ use blake2::{Blake2b, Digest};
 use blake2::digest::consts::U32;
 use std::fmt;
 
+// RGB MPC integration
+use commit_verify::mpc::ProtocolId;
+
 /// F1r3fly Protocol ID for RGB MPC tree
 /// 
 /// This 32-byte identifier uniquely identifies the F1r3fly protocol
@@ -33,6 +36,11 @@ impl F1r3flyProtocol {
         F1R3FLY_PROTOCOL_ID
     }
     
+    /// Get the RGB protocol ID for MPC integration
+    pub fn rgb_protocol_id(&self) -> ProtocolId {
+        ProtocolId::from(F1R3FLY_PROTOCOL_ID)
+    }
+    
     /// Get the protocol name
     pub fn protocol_name(&self) -> &'static str {
         "F1r3fly RSpace Anchor Protocol"
@@ -54,6 +62,11 @@ impl F1r3flyProtocol {
         id.copy_from_slice(&result[..32]);
         id
     }
+    
+    /// Create RGB MPC message from F1r3fly state commitment
+    pub fn create_mpc_message(&self, commitment: &[u8; 32]) -> commit_verify::mpc::Message {
+        commit_verify::mpc::Message::from(*commitment)
+    }
 }
 
 impl Default for F1r3flyProtocol {
@@ -68,18 +81,12 @@ impl fmt::Display for F1r3flyProtocol {
     }
 }
 
-// TODO: Uncomment when RGB compilation bug is fixed
-// 
-// use rgb_std::MpcProtocol;
-// use commit_verify::CommitVerify;
-// 
-// impl MpcProtocol for F1r3flyProtocol {
-//     const PROTOCOL_ID: [u8; 32] = F1R3FLY_PROTOCOL_ID;
-//     
-//     fn protocol_id(&self) -> [u8; 32] {
-//         Self::PROTOCOL_ID
-//     }
-// }
+// RGB MPC Protocol Integration - ACTIVATED
+impl From<F1r3flyProtocol> for ProtocolId {
+    fn from(_protocol: F1r3flyProtocol) -> Self {
+        ProtocolId::from(F1R3FLY_PROTOCOL_ID)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -103,5 +110,24 @@ mod tests {
     fn test_protocol_display() {
         let protocol = F1r3flyProtocol::new();
         assert_eq!(protocol.to_string(), "F1r3fly RSpace Anchor Protocol v1");
+    }
+    
+    #[test]
+    fn test_rgb_protocol_id_conversion() {
+        let protocol = F1r3flyProtocol::new();
+        let rgb_id = protocol.rgb_protocol_id();
+        assert_eq!(rgb_id.to_byte_array(), F1R3FLY_PROTOCOL_ID);
+        
+        // Test conversion trait
+        let protocol_id: ProtocolId = protocol.into();
+        assert_eq!(protocol_id, rgb_id);
+    }
+    
+    #[test]
+    fn test_mpc_message_creation() {
+        let protocol = F1r3flyProtocol::new();
+        let commitment = [42u8; 32];
+        let message = protocol.create_mpc_message(&commitment);
+        assert_eq!(message.to_byte_array(), commitment);
     }
 } 

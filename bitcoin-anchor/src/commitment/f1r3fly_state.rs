@@ -2,6 +2,9 @@ use blake2::{Blake2b, Digest};
 use blake2::digest::consts::U32;
 use serde::{Deserialize, Serialize};
 
+// RGB DBC integration
+use commit_verify::{CommitId, CommitEncode, CommitEngine, DigestExt};
+
 use crate::error::{AnchorError, AnchorResult};
 
 /// F1r3fly state commitment for Bitcoin anchoring
@@ -58,11 +61,72 @@ impl F1r3flyStateCommitment {
         Ok(result.into())
     }
     
+    /// Generate commitment using RGB DBC (Deterministic Bitcoin Commitments) framework
+    /// 
+    /// This is the preferred method for RGB integration as it uses the standardized
+    /// commitment procedures from the RGB ecosystem.
+    pub fn to_rgb_commitment(&self) -> AnchorResult<F1r3flyCommitmentId> {
+        Ok(self.commit_id())
+    }
+    
+    /// Create RGB MPC message for Multi-Protocol Commitments
+    pub fn to_mpc_message(&self) -> AnchorResult<commit_verify::mpc::Message> {
+        let commitment_id = self.to_rgb_commitment()?;
+        Ok(commit_verify::mpc::Message::from(commitment_id.to_byte_array()))
+    }
+    
     /// Serialize the commitment data deterministically
     fn serialize_deterministic(&self) -> AnchorResult<Vec<u8>> {
         use crate::commitment::serialization::deterministic_serialize;
         deterministic_serialize(self)
             .map_err(|e| AnchorError::Serialization(e.to_string()))
+    }
+}
+
+/// RGB DBC commitment ID for F1r3fly state
+/// 
+/// This type represents the result of applying RGB's Deterministic Bitcoin Commitments
+/// framework to F1r3fly state data.
+#[derive(
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug,
+    amplify::Wrapper, amplify::From
+)]
+#[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
+#[derive(strict_encoding::StrictType, strict_encoding::StrictEncode, strict_encoding::StrictDecode)]
+#[strict_type(lib = "F1r3flyBitcoinAnchor")]
+pub struct F1r3flyCommitmentId(
+    #[from]
+    #[from([u8; 32])]
+    amplify::Bytes32,
+);
+
+impl strict_encoding::StrictDumb for F1r3flyCommitmentId {
+    fn strict_dumb() -> Self {
+        F1r3flyCommitmentId(amplify::Bytes32::default())
+    }
+}
+
+impl commit_verify::CommitmentId for F1r3flyCommitmentId {
+    const TAG: &'static str = "urn:lnp-bp:f1r3fly:state#2025-01-08";
+}
+
+impl From<commit_verify::Sha256> for F1r3flyCommitmentId {
+    fn from(hasher: commit_verify::Sha256) -> Self {
+        hasher.finish().into()
+    }
+}
+
+// RGB DBC CommitEncode implementation for F1r3flyStateCommitment
+impl CommitEncode for F1r3flyStateCommitment {
+    type CommitmentId = F1r3flyCommitmentId;
+
+    fn commit_encode(&self, engine: &mut CommitEngine) {
+        // Commit to each field in a deterministic order
+        engine.commit_to_serialized(&self.lfb_hash);
+        engine.commit_to_serialized(&self.rspace_root);
+        engine.commit_to_serialized(&self.block_height);
+        engine.commit_to_serialized(&self.timestamp);
+        engine.commit_to_serialized(&self.validator_set_hash);
     }
 }
 

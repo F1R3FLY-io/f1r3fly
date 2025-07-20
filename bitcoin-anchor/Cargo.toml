@@ -16,10 +16,21 @@ blake2 = "0.10"
 hex = "0.4"
 
 # RGB ecosystem integration
-rgb-std = { version = "0.12.0-rc.2", features = ["bitcoin"] }
+amplify = "4.9.0"
+strict_encoding = "2.9.1"
+rgb-std = { version = "0.12.0-rc.3", features = ["bitcoin"] }
 bp-core = "0.12"
 commit_verify = { version = "0.12.0", features = ["rand"] }
 bp-std = { version = "0.12.0-rc.3", features = ["client-side-validation"] }
 
 # Bitcoin transaction handling
-bitcoin = "0.32"
+bitcoin = { version = "0.32", features = ["serde"] }
+
+# Blockchain provider integration
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+serde_json = "1.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
