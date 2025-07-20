@@ -123,27 +123,88 @@ impl PsbtTransaction {
     /// This method assumes the PSBT has been signed externally and extracts
     /// the final transaction hex ready for broadcasting.
     pub fn to_signed_transaction_hex(&self) -> AnchorResult<String> {
-        // In a real implementation, this would extract the finalized transaction
-        // from the PSBT after all inputs have been signed.
-        // For now, return a placeholder that indicates this needs external signing.
+        // Check if PSBT is fully signed by verifying all inputs have final scripts
+        for (i, input) in self.psbt.inputs().enumerate() {
+            if input.final_script_sig.is_none() {
+                return Err(crate::error::AnchorError::Psbt(
+                    format!("Input {} is not signed - PSBT must be fully signed before broadcasting", i)
+                ));
+            }
+        }
+
+        // For now, return an error indicating external signing is required
+        // In a real implementation, this would work with the specific PSBT library being used
         Err(crate::error::AnchorError::Psbt(
-            "PSBT must be signed externally before extracting transaction hex".to_string()
+            "PSBT must be signed externally and transaction hex provided directly for broadcasting".to_string()
         ))
     }
+
+    /// Check if PSBT is fully signed and ready for broadcasting
+    /// 
+    /// Returns true if all inputs have been signed and the PSBT
+    /// can be extracted as a complete transaction.
+    pub fn is_fully_signed(&self) -> bool {
+        // Check if all inputs have final scripts (signatures)
+        self.psbt.inputs().all(|input| {
+            input.final_script_sig.is_some()
+        })
+    }
+
+    /// Get signing instructions for the PSBT
+    /// 
+    /// Returns human-readable instructions for external wallet signing.
+    pub fn get_signing_instructions(&self) -> String {
+        format!(
+            "🔐 PSBT Signing Instructions:\n\
+            \n\
+            1. Save this PSBT to a file (e.g., 'f1r3fly_commitment.psbt')\n\
+            2. Import into your Bitcoin wallet:\n\
+            \n\
+            For Electrum:\n\
+            • Tools → Load transaction → From file\n\
+            • Review transaction details\n\
+            • Click 'Sign' if you have the private key\n\
+            • Click 'Broadcast' to send to network\n\
+            \n\
+            For Bitcoin Core:\n\
+            • walletprocesspsbt \"<psbt_base64>\"\n\
+            • signrawtransactionwithwallet \"<hex>\"\n\
+            • sendrawtransaction \"<signed_hex>\"\n\
+            \n\
+            For Hardware Wallets:\n\
+            • Use wallet software to import and sign PSBT\n\
+            • Export signed transaction for broadcasting\n\
+            \n\
+            Transaction Details:\n\
+            • Transaction ID: {}\n\
+            • F1r3fly commitment included\n\
+            • Fee: {} sats\n\
+            \n\
+            ⚠️  Always verify transaction details before signing!",
+                         self.txid(),
+             self.fee
+         )
+     }
 
     /// Broadcast this transaction using Esplora client
     
     pub async fn broadcast_with_esplora(&self, client: &EsploraClient) -> AnchorResult<BroadcastResult> {
+        // Check if PSBT is fully signed before broadcasting
+        if !self.is_fully_signed() {
+            return Err(crate::error::AnchorError::Psbt(
+                "PSBT must be fully signed before broadcasting".to_string()
+            ));
+        }
+
         // Extract the signed transaction hex
         let tx_hex = self.to_signed_transaction_hex()?;
         
         // Broadcast the transaction
         let bitcoin_txid = client.broadcast_transaction(&tx_hex).await
-            .map_err(|e| crate::error::AnchorError::Network(format!("Broadcast failed: {}", e)))?;
+            .map_err(|e| crate::error::AnchorError::Broadcast(format!("Broadcast failed: {}", e)))?;
 
         // Convert bitcoin::Txid to bpstd::Txid
-        let txid_str = bitcoin_txid.to_string();
-        let bpstd_txid = txid_str.parse::<Txid>()
+        let bpstd_txid = bitcoin_txid.to_string().parse::<Txid>()
             .map_err(|e| crate::error::AnchorError::InvalidData(format!("Invalid txid conversion: {}", e)))?;
 
         Ok(BroadcastResult {
@@ -728,6 +789,8 @@ impl AnchorPsbt {
             tokio::time::sleep(wait_time).await;
         }
     }
+
+
 }
 
 #[cfg(test)]

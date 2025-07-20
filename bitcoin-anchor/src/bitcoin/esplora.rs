@@ -1,6 +1,7 @@
 use std::fmt;
 
 use bitcoin::{Address, OutPoint, Txid, Amount};
+use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -97,6 +98,8 @@ pub struct FeeEstimates {
     pub slow: f64,    // 6 blocks
 }
 
+
+
 /// Retry configuration for Esplora API calls
 #[derive(Debug, Clone)]
 pub struct RetryConfig {
@@ -115,11 +118,11 @@ pub struct RetryConfig {
 impl Default for RetryConfig {
     fn default() -> Self {
         Self {
-            max_attempts: 3,
-            initial_delay: std::time::Duration::from_millis(500),
-            max_delay: std::time::Duration::from_secs(30),
-            backoff_multiplier: 2.0,
-            request_timeout: std::time::Duration::from_secs(30),
+            max_attempts: 2,                                               // Reduced from 3 to 2
+            initial_delay: std::time::Duration::from_millis(300),         // Reduced from 500ms
+            max_delay: std::time::Duration::from_secs(10),                // Reduced from 30s
+            backoff_multiplier: 1.5,                                      // Reduced from 2.0
+            request_timeout: std::time::Duration::from_secs(15),          // Reduced from 30s
         }
     }
 }
@@ -141,10 +144,10 @@ impl EsploraClient {
     /// use bitcoin_anchor::bitcoin::EsploraClient;
     /// 
     /// // For testnet
-    /// let client = EsploraClient::new("https://blockstream.info/testnet/api");
+    /// let client = EsploraClient::new("https://mempool.space/testnet/api");
     /// 
     /// // For mainnet  
-    /// let client = EsploraClient::new("https://blockstream.info/api");
+    /// let client = EsploraClient::new("https://mempool.space/api");
     /// ```
     pub fn new(base_url: impl Into<String>) -> Self {
         Self::with_retry_config(base_url, RetryConfig::default())
@@ -163,24 +166,24 @@ impl EsploraClient {
         }
     }
 
-    /// Create a new client for Bitcoin testnet (Blockstream.info)
+        /// Create a new client for Bitcoin testnet (Mempool.space)
     pub fn testnet() -> Self {
-        Self::new("https://blockstream.info/testnet/api")
+        Self::new("https://mempool.space/testnet/api")
     }
 
-    /// Create a new client for Bitcoin mainnet (Blockstream.info)  
+    /// Create a new client for Bitcoin mainnet (Mempool.space)
     pub fn mainnet() -> Self {
-        Self::new("https://blockstream.info/api")
+        Self::new("https://mempool.space/api")
     }
 
     /// Create a testnet client with custom retry configuration
     pub fn testnet_with_retry(retry_config: RetryConfig) -> Self {
-        Self::with_retry_config("https://blockstream.info/testnet/api", retry_config)
+        Self::with_retry_config("https://mempool.space/testnet/api", retry_config)
     }
 
     /// Create a mainnet client with custom retry configuration
     pub fn mainnet_with_retry(retry_config: RetryConfig) -> Self {
-        Self::with_retry_config("https://blockstream.info/api", retry_config)
+        Self::with_retry_config("https://mempool.space/api", retry_config)
     }
 
     /// Execute a request with retry logic and exponential backoff
@@ -398,6 +401,95 @@ impl EsploraClient {
 
         Ok(height)
     }
+
+
+
+    /// Get transaction status and confirmation details
+    /// 
+    /// Retrieves the current status of a transaction by its ID,
+    /// including confirmation status and block information.
+    pub async fn get_transaction_status(&self, txid: &str) -> Result<TransactionStatus, EsploraError> {
+        self.execute_with_retry(
+            || async {
+                let url = format!("{}/tx/{}/status", self.base_url, txid);
+                
+                let response = self.client
+                    .get(&url)
+                    .send()
+                    .await
+                    .map_err(|e| EsploraError::Network(e.to_string()))?;
+
+                if response.status().is_success() {
+                    let status: TransactionStatus = response
+                        .json()
+                        .await
+                        .map_err(|e| EsploraError::Json(e.to_string()))?;
+                    
+                    Ok(status)
+                } else {
+                    // Create a default/empty txid for not found case
+                    let empty_txid = bitcoin::Txid::from_str("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+                    Err(EsploraError::TransactionNotFound(empty_txid))
+                }
+            },
+            "get_transaction_status"
+        ).await
+    }
+
+    /// Wait for transaction confirmation with timeout
+    /// 
+    /// Polls the transaction status until it reaches the desired number of confirmations
+    /// or the timeout is reached. Returns the final transaction status.
+    pub async fn wait_for_confirmation(
+        &self,
+        txid: &str,
+        min_confirmations: u32,
+        timeout_seconds: u64,
+    ) -> Result<TransactionStatus, EsploraError> {
+        use tokio::time::{sleep, timeout, Duration};
+        
+        let timeout_duration = Duration::from_secs(timeout_seconds);
+        let poll_interval = Duration::from_secs(10); // Poll every 10 seconds
+        
+        timeout(timeout_duration, async {
+            loop {
+                match self.get_transaction_status(txid).await {
+                    Ok(status) => {
+                        if status.confirmed {
+                            // Calculate confirmations from current block height
+                            if let Some(tx_height) = status.block_height {
+                                match self.get_block_height().await {
+                                    Ok(current_height) => {
+                                        let confirmations = current_height.saturating_sub(tx_height) + 1;
+                                        if confirmations >= min_confirmations {
+                                            return Ok(status);
+                                        }
+                                    }
+                                    Err(_) => {
+                                        // If we can't get current height, assume transaction is confirmed
+                                        // if it's in a block (basic confirmation check)
+                                        if min_confirmations <= 1 {
+                                            return Ok(status);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Wait before next poll
+                        sleep(poll_interval).await;
+                    }
+                    Err(EsploraError::TransactionNotFound(_)) => {
+                        // Transaction not yet visible, wait and retry
+                        sleep(poll_interval).await;
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        })
+        .await
+        .map_err(|_| EsploraError::Network("Timeout waiting for confirmation".to_string()))?
+    }
 }
 
 impl fmt::Debug for EsploraClient {
@@ -451,14 +543,14 @@ mod tests {
 
     #[test]
     fn test_esplora_client_creation() {
-        let client = EsploraClient::new("https://blockstream.info/testnet/api");
-        assert_eq!(client.base_url, "https://blockstream.info/testnet/api");
+        let client = EsploraClient::new("https://mempool.space/testnet/api");
+        assert_eq!(client.base_url, "https://mempool.space/testnet/api");
 
         let testnet_client = EsploraClient::testnet();
-        assert_eq!(testnet_client.base_url, "https://blockstream.info/testnet/api");
+        assert_eq!(testnet_client.base_url, "https://mempool.space/testnet/api");
 
         let mainnet_client = EsploraClient::mainnet();
-        assert_eq!(mainnet_client.base_url, "https://blockstream.info/api");
+        assert_eq!(mainnet_client.base_url, "https://mempool.space/api");
     }
 
     #[test]

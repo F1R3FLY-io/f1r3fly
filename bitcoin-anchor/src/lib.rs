@@ -82,7 +82,7 @@ pub mod validation;
 
 // Essential exports only
 pub use bitcoin::{CommitmentTransaction, OpReturnCommitter, OpReturnCommitment, AnchorPsbt, PsbtRequest, PsbtTransaction};
-pub use bitcoin::{EsploraClient, EsploraError, EsploraUtxo, EsploraTransaction, FeeEstimates, BroadcastResult, TransactionStatus, CoinSelection, EnhancedUtxo};
+pub use bitcoin::{EsploraClient, EsploraError, EsploraUtxo, EsploraTransaction, FeeEstimates, BroadcastResult, TransactionStatus, CoinSelection, EnhancedUtxo, RetryConfig};
 pub use commitment::{F1r3flyStateCommitment, F1r3flyCommitmentId};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult, ErrorContext, RecoveryStrategy};
@@ -467,9 +467,17 @@ impl F1r3flyBitcoinAnchor {
                     report.fee_estimation_available = true;
                     report.current_fee_rates = Some((estimates.fast, estimates.medium, estimates.slow));
                     
-                    // Check for network congestion
-                    if estimates.fast > 50.0 {
-                        report.issues.push(format!("High network congestion: {} sat/vB for fast confirmation", estimates.fast));
+                    // Check for network congestion (adjusted thresholds for testnet)
+                    let congestion_threshold = match self.config.network {
+                        Network::Mainnet => 100.0,     // 100 sat/vB for mainnet
+                        Network::Testnet3 => 200.0,    // 200 sat/vB for testnet3 (higher normal range)
+                        Network::Testnet4 => 200.0,    // 200 sat/vB for testnet4 (higher normal range)
+                        Network::Signet => 150.0,      // 150 sat/vB for signet
+                        Network::Regtest => 50.0,      // 50 sat/vB for regtest (should be low)
+                    };
+                    
+                    if estimates.fast > congestion_threshold {
+                        report.issues.push(format!("High network congestion: {} sat/vB for fast confirmation (threshold: {})", estimates.fast, congestion_threshold));
                     }
                 }
                 Err(e) => {

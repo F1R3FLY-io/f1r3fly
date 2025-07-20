@@ -36,6 +36,10 @@ pub enum AnchorError {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
+    /// Transaction broadcast errors
+    #[error("Broadcast error: {0}")]
+    Broadcast(String),
+
     /// Network timeout errors (retryable)
     #[error("Network timeout after {timeout:?}: {message}")]
     NetworkTimeout { timeout: Duration, message: String },
@@ -173,6 +177,21 @@ impl AnchorError {
                     info
                 },
                 user_message: "Insufficient Bitcoin balance to complete the transaction.".to_string(),
+            },
+
+            AnchorError::Broadcast(msg) => ErrorContext {
+                error_code: "BROADCAST_FAILED".to_string(),
+                retryable: true,
+                recovery_strategy: RecoveryStrategy::Retry {
+                    delay: Duration::from_secs(30),
+                    max_attempts: 3,
+                },
+                debug_info: {
+                    let mut info = std::collections::HashMap::new();
+                    info.insert("error_message".to_string(), msg.clone());
+                    info
+                },
+                user_message: "Failed to broadcast transaction to Bitcoin network. This may be temporary.".to_string(),
             },
 
             AnchorError::FeeEstimation { reason } => ErrorContext {
