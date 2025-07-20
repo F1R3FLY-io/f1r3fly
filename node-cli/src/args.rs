@@ -65,7 +65,7 @@ pub enum Commands {
     /// Get the last finalized block
     LastFinalizedBlock(HttpArgs),
 
-    /// Get blocks in the main chain (finalized consensus path)
+    /// Get blocks in the main chain
     ShowMainChain(ShowMainChainArgs),
 
     /// Transfer REV tokens between addresses

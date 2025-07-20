@@ -616,9 +616,9 @@ pub async fn show_main_chain_command(
             if blocks.is_empty() {
                 println!("🔍 No blocks found in main chain");
             } else {
-                println!("🧱 Main Chain Blocks (finalized consensus path):");
+                println!("🧱 Main Chain Blocks:");
                 for (index, block) in blocks.iter().enumerate() {
-                    println!("📦 Block {} (#{}):", index + 1, block.block_number);
+                    println!("📦 Block #{}:", block.block_number);
                     println!("   🔗 Hash: {}", block.block_hash);
                     let sender_display = if block.sender.len() >= 16 {
                         format!("{}...", &block.sender[..16])

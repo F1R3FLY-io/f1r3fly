@@ -303,7 +303,7 @@ impl<'a> F1r3flyApi<'a> {
         }
     }
 
-    /// Gets blocks in the main chain (finalized consensus path)
+    /// Gets blocks in the main chain
     ///
     /// # Arguments
     ///

@@ -270,7 +270,7 @@ cargo run -- last-finalized-block -H node.example.com -p 40403
 
 ### Show Main Chain
 
-Get blocks from the main chain (finalized consensus path) in sequential order.
+Get blocks from the main chain in sequential order.
 
 ```bash
 # Get last 10 blocks from main chain (default depth)
