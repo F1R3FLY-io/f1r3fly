@@ -1,3 +1,4 @@
+use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use graphz::rust::graphz::{
     apply, subgraph, GraphArrowType, GraphRankDir, GraphSerializer, GraphShape, GraphStyle,
     GraphType, Graphz, GraphzError,
@@ -45,7 +46,6 @@ impl DagInfo {
     }
 }
 
-//TODO second step should be double checked
 pub struct GraphzGenerator;
 
 impl GraphzGenerator {
@@ -54,7 +54,7 @@ impl GraphzGenerator {
         last_finalized_block_hash: String,
         config: GraphConfig,
         ser: Arc<dyn GraphSerializer>,
-        block_store: &mut block_storage::rust::key_value_block_store::KeyValueBlockStore,
+        block_store: &mut KeyValueBlockStore,
     ) -> Result<Graphz, GraphGeneratorError> {
         let mut acc = DagInfo::empty();
         for block_hashes in topo_sort {
@@ -90,21 +90,28 @@ impl GraphzGenerator {
             .sorted()
             .collect();
 
-        // Draw ancestors first
+        // draw ancestors first
         for ancestor in &all_ancestors {
             let style = Self::style_for(ancestor, &last_finalized_block_hash);
             g.node(ancestor, GraphShape::Box, style, None, None).await?;
         }
 
-        // Create invisible edges from ancestors to first node in each cluster
+        // create invisible edges from ancestors to first node in each cluster for proper alignment
+        let mut invisible_edge_pairs = Vec::new();
         for (id, blocks) in &validators_list {
             let nodes = Self::nodes_for_ts(id, first_ts, blocks, &last_finalized_block_hash);
+            let node_names: Vec<String> = nodes.keys().cloned().collect();
             for ancestor in &all_ancestors {
-                for node_name in nodes.keys() {
-                    g.edge(ancestor, node_name, Some(GraphStyle::Invis), None, None)
-                        .await?;
+                for node_name in &node_names {
+                    invisible_edge_pairs.push((ancestor.clone(), node_name.clone()));
                 }
             }
+        }
+
+        // Create edges sequentially
+        for (ancestor, node_name) in invisible_edge_pairs {
+            g.edge(&ancestor, &node_name, Some(GraphStyle::Invis), None, None)
+                .await?;
         }
 
         // Draw clusters per validator
@@ -136,11 +143,10 @@ impl GraphzGenerator {
         Ok(g)
     }
 
-    // Ported from Scala accumulateDagInfo function
     pub async fn accumulate_dag_info(
         mut acc: DagInfo,
         block_hashes: Vec<BlockHash>,
-        block_store: &mut block_storage::rust::key_value_block_store::KeyValueBlockStore,
+        block_store: &mut KeyValueBlockStore,
     ) -> Result<DagInfo, GraphGeneratorError> {
         let mut blocks = Vec::new();
         for block_hash in &block_hashes {
@@ -148,11 +154,7 @@ impl GraphzGenerator {
             blocks.push(block);
         }
 
-        let time_entry = if let Some(first_block) = blocks.first() {
-            first_block.body.state.block_number
-        } else {
-            return Ok(acc);
-        };
+        let time_entry = blocks.first().unwrap().body.state.block_number;
 
         let validators: Vec<HashMap<String, ValidatorsBlocks>> = blocks
             .into_iter()
@@ -179,7 +181,7 @@ impl GraphzGenerator {
                 validator_blocks.insert(
                     time_entry,
                     vec![ValidatorBlock {
-                        block_hash: block_hash,
+                        block_hash,
                         parents,
                         justifications,
                     }],
@@ -191,18 +193,21 @@ impl GraphzGenerator {
             })
             .collect();
 
+        acc.timeseries.insert(0, time_entry);
+
         // Equivalent to acc.validators |+| Foldable[List].fold(validators)
-        for validator_map in validators {
-            for (block_sender_hash, blocks_map) in validator_map {
-                let acc_validator = acc.validators.entry(block_sender_hash).or_insert_with(HashMap::new);
-                for (ts, blocks) in blocks_map {
-                    acc_validator.entry(ts).or_insert_with(Vec::new).extend(blocks);
-                }
+        for (block_sender_hash, blocks_map) in validators.into_iter().flat_map(|m| m.into_iter()) {
+            let acc_validator = acc
+                .validators
+                .entry(block_sender_hash)
+                .or_insert_with(HashMap::new);
+            for (ts, blocks) in blocks_map {
+                acc_validator
+                    .entry(ts)
+                    .or_insert_with(Vec::new)
+                    .extend(blocks);
             }
         }
-
-        // Equivalent to timeEntry :: acc.timeseries
-        acc.timeseries.insert(0, time_entry);
 
         Ok(acc)
     }
@@ -251,15 +256,17 @@ impl GraphzGenerator {
         let edge_pairs: Vec<(&String, &String)> = all_validator_blocks
             .iter()
             .flat_map(|validator_block| {
-                validator_block.parents.iter().map(move |parent_hash| {
-                    (&validator_block.block_hash, parent_hash)
-                })
+                validator_block
+                    .parents
+                    .iter()
+                    .map(move |parent_hash| (&validator_block.block_hash, parent_hash))
             })
             .collect();
 
         // Create edges (async operations must be done sequentially)
         for (block_hash, parent_hash) in edge_pairs {
-            g.edge(block_hash, parent_hash, None, None, Some(false)).await?;
+            g.edge(block_hash, parent_hash, None, None, Some(false))
+                .await?;
         }
 
         Ok(())
@@ -280,9 +287,10 @@ impl GraphzGenerator {
         let edge_pairs: Vec<(&String, &String)> = all_validator_blocks
             .iter()
             .flat_map(|validator_block| {
-                validator_block.justifications.iter().map(move |justification| {
-                    (&validator_block.block_hash, justification)
-                })
+                validator_block
+                    .justifications
+                    .iter()
+                    .map(move |justification| (&validator_block.block_hash, justification))
             })
             .collect();
 
@@ -301,9 +309,8 @@ impl GraphzGenerator {
         Ok(())
     }
 
-    // Ported from Scala nodesForTs function
     pub fn nodes_for_ts(
-        block_sender_hash: &str,
+        validator_id: &str,
         ts: i64,
         blocks: &ValidatorsBlocks,
         last_finalized_block_hash: &str,
@@ -318,7 +325,7 @@ impl GraphzGenerator {
                 })
                 .collect(),
             None => {
-                let invisible_node = format!("{}_{}", ts, block_sender_hash);
+                let invisible_node = format!("{}_{}", ts, validator_id);
                 let mut map = HashMap::new();
                 map.insert(invisible_node, Some(GraphStyle::Invis));
                 map
@@ -332,7 +339,7 @@ impl GraphzGenerator {
         timeseries: &[i64],
         last_finalized_block_hash: &str,
         ser: Arc<dyn GraphSerializer>,
-    ) -> Result<(), GraphGeneratorError> {
+    ) -> Result<Graphz, GraphGeneratorError> {
         let cluster_name = format!("cluster_{}", id);
         let g = subgraph(
             cluster_name,
@@ -364,9 +371,9 @@ impl GraphzGenerator {
             .windows(2)
             .flat_map(|window| {
                 if let [n1s, n2s] = window {
-                    n1s.keys().flat_map(move |n1| {
-                        n2s.keys().map(move |n2| (n1, n2))
-                    }).collect::<Vec<_>>()
+                    n1s.keys()
+                        .flat_map(move |n1| n2s.keys().map(move |n2| (n1, n2)))
+                        .collect::<Vec<_>>()
                 } else {
                     vec![]
                 }
@@ -379,7 +386,7 @@ impl GraphzGenerator {
         }
 
         g.close().await?;
-        Ok(())
+        Ok(g)
     }
 
     pub fn style_for(block_hash: &str, last_finalized_block_hash: &str) -> Option<GraphStyle> {
