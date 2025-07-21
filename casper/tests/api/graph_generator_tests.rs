@@ -1,20 +1,23 @@
-use casper::rust::api::graph_generator::*;
-use graphz::rust::graphz::{StringSerializer, GraphStyle};
-use std::sync::Arc;
-use std::collections::HashMap;
-use prost::bytes::Bytes;
-use tokio;
-use hex;
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
-use models::rust::casper::protocol::casper_message::{BlockMessage, Header, Body, F1r3flyState, Justification};
+use casper::rust::api::graph_generator::*;
+use graphz::rust::graphz::{GraphStyle, StringSerializer};
+use hex;
+use models::rust::casper::protocol::casper_message::{
+    BlockMessage, Body, F1r3flyState, Header, Justification,
+};
+use prost::bytes::Bytes;
 use rspace_plus_plus::rspace::shared::in_mem_key_value_store::InMemoryKeyValueStore;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio;
 
 // Helper function to create a mock BlockStore with test data
 fn create_mock_block_store() -> KeyValueBlockStore {
     let store = InMemoryKeyValueStore::new();
     let store_box = Box::new(store);
-    let mut block_store = KeyValueBlockStore::new(store_box, Box::new(InMemoryKeyValueStore::new()));
-    
+    let mut block_store =
+        KeyValueBlockStore::new(store_box, Box::new(InMemoryKeyValueStore::new()));
+
     // Create mock blocks for testing
     let block1 = BlockMessage {
         block_hash: Bytes::from("block1"),
@@ -44,7 +47,7 @@ fn create_mock_block_store() -> KeyValueBlockStore {
         shard_id: String::new(),
         extra_bytes: Bytes::new(),
     };
-    
+
     let block2 = BlockMessage {
         block_hash: Bytes::from("block2"),
         header: Header {
@@ -73,7 +76,7 @@ fn create_mock_block_store() -> KeyValueBlockStore {
         shard_id: String::new(),
         extra_bytes: Bytes::new(),
     };
-    
+
     let block3 = BlockMessage {
         block_hash: Bytes::from("block3"),
         header: Header {
@@ -94,12 +97,10 @@ fn create_mock_block_store() -> KeyValueBlockStore {
             system_deploys: vec![],
             extra_bytes: Bytes::new(),
         },
-        justifications: vec![
-            Justification {
-                validator: Bytes::from("validator1"),
-                latest_block_hash: Bytes::from("block1"),
-            }
-        ],
+        justifications: vec![Justification {
+            validator: Bytes::from("validator1"),
+            latest_block_hash: Bytes::from("block1"),
+        }],
         sender: Bytes::from("charlie"),
         seq_num: 1,
         sig: Bytes::new(),
@@ -107,12 +108,12 @@ fn create_mock_block_store() -> KeyValueBlockStore {
         shard_id: String::new(),
         extra_bytes: Bytes::new(),
     };
-    
+
     // Add blocks to store
     block_store.put_block_message(&block1).unwrap();
     block_store.put_block_message(&block2).unwrap();
     block_store.put_block_message(&block3).unwrap();
-    
+
     block_store
 }
 
@@ -121,12 +122,9 @@ async fn dag_as_cluster_basic() {
     let block_hash1 = Bytes::from("block1");
     let block_hash2 = Bytes::from("block2");
     let block_hash3 = Bytes::from("block3");
-    
-    let topo_sort = vec![
-        vec![block_hash1, block_hash2],
-        vec![block_hash3],
-    ];
-    
+
+    let topo_sort = vec![vec![block_hash1, block_hash2], vec![block_hash3]];
+
     let last_finalized_block_hash = hex::encode(b"block1");
     let config = GraphConfig::default();
     let serializer = Arc::new(StringSerializer::new());
@@ -138,7 +136,8 @@ async fn dag_as_cluster_basic() {
         config,
         serializer.clone(),
         &mut block_store,
-    ).await;
+    )
+    .await;
 
     assert!(result.is_ok());
 
@@ -154,11 +153,9 @@ async fn dag_as_cluster_basic() {
 async fn dag_as_cluster_with_justifications() {
     let block_hash1 = Bytes::from("block1");
     let block_hash2 = Bytes::from("block2");
-    
-    let topo_sort = vec![
-        vec![block_hash1, block_hash2],
-    ];
-    
+
+    let topo_sort = vec![vec![block_hash1, block_hash2]];
+
     let last_finalized_block_hash = hex::encode(b"block1");
     let config = GraphConfig {
         show_justification_lines: true,
@@ -172,10 +169,11 @@ async fn dag_as_cluster_with_justifications() {
         config,
         serializer.clone(),
         &mut block_store,
-    ).await;
+    )
+    .await;
 
     assert!(result.is_ok());
-    
+
     let content = serializer.get_content().await;
     assert!(content.contains("digraph"));
     assert!(content.contains("dag"));
@@ -184,13 +182,11 @@ async fn dag_as_cluster_with_justifications() {
 #[tokio::test]
 async fn nodes_for_ts() {
     let mut blocks = HashMap::new();
-    let validator_blocks = vec![
-        ValidatorBlock {
-            block_hash: "block1".to_string(),
-            parents: vec!["parent1".to_string()],
-            justifications: vec!["just1".to_string()],
-        }
-    ];
+    let validator_blocks = vec![ValidatorBlock {
+        block_hash: "block1".to_string(),
+        parents: vec!["parent1".to_string()],
+        justifications: vec!["just1".to_string()],
+    }];
     blocks.insert(100i64, validator_blocks);
 
     let nodes = GraphzGenerator::nodes_for_ts("val1", 100, &blocks, "block1");
@@ -227,9 +223,9 @@ async fn accumulate_dag_info() {
 async fn init_graph() {
     let serializer = Arc::new(StringSerializer::new());
     let result = GraphzGenerator::init_graph("test_graph", serializer.clone()).await;
-    
+
     assert!(result.is_ok());
-    
+
     let content = serializer.get_content().await;
     assert!(content.contains("digraph"));
     assert!(content.contains("test_graph"));
@@ -245,33 +241,31 @@ async fn init_graph() {
 #[tokio::test]
 async fn draw_parent_dependencies() {
     let serializer = Arc::new(StringSerializer::new());
-    let g = GraphzGenerator::init_graph("test", serializer.clone()).await.unwrap();
+    let g = GraphzGenerator::init_graph("test", serializer.clone())
+        .await
+        .unwrap();
 
     let mut blocks1 = HashMap::new();
-    let validator_blocks1 = vec![
-        ValidatorBlock {
-            block_hash: "block1".to_string(),
-            parents: vec!["parent1".to_string()],
-            justifications: vec![],
-        }
-    ];
+    let validator_blocks1 = vec![ValidatorBlock {
+        block_hash: "block1".to_string(),
+        parents: vec!["parent1".to_string()],
+        justifications: vec![],
+    }];
     blocks1.insert(100i64, validator_blocks1);
-    
+
     let mut blocks2 = HashMap::new();
-    let validator_blocks2 = vec![
-        ValidatorBlock {
-            block_hash: "block2".to_string(),
-            parents: vec!["parent2".to_string()],
-            justifications: vec![],
-        }
-    ];
+    let validator_blocks2 = vec![ValidatorBlock {
+        block_hash: "block2".to_string(),
+        parents: vec!["parent2".to_string()],
+        justifications: vec![],
+    }];
     blocks2.insert(100i64, validator_blocks2);
-    
+
     let validators = vec![blocks1, blocks2];
-    
+
     let result = GraphzGenerator::draw_parent_dependencies(&g, &validators).await;
     assert!(result.is_ok());
-    
+
     let content = serializer.get_content().await;
     assert!(content.contains("block1"));
     assert!(content.contains("block2"));
@@ -280,23 +274,23 @@ async fn draw_parent_dependencies() {
 #[tokio::test]
 async fn draw_justification_dotted_lines() {
     let serializer = Arc::new(StringSerializer::new());
-    let g = GraphzGenerator::init_graph("test", serializer.clone()).await.unwrap();
+    let g = GraphzGenerator::init_graph("test", serializer.clone())
+        .await
+        .unwrap();
 
     let mut validators = HashMap::new();
     let mut blocks = HashMap::new();
-    let validator_blocks = vec![
-        ValidatorBlock {
-            block_hash: "block1".to_string(),
-            parents: vec![],
-            justifications: vec!["just1".to_string()],
-        }
-    ];
+    let validator_blocks = vec![ValidatorBlock {
+        block_hash: "block1".to_string(),
+        parents: vec![],
+        justifications: vec!["just1".to_string()],
+    }];
     blocks.insert(100i64, validator_blocks);
     validators.insert("validator1".to_string(), blocks);
-    
+
     let result = GraphzGenerator::draw_justification_dotted_lines(&g, &validators).await;
     assert!(result.is_ok());
-    
+
     let content = serializer.get_content().await;
     assert!(content.contains("block1"));
     assert!(content.contains("just1"));
@@ -304,11 +298,9 @@ async fn draw_justification_dotted_lines() {
 
 #[tokio::test]
 async fn style_for() {
-    // Тестуємо finalized блок отримує стиль Filled
     let style = GraphzGenerator::style_for("block1", "block1");
     assert_eq!(style, Some(GraphStyle::Filled));
 
-    // Тестуємо non-finalized блок отримує None
     let style = GraphzGenerator::style_for("block2", "block1");
     assert_eq!(style, None);
-} 
+}
