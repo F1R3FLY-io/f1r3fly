@@ -120,7 +120,13 @@ impl Genesis {
     ) -> Vec<Signed<DeployData>> {
         // Use hardcoded timestamp for backwards compatibility
         const BASE_TIMESTAMP: i64 = 1565818101792;
-        Self::default_blessed_terms_with_timestamp(BASE_TIMESTAMP, pos_params, vaults, supply, shard_id)
+        Self::default_blessed_terms_with_timestamp(
+            BASE_TIMESTAMP,
+            pos_params,
+            vaults,
+            supply,
+            shard_id,
+        )
     }
 
     pub async fn create_genesis_block(

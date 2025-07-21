@@ -1,17 +1,17 @@
 use blake2::{Blake2b, Digest};
 use models::casper::v1::deploy_response::Message as DeployResponseMessage;
 use models::casper::v1::deploy_service_client::DeployServiceClient;
+use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeployResponseMessage;
+use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
 use models::casper::v1::propose_response::Message as ProposeResponseMessage;
 use models::casper::v1::propose_service_client::ProposeServiceClient;
-use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
-use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeployResponseMessage;
-use models::casper::{IsFinalizedQuery, ProposeQuery, DeployDataProto, ExploratoryDeployQuery};
+use models::casper::{DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, ProposeQuery};
 use models::rhoapi::Par;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
-use typenum::U32;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
+use typenum::U32;
 
 /// Client for interacting with the F1r3fly API
 pub struct F1r3flyApi<'a> {
@@ -64,7 +64,8 @@ impl<'a> F1r3flyApi<'a> {
         };
 
         // Build and sign the deployment
-        let deployment = self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string());
+        let deployment =
+            self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string());
 
         // Connect to the F1r3fly node
         let mut deploy_service_client =
@@ -73,7 +74,7 @@ impl<'a> F1r3flyApi<'a> {
 
         // Send the deploy
         let deploy_response = deploy_service_client.do_deploy(deployment).await?;
-        
+
         // Process the response
         let deploy_message = deploy_response
             .get_ref()
@@ -82,12 +83,8 @@ impl<'a> F1r3flyApi<'a> {
             .ok_or("Deploy result not found")?;
 
         match deploy_message {
-            DeployResponseMessage::Error(service_error) => {
-                Err(service_error.clone().into())
-            }
-            DeployResponseMessage::Result(result) => {
-                Ok(result.clone())
-            }
+            DeployResponseMessage::Error(service_error) => Err(service_error.clone().into()),
+            DeployResponseMessage::Result(result) => Ok(result.clone()),
         }
     }
 
@@ -122,7 +119,7 @@ impl<'a> F1r3flyApi<'a> {
 
         // Send the exploratory deploy
         let response = deploy_service_client.exploratory_deploy(query).await?;
-        
+
         // Process the response
         let message = response
             .get_ref()
@@ -138,7 +135,7 @@ impl<'a> F1r3flyApi<'a> {
                 // Format the Par data structure to a readable string
                 let data = {
                     let mut result_str = String::new();
-                    
+
                     // Process the data
                     if !result.post_block_data.is_empty() {
                         for (i, par) in result.post_block_data.iter().enumerate() {
@@ -149,16 +146,17 @@ impl<'a> F1r3flyApi<'a> {
                             // A more sophisticated approach would be to recursively traverse the structure
                             match extract_par_data(par) {
                                 Some(data) => result_str.push_str(&data),
-                                None => result_str.push_str(&format!("Result {}: Complex data structure", i + 1)),
+                                None => result_str
+                                    .push_str(&format!("Result {}: Complex data structure", i + 1)),
                             }
                         }
                     } else {
                         result_str = "No data returned".to_string();
                     }
-                    
+
                     result_str
                 };
-                
+
                 // Format the block info to a readable string
                 let block_info = {
                     if let Some(block) = &result.block {
@@ -170,7 +168,7 @@ impl<'a> F1r3flyApi<'a> {
                         "No block info".to_string()
                     }
                 };
-                
+
                 Ok((data, block_info))
             }
         }
@@ -183,20 +181,18 @@ impl<'a> F1r3flyApi<'a> {
     /// The block hash of the proposed block if successful, otherwise an error
     pub async fn propose(&self) -> Result<String, Box<dyn std::error::Error>> {
         // Connect to the F1r3fly node's propose service
-        let mut propose_client = ProposeServiceClient::connect(
-            format!("http://{}:{}/", self.node_host, self.grpc_port)
-        ).await?;
+        let mut propose_client =
+            ProposeServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
+                .await?;
 
         // Send the propose request
         let propose_response = propose_client
             .propose(ProposeQuery { is_async: false })
             .await?
             .into_inner();
-            
+
         // Process the response
-        let message = propose_response
-            .message
-            .ok_or("Missing propose response")?;
+        let message = propose_response.message.ok_or("Missing propose response")?;
 
         match message {
             ProposeResponseMessage::Result(block_hash) => {
@@ -234,8 +230,9 @@ impl<'a> F1r3flyApi<'a> {
         language: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         // First deploy the code
-        self.deploy(rho_code, use_bigger_phlo_price, language).await?;
-        
+        self.deploy(rho_code, use_bigger_phlo_price, language)
+            .await?;
+
         // Then propose a block
         self.propose().await
     }
@@ -276,14 +273,14 @@ impl<'a> F1r3flyApi<'a> {
 
             // Send the query
             let response = deploy_service_client.is_finalized(query).await?;
-            
+
             // Process the response
             let message = response
                 .get_ref()
                 .message
                 .as_ref()
                 .ok_or("is_finalized result not found")?;
-            
+
             match message {
                 IsFinalizedResponseMessage::Error(service_error) => {
                     return Err(service_error.clone().into());
@@ -322,7 +319,7 @@ impl<'a> F1r3flyApi<'a> {
             .duration_since(UNIX_EPOCH)
             .expect("Failed to get system time")
             .as_millis() as i64;
-            
+
         // Create a projection with only the fields used for signature calculation
         // IMPORTANT: The language field is deliberately excluded from signature calculation
         let projection = DeployDataProto {
@@ -337,25 +334,25 @@ impl<'a> F1r3flyApi<'a> {
             deployer: prost::bytes::Bytes::new(),
             sig_algorithm: String::new(),
         };
-        
+
         // Serialize the projection for hashing
         let serialized = projection.encode_to_vec();
-        
+
         // Hash with Blake2b256
         let digest = blake2b_256_hash(&serialized);
-        
+
         // Sign the digest with secp256k1
         let secp = Secp256k1::new();
         let message = Secp256k1Message::from_digest(digest.into());
         let signature = secp.sign_ecdsa(&message, &self.signing_key);
-        
+
         // Get signature in DER format
         let sig_bytes = signature.serialize_der().to_vec();
-        
+
         // Get the public key in uncompressed format
         let public_key = self.signing_key.public_key(&secp);
         let pub_key_bytes = public_key.serialize_uncompressed().to_vec();
-        
+
         // Return the complete deploy message
         DeployDataProto {
             term: code,
@@ -385,12 +382,12 @@ fn extract_par_data(par: &Par) -> Option<String> {
                 models::rhoapi::expr::ExprInstance::GInt(i) => Some(i.to_string()),
                 models::rhoapi::expr::ExprInstance::GBool(b) => Some(b.to_string()),
                 // Add other types as needed
-                _ => Some("Complex expression".to_string())
+                _ => Some("Complex expression".to_string()),
             }
         } else {
             None
         }
-    } 
+    }
     // Check for sends
     else if !par.sends.is_empty() {
         Some("Send operation".to_string())

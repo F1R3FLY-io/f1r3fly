@@ -4,7 +4,9 @@ use prost::Message;
 
 use crate::{
     casper::{
-        ApprovedBlockProto, ApprovedBlockRequestProto, BlockApprovalProto, BlockHashMessageProto, BlockMessageProto, BlockRequestProto, ForkChoiceTipRequestProto, HasBlockRequestProto, NoApprovedBlockAvailableProto, StoreItemsMessageRequestProto, UnapprovedBlockProto
+        ApprovedBlockProto, ApprovedBlockRequestProto, BlockApprovalProto, BlockHashMessageProto,
+        BlockMessageProto, BlockRequestProto, ForkChoiceTipRequestProto, HasBlockRequestProto,
+        NoApprovedBlockAvailableProto, StoreItemsMessageRequestProto, UnapprovedBlockProto,
     },
     routing::Packet,
 };

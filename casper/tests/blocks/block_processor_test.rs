@@ -8,8 +8,7 @@ use block_storage::rust::{
     dag::block_dag_key_value_storage::BlockDagKeyValueStorage,
 };
 use casper::rust::{
-    blocks::block_processor::BlockProcessorDependencies,
-    engine::block_retriever::BlockRetriever,
+    blocks::block_processor::BlockProcessorDependencies, engine::block_retriever::BlockRetriever,
 };
 use comm::rust::{
     peer_node::PeerNode,
@@ -309,17 +308,17 @@ async fn block_processor_components_should_work_together() {
     // 1. Add block as pendant (no dependencies)
     // 2. Add another block that depends on the first one
     // 3. Remove the first block (which is now a parent)
-    
-    // 1. Add test_block as pendant (no dependencies) 
+
+    // 1. Add test_block as pendant (no dependencies)
     let result = fixture
         .dependencies
         .commit_to_buffer(&fixture.test_block, None)
         .await;
     assert!(result.is_ok());
-    
+
     // Verify test_block is pendant
     let buffer = fixture.dependencies.casper_buffer().lock().unwrap();
-    let block_hash_serde = 
+    let block_hash_serde =
         models::rust::block_hash::BlockHashSerde(fixture.test_block.block_hash.clone());
     assert!(buffer.is_pendant(&block_hash_serde));
     drop(buffer);
@@ -342,7 +341,7 @@ async fn block_processor_components_should_work_together() {
         shard_id: String::new(),
         extra_bytes: prost::bytes::Bytes::new(),
     };
-    
+
     let deps = HashSet::from([fixture.test_block.block_hash.clone()]);
     let result = fixture
         .dependencies

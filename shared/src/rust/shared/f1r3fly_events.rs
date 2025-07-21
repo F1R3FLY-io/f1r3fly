@@ -250,7 +250,7 @@ mod tests {
             let handle = tokio::spawn(async move {
                 let mut stream = events.consume();
                 let mut count = 0;
-                
+
                 // Add a timeout to avoid waiting forever
                 while let Some(_) = tokio::time::timeout(Duration::from_millis(100), stream.next())
                     .await
@@ -265,7 +265,7 @@ mod tests {
             });
             handles.push(handle);
         }
-        
+
         // Give consumers time to start up
         tokio::time::sleep(Duration::from_millis(10)).await;
 

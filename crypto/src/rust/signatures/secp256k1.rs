@@ -1,11 +1,11 @@
 use super::signatures_alg::SignaturesAlg;
 use crate::rust::{private_key::PrivateKey, public_key::PublicKey};
+use ed25519_dalek::ed25519::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::VerifyingKey;
 use k256::{
     ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey},
     elliptic_curve::generic_array::GenericArray,
 };
-use ed25519_dalek::ed25519::signature::hazmat::PrehashVerifier;
 
 use typenum::U32;
 
@@ -28,8 +28,11 @@ impl SignaturesAlg for Secp256k1 {
         // Scala implementation always expects 32-byte hashes (Blake2b256 or SHA256)
         // This matches the Scala comment: "@param data The data which was signed, must be exactly 32 bytes"
         if data.len() != 32 {
-            log::warn!("secp256k1.verify: expected 32 bytes (hash), got {} bytes. Data: {}",
-                      data.len(), hex::encode(data));
+            log::warn!(
+                "secp256k1.verify: expected 32 bytes (hash), got {} bytes. Data: {}",
+                data.len(),
+                hex::encode(data)
+            );
             return false;
         }
 
@@ -46,16 +49,21 @@ impl SignaturesAlg for Secp256k1 {
         // Scala implementation always expects 32-byte hashes
         // This matches the Scala comment: "@param data Message hash, 32 bytes"
         if data.len() != 32 {
-            log::warn!("secp256k1.sign: expected 32 bytes (hash), got {} bytes. Data: {}", 
-                      data.len(), hex::encode(data));
+            log::warn!(
+                "secp256k1.sign: expected 32 bytes (hash), got {} bytes. Data: {}",
+                data.len(),
+                hex::encode(data)
+            );
         }
 
         let key_bytes = GenericArray::clone_from_slice(sec);
         let signing_key = SigningKey::from_bytes(&key_bytes).expect("Invalid private key");
 
         // Always use prehash signing since we expect hashed data
-        let signature: Signature = signing_key.sign_prehash(data).expect("Failed to sign prehash");
-        
+        let signature: Signature = signing_key
+            .sign_prehash(data)
+            .expect("Failed to sign prehash");
+
         signature.to_der().as_bytes().to_vec()
     }
 
@@ -141,10 +149,11 @@ mod tests {
     fn verifies_the_given_secp256k1_signature_in_native_code() {
         let secp256k1 = Secp256k1;
         let data = Sha256::digest(b"testing");
-        
+
         // Generate a test key pair and signature using our implementation
-        let private_key = hex::decode("54d4e576251b6c7b95af0349a5a31e583e982edeb9856a59bde14f6be5a302b3")
-            .expect("Failed to decode private key");
+        let private_key =
+            hex::decode("54d4e576251b6c7b95af0349a5a31e583e982edeb9856a59bde14f6be5a302b3")
+                .expect("Failed to decode private key");
         let public_key = secp256k1.to_public(&PrivateKey::from_bytes(&private_key));
         let signature = secp256k1.sign(&data, &private_key);
 
@@ -164,15 +173,18 @@ mod tests {
 
         // Generate the signature with our implementation - don't hardcode expected value
         let generated_signature = secp256k1.sign(&data, &private_key);
-        
+
         // Verify that our generated signature is valid
         let public_key = secp256k1.to_public(&PrivateKey::from_bytes(&private_key));
         let is_valid = secp256k1.verify(&data, &generated_signature, &public_key.bytes);
-        
+
         assert!(is_valid, "Generated signature should be valid");
-        
+
         // Ensure signature is DER-encoded (starts with 0x30)
-        assert_eq!(generated_signature[0], 0x30, "Signature should be DER-encoded");
+        assert_eq!(
+            generated_signature[0], 0x30,
+            "Signature should be DER-encoded"
+        );
     }
 
     #[test]
@@ -331,7 +343,7 @@ mod tests {
 
         // But original signature should not work with different hash
         assert!(!secp256k1.verify(&different_data, &signature, &public_key.bytes));
-        
+
         // And different signature should not work with original hash
         assert!(!secp256k1.verify(&data, &different_signature, &public_key.bytes));
     }
@@ -339,16 +351,17 @@ mod tests {
     #[test]
     fn verify_scala_generated_signature() {
         let secp256k1 = Secp256k1;
-        
+
         // Create a realistic Blake2b256 hash from known data (simulating blessed contracts)
         use crate::rust::hash::blake2b256::Blake2b256;
         let test_data = b"test data for blessed contract signature";
         let blake2b_hash = Blake2b256::hash(test_data.to_vec());
-        
+
         // Use a known private key from ListOps
-        let private_key = hex::decode("867c21c6a3245865444d80e49cac08a1c11e23b35965b566bbe9f49bb9897511")
-            .expect("Failed to decode private key");
-        
+        let private_key =
+            hex::decode("867c21c6a3245865444d80e49cac08a1c11e23b35965b566bbe9f49bb9897511")
+                .expect("Failed to decode private key");
+
         // Generate public key and signature using our implementation
         let public_key = secp256k1.to_public(&PrivateKey::from_bytes(&private_key));
         let signature = secp256k1.sign(&blake2b_hash, &private_key);
