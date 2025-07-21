@@ -75,6 +75,41 @@ impl F1r3flyStateCommitment {
         Ok(commit_verify::mpc::Message::from(commitment_id.to_byte_array()))
     }
     
+    /// Get the commitment hash for Bitcoin OP_RETURN (32 bytes only)
+    /// 
+    /// This creates a Blake2b hash of all the F1r3fly state data,
+    /// which is compact enough for Bitcoin OP_RETURN while preserving
+    /// the complete commitment integrity.
+    pub fn commitment_hash(&self) -> [u8; 32] {
+        let mut hasher = Blake2b::<U32>::new();
+        
+        // Hash all the commitment data
+        hasher.update(&self.lfb_hash);
+        hasher.update(&self.rspace_root);
+        hasher.update(&self.block_height.to_le_bytes());
+        hasher.update(&self.timestamp.to_le_bytes());
+        hasher.update(&self.validator_set_hash);
+        
+        hasher.finalize().into()
+    }
+
+    /// Serialize the commitment data for OP_RETURN (32 bytes)
+    pub fn to_opreturn_data(&self) -> Vec<u8> {
+        // Use just the 32-byte hash for OP_RETURN to stay under limits
+        self.commitment_hash().to_vec()
+    }
+
+    /// Serialize the full commitment data (for storage/verification)
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = Vec::with_capacity(32 + 32 + 8 + 8 + 32); // 112 bytes total
+        data.extend_from_slice(&self.lfb_hash);
+        data.extend_from_slice(&self.rspace_root);
+        data.extend_from_slice(&self.block_height.to_le_bytes());
+        data.extend_from_slice(&self.timestamp.to_le_bytes());
+        data.extend_from_slice(&self.validator_set_hash);
+        data
+    }
+    
     /// Serialize the commitment data deterministically
     fn serialize_deterministic(&self) -> AnchorResult<Vec<u8>> {
         use crate::commitment::serialization::deterministic_serialize;

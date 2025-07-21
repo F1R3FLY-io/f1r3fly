@@ -10,34 +10,18 @@ impl OpReturnCommitter {
     /// Maximum data size for OP_RETURN (Bitcoin protocol limit)
     pub const MAX_DATA_SIZE: usize = 80;
 
-    /// Create a new OP_RETURN committer
+    /// Create new OP_RETURN committer
     pub fn new() -> Self {
         Self
     }
     
-    /// Create OP_RETURN commitment for F1r3fly state
-    pub fn create_commitment(
-        &self,
-        state: &F1r3flyStateCommitment,
-    ) -> AnchorResult<OpReturnCommitment> {
-        // Create the state commitment hash
-        let commitment_hash = state.to_bitcoin_commitment()?;
+    /// Create OP_RETURN commitment from F1r3fly state
+    pub fn create_commitment(&self, state: &F1r3flyStateCommitment) -> AnchorResult<OpReturnCommitment> {
+        // Use the compact 32-byte hash instead of full data
+        let data = state.to_opreturn_data();
+        let hash = state.commitment_hash();
         
-        // Create OP_RETURN payload
-        let mut data = Vec::new();
-        
-        // F1r3fly protocol identifier (8 bytes)
-        data.extend_from_slice(b"F1R3FLY\0");
-        
-        // State commitment hash (32 bytes)
-        data.extend_from_slice(&commitment_hash);
-        
-        // Additional state metadata
-        data.extend_from_slice(&state.block_height.to_le_bytes());
-        data.extend_from_slice(&state.timestamp.to_le_bytes());
-        data.extend_from_slice(&state.validator_set_hash[0..22]); // Truncate to fit in 80 bytes
-        
-        OpReturnCommitment::new(data)
+        Ok(OpReturnCommitment { data, hash })
     }
     
     /// Create OP_RETURN output for Bitcoin transaction

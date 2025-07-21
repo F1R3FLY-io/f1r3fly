@@ -98,6 +98,7 @@ impl TransactionValidator {
             Some('m') | Some('n') | Some('2') => Network::Testnet3,
             Some('t') if address.to_string().starts_with("tb1") => Network::Testnet3,
             Some('b') if address.to_string().starts_with("bc1") => Network::Mainnet,
+            Some('b') if address.to_string().starts_with("bcrt1") => Network::Regtest,
             _ => {
                 return Err(AnchorError::InvalidAddress {
                     address: address.to_string(),
@@ -112,6 +113,7 @@ impl TransactionValidator {
             (Network::Testnet3, Network::Testnet3) => true,
             (Network::Signet, Network::Testnet3) => true,
             (Network::Regtest, Network::Testnet3) => true,
+            (Network::Regtest, Network::Regtest) => true,
             _ => false,
         };
 

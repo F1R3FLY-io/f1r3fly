@@ -9,9 +9,10 @@ use crate::bitcoin::esplora::EsploraClient;
 use crate::bitcoin::esplora::EsploraUtxo;
 
 // bp-std PSBT infrastructure
-use bpstd::psbt::{Beneficiary, Psbt, PsbtVer, Utxo};
-use bpstd::{Network, Sats, Txid};
-use bitcoin::{Address, OutPoint, TxOut, Amount, ScriptBuf};
+use bpstd::psbt::{Beneficiary, Psbt, PsbtVer, Utxo, UnsignedTxIn, UnsignedTx};
+use bpstd::{Network, Sats, Txid, Outpoint, Vout, SeqNo, ScriptPubkey, TxOut, VarIntArray, TxVer, LockTime};
+use bitcoin::{Address, OutPoint, Amount, ScriptBuf, TxOut as BitcoinTxOut};
+use std::str::FromStr;
 
 /// PSBT request parameters for F1r3fly commitment transactions
 #[derive(Clone, Debug)]
@@ -107,7 +108,7 @@ pub struct PsbtTransaction {
 
 impl PsbtTransaction {
     /// Get the commitment output if it exists
-    pub fn commitment_output(&self) -> Option<&TxOut> {
+    pub fn commitment_output(&self) -> Option<&BitcoinTxOut> {
         // Note: This is a simplified implementation
         // In reality, we'd need to access the PSBT's transaction outputs
         None
@@ -602,25 +603,77 @@ impl AnchorPsbt {
         &self,
         state: &F1r3flyStateCommitment,
         coin_selection: CoinSelection,
-        _change_address: &Address,
+        change_address: &Address,
     ) -> AnchorResult<PsbtTransaction> {
         // Create the OP_RETURN commitment
         let committer = OpReturnCommitter::new();
         let commitment = committer.create_commitment(state)?;
 
-        // Create PSBT structure - this is simplified
-        // In a real implementation, we'd properly populate the PSBT with:
-        // - Input UTXOs with witness/script data
-        // - Output scripts and amounts
-        // - Fee calculation
-        let psbt = Psbt::create(PsbtVer::V2);
+        // Create unsigned transaction first
+        let mut unsigned_inputs = Vec::new();
+        for enhanced_utxo in &coin_selection.selected_utxos {
+            let outpoint = Outpoint::new(
+                Txid::from_str(&enhanced_utxo.outpoint.txid.to_string())
+                    .map_err(|e| crate::error::AnchorError::InvalidData(format!("Invalid txid: {}", e)))?,
+                Vout::from_u32(enhanced_utxo.outpoint.vout)
+            );
+            
+            let unsigned_input = UnsignedTxIn {
+                prev_output: outpoint,
+                sequence: SeqNo::from_consensus_u32(0xfffffffd), // Enable RBF
+            };
+            unsigned_inputs.push(unsigned_input);
+        }
+
+        // Create outputs
+        let mut unsigned_outputs = Vec::new();
+        
+        // Add change output
+        let change_script = ScriptPubkey::from_checked(change_address.script_pubkey().as_bytes().to_vec());
+        let change_output = TxOut::new(change_script, Sats::from_sats(coin_selection.change_amount.to_sat()));
+        unsigned_outputs.push(change_output);
+
+        // Add OP_RETURN commitment output
+        let commitment_script_bytes = {
+            let mut script_bytes = vec![0x6a]; // OP_RETURN opcode
+            let data = commitment.data();
+            if !data.is_empty() {
+                script_bytes.push(data.len() as u8);
+                script_bytes.extend_from_slice(data);
+            }
+            script_bytes
+        };
+
+        let commitment_script = ScriptPubkey::from_checked(commitment_script_bytes);
+        let commitment_output = TxOut::new(commitment_script, Sats::ZERO);
+        unsigned_outputs.push(commitment_output);
+
+        // Create unsigned transaction
+        let unsigned_tx = UnsignedTx {
+            version: TxVer::V2,
+            inputs: VarIntArray::from_iter_checked(unsigned_inputs),
+            outputs: VarIntArray::from_iter_checked(unsigned_outputs),
+            lock_time: LockTime::ZERO,
+        };
+
+        // Create PSBT from unsigned transaction
+        let mut psbt = Psbt::from_tx(unsigned_tx);
+        
+        // Add witness UTXO data to inputs for SegWit signing
+        for (i, enhanced_utxo) in coin_selection.selected_utxos.iter().enumerate() {
+            if let Some(input) = psbt.input_mut(i) {
+                let witness_utxo = TxOut::new(
+                    ScriptPubkey::from_checked(enhanced_utxo.script_pubkey.as_bytes().to_vec()),
+                    Sats::from_sats(enhanced_utxo.amount.to_sat())
+                );
+                input.witness_utxo = Some(witness_utxo);
+            }
+        }
+
+        let commitment_output_index = 1; // OP_RETURN output is second (after change)
 
         // Calculate fee based on actual transaction size
         let total_fee = coin_selection.total_input_value - coin_selection.change_amount;
-
-        // For now, return a basic PSBT structure
-        // The commitment output will be at index 1 (after change output)
-        let commitment_output_index = 1;
 
         Ok(PsbtTransaction {
             psbt,
