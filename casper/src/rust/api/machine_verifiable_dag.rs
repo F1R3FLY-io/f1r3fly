@@ -29,7 +29,7 @@ impl MachineVerifiableDag {
     where
         F: Fn(BlockHash) -> Vec<BlockHash>,
     {
-        let mut acc = Vec::new();
+        let mut result_parts = Vec::new();
 
         // Equivalent to toposort.foldM(List.empty[VerifiableEdge])
         for block_hashes in toposort {
@@ -56,10 +56,12 @@ impl MachineVerifiableDag {
                 })
                 .collect();
 
-            // Equivalent to _ ++ acc (prepend to accumulator)
-            acc.splice(0..0, new_edges);
+            // Collect each group separately to reverse group order later (not individual elements)
+            result_parts.push(new_edges);
         }
 
-        acc
+        // Equivalent to _ ++ acc: reverse the order of groups and flatten
+        // This gives us O(n) performance instead of O(n²) from splice(0..0, ...)
+        result_parts.into_iter().rev().flatten().collect()
     }
 }
