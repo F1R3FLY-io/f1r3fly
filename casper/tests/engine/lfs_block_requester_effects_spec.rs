@@ -426,16 +426,16 @@ mod tests {
                         None => panic!("Expected 2 requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut requests);
                 let (_, _, hash7, _, hash5, _, _, _, _) = get_hashes();
                 let expected = vec![hash7, hash5];
-                
+
                 assert_eq!(
                     requests, expected,
                     "Should initially request dependencies hash7 and hash5"
                 );
-                
+
                 // No other requests should be sent
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -451,7 +451,7 @@ mod tests {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 // Dependent block is already saved
                 {
                     let setup = mock.setup();
@@ -459,9 +459,9 @@ mod tests {
                     let b6_map = as_map(&[b6]);
                     test_state.add_blocks(b6_map);
                 }
-                
+
                 mock.receive_block(&[b7, b5]).await.expect("Should receive blocks");
-                
+
                 let mut new_requests = Vec::new();
                 for _ in 0..2 {
                     match mock.next_request().await {
@@ -469,16 +469,16 @@ mod tests {
                         None => panic!("Expected 2 new requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut new_requests);
                 let (_, _, _, _, _, hash4, hash3, _, _) = get_hashes();
                 let expected_new = vec![hash4, hash3];
-                
+
                 assert_eq!(
                     new_requests, expected_new,
                     "Should request hash4 and hash3 (dependencies of received blocks), but NOT hash6 since b6 is already saved"
                 );
-                
+
                 // No other requests should be sent
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -494,7 +494,7 @@ mod tests {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 Ok(())
             },
         )
@@ -522,19 +522,19 @@ mod tests {
                         None => panic!("Expected 2 requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut requests);
                 let (_, _, hash7, _, hash5, _, _, _, _) = get_hashes();
                 let expected = vec![hash7, hash5];
-                
+
                 assert_eq!(
                     requests, expected,
                     "Should initially request dependencies hash7 and hash5 from starting block"
                 );
-                
+
                 // Receive only one dependency
                 mock.receive_block(&[b7]).await.expect("Should receive b7");
-                
+
                 // No new requests until all dependencies received
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -550,10 +550,10 @@ mod tests {
                         // Timeout is expected - no new requests should be sent yet
                     }
                 }
-                
+
                 // Receive the last dependency (the last of latest blocks)
                 mock.receive_block(&[b5]).await.expect("Should receive b5");
-                
+
                 // All dependencies should be requested
                 let mut new_requests = Vec::new();
                 for _ in 0..2 {
@@ -562,16 +562,16 @@ mod tests {
                         None => panic!("Expected 2 new requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut new_requests);
                 let (_, _, _, hash6, _, _, hash3, _, _) = get_hashes();
                 let expected_new = vec![hash6, hash3];
-                
+
                 assert_eq!(
                     new_requests, expected_new,
                     "Should request hash6 and hash3 (dependencies of received blocks) only after all initial dependencies are received"
                 );
-                
+
                 Ok(())
             },
         )
@@ -790,29 +790,29 @@ mod tests {
                         None => panic!("Expected 1 initial request but channel closed early"),
                     }
                 }
-                
+
                 // Check initial request is for hash8
                 reverse_lexicographic_sort(&mut initial_requests);
                 let (_, hash8, _, _, _, _, _, _, _) = get_hashes();
                 let expected_initial = vec![hash8];
-                
+
                 assert_eq!(
                     initial_requests, expected_initial,
                     "Should initially request hash8 (dependency of b9)"
                 );
-                
+
                 // Store block hashes before moving blocks
                 let b8_hash = b8.block_hash.clone();
                 let b7_hash = b7.block_hash.clone();
-                
+
                 // Receive first block dependencies
                 mock.receive_block(&[b8]).await.expect("Should receive b8");
-                
+
                 // Only valid block should be saved
                 let first_save = mock.next_save().await.expect("Should save b8");
                 assert_eq!(first_save.0, b8_hash, "Should save b8 with correct hash");
                 assert_eq!(first_save.1.block_hash, b8_hash, "Should save correct b8 block");
-                
+
                 // No other blocks should be saved immediately
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -828,7 +828,7 @@ mod tests {
                         // Timeout is expected - no additional saves should happen yet
                     }
                 }
-                
+
                 // Set invalid blocks (hash5 is invalid)
                 {
                     let setup = mock.setup();
@@ -838,15 +838,15 @@ mod tests {
                     invalid_set.insert(hash5);
                     test_state.set_invalid(invalid_set);
                 }
-                
+
                 // Receive dependencies (b7 is valid, b5 is invalid)
                 mock.receive_block(&[b7, b5]).await.expect("Should receive b7 and b5");
-                
+
                 // Only valid block should be saved
                 let second_save = mock.next_save().await.expect("Should save b7");
                 assert_eq!(second_save.0, b7_hash, "Should save b7 with correct hash");
                 assert_eq!(second_save.1.block_hash, b7_hash, "Should save correct b7 block");
-                
+
                 // No other blocks should be saved (b5 should be skipped due to invalid status)
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -862,7 +862,7 @@ mod tests {
                         // Timeout is expected - b5 should not be saved due to invalid status
                     }
                 }
-                
+
                 // Only dependencies from valid block should be requested
                 let mut new_requests = Vec::new();
                 for _ in 0..3 {
@@ -871,16 +871,16 @@ mod tests {
                         None => panic!("Expected 3 new requests but channel closed early"),
                     }
                 }
-                
+
                 reverse_lexicographic_sort(&mut new_requests);
                 let (_, _, hash7, hash6, hash5, _, _, _, _) = get_hashes();
                 let expected_new = vec![hash7, hash6, hash5];
-                
+
                 assert_eq!(
                     new_requests, expected_new,
                     "Should request hash7, hash6, hash5 (dependencies from both valid and invalid blocks)"
                 );
-                
+
                 // No other requests should be sent
                 match tokio::time::timeout(
                     std::time::Duration::from_millis(100),
@@ -896,7 +896,7 @@ mod tests {
                         // Timeout is expected - no additional requests should be sent
                     }
                 }
-                
+
                 Ok(())
             },
         )
@@ -1169,14 +1169,14 @@ mod tests {
                     Some(req) => req,
                     None => panic!("Expected initial request but channel closed early"),
                 };
-                
+
                 let (_, hash8, _, _, _, _, _, _, _) = get_hashes();
                 assert_eq!(initial_request, hash8, "Should initially request hash8 (dependency of b9)");
-                
+
                 // Don't send any response - let the timeout trigger
                 // Wait exactly for one timeout period + small buffer
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                
+
                 // Wait for exactly one timeout-triggered resend request
                 let timeout_request = match tokio::time::timeout(
                     std::time::Duration::from_millis(300), // Allow time for timeout processing
@@ -1190,12 +1190,12 @@ mod tests {
                         panic!("Timeout resend functionality failed - no resend request received within expected timeframe");
                     }
                 };
-                
+
                 assert_eq!(timeout_request, hash8, "Should resend hash8 request after timeout");
-                
+
                 // Verify we got exactly 2 requests for the same hash (original + resend)
                 log::info!("Successfully received initial request and one timeout resend for hash8");
-                
+
                 // Wait a short period to check if any additional unexpected requests arrive
                 // This should be shorter than the timeout period to avoid triggering another resend
                 match tokio::time::timeout(
@@ -1217,7 +1217,7 @@ mod tests {
                         log::info!("No additional requests in short period - timeout behavior is working correctly");
                     }
                 }
-                
+
                 Ok(())
             },
         )

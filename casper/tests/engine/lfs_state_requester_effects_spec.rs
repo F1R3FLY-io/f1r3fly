@@ -945,7 +945,7 @@ mod tests {
 
             // Try to get stream states after validation error to ensure stream terminates
             // Scala equivalent: result <- stream.compile.lastOrError.attempt
-            
+
             // The stream should emit one final state showing termination, then stop
             let final_state = tokio::time::timeout(
                 std::time::Duration::from_millis(200),
@@ -1140,7 +1140,7 @@ mod tests {
             );
 
             // Don't send any response - let the timeout trigger
-            // Wait exactly for one timeout period + small buffer  
+            // Wait exactly for one timeout period + small buffer
             // Scala equivalent: No response sent, timeout should trigger resend
             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 
