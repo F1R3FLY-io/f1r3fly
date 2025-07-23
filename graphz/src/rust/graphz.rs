@@ -422,11 +422,13 @@ impl Graphz {
 
     pub async fn close(&self) -> Result<(), GraphzError> {
         let content = &self.tab[TAB.len()..];
-        
+
         // Equivalent to Scala: val suffix = if (content.isEmpty) "" else "\n"
         let suffix = if content.is_empty() { "" } else { "\n" };
 
-        self.serializer.push(&format!("{}}}", content), suffix).await
+        self.serializer
+            .push(&format!("{}}}", content), suffix)
+            .await
     }
 
     fn edge_mk_str(&self, src: &str, dst: &str, attr_str: &str) -> String {
