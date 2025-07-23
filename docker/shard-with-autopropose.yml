@@ -12,7 +12,8 @@ services:
       [
         "run",
         "--host=$BOOTSTRAP_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "--allow-private-addresses",
+        "--validator-private-key=$BOOTSTRAP_PRIVATE_KEY"
       ]
     ports:
       - "40400:40400"
@@ -22,13 +23,15 @@ services:
       - "40404:40404"
       - "40405:40405"
     volumes:
-      - ./data/$BOOTSTRAP_HOST:/var/lib/rnode/
+      # Bootstrap-specific configuration (ceremony master)
+      - ./conf/bootstrap-ceremony.conf:/var/lib/rnode/rnode.conf
       - ./genesis/wallets.txt:/var/lib/rnode/genesis/wallets.txt
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
-      - ./conf/bootstrap.conf:/var/lib/rnode/rnode.conf
-      - ./conf/bootstrap.certificate.pem:/var/lib/rnode/node.certificate.pem
-      - ./conf/bootstrap.key.pem:/var/lib/rnode/node.key.pem
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      # Node-specific volumes
+      - ./data/$BOOTSTRAP_HOST:/var/lib/rnode/
+      - ./certs/bootstrap/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+      - ./certs/bootstrap/node.key.pem:/var/lib/rnode/node.key.pem:ro
 
   validator1:
     <<: *default-rnode
@@ -37,7 +40,11 @@ services:
       [
         "run",
         "--host=$VALIDATOR1_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "--allow-private-addresses",
+        "--bootstrap=rnode://$BOOTSTRAP_NODE_ID@$BOOTSTRAP_HOST?protocol=40400&discovery=40404",
+        "--validator-public-key=$VALIDATOR1_PUBLIC_KEY",
+        "--validator-private-key=$VALIDATOR1_PRIVATE_KEY",
+        "--genesis-validator"
       ]
     ports:
       - "40410:40400"
@@ -47,13 +54,13 @@ services:
       - "40414:40404"
       - "40415:40405"
     volumes:
-      - ./data/$VALIDATOR1_HOST:/var/lib/rnode/
+      - ./conf/shared-rnode.conf:/var/lib/rnode/rnode.conf
       - ./genesis/wallets.txt:/var/lib/rnode/genesis/wallets.txt
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
-      - ./conf/validator1.conf:/var/lib/rnode/rnode.conf
-      - ./conf/validator1.certificate.pem:/var/lib/rnode/node.certificate.pem
-      - ./conf/validator1.key.pem:/var/lib/rnode/node.key.pem
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - ./data/$VALIDATOR1_HOST:/var/lib/rnode/
+      - ./certs/validator1/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+      - ./certs/validator1/node.key.pem:/var/lib/rnode/node.key.pem:ro
 
   validator2:
     <<: *default-rnode
@@ -62,7 +69,11 @@ services:
       [
         "run",
         "--host=$VALIDATOR2_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "--allow-private-addresses",
+        "--bootstrap=rnode://$BOOTSTRAP_NODE_ID@$BOOTSTRAP_HOST?protocol=40400&discovery=40404",
+        "--validator-public-key=$VALIDATOR2_PUBLIC_KEY",
+        "--validator-private-key=$VALIDATOR2_PRIVATE_KEY",
+        "--genesis-validator"
       ]
     ports:
       - "40420:40400"
@@ -72,13 +83,13 @@ services:
       - "40424:40404"
       - "40425:40405"
     volumes:
-      - ./data/$VALIDATOR2_HOST:/var/lib/rnode/
+      - ./conf/shared-rnode.conf:/var/lib/rnode/rnode.conf
       - ./genesis/wallets.txt:/var/lib/rnode/genesis/wallets.txt
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
-      - ./conf/validator2.conf:/var/lib/rnode/rnode.conf
-      - ./conf/validator2.certificate.pem:/var/lib/rnode/node.certificate.pem
-      - ./conf/validator2.key.pem:/var/lib/rnode/node.key.pem
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - ./data/$VALIDATOR2_HOST:/var/lib/rnode/
+      - ./certs/validator2/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+      - ./certs/validator2/node.key.pem:/var/lib/rnode/node.key.pem:ro
 
   validator3:
     <<: *default-rnode
@@ -87,7 +98,11 @@ services:
       [
         "run",
         "--host=$VALIDATOR3_HOST",
-        "-Dlogback.configurationFile=/var/lib/rnode/logback.xml"
+        "--allow-private-addresses",
+        "--bootstrap=rnode://$BOOTSTRAP_NODE_ID@$BOOTSTRAP_HOST?protocol=40400&discovery=40404",
+        "--validator-public-key=$VALIDATOR3_PUBLIC_KEY",
+        "--validator-private-key=$VALIDATOR3_PRIVATE_KEY",
+        "--genesis-validator"
       ]
     ports:
       - "40430:40400"
@@ -97,13 +112,13 @@ services:
       - "40434:40404"
       - "40435:40405"
     volumes:
-      - ./data/$VALIDATOR3_HOST:/var/lib/rnode/
+      - ./conf/shared-rnode.conf:/var/lib/rnode/rnode.conf
       - ./genesis/wallets.txt:/var/lib/rnode/genesis/wallets.txt
       - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
-      - ./conf/validator3.conf:/var/lib/rnode/rnode.conf
-      - ./conf/validator3.certificate.pem:/var/lib/rnode/node.certificate.pem
-      - ./conf/validator3.key.pem:/var/lib/rnode/node.key.pem
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - ./data/$VALIDATOR3_HOST:/var/lib/rnode/
+      - ./certs/validator3/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+      - ./certs/validator3/node.key.pem:/var/lib/rnode/node.key.pem:ro
 
   # =================================================================
   # AUTOPROPOSE SERVICE - RChain-Inspired Continuous Block Proposing

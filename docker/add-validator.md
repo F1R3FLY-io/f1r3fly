@@ -5,9 +5,9 @@ Branch - `add-validator`
 ----
 
 1. Run initial shard: `docker compose -f docker/shard.yml up`
-2. Wait a couple of minutes for all current nodes to sync. Once you see `Making a transition to Running state. Approved Block #0 (<block_number>) with empty parents (supposedly genesis)` for each node, you are ready to proceed to next step.
+2. Wait a couple of minutes for all current nodes to sync. Once you see `Making a transition to Running state.` for each node, you are ready to proceed to next step.
 3. In separate terminal, run read-only node: `docker compose -f docker/observer.yml up`.
-4. Wait until you see `Making a transition to Running state. Approved Block #0 (<block_number>) with empty parents (supposedly genesis)` and then in the terminal where the initial shard is running, you should see 4 peers for each node.
+4. Wait until you see `Making a transition to Running state.` and then in the terminal where the initial shard is running, you should see 4 peers for each node.
 
 At this point, you have stood up a shard with one bootstrap node, three validators and a read-only node. The bootstrap node does not participate in validation, it only acts as orchestrator for the other nodes. Only the three validator nodes can participate in validating blocks. The read-only (observer) node is needed to fetch information about the shard.
 

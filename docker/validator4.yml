@@ -24,8 +24,8 @@ services:
     volumes:
       - ./data/$VALIDATOR4_HOST:/var/lib/rnode/
       - ./conf/validator4.conf:/var/lib/rnode/rnode.conf
-      # - ./conf/validator4.certificate.pem:/var/lib/rnode/node.certificate.pem
-      # - ./conf/validator4.key.pem:/var/lib/rnode/node.key.pem
+      # - ./certs/validator4/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+      # - ./certs/validator4/node.key.pem:/var/lib/rnode/node.key.pem:ro
       - ./conf/logback.xml:/var/lib/rnode/logback.xml
 
 networks:
