@@ -9,6 +9,7 @@ edition = "2021"
 async-trait = "0.1.74"
 comm = { path = "../comm" }
 crypto = { path = "../crypto" }
+graphz = { path = "../graphz" }
 models = { path = "../models" }
 rholang = { path = "../rholang" }
 rspace_plus_plus = { path = "../rspace++" }
