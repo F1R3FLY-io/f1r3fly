@@ -191,10 +191,49 @@ mod tests {
     }
 
     #[test]
-    fn test_commitment_transaction_creation() {
-        let state = F1r3flyStateCommitment::new([1u8; 32], [2u8; 32], 12345, 1234567890, [3u8; 32]);
-
-        let commitment = OpReturnCommitter::create_commitment(&state).unwrap();
+    fn test_commitment_transaction() {
+        let state = F1r3flyStateCommitment::new(
+            [1u8; 32], [2u8; 32], 100, 1642694400, [3u8; 32]
+        );
+        
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state).unwrap();
+        
+        let inputs = vec![];
+        let outputs = vec![];
+        
+        let tx = CommitmentTransaction::build_with_opret_commitment(&inputs, &outputs, &commitment).unwrap();
+        
+        assert_eq!(tx.transaction.output.len(), 1); // Should have commitment output
+        assert_eq!(tx.commitment_output_index, 0);
+    }
+    
+    #[test]
+    fn test_fee_calculation() {
+        let state = F1r3flyStateCommitment::new(
+            [1u8; 32], [2u8; 32], 100, 1642694400, [3u8; 32]
+        );
+        
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state).unwrap();
+        
+        let inputs = vec![];
+        let outputs = vec![];
+        
+        let tx = CommitmentTransaction::build_with_opret_commitment(&inputs, &outputs, &commitment).unwrap();
+        
+        // Should have calculated some fee (simplified fee calculation)
+        assert!(tx.total_fee.to_sat() > 0);
+    }
+    
+    #[test]
+    fn test_commitment_output() {
+        let state = F1r3flyStateCommitment::new(
+            [1u8; 32], [2u8; 32], 100, 1642694400, [3u8; 32]
+        );
+        
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state).unwrap();
 
         let inputs = vec![create_dummy_input()];
         let outputs = vec![create_dummy_output()];
@@ -217,7 +256,8 @@ mod tests {
     fn test_commitment_only_transaction() {
         let state = F1r3flyStateCommitment::new([1u8; 32], [2u8; 32], 12345, 1234567890, [3u8; 32]);
 
-        let commitment = OpReturnCommitter::create_commitment(&state).unwrap();
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state).unwrap();
 
         let inputs = vec![create_dummy_input()];
         let change_output = create_dummy_output();
@@ -234,7 +274,8 @@ mod tests {
     fn test_transaction_properties() {
         let state = F1r3flyStateCommitment::new([1u8; 32], [2u8; 32], 12345, 1234567890, [3u8; 32]);
 
-        let commitment = OpReturnCommitter::create_commitment(&state).unwrap();
+        let committer = OpReturnCommitter::new();
+        let commitment = committer.create_commitment(&state).unwrap();
         let inputs = vec![create_dummy_input()];
         let outputs = vec![create_dummy_output()];
 
