@@ -489,7 +489,7 @@ impl<T: TupleSpaceRequesterOps, R: RSpaceImporter + Clone + 'static>
 /// # Returns
 /// fs2.Stream processing all tuple space state (Scala: F[Stream[F, ST[StatePartPath]]])
 pub async fn stream<T: TupleSpaceRequesterOps, R: RSpaceImporter + Clone + 'static>(
-    approved_block: ApprovedBlock,
+    approved_block: &ApprovedBlock,
     mut tuple_space_message_receiver: mpsc::UnboundedReceiver<StoreItemsMessage>,
     request_timeout: Duration,
     request_ops: T,
