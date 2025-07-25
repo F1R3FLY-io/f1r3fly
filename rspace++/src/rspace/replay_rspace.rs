@@ -772,7 +772,7 @@ where
         self.replay_data = updated_replays;
     }
 
-    fn log_comm(
+    pub fn log_comm(
         &mut self,
         _data_candidates: &Vec<ConsumeCandidate<C, A>>,
         _channels: &Vec<C>,
@@ -785,7 +785,7 @@ where
         comm
     }
 
-    fn log_consume(
+    pub fn log_consume(
         &mut self,
         consume_ref: Consume,
         _channels: &Vec<C>,
@@ -797,7 +797,7 @@ where
         consume_ref
     }
 
-    fn log_produce(
+    pub fn log_produce(
         &mut self,
         produce_ref: Produce,
         _channel: &C,
