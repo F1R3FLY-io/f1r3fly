@@ -11,21 +11,21 @@ use models::rust::casper::protocol::casper_message::{
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
 
 use crate::rust::errors::CasperError;
-use crate::rust::Casper;
 
-pub trait Engine {
+/// Object-safe Engine trait that matches Scala Engine[F] behavior
+/// Note: with_casper method is not included here due to object-safety constraints
+/// Implementations should provide their own with_casper methods when needed
+pub trait Engine: Send + Sync {
     fn init(&self) -> Result<(), CasperError>;
 
     fn handle(&self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
 
-    fn with_casper<A>(
-        &self,
-        f: impl FnOnce(&mut dyn Casper) -> Result<A, CasperError>,
-        default: impl FnOnce() -> Result<A, CasperError>,
-    ) -> Result<A, CasperError>;
+    /// Clone the engine into a boxed trait object
+    fn clone_box(&self) -> Box<dyn Engine>;
 }
 
 pub fn noop() -> Result<impl Engine, CasperError> {
+    #[derive(Clone)]
     struct NoopEngine;
 
     impl Engine for NoopEngine {
@@ -37,12 +37,8 @@ pub fn noop() -> Result<impl Engine, CasperError> {
             Ok(())
         }
 
-        fn with_casper<A>(
-            &self,
-            _f: impl FnOnce(&mut dyn Casper) -> Result<A, CasperError>,
-            default: impl FnOnce() -> Result<A, CasperError>,
-        ) -> Result<A, CasperError> {
-            default()
+        fn clone_box(&self) -> Box<dyn Engine> {
+            Box::new(self.clone())
         }
     }
 
