@@ -86,9 +86,8 @@ impl<T: TransportLayer + Sync> Initializing<T> {
         );
 
         let block_request_stream = lfs_block_requester::stream(
-            approved_block.clone(),
-            // TODO: just use self.block_message_queue instead of clone?
-            self.block_message_queue.clone(),
+            &approved_block,
+            &self.block_message_queue,
             response_message_rx,
             min_block_number_for_deploy_lifespan,
             Duration::from_secs(30),
@@ -104,7 +103,7 @@ impl<T: TransportLayer + Sync> Initializing<T> {
             TupleSpaceRequester::new(&self.transport_layer, &self.rp_conf_ask);
 
         let tuple_space_stream = lfs_tuple_space_requester::stream(
-            approved_block,
+            &approved_block,
             tuple_space_rx,
             Duration::from_secs(120),
             tuple_space_requester,
