@@ -10,9 +10,31 @@ use models::rhoapi::Par;
 use models::ByteString;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::time::sleep;
+use std::time::{SystemTime, UNIX_EPOCH};
 use typenum::U32;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeployInfo {
+    pub deploy_id: String,
+    pub block_hash: Option<String>,
+    pub sender: Option<String>,
+    pub seq_num: Option<u64>,
+    pub sig: Option<String>,
+    pub sig_algorithm: Option<String>,
+    pub shard_id: Option<String>,
+    pub version: Option<u64>,
+    pub timestamp: Option<u64>,
+    pub status: DeployStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DeployStatus {
+    Pending,      // Deploy submitted but not yet in a block
+    Included,     // Deploy included in a block
+    NotFound,     // Deploy ID not found
+    Error(String), // Error occurred
+}
 
 /// Client for interacting with the F1r3fly API
 pub struct F1r3flyApi<'a> {
@@ -85,7 +107,16 @@ impl<'a> F1r3flyApi<'a> {
 
         match deploy_message {
             DeployResponseMessage::Error(service_error) => Err(service_error.clone().into()),
-            DeployResponseMessage::Result(result) => Ok(result.clone()),
+            DeployResponseMessage::Result(result) => {
+                // Extract the deploy ID from the response
+                if let Some(deploy_id) = result
+                    .strip_prefix("Success! DeployId is: ")
+                {
+                    Ok(deploy_id.to_string())
+                } else {
+                    Ok(result.clone()) // Return the full message if we can't extract the deploy ID
+                }
+            }
         }
     }
 
@@ -252,54 +283,201 @@ impl<'a> F1r3flyApi<'a> {
     pub async fn is_finalized(
         &self,
         block_hash: &str,
-        max_attempts: Option<u32>,
-        retry_delay_sec: Option<u64>,
+        max_attempts: u32,
+        retry_delay_sec: u64,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        let max_attempts = max_attempts.unwrap_or(12); // Default 12 attempts (1 minute with 5-second retry)
-        let retry_delay = Duration::from_secs(retry_delay_sec.unwrap_or(5)); // Default 5 second delay
         let mut attempts = 0;
-
-        // Connect to the F1r3fly node
-        let mut deploy_service_client =
-            DeployServiceClient::connect(format!("http://{}:{}/", self.node_host, self.grpc_port))
-                .await?;
 
         loop {
             attempts += 1;
 
-            // Create the query
+            // Connect to the F1r3fly node
+            let mut deploy_service_client = DeployServiceClient::connect(format!(
+                "http://{}:{}/",
+                self.node_host, self.grpc_port
+            ))
+            .await?;
+
+            // Query if the block is finalized
             let query = IsFinalizedQuery {
                 hash: block_hash.to_string(),
             };
 
-            // Send the query
-            let response = deploy_service_client.is_finalized(query).await?;
-
-            // Process the response
-            let message = response
-                .get_ref()
-                .message
-                .as_ref()
-                .ok_or("is_finalized result not found")?;
-
-            match message {
-                IsFinalizedResponseMessage::Error(service_error) => {
-                    return Err(service_error.clone().into());
+            match deploy_service_client.is_finalized(query).await {
+                Ok(response) => {
+                    let finalized_response = response.get_ref();
+                    if let Some(message) = &finalized_response.message {
+                        match message {
+                            IsFinalizedResponseMessage::Error(_) => {
+                                return Err("Error checking finalization status".into());
+                            }
+                            IsFinalizedResponseMessage::IsFinalized(is_finalized) => {
+                                if *is_finalized {
+                                    return Ok(true);
+                                }
+                            }
+                        }
+                    }
                 }
-                IsFinalizedResponseMessage::IsFinalized(is_finalized) => {
-                    if *is_finalized {
-                        return Ok(true);
+                Err(_) => {
+                    if attempts >= max_attempts {
+                        return Err("Failed to connect to node after maximum attempts".into());
                     }
                 }
             }
 
             if attempts >= max_attempts {
-                // We've reached the maximum number of attempts, give up
                 return Ok(false);
             }
 
             // Wait before retrying
-            sleep(retry_delay).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(retry_delay_sec)).await;
+        }
+    }
+
+    /// Get the block hash for a given deploy ID by querying the HTTP API
+    ///
+    /// # Arguments
+    ///
+    /// * `deploy_id` - The deploy ID to look up
+    /// * `http_port` - The HTTP port for the deploy API endpoint
+    ///
+    /// # Returns
+    ///
+    /// Some(block_hash) if the deploy is included in a block, None if not yet included, or an error
+    pub async fn get_deploy_block_hash(
+        &self,
+        deploy_id: &str,
+        http_port: u16,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        let url = format!("http://{}:{}/api/deploy/{}", self.node_host, http_port, deploy_id);
+        let client = reqwest::Client::new();
+
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let deploy_info: serde_json::Value = response.json().await?;
+                    
+                    // Extract blockHash from the response
+                    if let Some(block_hash) = deploy_info.get("blockHash").and_then(|v| v.as_str()) {
+                        Ok(Some(block_hash.to_string()))
+                    } else {
+                        Ok(None) // Deploy exists but no blockHash yet
+                    }
+                } else if response.status().as_u16() == 404 {
+                    Ok(None) // Deploy not found yet
+                } else {
+                    let status = response.status();
+                    let error_body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
+                    
+                    // Handle the case where the deploy exists but isn't in a block yet
+                    if error_body.contains("Couldn't find block containing deploy with id:") {
+                        Ok(None) // Deploy exists but not in a block yet
+                    } else {
+                        Err(format!("HTTP error {}: {} - Response: {}", status, status.canonical_reason().unwrap_or("Unknown"), error_body).into())
+                    }
+                }
+            }
+            Err(e) => Err(format!("Network error: {}", e).into()),
+        }
+    }
+
+    /// Gets comprehensive information about a deploy by ID
+    ///
+    /// # Arguments
+    ///
+    /// * `deploy_id` - The deploy ID to look up
+    /// * `http_port` - HTTP port for API queries
+    ///
+    /// # Returns
+    ///
+    /// DeployInfo struct with deploy details and status
+    pub async fn get_deploy_info(
+        &self,
+        deploy_id: &str,
+        http_port: u16,
+    ) -> Result<DeployInfo, Box<dyn std::error::Error>> {
+        let url = format!("http://{}:{}/api/deploy/{}", self.node_host, http_port, deploy_id);
+        let client = reqwest::Client::new();
+
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let deploy_data: serde_json::Value = response.json().await?;
+                    
+                    // Parse the response into DeployInfo
+                    let deploy_info = DeployInfo {
+                        deploy_id: deploy_id.to_string(),
+                        block_hash: deploy_data.get("blockHash").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        sender: deploy_data.get("sender").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        seq_num: deploy_data.get("seqNum").and_then(|v| v.as_u64()),
+                        sig: deploy_data.get("sig").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        sig_algorithm: deploy_data.get("sigAlgorithm").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        shard_id: deploy_data.get("shardId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        version: deploy_data.get("version").and_then(|v| v.as_u64()),
+                        timestamp: deploy_data.get("timestamp").and_then(|v| v.as_u64()),
+                        status: DeployStatus::Included,
+                    };
+                    Ok(deploy_info)
+                } else if response.status().as_u16() == 404 {
+                    Ok(DeployInfo {
+                        deploy_id: deploy_id.to_string(),
+                        block_hash: None,
+                        sender: None,
+                        seq_num: None,
+                        sig: None,
+                        sig_algorithm: None,
+                        shard_id: None,
+                        version: None,
+                        timestamp: None,
+                        status: DeployStatus::NotFound,
+                    })
+                } else {
+                    let status = response.status();
+                    let error_body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
+                    
+                    // Handle the case where the deploy exists but isn't in a block yet
+                    if error_body.contains("Couldn't find block containing deploy with id:") {
+                        Ok(DeployInfo {
+                            deploy_id: deploy_id.to_string(),
+                            block_hash: None,
+                            sender: None,
+                            seq_num: None,
+                            sig: None,
+                            sig_algorithm: None,
+                            shard_id: None,
+                            version: None,
+                            timestamp: None,
+                            status: DeployStatus::Pending,
+                        })
+                    } else {
+                        Ok(DeployInfo {
+                            deploy_id: deploy_id.to_string(),
+                            block_hash: None,
+                            sender: None,
+                            seq_num: None,
+                            sig: None,
+                            sig_algorithm: None,
+                            shard_id: None,
+                            version: None,
+                            timestamp: None,
+                            status: DeployStatus::Error(format!("HTTP error {}: {}", status, error_body)),
+                        })
+                    }
+                }
+            }
+            Err(e) => Ok(DeployInfo {
+                deploy_id: deploy_id.to_string(),
+                block_hash: None,
+                sender: None,
+                seq_num: None,
+                sig: None,
+                sig_algorithm: None,
+                shard_id: None,
+                version: None,
+                timestamp: None,
+                status: DeployStatus::Error(format!("Network error: {}", e)),
+            }),
         }
     }
 

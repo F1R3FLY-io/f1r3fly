@@ -15,6 +15,9 @@ impl Dispatcher {
             Commands::FullDeploy(args) => {
                 full_deploy_command(args).await.map_err(NodeCliError::from)
             }
+            Commands::DeployAndWait(args) => {
+                deploy_and_wait_command(args).await.map_err(NodeCliError::from)
+            }
             Commands::IsFinalized(args) => {
                 is_finalized_command(args).await.map_err(NodeCliError::from)
             }
@@ -56,6 +59,9 @@ impl Dispatcher {
                 .await
                 .map_err(NodeCliError::from),
             Commands::Transfer(args) => transfer_command(args)
+                .await
+                .map_err(NodeCliError::from),
+            Commands::GetDeploy(args) => get_deploy_command(args)
                 .await
                 .map_err(NodeCliError::from),
         };
@@ -106,6 +112,7 @@ impl Dispatcher {
             Commands::Deploy(_) => "deploy",
             Commands::Propose(_) => "propose",
             Commands::FullDeploy(_) => "full-deploy",
+            Commands::DeployAndWait(_) => "deploy-and-wait",
             Commands::IsFinalized(_) => "is-finalized",
             Commands::ExploratoryDeploy(_) => "exploratory-deploy",
             Commands::GeneratePublicKey(_) => "generate-public-key",
@@ -123,6 +130,7 @@ impl Dispatcher {
             Commands::LastFinalizedBlock(_) => "last-finalized-block",
             Commands::ShowMainChain(_) => "show-main-chain",
             Commands::Transfer(_) => "transfer",
+            Commands::GetDeploy(_) => "get-deploy",
         }
     }
 }

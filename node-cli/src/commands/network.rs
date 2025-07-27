@@ -202,8 +202,8 @@ pub async fn is_finalized_command(
     match f1r3fly_api
         .is_finalized(
             &args.block_hash,
-            Some(args.max_attempts),
-            Some(args.retry_delay),
+            args.max_attempts,
+            args.retry_delay,
         )
         .await
     {
@@ -365,6 +365,242 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
         Err(e) => {
             println!("❌ Transfer deployment failed!");
             println!("Error: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn deploy_and_wait_command(
+    args: &DeployAndWaitArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Read the Rholang code from file
+    println!("📄 Reading Rholang from: {}", args.file);
+    let rholang_code =
+        fs::read_to_string(&args.file).map_err(|e| format!("Failed to read file: {}", e))?;
+    println!("📊 Code size: {} bytes", rholang_code.len());
+
+    // Initialize the F1r3fly API client
+    println!(
+        "🔌 Connecting to F1r3fly node at {}:{}",
+        args.host, args.port
+    );
+    let private_key = args.private_key.as_deref().unwrap_or("aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1");
+    let f1r3fly_api = F1r3flyApi::new(private_key, &args.host, args.port);
+
+    let phlo_limit = if args.bigger_phlo {
+        "5,000,000,000"
+    } else {
+        "50,000"
+    };
+    println!("💰 Using phlo limit: {}", phlo_limit);
+
+    // Step 1: Deploy the Rholang code
+    println!("🚀 Deploying Rholang code...");
+    let deploy_start_time = Instant::now();
+
+    let deploy_id = match f1r3fly_api
+        .deploy(&rholang_code, args.bigger_phlo, "rholang")
+        .await
+    {
+        Ok(deploy_id) => {
+            let deploy_duration = deploy_start_time.elapsed();
+            println!("✅ Deploy successful! Deploy ID: {}", deploy_id);
+            println!("⏱️  Deploy time: {:.2?}", deploy_duration);
+            deploy_id
+        }
+        Err(e) => {
+            println!("❌ Deployment failed!");
+            println!("Error: {}", e);
+            return Err(e);
+        }
+    };
+
+    // Step 2: Wait for deploy to be included in a block
+    println!("⏳ Waiting for deploy to be included in a block...");
+    let block_wait_start = Instant::now();
+    let max_block_wait_attempts = args.max_wait / args.check_interval;
+    let mut block_wait_attempts = 0;
+
+    let block_hash = loop {
+        block_wait_attempts += 1;
+
+        // Show progress every 10 attempts or if we're at the end
+        if block_wait_attempts % 10 == 0 || block_wait_attempts >= max_block_wait_attempts {
+            println!("   ⏱️  Checking... ({}/{} attempts)", block_wait_attempts, max_block_wait_attempts);
+        }
+
+        match f1r3fly_api
+            .get_deploy_block_hash(&deploy_id, args.http_port)
+            .await
+        {
+            Ok(Some(hash)) => {
+                println!("✅ Deploy found in block: {}", hash);
+                break hash;
+            }
+            Ok(None) => {
+                // Deploy not in block yet, continue waiting
+            }
+            Err(e) => {
+                println!("❌ Error checking deploy status: {}", e);
+                return Err(e);
+            }
+        }
+
+        if block_wait_attempts >= max_block_wait_attempts {
+            println!("❌ Timeout waiting for deploy to be included in block after {} seconds", args.max_wait);
+            return Err("Deploy inclusion timeout".into());
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(args.check_interval)).await;
+    };
+
+    let block_wait_duration = block_wait_start.elapsed();
+    println!("⏱️  Block inclusion time: {:.2?}", block_wait_duration);
+
+    // Step 3: Wait for block finalization
+    println!("🔍 Waiting for block finalization...");
+    let finalization_start = Instant::now();
+
+    // Calculate finalization attempts (default: 12 attempts, 5 second intervals)
+    let finalization_max_attempts: u32 = 12;
+    let finalization_retry_delay: u64 = 5;
+
+    match f1r3fly_api
+        .is_finalized(&block_hash, finalization_max_attempts, finalization_retry_delay)
+        .await
+    {
+        Ok(true) => {
+            let finalization_duration = finalization_start.elapsed();
+            let total_duration = deploy_start_time.elapsed();
+            
+            println!("✅ Block finalized! Deploy completed successfully.");
+            println!("⏱️  Finalization time: {:.2?}", finalization_duration);
+            println!("📊 Total time: {:.2?}", total_duration);
+        }
+        Ok(false) => {
+            println!(
+                "❌ Block not finalized after {} attempts ({} seconds)",
+                finalization_max_attempts,
+                (finalization_max_attempts as u64) * finalization_retry_delay
+            );
+            return Err("Block finalization timeout".into());
+        }
+        Err(e) => {
+            println!("❌ Error checking block finalization: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn get_deploy_command(
+    args: &GetDeployArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::f1r3fly_api::DeployStatus;
+
+    println!("🔍 Looking up deploy: {}", args.deploy_id);
+    println!("🔌 Connecting to F1r3fly node at {}:{}", args.host, args.http_port);
+
+    // Initialize the F1r3fly API client (private key not needed for read operations)
+    let dummy_private_key = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1";
+    let f1r3fly_api = F1r3flyApi::new(dummy_private_key, &args.host, 40412); // Port doesn't matter for HTTP queries
+
+    let start_time = Instant::now();
+
+    match f1r3fly_api
+        .get_deploy_info(&args.deploy_id, args.http_port)
+        .await
+    {
+        Ok(deploy_info) => {
+            let duration = start_time.elapsed();
+
+            match args.format.as_str() {
+                "json" => {
+                    // Output raw JSON
+                    let json_output = serde_json::to_string_pretty(&deploy_info)?;
+                    println!("{}", json_output);
+                }
+                "summary" => {
+                    // One-line summary
+                    match deploy_info.status {
+                        DeployStatus::Included => {
+                            if let Some(block_hash) = &deploy_info.block_hash {
+                                println!("✅ Deploy {} included in block {}", deploy_info.deploy_id, block_hash);
+                            } else {
+                                println!("✅ Deploy {} included in block", deploy_info.deploy_id);
+                            }
+                        }
+                        DeployStatus::Pending => {
+                            println!("⏳ Deploy {} pending (not yet in block)", deploy_info.deploy_id);
+                        }
+                        DeployStatus::NotFound => {
+                            println!("❌ Deploy {} not found", deploy_info.deploy_id);
+                        }
+                        DeployStatus::Error(ref err) => {
+                            println!("❌ Deploy {} error: {}", deploy_info.deploy_id, err);
+                        }
+                    }
+                }
+                "pretty" | _ => {
+                    // Pretty formatted output (default)
+                    println!("📋 Deploy Information");
+                    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    println!("🆔 Deploy ID: {}", deploy_info.deploy_id);
+                    
+                    match deploy_info.status {
+                        DeployStatus::Included => {
+                            println!("✅ Status: Included in block");
+                            if let Some(block_hash) = &deploy_info.block_hash {
+                                println!("🧱 Block Hash: {}", block_hash);
+                            }
+                        }
+                        DeployStatus::Pending => {
+                            println!("⏳ Status: Pending (not yet in block)");
+                        }
+                        DeployStatus::NotFound => {
+                            println!("❌ Status: Not found");
+                            println!("⏱️  Query time: {:.2?}", duration);
+                            return Ok(());
+                        }
+                        DeployStatus::Error(ref err) => {
+                            println!("❌ Status: Error - {}", err);
+                            println!("⏱️  Query time: {:.2?}", duration);
+                            return Ok(());
+                        }
+                    }
+
+                    if args.verbose || deploy_info.status == DeployStatus::Included {
+                        if let Some(sender) = &deploy_info.sender {
+                            println!("👤 Sender: {}", sender);
+                        }
+                        if let Some(seq_num) = deploy_info.seq_num {
+                            println!("🔢 Sequence Number: {}", seq_num);
+                        }
+                        if let Some(timestamp) = deploy_info.timestamp {
+                            println!("🕐 Timestamp: {}", timestamp);
+                        }
+                        if let Some(shard_id) = &deploy_info.shard_id {
+                            println!("🌐 Shard ID: {}", shard_id);
+                        }
+                        if let Some(sig_algorithm) = &deploy_info.sig_algorithm {
+                            println!("🔐 Signature Algorithm: {}", sig_algorithm);
+                        }
+                        if args.verbose {
+                            if let Some(sig) = &deploy_info.sig {
+                                println!("✍️  Signature: {}", sig);
+                            }
+                        }
+                    }
+                    
+                    println!("⏱️  Query time: {:.2?}", duration);
+                }
+            }
+        }
+        Err(e) => {
+            println!("❌ Error retrieving deploy information: {}", e);
             return Err(e);
         }
     }
