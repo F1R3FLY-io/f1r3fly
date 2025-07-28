@@ -533,10 +533,6 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
     }
 
     println!("🎯 Transfer process completed!");
-    println!("📋 Next steps:");
-    println!("   1. Verify the recipient balance increased");
-    println!("   2. Check that sender balance decreased");
-    println!("   3. Monitor for transaction finalization");
 
     Ok(())
 }

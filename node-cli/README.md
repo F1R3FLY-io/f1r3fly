@@ -331,17 +331,17 @@ The CLI provides commands for dynamically adding validators to a running F1r3fly
 Deploy a bonding transaction to add a new validator to the network. The command waits for the deploy to be included in a block and finalized, similar to `deploy-and-wait`. **Requires specifying which validator to bond via private key.**
 
 ```bash
-# Bond Validator_4 node as validator (50 trillion REV stake)
-cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --port 40411
+# Bond Validator_4 node as validator (1000 REV stake)
+cargo run -- bond-validator --stake 1000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --port 40411
 
-# Bond with auto-propose enabled
-cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --propose true --port 40411
+# Deploy bonding transaction and propose block immediately  
+cargo run -- bond-validator --stake 1000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --propose true --port 40411
 
-# Bond with custom wait settings
-cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --max-wait 600 --check-interval 10 --port 40411
+# Deploy bonding transaction and wait for finalization (with custom timeouts)
+cargo run -- bond-validator --stake 1000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --max-wait 600 --check-interval 10 --port 40411
 
-# Bond using custom node connection
-cargo run -- bond-validator --stake 50000000000000 --private-key YOUR_VALIDATOR_PRIVATE_KEY -H node.example.com -p 40411
+# Bond validator on custom node
+cargo run -- bond-validator --stake 1000 --private-key YOUR_VALIDATOR_PRIVATE_KEY -H node.example.com -p 40411
 ```
 
 ### Transfer

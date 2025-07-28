@@ -86,9 +86,23 @@ impl<'a> F1r3flyApi<'a> {
             50_000
         };
 
+        // Get current block number for VABN (solves Block 50 issue)
+        let current_block = match self.get_current_block_number().await {
+            Ok(block_num) => {
+                println!("🔢 Current block: {}", block_num);
+                println!("✅ Setting validity window: blocks {} to {} (50-block window)", block_num, block_num + 50);
+                block_num
+            }
+            Err(e) => {
+                println!("⚠️  Warning: Could not get current block number ({}), using VABN=0", e);
+                println!("⚠️  This may cause Block 50 issues if blockchain has > 50 blocks");
+                0
+            }
+        };
+
         // Build and sign the deployment
         let deployment =
-            self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string());
+            self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string(), current_block);
 
         // Connect to the F1r3fly node
         let mut deploy_service_client =
@@ -527,6 +541,23 @@ impl<'a> F1r3flyApi<'a> {
         Ok(blocks)
     }
 
+    /// Gets the current block number from the blockchain
+    ///
+    /// # Returns
+    ///
+    /// The current block number if successful, otherwise an error
+    pub async fn get_current_block_number(&self) -> Result<i64, Box<dyn std::error::Error>> {
+        // Get the most recent block using show_main_chain with depth 1
+        let blocks = self.show_main_chain(1).await?;
+        
+        if let Some(latest_block) = blocks.first() {
+            Ok(latest_block.block_number)
+        } else {
+            // Fallback to 0 if no blocks found (genesis case)
+            Ok(0)
+        }
+    }
+
     /// Builds and signs a deploy message
     ///
     /// # Arguments
@@ -534,11 +565,12 @@ impl<'a> F1r3flyApi<'a> {
     /// * `code` - Rholang source code to deploy
     /// * `phlo_limit` - Maximum amount of phlo to use for execution
     /// * `language` - Language of the deploy (typically "rholang")
+    /// * `valid_after_block_number` - Block number after which the deploy is valid
     ///
     /// # Returns
     ///
     /// A signed `DeployDataProto` ready to be sent to the node
-    fn build_deploy_msg(&self, code: String, phlo_limit: i64, language: String) -> DeployDataProto {
+    fn build_deploy_msg(&self, code: String, phlo_limit: i64, language: String, valid_after_block_number: i64) -> DeployDataProto {
         // Get current timestamp in milliseconds
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -552,7 +584,7 @@ impl<'a> F1r3flyApi<'a> {
             timestamp,
             phlo_price: 1,
             phlo_limit,
-            valid_after_block_number: 0,
+            valid_after_block_number,
             shard_id: "root".into(),
             language: String::new(), // Excluded from signature calculation
             sig: ByteString::new(),
@@ -584,7 +616,7 @@ impl<'a> F1r3flyApi<'a> {
             timestamp,
             phlo_price: 1,
             phlo_limit,
-            valid_after_block_number: 0,
+            valid_after_block_number,
             shard_id: "root".into(),
             language,
             sig: ByteString::from(sig_bytes),
