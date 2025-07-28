@@ -1,7 +1,27 @@
 [package]
-name = "models"
+name = "f1r3fly-models"
 version = "0.1.0"
 edition = "2021"
+description = "Common data model types for the F1r3fly blockchain, including protobuf definitions and Rust implementations"
+license = "Apache-2.0"
+repository = "https://github.com/F1R3FLY-io/f1r3fly"
+homepage = "https://f1r3fly.io"
+authors = ["F1r3fly team"]
+readme = "README.md"
+keywords = ["blockchain", "protobuf", "models", "f1r3fly", "data-structures"]
+categories = ["data-structures", "encoding"]
+documentation = "https://docs.rs/f1r3fly-models"
+include = [
+    "src/lib.rs",
+    "src/rust/**/*",
+    "src/main/protobuf/**/*",
+    "src/scalapb/**/*",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "rust-toolchain.toml",
+    "build.rs"
+]
 
 [profile.dev]
 debug = true
@@ -9,7 +29,6 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crypto = { path = "../crypto" }
 hex = "0.4.3"
 prost = "0.13.5"
 serde = { version = "1.0", features = ["derive"] }

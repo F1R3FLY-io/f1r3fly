@@ -1,54 +1,48 @@
-# Models
+# f1r3fly-models
 
-Common data model types common for the RChain blockchain.
+Common data model types for the F1r3fly blockchain, including protobuf definitions and Rust implementations.
 
-### Prerequisites
+## Features
 
-* [sbt](http://www.scala-sbt.org/download.html)
+**Data Models:**
+- Protobuf-generated types for blockchain operations
+- Par (parallel process) representations
+- Expression and pattern matching types
+- Connectives and logical operations
+- Unforgeable names and cryptographic primitives
 
-### Building
+**Protocol Buffers:**
+- Casper consensus protocol messages
+- RhoLang type definitions  
+- RSpace storage types
+- Service APIs and communication protocols
 
+**Utilities:**
+- Sorted collections (ParMap, ParSet)
+- Hash and equality implementations
+- Type mappers and converters
+
+## Usage
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+f1r3fly-models = "0.1.0"
 ```
-sbt compile
+
+## Building
+
+```bash
+cargo build --release
 ```
 
-### Testing
+## Testing
 
-```
-sbt test
-```
-
-Testing with coverage:
-
-```
-sbt clean coverage test
+```bash
+cargo test
 ```
 
-Generating a coverage report:
+## License
 
-```
-sbt coverageReport
-```
-
-The HTML version of the generated report is located at:
-
- `./target/scala-<version>/scoverage-report/index.html`
- 
- ## Rust
-
-Parts of this directory are ported to Rust.
-
-### Building
-
-To build the `models` Rust library, run `cargo build --release -p models`
-  - `cargo build --profile dev -p models` will build the library in debug mode
-
-### Testing
-
-To run all tests: `cargo test`
-
-Run all tests in release mode: `cargo test --release`
-
-To run specific test file: `cargo test --test <test_file_name>`
-
-To run specific test in specific folder: `cargo test --test <test_folder_name>::<test_file_name>`
+Licensed under the Apache License, Version 2.0.
