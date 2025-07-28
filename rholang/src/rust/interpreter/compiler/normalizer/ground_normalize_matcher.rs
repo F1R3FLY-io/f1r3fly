@@ -1,7 +1,7 @@
 use crate::rust::interpreter::compiler::rholang_ast::{Proc, UriLiteral};
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Expr;
-use models::rust::utils::{new_gbool_expr, new_gint_expr, new_gstring_expr, new_guri_expr};
+use f1r3fly_models::rhoapi::Expr;
+use f1r3fly_models::rust::utils::{new_gbool_expr, new_gint_expr, new_gstring_expr, new_guri_expr};
 
 /*
  This normalizer works with various types of "ground" (primitive) values, such as Bool, Int, String, and Uri.
@@ -32,7 +32,7 @@ pub fn normalize_ground(proc: &Proc) -> Result<Expr, InterpreterError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::rhoapi::expr::ExprInstance;
+    use f1r3fly_models::rhoapi::expr::ExprInstance;
 
     //rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/BoolMatcherSpec.scala
     #[test]

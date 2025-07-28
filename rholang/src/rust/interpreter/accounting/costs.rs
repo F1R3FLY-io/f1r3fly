@@ -1,4 +1,4 @@
-use models::{
+use f1r3fly_models::{
     rhoapi::{
         tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, ParWithRandom,
         TaggedContinuation,

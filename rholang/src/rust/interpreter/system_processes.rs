@@ -9,24 +9,24 @@ use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployerId, RhoName, RhoNumber, RhoString, RhoSysAuthToken, RhoUri,
 };
 use super::util::rev_address::RevAddress;
-use crypto::rust::hash::blake2b256::Blake2b256;
-use crypto::rust::hash::keccak256::Keccak256;
-use crypto::rust::hash::sha_256::Sha256Hasher;
-use crypto::rust::public_key::PublicKey;
-use crypto::rust::signatures::ed25519::Ed25519;
-use crypto::rust::signatures::secp256k1::Secp256k1;
-use crypto::rust::signatures::signatures_alg::SignaturesAlg;
+use f1r3fly_crypto::rust::hash::blake2b256::Blake2b256;
+use f1r3fly_crypto::rust::hash::keccak256::Keccak256;
+use f1r3fly_crypto::rust::hash::sha_256::Sha256Hasher;
+use f1r3fly_crypto::rust::public_key::PublicKey;
+use f1r3fly_crypto::rust::signatures::ed25519::Ed25519;
+use f1r3fly_crypto::rust::signatures::secp256k1::Secp256k1;
+use f1r3fly_crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use k256::{
     ecdsa::{signature::Signer, Signature, SigningKey},
     elliptic_curve::generic_array::GenericArray,
 };
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
-use models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
-use models::rust::casper::protocol::casper_message::BlockMessage;
-use models::rust::rholang::implicits::single_expr;
-use models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
-use models::Byte;
+use f1r3fly_models::rhoapi::expr::ExprInstance;
+use f1r3fly_models::rhoapi::g_unforgeable::UnfInstance::GPrivateBody;
+use f1r3fly_models::rhoapi::{Bundle, GPrivate, GUnforgeable, ListParWithRandom, Par, Var};
+use f1r3fly_models::rust::casper::protocol::casper_message::BlockMessage;
+use f1r3fly_models::rust::rholang::implicits::single_expr;
+use f1r3fly_models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
+use f1r3fly_models::Byte;
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
@@ -885,7 +885,7 @@ impl SystemProcesses {
                             client_host, client_port, notification_payload
                         );
 
-                        use models::rust::rholang::grpc_client::GrpcClient;
+                        use f1r3fly_models::rust::rholang::grpc_client::GrpcClient;
 
                         // Convert client_port from i64 to u64
                         let port = if client_port < 0 {

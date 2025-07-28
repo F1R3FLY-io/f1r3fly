@@ -7,7 +7,7 @@ use crate::rust::interpreter::compiler::normalizer::processes::p_var_ref_normali
 use crate::rust::interpreter::compiler::utils::{BinaryExpr, UnaryExpr};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::{
+use f1r3fly_models::rhoapi::{
     EAnd, EDiv, EEq, EGt, EGte, ELt, ELte, EMinus, EMinusMinus, EMod, EMult, ENeg, ENeq, ENot, EOr,
     EPercentPercent, EPlus, EPlusPlus, Expr, Par,
 };
@@ -334,13 +334,13 @@ mod tests {
         proc_visit_inputs_with_updated_vec_bound_map_chain,
     };
     use crate::rust::interpreter::util::prepend_expr;
-    use models::create_bit_vector;
-    use models::rhoapi::expr::ExprInstance;
-    use models::rhoapi::{
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rhoapi::expr::ExprInstance;
+    use f1r3fly_models::rhoapi::{
         expr, EDiv, EMinus, EMinusMinus, EMult, ENeg, ENot, EPercentPercent, EPlus, EPlusPlus,
         Expr, Par,
     };
-    use models::rust::utils::{
+    use f1r3fly_models::rust::utils::{
         new_boundvar_expr, new_boundvar_par, new_emap_par, new_freevar_par, new_gint_par,
         new_gstring_par, new_key_value_pair,
     };

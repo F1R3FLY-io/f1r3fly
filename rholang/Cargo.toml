@@ -12,9 +12,9 @@ crate-type = ["cdylib", "rlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crypto = { path = "../crypto" }
-models = { path = "../models" }
-shared = { path = "../shared" }
+f1r3fly-crypto = "0.1.0"
+f1r3fly-models = "0.1.0"
+f1r3fly-shared = { path = "../shared" }
 rspace_plus_plus = { path = "../rspace++" }
 tree-sitter-rholang = { path = "src/main/tree_sitter/" }
 itertools = "0.10.2"

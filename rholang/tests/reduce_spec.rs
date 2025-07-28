@@ -6,15 +6,15 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
-use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::{
+use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use f1r3fly_models::{
     rhoapi::{
         BindPattern, Expr, GDeployId, ListParWithRandom, Par, ParWithRandom, Send,
         TaggedContinuation, tagged_continuation::TaggedCont,
     },
     rust::utils::{new_eplus_par_gint, new_gint_expr, new_gint_par},
 };
-use models::{
+use f1r3fly_models::{
     rhoapi::{
         Bundle, Connective, EEq, EList, EMatches, EMethod, EMinus, EMinusMinus, EPercentPercent,
         EPlus, EPlusPlus, ETuple, GPrivate, GUnforgeable, Match, MatchCase, New, Receive,

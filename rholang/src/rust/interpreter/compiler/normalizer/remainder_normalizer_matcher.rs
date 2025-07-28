@@ -1,9 +1,9 @@
 use crate::rust::interpreter::compiler::exports::{FreeContext, FreeMap, SourcePosition};
 use crate::rust::interpreter::compiler::normalize::VarSort;
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
-use models::rhoapi::var::WildcardMsg;
-use models::rhoapi::Var as ModelsVar;
+use f1r3fly_models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
+use f1r3fly_models::rhoapi::var::WildcardMsg;
+use f1r3fly_models::rhoapi::Var as ModelsVar;
 
 use super::processes::exports::Proc;
 use crate::rust::interpreter::compiler::rholang_ast::Var;

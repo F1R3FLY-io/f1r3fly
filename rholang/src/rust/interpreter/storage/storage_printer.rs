@@ -1,10 +1,10 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/storage/StoragePrinter.scala
 
-use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::{
+use f1r3fly_models::rhoapi::tagged_continuation::TaggedCont;
+use f1r3fly_models::rhoapi::{
     BindPattern, ListParWithRandom, Par, Receive, ReceiveBind, Send, TaggedContinuation,
 };
-use models::rust::rholang::implicits::concatenate_pars;
+use f1r3fly_models::rust::rholang::implicits::concatenate_pars;
 use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 use std::collections::BTreeSet;
 

@@ -8,13 +8,13 @@ use crate::rust::interpreter::compiler::rholang_ast::{Block, Name, Names};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use crate::rust::interpreter::util::filter_and_adjust_bitset;
-use models::rhoapi::{Par, Receive, ReceiveBind};
-use models::rust::utils::union;
+use f1r3fly_models::rhoapi::{Par, Receive, ReceiveBind};
+use f1r3fly_models::rust::utils::union;
 use std::collections::HashMap;
 
 pub fn normalize_p_contr(
     name: &Name,
-    formals: &Names,
+    formals: &Names,  
     proc: &Box<Block>,
     input: ProcVisitInputs,
     env: &HashMap<String, Par>,
@@ -109,7 +109,7 @@ pub fn normalize_p_contr(
 #[cfg(test)]
 mod tests {
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::{expr::ExprInstance, EPlus, Expr, Par, Receive, ReceiveBind},
         rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_send_par},

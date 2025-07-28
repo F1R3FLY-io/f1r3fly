@@ -1,4 +1,4 @@
-use models::Byte;
+use f1r3fly_models::Byte;
 
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 

@@ -6,7 +6,7 @@ use crate::rust::interpreter::compiler::rholang_ast::{Decls, NameDecl, Proc};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::filter_and_adjust_bitset;
 use crate::rust::interpreter::util::prepend_new;
-use models::rhoapi::{New, Par};
+use f1r3fly_models::rhoapi::{New, Par};
 use std::collections::{BTreeMap, HashMap};
 
 pub fn normalize_p_new(
@@ -104,7 +104,7 @@ pub fn normalize_p_new(
 mod tests {
     use std::collections::BTreeMap;
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::{New, Par},
         rust::utils::{new_boundvar_par, new_gint_par, new_send},

@@ -1,7 +1,7 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/registry/RegistryBootstrap.scala
 
 use crate::rust::interpreter::system_processes::FixedChannels;
-use models::{
+use f1r3fly_models::{ 
     rhoapi::{New, Par, Receive, ReceiveBind, Send},
     rust::utils::{new_boundvar_par, new_freevar_par},
 };

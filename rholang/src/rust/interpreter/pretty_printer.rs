@@ -1,6 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/PrettyPrinter.scala
 
-use models::{
+use f1r3fly_models::{
     rhoapi::{
         connective::ConnectiveInstance, expr::ExprInstance, g_unforgeable::UnfInstance,
         var::VarInstance, Bundle, Connective, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte,
@@ -12,7 +12,7 @@ use models::{
         par_set_type_mapper::ParSetTypeMapper,
     },
 };
-use shared::rust::{printer::Printer, string_ops::wrap_with_braces};
+use f1r3fly_shared::rust::{printer::Printer, string_ops::wrap_with_braces};
 
 use super::errors::InterpreterError;
 
@@ -572,7 +572,7 @@ impl PrettyPrinter {
     ) -> Result<String, InterpreterError> {
         if let Some(v) = m.downcast_ref::<Var>() {
             Ok(self.build_string_from_var(v))
-        } else if let Some(s) = m.downcast_ref::<models::rhoapi::Send>() {
+        } else if let Some(s) = m.downcast_ref::<f1r3fly_models::rhoapi::Send>() {
             let str = if s.persistent {
                 String::from("!!(")
             } else {
@@ -802,7 +802,7 @@ impl PrettyPrinter {
                             prev_non_empty = true;
                         }
                     } else if let Some(items_vec) =
-                        items.downcast_ref::<Vec<models::rhoapi::Send>>()
+                        items.downcast_ref::<Vec<f1r3fly_models::rhoapi::Send>>()
                     {
                         if !items_vec.is_empty() {
                             if prev_non_empty {

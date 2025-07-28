@@ -1,13 +1,13 @@
 use blake2::{Blake2b, Digest};
-use models::casper::v1::deploy_response::Message as DeployResponseMessage;
-use models::casper::v1::deploy_service_client::DeployServiceClient;
-use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeployResponseMessage;
-use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
-use models::casper::v1::propose_response::Message as ProposeResponseMessage;
-use models::casper::v1::propose_service_client::ProposeServiceClient;
-use models::casper::{DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, ProposeQuery};
-use models::rhoapi::Par;
-use models::ByteString;
+use f1r3fly_models::casper::v1::deploy_response::Message as DeployResponseMessage;
+use f1r3fly_models::casper::v1::deploy_service_client::DeployServiceClient;
+use f1r3fly_models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeployResponseMessage;
+use f1r3fly_models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
+use f1r3fly_models::casper::v1::propose_response::Message as ProposeResponseMessage;
+use f1r3fly_models::casper::v1::propose_service_client::ProposeServiceClient;
+use f1r3fly_models::casper::{DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, ProposeQuery};
+use f1r3fly_models::rhoapi::Par;
+use f1r3fly_models::ByteString;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -379,9 +379,9 @@ fn extract_par_data(par: &Par) -> Option<String> {
         if let Some(instance) = &expr.expr_instance {
             match instance {
                 // Handle different types of expressions
-                models::rhoapi::expr::ExprInstance::GString(s) => Some(format!("\"{}\"", s)),
-                models::rhoapi::expr::ExprInstance::GInt(i) => Some(i.to_string()),
-                models::rhoapi::expr::ExprInstance::GBool(b) => Some(b.to_string()),
+                f1r3fly_models::rhoapi::expr::ExprInstance::GString(s) => Some(format!("\"{}\"", s)),
+                f1r3fly_models::rhoapi::expr::ExprInstance::GInt(i) => Some(i.to_string()),
+                f1r3fly_models::rhoapi::expr::ExprInstance::GBool(b) => Some(b.to_string()),
                 // Add other types as needed
                 _ => Some("Complex expression".to_string()),
             }

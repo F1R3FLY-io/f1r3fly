@@ -1,17 +1,17 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 
-use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::expr::ExprInstance::EMapBody;
-use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::Bundle;
-use models::rhoapi::Var;
-use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
-use models::rust::block_hash::BlockHash;
-use models::rust::par_map::ParMap;
-use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::sorted_par_map::SortedParMap;
-use models::rust::utils::new_freevar_par;
-use models::rust::validator::Validator;
+use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use f1r3fly_models::rhoapi::expr::ExprInstance::EMapBody;
+use f1r3fly_models::rhoapi::tagged_continuation::TaggedCont;
+use f1r3fly_models::rhoapi::Bundle;
+use f1r3fly_models::rhoapi::Var;
+use f1r3fly_models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
+use f1r3fly_models::rust::block_hash::BlockHash;
+use f1r3fly_models::rust::par_map::ParMap;
+use f1r3fly_models::rust::par_map_type_mapper::ParMapTypeMapper;
+use f1r3fly_models::rust::sorted_par_map::SortedParMap;
+use f1r3fly_models::rust::utils::new_freevar_par;
+use f1r3fly_models::rust::validator::Validator;
 use rspace_plus_plus::rspace::checkpoint::{Checkpoint, SoftCheckpoint};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::history_repository_impl::HistoryRepositoryImpl;
@@ -46,7 +46,7 @@ use super::system_processes::{
     Arity, BlockData, BodyRef, Definition, InvalidBlocks, Name, ProcessContext, Remainder,
     RhoDispatchMap,
 };
-use models::rhoapi::expr::ExprInstance::GByteArray;
+use f1r3fly_models::rhoapi::expr::ExprInstance::GByteArray;
 
 /*
  * This trait has been combined with the 'ReplayRhoRuntime' trait

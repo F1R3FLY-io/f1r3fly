@@ -4,7 +4,7 @@ use crate::rust::interpreter::compiler::normalize::{
 };
 use crate::rust::interpreter::compiler::rholang_ast::Eval;
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 
 pub fn normalize_p_eval(
@@ -32,7 +32,7 @@ pub fn normalize_p_eval(
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use models::rust::utils::new_boundvar_expr;
+    use f1r3fly_models::rust::utils::new_boundvar_expr;
 
     use crate::rust::interpreter::{
         compiler::{

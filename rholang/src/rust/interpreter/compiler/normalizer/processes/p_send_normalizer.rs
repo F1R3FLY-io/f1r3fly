@@ -5,8 +5,8 @@ use crate::rust::interpreter::compiler::normalize::{
 use crate::rust::interpreter::compiler::rholang_ast::{Name, ProcList, SendType};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
-use models::rhoapi::{Par, Send};
-use models::rust::utils::union;
+use f1r3fly_models::rhoapi::{Par, Send};
+use f1r3fly_models::rust::utils::union;
 use std::collections::HashMap;
 
 pub fn normalize_p_send(
@@ -84,7 +84,7 @@ pub fn normalize_p_send(
 mod tests {
     use std::collections::HashMap;
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::Par,
         rust::utils::{new_boundvar_par, new_gint_par, new_send},

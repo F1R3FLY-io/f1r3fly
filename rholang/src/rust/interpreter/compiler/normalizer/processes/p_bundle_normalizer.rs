@@ -2,8 +2,8 @@ use super::exports::*;
 use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
 use crate::rust::interpreter::compiler::rholang_ast::{Block, BundleType};
 use crate::rust::interpreter::util::prepend_bundle;
-use models::rhoapi::{Bundle, Par};
-use models::rust::bundle_ops::BundleOps;
+use f1r3fly_models::rhoapi::{Bundle, Par};
+use f1r3fly_models::rust::bundle_ops::BundleOps;
 use std::collections::HashMap;
 use std::result::Result;
 
@@ -135,9 +135,9 @@ mod tests {
     use crate::rust::interpreter::errors::InterpreterError;
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_with_updated_bound_map_chain;
-    use models::create_bit_vector;
-    use models::rhoapi::{Bundle, Par};
-    use models::rust::utils::new_boundvar_par;
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rhoapi::{Bundle, Par};
+    use f1r3fly_models::rust::utils::new_boundvar_par;
     use pretty_assertions::assert_eq;
 
     #[test]

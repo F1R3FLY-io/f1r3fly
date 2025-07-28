@@ -1,16 +1,16 @@
 // See models/src/test/scala/coop/rchain/models/rholang/SortTest.scala - ParSortMatcherSpec
 
-use models::rhoapi::connective::ConnectiveInstance::{
+use f1r3fly_models::rhoapi::connective::ConnectiveInstance::{
     ConnAndBody, ConnBool, ConnByteArray, ConnInt, ConnNotBody, ConnOrBody, ConnString, ConnUri,
     VarRefBody,
 };
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::{
+use f1r3fly_models::rhoapi::expr::ExprInstance;
+use f1r3fly_models::rhoapi::{
     Connective, ConnectiveBody, EMap, Expr, KeyValuePair, Match, MatchCase, New, Receive,
     ReceiveBind, VarRef,
 };
-use models::rust::rholang::sorter::expr_sort_matcher::ExprSortMatcher;
-use models::rust::utils::{
+use f1r3fly_models::rust::rholang::sorter::expr_sort_matcher::ExprSortMatcher;
+use f1r3fly_models::rust::utils::{
     new_boundvar_expr, new_boundvar_par, new_bundle_par, new_ediv_expr_gint, new_eeq_expr_gint,
     new_egt_expr_gbool, new_egte_expr_gbool, new_elt_expr_gint, new_elte_expr_gint, new_emap_par,
     new_emethod_expr, new_eminus_expr_gint, new_emult_expr_gint, new_eneq_expr_gint, new_eor_expr,
@@ -18,7 +18,7 @@ use models::rust::utils::{
     new_freevar_par, new_gbool_expr, new_gbool_par, new_gint_par, new_gstring_expr, new_guri_expr,
     new_key_value_pair, new_new_par, new_send_par, new_wildcard_par,
 };
-use models::{
+use f1r3fly_models::{
     create_bit_vector,
     rhoapi::Par,
     rhoapi::Send,

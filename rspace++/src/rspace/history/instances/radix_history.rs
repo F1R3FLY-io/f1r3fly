@@ -1,4 +1,4 @@
-use models::ByteVector;
+use f1r3fly_models::ByteVector;
 
 use crate::rspace::errors::HistoryError;
 use crate::rspace::hashing::blake2b256_hash::Blake2b256Hash;

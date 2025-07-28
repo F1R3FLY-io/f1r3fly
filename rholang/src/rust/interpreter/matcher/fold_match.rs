@@ -1,5 +1,5 @@
-use models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
-use models::rhoapi::{MatchCase, Par, Var};
+use f1r3fly_models::rhoapi::var::VarInstance::{FreeVar, Wildcard};
+use f1r3fly_models::rhoapi::{MatchCase, Par, Var};
 
 use super::has_locally_free::HasLocallyFree;
 use super::spatial_matcher::{SpatialMatcher, SpatialMatcherContext};

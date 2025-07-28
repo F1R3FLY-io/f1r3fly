@@ -1,10 +1,10 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/SpatialMatcher.scala - trait SpatialMatcher
 
-use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::par_set_type_mapper::ParSetTypeMapper;
-use models::rust::rholang::implicits::single_expr;
-use models::rust::rholang::implicits::vector_par;
-use models::rust::utils::*;
+use f1r3fly_models::rust::par_map_type_mapper::ParMapTypeMapper;
+use f1r3fly_models::rust::par_set_type_mapper::ParSetTypeMapper;
+use f1r3fly_models::rust::rholang::implicits::single_expr;
+use f1r3fly_models::rust::rholang::implicits::vector_par;
+use f1r3fly_models::rust::utils::*;
 
 use super::exports::*;
 use super::fold_match::FoldMatch;

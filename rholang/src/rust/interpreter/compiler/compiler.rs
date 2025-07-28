@@ -1,6 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/Compiler.scala
 
-use models::{
+use f1r3fly_models::{
     rhoapi::{connective::ConnectiveInstance, Par},
     rust::rholang::sorter::{par_sort_matcher::ParSortMatcher, sortable::Sortable},
 };

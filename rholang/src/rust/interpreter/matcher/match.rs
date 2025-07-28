@@ -1,4 +1,4 @@
-use models::rust::{
+use f1r3fly_models::rust::{
     rholang::implicits::vector_par,
     utils::{new_elist_expr, to_vec},
 };

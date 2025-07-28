@@ -7,10 +7,10 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use crate::rust::interpreter::compiler::compiler::Compiler;
-use crypto::rust::hash::blake2b512_block::Blake2b512Block;
-use crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
-use models::rspace_plus_plus_types::*;
-use models::{
+use f1r3fly_crypto::rust::hash::blake2b512_block::Blake2b512Block;
+use f1r3fly_crypto::rust::{hash::blake2b512_random::Blake2b512Random, public_key::PublicKey};
+use f1r3fly_models::rspace_plus_plus_types::*;
+use f1r3fly_models::{
     rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation},
     rholang_scala_rust_types::*,
 };

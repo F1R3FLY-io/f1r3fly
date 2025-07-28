@@ -4,7 +4,7 @@ use crate::rust::interpreter::compiler::free_map::FreeMap;
 use crate::rust::interpreter::compiler::normalize::VarSort::{NameSort, ProcSort};
 use crate::rust::interpreter::compiler::normalize::{NameVisitInputs, ProcVisitInputs, VarSort};
 use crate::rust::interpreter::compiler::source_position::SourcePosition;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 
 pub fn name_visit_inputs_and_env() -> (NameVisitInputs, HashMap<String, Par>) {

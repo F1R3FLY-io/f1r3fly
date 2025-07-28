@@ -3,8 +3,8 @@ use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
 };
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::{Match, MatchCase, Par};
-use models::rust::utils::{new_gbool_par, union};
+use f1r3fly_models::rhoapi::{Match, MatchCase, Par};
+use f1r3fly_models::rust::utils::{new_gbool_par, union};
 use std::collections::HashMap;
 
 pub fn normalize_p_if(
@@ -78,7 +78,7 @@ pub fn normalize_p_if(
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::{expr::ExprInstance, EEq, Expr, Match, MatchCase, Par, Send},
         rust::utils::{

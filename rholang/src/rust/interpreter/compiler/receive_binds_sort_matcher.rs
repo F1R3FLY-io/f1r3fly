@@ -1,6 +1,6 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/compiler/ReceiveBindsSortMatcher.scala
 
-use models::{
+use f1r3fly_models::{
     rhoapi::{Par, ReceiveBind, Var},
     rust::rholang::sorter::{receive_sort_matcher::ReceiveSortMatcher, score_tree::ScoredTerm},
 };
@@ -40,7 +40,7 @@ pub fn pre_sort_binds<T: Clone + std::fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
-    use models::rust::utils::{new_freevar_var, new_gint_par};
+    use f1r3fly_models::rust::utils::{new_freevar_var, new_gint_par};
 
     use crate::rust::interpreter::compiler::normalize::VarSort;
 

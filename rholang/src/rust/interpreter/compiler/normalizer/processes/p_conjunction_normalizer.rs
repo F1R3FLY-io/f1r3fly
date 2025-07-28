@@ -5,8 +5,8 @@ use crate::rust::interpreter::compiler::normalize::{
 use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
-use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::{Connective, ConnectiveBody, Par};
+use f1r3fly_models::rhoapi::connective::ConnectiveInstance;
+use f1r3fly_models::rhoapi::{Connective, ConnectiveBody, Par};
 use std::collections::HashMap;
 
 pub fn normalize_p_conjunction(
@@ -82,9 +82,9 @@ mod tests {
     use crate::rust::interpreter::compiler::rholang_ast::Conjunction;
     use crate::rust::interpreter::compiler::source_position::SourcePosition;
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance;
-    use models::rhoapi::{Connective, ConnectiveBody};
-    use models::rust::utils::new_freevar_par;
+    use f1r3fly_models::rhoapi::connective::ConnectiveInstance;
+    use f1r3fly_models::rhoapi::{Connective, ConnectiveBody};
+    use f1r3fly_models::rust::utils::new_freevar_par;
     use pretty_assertions::assert_eq;
 
     #[test]

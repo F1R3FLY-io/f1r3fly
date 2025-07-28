@@ -1,4 +1,4 @@
-use models::{Byte, ByteVector};
+use f1r3fly_models::{Byte, ByteVector};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::history::instances::radix_history::RadixHistory;
 use rspace_plus_plus::rspace::hot_store::HotStoreInstances;

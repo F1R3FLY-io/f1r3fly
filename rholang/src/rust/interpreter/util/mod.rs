@@ -1,4 +1,4 @@
-use models::{
+use f1r3fly_models::{
     rhoapi::{Bundle, Connective, Expr, Match, New, Par, Receive, Send},
     rust::utils::union,
 };

@@ -1,4 +1,4 @@
-use models::{Byte, ByteVector};
+use f1r3fly_models::{Byte, ByteVector};
 use rand::distributions::{Alphanumeric, DistString};
 use rspace_plus_plus::rspace::errors::{HistoryError, RadixTreeError};
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;

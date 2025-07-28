@@ -1,7 +1,7 @@
 //See rholang/src/test/scala/coop/rchain/rholang/interpreter/accounting/CostAccountingSpec.scala from main branch
 
-use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
+use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use f1r3fly_models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rholang::rust::interpreter::rho_runtime::{create_replay_rho_runtime, RhoRuntimeImpl};
 use rholang::rust::interpreter::system_processes::Definition;
 use rholang::rust::interpreter::test_utils::resources::create_runtimes;

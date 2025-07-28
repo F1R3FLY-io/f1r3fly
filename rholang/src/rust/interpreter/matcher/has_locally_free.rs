@@ -1,6 +1,6 @@
 use crate::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 
-use models::{create_bit_vector, rust::utils::union};
+use f1r3fly_models::{create_bit_vector, rust::utils::union};
 
 use super::exports::*;
 

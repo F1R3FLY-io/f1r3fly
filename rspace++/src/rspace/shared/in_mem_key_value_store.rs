@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use models::{ByteBuffer, ByteVector};
+use f1r3fly_models::{ByteBuffer, ByteVector};
 
 use super::key_value_store::{KeyValueStore, KvStoreError};
 

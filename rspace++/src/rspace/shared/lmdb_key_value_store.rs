@@ -1,7 +1,7 @@
 use super::key_value_store::{KeyValueStore, KvStoreError};
 use heed::types::SerdeBincode;
 use heed::{Database, Env};
-use models::ByteBuffer;
+use f1r3fly_models::ByteBuffer;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 

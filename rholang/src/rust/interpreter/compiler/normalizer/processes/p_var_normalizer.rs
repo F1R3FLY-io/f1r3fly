@@ -1,4 +1,4 @@
-use models::rust::utils::{new_boundvar_expr, new_freevar_expr, new_wildcard_expr};
+use f1r3fly_models::rust::utils::{new_boundvar_expr, new_freevar_expr, new_wildcard_expr};
 
 use crate::rust::interpreter::compiler::exports::{BoundContext, FreeContext};
 use crate::rust::interpreter::compiler::normalize::VarSort;
@@ -95,8 +95,8 @@ mod tests {
     use crate::rust::interpreter::compiler::rholang_ast::Var;
 
     use super::*;
-    use models::create_bit_vector;
-    use models::rhoapi::Par;
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rhoapi::Par;
 
     fn inputs() -> ProcVisitInputs {
         ProcVisitInputs {

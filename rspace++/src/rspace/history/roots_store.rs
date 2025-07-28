@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use models::ByteBuffer;
+use f1r3fly_models::ByteBuffer;
 
 use crate::rspace::{
     errors::RootError, hashing::blake2b256_hash::Blake2b256Hash,

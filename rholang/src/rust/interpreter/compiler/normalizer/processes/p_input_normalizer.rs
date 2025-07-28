@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use models::{
+use f1r3fly_models::{
     rhoapi::{Par, Receive, ReceiveBind},
     rust::utils::union,
     BitSet,
@@ -323,7 +323,7 @@ pub fn normalize_p_input(
             ) -> Result<
                 Vec<(
                     Vec<Par>,
-                    Option<models::rhoapi::Var>,
+                    Option<f1r3fly_models::rhoapi::Var>,
                     FreeMap<VarSort>,
                     BitSet,
                 )>,
@@ -546,7 +546,7 @@ pub fn normalize_p_input(
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::Receive,
         rust::utils::{

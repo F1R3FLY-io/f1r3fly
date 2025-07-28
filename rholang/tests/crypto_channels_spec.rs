@@ -4,14 +4,14 @@
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crypto::rust::{
+    use f1r3fly_crypto::rust::{
         hash::{
             blake2b256::Blake2b256, blake2b512_random::Blake2b512Random, keccak256::Keccak256,
             sha_256::Sha256Hasher,
         },
         signatures::{ed25519::Ed25519, secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
     };
-    use models::{
+    use f1r3fly_models::{
         rhoapi::{
             expr::ExprInstance, BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation,
         },

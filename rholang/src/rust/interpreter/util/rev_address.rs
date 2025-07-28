@@ -1,9 +1,9 @@
-use crypto::rust::public_key::PublicKey;
+use f1r3fly_crypto::rust::public_key::PublicKey;
 use hex;
-use models::rust::validator;
+use f1r3fly_models::rust::validator;
 
 use super::address_tools::{Address, AddressTools};
-use models::rhoapi::GPrivate;
+use f1r3fly_models::rhoapi::GPrivate;
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala
 pub struct RevAddress {

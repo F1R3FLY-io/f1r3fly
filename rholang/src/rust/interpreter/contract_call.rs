@@ -1,4 +1,4 @@
-use models::rhoapi::{ListParWithRandom, Par};
+use f1r3fly_models::rhoapi::{ListParWithRandom, Par};
 use prost::Message;
 use std::pin::Pin;
 

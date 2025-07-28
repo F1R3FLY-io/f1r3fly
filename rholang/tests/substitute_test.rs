@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use models::{
+use f1r3fly_models::{
     create_bit_vector,
     rhoapi::{
         connective::ConnectiveInstance, expr::ExprInstance, var::VarInstance, Bundle, Connective,

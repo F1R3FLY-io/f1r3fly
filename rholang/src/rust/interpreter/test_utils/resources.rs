@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use std::{future::Future, path::Path, sync::Arc};
 use tempfile::Builder;
 
-use models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
+use f1r3fly_models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
 use rspace_plus_plus::rspace::history::history_repository::HistoryRepository;
 use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
 

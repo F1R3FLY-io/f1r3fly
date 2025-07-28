@@ -1,7 +1,7 @@
 use crate::rust::interpreter::compiler::normalize::{NameVisitOutputs, ProcVisitInputs};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::errors::InterpreterError::PatternReceiveError;
-use models::rhoapi::connective::ConnectiveInstance;
+use f1r3fly_models::rhoapi::connective::ConnectiveInstance;
 
 pub fn fail_on_invalid_connective(
     input: &ProcVisitInputs,

@@ -1,4 +1,4 @@
-use models::rhoapi::{
+use f1r3fly_models::rhoapi::{
     Bundle, Connective, Expr, GUnforgeable, Match, New, Par, Receive, ReceiveBind, Send,
 };
 

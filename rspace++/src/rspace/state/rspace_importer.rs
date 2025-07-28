@@ -1,4 +1,4 @@
-use models::ByteVector;
+use f1r3fly_models::ByteVector;
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPoolBuilder,

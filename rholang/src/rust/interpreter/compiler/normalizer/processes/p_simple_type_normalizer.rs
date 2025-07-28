@@ -2,8 +2,8 @@ use crate::rust::interpreter::compiler::normalize::{ProcVisitInputs, ProcVisitOu
 use crate::rust::interpreter::compiler::rholang_ast::SimpleType;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
-use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::Connective;
+use f1r3fly_models::rhoapi::connective::ConnectiveInstance;
+use f1r3fly_models::rhoapi::Connective;
 
 pub fn normalize_simple_type(
     simple_type: &SimpleType,
@@ -41,11 +41,11 @@ mod tests {
     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
     use crate::rust::interpreter::compiler::rholang_ast::{Proc, SimpleType};
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance::{
+    use f1r3fly_models::rhoapi::connective::ConnectiveInstance::{
         ConnBool, ConnByteArray, ConnInt, ConnString, ConnUri,
     };
 
-    use models::rhoapi::{Connective, Par};
+    use f1r3fly_models::rhoapi::{Connective, Par};
     use pretty_assertions::assert_eq;
 
     #[test]

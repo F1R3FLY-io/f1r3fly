@@ -1,5 +1,5 @@
-use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::Par;
+use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 

@@ -5,8 +5,8 @@ use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_connective;
 
 use super::exports::*;
-use models::rhoapi::connective::ConnectiveInstance;
-use models::rhoapi::{Connective, VarRef};
+use f1r3fly_models::rhoapi::connective::ConnectiveInstance;
+use f1r3fly_models::rhoapi::{Connective, VarRef};
 use std::result::Result;
 
 pub fn normalize_p_var_ref(
@@ -92,11 +92,11 @@ mod tests {
     use crate::rust::interpreter::test_utils::utils::{
         proc_visit_inputs_and_env, proc_visit_inputs_with_updated_bound_map_chain,
     };
-    use models::create_bit_vector;
-    use models::rhoapi::connective::ConnectiveInstance::VarRefBody;
-    use models::rhoapi::{Connective, Match as model_match, MatchCase, Par, ReceiveBind};
-    use models::rhoapi::{Receive, VarRef as model_VarRef};
-    use models::rust::utils::new_gint_par;
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rhoapi::connective::ConnectiveInstance::VarRefBody;
+    use f1r3fly_models::rhoapi::{Connective, Match as model_match, MatchCase, Par, ReceiveBind};
+    use f1r3fly_models::rhoapi::{Receive, VarRef as model_VarRef};
+    use f1r3fly_models::rust::utils::new_gint_par;
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -1,5 +1,5 @@
-use models::rspace_plus_plus_types::*;
-use models::{ByteVector, rhoapi::*};
+use f1r3fly_models::rspace_plus_plus_types::*;
+use f1r3fly_models::{ByteVector, rhoapi::*};
 use prost::Message;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
 use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;

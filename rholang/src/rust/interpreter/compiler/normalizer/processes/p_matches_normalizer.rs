@@ -1,6 +1,6 @@
 use super::exports::{FreeMap, InterpreterError, Proc, ProcVisitInputs, ProcVisitOutputs};
 use crate::rust::interpreter::{compiler::normalize::normalize_match_proc, util::prepend_expr};
-use models::rhoapi::{expr, EMatches, Expr, Par};
+use f1r3fly_models::rhoapi::{expr, EMatches, Expr, Par};
 use std::collections::HashMap;
 
 pub fn normalize_p_matches(
@@ -26,7 +26,7 @@ pub fn normalize_p_matches(
             bound_map_chain: input.bound_map_chain.clone().push(),
             free_map: FreeMap::default(),
         },
-        env,
+        env,  
     )?;
 
     let new_expr = Expr {
@@ -50,11 +50,11 @@ mod tests {
     use crate::rust::interpreter::compiler::normalize::normalize_match_proc;
     use crate::rust::interpreter::compiler::rholang_ast::{Negation, Proc};
     use crate::rust::interpreter::test_utils::utils::proc_visit_inputs_and_env;
-    use models::rhoapi::connective::ConnectiveInstance::ConnNotBody;
+    use f1r3fly_models::rhoapi::connective::ConnectiveInstance::ConnNotBody;
 
     use crate::rust::interpreter::util::prepend_expr;
-    use models::rhoapi::{expr, Connective, EMatches, Expr, Par};
-    use models::rust::utils::{new_gint_par, new_wildcard_par};
+    use f1r3fly_models::rhoapi::{expr, Connective, EMatches, Expr, Par};
+    use f1r3fly_models::rust::utils::{new_gint_par, new_wildcard_par};
     use pretty_assertions::assert_eq;
 
     //1 matches _

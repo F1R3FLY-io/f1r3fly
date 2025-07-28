@@ -1,4 +1,4 @@
-use models::{Byte, ByteVector};
+use f1r3fly_models::{Byte, ByteVector};
 
 use crate::rspace::{
     errors::RootError, hashing::blake2b256_hash::Blake2b256Hash, history::radix_tree::{sequential_export, ExportData, ExportDataSettings}, shared::trie_exporter::{KeyHash, TrieExporter, TrieNode}

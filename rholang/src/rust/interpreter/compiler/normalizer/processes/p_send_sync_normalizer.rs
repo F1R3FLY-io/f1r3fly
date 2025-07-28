@@ -5,7 +5,7 @@ use crate::rust::interpreter::compiler::rholang_ast;
 use crate::rust::interpreter::compiler::rholang_ast::{Name, Proc, SyncSendCont};
 use crate::rust::interpreter::compiler::rholang_ast::{NameDecl, ProcList};
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -153,7 +153,7 @@ mod tests {
     use crate::rust::interpreter::compiler::normalize::{ProcVisitInputs, VarSort};
     use crate::rust::interpreter::compiler::rholang_ast;
     use crate::rust::interpreter::compiler::rholang_ast::Proc;
-    use models::rhoapi::Par;
+    use f1r3fly_models::rhoapi::Par;
 
     fn p_send_sync() -> Proc {
         let p_send_sync = Proc::SendSync {

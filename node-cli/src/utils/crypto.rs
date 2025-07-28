@@ -1,5 +1,5 @@
 use crate::error::{NodeCliError, Result};
-use crypto::rust::public_key::PublicKey;
+use f1r3fly_crypto::rust::public_key::PublicKey;
 use hex;
 use rand::rngs::OsRng;
 use rholang::rust::interpreter::util::rev_address::RevAddress;

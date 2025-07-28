@@ -1,26 +1,26 @@
 // See models/src/test/scala/coop/rchain/models/rholang/SortTest.scala - ScoredTermSpec
 
-use models::rhoapi::var::WildcardMsg;
-use models::rhoapi::{
+use f1r3fly_models::rhoapi::var::WildcardMsg;
+use f1r3fly_models::rhoapi::{
     connective, expr, var, Bundle, Connective, EList, EMethod, ENot, Match, MatchCase, New, Par,
     Receive, ReceiveBind, Send,
 };
-use models::rust::par_map::ParMap;
-use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::rholang::sorter::bundle_sort_matcher::BundleSortMatcher;
-use models::rust::rholang::sorter::connective_sort_matcher::ConnectiveSortMatcher;
-use models::rust::rholang::sorter::match_sort_matcher::MatchSortMatcher;
-use models::rust::rholang::sorter::new_sort_matcher::NewSortMatcher;
-use models::rust::rholang::sorter::par_sort_matcher::ParSortMatcher;
-use models::rust::rholang::sorter::receive_sort_matcher::ReceiveSortMatcher;
-use models::rust::rholang::sorter::send_sort_matcher::SendSortMatcher;
-use models::rust::rholang::sorter::unforgeable_sort_matcher::UnforgeableSortMatcher;
-use models::rust::rholang::sorter::var_sort_matcher::VarSortMatcher;
-use models::rust::test_utils::test_utils::{
+use f1r3fly_models::rust::par_map::ParMap;
+use f1r3fly_models::rust::par_map_type_mapper::ParMapTypeMapper;
+use f1r3fly_models::rust::rholang::sorter::bundle_sort_matcher::BundleSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::connective_sort_matcher::ConnectiveSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::match_sort_matcher::MatchSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::new_sort_matcher::NewSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::par_sort_matcher::ParSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::receive_sort_matcher::ReceiveSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::send_sort_matcher::SendSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::unforgeable_sort_matcher::UnforgeableSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::var_sort_matcher::VarSortMatcher;
+use f1r3fly_models::rust::test_utils::test_utils::{
     for_all_similar_a, generate_bundle, generate_connective, generate_expr, generate_match,
     generate_new, generate_par, generate_receive, generate_send, generate_var, sort,
 };
-use models::{
+use f1r3fly_models::{
     rhoapi::{expr::ExprInstance, Expr, Var},
     rust::{
         par_set::ParSet,

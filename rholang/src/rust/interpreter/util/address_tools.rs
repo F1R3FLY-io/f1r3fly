@@ -1,11 +1,11 @@
-use crypto::rust::{
+use f1r3fly_crypto::rust::{
     hash::{
         blake2b256::{Blake2b256, HASH_LENGTH},
         keccak256::Keccak256,
     },
     public_key::PublicKey,
 };
-use models::rhoapi::GPrivate;
+use f1r3fly_models::rhoapi::GPrivate;
 use prost::Message;
 
 use super::base58;

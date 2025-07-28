@@ -5,15 +5,15 @@ use crate::rust::interpreter::compiler::normalizer::remainder_normalizer_matcher
 use crate::rust::interpreter::compiler::rholang_ast::{Collection, KeyValuePair, Proc};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::{EList, ETuple, Expr, Par, Var};
-use models::rust::par_map::ParMap;
-use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::par_set::ParSet;
-use models::rust::par_set_type_mapper::ParSetTypeMapper;
-use models::rust::sorted_par_hash_set::SortedParHashSet;
-use models::rust::sorted_par_map::SortedParMap;
-use models::rust::utils::union;
+use f1r3fly_models::rhoapi::expr::ExprInstance;
+use f1r3fly_models::rhoapi::{EList, ETuple, Expr, Par, Var};
+use f1r3fly_models::rust::par_map::ParMap;
+use f1r3fly_models::rust::par_map_type_mapper::ParMapTypeMapper;
+use f1r3fly_models::rust::par_set::ParSet;
+use f1r3fly_models::rust::par_set_type_mapper::ParSetTypeMapper;
+use f1r3fly_models::rust::sorted_par_hash_set::SortedParHashSet;
+use f1r3fly_models::rust::sorted_par_map::SortedParMap;
+use f1r3fly_models::rust::utils::union;
 use std::collections::HashMap;
 use std::result::Result;
 
@@ -221,9 +221,9 @@ mod tests {
     use crate::rust::interpreter::test_utils::par_builder_util::ParBuilderUtil;
     use crate::rust::interpreter::test_utils::utils::collection_proc_visit_inputs_and_env;
     use crate::rust::interpreter::util::prepend_expr;
-    use models::create_bit_vector;
-    use models::rhoapi::{KeyValuePair as model_key_value_pair, Par};
-    use models::rust::utils::{
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rhoapi::{KeyValuePair as model_key_value_pair, Par};
+    use f1r3fly_models::rust::utils::{
         new_boundvar_par, new_elist_expr, new_emap_expr, new_eplus_par, new_eset_expr,
         new_etuple_expr, new_freevar_expr, new_freevar_par, new_freevar_var, new_gint_par,
         new_gstring_par,

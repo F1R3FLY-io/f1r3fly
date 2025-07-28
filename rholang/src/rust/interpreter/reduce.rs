@@ -1,26 +1,26 @@
 // See See rholang/src/main/scala/coop/rchain/rholang/interpreter/Reduce.scala
 
-use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::g_unforgeable::UnfInstance;
-use models::rhoapi::tagged_continuation::TaggedCont;
-use models::rhoapi::var::VarInstance;
-use models::rhoapi::{
+use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
+use f1r3fly_models::rhoapi::expr::ExprInstance;
+use f1r3fly_models::rhoapi::g_unforgeable::UnfInstance;
+use f1r3fly_models::rhoapi::tagged_continuation::TaggedCont;
+use f1r3fly_models::rhoapi::var::VarInstance;
+use f1r3fly_models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPercentPercent, EPlus, EPlusPlus, EVar, Expr, GPrivate,
     GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom, Receive, ReceiveBind, Send,
     Var,
 };
-use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
-use models::rust::par_map::ParMap;
-use models::rust::par_map_type_mapper::ParMapTypeMapper;
-use models::rust::par_set::ParSet;
-use models::rust::par_set_type_mapper::ParSetTypeMapper;
-use models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
-use models::rust::sorted_par_hash_set::SortedParHashSet;
-use models::rust::sorted_par_map::SortedParMap;
-use models::rust::string_ops::StringOps;
-use models::rust::utils::{
+use f1r3fly_models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
+use f1r3fly_models::rust::par_map::ParMap;
+use f1r3fly_models::rust::par_map_type_mapper::ParMapTypeMapper;
+use f1r3fly_models::rust::par_set::ParSet;
+use f1r3fly_models::rust::par_set_type_mapper::ParSetTypeMapper;
+use f1r3fly_models::rust::rholang::implicits::{concatenate_pars, single_bundle, single_expr};
+use f1r3fly_models::rust::sorted_par_hash_set::SortedParHashSet;
+use f1r3fly_models::rust::sorted_par_map::SortedParMap;
+use f1r3fly_models::rust::string_ops::StringOps;
+use f1r3fly_models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
 use prost::Message;

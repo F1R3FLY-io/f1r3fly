@@ -385,24 +385,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "crypto"
-version = "0.1.0"
-dependencies = [
- "blake2",
- "byteorder",
- "ed25519-dalek",
- "hex",
- "k256",
- "num-bigint",
- "rand",
- "rand_core",
- "sha2",
- "tiny-keccak",
- "typenum",
- "yasna",
-]
-
-[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -592,6 +574,47 @@ dependencies = [
  "libc",
  "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "f1r3fly-crypto"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff4bedf15c1f1010f546ae3f661cfdbc060f625a711ab3c641f3eb5b515dc9c5"
+dependencies = [
+ "blake2",
+ "byteorder",
+ "ed25519-dalek",
+ "hex",
+ "k256",
+ "num-bigint",
+ "rand",
+ "rand_core",
+ "sha2",
+ "tiny-keccak",
+ "typenum",
+ "yasna",
+]
+
+[[package]]
+name = "f1r3fly-models"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63004e19b0925803f8e6b945602019c8abc6677cdc1724fe3bcf8adee5929900"
+dependencies = [
+ "hex",
+ "itertools 0.12.1",
+ "proptest",
+ "proptest-derive",
+ "prost",
+ "serde",
+ "tonic",
+ "tonic-build",
+ "uuid",
+]
+
+[[package]]
+name = "f1r3fly-shared"
+version = "0.1.0"
 
 [[package]]
 name = "fastrand"
@@ -1282,22 +1305,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "models"
-version = "0.1.0"
-dependencies = [
- "crypto",
- "hex",
- "itertools 0.12.1",
- "proptest",
- "proptest-derive",
- "prost",
- "serde",
- "tonic",
- "tonic-build",
- "uuid",
-]
-
-[[package]]
 name = "monadic"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1889,14 +1896,15 @@ dependencies = [
  "anyhow",
  "bincode",
  "cc",
- "crypto",
  "dotenv",
+ "f1r3fly-crypto",
+ "f1r3fly-models",
+ "f1r3fly-shared",
  "futures",
  "hex",
  "itertools 0.10.5",
  "k256",
  "lazy_static",
- "models",
  "openai-api-rs",
  "openssl",
  "pretty_assertions",
@@ -1905,7 +1913,6 @@ dependencies = [
  "regex",
  "rspace_plus_plus",
  "serde",
- "shared",
  "tempfile",
  "thiserror 2.0.9",
  "tokio",
@@ -1943,13 +1950,13 @@ dependencies = [
  "chrono",
  "counter",
  "dashmap",
+ "f1r3fly-models",
  "futures",
  "heed",
  "hex",
  "itertools 0.10.5",
  "lazy_static",
  "log",
- "models",
  "monadic",
  "multiset",
  "once_cell",
@@ -2224,10 +2231,6 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
-
-[[package]]
-name = "shared"
-version = "0.1.0"
 
 [[package]]
 name = "shlex"

@@ -1,12 +1,12 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoType.scala
 
-use models::rhoapi::g_unforgeable::UnfInstance;
-use models::rhoapi::ETuple;
-use models::rhoapi::GPrivate;
-use models::rhoapi::GSysAuthToken;
-use models::rhoapi::GUnforgeable;
-use models::rhoapi::{expr::ExprInstance, Expr, GDeployerId, Par};
-use models::rust::rholang::implicits::{single_expr, single_unforgeable};
+use f1r3fly_models::rhoapi::g_unforgeable::UnfInstance;
+use f1r3fly_models::rhoapi::ETuple;
+use f1r3fly_models::rhoapi::GPrivate;
+use f1r3fly_models::rhoapi::GSysAuthToken;
+use f1r3fly_models::rhoapi::GUnforgeable;
+use f1r3fly_models::rhoapi::{expr::ExprInstance, Expr, GDeployerId, Par};
+use f1r3fly_models::rust::rholang::implicits::{single_expr, single_unforgeable};
 
 pub struct RhoByteArray;
 

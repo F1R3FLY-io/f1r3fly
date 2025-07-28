@@ -5,7 +5,7 @@ use crate::rust::interpreter::compiler::normalizer::collection_normalize_matcher
 use crate::rust::interpreter::compiler::rholang_ast::Collection;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 
 pub fn normalize_p_collect(

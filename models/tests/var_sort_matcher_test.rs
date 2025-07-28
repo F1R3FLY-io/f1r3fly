@@ -1,11 +1,11 @@
 // See models/src/test/scala/coop/rchain/models/rholang/SortTest.scala - VarSortMatcherSpec
 
-use models::create_bit_vector;
-use models::rhoapi::expr::ExprInstance;
-use models::rhoapi::var::{VarInstance, WildcardMsg};
-use models::rhoapi::{EVar, Expr, Par, Var};
-use models::rust::rholang::sorter::par_sort_matcher::ParSortMatcher;
-use models::rust::rholang::sorter::sortable::Sortable;
+use f1r3fly_models::create_bit_vector;  
+use f1r3fly_models::rhoapi::expr::ExprInstance;
+use f1r3fly_models::rhoapi::var::{VarInstance, WildcardMsg};
+use f1r3fly_models::rhoapi::{EVar, Expr, Par, Var};
+use f1r3fly_models::rust::rholang::sorter::par_sort_matcher::ParSortMatcher;
+use f1r3fly_models::rust::rholang::sorter::sortable::Sortable;
 
 #[test]
 fn different_kinds_of_variables_should_bin_separately() {

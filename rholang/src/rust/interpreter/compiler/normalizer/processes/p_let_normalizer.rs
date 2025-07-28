@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use models::{
+use f1r3fly_models::{
     rhoapi::{MatchCase, Par},
     rust::utils::{new_elist_par, new_match_par, union},
 };

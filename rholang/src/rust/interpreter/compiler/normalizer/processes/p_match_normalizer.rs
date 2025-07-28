@@ -5,8 +5,8 @@ use crate::rust::interpreter::compiler::normalize::{
 use crate::rust::interpreter::compiler::rholang_ast::{Case, Proc};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::filter_and_adjust_bitset;
-use models::rhoapi::{Match, MatchCase, Par};
-use models::rust::utils::union;
+use f1r3fly_models::rhoapi::{Match, MatchCase, Par};
+use f1r3fly_models::rust::utils::union;
 use std::collections::HashMap;
 
 pub fn normalize_p_match(
@@ -94,7 +94,7 @@ pub fn normalize_p_match(
 mod tests {
     use std::collections::HashMap;
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::{Match, MatchCase, Par, Receive, ReceiveBind},
         rust::utils::{

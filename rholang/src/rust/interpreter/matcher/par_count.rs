@@ -1,4 +1,4 @@
-use models::rust::utils::no_frees;
+use f1r3fly_models::rust::utils::no_frees;
 
 use super::exports::*;
 

@@ -1,6 +1,6 @@
 use crate::rust::interpreter::compiler::compiler::Compiler;
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 
 pub struct ParBuilderUtil;

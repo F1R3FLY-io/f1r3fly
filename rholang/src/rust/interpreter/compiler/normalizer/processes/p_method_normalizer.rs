@@ -6,8 +6,8 @@ use crate::rust::interpreter::compiler::rholang_ast::{ProcList, Var};
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::matcher::has_locally_free::HasLocallyFree;
 use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::{expr, EMethod, Expr, Par};
-use models::rust::utils::union;
+use f1r3fly_models::rhoapi::{expr, EMethod, Expr, Par};
+use f1r3fly_models::rust::utils::union;
 use std::collections::HashMap;
 
 pub fn normalize_p_method(
@@ -86,7 +86,7 @@ pub fn normalize_p_method(
 // See rholang/src/test/scala/coop/rchain/rholang/interpreter/compiler/normalizer/ProcMatcherSpec.scala
 #[cfg(test)]
 mod tests {
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::{expr::ExprInstance, EMethod, Expr, Par},
         rust::utils::{new_boundvar_par, new_gint_par},

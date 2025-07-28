@@ -1,6 +1,6 @@
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryRepositorySpec.scala
 
-use models::ByteVector;
+use f1r3fly_models::ByteVector;
 use rand::prelude::SliceRandom;
 use rspace_plus_plus::rspace::{
     errors::{HistoryError, RootError},

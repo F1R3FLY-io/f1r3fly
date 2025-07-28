@@ -6,7 +6,7 @@ use crate::rust::interpreter::compiler::rholang_ast::{Name, Proc, Quote, Var};
 use crate::rust::interpreter::compiler::source_position::SourcePosition;
 use crate::rust::interpreter::errors::InterpreterError;
 use crate::rust::interpreter::util::prepend_expr;
-use models::rhoapi::{expr, var, EVar, Expr, Par, Var as model_var};
+use f1r3fly_models::rhoapi::{expr, var, EVar, Expr, Par, Var as model_var};
 use std::collections::HashMap;
 
 pub fn normalize_name(
@@ -161,8 +161,8 @@ mod tests {
     use super::*;
     use crate::rust::interpreter::compiler::rholang_ast::Name;
     use crate::rust::interpreter::test_utils::utils::name_visit_inputs_and_env;
-    use models::create_bit_vector;
-    use models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
+    use f1r3fly_models::create_bit_vector;
+    use f1r3fly_models::rust::utils::{new_boundvar_par, new_freevar_par, new_gint_par, new_wildcard_par};
 
     fn bound_name_inputs_with_bound_map_chain(
         input: NameVisitInputs,

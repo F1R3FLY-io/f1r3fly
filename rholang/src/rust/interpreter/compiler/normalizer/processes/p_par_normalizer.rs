@@ -3,7 +3,7 @@ use crate::rust::interpreter::compiler::normalize::{
     normalize_match_proc, ProcVisitInputs, ProcVisitOutputs,
 };
 use crate::rust::interpreter::errors::InterpreterError;
-use models::rhoapi::Par;
+use f1r3fly_models::rhoapi::Par;
 use std::collections::HashMap;
 
 pub fn normalize_p_par(
@@ -28,7 +28,7 @@ pub fn normalize_p_par(
 mod tests {
     use std::collections::HashMap;
 
-    use models::{
+    use f1r3fly_models::{
         create_bit_vector,
         rhoapi::Par,
         rust::utils::{new_boundvar_expr, new_freevar_expr, new_gint_expr},
