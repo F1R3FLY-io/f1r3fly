@@ -1,7 +1,24 @@
 [package]
-name = "shared"
+name = "f1r3fly-shared"
 version = "0.1.0"
 edition = "2021"
+description = "Shared utilities and common functionality for F1r3fly blockchain components"
+license = "Apache-2.0"
+repository = "https://github.com/F1R3FLY-io/f1r3fly"
+homepage = "https://f1r3fly.io"
+authors = ["F1r3fly team"]
+readme = "README.md"
+keywords = ["utilities", "shared", "blockchain", "f1r3fly", "common"]
+categories = ["development-tools"]
+documentation = "https://docs.rs/f1r3fly-shared"
+include = [
+    "src/lib.rs",
+    "src/rust/**/*",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "rust-toolchain.toml"
+]
 
 [profile.dev]
 debug = true
