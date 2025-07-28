@@ -1,7 +1,16 @@
 [package]
-name = "crypto"
+name = "f1r3fly-crypto"      
 version = "0.1.0"
 edition = "2021"
+description = "F1r3fly cryptography module providing hash algorithms, digital signatures, and key management"
+license = "Apache-2.0"
+repository = "https://github.com/F1R3FLY-io/f1r3fly" 
+homepage = "https://f1r3fly.io"
+authors = ["F1r3fly team"]
+readme = "README.md"
+keywords = ["cryptography", "crypto", "signatures", "hash", "blockchain"]
+categories = ["cryptography"]
+documentation = "https://docs.rs/f1r3fly-crypto"
 
 [profile.dev]
 debug = true

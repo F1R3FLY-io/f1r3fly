@@ -1,14 +1,33 @@
-# RChain Cryptography module
+# f1r3fly-crypto
 
-`crypto` module provides cryptography functionalities for `node`.
+Cryptography module providing hash algorithms, digital signatures, and key management for F1r3fly.
 
-## Available functionality
+## Features
 
-| Feature                                                                       | Description                               |
-| ----------------------------------------------------------------------------  | ----------------------------------------- | 
-| [Base16](./src/main/scala/coop/rchain/crypto/codec/Base16.scala)              | Traditional hexadecimal String encoding   |
-| [Curve25519](./src/main/scala/coop/rchain/crypto/encryption/Curve25519.scala) | Elliptic curve cryptography               |
-| [Sha256](./src/main/scala/coop/rchain/crypto/hash/Sha256.sclaa)               | Sha256 hashing algorithm                  |
-| [Keccak256](./src/main/scala/coop/rchain/crypto/hash/Keccak256.scala)         | Keccak256 hashing algorithm               |
-| [Blake2b256](./src/main/scala/coop/rchain/crypto/hash/Blake2b256.scala)       | Blake2b256 hashing algorithm              |
-| [Ed25519](./src/main/scala/coop/rchain/crypto/signatures/Ed25519.scala)       | Edwards-curve Digital Signature Algorithm |
+**Hash Algorithms:**
+- Blake2b-256
+- Blake2b-512 (block and random variants)
+- Keccak-256  
+- SHA-256
+
+**Digital Signatures:**
+- Ed25519
+- secp256k1
+- secp256k1 (Ethereum variant)
+
+**Key Management:**
+- Private key utilities
+- Public key utilities
+
+## Usage
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+f1r3fly-crypto = "0.1.0"
+```
+
+## License
+
+Licensed under the Apache License, Version 2.0.
