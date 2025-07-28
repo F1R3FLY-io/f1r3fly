@@ -11,15 +11,29 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         graalOverlay = final: prev: rec {
-          holyGraal = with oldNixpkgs.legacyPackages.${system}; graalvm17-ce.override {
-            products = with graalvmCEPackages; [
-              js-installable-svm-java17
-              native-image-installable-svm-java17
-            ];
-          };
+          holyGraal = with oldNixpkgs.legacyPackages.${system};
+            graalvm17-ce.overrideAttrs (old: {
+              buildPhase = ''
+                export HOME=$TMPDIR/fake-home
+                mkdir -p $HOME
+                ${old.buildPhase or ""}
+              '';
+              installPhase = ''
+                export HOME=$TMPDIR/fake-home
+                mkdir -p $HOME
+                ${old.installPhase or ""}
+              '';
+            }).override {
+              products = with graalvmCEPackages; [
+                js-installable-svm-java17
+                native-image-installable-svm-java17
+              ];
+            };
+
           jdk = holyGraal;
           jre = holyGraal;
         };
+
         ammOverlay = final: prev: {
           hematite = prev.ammonite.overrideAttrs rec {
             version = "2.5.11";
@@ -30,7 +44,9 @@
             };
           };
         };
+
         overlays = [ typelevel-nix.overlay (import rust-overlay) graalOverlay ammOverlay ];
+
         pkgs = import nixpkgs {
           inherit system overlays;
           config.allowUnfree = true;
@@ -46,15 +62,16 @@
             }
             {
               name = "cargo";
-              package = "rust-bin.stable.latest.default";
+              package = rust-bin.stable.latest.default;
               help = "The Rust package management tool";
             }
             {
               name = "rustc";
-              package = "rust-bin.stable.latest.default";
+              package = rust-bin.stable.latest.default;
               help = "The Rust compiler";
             }
-            { name = "rust-analyzer";
+            {
+              name = "rust-analyzer";
               package = "rust-analyzer-unwrapped";
               help = "Language server for Rust";
             }
@@ -112,7 +129,7 @@
           imports = [ typelevel-nix.typelevelShell ];
           name = "f1r3fly-shell";
           typelevelShell = {
-		        jdk.package = holyGraal;
+            jdk.package = holyGraal;
           };
         };
       }
