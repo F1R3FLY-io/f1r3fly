@@ -756,8 +756,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "f1r3fly-rspace-plus-plus"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bit-set 0.5.3",
+ "blake2",
+ "blake3",
+ "bytes",
+ "chrono",
+ "counter",
+ "dashmap",
+ "f1r3fly-models",
+ "futures",
+ "heed",
+ "hex",
+ "itertools 0.10.5",
+ "lazy_static",
+ "log",
+ "monadic",
+ "multiset",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "prost",
+ "rand 0.8.5",
+ "rayon",
+ "rstest",
+ "serde",
+ "serde_json",
+ "state",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "f1r3fly-shared"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da1b81f67218c6e6e7df2de36e79d6d6da335fd66f4473b8ccc244af74b40abe"
 
 [[package]]
 name = "fastrand"
@@ -2313,6 +2351,7 @@ dependencies = [
  "dotenv",
  "f1r3fly-crypto",
  "f1r3fly-models",
+ "f1r3fly-rspace-plus-plus",
  "f1r3fly-shared",
  "futures",
  "hex",
@@ -2325,7 +2364,6 @@ dependencies = [
  "prost",
  "rand 0.8.5",
  "regex",
- "rspace_plus_plus",
  "serde",
  "tempfile",
  "thiserror 2.0.12",
@@ -2349,42 +2387,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rspace_plus_plus"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bincode",
- "bit-set 0.5.3",
- "blake2",
- "blake3",
- "bytes",
- "chrono",
- "counter",
- "dashmap",
- "f1r3fly-models",
- "futures",
- "heed",
- "hex",
- "itertools 0.10.5",
- "lazy_static",
- "log",
- "monadic",
- "multiset",
- "once_cell",
- "proptest",
- "proptest-derive",
- "prost",
- "rand 0.8.5",
- "rayon",
- "rstest",
- "serde",
- "serde_json",
- "state",
- "tokio",
- "uuid",
 ]
 
 [[package]]

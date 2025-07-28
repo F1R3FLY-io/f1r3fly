@@ -1,7 +1,28 @@
 [package]
-name = "rspace_plus_plus"
+name = "f1r3fly-rspace-plus-plus"
 version = "0.1.0"
 edition = "2021"
+description = "F1r3fly Tuple Space implementation in Rust - high-performance storage and pattern matching"
+license = "Apache-2.0"
+repository = "https://github.com/F1R3FLY-io/f1r3fly"
+homepage = "https://f1r3fly.io"
+authors = ["F1r3fly team"]
+readme = "README.md"
+keywords = ["blockchain", "storage", "pattern-matching", "f1r3fly", "rspace"]
+categories = ["data-structures", "database-implementations"]
+documentation = "https://docs.rs/f1r3fly-rspace-plus-plus"
+include = [
+	"src/lib.rs",
+	"src/rspace/**/*",
+	"src/main.rs",
+	"tests/**/*",
+	"Cargo.toml",
+	"LICENSE",
+	"README.md",
+	"rust-toolchain.toml",
+	"Cross.toml",
+	".rustfmt.toml",
+]
 
 [workspace]
 members = ["libs/rspace_rhotypes"]

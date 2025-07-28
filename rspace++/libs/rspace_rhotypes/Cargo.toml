@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rspace_plus_plus = { path = "../../../rspace++" }
+f1r3fly-rspace-plus-plus = { path = "../../../rspace++" }
 f1r3fly-models = "0.1.0"
 rholang = { path = "../../../rholang" }
 prost = "0.13.5"

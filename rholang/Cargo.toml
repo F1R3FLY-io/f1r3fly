@@ -14,8 +14,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 f1r3fly-crypto = "0.1.0"
 f1r3fly-models = "0.1.0"
-f1r3fly-shared = { path = "../shared" }
-rspace_plus_plus = { path = "../rspace++" }
+f1r3fly-shared = "0.1.0"
+f1r3fly-rspace-plus-plus = { path = "../rspace++" }
 tree-sitter-rholang = { path = "src/main/tree_sitter/" }
 itertools = "0.10.2"
 serde = "1.0"

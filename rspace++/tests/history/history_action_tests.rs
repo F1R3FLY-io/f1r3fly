@@ -1,7 +1,7 @@
 use f1r3fly_models::{Byte, ByteVector};
 use rand::distributions::{Alphanumeric, DistString};
-use rspace_plus_plus::rspace::errors::{HistoryError, RadixTreeError};
-use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
+use f1r3fly_rspace_plus_plus::rspace::errors::{HistoryError, RadixTreeError};
+use f1r3fly_rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 
 // See rspace/src/test/scala/coop/rchain/rspace/history/HistoryActionTests.scala
 
@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 
 use rand::seq::SliceRandom;
 use rand::Rng;
-use rspace_plus_plus::rspace::shared::key_value_store::KeyValueStore;
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::shared::key_value_store::KeyValueStore;
+use f1r3fly_rspace_plus_plus::rspace::{
     history::{
         history::{History, HistoryInstances},
         history_action::{DeleteAction, HistoryAction, HistoryActionTrait, InsertAction, KeyPath},

@@ -9,7 +9,7 @@ use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::{
     history::history_reader::HistoryReaderBase,
     hot_store::{HotStore, HotStoreInstances, HotStoreState},
     hot_store_action::{

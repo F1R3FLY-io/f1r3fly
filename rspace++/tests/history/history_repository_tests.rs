@@ -2,7 +2,7 @@
 
 use f1r3fly_models::ByteVector;
 use rand::prelude::SliceRandom;
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::{
     errors::{HistoryError, RootError},
     hashing::blake2b256_hash::Blake2b256Hash,
     history::{
