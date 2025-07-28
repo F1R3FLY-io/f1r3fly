@@ -88,23 +88,12 @@ cargo run -- get-deploy -d "3045022100abc..." --format pretty --verbose
 
 # Custom node connection
 cargo run -- get-deploy -d "3045022100abc..." -H validator2.local --http-port 40423
-
-
 ```
 
 Available output formats:
 - `pretty` (default): Human-readable formatted output with emojis
 - `summary`: One-line status summary
 - `json`: Raw JSON response for scripting
-
-The command shows:
-- Deploy ID and status (pending, included, not found, error)
-- Block hash (if included in a block)
-- Sender address and signature details
-- Timestamp and sequence number
-- Additional details with `--verbose` flag
-
-**Note**: This command does NOT propose blocks. It waits for external block proposals to include your deployment.
 
 ### Is Finalized
 
@@ -339,23 +328,41 @@ The CLI provides commands for dynamically adding validators to a running F1r3fly
 
 ### Bond Validator
 
-Deploy a bonding transaction to add a new validator to the network.
+Deploy a bonding transaction to add a new validator to the network. The command waits for the deploy to be included in a block and finalized, similar to `deploy-and-wait`. **Requires specifying which validator to bond via private key.**
 
 ```bash
-# Bond a new validator with default stake (50 trillion REV)
-cargo run -- bond-validator
+# Bond Validator_4 node as validator (50 trillion REV stake)
+cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --port 40411
 
-# Bond with custom stake amount
-cargo run -- bond-validator --stake 25000000000000
+# Bond with auto-propose enabled
+cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --propose true --port 40411
 
-# Bond and also propose a block (auto-propose)
-cargo run -- bond-validator --propose true
+# Bond with custom wait settings
+cargo run -- bond-validator --stake 50000000000000 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --max-wait 600 --check-interval 10 --port 40411
 
-# Explicitly disable auto-propose (same as default)
-cargo run -- bond-validator --propose false
+# Bond using custom node connection
+cargo run -- bond-validator --stake 50000000000000 --private-key YOUR_VALIDATOR_PRIVATE_KEY -H node.example.com -p 40411
+```
 
-# Bond using custom node and private key
-cargo run -- bond-validator -H node.example.com -p 40412 --private-key YOUR_PRIVATE_KEY
+### Transfer
+
+Transfer REV tokens between addresses. The command waits for the deploy to be included in a block and finalized, providing full confirmation of the transfer.
+
+```bash
+# Transfer 1000 REV from bootstrap wallet to another address
+cargo run -- transfer --to-address 1111La6tHaCtGjRiv4wkffbTAAjGyMsVhzSUNzQxH1jjZH9jtEi3M --amount 1000 --port 40411
+
+# Transfer with custom private key (different sender)
+cargo run -- transfer --to-address 1111La6tHaCtGjRiv4wkffbTAAjGyMsVhzSUNzQxH1jjZH9jtEi3M --amount 500 --private-key 5ff3514bf79a7d18e8dd974c699678ba63b7762ce8d78c532346e52f0ad219cd --port 40411
+
+# Transfer with auto-propose enabled
+cargo run -- transfer --to-address 1111La6tHaCtGjRiv4wkffbTAAjGyMsVhzSUNzQxH1jjZH9jtEi3M --amount 1000 --propose true --port 40411
+
+# Transfer with custom wait settings
+cargo run -- transfer --to-address 1111La6tHaCtGjRiv4wkffbTAAjGyMsVhzSUNzQxH1jjZH9jtEi3M --amount 1000 --max-wait 600 --check-interval 10 --port 40411
+
+# Transfer using custom node connection
+cargo run -- transfer --to-address RECIPIENT_ADDRESS --amount 1000 -H node.example.com -p 40411
 ```
 
 ### Network Health
@@ -497,9 +504,12 @@ cargo run -- network-health -H node.example.com --custom-ports "60503"
 
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-p, --port <PORT>`: gRPC port number for deploy (default: 40412)
-- `-s, --stake <STAKE>`: Stake amount for the validator (default: 50000000000000)
-- `--private-key <PRIVATE_KEY>`: Private key for signing the deploy (hex format)
+- `--http-port <HTTP_PORT>`: HTTP port number for deploy status checks (default: 40413)
+- `-s, --stake <STAKE>`: Stake amount for the validator (required)
+- `--private-key <PRIVATE_KEY>`: Private key for signing the deploy - determines which validator gets bonded (required)
 - `--propose <PROPOSE>`: Also propose a block after bonding (default: false)
+- `--max-wait <MAX_WAIT>`: Maximum total wait time in seconds for deploy finalization (default: 300)
+- `--check-interval <CHECK_INTERVAL>`: Check interval in seconds for deploy status (default: 5)
 
 ### Network-Health Command
 
@@ -514,5 +524,8 @@ cargo run -- network-health -H node.example.com --custom-ports "60503"
 - `--private-key <PRIVATE_KEY>`: Private key for signing the transfer (hex format)
 - `-H, --host <HOST>`: Host address (default: "localhost")
 - `-p, --port <PORT>`: gRPC port number for deploy (default: 40412)
+- `--http-port <HTTP_PORT>`: HTTP port number for deploy status checks (default: 40413)
 - `-b, --bigger-phlo`: Use bigger phlo limit (default: true, recommended for transfers)
 - `--propose <PROPOSE>`: Also propose a block after transfer (default: false)
+- `--max-wait <MAX_WAIT>`: Maximum total wait time in seconds for deploy finalization (default: 300)
+- `--check-interval <CHECK_INTERVAL>`: Check interval in seconds for deploy status (default: 5)

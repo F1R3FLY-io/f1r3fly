@@ -146,7 +146,7 @@ pub struct DeployArgs {
     /// Private key in hex format
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -169,7 +169,7 @@ pub struct ProposeArgs {
     /// Private key in hex format
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -192,7 +192,7 @@ pub struct IsFinalizedArgs {
     /// Private key in hex format
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -223,7 +223,7 @@ pub struct ExploratoryDeployArgs {
     /// Private key in hex format
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -251,7 +251,7 @@ pub struct GeneratePublicKeyArgs {
     #[arg(
         short,
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -286,7 +286,7 @@ pub struct GenerateRevAddressArgs {
     /// Private key in hex format (will derive public key from this)
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1",
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657",
         conflicts_with = "public_key"
     )]
     pub private_key: Option<String>,
@@ -342,7 +342,7 @@ pub struct ShowMainChainArgs {
     /// Private key in hex format (required for gRPC)
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 }
@@ -390,20 +390,29 @@ pub struct BondValidatorArgs {
     #[arg(short, long, default_value_t = 40412)]
     pub port: u16,
 
-    /// Stake amount for the validator
-    #[arg(short, long, default_value_t = 50000000000000)]
+    /// HTTP port for status queries
+    #[arg(long = "http-port", default_value_t = 40413)]
+    pub http_port: u16,
+
+    /// Stake amount for the validator (required)
+    #[arg(short, long)]
     pub stake: u64,
 
-    /// Private key for signing the deploy (hex format)
-    #[arg(
-        long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
-    )]
+    /// Private key for signing the deploy (hex format) - determines which validator gets bonded
+    #[arg(long)]
     pub private_key: String,
 
     /// Also propose a block after bonding
     #[arg(long, default_value_t = false, action = ArgAction::Set, value_parser = clap::value_parser!(bool))]
     pub propose: bool,
+
+    /// Maximum wait time in seconds for deploy finalization
+    #[arg(long = "max-wait", default_value_t = 300)]
+    pub max_wait: u64,
+
+    /// Check interval in seconds for deploy status
+    #[arg(long = "check-interval", default_value_t = 5)]
+    pub check_interval: u64,
 }
 
 /// Arguments for network-health command
@@ -436,7 +445,7 @@ pub struct TransferArgs {
     /// Private key for signing the transfer (hex format)
     #[arg(
         long,
-        default_value = "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1"
+        default_value = "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657"
     )]
     pub private_key: String,
 
@@ -448,6 +457,10 @@ pub struct TransferArgs {
     #[arg(short, long, default_value_t = 40412)]
     pub port: u16,
 
+    /// HTTP port for status queries
+    #[arg(long = "http-port", default_value_t = 40413)]
+    pub http_port: u16,
+
     /// Use bigger phlo limit (recommended for transfers)
     #[arg(short, long, default_value_t = true)]
     pub bigger_phlo: bool,
@@ -455,4 +468,12 @@ pub struct TransferArgs {
     /// Also propose a block after transfer
     #[arg(long, default_value_t = false, action = ArgAction::Set, value_parser = clap::value_parser!(bool))]
     pub propose: bool,
+
+    /// Maximum wait time in seconds for deploy finalization
+    #[arg(long = "max-wait", default_value_t = 300)]
+    pub max_wait: u64,
+
+    /// Check interval in seconds for deploy status
+    #[arg(long = "check-interval", default_value_t = 5)]
+    pub check_interval: u64,
 }

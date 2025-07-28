@@ -29,6 +29,28 @@ docker-compose -f shard-with-autopropose.yml up
 
 **⚠️ Warning**: Removing the `data/` directory will permanently delete all blockchain history, blocks, and state.
 
+### Observer Node (Optional)
+The observer node provides **read-only access** to the blockchain without participating in consensus. It's useful for:
+- API queries and data retrieval
+- Monitoring blockchain state
+- Applications that need blockchain data without validator responsibilities
+
+**To start the observer** (requires running shard network):
+```bash
+# First ensure shard-with-autopropose is running
+docker-compose -f shard-with-autopropose.yml up
+
+# Then start observer
+docker-compose -f observer.yml up
+```
+
+**To stop the observer:**
+```bash
+docker-compose -f observer.yml down
+```
+
+The observer will connect to your running validator network and sync blockchain data for read-only operations.
+
 ## Genesis Configuration
 
 ### Wallets.txt - Funded Accounts

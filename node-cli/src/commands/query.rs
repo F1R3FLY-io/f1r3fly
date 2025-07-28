@@ -213,7 +213,7 @@ pub async fn wallet_balance_command(
 
     // Use F1r3fly API with gRPC (like exploratory-deploy)
     let f1r3fly_api = F1r3flyApi::new(
-        "aebb63dc0d50e4dd29ddd94fb52103bfe0dc4941fa0c2c8a9082a191af35ffa1", // Default private key
+        "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657", // Bootstrap private key
         &args.host,
         args.port,
     );
