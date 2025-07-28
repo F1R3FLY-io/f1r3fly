@@ -11,6 +11,14 @@ readme = "README.md"
 keywords = ["cryptography", "crypto", "signatures", "hash", "blockchain"]
 categories = ["cryptography"]
 documentation = "https://docs.rs/f1r3fly-crypto"
+include = [
+    "src/lib.rs",
+    "src/rust/**/*",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "rust-toolchain.toml"
+]
 
 [profile.dev]
 debug = true
