@@ -76,6 +76,21 @@ pub enum Commands {
 
     /// Get a specific deploy by ID
     GetDeploy(GetDeployArgs),
+
+    /// Get current epoch information and status
+    EpochInfo(PosQueryArgs),
+
+    /// Check individual validator status (bonded, active, quarantine)
+    ValidatorStatus(ValidatorStatusArgs),
+
+    /// Get current epoch rewards information
+    EpochRewards(PosQueryArgs),
+
+    /// Monitor validator state transitions (real-time)
+    ValidatorTransitions(ValidatorTransitionsArgs),
+
+    /// Get network-wide consensus health overview
+    NetworkConsensus(PosQueryArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -476,4 +491,52 @@ pub struct TransferArgs {
     /// Check interval in seconds for deploy status
     #[arg(long = "check-interval", default_value_t = 5)]
     pub check_interval: u64,
+}
+
+/// Arguments for validator-status command
+#[derive(Parser)]
+pub struct ValidatorStatusArgs {
+    /// Validator public key to check (hex format)
+    #[arg(short = 'k', long)]
+    pub public_key: String,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    pub host: String,
+
+    /// gRPC port number (use 40452 for observer/read-only node)
+    #[arg(short, long, default_value_t = 40452)]
+    pub port: u16,
+}
+
+/// Arguments for validator-transitions command
+#[derive(Parser)]
+pub struct ValidatorTransitionsArgs {
+    /// Enable continuous monitoring mode
+    #[arg(short, long, default_value_t = false)]
+    pub watch: bool,
+
+    /// Polling interval in seconds for watch mode
+    #[arg(short, long, default_value_t = 30)]
+    pub interval: u64,
+
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    pub host: String,
+
+    /// gRPC port number (use 40452 for observer/read-only node)
+    #[arg(short, long, default_value_t = 40452)]
+    pub port: u16,
+}
+
+/// Arguments for PoS contract query commands (epoch-info, network-consensus, epoch-rewards)
+#[derive(Parser)]
+pub struct PosQueryArgs {
+    /// Host address
+    #[arg(short = 'H', long, default_value = "localhost")]
+    pub host: String,
+
+    /// gRPC port number (use 40452 for observer/read-only node)
+    #[arg(short, long, default_value_t = 40452)]
+    pub port: u16,
 }

@@ -5,14 +5,17 @@ use models::casper::v1::exploratory_deploy_response::Message as ExploratoryDeplo
 use models::casper::v1::is_finalized_response::Message as IsFinalizedResponseMessage;
 use models::casper::v1::propose_response::Message as ProposeResponseMessage;
 use models::casper::v1::propose_service_client::ProposeServiceClient;
-use models::casper::{BlocksQuery, DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, LightBlockInfo, ProposeQuery};
+use models::casper::{
+    BlocksQuery, DeployDataProto, ExploratoryDeployQuery, IsFinalizedQuery, LightBlockInfo,
+    ProposeQuery,
+};
 use models::rhoapi::Par;
 use models::ByteString;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use typenum::U32;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeployInfo {
@@ -30,9 +33,9 @@ pub struct DeployInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DeployStatus {
-    Pending,      // Deploy submitted but not yet in a block
-    Included,     // Deploy included in a block
-    NotFound,     // Deploy ID not found
+    Pending,       // Deploy submitted but not yet in a block
+    Included,      // Deploy included in a block
+    NotFound,      // Deploy ID not found
     Error(String), // Error occurred
 }
 
@@ -90,19 +93,30 @@ impl<'a> F1r3flyApi<'a> {
         let current_block = match self.get_current_block_number().await {
             Ok(block_num) => {
                 println!("🔢 Current block: {}", block_num);
-                println!("✅ Setting validity window: blocks {} to {} (50-block window)", block_num, block_num + 50);
+                println!(
+                    "✅ Setting validity window: blocks {} to {} (50-block window)",
+                    block_num,
+                    block_num + 50
+                );
                 block_num
             }
             Err(e) => {
-                println!("⚠️  Warning: Could not get current block number ({}), using VABN=0", e);
+                println!(
+                    "⚠️  Warning: Could not get current block number ({}), using VABN=0",
+                    e
+                );
                 println!("⚠️  This may cause Block 50 issues if blockchain has > 50 blocks");
                 0
             }
         };
 
         // Build and sign the deployment
-        let deployment =
-            self.build_deploy_msg(rho_code.to_string(), phlo_limit, language.to_string(), current_block);
+        let deployment = self.build_deploy_msg(
+            rho_code.to_string(),
+            phlo_limit,
+            language.to_string(),
+            current_block,
+        );
 
         // Connect to the F1r3fly node
         let mut deploy_service_client =
@@ -123,9 +137,7 @@ impl<'a> F1r3flyApi<'a> {
             DeployResponseMessage::Error(service_error) => Err(service_error.clone().into()),
             DeployResponseMessage::Result(result) => {
                 // Extract the deploy ID from the response
-                if let Some(deploy_id) = result
-                    .strip_prefix("Success! DeployId is: ")
-                {
+                if let Some(deploy_id) = result.strip_prefix("Success! DeployId is: ") {
                     Ok(deploy_id.to_string())
                 } else {
                     Ok(result.clone()) // Return the full message if we can't extract the deploy ID
@@ -364,16 +376,20 @@ impl<'a> F1r3flyApi<'a> {
         deploy_id: &str,
         http_port: u16,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        let url = format!("http://{}:{}/api/deploy/{}", self.node_host, http_port, deploy_id);
+        let url = format!(
+            "http://{}:{}/api/deploy/{}",
+            self.node_host, http_port, deploy_id
+        );
         let client = reqwest::Client::new();
 
         match client.get(&url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
                     let deploy_info: serde_json::Value = response.json().await?;
-                    
+
                     // Extract blockHash from the response
-                    if let Some(block_hash) = deploy_info.get("blockHash").and_then(|v| v.as_str()) {
+                    if let Some(block_hash) = deploy_info.get("blockHash").and_then(|v| v.as_str())
+                    {
                         Ok(Some(block_hash.to_string()))
                     } else {
                         Ok(None) // Deploy exists but no blockHash yet
@@ -382,13 +398,22 @@ impl<'a> F1r3flyApi<'a> {
                     Ok(None) // Deploy not found yet
                 } else {
                     let status = response.status();
-                    let error_body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
-                    
+                    let error_body = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Unable to read response body".to_string());
+
                     // Handle the case where the deploy exists but isn't in a block yet
                     if error_body.contains("Couldn't find block containing deploy with id:") {
                         Ok(None) // Deploy exists but not in a block yet
                     } else {
-                        Err(format!("HTTP error {}: {} - Response: {}", status, status.canonical_reason().unwrap_or("Unknown"), error_body).into())
+                        Err(format!(
+                            "HTTP error {}: {} - Response: {}",
+                            status,
+                            status.canonical_reason().unwrap_or("Unknown"),
+                            error_body
+                        )
+                        .into())
                     }
                 }
             }
@@ -411,23 +436,41 @@ impl<'a> F1r3flyApi<'a> {
         deploy_id: &str,
         http_port: u16,
     ) -> Result<DeployInfo, Box<dyn std::error::Error>> {
-        let url = format!("http://{}:{}/api/deploy/{}", self.node_host, http_port, deploy_id);
+        let url = format!(
+            "http://{}:{}/api/deploy/{}",
+            self.node_host, http_port, deploy_id
+        );
         let client = reqwest::Client::new();
 
         match client.get(&url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
                     let deploy_data: serde_json::Value = response.json().await?;
-                    
+
                     // Parse the response into DeployInfo
                     let deploy_info = DeployInfo {
                         deploy_id: deploy_id.to_string(),
-                        block_hash: deploy_data.get("blockHash").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        sender: deploy_data.get("sender").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        block_hash: deploy_data
+                            .get("blockHash")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        sender: deploy_data
+                            .get("sender")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
                         seq_num: deploy_data.get("seqNum").and_then(|v| v.as_u64()),
-                        sig: deploy_data.get("sig").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        sig_algorithm: deploy_data.get("sigAlgorithm").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        shard_id: deploy_data.get("shardId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        sig: deploy_data
+                            .get("sig")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        sig_algorithm: deploy_data
+                            .get("sigAlgorithm")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        shard_id: deploy_data
+                            .get("shardId")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
                         version: deploy_data.get("version").and_then(|v| v.as_u64()),
                         timestamp: deploy_data.get("timestamp").and_then(|v| v.as_u64()),
                         status: DeployStatus::Included,
@@ -448,8 +491,11 @@ impl<'a> F1r3flyApi<'a> {
                     })
                 } else {
                     let status = response.status();
-                    let error_body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
-                    
+                    let error_body = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Unable to read response body".to_string());
+
                     // Handle the case where the deploy exists but isn't in a block yet
                     if error_body.contains("Couldn't find block containing deploy with id:") {
                         Ok(DeployInfo {
@@ -475,7 +521,10 @@ impl<'a> F1r3flyApi<'a> {
                             shard_id: None,
                             version: None,
                             timestamp: None,
-                            status: DeployStatus::Error(format!("HTTP error {}: {}", status, error_body)),
+                            status: DeployStatus::Error(format!(
+                                "HTTP error {}: {}",
+                                status, error_body
+                            )),
                         })
                     }
                 }
@@ -508,8 +557,8 @@ impl<'a> F1r3flyApi<'a> {
         &self,
         depth: u32,
     ) -> Result<Vec<LightBlockInfo>, Box<dyn std::error::Error>> {
-        use models::casper::v1::deploy_service_client::DeployServiceClient;
         use models::casper::v1::block_info_response::Message;
+        use models::casper::v1::deploy_service_client::DeployServiceClient;
 
         // Connect to the F1r3fly node
         let mut deploy_service_client =
@@ -522,14 +571,19 @@ impl<'a> F1r3flyApi<'a> {
         };
 
         // Send the query and collect streaming response
-        let mut stream = deploy_service_client.show_main_chain(query).await?.into_inner();
+        let mut stream = deploy_service_client
+            .show_main_chain(query)
+            .await?
+            .into_inner();
 
         let mut blocks = Vec::new();
         while let Some(response) = stream.message().await? {
             if let Some(message) = response.message {
                 match message {
                     Message::Error(service_error) => {
-                        return Err(format!("gRPC Error: {}", service_error.messages.join("; ")).into());
+                        return Err(
+                            format!("gRPC Error: {}", service_error.messages.join("; ")).into()
+                        );
                     }
                     Message::BlockInfo(block_info) => {
                         blocks.push(block_info);
@@ -549,7 +603,7 @@ impl<'a> F1r3flyApi<'a> {
     pub async fn get_current_block_number(&self) -> Result<i64, Box<dyn std::error::Error>> {
         // Get the most recent block using show_main_chain with depth 1
         let blocks = self.show_main_chain(1).await?;
-        
+
         if let Some(latest_block) = blocks.first() {
             Ok(latest_block.block_number)
         } else {
@@ -570,7 +624,13 @@ impl<'a> F1r3flyApi<'a> {
     /// # Returns
     ///
     /// A signed `DeployDataProto` ready to be sent to the node
-    fn build_deploy_msg(&self, code: String, phlo_limit: i64, language: String, valid_after_block_number: i64) -> DeployDataProto {
+    fn build_deploy_msg(
+        &self,
+        code: String,
+        phlo_limit: i64,
+        language: String,
+        valid_after_block_number: i64,
+    ) -> DeployDataProto {
         // Get current timestamp in milliseconds
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

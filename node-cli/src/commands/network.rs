@@ -327,7 +327,11 @@ pub async fn bond_validator_command(
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
-        .is_finalized(&block_hash, finalization_max_attempts, finalization_retry_delay)
+        .is_finalized(
+            &block_hash,
+            finalization_max_attempts,
+            finalization_retry_delay,
+        )
         .await
     {
         Ok(true) => {
@@ -452,7 +456,10 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
 
         // Show progress every 10 attempts or if we're at the end
         if block_wait_attempts % 10 == 0 || block_wait_attempts >= max_block_wait_attempts {
-            println!("   ⏱️  Checking... ({}/{} attempts)", block_wait_attempts, max_block_wait_attempts);
+            println!(
+                "   ⏱️  Checking... ({}/{} attempts)",
+                block_wait_attempts, max_block_wait_attempts
+            );
         }
 
         match f1r3fly_api
@@ -473,7 +480,10 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
         }
 
         if block_wait_attempts >= max_block_wait_attempts {
-            println!("❌ Timeout waiting for transfer deploy to be included in block after {} seconds", args.max_wait);
+            println!(
+                "❌ Timeout waiting for transfer deploy to be included in block after {} seconds",
+                args.max_wait
+            );
             return Err("Transfer deploy inclusion timeout".into());
         }
 
@@ -492,7 +502,11 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
-        .is_finalized(&block_hash, finalization_max_attempts, finalization_retry_delay)
+        .is_finalized(
+            &block_hash,
+            finalization_max_attempts,
+            finalization_retry_delay,
+        )
         .await
     {
         Ok(true) => {
@@ -508,7 +522,9 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
         }
         Err(e) => {
             println!("❌ Error checking finalization status: {}", e);
-            println!("⚠️  Could not verify finalization, but transfer deploy is in the blockchain.");
+            println!(
+                "⚠️  Could not verify finalization, but transfer deploy is in the blockchain."
+            );
         }
     }
 

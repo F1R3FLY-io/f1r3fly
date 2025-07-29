@@ -47,7 +47,7 @@ validators:
 rotation:
   enabled: true                # Enable round-robin rotation
   rotate_on_success: true      # Rotate to next validator after successful propose
-  rotate_on_failure: false    # Keep trying same validator on failure
+  rotate_on_failure: true    # Keep trying same validator on failure
   max_failures_per_validator: 3  # Max failures before forcing rotation
 
 # =================================================================

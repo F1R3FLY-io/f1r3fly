@@ -64,13 +64,11 @@ cargo run -- full-deploy -f ../rholang/examples/stdout.rho -b
 The `deploy-and-wait` command deploys Rholang code and waits for the transaction to be included in a block and finalized.
 
 ```bash
-# Basic usage
-cargo run -- deploy-and-wait -f contract.rho
+# Using default values
+cargo run -- deploy-and-wait -f ../rholang/examples/stdout.rho
 
 # With custom parameters
-cargo run -- deploy-and-wait -f contract.rho --max-wait 600 --check-interval 10
-
-
+cargo run -- deploy-and-wait -f ../rholang/examples/stdout.rho --max-wait 600 --check-interval 10
 ```
 
 ### Get Deploy Information
@@ -381,6 +379,72 @@ cargo run -- network-health --standard-ports false --custom-ports "60503,70503"
 
 # Check network health on different host
 cargo run -- network-health -H node.example.com --custom-ports "60503"
+```
+
+### Epoch Info
+
+Get current epoch information including epoch length, quarantine length, and transition timing.
+
+```bash
+# Get epoch information (uses default observer port 40452)
+cargo run -- epoch-info
+
+# Get epoch info from custom node
+cargo run -- epoch-info -H node.example.com -p 40452
+```
+
+### Validator Status
+
+Check the detailed status of a specific validator (bonded, active, or quarantine state).
+
+```bash
+# Check validator4 status (replace with actual public key)
+cargo run -- validator-status -k 04d26c6103d7269773b943d7a9c456f9eb227e0d8b1fe30bccee4fca963f4446e3385d99f6386317f2c1ad36b9e6b0d5f97bb0a0041f05781c60a5ebca124a251d
+
+# Check validator status on custom node
+cargo run -- validator-status -k YOUR_VALIDATOR_PUBLIC_KEY -H node.example.com -p 40452
+```
+
+### Epoch Rewards
+
+Get current epoch rewards information from the PoS contract.
+
+```bash
+# Get epoch rewards (uses default observer port 40452)
+cargo run -- epoch-rewards
+
+# Get epoch rewards from custom node
+cargo run -- epoch-rewards -H node.example.com -p 40452
+```
+
+### Validator Transitions
+
+Monitor validator state transitions in real-time or get a snapshot of all validator states.
+
+```bash
+# Get current snapshot of all validator states
+cargo run -- validator-transitions
+
+# Watch for real-time validator transitions (30 second intervals)
+cargo run -- validator-transitions --watch
+
+# Watch with custom polling interval (10 seconds)
+cargo run -- validator-transitions --watch --interval 10
+
+# Monitor transitions on custom node
+cargo run -- validator-transitions --watch --interval 5 -H node.example.com -p 40452
+```
+
+### Network Consensus
+
+Get network-wide consensus health overview including validator participation rates.
+
+```bash
+# Get network consensus overview (uses default observer port 40452)
+cargo run -- network-consensus
+
+# Get consensus overview from custom node
+cargo run -- network-consensus -H node.example.com -p 40452
 ```
 
 
