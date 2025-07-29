@@ -3,18 +3,16 @@
 ## Bitcoin Core - Regtest (Local Testnet)
 
 ### Setup
-1. Install bitcoin-core: https://bitcoincore.org/en/download/ 
-   
-   *Or ask AI with this prompt:*
-   ```
-   How do I install Bitcoin Core via command line on [your OS]? 
-   I need bitcoind and bitcoin-cli for development work.
-   ```
-
-2. Verify installation: `bitcoind --version`
-3. Start local testnet:
+1. Install bitcoin-core: `brew install bitcoin`
+2. Verify installation: `bitcoind --version`. `v29.0.0`
+3. Create Bitcoin data directory and start local testnet:
    ```bash
-   bitcoind -regtest -server -rpcallowip=127.0.0.1 -rpcbind=127.0.0.1:18443 \
+   # Create data directory first
+   mkdir -p ~/.bitcoin
+   
+   # Start bitcoind with custom data directory
+   bitcoind -regtest -server -datadir=$HOME/.bitcoin \
+     -rpcallowip=127.0.0.1 -rpcbind=127.0.0.1:18443 \
      -zmqpubrawblock=tcp://127.0.0.1:28332 -zmqpubrawtx=tcp://127.0.0.1:28333 \
      -fallbackfee=0.0001
    ```
@@ -22,113 +20,181 @@
 
 4. Create wallet and mining address:
    ```bash
-   bitcoin-cli -regtest createwallet "mining_wallet"
-   bitcoin-cli -regtest getnewaddress "mining" "bech32"
+   bitcoin-cli -regtest -datadir=$HOME/.bitcoin createwallet "mining_wallet"
+   bitcoin-cli -regtest -datadir=$HOME/.bitcoin getnewaddress "mining" "bech32"
    ```
 
 5. Generate initial blocks and verify:
    ```bash
-   bitcoin-cli -regtest generatetoaddress 101 <your-bcrt1q-address>
-   bitcoin-cli -regtest getbalance  # Expected: 50.00000000
+   bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 101 <your-bcrt1q-address>
+   bitcoin-cli -regtest -datadir=$HOME/.bitcoin getbalance  # Expected: 50.00000000
    ```
 
 ### Common Commands
+
+#### Wallet Management
 ```bash
-# Wallet management
-bitcoin-cli -regtest listwallets
-bitcoin-cli -regtest listreceivedbyaddress 0 true
-bitcoin-cli -regtest sendtoaddress <address> <amount>
+# List all available wallets in the node
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin listwallets
 
-# Mining & blockchain
-bitcoin-cli -regtest generatetoaddress 1 <miner_address>
-bitcoin-cli -regtest getblockchaininfo
+# Show all addresses that have received transactions (0 = include zero-confirmation, true = include empty addresses)
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin listreceivedbyaddress 0 true
 
-# PSBT operations
-bitcoin-cli -regtest decodepsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)"
+# Send Bitcoin to a specific address with specified amount
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin sendtoaddress <address> <amount>
 
-# Stop node
-bitcoin-cli -regtest stop
+# Get current wallet balance
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getbalance
+
+# Generate a new receiving address for the wallet
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getnewaddress "label" "bech32"
 ```
 
-## Blockstream/Electrs
+#### Mining & Blockchain Operations
+```bash
+# Generate blocks and send mining rewards to specified address (essential for regtest)
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 1 <miner_address>
 
-1. **Clone the repository:**
+# Get comprehensive blockchain information (height, difficulty, chain tips, etc.)
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getblockchaininfo
+
+# Get detailed information about a specific block by hash
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getblock <block_hash>
+
+# Get the hash of the block at a specific height
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getblockhash <block_height>
+
+# Get memory pool information (pending transactions)
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getmempoolinfo
+```
+
+#### PSBT (Partially Signed Bitcoin Transaction) Operations
+```bash
+# Decode and display a PSBT file in human-readable format
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin decodepsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)"
+
+# Process/sign a PSBT with the wallet's private keys
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin walletprocesspsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)"
+
+# Finalize a PSBT (converts to raw transaction if fully signed)
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin finalizepsbt "<psbt_string>"
+```
+
+#### Transaction Operations
+```bash
+# Broadcast a raw transaction to the network
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin sendrawtransaction <hex_transaction>
+
+# Get detailed information about a transaction by ID
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin gettransaction <txid>
+
+# Get raw transaction data in hexadecimal format
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getrawtransaction <txid> true
+```
+
+#### Node Control
+```bash
+# Gracefully stop the Bitcoin node
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin stop
+
+# Get node connection and network information
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getnetworkinfo
+
+# Get peer connection information
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin getpeerinfo
+```
+
+## Electrs Backend
+
+Repository: https://github.com/blockstream/electrs
+
+### Installation & Setup
+
+```bash
+git clone https://github.com/blockstream/electrs && cd electrs
+git checkout new-index
+
+# macOS only: Set export flags before cargo build --release
+export CPPFLAGS="-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1"
+export CXXFLAGS="-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1"
+
+cargo build --release
+```
+
+### Running Electrs (Regtest)
+
+```bash
+./target/release/electrs --network regtest \
+  --daemon-rpc-addr 127.0.0.1:18443 \
+  --electrum-rpc-addr 127.0.0.1:60401 \
+  --http-addr 0.0.0.0:3002 \
+  --monitoring-addr 127.0.0.1:24224 \
+  --db-dir ./db/regtest \
+  --daemon-dir ~/.bitcoin/ -vvv
+```
+
+## Esplora Frontend
+
+Repository: https://github.com/Blockstream/esplora
+
+### Installation & Setup
+
+```bash
+git clone https://github.com/Blockstream/esplora.git
+cd esplora && npm i
+```
+
+### Configuration
+
+```bash
+cat > config.js << EOF
+module.exports = {
+  network: 'regtest',
+  api_url: '/api',
+  electrum_url: 'tcp://localhost:60401'
+};
+EOF
+```
+
+### Running Development Server
+
+```bash
+export API_URL=http://localhost:3002/ && PORT=5001 npm run dev-server
+```
+
+### Verify Setup
+1. **Check Bitcoin Core is running on regtest:**
    ```bash
-   git clone https://github.com/blockstream/electrs -b new-index
-   cd electrs
+   bitcoin-cli -regtest -datadir=$HOME/.bitcoin getblockchaininfo
    ```
 
-2. **Build the project:**
-   ```bash
-   cargo build --release
-   ```
+2. **Check Electrs is syncing:**
+   Look for log messages showing block processing and indexing progress
 
-3. **Start Electrs server:**
-   ```bash
-   ./target/release/electrs --network regtest \
-     --daemon-rpc-addr 127.0.0.1:18443 \
-     --electrum-rpc-addr 127.0.0.1:60401 \
-     --http-addr 0.0.0.0:3002 \
-     --monitoring-addr 127.0.0.1:24224 \
-     --db-dir ./db/regtest \
-     --daemon-dir ~/.bitcoin/ -vvv
-   ```
-
-4. **Verify server is running:**
-   
-   *Look for: `INFO REST server running on 0.0.0.0:3002`*
-
-## Blockstream/Esplora
-
-1. **Clone and install dependencies:**
-   ```bash
-   git clone https://github.com/Blockstream/esplora.git
-   cd esplora && npm i
-   ```
-
-2. **Create configuration file:**
-   ```bash
-   cat > config.js << EOF
-   module.exports = {
-     network: 'regtest',
-     api_url: '/api',
-     electrum_url: 'tcp://localhost:60401'
-   };
-   EOF
-   ```
-
-3. **Set environment and start server:**
-   ```bash
-   export API_URL=http://localhost:3002/
-   npm run dev-server
-   ```
-
-4. **Access the interface:**
-   
-   *Enable CORS extension for browser access: https://mybrowseraddon.com/access-control-allow-origin.html*  
-   *Mempool interface: http://localhost:5000/mempool*
+3. **Access Esplora Frontend:**
+   Open http://localhost:5001 in your browser
 
 ## F1r3fly Transaction Workflow
 
 ```bash
 # 0. Ensure blocks are available
-bitcoin-cli -regtest generatetoaddress 101 <your-address>
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 101 <your-address>
 
 # 1. Create PSBT
 cargo run --example create_f1r3fly_psbt_regtest -- <your-address>
 
 # 2. Verify PSBT
-bitcoin-cli -regtest decodepsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)"
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin decodepsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)"
 
 # 3. Sign and broadcast transaction
-SIGNED_RESULT=$(bitcoin-cli -regtest walletprocesspsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)") && \
+SIGNED_RESULT=$(bitcoin-cli -regtest -datadir=$HOME/.bitcoin walletprocesspsbt "$(cat f1r3fly_transaction_<address_prefix>.psbt)") && \
 RAW_TX=$(echo $SIGNED_RESULT | jq -r '.hex') && \
-TXID=$(bitcoin-cli -regtest sendrawtransaction $RAW_TX) && \
+TXID=$(bitcoin-cli -regtest -datadir=$HOME/.bitcoin sendrawtransaction $RAW_TX) && \
 echo "🎉 F1r3fly transaction broadcast!" && \
 echo "Transaction ID: $TXID"
 
 # 4. Generate block for confirmation
-BLOCK_HASH=$(bitcoin-cli -regtest generatetoaddress 1 <your-address>) && \
+BLOCK_HASH=$(bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 1 <your-address>) && \
 echo "⚡ Block generated: $BLOCK_HASH" && \
 echo "🔍 Checking transaction confirmation..."
 
