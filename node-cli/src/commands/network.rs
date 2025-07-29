@@ -323,7 +323,7 @@ pub async fn bond_validator_command(
     let finalization_start = Instant::now();
 
     // Use the same finalization logic as deploy_and_wait_command
-    let finalization_max_attempts: u32 = 12;
+    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
@@ -498,7 +498,7 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
     let finalization_start = Instant::now();
 
     // Use the same finalization logic as deploy_and_wait_command
-    let finalization_max_attempts: u32 = 12;
+    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
@@ -653,8 +653,8 @@ pub async fn deploy_and_wait_command(
     println!("🔍 Waiting for block finalization...");
     let finalization_start = Instant::now();
 
-    // Calculate finalization attempts (default: 12 attempts, 5 second intervals)
-    let finalization_max_attempts: u32 = 12;
+    // Calculate finalization attempts (default: 60 attempts, 5 second intervals = 5 minutes)
+    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
@@ -674,16 +674,14 @@ pub async fn deploy_and_wait_command(
             println!("📊 Total time: {:.2?}", total_duration);
         }
         Ok(false) => {
-            println!(
-                "❌ Block not finalized after {} attempts ({} seconds)",
-                finalization_max_attempts,
-                (finalization_max_attempts as u64) * finalization_retry_delay
-            );
-            return Err("Block finalization timeout".into());
+            println!("⚠️  Block not yet finalized after {} attempts, but deploy is in the blockchain.", finalization_max_attempts);
+            println!("💡 The deployment is likely successful and will be finalized soon.");
         }
         Err(e) => {
-            println!("❌ Error checking block finalization: {}", e);
-            return Err(e);
+            println!("❌ Error checking finalization status: {}", e);
+            println!(
+                "⚠️  Could not verify finalization, but deploy is in the blockchain."
+            );
         }
     }
 

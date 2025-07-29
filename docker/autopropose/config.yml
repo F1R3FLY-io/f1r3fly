@@ -32,6 +32,12 @@ validators:
     host: rnode.validator3
     grpc_port: 40402           # Internal gRPC port for propose operations
     enabled: true              # Participate in rotation
+
+  # Validator 4 - Quaternary validator
+  - name: validator4
+    host: rnode.validator4
+    grpc_port: 40402
+    enabled: false
   
   # Bootstrap node (typically doesn't propose)
   - name: bootstrap

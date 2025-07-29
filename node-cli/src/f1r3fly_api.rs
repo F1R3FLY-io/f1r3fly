@@ -136,11 +136,27 @@ impl<'a> F1r3flyApi<'a> {
         match deploy_message {
             DeployResponseMessage::Error(service_error) => Err(service_error.clone().into()),
             DeployResponseMessage::Result(result) => {
-                // Extract the deploy ID from the response
-                if let Some(deploy_id) = result.strip_prefix("Success! DeployId is: ") {
-                    Ok(deploy_id.to_string())
+                // Extract the deploy ID from the response - handle various formats
+                let cleaned_result = result.trim();
+                
+                // Try different possible prefixes and formats
+                if let Some(deploy_id) = cleaned_result.strip_prefix("Success! DeployId is: ") {
+                    Ok(deploy_id.trim().to_string())
+                } else if let Some(deploy_id) = cleaned_result.strip_prefix("Success!\nDeployId is: ") {
+                    Ok(deploy_id.trim().to_string())
+                } else if cleaned_result.starts_with("Success!") {
+                    // Look for any long hex string in the response
+                    let lines: Vec<&str> = cleaned_result.lines().collect();
+                    for line in lines {
+                        let trimmed = line.trim();
+                        if trimmed.len() > 64 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+                            return Ok(trimmed.to_string());
+                        }
+                    }
+                    Err(format!("Could not extract deploy ID from response: {}", result).into())
                 } else {
-                    Ok(result.clone()) // Return the full message if we can't extract the deploy ID
+                    // Assume it's already just the deploy ID
+                    Ok(cleaned_result.to_string())
                 }
             }
         }
