@@ -613,8 +613,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "f1r3fly-rholang"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "cc",
+ "dotenv",
+ "f1r3fly-crypto",
+ "f1r3fly-models",
+ "f1r3fly-rspace-plus-plus",
+ "f1r3fly-shared",
+ "f1r3fly-tree-sitter-rholang",
+ "futures",
+ "hex",
+ "itertools 0.10.5",
+ "k256",
+ "lazy_static",
+ "openai-api-rs",
+ "openssl",
+ "pretty_assertions",
+ "prost",
+ "rand",
+ "regex",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.9",
+ "tokio",
+ "tree-sitter",
+ "tree-sitter-rust",
+ "uuid",
+ "zbase32",
+]
+
+[[package]]
 name = "f1r3fly-rspace-plus-plus"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e59ae0158d4691b884c7fb083bb069b624d2a4dfddd1474c5b5d782d7d7bf7bc"
 dependencies = [
  "async-trait",
  "bincode",
@@ -653,6 +689,16 @@ name = "f1r3fly-shared"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da1b81f67218c6e6e7df2de36e79d6d6da335fd66f4473b8ccc244af74b40abe"
+
+[[package]]
+name = "f1r3fly-tree-sitter-rholang"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "744b70138fa40367443ad0f3f635e7694f8f72babbac1a76f4b9d6dfe7d5d114"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
 
 [[package]]
 name = "fastrand"
@@ -1928,40 +1974,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rholang"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "cc",
- "dotenv",
- "f1r3fly-crypto",
- "f1r3fly-models",
- "f1r3fly-rspace-plus-plus",
- "f1r3fly-shared",
- "futures",
- "hex",
- "itertools 0.10.5",
- "k256",
- "lazy_static",
- "openai-api-rs",
- "openssl",
- "pretty_assertions",
- "prost",
- "rand",
- "regex",
- "serde",
- "tempfile",
- "thiserror 2.0.9",
- "tokio",
- "tree-sitter",
- "tree-sitter-rholang",
- "tree-sitter-rust",
- "uuid",
- "zbase32",
-]
-
-[[package]]
 name = "ring"
 version = "0.17.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2693,14 +2705,6 @@ name = "tree-sitter-language"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ca9cabf8f61ee3e83c0f532c45e9e082627f77a8bb9553684df584edcf82654"
-
-[[package]]
-name = "tree-sitter-rholang"
-version = "0.0.1"
-dependencies = [
- "cc",
- "tree-sitter-language",
-]
 
 [[package]]
 name = "tree-sitter-rust"

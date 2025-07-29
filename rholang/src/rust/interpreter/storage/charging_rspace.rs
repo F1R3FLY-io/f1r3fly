@@ -16,7 +16,7 @@ use f1r3fly_crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use f1r3fly_models::rhoapi::{
     tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, Par, TaggedContinuation,
 };
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::{
     checkpoint::{Checkpoint, SoftCheckpoint},
     errors::RSpaceError,
     hashing::blake2b256_hash::Blake2b256Hash,

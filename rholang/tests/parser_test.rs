@@ -1,4 +1,4 @@
-use rholang::rust::interpreter::compiler::{
+use f1r3fly_rholang::rust::interpreter::compiler::{
     normalizer::parser::parse_rholang_code_to_proc,
     rholang_ast::{
         Block, Branch, BundleType, Case, Collection, Conjunction, Decl, Decls, DeclsChoice,

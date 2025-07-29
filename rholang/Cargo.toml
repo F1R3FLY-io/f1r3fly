@@ -1,7 +1,31 @@
 [package]
-name = "rholang"
+name = "f1r3fly-rholang"
 version = "0.1.0"
 edition = "2021"
+description = "F1r3fly Rholang programming language - concurrent, message-passing smart contract language"
+license = "MIT"
+repository = "https://github.com/F1R3FLY-io/f1r3fly"
+homepage = "https://f1r3fly.io"
+authors = ["F1r3fly team"]
+readme = "README.md"
+keywords = ["rholang", "programming-language", "smart-contracts", "f1r3fly", "concurrent"]
+categories = ["development-tools::build-utils", "parser-implementations"]
+documentation = "https://docs.rs/f1r3fly-rholang"
+include = [
+    "src/lib.rs",
+    "src/main.rs", 
+    "src/rust/**/*",
+    "tests/**/*",
+    "examples/**/*",
+    "build.rs",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "rust-toolchain.toml",
+    "Cross.toml",
+    "clean_tree_sitter_generated_files.sh",
+    "rho2rbl"
+]
 
 [profile.dev]
 debug = true
@@ -15,8 +39,8 @@ crate-type = ["cdylib", "rlib"]
 f1r3fly-crypto = "0.1.0"
 f1r3fly-models = "0.1.0"
 f1r3fly-shared = "0.1.0"
-f1r3fly-rspace-plus-plus = { path = "../rspace++" }
-tree-sitter-rholang = { path = "src/main/tree_sitter/" }
+f1r3fly-rspace-plus-plus = "0.1.0"
+f1r3fly-tree-sitter-rholang = "0.1.0"
 itertools = "0.10.2"
 serde = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -42,4 +66,3 @@ openssl = { version = "0.10", features = ["vendored"] }
 tempfile = "3.19.1"
 
 [build-dependencies]
-cc = "1.0"

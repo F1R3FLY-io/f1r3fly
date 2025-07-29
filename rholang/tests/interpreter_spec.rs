@@ -1,8 +1,8 @@
 // See rholang/src/test/scala/coop/rchain/rholang/InterpreterSpec.scala
 
 use f1r3fly_models::rhoapi::{expr, Expr, Par};
-use rholang::rust::interpreter::accounting::costs::{parsing_cost, subtraction_cost_with_value};
-use rholang::rust::interpreter::{
+use f1r3fly_rholang::rust::interpreter::accounting::costs::{parsing_cost, subtraction_cost_with_value};
+use f1r3fly_rholang::rust::interpreter::{
     errors::InterpreterError,
     interpreter::EvaluateResult,
     rho_runtime::{RhoRuntime, RhoRuntimeImpl},

@@ -5,7 +5,7 @@ use f1r3fly_models::{
     },
     ByteString,
 };
-use rspace_plus_plus::rspace::hashing::blake2b256_hash;
+use f1r3fly_rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use std::ops::{Add, Mul, Sub};
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/accounting/Costs.scala

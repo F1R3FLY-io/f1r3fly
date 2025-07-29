@@ -35,7 +35,7 @@ use f1r3fly_models::{
         },
     },
 };
-use rholang::rust::interpreter::{
+use f1r3fly_rholang::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
     env::Env,
     errors::InterpreterError,
@@ -44,7 +44,7 @@ use rholang::rust::interpreter::{
     rho_runtime::RhoISpace,
     test_utils::persistent_store_tester::create_test_space,
 };
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::{
     internal::{Datum, Row, WaitingContinuation},
     rspace::RSpace,
     rspace_interface::ISpace,

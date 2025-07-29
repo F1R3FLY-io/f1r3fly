@@ -15,13 +15,13 @@ use f1r3fly_models::{
     },
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use rholang::rust::interpreter::{
+use f1r3fly_rholang::rust::interpreter::{
     accounting::{costs::Cost, CostManager},
     env::Env,
     substitute::{Substitute, SubstituteTrait},
     util::prepend_connective,
 };
-use rspace_plus_plus::rspace::history::Either;
+use f1r3fly_rspace_plus_plus::rspace::history::Either;
 
 const DEPTH: i32 = 0;
 

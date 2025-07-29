@@ -5,7 +5,7 @@ use f1r3fly_models::rhoapi::{
     BindPattern, ListParWithRandom, Par, Receive, ReceiveBind, Send, TaggedContinuation,
 };
 use f1r3fly_models::rust::rholang::implicits::concatenate_pars;
-use rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
+use f1r3fly_rspace_plus_plus::rspace::internal::{Datum, Row, WaitingContinuation};
 use std::collections::BTreeSet;
 
 use crate::rust::interpreter::pretty_printer::PrettyPrinter;

@@ -21,7 +21,7 @@ use f1r3fly_models::rust::rholang::sorter::send_sort_matcher::SendSortMatcher;
 use f1r3fly_models::rust::rholang::sorter::sortable::Sortable;
 use f1r3fly_models::rust::sorted_par_hash_set::SortedParHashSet;
 use f1r3fly_models::rust::sorted_par_map::SortedParMap;
-use rspace_plus_plus::rspace::history::Either;
+use f1r3fly_rspace_plus_plus::rspace::history::Either;
 
 use super::accounting::_cost;
 use super::accounting::costs::Cost;

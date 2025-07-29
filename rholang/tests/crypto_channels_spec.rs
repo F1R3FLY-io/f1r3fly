@@ -17,7 +17,7 @@ mod tests {
         },
         rust::utils::{new_gbool_par, new_gint_par, new_gstring_par, new_send_par},
     };
-    use rholang::rust::interpreter::{
+    use f1r3fly_rholang::rust::interpreter::{
         accounting::costs::Cost,
         env::Env,
         matcher::r#match::Matcher,
@@ -25,7 +25,7 @@ mod tests {
         rho_type::RhoByteArray,
         system_processes::FixedChannels,
     };
-    use rspace_plus_plus::rspace::{
+    use f1r3fly_rspace_plus_plus::rspace::{
         rspace::RSpace,
         shared::{
             in_mem_store_manager::InMemoryStoreManager,

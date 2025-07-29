@@ -7,9 +7,9 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-f1r3fly-rspace-plus-plus = { path = "../../../rspace++" }
+f1r3fly-rspace-plus-plus = "0.1.0"
 f1r3fly-models = "0.1.0"
-rholang = { path = "../../../rholang" }
+f1r3fly-rholang = { path = "../../../rholang" }
 prost = "0.13.5"
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }

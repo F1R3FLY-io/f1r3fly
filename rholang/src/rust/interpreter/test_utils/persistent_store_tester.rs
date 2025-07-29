@@ -1,5 +1,5 @@
 use f1r3fly_models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
-use rspace_plus_plus::rspace::{
+use f1r3fly_rspace_plus_plus::rspace::{
     rspace::RSpace,
     rspace_interface::ISpace,
     shared::{

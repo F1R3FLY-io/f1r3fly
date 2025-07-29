@@ -24,7 +24,7 @@ use f1r3fly_models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
 use prost::Message;
-use rspace_plus_plus::rspace::util::unpack_option_with_peek;
+use f1r3fly_rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;

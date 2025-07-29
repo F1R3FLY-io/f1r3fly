@@ -5,15 +5,15 @@ use std::{future::Future, path::Path, sync::Arc};
 use tempfile::Builder;
 
 use f1r3fly_models::rhoapi::{BindPattern, ListParWithRandom, Par, TaggedContinuation};
-use rspace_plus_plus::rspace::history::history_repository::HistoryRepository;
-use rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
+use f1r3fly_rspace_plus_plus::rspace::history::history_repository::HistoryRepository;
+use f1r3fly_rspace_plus_plus::rspace::rspace::{RSpace, RSpaceStore};
 
 use crate::rust::interpreter::matcher::r#match::Matcher;
 use crate::rust::interpreter::rho_runtime;
 use crate::rust::interpreter::rho_runtime::{create_replay_rho_runtime, create_rho_runtime};
 use crate::rust::interpreter::system_processes::Definition;
 use crate::RhoRuntimeImpl;
-use rspace_plus_plus::rspace::shared::{
+use f1r3fly_rspace_plus_plus::rspace::shared::{
     key_value_store_manager::KeyValueStoreManager, lmdb_dir_store_manager::MB,
     rspace_store_manager::mk_rspace_store_manager,
 };

@@ -758,6 +758,8 @@ dependencies = [
 [[package]]
 name = "f1r3fly-rspace-plus-plus"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e59ae0158d4691b884c7fb083bb069b624d2a4dfddd1474c5b5d782d7d7bf7bc"
 dependencies = [
  "async-trait",
  "bincode",

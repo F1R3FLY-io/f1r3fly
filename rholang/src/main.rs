@@ -1,4 +1,4 @@
-use rholang::rust::interpreter::openai_service::OpenAIService;
+use f1r3fly_rholang::rust::interpreter::openai_service::OpenAIService;
 
 #[tokio::main]
 async fn main() {

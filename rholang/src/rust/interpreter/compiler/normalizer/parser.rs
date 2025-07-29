@@ -13,7 +13,7 @@ use crate::rust::interpreter::{
 pub fn parse_rholang_code(code: &str) -> Tree {
     let mut parser = Parser::new();
     parser
-        .set_language(&tree_sitter_rholang::LANGUAGE.into())
+        .set_language(&f1r3fly_tree_sitter_rholang::LANGUAGE.into())
         .expect("Error loading Rholang grammar");
     println!("Language {:?}", parser.language());
     parser.parse(code, None).expect("Failed to parse code")
@@ -23,7 +23,7 @@ pub fn parse_rholang_code_to_proc(code: &str) -> Result<Proc, InterpreterError> 
     // println!("\nhit parse_rholang_code_to_proc");
     let mut parser = Parser::new();
     parser
-        .set_language(&tree_sitter_rholang::LANGUAGE.into())
+        .set_language(&f1r3fly_tree_sitter_rholang::LANGUAGE.into())
         .expect("Error loading Rholang grammar");
 
     let tree = match parser.parse(code, None) {

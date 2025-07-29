@@ -1,7 +1,7 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/errors.scala
 use std::fmt;
 
-use rspace_plus_plus::rspace::errors::RSpaceError;
+use f1r3fly_rspace_plus_plus::rspace::errors::RSpaceError;
 
 use super::compiler::exports::SourcePosition;
 
