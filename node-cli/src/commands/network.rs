@@ -323,7 +323,7 @@ pub async fn bond_validator_command(
     let finalization_start = Instant::now();
 
     // Use the same finalization logic as deploy_and_wait_command
-    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
+    let finalization_max_attempts: u32 = 120; // 10 minutes (120 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api
@@ -493,15 +493,23 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
     let block_wait_duration = block_wait_start.elapsed();
     println!("⏱️  Block inclusion time: {:.2?}", block_wait_duration);
 
-    // Step 3: Wait for block finalization
+    // Step 3: Wait for block finalization using observer node
     println!("🔍 Waiting for block finalization...");
+    
+    // Determine observer node settings (fallback to default observer or main node)
+    let observer_host = args.observer_host.as_deref().unwrap_or("localhost");
+    let observer_port = args.observer_port.unwrap_or(40452); // Default to port 40452 (common observer port)
+    
     let finalization_start = Instant::now();
 
+    // Create observer node API client for finalization checks
+    let observer_api = F1r3flyApi::new(&args.private_key, observer_host, observer_port);
+    
     // Use the same finalization logic as deploy_and_wait_command
-    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
+    let finalization_max_attempts: u32 = 120; // 10 minutes (120 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
-    match f1r3fly_api
+    match observer_api
         .is_finalized(
             &block_hash,
             finalization_max_attempts,
@@ -653,8 +661,8 @@ pub async fn deploy_and_wait_command(
     println!("🔍 Waiting for block finalization...");
     let finalization_start = Instant::now();
 
-    // Calculate finalization attempts (default: 60 attempts, 5 second intervals = 5 minutes)
-    let finalization_max_attempts: u32 = 60; // 5 minutes (60 * 5 seconds)
+    // Calculate finalization attempts (default: 120 attempts, 5 second intervals = 10 minutes)
+    let finalization_max_attempts: u32 = 120; // 10 minutes (120 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
 
     match f1r3fly_api

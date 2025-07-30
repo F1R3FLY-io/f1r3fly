@@ -491,6 +491,14 @@ pub struct TransferArgs {
     /// Check interval in seconds for deploy status
     #[arg(long = "check-interval", default_value_t = 5)]
     pub check_interval: u64,
+
+    /// Observer node host for finalization checks (falls back to main host if not specified)
+    #[arg(long = "observer-host")]
+    pub observer_host: Option<String>,
+
+    /// Observer node gRPC port for finalization checks (falls back to 40452 if not specified)
+    #[arg(long = "observer-port")]
+    pub observer_port: Option<u16>,
 }
 
 /// Arguments for validator-status command
