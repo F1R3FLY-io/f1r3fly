@@ -29,7 +29,7 @@ docker-compose -f shard-with-autopropose.yml up
 
 **⚠️ Warning**: Removing the `data/` directory will permanently delete all blockchain history, blocks, and state.
 
-### Observer Node (Optional)
+### Observer Node
 The observer node provides **read-only access** to the blockchain without participating in consensus. It's useful for:
 - API queries and data retrieval
 - Monitoring blockchain state
