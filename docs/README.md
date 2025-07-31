@@ -66,18 +66,18 @@ flowchart TD
         end
     end
     
-    %% Bitcoin Layer
-    subgraph Bitcoin["₿ Bitcoin Network"]
-        BTC[🔐 L1 Anchoring<br/>State Commitments]
-    end
-    
-    %% Consensus Mechanisms (positioned left of Bitcoin)
+    %% Consensus Mechanisms (below central network)
     subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
         direction LR
         CM[🌱 Cordial Miners<br/>Cooperative Mining]
         CBC[🛡️ Casper CBC<br/>BFT Consensus]
         RGB[🎨 RGB PSSM<br/>Client-Side Validation]
         CS[🚀 Casanova<br/>Adaptive Consensus]
+    end
+    
+    %% Bitcoin Layer
+    subgraph Bitcoin["₿ Bitcoin Network"]
+        BTC[🔐 L1 Anchoring<br/>State Commitments]
     end
     
     %% Client Interactions
