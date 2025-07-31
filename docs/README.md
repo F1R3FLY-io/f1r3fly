@@ -9,124 +9,136 @@ RNode is a decentralized blockchain platform developed by F1R3FLY.io that implem
 ### High-Level Operation with Shards
 
 ```mermaid
-graph TB
-    subgraph "RNode Network"
-        subgraph "Shard 0 (Root Shard)"
-            S0_V1[Validator 1]
-            S0_V2[Validator 2]
-            S0_V3[Validator 3]
-            S0_V4[Validator 4]
-            S0_Consensus[Multi-Consensus Engine]
-            S0_RSpace[RSpace Storage]
+flowchart TD
+    %% Client Layer
+    subgraph Client["🌐 Client Layer"]
+        direction LR
+        Clients[👥 Client Applications<br/>Smart Contracts]
+        Observers[👁️ Observer Nodes<br/>Read-Only Access]
+    end
+    
+    %% Smart Contract Execution Flow
+    subgraph Execution["⚙️ Smart Contract Execution Flow"]
+        direction TB
+        Deploy[📤 Deploy Rholang Contract]
+        Propose[🔄 Propose Block]
+        Execute[⚡ Concurrent Execution]
+        Finalize[✅ Block Finalization]
+        
+        Deploy --> Propose
+        Propose --> Execute
+        Execute --> Finalize
+    end
+    
+    %% Consensus Mechanisms
+    subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
+        direction TB
+        CM[🌱 Cordial Miners<br/>Cooperative Mining]
+        CBC[🛡️ Casper CBC<br/>BFT Consensus]
+        RGB[🎨 RGB PSSM<br/>Client-Side Validation]
+        CS[🚀 Casanova<br/>Adaptive Consensus]
+    end
+    
+    %% Shard Architecture
+    subgraph Network["🔗 RNode Sharded Network"]
+        direction TB
+        
+        subgraph Shard0["🏛️ Shard 0 (Root Shard)"]
+            direction TB
+            S0_Validators[👤 Validators 1-4]
+            S0_Consensus[🎯 Multi-Consensus Engine]
+            S0_RSpace[💾 RSpace Storage]
+            
+            S0_Validators --> S0_Consensus
+            S0_Consensus --> S0_RSpace
         end
         
-        subgraph "Shard 1"
-            S1_V1[Validator 1]
-            S1_V2[Validator 2]
-            S1_V3[Validator 3]
-            S1_Consensus[Multi-Consensus Engine]
-            S1_RSpace[RSpace Storage]
+        subgraph Shard1["🏢 Shard 1"]
+            direction TB
+            S1_Validators[👤 Validators 1-3]
+            S1_Consensus[🎯 Multi-Consensus Engine]
+            S1_RSpace[💾 RSpace Storage]
+            
+            S1_Validators --> S1_Consensus
+            S1_Consensus --> S1_RSpace
         end
         
-        subgraph "Shard N"
-            SN_V1[Validator 1]
-            SN_V2[Validator 2]
-            SN_V3[Validator 3]
-            SN_Consensus[Multi-Consensus Engine]
-            SN_RSpace[RSpace Storage]
+        subgraph ShardN["🏭 Shard N"]
+            direction TB
+            SN_Validators[👤 Validators 1-3]
+            SN_Consensus[🎯 Multi-Consensus Engine]
+            SN_RSpace[💾 RSpace Storage]
+            
+            SN_Validators --> SN_Consensus
+            SN_Consensus --> SN_RSpace
         end
     end
     
-    subgraph "Consensus Mechanisms"
-        CM[Cordial Miners<br/>Cooperative Mining]
-        CBC[Casper CBC<br/>BFT Consensus]
-        RGB[RGB PSSM<br/>Client-Side Validation]
-        CS[Casanova<br/>Adaptive Consensus]
+    %% Bitcoin Layer
+    subgraph Bitcoin["₿ Bitcoin Network"]
+        BTC[🔐 L1 Anchoring<br/>State Commitments]
     end
-    
-    subgraph "External Systems"
-        Bitcoin[Bitcoin Network<br/>L1 Anchoring]
-        Clients[Client Applications<br/>Smart Contracts]
-        Observers[Observer Nodes<br/>Read-Only Access]
-    end
-    
-    subgraph "Smart Contract Execution"
-        Deploy[Deploy Rholang Contract]
-        Propose[Propose Block]
-        Execute[Concurrent Execution]
-        Finalize[Block Finalization]
-    end
-    
-    %% Shard Communications
-    S0_Consensus -.->|Cross-Shard Messages| S1_Consensus
-    S0_Consensus -.->|Cross-Shard Messages| SN_Consensus
-    S1_Consensus -.->|Cross-Shard Messages| SN_Consensus
-    
-    %% Consensus Selection
-    S0_Consensus --> CM
-    S0_Consensus --> CBC
-    S0_Consensus --> RGB
-    S0_Consensus --> CS
-    
-    S1_Consensus --> CM
-    S1_Consensus --> CBC
-    S1_Consensus --> RGB
-    S1_Consensus --> CS
-    
-    SN_Consensus --> CM
-    SN_Consensus --> CBC
-    SN_Consensus --> RGB
-    SN_Consensus --> CS
-    
-    %% Bitcoin Anchoring
-    S0_RSpace -->|State Commitments| Bitcoin
-    S1_RSpace -->|State Commitments| Bitcoin
-    SN_RSpace -->|State Commitments| Bitcoin
     
     %% Client Interactions
     Clients -->|Deploy Contracts| Deploy
-    Deploy -->|Assign to Shard| S0_Consensus
-    Deploy -->|Assign to Shard| S1_Consensus
-    Deploy -->|Assign to Shard| SN_Consensus
-    
-    %% Contract Execution Flow
-    Deploy --> Propose
-    Propose --> Execute
-    Execute --> Finalize
-    
-    %% RSpace Integration
-    Execute -->|State Updates| S0_RSpace
-    Execute -->|State Updates| S1_RSpace
-    Execute -->|State Updates| SN_RSpace
-    
-    %% Observer Access
     Observers -->|Read State| S0_RSpace
     Observers -->|Read State| S1_RSpace
     Observers -->|Read State| SN_RSpace
     
-    %% Validator Participation
-    S0_V1 --> S0_Consensus
-    S0_V2 --> S0_Consensus
-    S0_V3 --> S0_Consensus
-    S0_V4 --> S0_Consensus
+    %% Contract Assignment
+    Deploy -->|Assign to Shard| S0_Consensus
+    Deploy -->|Assign to Shard| S1_Consensus
+    Deploy -->|Assign to Shard| SN_Consensus
     
-    S1_V1 --> S1_Consensus
-    S1_V2 --> S1_Consensus
-    S1_V3 --> S1_Consensus
+    %% Consensus Selection (each shard can choose)
+    S0_Consensus -.->|Selects| CM
+    S0_Consensus -.->|Selects| CBC
+    S0_Consensus -.->|Selects| RGB
+    S0_Consensus -.->|Selects| CS
     
-    SN_V1 --> SN_Consensus
-    SN_V2 --> SN_Consensus
-    SN_V3 --> SN_Consensus
+    S1_Consensus -.->|Selects| CM
+    S1_Consensus -.->|Selects| CBC
+    S1_Consensus -.->|Selects| RGB
+    S1_Consensus -.->|Selects| CS
     
-    classDef shard fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef consensus fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef external fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef execution fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    SN_Consensus -.->|Selects| CM
+    SN_Consensus -.->|Selects| CBC
+    SN_Consensus -.->|Selects| RGB
+    SN_Consensus -.->|Selects| CS
     
-    class S0_V1,S0_V2,S0_V3,S0_V4,S1_V1,S1_V2,S1_V3,SN_V1,SN_V2,SN_V3,S0_RSpace,S1_RSpace,SN_RSpace shard
-    class CM,CBC,RGB,CS,S0_Consensus,S1_Consensus,SN_Consensus consensus
-    class Bitcoin,Clients,Observers external
+    %% Cross-Shard Communication
+    S0_Consensus <-.->|Cross-Shard Messages| S1_Consensus
+    S0_Consensus <-.->|Cross-Shard Messages| SN_Consensus
+    S1_Consensus <-.->|Cross-Shard Messages| SN_Consensus
+    
+    %% State Updates
+    Execute -->|State Updates| S0_RSpace
+    Execute -->|State Updates| S1_RSpace
+    Execute -->|State Updates| SN_RSpace
+    
+    %% Bitcoin Anchoring
+    S0_RSpace -->|Periodic Commitments| BTC
+    S1_RSpace -->|Periodic Commitments| BTC
+    SN_RSpace -->|Periodic Commitments| BTC
+    
+    %% Dark theme optimized styling
+    classDef client fill:#2d3748,stroke:#63b3ed,stroke-width:3px,color:#ffffff
+    classDef execution fill:#2d3748,stroke:#f6ad55,stroke-width:3px,color:#ffffff
+    classDef consensus fill:#2d3748,stroke:#9f7aea,stroke-width:3px,color:#ffffff
+    classDef shard fill:#1a202c,stroke:#4fd1c7,stroke-width:3px,color:#ffffff
+    classDef validator fill:#2d3748,stroke:#68d391,stroke-width:2px,color:#ffffff
+    classDef storage fill:#2d3748,stroke:#fc8181,stroke-width:2px,color:#ffffff
+    classDef bitcoin fill:#2d3748,stroke:#fbb040,stroke-width:3px,color:#ffffff
+    classDef network fill:#1a202c,stroke:#4fd1c7,stroke-width:2px,color:#ffffff
+    
+    class Clients,Observers client
     class Deploy,Propose,Execute,Finalize execution
+    class CM,CBC,RGB,CS consensus
+    class S0_Consensus,S1_Consensus,SN_Consensus consensus
+    class S0_Validators,S1_Validators,SN_Validators validator
+    class S0_RSpace,S1_RSpace,SN_RSpace storage
+    class BTC bitcoin
+    class Shard0,Shard1,ShardN,Network network
 ```
 
 ### Key Architecture Components
@@ -152,25 +164,25 @@ Each shard can independently select and switch between four consensus mechanisms
 
 ## Documentation Structure
 
-### =� Requirements
+### =� Requirements
 - **[Requirements Overview](requirements/)** - Business and user requirements
   - **[User Stories](requirements/user-stories/)** - Feature requirements from user perspective
   - **[Business Requirements](requirements/business-requirements/)** - Business logic and constraints
   - **[Acceptance Criteria](requirements/acceptance-criteria/)** - Definition of done for features
 
-### =� Specifications  
+### =� Specifications  
 - **[Specifications Overview](specifications/)** - Technical specifications and design documents
   - **[Technical Specifications](specifications/technical/)** - API specs, data schemas, algorithms
   - **[Visual Design](specifications/visual-design/)** - UI/UX mockups and style guides
   - **[Integration Specifications](specifications/integration/)** - Third-party service integrations
 
-### <� Architecture
+### <� Architecture
 - **[Architecture Overview](architecture/)** - System design and architectural decisions
   - **[Architecture Decision Records](architecture/decisions/)** - ADRs documenting key decisions
   - **[System Diagrams](architecture/diagrams/)** - Component diagrams and data flows
   - **[Design Patterns](architecture/patterns/)** - Established patterns and conventions
 
-### =� API Documentation
+### =� API Documentation
 - **[API Overview](api/)** - Complete API reference and examples
   - **[Node Operations](api/node-operations.md)** - Core node functionality
   - **[Smart Contracts](api/smart-contracts.md)** - Contract deployment and execution
