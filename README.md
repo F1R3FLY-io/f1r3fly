@@ -1,4 +1,4 @@
-# F1R3FLY
+# RNode
 
 Highly concurrent throughput Byzantine Fault Tolerants
 
@@ -74,7 +74,7 @@ When using AI coding assistants (Claude, GitHub Copilot, etc.), provide context 
 ## 🗂️ Project Structure
 
 ```
-f1r3fly/
+rnode/
 ├── docs/                  # Documentation hierarchy
 │   ├── requirements/      # Business and user requirements
 │   ├── specifications/    # Technical specifications
@@ -126,9 +126,9 @@ f1r3fly/
 - **Version Control**: Git with feature branching
 - **Development Environment**: Nix flakes + Direnv for reproducible environments
 
-## What is F1R3FLY?
+## What is RNode?
 
-F1R3FLY is building a decentralized, economic, censorship-resistant, public compute infrastructure and blockchain. It will host and execute programs popularly referred to as "smart contracts". It will be trustworthy, scalable, concurrent, with proof-of-stake consensus and content delivery.
+RNode is a decentralized, economic, censorship-resistant, public compute infrastructure and blockchain developed by F1R3FLY.io. It hosts and executes programs popularly referred to as "smart contracts". It is designed to be trustworthy, scalable, concurrent, with proof-of-stake consensus and content delivery.
 
 [F1R3FLY Discord](https://discord.gg/NN59aFdAHM) features project-related tutorials, documentation, project planning information, events calendar, and information for how to engage with this project.
 
@@ -144,8 +144,8 @@ F1R3FLY is building a decentralized, economic, censorship-resistant, public comp
 
 3. **Clone and Setup**:
    ```bash
-   git clone https://github.com/F1R3FLY-io/f1r3fly.git
-   cd f1r3fly
+   git clone https://github.com/F1R3FLY-io/rnode.git
+   cd rnode
    direnv allow
    ```
    
@@ -157,10 +157,10 @@ F1R3FLY is building a decentralized, economic, censorship-resistant, public comp
 ### Docker
 
 ```bash
-docker pull f1r3flyindustries/f1r3fly-rust-node
+docker pull f1r3flyindustries/rnode-rust-node
 ```
 
-See https://hub.docker.com/r/f1r3flyindustries/f1r3fly-rust-node for more information.
+See https://hub.docker.com/r/f1r3flyindustries/rnode-rust-node for more information.
 
 ### Platform Packages
 
@@ -216,9 +216,9 @@ rm -rf ~/.rnode/
 
 ### Node CLI
 
-A command-line interface for interacting with F1R3FLY nodes is available in the `node-cli` directory. Features include:
+A command-line interface for interacting with RNode is available in the `node-cli` directory. Features include:
 
-- **Deploying** Rholang code to F1R3FLY nodes
+- **Deploying** Rholang code to RNode
 - **Proposing** blocks to create a new block containing deployed code
 - **Full Deploy** operations (deploy + propose in one step)
 - **Checking finalization** of blocks with automatic retries
@@ -240,9 +240,9 @@ sbt ";compile ;stage"
   eval ./rholang/examples/tut-ai.rho
 ```
 
-### F1R3FlyFS
+### RNodeFS
 
-Check out [F1R3FlyFS](https://github.com/F1R3FLY-io/f1r3flyfs#f1r3flyfs) for a simple, easy-to-use, and fast file system built on top of F1R3FLY.
+Check out [RNodeFS](https://github.com/F1R3FLY-io/rnodefs#rnodefs) for a simple, easy-to-use, and fast file system built on top of RNode.
 
 ## 🧪 Testing
 
@@ -345,7 +345,7 @@ Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-To get a summary of licenses being used by F1R3FLY's dependencies:
+To get a summary of licenses being used by RNode's dependencies:
 ```bash
 sbt node/dumpLicenseReport
 ```
@@ -359,4 +359,4 @@ We use YourKit to profile RNode performance. YourKit supports open source projec
 
 ### 📦 Additional Resources
 
-> **Note for F1R3FLY Projects**: This README follows our organization's commitment to documentation-first development and LLM-enhanced workflows. The core documentation structure supports systematic development and clear communication of project goals and progress.
+> **Note for F1R3FLY.io Projects**: This README follows F1R3FLY.io's commitment to documentation-first development and LLM-enhanced workflows. The core documentation structure supports systematic development and clear communication of project goals and progress.
