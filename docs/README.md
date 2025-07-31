@@ -20,6 +20,17 @@ flowchart TD
     %% Contract Deployment Entry Point
     Deploy[📤 Deploy Rholang Contract]
     
+    %% Smart Contract Execution Flow
+    subgraph Execution["⚙️ Smart Contract Execution Flow"]
+        direction LR
+        Propose[🔄 Propose Block]
+        Execute[⚡ Concurrent Execution]
+        Finalize[✅ Block Finalization]
+        
+        Propose --> Execute
+        Execute --> Finalize
+    end
+    
     %% Shard Architecture
     subgraph Network["🔗 RNode Sharded Network"]
         direction TB
@@ -62,17 +73,6 @@ flowchart TD
         CBC[🛡️ Casper CBC<br/>BFT Consensus]
         RGB[🎨 RGB PSSM<br/>Client-Side Validation]
         CS[🚀 Casanova<br/>Adaptive Consensus]
-    end
-    
-    %% Smart Contract Execution Flow
-    subgraph Execution["⚙️ Smart Contract Execution Flow"]
-        direction LR
-        Propose[🔄 Propose Block]
-        Execute[⚡ Concurrent Execution]
-        Finalize[✅ Block Finalization]
-        
-        Propose --> Execute
-        Execute --> Finalize
     end
     
     %% Bitcoin Layer
