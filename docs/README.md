@@ -71,6 +71,15 @@ flowchart TD
         BTC[🔐 L1 Anchoring<br/>State Commitments]
     end
     
+    %% Consensus Mechanisms (positioned left of Bitcoin)
+    subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
+        direction LR
+        CM[🌱 Cordial Miners<br/>Cooperative Mining]
+        CBC[🛡️ Casper CBC<br/>BFT Consensus]
+        RGB[🎨 RGB PSSM<br/>Client-Side Validation]
+        CS[🚀 Casanova<br/>Adaptive Consensus]
+    end
+    
     %% Client Interactions
     Clients -->|Deploy Contracts| Deploy
     Observers -->|Read State| S0_RSpace
@@ -118,14 +127,6 @@ flowchart TD
     S1_RSpace -->|Periodic Commitments| BTC
     SN_RSpace -->|Periodic Commitments| BTC
     
-    %% Consensus Mechanisms
-    subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
-        direction LR
-        CM[🌱 Cordial Miners<br/>Cooperative Mining]
-        CBC[🛡️ Casper CBC<br/>BFT Consensus]
-        RGB[🎨 RGB PSSM<br/>Client-Side Validation]
-        CS[🚀 Casanova<br/>Adaptive Consensus]
-    end
     
     %% Dark theme optimized styling
     classDef client fill:#2d3748,stroke:#63b3ed,stroke-width:3px,color:#ffffff
