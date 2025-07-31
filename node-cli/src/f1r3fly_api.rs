@@ -138,11 +138,13 @@ impl<'a> F1r3flyApi<'a> {
             DeployResponseMessage::Result(result) => {
                 // Extract the deploy ID from the response - handle various formats
                 let cleaned_result = result.trim();
-                
+
                 // Try different possible prefixes and formats
                 if let Some(deploy_id) = cleaned_result.strip_prefix("Success! DeployId is: ") {
                     Ok(deploy_id.trim().to_string())
-                } else if let Some(deploy_id) = cleaned_result.strip_prefix("Success!\nDeployId is: ") {
+                } else if let Some(deploy_id) =
+                    cleaned_result.strip_prefix("Success!\nDeployId is: ")
+                {
                     Ok(deploy_id.trim().to_string())
                 } else if cleaned_result.starts_with("Success!") {
                     // Look for any long hex string in the response

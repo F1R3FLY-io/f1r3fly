@@ -86,9 +86,6 @@ pub enum Commands {
     /// Get current epoch rewards information
     EpochRewards(PosQueryArgs),
 
-    /// Monitor validator state transitions (real-time)
-    ValidatorTransitions(ValidatorTransitionsArgs),
-
     /// Get network-wide consensus health overview
     NetworkConsensus(PosQueryArgs),
 }
@@ -523,26 +520,6 @@ pub struct ValidatorStatusArgs {
     /// Validator public key to check (hex format)
     #[arg(short = 'k', long)]
     pub public_key: String,
-
-    /// Host address
-    #[arg(short = 'H', long, default_value = "localhost")]
-    pub host: String,
-
-    /// gRPC port number (use 40452 for observer/read-only node)
-    #[arg(short, long, default_value_t = 40452)]
-    pub port: u16,
-}
-
-/// Arguments for validator-transitions command
-#[derive(Parser)]
-pub struct ValidatorTransitionsArgs {
-    /// Enable continuous monitoring mode
-    #[arg(short, long, default_value_t = false)]
-    pub watch: bool,
-
-    /// Polling interval in seconds for watch mode
-    #[arg(short, long, default_value_t = 30)]
-    pub interval: u64,
 
     /// Host address
     #[arg(short = 'H', long, default_value = "localhost")]

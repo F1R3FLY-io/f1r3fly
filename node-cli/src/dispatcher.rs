@@ -67,9 +67,6 @@ impl Dispatcher {
             Commands::EpochRewards(args) => epoch_rewards_command(args)
                 .await
                 .map_err(NodeCliError::from),
-            Commands::ValidatorTransitions(args) => validator_transitions_command(args)
-                .await
-                .map_err(NodeCliError::from),
             Commands::NetworkConsensus(args) => network_consensus_command(args)
                 .await
                 .map_err(NodeCliError::from),
@@ -143,7 +140,6 @@ impl Dispatcher {
             Commands::EpochInfo(_) => "epoch-info",
             Commands::ValidatorStatus(_) => "validator-status",
             Commands::EpochRewards(_) => "epoch-rewards",
-            Commands::ValidatorTransitions(_) => "validator-transitions",
             Commands::NetworkConsensus(_) => "network-consensus",
         }
     }

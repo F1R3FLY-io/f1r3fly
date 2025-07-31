@@ -2,10 +2,7 @@ use crate::args::*;
 use crate::f1r3fly_api::F1r3flyApi;
 use reqwest;
 use serde_json;
-use std::collections::HashMap;
-use std::io::{self, Write};
 use std::time::Instant;
-use tokio::time::{sleep, Duration};
 
 pub async fn status_command(args: &HttpArgs) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Getting node status from {}:{}", args.host, args.port);
@@ -781,7 +778,7 @@ pub async fn validator_status_command(
     // Use HTTP API for PoS contract queries (like bonds/network-consensus commands)
     let client = reqwest::Client::new();
     let http_url = format!("http://{}:40453/api/explore-deploy", args.host); // Use HTTP port
-    
+
     // Execute all queries and get current block
     let (bonds_result, active_result, quarantine_result, current_block) = tokio::try_join!(
         query_pos_http(&client, &http_url, bonds_query),
@@ -811,22 +808,24 @@ pub async fn validator_status_command(
     // Parse bonded validators from HTTP response
     let bonded_validators = parse_validator_data(&bonds_data);
     let active_validators = parse_validator_data(&active_data);
-    
+
     // Check bonded status
     let is_bonded = bonded_validators.contains(&args.public_key);
-    
+
     if is_bonded {
         println!("✅ BONDED: Validator is bonded to the network");
-        
+
         // Try to extract bond amount from JSON
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&bonds_data) {
             if let Some(block) = json.get("block") {
                 if let Some(bonds) = block.get("bonds") {
                     if let Some(bonds_array) = bonds.as_array() {
                         for bond in bonds_array {
-                            if let Some(validator) = bond.get("validator").and_then(|v| v.as_str()) {
+                            if let Some(validator) = bond.get("validator").and_then(|v| v.as_str())
+                            {
                                 if validator == args.public_key {
-                                    if let Some(stake) = bond.get("stake").and_then(|s| s.as_i64()) {
+                                    if let Some(stake) = bond.get("stake").and_then(|s| s.as_i64())
+                                    {
                                         println!("   Stake Amount: {} REV", stake);
                                     }
                                     break;
@@ -868,8 +867,6 @@ pub async fn validator_status_command(
         println!("   Status: ❌ Not participating");
         println!("   Next: Bond validator to network first");
     }
-
-
 
     Ok(())
 }
@@ -1174,149 +1171,6 @@ pub async fn network_consensus_command(
     Ok(())
 }
 
-pub async fn validator_transitions_command(
-    args: &ValidatorTransitionsArgs,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if args.watch {
-        println!("👁️  Starting validator transitions monitor (watch mode)");
-        println!("   Polling interval: {} seconds", args.interval);
-        println!("   Press Ctrl+C to stop");
-        println!();
-
-        let f1r3fly_api = F1r3flyApi::new(
-            "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657",
-            &args.host,
-            args.port,
-        );
-
-        // Get initial state
-        let mut previous_state = get_validator_states(&f1r3fly_api).await?;
-        print_validator_states(&previous_state, "Initial State");
-
-        // Continuous monitoring loop
-        loop {
-            sleep(Duration::from_secs(args.interval)).await;
-
-            match get_validator_states(&f1r3fly_api).await {
-                Ok(current_state) => {
-                    let changes = detect_validator_changes(&previous_state, &current_state);
-
-                    if !changes.is_empty() {
-                        println!(
-                            "\n🔄 Changes detected at {}:",
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs()
-                        );
-                        for change in changes {
-                            println!("   {}", change);
-                        }
-                        println!();
-                        print_validator_states(&current_state, "Current State");
-                    } else {
-                        print!("."); // Show activity without spam
-                        io::stdout().flush()?;
-                    }
-
-                    previous_state = current_state;
-                }
-                Err(e) => {
-                    println!("\n❌ Error getting validator states: {}", e);
-                    println!("   Retrying in {} seconds...", args.interval);
-                }
-            }
-        }
-    } else {
-        // Single snapshot mode
-        println!(
-            "📊 Getting current validator transitions snapshot from {}:{}",
-            args.host, args.port
-        );
-
-        let f1r3fly_api = F1r3flyApi::new(
-            "5f668a7ee96d944a4494cc947e4005e172d7ab3461ee5538f1f2a45a835e9657",
-            &args.host,
-            args.port,
-        );
-
-        let validator_states = get_validator_states(&f1r3fly_api).await?;
-        print_validator_states(&validator_states, "Current Validator States");
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct ValidatorState {
-    public_key: String,
-    is_bonded: bool,
-    is_active: bool,
-    bond_amount: String,
-}
-
-async fn get_validator_states(
-    api: &F1r3flyApi<'_>,
-) -> Result<HashMap<String, ValidatorState>, Box<dyn std::error::Error>> {
-    let bonds_query = r#"new return, rl(`rho:registry:lookup`), poSCh in {
-        rl!(`rho:rchain:pos`, *poSCh) |
-        for(@(_, PoS) <- poSCh) {
-            @PoS!("getBonds", *return)
-        }
-    }"#;
-
-    let active_query = r#"new return, rl(`rho:registry:lookup`), poSCh in {
-        rl!(`rho:rchain:pos`, *poSCh) |
-        for(@(_, PoS) <- poSCh) {
-            @PoS!("getActiveValidators", *return)
-        }
-    }"#;
-
-    let bonds_result = api.exploratory_deploy(bonds_query, None, false).await?;
-    let active_result = api.exploratory_deploy(active_query, None, false).await?;
-
-    let bonds_data = bonds_result.0;
-    let active_data = active_result.0;
-
-    // Parse bonds data to extract validators (simplified parsing)
-    let mut states = HashMap::new();
-
-    // This is a simplified parser - in reality we'd parse the Rholang map structure
-    // For now, we'll extract public keys that appear in the data
-    let bond_keys = extract_public_keys(&bonds_data);
-    let active_keys = extract_public_keys(&active_data);
-
-    // Create states for all bonded validators
-    for key in bond_keys {
-        states.insert(
-            key.clone(),
-            ValidatorState {
-                public_key: key.clone(),
-                is_bonded: true,
-                is_active: active_keys.contains(&key),
-                bond_amount: "Unknown".to_string(), // Would parse actual amount in real implementation
-            },
-        );
-    }
-
-    // Add any active validators not in bonds (shouldn't happen but defensive)
-    for key in active_keys {
-        if !states.contains_key(&key) {
-            states.insert(
-                key.clone(),
-                ValidatorState {
-                    public_key: key.clone(),
-                    is_bonded: false,
-                    is_active: true,
-                    bond_amount: "0".to_string(),
-                },
-            );
-        }
-    }
-
-    Ok(states)
-}
-
 fn parse_validator_data(json_str: &str) -> Vec<String> {
     // Parse JSON response from HTTP PoS query
     let mut validators = Vec::new();
@@ -1356,144 +1210,4 @@ fn parse_validator_data(json_str: &str) -> Vec<String> {
     validators.sort();
     validators.dedup();
     validators
-}
-
-fn extract_public_keys(data: &str) -> Vec<String> {
-    // Simplified extraction - looks for hex strings that could be public keys
-    // Real implementation would properly parse Rholang data structures
-    let mut keys = Vec::new();
-
-    // Look for 64-character hex strings (typical public key length)
-    for word in data.split_whitespace() {
-        let clean = word.trim_matches(|c: char| !c.is_ascii_hexdigit());
-        if clean.len() == 64 && clean.chars().all(|c| c.is_ascii_hexdigit()) {
-            keys.push(clean.to_string());
-        }
-    }
-
-    keys.sort();
-    keys.dedup();
-    keys
-}
-
-fn detect_validator_changes(
-    previous: &HashMap<String, ValidatorState>,
-    current: &HashMap<String, ValidatorState>,
-) -> Vec<String> {
-    let mut changes = Vec::new();
-
-    // Check for new validators
-    for (key, state) in current {
-        if !previous.contains_key(key) {
-            if state.is_bonded {
-                changes.push(format!(
-                    "🆕 New validator bonded: {}...{}",
-                    &key[0..8],
-                    &key[56..64]
-                ));
-            }
-        } else {
-            let prev_state = &previous[key];
-
-            // Check for status changes
-            if prev_state.is_bonded != state.is_bonded {
-                if state.is_bonded {
-                    changes.push(format!(
-                        "✅ Validator bonded: {}...{}",
-                        &key[0..8],
-                        &key[56..64]
-                    ));
-                } else {
-                    changes.push(format!(
-                        "❌ Validator unbonded: {}...{}",
-                        &key[0..8],
-                        &key[56..64]
-                    ));
-                }
-            }
-
-            if prev_state.is_active != state.is_active {
-                if state.is_active {
-                    changes.push(format!(
-                        "🎯 Validator activated: {}...{} (exited quarantine)",
-                        &key[0..8],
-                        &key[56..64]
-                    ));
-                } else {
-                    changes.push(format!(
-                        "⏸️  Validator deactivated: {}...{}",
-                        &key[0..8],
-                        &key[56..64]
-                    ));
-                }
-            }
-        }
-    }
-
-    // Check for removed validators
-    for key in previous.keys() {
-        if !current.contains_key(key) {
-            changes.push(format!(
-                "🗑️  Validator removed: {}...{}",
-                &key[0..8],
-                &key[56..64]
-            ));
-        }
-    }
-
-    changes
-}
-
-fn print_validator_states(states: &HashMap<String, ValidatorState>, title: &str) {
-    println!("📊 {}:", title);
-
-    if states.is_empty() {
-        println!("   No validators found");
-        return;
-    }
-
-    let mut bonded_count = 0;
-    let mut active_count = 0;
-    let mut quarantine_count = 0;
-
-    println!("   ┌─────────────────┬────────┬────────┬──────────────┐");
-    println!("   │ Validator       │ Bonded │ Active │ Status       │");
-    println!("   ├─────────────────┼────────┼────────┼──────────────┤");
-
-    for state in states.values() {
-        let short_key = format!(
-            "{}...{}",
-            &state.public_key[0..8],
-            &state.public_key[56..64]
-        );
-        let bonded_icon = if state.is_bonded { "✅" } else { "❌" };
-        let active_icon = if state.is_active { "✅" } else { "❌" };
-        let status = if state.is_bonded && state.is_active {
-            "Operational"
-        } else if state.is_bonded && !state.is_active {
-            quarantine_count += 1;
-            "Quarantine"
-        } else {
-            "Not bonded"
-        };
-
-        if state.is_bonded {
-            bonded_count += 1;
-        }
-        if state.is_active {
-            active_count += 1;
-        }
-
-        println!(
-            "   │ {:15} │ {:6} │ {:6} │ {:12} │",
-            short_key, bonded_icon, active_icon, status
-        );
-    }
-
-    println!("   └─────────────────┴────────┴────────┴──────────────┘");
-    println!(
-        "   Summary: {} bonded, {} active, {} in quarantine",
-        bonded_count, active_count, quarantine_count
-    );
-    println!();
 }

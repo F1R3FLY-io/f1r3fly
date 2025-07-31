@@ -417,24 +417,6 @@ cargo run -- epoch-rewards
 cargo run -- epoch-rewards -H node.example.com -p 40452
 ```
 
-### Validator Transitions
-
-Monitor validator state transitions in real-time or get a snapshot of all validator states.
-
-```bash
-# Get current snapshot of all validator states
-cargo run -- validator-transitions
-
-# Watch for real-time validator transitions (30 second intervals)
-cargo run -- validator-transitions --watch
-
-# Watch with custom polling interval (10 seconds)
-cargo run -- validator-transitions --watch --interval 10
-
-# Monitor transitions on custom node
-cargo run -- validator-transitions --watch --interval 5 -H node.example.com -p 40452
-```
-
 ### Network Consensus
 
 Get network-wide consensus health overview including validator participation rates.
@@ -446,8 +428,6 @@ cargo run -- network-consensus
 # Get consensus overview from custom node
 cargo run -- network-consensus -H node.example.com -p 40452
 ```
-
-
 
 ## Command Line Options
 

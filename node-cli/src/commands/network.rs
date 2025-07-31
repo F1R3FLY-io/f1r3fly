@@ -320,16 +320,16 @@ pub async fn bond_validator_command(
 
     // Step 3: Wait for block finalization using observer node
     println!("🔍 Waiting for block finalization...");
-    
+
     // Determine observer node settings (fallback to default observer or main node)
     let observer_host = args.observer_host.as_deref().unwrap_or("localhost");
     let observer_port = args.observer_port.unwrap_or(40452); // Default to port 40452 (common observer port)
-    
+
     let finalization_start = Instant::now();
 
     // Create observer node API client for finalization checks
     let observer_api = F1r3flyApi::new(&args.private_key, observer_host, observer_port);
-    
+
     // Use the same finalization logic as deploy_and_wait_command
     let finalization_max_attempts: u32 = 120; // 10 minutes (120 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
@@ -503,16 +503,16 @@ pub async fn transfer_command(args: &TransferArgs) -> Result<(), Box<dyn std::er
 
     // Step 3: Wait for block finalization using observer node
     println!("🔍 Waiting for block finalization...");
-    
+
     // Determine observer node settings (fallback to default observer or main node)
     let observer_host = args.observer_host.as_deref().unwrap_or("localhost");
     let observer_port = args.observer_port.unwrap_or(40452); // Default to port 40452 (common observer port)
-    
+
     let finalization_start = Instant::now();
 
     // Create observer node API client for finalization checks
     let observer_api = F1r3flyApi::new(&args.private_key, observer_host, observer_port);
-    
+
     // Use the same finalization logic as deploy_and_wait_command
     let finalization_max_attempts: u32 = 120; // 10 minutes (120 * 5 seconds)
     let finalization_retry_delay: u64 = 5;
@@ -667,11 +667,11 @@ pub async fn deploy_and_wait_command(
 
     // Step 3: Wait for block finalization using observer node
     println!("🔍 Waiting for block finalization...");
-    
+
     // Determine observer node settings (fallback to default observer or main node)
     let observer_host = args.observer_host.as_deref().unwrap_or("localhost");
     let observer_port = args.observer_port.unwrap_or(40452); // Default to port 40452 (common observer port)
-    
+
     let finalization_start = Instant::now();
 
     // Create observer node API client for finalization checks
@@ -702,14 +702,15 @@ pub async fn deploy_and_wait_command(
             println!("📊 Total time: {:.2?}", total_duration);
         }
         Ok(false) => {
-            println!("⚠️  Block not yet finalized after {} attempts, but deploy is in the blockchain.", finalization_max_attempts);
+            println!(
+                "⚠️  Block not yet finalized after {} attempts, but deploy is in the blockchain.",
+                finalization_max_attempts
+            );
             println!("💡 The deployment is likely successful and will be finalized soon.");
         }
         Err(e) => {
             println!("❌ Error checking finalization status: {}", e);
-            println!(
-                "⚠️  Could not verify finalization, but deploy is in the blockchain."
-            );
+            println!("⚠️  Could not verify finalization, but deploy is in the blockchain.");
         }
     }
 

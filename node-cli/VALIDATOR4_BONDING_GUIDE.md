@@ -116,9 +116,6 @@ Monitor validator4's transition from quarantine to active status.
 # Check validator4 status immediately after bonding
 cargo run -- validator-status -k 04d26c6103d7269773b943d7a9c456f9eb227e0d8b1fe30bccee4fca963f4446e3385d99f6386317f2c1ad36b9e6b0d5f97bb0a0041f05781c60a5ebca124a251d
 
-# Start real-time monitoring (in separate terminal)
-cargo run -- validator-transitions --watch --interval 10
-
 # Monitor epoch progression
 cargo run -- epoch-info
 
@@ -143,13 +140,13 @@ Confirm validator4 is now actively participating in consensus.
 cargo run -- validator-status -k 04d26c6103d7269773b943d7a9c456f9eb227e0d8b1fe30bccee4fca963f4446e3385d99f6386317f2c1ad36b9e6b0d5f97bb0a0041f05781c60a5ebca124a251d
 
 # Check all active validators
-cargo run -- active-validators --port 40413
+cargo run -- active-validators
 
 # Verify network consensus health
 cargo run -- network-consensus
 
 # Check recent blocks
-cargo run -- show-main-chain --depth 10 --port 40413
+cargo run -- show-main-chain --depth 10 --port 40412
 ```
 
 **Expected Output:**
@@ -200,6 +197,8 @@ validators:
     enabled: false
 ```
 
+> **💡 Performance Tip:** Now that the network is past genesis, you can reduce the `startup_delay` in your autopropose configuration to speed up block proposing. The startup delay was primarily needed during the initial genesis setup and can be lowered for normal operations.
+
 ### 7.2 Restart Autopropose Service
 
 ```bash
@@ -224,10 +223,7 @@ docker logs -f autopropose | grep validator4
 
 # Check recent blocks for validator4 signatures
 cd ../node-cli
-cargo run -- show-main-chain --depth 20 --port 40413
-
-# Monitor ongoing validator activity
-cargo run -- validator-transitions --watch --interval 30
+cargo run -- show-main-chain --depth 20 --port 40412
 
 # Check network consensus continuously
 cargo run -- network-consensus
@@ -289,9 +285,6 @@ cargo run -- bond-validator --stake 1000 --private-key 5ff3514bf79a7d18e8dd974c6
 
 **Solutions:**
 ```bash
-# Monitor real-time transitions
-cargo run -- validator-transitions --watch --interval 5
-
 # Check for network consensus issues
 cargo run -- network-consensus
 
@@ -334,9 +327,6 @@ docker exec autopropose ping rnode.validator4
 ```bash
 # Check overall network health
 cargo run -- network-health --standard-ports
-
-# Monitor all validator statuses
-cargo run -- validator-transitions --watch --interval 10
 
 # Check individual validator connectivity
 cargo run -- status --port 40403  # bootstrap
