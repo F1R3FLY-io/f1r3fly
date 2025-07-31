@@ -8,6 +8,7 @@ pub enum F1r3flyEvent {
     SentUnapprovedBlock(String),
     SentApprovedBlock(String),
     BlockApprovalReceived(BlockApprovalReceived),
+    ApprovedBlockReceived(ApprovedBlockReceived),
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +40,11 @@ pub struct BlockFinalised {
 pub struct BlockApprovalReceived {
     pub block_hash: String,
     pub sender: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApprovedBlockReceived {
+    pub block_hash: String,
 }
 
 impl F1r3flyEvent {
@@ -80,5 +86,9 @@ impl F1r3flyEvent {
 
     pub fn block_finalised(block_hash: String) -> Self {
         Self::BlockFinalised(BlockFinalised { block_hash })
+    }
+
+    pub fn approved_block_received(block_hash: String) -> Self {
+        Self::ApprovedBlockReceived(ApprovedBlockReceived { block_hash })
     }
 }

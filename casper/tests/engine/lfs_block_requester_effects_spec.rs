@@ -328,9 +328,10 @@ where
         // Create mock operations implementation
         let mut mock_ops = MockBlockRequesterOps::new(test_state, request_tx, save_tx);
 
+        let empty_queue = std::collections::VecDeque::new();
         let lfs_stream = casper::rust::engine::lfs_block_requester::stream(
-            approved_block,
-            std::collections::VecDeque::new(),
+            &approved_block,
+            &empty_queue,
             response_rx,
             0,
             request_timeout,

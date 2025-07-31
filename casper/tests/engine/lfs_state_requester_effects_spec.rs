@@ -478,7 +478,7 @@ where
     // Create the actual LFS tuple space requester stream
     // Scala equivalent: processingStream <- LfsTupleSpaceRequester.stream(...)
     let stream_result = lfs_tuple_space_requester::stream(
-        approved_block,
+        &approved_block,
         store_items_rx,
         request_timeout,
         mock_ops,
