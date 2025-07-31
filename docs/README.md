@@ -17,27 +17,8 @@ flowchart TD
         Observers[👁️ Observer Nodes<br/>Read-Only Access]
     end
     
-    %% Smart Contract Execution Flow
-    subgraph Execution["⚙️ Smart Contract Execution Flow"]
-        direction TB
-        Deploy[📤 Deploy Rholang Contract]
-        Propose[🔄 Propose Block]
-        Execute[⚡ Concurrent Execution]
-        Finalize[✅ Block Finalization]
-        
-        Deploy --> Propose
-        Propose --> Execute
-        Execute --> Finalize
-    end
-    
-    %% Consensus Mechanisms
-    subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
-        direction TB
-        CM[🌱 Cordial Miners<br/>Cooperative Mining]
-        CBC[🛡️ Casper CBC<br/>BFT Consensus]
-        RGB[🎨 RGB PSSM<br/>Client-Side Validation]
-        CS[🚀 Casanova<br/>Adaptive Consensus]
-    end
+    %% Contract Deployment Entry Point
+    Deploy[📤 Deploy Rholang Contract]
     
     %% Shard Architecture
     subgraph Network["🔗 RNode Sharded Network"]
@@ -74,6 +55,26 @@ flowchart TD
         end
     end
     
+    %% Consensus Mechanisms
+    subgraph ConsensusTypes["🤝 Consensus Mechanisms"]
+        direction LR
+        CM[🌱 Cordial Miners<br/>Cooperative Mining]
+        CBC[🛡️ Casper CBC<br/>BFT Consensus]
+        RGB[🎨 RGB PSSM<br/>Client-Side Validation]
+        CS[🚀 Casanova<br/>Adaptive Consensus]
+    end
+    
+    %% Smart Contract Execution Flow
+    subgraph Execution["⚙️ Smart Contract Execution Flow"]
+        direction LR
+        Propose[🔄 Propose Block]
+        Execute[⚡ Concurrent Execution]
+        Finalize[✅ Block Finalization]
+        
+        Propose --> Execute
+        Execute --> Finalize
+    end
+    
     %% Bitcoin Layer
     subgraph Bitcoin["₿ Bitcoin Network"]
         BTC[🔐 L1 Anchoring<br/>State Commitments]
@@ -85,10 +86,15 @@ flowchart TD
     Observers -->|Read State| S1_RSpace
     Observers -->|Read State| SN_RSpace
     
-    %% Contract Assignment
+    %% Contract Assignment - Deploy routes to shards
     Deploy -->|Assign to Shard| S0_Consensus
     Deploy -->|Assign to Shard| S1_Consensus
     Deploy -->|Assign to Shard| SN_Consensus
+    
+    %% Execution Flow - triggered by consensus engines
+    S0_Consensus --> Propose
+    S1_Consensus --> Propose
+    SN_Consensus --> Propose
     
     %% Consensus Selection (each shard can choose)
     S0_Consensus -.->|Selects| CM
@@ -123,6 +129,7 @@ flowchart TD
     
     %% Dark theme optimized styling
     classDef client fill:#2d3748,stroke:#63b3ed,stroke-width:3px,color:#ffffff
+    classDef deploy fill:#2d3748,stroke:#f6ad55,stroke-width:4px,color:#ffffff
     classDef execution fill:#2d3748,stroke:#f6ad55,stroke-width:3px,color:#ffffff
     classDef consensus fill:#2d3748,stroke:#9f7aea,stroke-width:3px,color:#ffffff
     classDef shard fill:#1a202c,stroke:#4fd1c7,stroke-width:3px,color:#ffffff
@@ -130,15 +137,20 @@ flowchart TD
     classDef storage fill:#2d3748,stroke:#fc8181,stroke-width:2px,color:#ffffff
     classDef bitcoin fill:#2d3748,stroke:#fbb040,stroke-width:3px,color:#ffffff
     classDef network fill:#1a202c,stroke:#4fd1c7,stroke-width:2px,color:#ffffff
+    classDef consensusBox fill:#22543d88,stroke:#9f7aea,stroke-width:2px,color:#ffffff
+    classDef executionBox fill:#2d5a8788,stroke:#63b3ed,stroke-width:2px,color:#ffffff
     
     class Clients,Observers client
-    class Deploy,Propose,Execute,Finalize execution
+    class Deploy deploy
+    class Propose,Execute,Finalize execution
     class CM,CBC,RGB,CS consensus
     class S0_Consensus,S1_Consensus,SN_Consensus consensus
     class S0_Validators,S1_Validators,SN_Validators validator
     class S0_RSpace,S1_RSpace,SN_RSpace storage
     class BTC bitcoin
     class Shard0,Shard1,ShardN,Network network
+    class ConsensusTypes consensusBox
+    class Execution executionBox
 ```
 
 ### Key Architecture Components
