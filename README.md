@@ -1,6 +1,20 @@
 # RNode
 
-Highly concurrent throughput Byzantine Fault Tolerants
+**Multi-Consensus Blockchain Platform by F1R3FLY.io**
+
+Highly concurrent throughput Byzantine Fault Tolerant blockchain with four consensus mechanisms implemented in Rholang.
+
+## 📋 Quick Navigation
+
+**New to RNode?** → [What is RNode?](#what-is-rnode) → [Installation](#installation) → [Quick Start](#-quick-start)
+
+**Developer?** → [📚 Documentation](docs/) → [🔧 Development Setup](DEVELOPER.md) → [🧪 Testing](#testing)
+
+**Node Operator?** → [▶️ Running](#running) → [🐳 Docker](#docker) → [🔧 Configuration](#configuration)
+
+**Smart Contract Developer?** → [📖 Rholang Language](docs/specifications/technical/SPEC-LANG-001-rholang.md) → [🛠️ Node CLI](node-cli/README.md) → [📝 Examples](rholang/examples/)
+
+**Researcher?** → [🏗️ Architecture](docs/architecture/) → [📋 Requirements](docs/requirements/) → [📐 Specifications](docs/specifications/)
 
 ## 🚀 Quick Start
 
@@ -35,32 +49,35 @@ sbt compile
 
 This project follows a documentation-first methodology optimized for both human developers and LLM-assisted development. All features begin with documentation, ensuring clear requirements before implementation.
 
+**[📖 Complete Documentation](docs/)** - Comprehensive project documentation with system architecture diagrams
+
 ### Core Documentation Structure
 
-- **[📋 Requirements](docs/requirements)** - User stories, business requirements, and acceptance criteria
-  - `user-stories/` - Feature requirements from user perspective
-  - `business-requirements/` - Business logic and constraints
-  - `acceptance-criteria/` - Definition of done for features
+- **[📋 Requirements](docs/requirements/)** - User stories, business requirements, and acceptance criteria
+  - **[User Stories](docs/requirements/user-stories/)** - Feature requirements from user perspective
+  - **[Business Requirements](docs/requirements/business-requirements/)** - Business logic and constraints
+  - **[Acceptance Criteria](docs/requirements/acceptance-criteria/)** - Definition of done for features
 
-- **[📐 Specifications](docs/specifications)** - Technical specifications and design documents
-  - `visual-design/` - UI/UX mockups, wireframes, and style guides
-  - `technical/` - API specifications, data schemas, and algorithms
-  - `integration/` - Third-party service integration specs
+- **[📐 Specifications](docs/specifications/)** - Technical specifications and design documents
+  - **[Technical Specifications](docs/specifications/technical/)** - API specifications, data schemas, and algorithms
+  - **[Visual Design](docs/specifications/visual-design/)** - UI/UX mockups, wireframes, and style guides
+  - **[Integration Specifications](docs/specifications/integration/)** - Third-party service integration specs
 
-- **[🏗️ Architecture](docs/architecture)** - System design and architectural decisions
-  - `decisions/` - Architecture Decision Records (ADRs)
-  - `diagrams/` - System component diagrams and data flows
-  - `patterns/` - Established patterns and conventions
+- **[🏗️ Architecture](docs/architecture/)** - System design and architectural decisions
+  - **[Architecture Decision Records](docs/architecture/decisions/)** - ADRs documenting key decisions
+  - **[System Diagrams](docs/architecture/diagrams/)** - Component diagrams and data flows
+  - **[Design Patterns](docs/architecture/patterns/)** - Established patterns and conventions
 
-- **[Current Status](docs/ToDos.md)** - Live project status, active tasks, and priorities
+- **[📖 API Documentation](docs/api/)** - Complete API reference and examples
+- **[✅ Current Status](docs/ToDos.md)** - Live project status, active tasks, and priorities
 
 ### For Contributors
 
-- **[Contributing Guide](CONTRIBUTING.md)** - Complete workflow for development
-- **[Development Setup](DEVELOPER.md)** - Environment configuration
-- **[Nix/Direnv Setup](#installation)** - Reproducible development environments
-- **[Testing Guide](#testing)** - Testing strategies and conventions
-- **[API Documentation](docs/api)** - API reference and examples
+- **[🤝 Contributing Guide](CONTRIBUTING.md)** - Complete workflow for development
+- **[🔧 Development Setup](DEVELOPER.md)** - Environment configuration and build system
+- **[🐚 Nix/Direnv Setup](#installation)** - Reproducible development environments
+- **[🧪 Testing Guide](#testing)** - Testing strategies and conventions
+- **[📖 API Documentation](docs/api/)** - API reference and examples
 
 ### For LLM-Assisted Development
 
@@ -75,12 +92,12 @@ When using AI coding assistants (Claude, GitHub Copilot, etc.), provide context 
 
 ```
 rnode/
-├── docs/                  # Documentation hierarchy
-│   ├── requirements/      # Business and user requirements
-│   ├── specifications/    # Technical specifications
-│   ├── architecture/      # System design documents
-│   ├── api/              # API documentation
-│   └── ToDos.md          # Current status and tasks
+├── docs/                  # 📚 Documentation hierarchy (F1R3FLY.io standard)
+│   ├── requirements/      # 📋 Business and user requirements
+│   ├── specifications/    # 📐 Technical specifications
+│   ├── architecture/      # 🏗️ System design documents
+│   ├── api/              # 📖 API documentation
+│   └── ToDos.md          # ✅ Current status and tasks
 ├── node/                 # Scala node implementation
 ├── rust_libraries/       # Rust components
 ├── rholang/             # Rholang examples and tests
@@ -128,7 +145,21 @@ rnode/
 
 ## What is RNode?
 
-RNode is a decentralized, economic, censorship-resistant, public compute infrastructure and blockchain developed by F1R3FLY.io. It hosts and executes programs popularly referred to as "smart contracts". It is designed to be trustworthy, scalable, concurrent, with proof-of-stake consensus and content delivery.
+RNode is a decentralized, economic, censorship-resistant, public compute infrastructure and blockchain developed by F1R3FLY.io. It implements **four distinct consensus mechanisms** using the Rholang programming language:
+
+1. **Cordial Miners** - Cooperative, energy-efficient mining approach
+2. **Casper CBC** - Byzantine Fault Tolerant consensus with mathematical safety proofs
+3. **RGB Partially Synchronized State Machines** - Client-side validation with Bitcoin L1 anchoring
+4. **Casanova** - Adaptive consensus for high-performance scenarios
+
+The platform hosts and executes smart contracts written in Rholang, providing trustworthy, scalable, concurrent transaction processing with multi-consensus flexibility and Bitcoin anchoring for additional security.
+
+### Key Features
+- **Multi-Consensus Architecture**: Four consensus mechanisms for different use cases
+- **Concurrent Execution**: Built on ρ-calculus for true parallel smart contract execution
+- **Sharded Design**: Scalable architecture with cross-shard communication
+- **Bitcoin Anchoring**: Layer 1 security through RGB protocol integration
+- **Developer-Friendly**: Comprehensive CLI tools and development environment
 
 [F1R3FLY Discord](https://discord.gg/NN59aFdAHM) features project-related tutorials, documentation, project planning information, events calendar, and information for how to engage with this project.
 
