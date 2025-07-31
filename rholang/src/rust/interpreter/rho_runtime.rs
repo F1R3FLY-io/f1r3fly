@@ -1,10 +1,10 @@
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/RhoRuntime.scala
 
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
-use models::rhoapi::expr::ExprInstance::EMapBody;
-use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::Bundle;
 use models::rhoapi::Var;
+use models::rhoapi::expr::ExprInstance::EMapBody;
+use models::rhoapi::tagged_continuation::TaggedCont;
 use models::rhoapi::{BindPattern, Expr, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::block_hash::BlockHash;
 use models::rust::par_map::ParMap;
@@ -642,6 +642,19 @@ fn std_system_processes() -> Vec<Definition> {
                 Box::new(move |args| {
                     let ctx = ctx.clone();
                     Box::pin(async move { ctx.system_processes.clone().grpc_tell(args).await })
+                })
+            }),
+            remainder: None,
+        },
+        Definition {
+            urn: "rho:io:devNull".to_string(),
+            fixed_channel: FixedChannels::dev_null(),
+            arity: 1,
+            body_ref: BodyRefs::DEV_NULL,
+            handler: Box::new(|ctx| {
+                Box::new(move |args| {
+                    let ctx = ctx.clone();
+                    Box::pin(async move { ctx.system_processes.clone().dev_null(args).await })
                 })
             }),
             remainder: None,
