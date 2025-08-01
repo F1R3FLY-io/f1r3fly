@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Cryptographic integrity verified");
     println!("✅ Immutable record: Once in Bitcoin, cannot be altered");
     println!();
-    println!("🌐 View on Block Explorer: http://localhost:5000/tx/{}", txid_str);
+    println!("🌐 View on Block Explorer: http://localhost:5001/tx/{}", txid_str);
     println!("📄 Look for output #{} (OP_RETURN) containing the commitment hash", output_index);
     
     Ok(())

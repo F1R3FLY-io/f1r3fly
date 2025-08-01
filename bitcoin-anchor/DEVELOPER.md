@@ -29,6 +29,7 @@
    bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 101 <your-bcrt1q-address>
    bitcoin-cli -regtest -datadir=$HOME/.bitcoin getbalance  # Expected: 50.00000000
    ```
+	 In Bitcoin, new coins from mining (called coinbase rewards) cannot be spent until they have 100 confirmations.
 
 ### Common Commands
 
@@ -124,14 +125,9 @@ cargo build --release
 ### Running Electrs (Regtest)
 
 ```bash
-./target/release/electrs --network regtest \
-  --daemon-rpc-addr 127.0.0.1:18443 \
-  --electrum-rpc-addr 127.0.0.1:60401 \
-  --http-addr 0.0.0.0:3002 \
-  --monitoring-addr 127.0.0.1:24224 \
-  --db-dir ./db/regtest \
-  --daemon-dir ~/.bitcoin/ -vvv
+./target/release/electrs --network regtest --daemon-rpc-addr 127.0.0.1:18443 --electrum-rpc-addr 127.0.0.1:60401 --http-addr 0.0.0.0:3002 --monitoring-addr 127.0.0.1:24224 --db-dir ./db/regtest --daemon-dir ~/.bitcoin/ -vvv
 ```
+Look for: `INFO REST server running on 0.0.0.0:3002`
 
 ## Esplora Frontend
 
@@ -195,9 +191,24 @@ echo "Transaction ID: $TXID"
 
 # 4. Generate block for confirmation
 BLOCK_HASH=$(bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 1 <your-address>) && \
-echo "⚡ Block generated: $BLOCK_HASH" && \
-echo "🔍 Checking transaction confirmation..."
+echo "⚡ Block generated: $BLOCK_HASH"
 
 # 5. Verify State Commitment
-cargo run --example verify_f1r3fly_commitment -- <commitment_hash>
+cargo run --example verify_f1r3fly_commitment -- <TXID>
 ``` 
+
+## Troubleshooting
+
+#### Coinbase Spending Error
+**Error:** `bad-txns-premature-spend-of-coinbase, tried to spend coinbase at depth 44`
+
+**Cause:** You're trying to spend a coinbase transaction (mining reward) that doesn't have enough confirmations. Bitcoin requires 100 confirmations before coinbase outputs can be spent.
+
+**Resolution:** Generate more blocks to reach the required depth:
+```bash
+# If the error shows depth 44, you need 100 - 44 = 56 more blocks
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress 56 <your-address>
+
+# General formula: generate (100 - current_depth) blocks
+bitcoin-cli -regtest -datadir=$HOME/.bitcoin generatetoaddress <100_minus_current_depth> <your-address>
+```
