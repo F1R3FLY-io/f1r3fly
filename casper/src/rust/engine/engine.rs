@@ -5,12 +5,20 @@ use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use comm::rust::peer_node::PeerNode;
 use comm::rust::rp::rp_conf::RPConf;
 use comm::rust::transport::transport_layer::{Blob, TransportLayer};
+use models::rust::block_hash::BlockHash;
+use models::rust::casper::pretty_printer::PrettyPrinter;
 use models::rust::casper::protocol::casper_message::{
     ApprovedBlock, BlockMessage, CasperMessage, NoApprovedBlockAvailable,
 };
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
+use std::collections::{HashSet, VecDeque};
+use std::sync::{Arc, Mutex};
 
+use crate::rust::casper::MultiParentCasper;
+use crate::rust::engine::engine_cell::EngineCell;
+use crate::rust::engine::running::Running;
 use crate::rust::errors::CasperError;
+use crate::rust::validator_identity::ValidatorIdentity;
 
 /// Object-safe Engine trait that matches Scala Engine[F] behavior
 /// Note: with_casper method is not included here due to object-safety constraints
@@ -88,5 +96,42 @@ pub async fn send_no_approved_block_available(
     };
 
     transport_layer.stream(&peer, &msg).await?;
+    Ok(())
+}
+
+pub async fn transition_to_running<T: MultiParentCasper + Send + Sync + 'static>(
+    block_processing_queue: VecDeque<(T, BlockMessage)>,
+    blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
+    casper: T,
+    approved_block: ApprovedBlock,
+    validator_id: Option<ValidatorIdentity>,
+    init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
+    disable_state_exporter: bool,
+    engine_cell: &EngineCell,
+) -> Result<(), CasperError> {
+    let approved_block_info =
+        PrettyPrinter::build_string_block_message(&approved_block.candidate.block, true);
+
+    log::info!(
+        "Making a transition to Running state. Approved {}",
+        approved_block_info
+    );
+
+    // TODO: Publish EnteredRunningState event when event system is available
+    // let block_hash_string = PrettyPrinter::build_string_no_limit(&approved_block.candidate.block.block_hash);
+    // event_log.publish(Event::EnteredRunningState { block_hash: block_hash_string })?;
+
+    let running = Running::new(
+        block_processing_queue,
+        blocks_in_processing,
+        casper,
+        approved_block,
+        validator_id,
+        init,
+        disable_state_exporter,
+    );
+
+    engine_cell.set(Box::new(running)).await?;
+
     Ok(())
 }
