@@ -127,7 +127,7 @@ pub async fn transition_to_running<
     T: MultiParentCasper + Send + Sync + Clone + 'static,
     U: TransportLayer + Send + Sync + 'static,
 >(
-    block_processing_queue: VecDeque<(T, BlockMessage)>,
+    block_processing_queue: Arc<Mutex<VecDeque<(T, BlockMessage)>>>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: T,
     approved_block: ApprovedBlock,

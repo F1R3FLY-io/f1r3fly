@@ -74,7 +74,8 @@ impl<'a> TestFixture<'a> {
         casper.add_block_to_store(genesis.clone());
         casper.add_to_dag(genesis.block_hash.clone());
 
-        let block_processing_queue = VecDeque::new();
+        let block_processing_queue: Arc<Mutex<VecDeque<(MockCasper, BlockMessage)>>> =
+            Arc::new(Mutex::new(VecDeque::new()));
 
         let block_retriever = Arc::new(block_retriever::BlockRetriever::new(
             transport_layer.clone(),
@@ -83,7 +84,7 @@ impl<'a> TestFixture<'a> {
         ));
 
         let engine = Running::new(
-            block_processing_queue,
+            block_processing_queue.clone(),
             Arc::new(Mutex::new(Default::default())),
             casper.clone(),
             approved_block,
@@ -210,7 +211,7 @@ mod tests {
                 identifier: "test".to_string(),
                 trim_state: false,
             };
-        let expected_approved_block = fixture.casper.get_approved_block().candidate.block.clone();
+        let expected_approved_block = fixture.casper.get_approved_block().clone();
 
         fixture
             .engine
@@ -225,7 +226,7 @@ mod tests {
         let sent_request = fixture.transport_layer.pop_request().unwrap();
         assert_eq!(sent_request.peer, fixture.local_peer);
         if let CasperMessage::ApprovedBlock(sent_msg) = to_casper_message(sent_request.msg) {
-            assert_eq!(sent_msg.candidate.block, expected_approved_block);
+            assert_eq!(sent_msg, expected_approved_block);
         } else {
             panic!("Expected ApprovedBlock");
         }
