@@ -498,9 +498,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         Ok(result)
     }
 
-    fn get_validator(&self) -> Option<ValidatorIdentity> {
-        self.validator_id.clone()
-    }
+
 }
 
 #[async_trait]
@@ -656,6 +654,14 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
 
     fn rspace_state_manager(&self) -> &RSpaceStateManager {
         &self.rspace_state_manager
+    }
+    
+    fn get_validator(&self) -> Option<ValidatorIdentity> {
+        self.validator_id.clone()
+    }
+    
+    fn get_history_exporter(&self) -> std::sync::Arc<std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>> {
+        self.runtime_manager.get_history_repo().exporter()
     }
 }
 
