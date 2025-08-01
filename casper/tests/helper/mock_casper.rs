@@ -43,7 +43,7 @@ impl MockKeyValueStore {
 impl KeyValueStore for MockKeyValueStore {
     fn get(&self, keys: &Vec<Vec<u8>>) -> Result<Vec<Option<Vec<u8>>>, KvStoreError> {
         let data = self.data.lock().unwrap();
-        let results = keys.iter().map(|key| data.get(key).cloned()).collect();
+        let results: Vec<Option<Vec<u8>>> = keys.iter().map(|key| data.get(key).cloned()).collect();
         Ok(results)
     }
     fn put(&mut self, kv_pairs: Vec<(Vec<u8>, Vec<u8>)>) -> Result<(), KvStoreError> {
@@ -125,12 +125,19 @@ pub struct MockCasper {
     latest_messages: Arc<DashMap<Validator, BlockHash>>,
     approved_block: ApprovedBlock,
     key_value_block_store: KeyValueBlockStore,
+    shared_store_data: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>>,
 }
 
 impl MockCasper {
     pub fn new(approved_block: ApprovedBlock) -> Self {
-        let store = Box::new(MockKeyValueStore::new());
-        let store_approved_block = Box::new(MockKeyValueStore::new());
+        // Use shared storage so that cloned instances share the same data
+        let shared_data = Arc::new(Mutex::new(HashMap::new()));
+        let store = Box::new(MockKeyValueStore {
+            data: shared_data.clone(),
+        });
+        let store_approved_block = Box::new(MockKeyValueStore {
+            data: shared_data.clone(),
+        });
         let mut key_value_block_store = KeyValueBlockStore::new(store, store_approved_block);
 
         // Store the genesis/approved block so it can be found by the handlers
@@ -141,14 +148,17 @@ impl MockCasper {
                 log::warn!("Failed to store genesis block in mock: {:?}", e);
             });
 
+        let block_store_map = Arc::new(Mutex::new(HashMap::new()));
+
         Self {
-            block_store_map: Arc::new(Mutex::new(HashMap::new())),
+            block_store_map,
             dag: Arc::new(Mutex::new(HashSet::new())),
             buffer: Arc::new(Mutex::new(HashSet::new())),
             validator: None,
             latest_messages: Arc::new(DashMap::new()),
             approved_block,
             key_value_block_store,
+            shared_store_data: shared_data,
         }
     }
 
@@ -157,8 +167,6 @@ impl MockCasper {
             .lock()
             .unwrap()
             .insert(block.block_hash.clone(), block.clone());
-        // Also store in the actual KeyValueBlockStore, but since we can't mutate it directly,
-        // we'll override the get method to check our HashMap first
     }
 
     pub fn add_to_dag(&self, block_hash: BlockHash) {
@@ -185,8 +193,13 @@ impl MockCasper {
 
 impl Clone for MockCasper {
     fn clone(&self) -> Self {
-        let store = Box::new(MockKeyValueStore::new());
-        let store_approved_block = Box::new(MockKeyValueStore::new());
+        // Use the same shared storage so cloned instances see the same data
+        let store = Box::new(MockKeyValueStore {
+            data: self.shared_store_data.clone(),
+        });
+        let store_approved_block = Box::new(MockKeyValueStore {
+            data: self.shared_store_data.clone(),
+        });
         let key_value_block_store = KeyValueBlockStore::new(store, store_approved_block);
 
         Self {
@@ -197,6 +210,7 @@ impl Clone for MockCasper {
             latest_messages: self.latest_messages.clone(),
             approved_block: self.get_approved_block().clone(),
             key_value_block_store,
+            shared_store_data: self.shared_store_data.clone(),
         }
     }
 }
