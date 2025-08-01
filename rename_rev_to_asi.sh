@@ -28,7 +28,6 @@ find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path ".
         -e 's/RevAddr/ASIAddr/g' \
         -e 's/revAddr/asiAddr/g' \
         -e 's/revVaultCh/asiVaultCh/g' \
-        -e 's/revVaultexport/asivaultexport/g' \
         -e 's/multiSigRevVault/multiSigASIVault/g' \
         -e 's/MultiSigRevVault/MultiSigASIVault/g' \
         -e 's/REV_ADDRESS/ASI_ADDRESS/g' \
@@ -69,6 +68,14 @@ find . -name "*.scala" | while read -r file; do
         "$file"
 done
 
+# 4b. ADDITIONAL: Update any remaining revvaultexport references in all file types
+echo "🔄 Updating any remaining revvaultexport references..."
+find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
+    sed -i '' \
+        -e 's/coop\.rchain\.node\.revvaultexport/coop.rchain.node.asivaultexport/g' \
+        "$file"
+done
+
 # 5. UPDATE COMMENTS AND DOCUMENTATION (selective)
 echo "📚 Updating comments..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
@@ -105,71 +112,95 @@ echo "📁 Renaming files..."
 
 # Main contracts
 if [ -f "casper/src/main/resources/RevVault.rho" ]; then
-    mv "casper/src/main/resources/RevVault.rho" "casper/src/main/resources/ASIVault.rho"
+    git mv "casper/src/main/resources/RevVault.rho" "casper/src/main/resources/ASIVault.rho"
     echo "✅ RevVault.rho -> ASIVault.rho"
 fi
 
 if [ -f "casper/src/main/resources/MultiSigRevVault.rho" ]; then
-    mv "casper/src/main/resources/MultiSigRevVault.rho" "casper/src/main/resources/MultiSigASIVault.rho"
+    git mv "casper/src/main/resources/MultiSigRevVault.rho" "casper/src/main/resources/MultiSigASIVault.rho"
     echo "✅ MultiSigRevVault.rho -> MultiSigASIVault.rho"
 fi
 
 # Tests
 if [ -f "casper/src/test/resources/RevVaultTest.rho" ]; then
-    mv "casper/src/test/resources/RevVaultTest.rho" "casper/src/test/resources/ASIVaultTest.rho"
+    git mv "casper/src/test/resources/RevVaultTest.rho" "casper/src/test/resources/ASIVaultTest.rho"
     echo "✅ RevVaultTest.rho -> ASIVaultTest.rho"
 fi
 
 if [ -f "casper/src/test/resources/MultiSigRevVaultTest.rho" ]; then
-    mv "casper/src/test/resources/MultiSigRevVaultTest.rho" "casper/src/test/resources/MultiSigASIVaultTest.rho"
+    git mv "casper/src/test/resources/MultiSigRevVaultTest.rho" "casper/src/test/resources/MultiSigASIVaultTest.rho"
     echo "✅ MultiSigRevVaultTest.rho -> MultiSigASIVaultTest.rho"
 fi
 
 # CRITICAL: RevAddressTest.rho exists and must be renamed
 if [ -f "casper/src/test/resources/RevAddressTest.rho" ]; then
-    mv "casper/src/test/resources/RevAddressTest.rho" "casper/src/test/resources/ASIAddressTest.rho"
+    git mv "casper/src/test/resources/RevAddressTest.rho" "casper/src/test/resources/ASIAddressTest.rho"
     echo "✅ RevAddressTest.rho -> ASIAddressTest.rho"
 fi
 
 # Rust files (may not exist)
 if [ -f "rholang/src/rust/interpreter/util/rev_address.rs" ]; then
-    mv "rholang/src/rust/interpreter/util/rev_address.rs" "rholang/src/rust/interpreter/util/asi_address.rs"
+    git mv "rholang/src/rust/interpreter/util/rev_address.rs" "rholang/src/rust/interpreter/util/asi_address.rs"
     echo "✅ rev_address.rs -> asi_address.rs"
 fi
 
 if [ -f "casper/src/rust/genesis/contracts/rev_generator.rs" ]; then
-    mv "casper/src/rust/genesis/contracts/rev_generator.rs" "casper/src/rust/genesis/contracts/asi_generator.rs"
+    git mv "casper/src/rust/genesis/contracts/rev_generator.rs" "casper/src/rust/genesis/contracts/asi_generator.rs"
     echo "✅ rev_generator.rs -> asi_generator.rs"
 fi
 
 # Scala files
 if [ -f "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" ]; then
-    mv "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala"
+    git mv "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala"
     echo "✅ RevGenerator.scala -> ASIGenerator.scala"
 fi
 
 # CRITICAL: RevAddress.scala exists and must be renamed  
 if [ -f "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" ]; then
-    mv "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala"
+    git mv "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala"
     echo "✅ RevAddress.scala -> ASIAddress.scala"
 fi
 
 # Test specs
 if [ -f "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" ]; then
-    mv "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala"
+    git mv "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala"
     echo "✅ RevAddressSpec.scala -> ASIAddressSpec.scala"
 fi
 
 if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" ]; then
-    mv "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala"
+    git mv "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala"
     echo "✅ RevAddressSpec.scala -> ASIAddressSpec.scala"
 fi
 
 # Rename directories
+# CRITICAL: Handle ALL revvaultexport directories (main AND test)
+echo "📁 Renaming directories and moving all files..."
+
+# Main revvaultexport directory
 if [ -d "node/src/main/scala/coop/rchain/node/revvaultexport" ]; then
-    mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/asivaultexport"
-    echo "✅ revvaultexport/ -> asivaultexport/"
+    git mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/asivaultexport"
+    echo "✅ node/src/main/.../revvaultexport/ -> asivaultexport/"
 fi
+
+# Test revvaultexport directory - CRITICAL: This was missed before!
+if [ -d "node/src/test/scala/coop/rchain/node/revvaultexport" ]; then
+    git mv "node/src/test/scala/coop/rchain/node/revvaultexport" "node/src/test/scala/coop/rchain/node/asivaultexport"
+    echo "✅ node/src/test/.../revvaultexport/ -> asivaultexport/"
+fi
+
+# Look for any other revvaultexport directories we might have missed
+find . -type d -name "*revvaultexport*" -not -path "./.git/*" | while read -r dir; do
+    if [ -d "$dir" ]; then
+        newdir=$(echo "$dir" | sed 's/revvaultexport/asivaultexport/g')
+        # Avoid creating nested directories
+        if [[ "$newdir" != *"asivaultexport/asivaultexport"* ]]; then
+            git mv "$dir" "$newdir"
+            echo "✅ Found and moved: $dir -> $newdir"
+        else
+            echo "⚠️  Skipping to avoid nested directory: $dir"
+        fi
+    fi
+done
 
 # 8. UPDATE IMPORTS/MODULES - Final pass
 echo "🔧 Final import updates..."
@@ -177,6 +208,15 @@ find . -name "*.scala" -o -name "*.rs" | while read -r file; do
     sed -i '' \
         -e 's/use.*rev_address/use crate::interpreter::util::asi_address/g' \
         -e 's/mod rev_address/mod asi_address/g' \
+        "$file"
+done
+
+# 8b. ADDITIONAL: Final cleanup of any remaining references
+echo "🧹 Final cleanup of remaining references..."
+find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
+    sed -i '' \
+        -e 's/coop\.rchain\.node\.revvaultexport/coop.rchain.node.asivaultexport/g' \
+        -e 's/node\.revvaultexport/node.asivaultexport/g' \
         "$file"
 done
 
@@ -201,13 +241,15 @@ echo "📋 What was done:"
 echo "   ✅ Replaced all identifiers (RevVault -> ASIVault etc.)"
 echo "   ✅ Updated Registry URIs (rho:rchain:revVault -> rho:rchain:asiVault)"
 echo "   ✅ Updated Registry.rho system file"
-echo "   ✅ Updated Scala package declarations"
+echo "   ✅ Updated Scala package declarations (ALL files)"
 echo "   ✅ Updated method names (receiveRev -> receiveASI)"
 echo "   ✅ Updated hardcoded constants and values"
 echo "   ✅ Renamed files (.rho, .rs, .scala)"
 echo "   ✅ Renamed directories and test specs"
-echo "   ✅ Updated imports and modules"
+echo "   ✅ Moved ALL revvaultexport directories (main AND test)"
+echo "   ✅ Updated imports and modules (comprehensive)"
 echo "   ✅ Updated comments in code files"
+echo "   ✅ Final cleanup of all remaining references"
 echo ""
 echo "📝 What was NOT changed:"
 echo "   ⏭️  Documentation files (.md, .txt, README, etc.) - ASI team should update these"
