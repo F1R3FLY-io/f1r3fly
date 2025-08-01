@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala
 
+use async_trait::async_trait;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use block_storage::rust::{
@@ -22,7 +23,10 @@ use models::rust::{
     normalizer_env::normalizer_env_from_deploy,
     validator::Validator,
 };
-use rspace_plus_plus::rspace::{hashing::blake2b256_hash::Blake2b256Hash, history::Either};
+use rspace_plus_plus::rspace::{
+    hashing::blake2b256_hash::Blake2b256Hash, history::Either,
+    state::rspace_state_manager::RSpaceStateManager,
+};
 use shared::rust::{
     dag::dag_ops,
     shared::{f1r3fly_event::F1r3flyEvent, f1r3fly_events::F1r3flyEvents},
@@ -63,8 +67,10 @@ pub struct MultiParentCasperImpl<T: TransportLayer + Send + Sync> {
     // TODO: this should be read from chain, for now read from startup options - OLD
     pub casper_shard_conf: CasperShardConf,
     pub approved_block: BlockMessage,
+    pub rspace_state_manager: RSpaceStateManager,
 }
 
+#[async_trait]
 impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
     async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError> {
         let mut dag = self.block_dag_storage.get_representation();
@@ -78,8 +84,8 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
             // bond maps that has biggest cumulative stake.
             let blocks = tips
                 .iter()
-                .map(|b| self.block_store.get_unsafe(b))
-                .collect::<Vec<_>>();
+                .map(|b| self.block_store.get(b).unwrap())
+                .collect::<Result<Vec<_>, _>>()?;
 
             let parents = blocks
                 .iter()
@@ -147,7 +153,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
             let all_deploys = dashmap::DashSet::new();
             for block_metadata in traversal_result {
-                let block = self.block_store.get_unsafe(&block_metadata.block_hash);
+                let block = self.block_store.get(&block_metadata.block_hash)?.unwrap();
                 let block_deploys = proto_util::deploys(&block);
                 for processed_deploy in block_deploys {
                     all_deploys.insert(processed_deploy.deploy);
@@ -469,7 +475,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         // Filter to dependency-free pendants
         let mut dep_free_pendants = Vec::new();
         for pendant_hash in pendants_stored {
-            let block = self.block_store.get_unsafe(&pendant_hash);
+            let block = self.block_store.get(&pendant_hash)?.unwrap();
             let justifications = &block.justifications;
 
             // Check if all justifications are in DAG
@@ -486,13 +492,14 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         // Get the actual BlockMessages
         let result = dep_free_pendants
             .into_iter()
-            .map(|hash| self.block_store.get_unsafe(&hash))
-            .collect();
+            .map(|hash| self.block_store.get(&hash).unwrap())
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(result)
     }
 }
 
+#[async_trait]
 impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImpl<T> {
     async fn fetch_dependencies(&self) -> Result<(), CasperError> {
         // Get pendants from CasperBuffer
@@ -577,7 +584,7 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
                 |finalized_set: &HashSet<BlockHash>| -> Result<(), KvStoreError> {
                     // process_finalized
                     for block_hash in finalized_set {
-                        let block = self.block_store.get_unsafe(block_hash);
+                        let block = self.block_store.get(block_hash)?.unwrap();
                         let deploys: Vec<_> = block
                             .body
                             .deploys
@@ -630,13 +637,21 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
         let final_lfb_hash = new_finalized_hash_opt.unwrap_or(last_finalized_block_hash);
 
         // Return the finalized block
-        let block_message = self.block_store.get_unsafe(&final_lfb_hash);
+        let block_message = self.block_store.get(&final_lfb_hash)?.unwrap();
         Ok(block_message)
     }
 
     // Equivalent to Scala's def blockDag: F[BlockDagRepresentation[F]] = BlockDagStorage[F].getRepresentation
     async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError> {
         Ok(self.block_dag_storage.get_representation())
+    }
+
+    fn block_store(&self) -> &KeyValueBlockStore {
+        &self.block_store
+    }
+
+    fn rspace_state_manager(&self) -> &RSpaceStateManager {
+        &self.rspace_state_manager
     }
 }
 

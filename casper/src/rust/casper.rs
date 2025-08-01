@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/Casper.scala
 
+use async_trait::async_trait;
 use comm::rust::transport::transport_layer::TransportLayer;
 use dashmap::{DashMap, DashSet};
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
@@ -22,7 +23,9 @@ use models::rust::{
     casper::protocol::casper_message::{BlockMessage, DeployData, Justification},
     validator::Validator,
 };
-use rspace_plus_plus::rspace::history::Either;
+use rspace_plus_plus::rspace::{
+    history::Either, state::rspace_state_manager::RSpaceStateManager,
+};
 
 use crate::rust::{
     block_status::{BlockError, InvalidBlock, ValidBlock},
@@ -73,6 +76,7 @@ impl Display for DeployError {
     }
 }
 
+#[async_trait]
 pub trait Casper {
     async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError>;
 
@@ -117,6 +121,7 @@ pub trait Casper {
     fn get_dependency_free_from_buffer(&self) -> Result<Vec<BlockMessage>, CasperError>;
 }
 
+#[async_trait]
 pub trait MultiParentCasper: Casper {
     async fn fetch_dependencies(&self) -> Result<(), CasperError>;
 
@@ -132,6 +137,10 @@ pub trait MultiParentCasper: Casper {
 
     // Equivalent to Scala's blockDag: F[BlockDagRepresentation[F]]
     async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError>;
+
+    fn block_store(&self) -> &KeyValueBlockStore;
+
+    fn rspace_state_manager(&self) -> &RSpaceStateManager;
 }
 
 pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
@@ -146,6 +155,7 @@ pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
     validator_id: Option<ValidatorIdentity>,
     casper_shard_conf: CasperShardConf,
     approved_block: BlockMessage,
+    rspace_state_manager: RSpaceStateManager,
 ) -> Result<impl MultiParentCasper, CasperError> {
     Ok(MultiParentCasperImpl {
         block_retriever,
@@ -159,6 +169,7 @@ pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
         validator_id,
         casper_shard_conf,
         approved_block,
+        rspace_state_manager,
     })
 }
 
