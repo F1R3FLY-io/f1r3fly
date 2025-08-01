@@ -46,7 +46,11 @@ pub fn noop() -> Result<impl Engine, CasperError> {
             Ok(())
         }
 
-        async fn handle(&mut self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
+        async fn handle(
+            &mut self,
+            _peer: PeerNode,
+            _msg: CasperMessage,
+        ) -> Result<(), CasperError> {
             Ok(())
         }
 
@@ -104,7 +108,10 @@ pub async fn send_no_approved_block_available(
     Ok(())
 }
 
-pub async fn transition_to_running<T: MultiParentCasper + Send + Sync + Clone + 'static, U: TransportLayer + Send + Sync + 'static>(
+pub async fn transition_to_running<
+    T: MultiParentCasper + Send + Sync + Clone + 'static,
+    U: TransportLayer + Send + Sync + 'static,
+>(
     block_processing_queue: VecDeque<(T, BlockMessage)>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: T,

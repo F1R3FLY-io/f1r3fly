@@ -1,20 +1,19 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/Running.scala
 
-use crate::{
-    rust::{
-        casper::MultiParentCasper,
-        engine::{
-            block_retriever::{self, BlockRetriever},
-            engine::{self, Engine},
-        },
-        errors::CasperError,
-        validator_identity::ValidatorIdentity,
+use crate::rust::{
+    casper::MultiParentCasper,
+    engine::{
+        block_retriever::{self, BlockRetriever},
+        engine::{self, Engine},
     },
+    errors::CasperError,
+    validator_identity::ValidatorIdentity,
 };
 use async_trait::async_trait;
 use comm::rust::{
     peer_node::PeerNode,
-    rp::{connect::ConnectionsCell, rp_conf::RPConf}, transport::transport_layer::TransportLayer,
+    rp::{connect::ConnectionsCell, rp_conf::RPConf},
+    transport::transport_layer::TransportLayer,
 };
 use models::rust::{
     block_hash::BlockHash,
@@ -28,10 +27,10 @@ use models::rust::{
 };
 
 use rspace_plus_plus::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash, 
+    hashing::blake2b256_hash::Blake2b256Hash,
     state::{
-        rspace_exporter::RSpaceExporterInstance,
         exporters::rspace_exporter_items::RSpaceExporterItems,
+        rspace_exporter::RSpaceExporterInstance,
     },
 };
 use std::{
@@ -41,16 +40,21 @@ use std::{
 };
 
 #[async_trait(?Send)]
-impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine for Running<'r, M, T> {
+impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine
+    for Running<'r, M, T>
+{
     async fn init(&self) -> Result<(), CasperError> {
-        let mut init_called = self.init_called.lock().map_err(|_| {
-            CasperError::RuntimeError("Failed to acquire init lock".to_string())
-        })?;
-        
+        let mut init_called = self
+            .init_called
+            .lock()
+            .map_err(|_| CasperError::RuntimeError("Failed to acquire init lock".to_string()))?;
+
         if *init_called {
-            return Err(CasperError::RuntimeError("Init function already called".to_string()));
+            return Err(CasperError::RuntimeError(
+                "Init function already called".to_string(),
+            ));
         }
-        
+
         *init_called = true;
         log::info!("Running engine initialized");
         Ok(())
@@ -82,18 +86,19 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
                         PrettyPrinter::build_string_block_message(&b, true),
                         peer.endpoint.host
                     );
-                    self.block_processing_queue.push_back((self.casper.clone(), b));
+                    self.block_processing_queue
+                        .push_back((self.casper.clone(), b));
                 }
                 Ok(())
             }
             CasperMessage::BlockRequest(br) => self.handle_block_request(peer, br).await,
 
-            
             // TODO should node say it has block only after it is in DAG, or CasperBuffer is enough? Or even just BlockStore?
             // https://github.com/rchain/rchain/pull/2943#discussion_r449887701 -- OLD
-            CasperMessage::HasBlockRequest(hbr) => self
-                .handle_has_block_request(peer, hbr, |hash| self.casper.dag_contains(&hash))
-                .await,
+            CasperMessage::HasBlockRequest(hbr) => {
+                self.handle_has_block_request(peer, hbr, |hash| self.casper.dag_contains(&hash))
+                    .await
+            }
             CasperMessage::HasBlock(hb) => {
                 self.handle_has_block_message(peer, hb, |hash| self.ignore_casper_message(hash))
                     .await
@@ -210,7 +215,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         connections_cell: ConnectionsCell,
         transport: Arc<T>,
         conf: RPConf,
-        block_retriever: Arc<BlockRetriever<T>>   
+        block_retriever: Arc<BlockRetriever<T>>,
     ) -> Self {
         Running {
             block_processing_queue,
@@ -248,8 +253,11 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         delay_threshold: Duration,
     ) -> Result<(), CasperError> {
         let latest_messages = self.casper.block_dag().await?.latest_message_hashes();
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
-        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+
         let mut has_recent_latest_message = false;
         // Convert Arc<DashMap> to iterate over its contents
         for entry in latest_messages.iter() {
@@ -269,7 +277,9 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
                 "Requesting tips update as newest latest message is more then {:?} old. Might be network is faulty.",
                 delay_threshold
             );
-            self.transport.send_fork_choice_tip_request(&self.connections_cell, &self.conf).await?;
+            self.transport
+                .send_fork_choice_tip_request(&self.connections_cell, &self.conf)
+                .await?;
         }
         Ok(())
     }
@@ -282,14 +292,18 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
     ) -> Result<(), CasperError> {
         let h = bhm.block_hash;
         if ignore_message_f(h.clone())? {
-            log::debug!("Ignoring {} hash broadcast", PrettyPrinter::build_string_bytes(&h));
+            log::debug!(
+                "Ignoring {} hash broadcast",
+                PrettyPrinter::build_string_bytes(&h)
+            );
         } else {
             log::debug!(
                 "Incoming BlockHashMessage {} from {}",
                 PrettyPrinter::build_string_bytes(&h),
                 peer.endpoint.host
             );
-            self.block_retriever.admit_hash(
+            self.block_retriever
+                .admit_hash(
                     h,
                     Some(peer),
                     block_retriever::AdmitHashReason::HashBroadcastReceived,
@@ -317,7 +331,8 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
                 PrettyPrinter::build_string_bytes(&h),
                 peer.endpoint.host
             );
-            self.block_retriever.admit_hash(
+            self.block_retriever
+                .admit_hash(
                     h,
                     Some(peer),
                     block_retriever::AdmitHashReason::HasBlockMessageReceived,
@@ -339,7 +354,9 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
                 PrettyPrinter::build_string_bytes(&br.hash),
                 peer
             );
-            self.transport.stream_message_to_peer(&self.conf, &peer, &block.to_proto()).await?;
+            self.transport
+                .stream_message_to_peer(&self.conf, &peer, &block.to_proto())
+                .await?;
         } else {
             log::info!(
                 "Received request for block {} from {}. No response given since block not found.",
@@ -358,30 +375,37 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
     ) -> Result<(), CasperError> {
         if block_lookup(hbr.hash.clone()) {
             let has_block = HasBlock { hash: hbr.hash };
-            self.transport.send_message_to_peer(&self.conf, &peer, &has_block.to_proto()).await?;
+            self.transport
+                .send_message_to_peer(&self.conf, &peer, &has_block.to_proto())
+                .await?;
         }
         Ok(())
     }
 
     /**
-    * Peer asks for fork-choice tip
-    */
+     * Peer asks for fork-choice tip
+     */
     // TODO name for this message is misleading, as its a request for all tips, not just fork choice. -- OLD
     pub async fn handle_fork_choice_tip_request(&self, peer: PeerNode) -> Result<(), CasperError> {
-        log::info!(
-            "Received ForkChoiceTipRequest from {}",
-            peer.endpoint.host
-        );
+        log::info!("Received ForkChoiceTipRequest from {}", peer.endpoint.host);
         let latest_messages = self.casper.block_dag().await?.latest_message_hashes();
-        let tips: Vec<BlockHash> = latest_messages.iter().map(|entry| entry.value().clone()).collect();
+        let tips: Vec<BlockHash> = latest_messages
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
         log::info!(
             "Sending tips {} to {}",
-            tips.iter().map(|tip| PrettyPrinter::build_string_bytes(tip)).collect::<Vec<_>>().join(", "),
+            tips.iter()
+                .map(|tip| PrettyPrinter::build_string_bytes(tip))
+                .collect::<Vec<_>>()
+                .join(", "),
             peer.endpoint.host
         );
         for tip in tips {
             let has_block = HasBlock { hash: tip };
-            self.transport.send_message_to_peer(&self.conf, &peer, &has_block.to_proto()).await?;
+            self.transport
+                .send_message_to_peer(&self.conf, &peer, &has_block.to_proto())
+                .await?;
         }
         Ok(())
     }
@@ -392,7 +416,9 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         _approved_block: ApprovedBlock,
     ) -> Result<(), CasperError> {
         log::info!("Received ApprovedBlockRequest from {}", peer);
-        self.transport.stream_message_to_peer(&self.conf, &peer, &_approved_block.to_proto()).await?;
+        self.transport
+            .stream_message_to_peer(&self.conf, &peer, &_approved_block.to_proto())
+            .await?;
         log::info!("ApprovedBlock sent to {}", peer);
         Ok(())
     }
@@ -405,7 +431,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         take: u32,
     ) -> Result<(), CasperError> {
         let exporter = self.casper.get_history_exporter();
-        
+
         let (history, data) = RSpaceExporterItems::get_history_and_data(
             exporter,
             start_path.clone(),
@@ -415,12 +441,22 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         let resp = casper_message::StoreItemsMessage {
             start_path: start_path,
             last_path: history.last_path,
-            history_items: history.items.into_iter().map(|(k, v)| (k, prost::bytes::Bytes::from(v))).collect(),
-            data_items: data.items.into_iter().map(|(k, v)| (k, prost::bytes::Bytes::from(v))).collect(),
+            history_items: history
+                .items
+                .into_iter()
+                .map(|(k, v)| (k, prost::bytes::Bytes::from(v)))
+                .collect(),
+            data_items: data
+                .items
+                .into_iter()
+                .map(|(k, v)| (k, prost::bytes::Bytes::from(v)))
+                .collect(),
         };
         let resp_proto = resp.to_proto();
-        log::info!("Read {}", "store items response");  // Using static string since resp is moved
-        self.transport.stream_message_to_peer(&self.conf, &peer, &resp_proto).await?;
+        log::info!("Read {}", "store items response"); // Using static string since resp is moved
+        self.transport
+            .stream_message_to_peer(&self.conf, &peer, &resp_proto)
+            .await?;
 
         log::info!("Store items sent to {}", peer);
         Ok(())
