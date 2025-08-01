@@ -1,10 +1,9 @@
 use std::fmt;
 
-use bitcoin::{Address, OutPoint, Txid, Amount};
-use std::str::FromStr;
+use bitcoin::{Address, Amount, OutPoint, Txid};
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
 
 use reqwest;
 
@@ -91,14 +90,12 @@ pub struct TransactionStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeeEstimates {
     #[serde(rename = "1")]
-    pub fast: f64,    // Next block
+    pub fast: f64, // Next block
     #[serde(rename = "3")]
-    pub medium: f64,  // 3 blocks
+    pub medium: f64, // 3 blocks
     #[serde(rename = "6")]
-    pub slow: f64,    // 6 blocks
+    pub slow: f64, // 6 blocks
 }
-
-
 
 /// Retry configuration for Esplora API calls
 #[derive(Debug, Clone)]
@@ -118,11 +115,11 @@ pub struct RetryConfig {
 impl Default for RetryConfig {
     fn default() -> Self {
         Self {
-            max_attempts: 2,                                               // Reduced from 3 to 2
-            initial_delay: std::time::Duration::from_millis(300),         // Reduced from 500ms
-            max_delay: std::time::Duration::from_secs(10),                // Reduced from 30s
-            backoff_multiplier: 1.5,                                      // Reduced from 2.0
-            request_timeout: std::time::Duration::from_secs(15),          // Reduced from 30s
+            max_attempts: 2,                                      // Reduced from 3 to 2
+            initial_delay: std::time::Duration::from_millis(300), // Reduced from 500ms
+            max_delay: std::time::Duration::from_secs(10),        // Reduced from 30s
+            backoff_multiplier: 1.5,                              // Reduced from 2.0
+            request_timeout: std::time::Duration::from_secs(15),  // Reduced from 30s
         }
     }
 }
@@ -130,43 +127,31 @@ impl Default for RetryConfig {
 /// Esplora API client for Bitcoin blockchain interactions
 pub struct EsploraClient {
     base_url: String,
-    retry_config: RetryConfig,
-    
     client: reqwest::Client,
 }
 
 impl EsploraClient {
     /// Create a new Esplora client with the given base URL
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use bitcoin_anchor::bitcoin::EsploraClient;
-    /// 
+    ///
     /// // For testnet
     /// let client = EsploraClient::new("https://mempool.space/testnet/api");
-    /// 
+    ///
     /// // For mainnet  
     /// let client = EsploraClient::new("https://mempool.space/api");
     /// ```
     pub fn new(base_url: impl Into<String>) -> Self {
-        Self::with_retry_config(base_url, RetryConfig::default())
-    }
-
-    /// Create a new Esplora client with custom retry configuration
-    pub fn with_retry_config(base_url: impl Into<String>, retry_config: RetryConfig) -> Self {
-        let timeout = retry_config.request_timeout;
         Self {
             base_url: base_url.into(),
-            retry_config,
-            client: reqwest::Client::builder()
-                .timeout(timeout)
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new()),
+            client: reqwest::Client::new(),
         }
     }
 
-        /// Create a new client for Bitcoin testnet (Mempool.space)
+    /// Create a new client for Bitcoin testnet (Mempool.space)
     pub fn testnet() -> Self {
         Self::new("https://mempool.space/testnet/api")
     }
@@ -176,123 +161,36 @@ impl EsploraClient {
         Self::new("https://mempool.space/api")
     }
 
-    /// Create a testnet client with custom retry configuration
-    pub fn testnet_with_retry(retry_config: RetryConfig) -> Self {
-        Self::with_retry_config("https://mempool.space/testnet/api", retry_config)
-    }
-
-    /// Create a mainnet client with custom retry configuration
-    pub fn mainnet_with_retry(retry_config: RetryConfig) -> Self {
-        Self::with_retry_config("https://mempool.space/api", retry_config)
-    }
-
-    /// Execute a request with retry logic and exponential backoff
-    
-    async fn execute_with_retry<F, T, Fut>(&self, operation: F, operation_name: &str) -> Result<T, EsploraError>
-    where
-        F: Fn() -> Fut,
-        Fut: std::future::Future<Output = Result<T, EsploraError>>,
-    {
-        let mut attempt = 0;
-        let mut delay = self.retry_config.initial_delay;
-
-        loop {
-            attempt += 1;
-            
-            match operation().await {
-                Ok(result) => return Ok(result),
-                Err(error) => {
-                    // Check if we should retry this error
-                    let should_retry = match &error {
-                        EsploraError::Network(_) => true,
-                        EsploraError::Http(_) => true,
-                        _ => false,
-                    };
-
-                    // If we've exhausted our retries or the error is not retryable, return the error
-                    if attempt >= self.retry_config.max_attempts || !should_retry {
-                        return Err(error);
-                    }
-
-                    // Log the retry attempt (in a real implementation, use proper logging)
-                    #[cfg(debug_assertions)]
-                    eprintln!(
-                        "Retry attempt {} for {} failed: {}. Retrying in {:?}",
-                        attempt, operation_name, error, delay
-                    );
-
-                    // Wait before retrying
-                    tokio::time::sleep(delay).await;
-
-                    // Exponential backoff
-                    delay = std::cmp::min(
-                        std::time::Duration::from_millis(
-                            (delay.as_millis() as f64 * self.retry_config.backoff_multiplier) as u64
-                        ),
-                        self.retry_config.max_delay
-                    );
-                }
-            }
-        }
-    }
-
     /// Get UTXOs for a given address
-    
-    pub async fn get_address_utxos(&self, address: &Address) -> Result<Vec<EsploraUtxo>, EsploraError> {
-        let address_clone = address.clone();
-        self.execute_with_retry(
-            move || {
-                let url = format!("{}/address/{}/utxo", self.base_url, address_clone);
-                let client = self.client.clone();
-                async move {
-                    let response = client
-                        .get(&url)
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            if e.is_timeout() {
-                                EsploraError::Network(format!("Request timeout: {}", e))
-                            } else if e.is_connect() {
-                                EsploraError::Network(format!("Connection failed: {}", e))
-                            } else {
-                                EsploraError::Network(e.to_string())
-                            }
-                        })?;
 
-                    if response.status() == 404 {
-                        return Err(EsploraError::AddressNotFound);
-                    }
+    pub async fn get_address_utxos(
+        &self,
+        address: &Address,
+    ) -> Result<Vec<EsploraUtxo>, EsploraError> {
+        let url = format!("{}/address/{}/utxo", self.base_url, address);
 
-                    if response.status() == 429 {
-                        return Err(EsploraError::Http("Rate limited".to_string()));
-                    }
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| EsploraError::Network(e.to_string()))?;
 
-                    if !response.status().is_success() {
-                        return Err(EsploraError::Http(format!(
-                            "HTTP error {}: {}",
-                            response.status(),
-                            response.text().await.unwrap_or_else(|_| "Unknown error".to_string())
-                        )));
-                    }
+        let utxos: Vec<EsploraUtxo> = response
+            .json()
+            .await
+            .map_err(|e| EsploraError::Json(e.to_string()))?;
 
-                    let utxos: Vec<EsploraUtxo> = response
-                        .json()
-                        .await
-                        .map_err(|e| EsploraError::Json(e.to_string()))?;
-
-                    Ok(utxos)
-                }
-            },
-            "get_address_utxos"
-        ).await
+        Ok(utxos)
     }
 
     /// Get transaction details by transaction ID
-    
+
     pub async fn get_transaction(&self, txid: &Txid) -> Result<EsploraTransaction, EsploraError> {
         let url = format!("{}/tx/{}", self.base_url, txid);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -311,11 +209,12 @@ impl EsploraClient {
     }
 
     /// Get raw transaction hex by transaction ID
-    
+
     pub async fn get_transaction_hex(&self, txid: &Txid) -> Result<String, EsploraError> {
         let url = format!("{}/tx/{}/hex", self.base_url, txid);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -333,60 +232,13 @@ impl EsploraClient {
         Ok(hex)
     }
 
-    /// Broadcast a transaction to the network
-    
-    pub async fn broadcast_transaction(&self, tx_hex: &str) -> Result<Txid, EsploraError> {
-        let url = format!("{}/tx", self.base_url);
-        
-        let response = self.client
-            .post(&url)
-            .header("Content-Type", "text/plain")
-            .body(tx_hex.to_string())
-            .send()
-            .await
-            .map_err(|e| EsploraError::Network(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(EsploraError::Http(format!("Broadcast failed: {}", error_text)));
-        }
-
-        let txid_str = response
-            .text()
-            .await
-            .map_err(|e| EsploraError::Network(e.to_string()))?;
-
-        let txid = txid_str.parse::<Txid>()
-            .map_err(|e| EsploraError::Json(format!("Invalid txid returned: {}", e)))?;
-
-        Ok(txid)
-    }
-
-    /// Get current fee estimates (sat/vB)
-    
-    pub async fn get_fee_estimates(&self) -> Result<FeeEstimates, EsploraError> {
-        let url = format!("{}/fee-estimates", self.base_url);
-        
-        let response = self.client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| EsploraError::Network(e.to_string()))?;
-
-        let estimates: FeeEstimates = response
-            .json()
-            .await
-            .map_err(|e| EsploraError::Json(e.to_string()))?;
-
-        Ok(estimates)
-    }
-
     /// Get the current block height
-    
+
     pub async fn get_block_height(&self) -> Result<u32, EsploraError> {
         let url = format!("{}/blocks/tip/height", self.base_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -402,93 +254,24 @@ impl EsploraClient {
         Ok(height)
     }
 
+    /// Get current fee estimates (sat/vB)
 
+    pub async fn get_fee_estimates(&self) -> Result<FeeEstimates, EsploraError> {
+        let url = format!("{}/fee-estimates", self.base_url);
 
-    /// Get transaction status and confirmation details
-    /// 
-    /// Retrieves the current status of a transaction by its ID,
-    /// including confirmation status and block information.
-    pub async fn get_transaction_status(&self, txid: &str) -> Result<TransactionStatus, EsploraError> {
-        self.execute_with_retry(
-            || async {
-                let url = format!("{}/tx/{}/status", self.base_url, txid);
-                
-                let response = self.client
-                    .get(&url)
-                    .send()
-                    .await
-                    .map_err(|e| EsploraError::Network(e.to_string()))?;
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| EsploraError::Network(e.to_string()))?;
 
-                if response.status().is_success() {
-                    let status: TransactionStatus = response
-                        .json()
-                        .await
-                        .map_err(|e| EsploraError::Json(e.to_string()))?;
-                    
-                    Ok(status)
-                } else {
-                    // Create a default/empty txid for not found case
-                    let empty_txid = bitcoin::Txid::from_str("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-                    Err(EsploraError::TransactionNotFound(empty_txid))
-                }
-            },
-            "get_transaction_status"
-        ).await
-    }
+        let estimates: FeeEstimates = response
+            .json()
+            .await
+            .map_err(|e| EsploraError::Json(e.to_string()))?;
 
-    /// Wait for transaction confirmation with timeout
-    /// 
-    /// Polls the transaction status until it reaches the desired number of confirmations
-    /// or the timeout is reached. Returns the final transaction status.
-    pub async fn wait_for_confirmation(
-        &self,
-        txid: &str,
-        min_confirmations: u32,
-        timeout_seconds: u64,
-    ) -> Result<TransactionStatus, EsploraError> {
-        use tokio::time::{sleep, timeout, Duration};
-        
-        let timeout_duration = Duration::from_secs(timeout_seconds);
-        let poll_interval = Duration::from_secs(10); // Poll every 10 seconds
-        
-        timeout(timeout_duration, async {
-            loop {
-                match self.get_transaction_status(txid).await {
-                    Ok(status) => {
-                        if status.confirmed {
-                            // Calculate confirmations from current block height
-                            if let Some(tx_height) = status.block_height {
-                                match self.get_block_height().await {
-                                    Ok(current_height) => {
-                                        let confirmations = current_height.saturating_sub(tx_height) + 1;
-                                        if confirmations >= min_confirmations {
-                                            return Ok(status);
-                                        }
-                                    }
-                                    Err(_) => {
-                                        // If we can't get current height, assume transaction is confirmed
-                                        // if it's in a block (basic confirmation check)
-                                        if min_confirmations <= 1 {
-                                            return Ok(status);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Wait before next poll
-                        sleep(poll_interval).await;
-                    }
-                    Err(EsploraError::TransactionNotFound(_)) => {
-                        // Transaction not yet visible, wait and retry
-                        sleep(poll_interval).await;
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-        })
-        .await
-        .map_err(|_| EsploraError::Network("Timeout waiting for confirmation".to_string()))?
+        Ok(estimates)
     }
 }
 
@@ -520,12 +303,14 @@ impl EsploraUtxo {
     }
 
     /// Get the confirmation count (None if unconfirmed)
-    pub async fn confirmation_count(&self, client: &EsploraClient) -> Result<Option<u32>, EsploraError> {
+    pub async fn confirmation_count(
+        &self,
+        client: &EsploraClient,
+    ) -> Result<Option<u32>, EsploraError> {
         if !self.is_confirmed() {
             return Ok(None);
         }
 
-        
         {
             let current_height = client.get_block_height().await?;
             if let Some(block_height) = self.status.block_height {
@@ -540,6 +325,7 @@ impl EsploraUtxo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_esplora_client_creation() {
@@ -556,9 +342,10 @@ mod tests {
     #[test]
     fn test_utxo_helpers() {
         use bitcoin::Txid;
-        use std::str::FromStr;
 
-        let txid = Txid::from_str("a1b2c3d4e5f67890123456789012345678901234567890123456789012345678").unwrap();
+        let txid =
+            Txid::from_str("a1b2c3d4e5f67890123456789012345678901234567890123456789012345678")
+                .unwrap();
         let utxo = EsploraUtxo {
             txid,
             vout: 0,
@@ -580,4 +367,4 @@ mod tests {
 
         assert!(utxo.is_confirmed());
     }
-} 
+}

@@ -27,22 +27,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aluvm"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ebf5d98086a4ba06795c54a1aa613046b9449661117ea3d47ec3e8be75dfe3b"
-dependencies = [
- "amplify",
- "baid64",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "paste",
- "strict_encoding",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "amplify"
 version = "4.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,20 +143,6 @@ name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
-
-[[package]]
-name = "aora"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa0b56f69d2c47f8ee387f40849742d552e8b94596d997c19095809ac5c6b377"
-dependencies = [
- "amplify",
- "binfile",
- "getrandom 0.2.16",
- "indexmap",
- "strict_encoding",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "arrayref"
@@ -461,15 +431,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89e25b6adfb930f02d1981565a6e5d9c547ac15a96606256d3b59040e5cd4ca3"
 
 [[package]]
-name = "base85"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36915bbaca237c626689b5bd14d02f2ba7a5a359d30a2a08be697392e3718079"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "bcder"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -524,15 +485,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "binfile"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6274ba7d40c4296332ddf908383673f96412b853337a4df0f6ecc9495ec5ff7d"
-dependencies = [
- "amplify",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -584,19 +536,14 @@ dependencies = [
 name = "bitcoin-anchor"
 version = "0.1.0"
 dependencies = [
- "amplify",
  "async-trait",
  "bitcoin",
  "blake2",
- "bp-core",
  "bp-std",
- "commit_verify",
  "hex",
  "reqwest 0.11.27",
- "rgb-std",
  "serde",
  "serde_json",
- "strict_encoding",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
@@ -714,12 +661,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "borrow-or-share"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eeab4423108c5d7c744f4d234de88d18d636100093ae04caf4825134b9c3a32"
-
-[[package]]
 name = "bp-consensus"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -727,39 +668,6 @@ checksum = "22bbb56809c40565d6085b4211ee2d25a7b5e84848960678ff748e0a8707552f"
 dependencies = [
  "amplify",
  "chrono",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "secp256k1 0.30.0",
- "strict_encoding",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "bp-core"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a28cb4d675dd49dddd705a29d868d3e3b8f217639fd6f9cbfcbf435236eef77"
-dependencies = [
- "bp-consensus",
- "bp-dbc",
- "bp-seals",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "strict_encoding",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "bp-dbc"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8aa1f2d9e00a4f2b107d2df25e0d804cfb87a175a37ee503b982b5784e892a6d"
-dependencies = [
- "amplify",
- "base85",
- "bp-consensus",
  "commit_verify",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
@@ -793,24 +701,6 @@ dependencies = [
  "bech32 0.9.1",
  "bp-consensus",
  "commit_verify",
- "strict_encoding",
-]
-
-[[package]]
-name = "bp-seals"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "565ffa069d6425b01630c68dbf1088a88786bd4b794ebf1f37a1d6edbbc29817"
-dependencies = [
- "amplify",
- "bp-consensus",
- "bp-dbc",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "single_use_seals",
- "strict_encoding",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -821,7 +711,6 @@ checksum = "6c69f38f9656b94b7241a9219523306fd3ed1aaefe5bd931da079a86dfeda025"
 dependencies = [
  "amplify",
  "bp-consensus",
- "bp-core",
  "bp-derive",
  "bp-invoice",
  "descriptors",
@@ -1055,7 +944,6 @@ dependencies = [
  "commit_encoding_derive",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
- "rand 0.9.1",
  "ripemd",
  "sha2",
  "strict_encoding",
@@ -1495,16 +1383,6 @@ name = "fixedbitset"
 version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
-
-[[package]]
-name = "fluent-uri"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1918b65d96df47d3591bed19c5cca17e3fa5d0707318e4b5ef2eae01764df7e5"
-dependencies = [
- "borrow-or-share",
- "ref-cast",
-]
 
 [[package]]
 name = "flume"
@@ -2060,26 +1938,6 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "hypersonic"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c00803ea8486e44382493683450a73426a3d41c338b187fa420e770b72ebd6"
-dependencies = [
- "aluvm",
- "amplify",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "indexmap",
- "sonic-api",
- "sonic-callreq",
- "strict_encoding",
- "strict_types",
- "ultrasonic",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -3073,12 +2931,9 @@ dependencies = [
  "amplify",
  "base64 0.22.1",
  "bp-consensus",
- "bp-core",
  "bp-derive",
- "commit_verify",
  "descriptors",
  "indexmap",
- "strict_encoding",
 ]
 
 [[package]]
@@ -3216,26 +3071,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "928fca9cf2aa042393a8325b9ead81d2f0df4cb12e1e24cef072922ccd99c5af"
 dependencies = [
  "bitflags 2.9.0",
-]
-
-[[package]]
-name = "ref-cast"
-version = "1.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a0ae411dbe946a674d89546582cea4ba2bb8defac896622d6496f14c23ba5cf"
-dependencies = [
- "ref-cast-impl",
-]
-
-[[package]]
-name = "ref-cast-impl"
-version = "1.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1165225c21bff1f3bbce98f5a1f889949bc902d3575308cc7b0de30b4f6d27c7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.101",
 ]
 
 [[package]]
@@ -3382,64 +3217,6 @@ checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
  "hmac",
  "subtle",
-]
-
-[[package]]
-name = "rgb-core"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090112e02c7e100a4c0c205ff3db6d253ad8b25bcf516b4ebf4c7af265be9f2a"
-dependencies = [
- "amplify",
- "bp-core",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "single_use_seals",
- "strict_encoding",
- "ultrasonic",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "rgb-invoice"
-version = "0.12.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bba97ce706586ea9387a5f3ff7bd9d8b5eeb37ecfb37d9e27224185ecf27659"
-dependencies = [
- "amplify",
- "baid64",
- "bp-core",
- "bp-invoice",
- "commit_verify",
- "hypersonic",
- "rgb-core",
- "sonic-callreq",
- "strict_encoding",
-]
-
-[[package]]
-name = "rgb-std"
-version = "0.12.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37923082a6d87af518cad98b370b0fe742127c1781d40dbd3bdd513af55cbd53"
-dependencies = [
- "amplify",
- "aora",
- "bp-core",
- "bp-invoice",
- "chrono",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "hypersonic",
- "indexmap",
- "rgb-core",
- "rgb-invoice",
- "single_use_seals",
- "strict_encoding",
- "strict_types",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4022,15 +3799,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "single_use_seals"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc1d9d2dc270edf5d0c6a233517809208d83c403e4ef4570585bb9744f9810e3"
-dependencies = [
- "strict_encoding",
-]
-
-[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4053,47 +3821,6 @@ checksum = "4f5fd57c80058a56cf5c777ab8a126398ece8e442983605d280a44ce79d0edef"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "sonic-api"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01c04bac27874c60a101fcb8c62d8181e671bfd277ec6f2ed16275b6fd6b1ac1"
-dependencies = [
- "aluvm",
- "amplify",
- "baid64",
- "binfile",
- "chrono",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "indexmap",
- "sonic-callreq",
- "strict_encoding",
- "strict_types",
- "ultrasonic",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "sonic-callreq"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5239b3802292549a1ce7e2edd7200180f5f6bc16c04307e8c28556d3629e0670"
-dependencies = [
- "amplify",
- "baid64",
- "chrono",
- "fluent-uri",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "indexmap",
- "strict_encoding",
- "strict_types",
- "ultrasonic",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4735,22 +4462,6 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
-
-[[package]]
-name = "ultrasonic"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e69fa4148b5009ac0becf7c258b196a4f00e8a9411ef8ee55445cfa4fe9ab0fd"
-dependencies = [
- "amplify",
- "baid64",
- "commit_verify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "strict_encoding",
- "wasm-bindgen",
- "zk-aluvm",
-]
 
 [[package]]
 name = "unarray"
@@ -5545,18 +5256,4 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
-]
-
-[[package]]
-name = "zk-aluvm"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db451adaf2f1fe68d139006cdda0d4265c4170ba44ea00110424d023780b0342"
-dependencies = [
- "aluvm",
- "amplify",
- "getrandom 0.2.16",
- "getrandom 0.3.3",
- "strict_encoding",
- "wasm-bindgen",
 ]
