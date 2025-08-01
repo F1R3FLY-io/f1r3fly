@@ -1,37 +1,34 @@
 // See casper/src/test/scala/coop/rchain/casper/engine/RunningSpec.scala
 
-use std::sync::{Arc, Mutex};
-use tokio;
-use std::collections::{VecDeque, HashMap, HashSet};
 use casper::rust::{
     casper::{Casper, MultiParentCasper},
-    engine::{running::Running, block_retriever},
+    engine::{block_retriever, running::Running},
     validator_identity::ValidatorIdentity,
 };
 use comm::rust::{
     peer_node::PeerNode,
-    rp::{connect::{ConnectionsCell, Connections}},
+    rp::connect::{Connections, ConnectionsCell},
     test_instances::{create_rp_conf_ask, TransportLayerStub},
 };
-use crypto::rust::{
-    private_key::PrivateKey,
-    public_key::PublicKey,
-};
+use crypto::rust::{private_key::PrivateKey, public_key::PublicKey};
 use models::{
+    routing::Protocol,
     rust::{
-        casper::protocol::casper_message::{
-            ApprovedBlock, ApprovedBlockCandidate, BlockMessage, CasperMessage, BlockRequest, HasBlock, ForkChoiceTipRequest
-        },
         block_implicits::get_random_block,
+        casper::protocol::casper_message::{
+            ApprovedBlock, ApprovedBlockCandidate, BlockMessage, BlockRequest, CasperMessage,
+            ForkChoiceTipRequest, HasBlock,
+        },
         validator::Validator,
     },
-    routing::Protocol,
 };
 use prost::bytes::Bytes;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Arc, Mutex};
+use tokio;
 
 use crate::{
-    engine::setup::peer_node,
-    helper::mock_casper::MockCasper,
+    engine::setup::peer_node, helper::mock_casper::MockCasper,
     util::genesis_builder::GenesisBuilder,
 };
 use casper::rust::engine::engine::Engine;
@@ -113,7 +110,10 @@ impl<'a> TestFixture<'a> {
 fn create_test_genesis() -> BlockMessage {
     let private_key_bytes = Bytes::from(vec![1u8; 32]);
     let public_key_bytes = Bytes::from(vec![2u8; 33]);
-    let validator_keys = vec![(PrivateKey::new(private_key_bytes), PublicKey::new(public_key_bytes))];
+    let validator_keys = vec![(
+        PrivateKey::new(private_key_bytes),
+        PublicKey::new(public_key_bytes),
+    )];
     GenesisBuilder::build_test_genesis(validator_keys)
 }
 
@@ -123,12 +123,14 @@ fn to_casper_message(p: Protocol) -> CasperMessage {
             // This is a simplified stand-in for the full conversion logic,
             // which would involve looking at the typeId of the packet.
             // For these tests, we can make assumptions about the message type.
-            if let Ok(bm) = models::casper::BlockMessageProto::decode(packet_data.content.as_ref()) {
+            if let Ok(bm) = models::casper::BlockMessageProto::decode(packet_data.content.as_ref())
+            {
                 if let Ok(block_message) = BlockMessage::from_proto(bm) {
                     return CasperMessage::BlockMessage(block_message);
                 }
             }
-            if let Ok(ab) = models::casper::ApprovedBlockProto::decode(packet_data.content.as_ref()) {
+            if let Ok(ab) = models::casper::ApprovedBlockProto::decode(packet_data.content.as_ref())
+            {
                 if let Ok(approved_block) = ApprovedBlock::from_proto(ab) {
                     return CasperMessage::ApprovedBlock(approved_block);
                 }
@@ -153,12 +155,22 @@ mod tests {
 
         let signed_block = fixture.validator_identity.sign_block(&new_block);
 
-        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::BlockMessage(signed_block.clone())).await.unwrap();
+        fixture
+            .engine
+            .handle(
+                fixture.local_peer.clone(),
+                CasperMessage::BlockMessage(signed_block.clone()),
+            )
+            .await
+            .unwrap();
 
         // Instead of checking the internal queue, verify the block was processed by checking if it's in the casper DAG or buffer
         let is_in_dag = fixture.casper.dag_contains(&signed_block.block_hash);
         let is_in_buffer = fixture.casper.buffer_contains(&signed_block.block_hash);
-        assert!(is_in_dag || is_in_buffer, "Block should be in DAG or buffer after being handled");
+        assert!(
+            is_in_dag || is_in_buffer,
+            "Block should be in DAG or buffer after being handled"
+        );
     }
 
     #[tokio::test]
@@ -171,7 +183,14 @@ mod tests {
             hash: genesis.block_hash.clone(),
         };
 
-        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::BlockRequest(block_request)).await.unwrap();
+        fixture
+            .engine
+            .handle(
+                fixture.local_peer.clone(),
+                CasperMessage::BlockRequest(block_request),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(fixture.transport_layer.request_count(), 1);
         let sent_request = fixture.transport_layer.pop_request().unwrap();
@@ -186,13 +205,21 @@ mod tests {
     #[tokio::test]
     async fn engine_should_respond_to_approved_block_request() {
         let mut fixture = TestFixture::new().await;
-        let approved_block_request = models::rust::casper::protocol::casper_message::ApprovedBlockRequest {
-            identifier: "test".to_string(),
-            trim_state: false,
-        };
+        let approved_block_request =
+            models::rust::casper::protocol::casper_message::ApprovedBlockRequest {
+                identifier: "test".to_string(),
+                trim_state: false,
+            };
         let expected_approved_block = fixture.casper.get_approved_block().candidate.block.clone();
 
-        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ApprovedBlockRequest(approved_block_request)).await.unwrap();
+        fixture
+            .engine
+            .handle(
+                fixture.local_peer.clone(),
+                CasperMessage::ApprovedBlockRequest(approved_block_request),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(fixture.transport_layer.request_count(), 1);
         let sent_request = fixture.transport_layer.pop_request().unwrap();
@@ -207,53 +234,64 @@ mod tests {
     #[tokio::test]
     async fn engine_should_respond_to_fork_choice_tip_request() {
         let mut fixture = TestFixture::new().await;
-        
+
         // Step 1: Create a request object
         let request = ForkChoiceTipRequest {};
-        
-        // Step 2: Create 2 blocks with empty sender  
+
+        // Step 2: Create 2 blocks with empty sender
         let mut block1 = get_random_block(
-            None, None, None, None, None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
         );
         block1.sender = Bytes::new(); // Empty sender
-        
+
         let mut block2 = get_random_block(
-            None, None, None, None, None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
         );
         block2.sender = Bytes::new(); // Empty sender
-        
+
         // Step 3: Insert blocks in blockDagStorage
         fixture.casper.add_block_to_store(block1.clone());
         fixture.casper.add_to_dag(block1.block_hash.clone());
         fixture.casper.add_block_to_store(block2.clone());
         fixture.casper.add_to_dag(block2.block_hash.clone());
-        
+
         // Update latest messages to include our blocks (simulating they are tips)
         let mut tips = HashMap::new();
         tips.insert(Validator::from(vec![1; 32]), block1.block_hash.clone());
         tips.insert(Validator::from(vec![2; 32]), block2.block_hash.clone());
         fixture.casper.set_latest_messages(tips);
-        
+
         // Step 4: Get tips from casper.blockDag (this happens inside the engine)
         let dag = fixture.casper.block_dag().await.unwrap();
-        let tips_from_dag: Vec<_> = dag.latest_messages_map.iter().map(|entry| entry.value().clone()).collect();
-        
+        let tips_from_dag: Vec<_> = dag
+            .latest_messages_map
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+
         // Step 5: Call engine.handle with local peer and request object
-        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ForkChoiceTipRequest(request)).await.unwrap();
-        
+        fixture
+            .engine
+            .handle(
+                fixture.local_peer.clone(),
+                CasperMessage::ForkChoiceTipRequest(request),
+            )
+            .await
+            .unwrap();
+
         // Step 6: Get requests from transportLayer
         let requests = fixture.transport_layer.get_all_requests();
-        
+
         // Step 7: Create Expected Tip value
         let expected_tips: HashSet<_> = tips_from_dag.into_iter().collect();
-        
+
         // Step 8: Assert peer in head in requests in transport layer is local
         assert!(!requests.is_empty());
         let first_request = &requests[0];
         assert_eq!(first_request.peer, fixture.local_peer);
         let second_request = &requests[1];
         assert_eq!(second_request.peer, fixture.local_peer);
-        
+
         // Step 9: Assert requests matches to expected tips value
         let mut received_tips = HashSet::new();
         for request in requests {
@@ -261,7 +299,7 @@ mod tests {
                 received_tips.insert(hash);
             }
         }
-        
+
         assert_eq!(received_tips, expected_tips);
     }
 }
