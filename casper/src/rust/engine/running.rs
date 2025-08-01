@@ -40,7 +40,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine for Running<'r, M, T> {
     async fn init(&self) -> Result<(), CasperError> {
         let mut init_called = self.init_called.lock().map_err(|_| {
