@@ -129,6 +129,9 @@ pub trait MultiParentCasper: Casper {
     ) -> Result<f32, CasperError>;
 
     async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError>;
+
+    // Equivalent to Scala's blockDag: F[BlockDagRepresentation[F]]
+    async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError>;
 }
 
 pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
