@@ -497,6 +497,10 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
         Ok(result)
     }
+
+    fn get_validator(&self) -> Option<ValidatorIdentity> {
+        self.validator_id.clone()
+    }
 }
 
 #[async_trait]

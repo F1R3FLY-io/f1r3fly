@@ -141,6 +141,8 @@ pub trait MultiParentCasper: Casper {
     fn block_store(&self) -> &KeyValueBlockStore;
 
     fn rspace_state_manager(&self) -> &RSpaceStateManager;
+
+    fn get_validator(&self) -> Option<ValidatorIdentity>;
 }
 
 pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
