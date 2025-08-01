@@ -7,6 +7,121 @@ set -e
 echo "🚀 Starting REV → ASI migration for existing blockchain..."
 echo ""
 
+# 0. CLEANUP - Remove any leftover ASI files from previous runs
+echo "🧹 Cleaning up leftover files from previous runs..."
+
+# Remove ASI directories if they exist (from previous incomplete runs)
+if [ -d "node/src/main/scala/coop/rchain/node/asivaultexport" ]; then
+    rm -rf "node/src/main/scala/coop/rchain/node/asivaultexport"
+    echo "✅ Removed leftover node/src/main/.../asivaultexport/"
+fi
+
+if [ -d "node/src/test/scala/coop/rchain/node/asivaultexport" ]; then
+    rm -rf "node/src/test/scala/coop/rchain/node/asivaultexport"
+    echo "✅ Removed leftover node/src/test/.../asivaultexport/"
+fi
+
+# Remove ASI files if they exist (from previous incomplete runs)
+if [ -f "casper/src/main/resources/ASIVault.rho" ]; then
+    rm "casper/src/main/resources/ASIVault.rho"
+    echo "✅ Removed leftover ASIVault.rho"
+fi
+
+if [ -f "casper/src/main/resources/MultiSigASIVault.rho" ]; then
+    rm "casper/src/main/resources/MultiSigASIVault.rho"
+    echo "✅ Removed leftover MultiSigASIVault.rho"
+fi
+
+if [ -f "casper/src/test/resources/ASIVaultTest.rho" ]; then
+    rm "casper/src/test/resources/ASIVaultTest.rho"
+    echo "✅ Removed leftover ASIVaultTest.rho"
+fi
+
+if [ -f "casper/src/test/resources/MultiSigASIVaultTest.rho" ]; then
+    rm "casper/src/test/resources/MultiSigASIVaultTest.rho"
+    echo "✅ Removed leftover MultiSigASIVaultTest.rho"
+fi
+
+if [ -f "casper/src/test/resources/ASIAddressTest.rho" ]; then
+    rm "casper/src/test/resources/ASIAddressTest.rho"
+    echo "✅ Removed leftover ASIAddressTest.rho"
+fi
+
+if [ -f "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala" ]; then
+    rm "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala"
+    echo "✅ Removed leftover ASIGenerator.scala"
+fi
+
+if [ -f "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala" ]; then
+    rm "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala"
+    echo "✅ Removed leftover ASIAddress.scala"
+fi
+
+if [ -f "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala" ]; then
+    rm "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala"
+    echo "✅ Removed leftover ASIAddressSpec.scala"
+fi
+
+if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala" ]; then
+    rm "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala"
+    echo "✅ Removed leftover ASIAddressSpec.scala"
+fi
+
+echo "🧹 Cleanup completed!"
+echo ""
+
+# 0.5. VERIFY REQUIRED FILES EXIST
+echo "🔍 Verifying required REV files exist..."
+
+required_files=(
+    "casper/src/main/resources/RevVault.rho"
+    "casper/src/main/resources/MultiSigRevVault.rho"
+    "casper/src/test/resources/RevVaultTest.rho"
+    "casper/src/test/resources/MultiSigRevVaultTest.rho"
+    "casper/src/test/resources/RevAddressTest.rho"
+    "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala"
+    "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala"
+    "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala"
+    "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala"
+)
+
+required_dirs=(
+    "node/src/main/scala/coop/rchain/node/revvaultexport"
+    "node/src/test/scala/coop/rchain/node/revvaultexport"
+)
+
+missing_files=()
+missing_dirs=()
+
+for file in "${required_files[@]}"; do
+    if [ ! -f "$file" ]; then
+        missing_files+=("$file")
+    fi
+done
+
+for dir in "${required_dirs[@]}"; do
+    if [ ! -d "$dir" ]; then
+        missing_dirs+=("$dir")
+    fi
+done
+
+if [ ${#missing_files[@]} -gt 0 ] || [ ${#missing_dirs[@]} -gt 0 ]; then
+    echo "❌ ERROR: Missing required files/directories:"
+    for file in "${missing_files[@]}"; do
+        echo "   - $file"
+    done
+    for dir in "${missing_dirs[@]}"; do
+        echo "   - $dir"
+    done
+    echo ""
+    echo "💡 Please make sure you have a clean REV codebase before running this script."
+    echo "   Consider doing: git checkout . && git clean -fd"
+    exit 1
+fi
+
+echo "✅ All required REV files found!"
+echo ""
+
 # 1. REPLACE CONTENT IN FILES
 echo "📝 Replacing text in files..."
 
@@ -107,7 +222,36 @@ find . -name "*.scala" -o -name "*.rho" | while read -r file; do
         "$file"
 done
 
-# 7. RENAME FILES
+# 7. RENAME DIRECTORIES FIRST
+echo "📁 Renaming directories first..."
+
+# Main revvaultexport directory
+if [ -d "node/src/main/scala/coop/rchain/node/revvaultexport" ]; then
+    git mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/asivaultexport"
+    echo "✅ node/src/main/.../revvaultexport/ -> asivaultexport/"
+fi
+
+# Test revvaultexport directory - CRITICAL: This was missed before!
+if [ -d "node/src/test/scala/coop/rchain/node/revvaultexport" ]; then
+    git mv "node/src/test/scala/coop/rchain/node/revvaultexport" "node/src/test/scala/coop/rchain/node/asivaultexport"
+    echo "✅ node/src/test/.../revvaultexport/ -> asivaultexport/"
+fi
+
+# Look for any other revvaultexport directories we might have missed
+find . -type d -name "*revvaultexport*" -not -path "./.git/*" | while read -r dir; do
+    if [ -d "$dir" ]; then
+        newdir=$(echo "$dir" | sed 's/revvaultexport/asivaultexport/g')
+        # Avoid creating nested directories
+        if [[ "$newdir" != *"asivaultexport/asivaultexport"* ]]; then
+            git mv "$dir" "$newdir"
+            echo "✅ Found and moved: $dir -> $newdir"
+        else
+            echo "⚠️  Skipping to avoid nested directory: $dir"
+        fi
+    fi
+done
+
+# 8. RENAME FILES
 echo "📁 Renaming files..."
 
 # Main contracts
@@ -172,37 +316,7 @@ if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSp
     echo "✅ RevAddressSpec.scala -> ASIAddressSpec.scala"
 fi
 
-# Rename directories
-# CRITICAL: Handle ALL revvaultexport directories (main AND test)
-echo "📁 Renaming directories and moving all files..."
-
-# Main revvaultexport directory
-if [ -d "node/src/main/scala/coop/rchain/node/revvaultexport" ]; then
-    git mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/asivaultexport"
-    echo "✅ node/src/main/.../revvaultexport/ -> asivaultexport/"
-fi
-
-# Test revvaultexport directory - CRITICAL: This was missed before!
-if [ -d "node/src/test/scala/coop/rchain/node/revvaultexport" ]; then
-    git mv "node/src/test/scala/coop/rchain/node/revvaultexport" "node/src/test/scala/coop/rchain/node/asivaultexport"
-    echo "✅ node/src/test/.../revvaultexport/ -> asivaultexport/"
-fi
-
-# Look for any other revvaultexport directories we might have missed
-find . -type d -name "*revvaultexport*" -not -path "./.git/*" | while read -r dir; do
-    if [ -d "$dir" ]; then
-        newdir=$(echo "$dir" | sed 's/revvaultexport/asivaultexport/g')
-        # Avoid creating nested directories
-        if [[ "$newdir" != *"asivaultexport/asivaultexport"* ]]; then
-            git mv "$dir" "$newdir"
-            echo "✅ Found and moved: $dir -> $newdir"
-        else
-            echo "⚠️  Skipping to avoid nested directory: $dir"
-        fi
-    fi
-done
-
-# 8. UPDATE IMPORTS/MODULES - Final pass
+# 9. UPDATE IMPORTS/MODULES - Final pass
 echo "🔧 Final import updates..."
 find . -name "*.scala" -o -name "*.rs" | while read -r file; do
     sed -i '' \
@@ -211,7 +325,7 @@ find . -name "*.scala" -o -name "*.rs" | while read -r file; do
         "$file"
 done
 
-# 8b. ADDITIONAL: Final cleanup of any remaining references
+# 9b. ADDITIONAL: Final cleanup of any remaining references
 echo "🧹 Final cleanup of remaining references..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
     sed -i '' \
