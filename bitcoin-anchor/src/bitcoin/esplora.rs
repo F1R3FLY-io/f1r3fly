@@ -161,6 +161,11 @@ impl EsploraClient {
         Self::new("https://mempool.space/api")
     }
 
+    /// Create a new client for Bitcoin signet (Mempool.space)
+    pub fn signet() -> Self {
+        Self::new("https://mempool.space/signet/api")
+    }
+
     /// Get UTXOs for a given address
 
     pub async fn get_address_utxos(
@@ -337,6 +342,9 @@ mod tests {
 
         let mainnet_client = EsploraClient::mainnet();
         assert_eq!(mainnet_client.base_url, "https://mempool.space/api");
+
+        let signet_client = EsploraClient::signet();
+        assert_eq!(signet_client.base_url, "https://mempool.space/signet/api");
     }
 
     #[test]

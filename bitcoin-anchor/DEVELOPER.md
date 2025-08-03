@@ -1,5 +1,21 @@
 # F1r3fly Bitcoin Anchor Developer Guide
 
+## Network Support
+
+The F1r3fly Bitcoin Anchor system supports multiple Bitcoin networks for different development and testing scenarios:
+
+- **Regtest** (Local Testnet) - Fully local testing environment with instant block generation
+- **Signet** (Controlled Test Network) - Federated test network with predictable block times
+- **Testnet3** - Public test network (planned support)  
+- **Mainnet** - Bitcoin production network (planned support)
+
+### Network Documentation
+
+- **Regtest Setup**: Instructions below for local development
+- **Signet Setup**: See [SIGNET.md](SIGNET.md) for detailed Signet integration guide
+
+---
+
 ## Bitcoin Core - Regtest (Local Testnet)
 
 ### Setup

@@ -321,7 +321,7 @@ impl AnchorPsbt {
                         e
                     ))
                 })?;
-                estimates.medium // Use medium priority (3 blocks)
+                estimates.fast // Use fast priority (1 block)
             }
         };
 
@@ -360,23 +360,34 @@ impl AnchorPsbt {
         let mut sorted_utxos = utxos.to_vec();
         sorted_utxos.sort_by(|a, b| b.amount.cmp(&a.amount));
 
-        // Only use confirmed UTXOs for safety
-        let confirmed_utxos: Vec<_> = sorted_utxos
-            .into_iter()
-            .filter(|utxo| utxo.is_confirmed)
-            .collect();
+        // For testing networks (regtest, signet, testnet), allow unconfirmed UTXOs
+        let use_unconfirmed = matches!(self.network, Network::Regtest | Network::Signet | Network::Testnet3);
+        
+        let available_utxos: Vec<_> = if use_unconfirmed {
+            // For test networks: use all UTXOs (confirmed and unconfirmed)
+            sorted_utxos
+        } else {
+            // For mainnet: only use confirmed UTXOs for safety
+            sorted_utxos
+                .into_iter()
+                .filter(|utxo| utxo.is_confirmed)
+                .collect()
+        };
 
-        if confirmed_utxos.is_empty() {
-            return Err(crate::error::AnchorError::InsufficientFunds(
-                "No confirmed UTXOs available".to_string(),
-            ));
+        if available_utxos.is_empty() {
+            let error_msg = if use_unconfirmed {
+                "No UTXOs available".to_string()
+            } else {
+                "No confirmed UTXOs available".to_string()
+            };
+            return Err(crate::error::AnchorError::InsufficientFunds(error_msg));
         }
 
         // Try to select coins
         let mut selected_utxos = Vec::new();
         let mut total_input_value = Amount::ZERO;
 
-        for utxo in confirmed_utxos {
+        for utxo in available_utxos {
             selected_utxos.push(utxo.clone());
             total_input_value += utxo.amount;
 
