@@ -11,19 +11,20 @@ use crate::rust::errors::CasperError;
 ///
 /// Usage:
 ///   let engine_cell = EngineCell::init().await?;
-///   let engine = engine_cell.read().await?;
-///   engine_cell.set(Box::new(MyEngine::new(...))).await?;
+///   let engine = engine_cell.read().await?;  // Returns Arc<dyn Engine>
+///   engine_cell.set(Arc::new(MyEngine::new(...))).await?;
 ///
 /// This implementation provides 1:1 API compatibility with the Scala EngineCell.
+/// Uses Arc internally to avoid expensive cloning on read operations.
 pub struct EngineCell {
-    inner: Arc<RwLock<Box<dyn Engine>>>,
+    inner: Arc<RwLock<Arc<dyn Engine>>>,
 }
 
 impl EngineCell {
     /// Initialize EngineCell with NoopEngine (equivalent to Cell.mvarCell[F, Engine[F]](Engine.noop))
     /// Returns Future<Result<EngineCell, CasperError>> to match Scala's F[EngineCell[F]]
     pub async fn init() -> Result<Self, CasperError> {
-        let engine = Box::new(noop()?);
+        let engine = Arc::new(noop()?);
         Ok(EngineCell {
             inner: Arc::new(RwLock::new(engine)),
         })
@@ -31,29 +32,38 @@ impl EngineCell {
 
     /// Read the current engine (equivalent to Cell.read: F[Engine[F]])
     /// This is the most frequently used method in the Scala codebase
-    pub async fn read(&self) -> Result<Box<dyn Engine>, CasperError> {
-        // Clone the engine to match Scala's read behavior which doesn't hold locks
+    pub async fn read(&self) -> Result<Arc<dyn Engine>, CasperError> {
+        // Return a cheap Arc clone, matching Scala's read behavior which doesn't hold locks
+        // This is much more efficient than the previous clone_box() approach
         let guard = self.inner.read().await;
-        // Since we can't clone trait objects directly, we need to handle this differently
-        // For now, we'll return a reference-counted clone of the inner Arc
-        // This maintains the async behavior while providing access to the engine
-        Ok(guard.clone_box())
+        Ok(Arc::clone(&*guard))
+    }
+
+    /// Convenience method to read engine as Box (for backwards compatibility if needed)
+    pub async fn read_boxed(&self) -> Result<Box<dyn Engine>, CasperError> {
+        let arc_engine = self.read().await?;
+        Ok(arc_engine.clone_box())
     }
 
     /// Set the engine to a new instance (equivalent to Cell.set(s: Engine[F]): F[Unit])
-    pub async fn set(&self, engine: Box<dyn Engine>) -> Result<(), CasperError> {
+    pub async fn set(&self, engine: Arc<dyn Engine>) -> Result<(), CasperError> {
         let mut guard = self.inner.write().await;
         *guard = engine;
         Ok(())
     }
 
+    /// Convenience method to set engine from Box (for easier migration)
+    pub async fn set_boxed(&self, engine: Box<dyn Engine>) -> Result<(), CasperError> {
+        self.set(engine.into()).await
+    }
+
     /// Modify the engine with a pure function (equivalent to Cell.modify(f: Engine[F] => Engine[F]): F[Unit])
     pub async fn modify<F>(&self, f: F) -> Result<(), CasperError>
     where
-        F: FnOnce(Box<dyn Engine>) -> Box<dyn Engine> + Send,
+        F: FnOnce(Arc<dyn Engine>) -> Arc<dyn Engine> + Send,
     {
         let mut guard = self.inner.write().await;
-        let current_engine = std::mem::replace(&mut *guard, Box::new(noop()?));
+        let current_engine = std::mem::replace(&mut *guard, Arc::new(noop()?));
         *guard = f(current_engine);
         Ok(())
     }
@@ -61,23 +71,23 @@ impl EngineCell {
     /// Modify the engine with an async function (equivalent to Cell.flatModify(f: Engine[F] => F[Engine[F]]): F[Unit])
     pub async fn flat_modify<F, Fut>(&self, f: F) -> Result<(), CasperError>
     where
-        F: FnOnce(Box<dyn Engine>) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<Box<dyn Engine>, CasperError>> + Send,
+        F: FnOnce(Arc<dyn Engine>) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<Arc<dyn Engine>, CasperError>> + Send,
     {
-        // Remove the current engine from the cell and replace it with a placeholder so
-        // other readers will block until the new engine is written back. Keep a handle
-        // to the original value so we can restore it if the async operation fails.
-        let current_engine = {
-            let mut guard = self.inner.write().await;
-            std::mem::replace(&mut *guard, Box::new(noop()?))
-        };
-
-        // Execute the provided async function **without** holding the lock.
-        let result = f(current_engine.clone_box()).await;
-
-        // Re-acquire the lock and either commit the new engine or restore the old one,
-        // matching Scala's bracket‐style resource handling (restore on failure).
+        // Acquire write lock and hold it for the entire duration to prevent race conditions.
+        // This matches Scala's MVar.take pattern where the value is exclusively held during
+        // the async operation, preventing other threads from reading placeholder state or
+        // causing lost updates from concurrent modifications.
         let mut guard = self.inner.write().await;
+        let current_engine = std::mem::replace(&mut *guard, Arc::new(noop()?));
+
+        // Execute the provided async function while holding the write lock.
+        // This ensures no other thread can access the EngineCell during the operation.
+        // Use cheap Arc::clone instead of expensive clone_box().
+        let result = f(Arc::clone(&current_engine)).await;
+
+        // Commit the new engine or restore the original on failure,
+        // matching Scala's bracket-style resource handling.
         match result {
             Ok(new_engine) => {
                 *guard = new_engine;
@@ -88,6 +98,7 @@ impl EngineCell {
                 Err(e)
             }
         }
+        // Write lock is held until this point, ensuring atomic operation
     }
 
     /// Read with a transformation function (equivalent to Cell.reads[A](f: Engine[F] => A): F[A])
