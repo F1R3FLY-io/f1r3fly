@@ -1,6 +1,9 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/NoOpsCasperEffect.scala
 
 use std::collections::HashMap;
+use async_trait::async_trait;
+use rspace_plus_plus::rspace::state::rspace_state_manager::RSpaceStateManager;
+use casper::rust::validator_identity::ValidatorIdentity;
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::{DeployId, KeyValueDagRepresentation},
@@ -47,6 +50,7 @@ impl NoOpsCasperEffect {
     }
 }
 
+#[async_trait(?Send)]
 impl MultiParentCasper for NoOpsCasperEffect {
     async fn fetch_dependencies(&self) -> Result<(), CasperError> {
         Ok(())
@@ -62,8 +66,31 @@ impl MultiParentCasper for NoOpsCasperEffect {
     async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError> {
         Ok(get_random_block_default())
     }
+
+    async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError> {
+        Ok(self.block_dag_storage.clone())
+    }
+
+    fn block_store(&self) -> &KeyValueBlockStore {
+        &self.block_store
+    }
+
+    fn rspace_state_manager(&self) -> &RSpaceStateManager {
+        todo!()
+    }
+
+    fn get_validator(&self) -> Option<ValidatorIdentity> {
+        None
+    }
+
+    fn get_history_exporter(
+        &self,
+    ) -> std::sync::Arc<std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>> {
+        todo!()
+    }
 }
 
+#[async_trait(?Send)]
 impl Casper for NoOpsCasperEffect {
     async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError> {
         todo!()
