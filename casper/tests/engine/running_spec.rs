@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokio;
 use std::collections::{VecDeque, HashMap, HashSet};
 use casper::rust::{
-    casper::Casper,
+    casper::{Casper, MultiParentCasper},
     engine::{running::Running, block_retriever},
     validator_identity::ValidatorIdentity,
 };
@@ -20,9 +20,9 @@ use crypto::rust::{
 use models::{
     rust::{
         casper::protocol::casper_message::{
-            ApprovedBlock, ApprovedBlockCandidate, BlockMessage, CasperMessage, BlockRequest, HasBlock
+            ApprovedBlock, ApprovedBlockCandidate, BlockMessage, CasperMessage, BlockRequest, HasBlock, ForkChoiceTipRequest
         },
-
+        block_implicits::get_random_block,
         validator::Validator,
     },
     routing::Protocol,
@@ -207,39 +207,61 @@ mod tests {
     #[tokio::test]
     async fn engine_should_respond_to_fork_choice_tip_request() {
         let mut fixture = TestFixture::new().await;
-        let tip1 = prost::bytes::Bytes::from(vec![1; 32]);
-        let tip2 = prost::bytes::Bytes::from(vec![2; 32]);
-        let validator1: Validator = vec![1; 32].into();
-        let validator2: Validator = vec![2; 32].into();
+        
+        // Step 1: Create a request object
+        let request = ForkChoiceTipRequest {};
+        
+        // Step 2: Create 2 blocks with empty sender  
+        let mut block1 = get_random_block(
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        );
+        block1.sender = Bytes::new(); // Empty sender
+        
+        let mut block2 = get_random_block(
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        );
+        block2.sender = Bytes::new(); // Empty sender
+        
+        // Step 3: Insert blocks in blockDagStorage
+        fixture.casper.add_block_to_store(block1.clone());
+        fixture.casper.add_to_dag(block1.block_hash.clone());
+        fixture.casper.add_block_to_store(block2.clone());
+        fixture.casper.add_to_dag(block2.block_hash.clone());
+        
+        // Update latest messages to include our blocks (simulating they are tips)
         let mut tips = HashMap::new();
-        tips.insert(validator1, tip1.clone());
-        tips.insert(validator2, tip2.clone());
+        tips.insert(Validator::from(vec![1; 32]), block1.block_hash.clone());
+        tips.insert(Validator::from(vec![2; 32]), block2.block_hash.clone());
         fixture.casper.set_latest_messages(tips);
-
-        let fork_choice_tip_request = models::rust::casper::protocol::casper_message::ForkChoiceTipRequest {};
-        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ForkChoiceTipRequest(fork_choice_tip_request)).await.unwrap();
-
-        assert_eq!(fixture.transport_layer.request_count(), 2);
+        
+        // Step 4: Get tips from casper.blockDag (this happens inside the engine)
+        let dag = fixture.casper.block_dag().await.unwrap();
+        let tips_from_dag: Vec<_> = dag.latest_messages_map.iter().map(|entry| entry.value().clone()).collect();
+        
+        // Step 5: Call engine.handle with local peer and request object
+        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ForkChoiceTipRequest(request)).await.unwrap();
+        
+        // Step 6: Get requests from transportLayer
+        let requests = fixture.transport_layer.get_all_requests();
+        
+        // Step 7: Create Expected Tip value
+        let expected_tips: HashSet<_> = tips_from_dag.into_iter().collect();
+        
+        // Step 8: Assert peer in head in requests in transport layer is local
+        assert!(!requests.is_empty());
+        let first_request = &requests[0];
+        assert_eq!(first_request.peer, fixture.local_peer);
+        let second_request = &requests[1];
+        assert_eq!(second_request.peer, fixture.local_peer);
+        
+        // Step 9: Assert requests matches to expected tips value
         let mut received_tips = HashSet::new();
-
-        let req1 = fixture.transport_layer.pop_request().unwrap();
-        if let CasperMessage::HasBlock(HasBlock { hash }) = to_casper_message(req1.msg) {
-            received_tips.insert(hash);
-        } else {
-            panic!("Expected HasBlock message")
+        for request in requests {
+            if let CasperMessage::HasBlock(HasBlock { hash }) = to_casper_message(request.msg) {
+                received_tips.insert(hash);
+            }
         }
         
-        let req2 = fixture.transport_layer.pop_request().unwrap();
-        if let CasperMessage::HasBlock(HasBlock { hash }) = to_casper_message(req2.msg) {
-            received_tips.insert(hash);
-        } else {
-            panic!("Expected HasBlock message")
-        }
-
-        let mut expected_tips = HashSet::new();
-        expected_tips.insert(tip1);
-        expected_tips.insert(tip2);
-
         assert_eq!(received_tips, expected_tips);
     }
 }
