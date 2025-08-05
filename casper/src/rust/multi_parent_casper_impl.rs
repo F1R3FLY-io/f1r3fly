@@ -633,6 +633,11 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
         let block_message = self.block_store.get_unsafe(&final_lfb_hash);
         Ok(block_message)
     }
+
+    // Equivalent to Scala's def blockDag: F[BlockDagRepresentation[F]] = BlockDagStorage[F].getRepresentation
+    async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError> {
+        Ok(self.block_dag_storage.get_representation())
+    }
 }
 
 impl<T: TransportLayer + Send + Sync> MultiParentCasperImpl<T> {
