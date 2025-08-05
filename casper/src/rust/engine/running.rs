@@ -282,6 +282,18 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         }
     }
 
+    /// Get the current length of the block processing queue (for testing)
+    pub fn block_processing_queue_len(&self) -> usize {
+        self.block_processing_queue.len()
+    }
+
+    /// Check if a block with the given hash is in the processing queue (for testing)
+    pub fn is_block_in_processing_queue(&self, hash: &BlockHash) -> bool {
+        self.block_processing_queue
+            .iter()
+            .any(|(_, block)| &block.block_hash == hash)
+    }
+
     fn ignore_casper_message(&self, hash: BlockHash) -> Result<bool, CasperError> {
         let blocks_in_processing = self.blocks_in_processing.lock().unwrap().contains(&hash);
         let buffer_contains = self.casper.buffer_contains(&hash);

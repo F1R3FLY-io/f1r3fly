@@ -1,7 +1,7 @@
 // See casper/src/test/scala/coop/rchain/casper/engine/RunningSpec.scala
 
 use casper::rust::{
-    casper::{Casper, MultiParentCasper},
+    casper::MultiParentCasper,
     engine::{block_retriever, running::Running},
     validator_identity::ValidatorIdentity,
 };
@@ -164,12 +164,12 @@ mod tests {
             .await
             .unwrap();
 
-        // Instead of checking the internal queue, verify the block was processed by checking if it's in the casper DAG or buffer
-        let is_in_dag = fixture.casper.dag_contains(&signed_block.block_hash);
-        let is_in_buffer = fixture.casper.buffer_contains(&signed_block.block_hash);
+        // Verify the block was enqueued for processing (following Scala test behavior)
         assert!(
-            is_in_dag || is_in_buffer,
-            "Block should be in DAG or buffer after being handled"
+            fixture
+                .engine
+                .is_block_in_processing_queue(&signed_block.block_hash),
+            "Block should be enqueued in processing queue after being handled"
         );
     }
 
