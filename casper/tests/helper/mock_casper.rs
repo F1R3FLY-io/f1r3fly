@@ -1,25 +1,30 @@
 use async_trait::async_trait;
+use block_storage::rust::dag::block_dag_key_value_storage::{
+    DeployId, KeyValueDagRepresentation as RealKeyValueDagRepresentation,
+};
+use block_storage::rust::dag::block_metadata_store::BlockMetadataStore;
+use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use casper::rust::{
-    casper::{Casper, MultiParentCasper, DeployError, CasperSnapshot},
+    block_status::{BlockError, InvalidBlock, ValidBlock},
+    casper::{Casper, CasperSnapshot, DeployError, MultiParentCasper},
     errors::CasperError,
     validator_identity::ValidatorIdentity,
-    block_status::{BlockError, ValidBlock, InvalidBlock},
 };
+use crypto::rust::signatures::signed::Signed;
+use dashmap::DashMap;
+use models::rust::validator::Validator;
 use models::rust::{
     block_hash::{BlockHash, BlockHashSerde},
     block_metadata::BlockMetadata,
-    casper::protocol::casper_message::{BlockMessage, ApprovedBlock, DeployData},
+    casper::protocol::casper_message::{ApprovedBlock, BlockMessage, DeployData},
 };
-use crypto::rust::signatures::signed::Signed;
-use std::sync::{Arc, Mutex};
-use std::collections::{HashMap, HashSet, BTreeMap};
-use block_storage::rust::dag::block_dag_key_value_storage::{KeyValueDagRepresentation as RealKeyValueDagRepresentation, DeployId};
-use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use rspace_plus_plus::rspace::{history::Either, state::rspace_state_manager::RSpaceStateManager};
-use models::rust::validator::Validator;
-use dashmap::DashMap;
-use shared::rust::store::{key_value_store::{KeyValueStore, KvStoreError}, key_value_typed_store_impl::KeyValueTypedStoreImpl};
-use block_storage::rust::dag::block_metadata_store::BlockMetadataStore;
+use shared::rust::store::{
+    key_value_store::{KeyValueStore, KvStoreError},
+    key_value_typed_store_impl::KeyValueTypedStoreImpl,
+};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 // Mock KeyValueStore for testing
 #[derive(Clone, Default)]
@@ -94,7 +99,8 @@ impl Default for DagRepresentation {
         let block_metadata_store = BlockMetadataStore::new(typed_store);
 
         let deploy_store = Box::new(MockKeyValueStore::default());
-        let deploy_typed_store = KeyValueTypedStoreImpl::<DeployId, BlockHashSerde>::new(deploy_store);
+        let deploy_typed_store =
+            KeyValueTypedStoreImpl::<DeployId, BlockHashSerde>::new(deploy_store);
 
         Self(RealKeyValueDagRepresentation {
             dag_set: Default::default(),
@@ -126,13 +132,15 @@ impl MockCasper {
         let store = Box::new(MockKeyValueStore::new());
         let store_approved_block = Box::new(MockKeyValueStore::new());
         let mut key_value_block_store = KeyValueBlockStore::new(store, store_approved_block);
-        
+
         // Store the genesis/approved block so it can be found by the handlers
         let genesis_block = approved_block.candidate.block.clone();
-        key_value_block_store.put_block_message(&genesis_block).unwrap_or_else(|e| {
-            log::warn!("Failed to store genesis block in mock: {:?}", e);
-        });
-        
+        key_value_block_store
+            .put_block_message(&genesis_block)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to store genesis block in mock: {:?}", e);
+            });
+
         Self {
             block_store_map: Arc::new(Mutex::new(HashMap::new())),
             dag: Arc::new(Mutex::new(HashSet::new())),
@@ -145,7 +153,10 @@ impl MockCasper {
     }
 
     pub fn add_block_to_store(&self, block: BlockMessage) {
-        self.block_store_map.lock().unwrap().insert(block.block_hash.clone(), block.clone());
+        self.block_store_map
+            .lock()
+            .unwrap()
+            .insert(block.block_hash.clone(), block.clone());
         // Also store in the actual KeyValueBlockStore, but since we can't mutate it directly,
         // we'll override the get method to check our HashMap first
     }
@@ -161,7 +172,10 @@ impl MockCasper {
     }
 
     pub fn get_latest_messages(&self) -> HashMap<Validator, BlockHash> {
-        self.latest_messages.iter().map(|entry| (entry.key().clone(), entry.value().clone())).collect()
+        self.latest_messages
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect()
     }
 
     pub fn get_approved_block(&self) -> &ApprovedBlock {
@@ -174,7 +188,7 @@ impl Clone for MockCasper {
         let store = Box::new(MockKeyValueStore::new());
         let store_approved_block = Box::new(MockKeyValueStore::new());
         let key_value_block_store = KeyValueBlockStore::new(store, store_approved_block);
-        
+
         Self {
             block_store_map: self.block_store_map.clone(),
             dag: self.dag.clone(),
@@ -278,10 +292,12 @@ impl MultiParentCasper for MockCasper {
         let mut dag = DagRepresentation::default().0;
         // Add latest messages from our test data
         for entry in self.latest_messages.iter() {
-            dag.latest_messages_map.insert(entry.key().clone(), entry.value().clone());
+            dag.latest_messages_map
+                .insert(entry.key().clone(), entry.value().clone());
         }
         // Set the last finalized block to the genesis block so it can be found
-        dag.last_finalized_block_hash = self.get_approved_block().candidate.block.block_hash.clone();
+        dag.last_finalized_block_hash =
+            self.get_approved_block().candidate.block.block_hash.clone();
         Ok(dag)
     }
 
