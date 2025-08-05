@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use block_storage::rust::dag::block_dag_key_value_storage::BlockDagKeyValueStorage;
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use comm::rust::peer_node::PeerNode;
+use comm::rust::rp::connect::ConnectionsCell;
 use comm::rust::rp::rp_conf::RPConf;
 use comm::rust::transport::transport_layer::{Blob, TransportLayer};
 use models::rust::block_hash::BlockHash;
@@ -16,6 +17,7 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use crate::rust::casper::MultiParentCasper;
+use crate::rust::engine::block_retriever::BlockRetriever;
 use crate::rust::engine::engine_cell::EngineCell;
 use crate::rust::engine::running::Running;
 use crate::rust::errors::CasperError;
@@ -24,7 +26,7 @@ use crate::rust::validator_identity::ValidatorIdentity;
 /// Object-safe Engine trait that matches Scala Engine[F] behavior
 /// Note: with_casper method is not included here due to object-safety constraints
 /// Implementations should provide their own with_casper methods when needed
-#[async_trait]
+#[async_trait(?Send)]
 pub trait Engine: Send + Sync {
     async fn init(&self) -> Result<(), CasperError>;
 
@@ -38,13 +40,13 @@ pub fn noop() -> Result<impl Engine, CasperError> {
     #[derive(Clone)]
     struct NoopEngine;
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl Engine for NoopEngine {
         async fn init(&self) -> Result<(), CasperError> {
             Ok(())
         }
 
-        async fn handle(&self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
+        async fn handle(&mut self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
             Ok(())
         }
 
@@ -102,14 +104,18 @@ pub async fn send_no_approved_block_available(
     Ok(())
 }
 
-pub async fn transition_to_running<T: MultiParentCasper + Send + Sync + 'static>(
+pub async fn transition_to_running<T: MultiParentCasper + Send + Sync + Clone + 'static, U: TransportLayer + Send + Sync + 'static>(
     block_processing_queue: VecDeque<(T, BlockMessage)>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: T,
     approved_block: ApprovedBlock,
     validator_id: Option<ValidatorIdentity>,
-    init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
+    _init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
     disable_state_exporter: bool,
+    connections_cell: ConnectionsCell,
+    transport: Arc<U>,
+    conf: RPConf,
+    block_retriever: Arc<BlockRetriever<U>>,
     engine_cell: &EngineCell,
 ) -> Result<(), CasperError> {
     let approved_block_info =
@@ -130,8 +136,11 @@ pub async fn transition_to_running<T: MultiParentCasper + Send + Sync + 'static>
         casper,
         approved_block,
         validator_id,
-        init,
         disable_state_exporter,
+        connections_cell,
+        transport,
+        conf,
+        block_retriever,
     );
 
     engine_cell.set(Box::new(running)).await?;

@@ -70,7 +70,7 @@ pub struct MultiParentCasperImpl<T: TransportLayer + Send + Sync> {
     pub rspace_state_manager: RSpaceStateManager,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
     async fn get_snapshot(&mut self) -> Result<CasperSnapshot, CasperError> {
         let mut dag = self.block_dag_storage.get_representation();
@@ -85,7 +85,8 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
             let blocks = tips
                 .iter()
                 .map(|b| self.block_store.get(b).unwrap())
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| CasperError::RuntimeError("Failed to get blocks from store".to_string()))?;
 
             let parents = blocks
                 .iter()
@@ -493,7 +494,8 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         let result = dep_free_pendants
             .into_iter()
             .map(|hash| self.block_store.get(&hash).unwrap())
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| CasperError::RuntimeError("Failed to get blocks from store".to_string()))?;
 
         Ok(result)
     }
@@ -501,7 +503,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
 
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImpl<T> {
     async fn fetch_dependencies(&self) -> Result<(), CasperError> {
         // Get pendants from CasperBuffer

@@ -75,7 +75,7 @@ impl<T: TransportLayer + Sync> Initializing<T> {
         );
 
         // Create channel for incoming block messages (equivalent to Scala's blockMessageQueue)
-        let (response_message_tx, response_message_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (_response_message_tx, response_message_rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Create block requester wrapper with needed components
         let mut block_requester = BlockRequesterWrapper::new(
@@ -85,7 +85,7 @@ impl<T: TransportLayer + Sync> Initializing<T> {
             &mut self.block_store,
         );
 
-        let block_request_stream = lfs_block_requester::stream(
+        let _block_request_stream = lfs_block_requester::stream(
             &approved_block,
             &self.block_message_queue,
             response_message_rx,
@@ -96,13 +96,13 @@ impl<T: TransportLayer + Sync> Initializing<T> {
         .await?;
 
         // Create channel for incoming tuple space messages
-        let (tuple_space_tx, tuple_space_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (_tuple_space_tx, tuple_space_rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Create tuple space requester wrapper with needed components
         let tuple_space_requester =
             TupleSpaceRequester::new(&self.transport_layer, &self.rp_conf_ask);
 
-        let tuple_space_stream = lfs_tuple_space_requester::stream(
+        let _tuple_space_stream = lfs_tuple_space_requester::stream(
             &approved_block,
             tuple_space_rx,
             Duration::from_secs(120),
