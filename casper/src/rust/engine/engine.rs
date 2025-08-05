@@ -1,5 +1,6 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/Engine.scala
 
+use async_trait::async_trait;
 use block_storage::rust::dag::block_dag_key_value_storage::BlockDagKeyValueStorage;
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use comm::rust::peer_node::PeerNode;
@@ -23,10 +24,11 @@ use crate::rust::validator_identity::ValidatorIdentity;
 /// Object-safe Engine trait that matches Scala Engine[F] behavior
 /// Note: with_casper method is not included here due to object-safety constraints
 /// Implementations should provide their own with_casper methods when needed
+#[async_trait]
 pub trait Engine: Send + Sync {
-    fn init(&self) -> Result<(), CasperError>;
+    async fn init(&self) -> Result<(), CasperError>;
 
-    fn handle(&self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
+    async fn handle(&self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
 
     /// Clone the engine into a boxed trait object
     fn clone_box(&self) -> Box<dyn Engine>;
@@ -36,12 +38,13 @@ pub fn noop() -> Result<impl Engine, CasperError> {
     #[derive(Clone)]
     struct NoopEngine;
 
+    #[async_trait]
     impl Engine for NoopEngine {
-        fn init(&self) -> Result<(), CasperError> {
+        async fn init(&self) -> Result<(), CasperError> {
             Ok(())
         }
 
-        fn handle(&self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
+        async fn handle(&self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
             Ok(())
         }
 
