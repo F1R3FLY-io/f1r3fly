@@ -29,7 +29,10 @@ use models::rust::{
 
 use rspace_plus_plus::rspace::{
     hashing::blake2b256_hash::Blake2b256Hash, 
-    state::rspace_exporter::RSpaceExporterInstance,
+    state::{
+        rspace_exporter::RSpaceExporterInstance,
+        exporters::rspace_exporter_items::RSpaceExporterItems,
+    },
 };
 use std::{
     collections::{HashSet, VecDeque},
@@ -38,7 +41,7 @@ use std::{
 };
 
 #[async_trait]
-impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
+impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine for Running<'r, M, T> {
     async fn init(&self) -> Result<(), CasperError> {
         let mut init_called = self.init_called.lock().map_err(|_| {
             CasperError::RuntimeError("Failed to acquire init lock".to_string())
@@ -182,7 +185,7 @@ impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
 }
 
 pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
-    block_processing_queue: VecDeque<(T, BlockMessage)>,
+    block_processing_queue: VecDeque<(M, BlockMessage)>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: M,
     approved_block: ApprovedBlock,
@@ -198,7 +201,7 @@ pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
 
 impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<'r, M, T> {
     pub fn new(
-        block_processing_queue: VecDeque<(T, BlockMessage)>,
+        block_processing_queue: VecDeque<(M, BlockMessage)>,
         blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
         casper: M,
         approved_block: ApprovedBlock,
@@ -227,7 +230,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
 
     async fn with_casper<'a, A>(
         &'a mut self,
-        f: Box<dyn FnOnce(&'a mut T) -> Result<A, CasperError> + 'a>,
+        f: Box<dyn FnOnce(&'a mut M) -> Result<A, CasperError> + 'a>,
         _default: Result<A, CasperError>,
     ) -> Result<A, CasperError> {
         f(&mut self.casper)
@@ -389,7 +392,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         _approved_block: ApprovedBlock,
     ) -> Result<(), CasperError> {
         log::info!("Received ApprovedBlockRequest from {}", peer);
-        self.transport.stream_message_to_peer(&self.conf, &peer, &approved_block.to_proto()).await?;
+        self.transport.stream_message_to_peer(&self.conf, &peer, &_approved_block.to_proto()).await?;
         log::info!("ApprovedBlock sent to {}", peer);
         Ok(())
     }
@@ -398,24 +401,26 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         &self,
         peer: PeerNode,
         start_path: Vec<(Blake2b256Hash, Option<u8>)>,
-        _skip: u32,
-        _take: u32,
+        skip: u32,
+        take: u32,
     ) -> Result<(), CasperError> {
-        let (history, data) = self
-            .casper
-            .rspace_state_manager()
-            .exporter
-            .get_history_and_data(start_path.clone(), skip as usize, take as usize, |bytes| {
-                bytes.to_vec()
-            })?;
+        let exporter = self.casper.get_history_exporter();
+        
+        let (history, data) = RSpaceExporterItems::get_history_and_data(
+            exporter,
+            start_path.clone(),
+            skip as i32,
+            take as i32,
+        );
         let resp = casper_message::StoreItemsMessage {
             start_path: start_path,
             last_path: history.last_path,
-            history_items: history.items,
-            data_items: data.items,
+            history_items: history.items.into_iter().map(|(k, v)| (k, prost::bytes::Bytes::from(v))).collect(),
+            data_items: data.items.into_iter().map(|(k, v)| (k, prost::bytes::Bytes::from(v))).collect(),
         };
-        log::info!("Read {}", resp.pretty());
-        self.transport.stream_message_to_peer(&self.conf, &peer, &resp.to_proto()).await?;
+        let resp_proto = resp.to_proto();
+        log::info!("Read {}", "store items response");  // Using static string since resp is moved
+        self.transport.stream_message_to_peer(&self.conf, &peer, &resp_proto).await?;
 
         log::info!("Store items sent to {}", peer);
         Ok(())

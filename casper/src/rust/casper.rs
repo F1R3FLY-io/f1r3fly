@@ -143,6 +143,8 @@ pub trait MultiParentCasper: Casper {
     fn rspace_state_manager(&self) -> &RSpaceStateManager;
 
     fn get_validator(&self) -> Option<ValidatorIdentity>;
+    
+    fn get_history_exporter(&self) -> std::sync::Arc<std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>>;
 }
 
 pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
