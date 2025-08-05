@@ -1,9 +1,9 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/NoOpsCasperEffect.scala
 
-use std::collections::HashMap;
 use async_trait::async_trait;
-use rspace_plus_plus::rspace::state::rspace_state_manager::RSpaceStateManager;
 use casper::rust::validator_identity::ValidatorIdentity;
+use rspace_plus_plus::rspace::state::rspace_state_manager::RSpaceStateManager;
+use std::collections::HashMap;
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::{DeployId, KeyValueDagRepresentation},
@@ -85,7 +85,9 @@ impl MultiParentCasper for NoOpsCasperEffect {
 
     fn get_history_exporter(
         &self,
-    ) -> std::sync::Arc<std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>> {
+    ) -> std::sync::Arc<
+        std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>,
+    > {
         todo!()
     }
 }
