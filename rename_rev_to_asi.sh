@@ -1,70 +1,86 @@
 #!/bin/bash
 
-# Script to replace REV -> ASI throughout the entire project
-# This migrates an EXISTING blockchain from REV tokens to ASI tokens
+# Script to replace REV -> configurable ticker throughout the entire project
+# This migrates an EXISTING blockchain from REV tokens to the new ticker
 set -e
 
-echo "🚀 Starting REV → ASI migration for existing blockchain..."
+# Configuration - Ticker name parameter
+TICKER_NAME="${1:-ASI}"  # Default to ASI if no parameter provided
+
+# Validate ticker name
+if [ -z "$TICKER_NAME" ]; then
+    echo "❌ ERROR: Ticker name cannot be empty"
+    echo "Usage: $0 <TICKER_NAME>"
+    echo "Example: $0 ASI"
+    exit 1
+fi
+
+# Generate case variations
+TICKER_UPPER=$(echo "$TICKER_NAME" | tr '[:lower:]' '[:upper:]')
+TICKER_LOWER=$(echo "$TICKER_NAME" | tr '[:upper:]' '[:lower:]')
+
+echo "🚀 Starting REV → ${TICKER_UPPER} migration for existing blockchain..."
+echo "📊 Using ticker: ${TICKER_UPPER} (upper), ${TICKER_LOWER} (lower)"
 echo ""
 
-# 0. CLEANUP - Remove any leftover ASI files from previous runs
+# 0. CLEANUP - Remove any leftover ticker files from previous runs
 echo "🧹 Cleaning up leftover files from previous runs..."
 
-# Remove ASI directories if they exist (from previous incomplete runs)
-if [ -d "node/src/main/scala/coop/rchain/node/asivaultexport" ]; then
-    rm -rf "node/src/main/scala/coop/rchain/node/asivaultexport"
-    echo "✅ Removed leftover node/src/main/.../asivaultexport/"
+# Remove ticker directories if they exist (from previous incomplete runs)
+if [ -d "node/src/main/scala/coop/rchain/node/${TICKER_LOWER}vaultexport" ]; then
+    rm -rf "node/src/main/scala/coop/rchain/node/${TICKER_LOWER}vaultexport"
+    echo "✅ Removed leftover node/src/main/.../${TICKER_LOWER}vaultexport/"
 fi
 
-if [ -d "node/src/test/scala/coop/rchain/node/asivaultexport" ]; then
-    rm -rf "node/src/test/scala/coop/rchain/node/asivaultexport"
-    echo "✅ Removed leftover node/src/test/.../asivaultexport/"
+if [ -d "node/src/test/scala/coop/rchain/node/${TICKER_LOWER}vaultexport" ]; then
+    rm -rf "node/src/test/scala/coop/rchain/node/${TICKER_LOWER}vaultexport"
+    echo "✅ Removed leftover node/src/test/.../${TICKER_LOWER}vaultexport/"
 fi
 
-# Remove ASI files if they exist (from previous incomplete runs)
-if [ -f "casper/src/main/resources/ASIVault.rho" ]; then
-    rm "casper/src/main/resources/ASIVault.rho"
-    echo "✅ Removed leftover ASIVault.rho"
+# Remove ticker files if they exist (from previous incomplete runs)
+if [ -f "casper/src/main/resources/${TICKER_UPPER}Vault.rho" ]; then
+    rm "casper/src/main/resources/${TICKER_UPPER}Vault.rho"
+    echo "✅ Removed leftover ${TICKER_UPPER}Vault.rho"
 fi
 
-if [ -f "casper/src/main/resources/MultiSigASIVault.rho" ]; then
-    rm "casper/src/main/resources/MultiSigASIVault.rho"
-    echo "✅ Removed leftover MultiSigASIVault.rho"
+if [ -f "casper/src/main/resources/MultiSig${TICKER_UPPER}Vault.rho" ]; then
+    rm "casper/src/main/resources/MultiSig${TICKER_UPPER}Vault.rho"
+    echo "✅ Removed leftover MultiSig${TICKER_UPPER}Vault.rho"
 fi
 
-if [ -f "casper/src/test/resources/ASIVaultTest.rho" ]; then
-    rm "casper/src/test/resources/ASIVaultTest.rho"
-    echo "✅ Removed leftover ASIVaultTest.rho"
+if [ -f "casper/src/test/resources/${TICKER_UPPER}VaultTest.rho" ]; then
+    rm "casper/src/test/resources/${TICKER_UPPER}VaultTest.rho"
+    echo "✅ Removed leftover ${TICKER_UPPER}VaultTest.rho"
 fi
 
-if [ -f "casper/src/test/resources/MultiSigASIVaultTest.rho" ]; then
-    rm "casper/src/test/resources/MultiSigASIVaultTest.rho"
-    echo "✅ Removed leftover MultiSigASIVaultTest.rho"
+if [ -f "casper/src/test/resources/MultiSig${TICKER_UPPER}VaultTest.rho" ]; then
+    rm "casper/src/test/resources/MultiSig${TICKER_UPPER}VaultTest.rho"
+    echo "✅ Removed leftover MultiSig${TICKER_UPPER}VaultTest.rho"
 fi
 
-if [ -f "casper/src/test/resources/ASIAddressTest.rho" ]; then
-    rm "casper/src/test/resources/ASIAddressTest.rho"
-    echo "✅ Removed leftover ASIAddressTest.rho"
+if [ -f "casper/src/test/resources/${TICKER_UPPER}AddressTest.rho" ]; then
+    rm "casper/src/test/resources/${TICKER_UPPER}AddressTest.rho"
+    echo "✅ Removed leftover ${TICKER_UPPER}AddressTest.rho"
 fi
 
-if [ -f "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala" ]; then
-    rm "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala"
-    echo "✅ Removed leftover ASIGenerator.scala"
+if [ -f "casper/src/main/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}Generator.scala" ]; then
+    rm "casper/src/main/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}Generator.scala"
+    echo "✅ Removed leftover ${TICKER_UPPER}Generator.scala"
 fi
 
-if [ -f "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala" ]; then
-    rm "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala"
-    echo "✅ Removed leftover ASIAddress.scala"
+if [ -f "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}Address.scala" ]; then
+    rm "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}Address.scala"
+    echo "✅ Removed leftover ${TICKER_UPPER}Address.scala"
 fi
 
-if [ -f "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala" ]; then
-    rm "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala"
-    echo "✅ Removed leftover ASIAddressSpec.scala"
+if [ -f "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}AddressSpec.scala" ]; then
+    rm "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}AddressSpec.scala"
+    echo "✅ Removed leftover ${TICKER_UPPER}AddressSpec.scala"
 fi
 
-if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala" ]; then
-    rm "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala"
-    echo "✅ Removed leftover ASIAddressSpec.scala"
+if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}AddressSpec.scala" ]; then
+    rm "casper/src/test/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}AddressSpec.scala"
+    echo "✅ Removed leftover ${TICKER_UPPER}AddressSpec.scala"
 fi
 
 echo "🧹 Cleanup completed!"
@@ -73,6 +89,7 @@ echo ""
 # 0.5. VERIFY REQUIRED FILES EXIST
 echo "🔍 Verifying required REV files exist..."
 
+#based on clear main branch
 required_files=(
     "casper/src/main/resources/RevVault.rho"
     "casper/src/main/resources/MultiSigRevVault.rho"
@@ -127,29 +144,29 @@ echo "📝 Replacing text in files..."
 
 # Main identifiers (case-sensitive) - ONLY in code files
 # NOTE: Documentation files (.md, .txt, .json, .py, etc.) are NOT processed
-# ASI team should update documentation themselves based on their future features
+# Ticker team should update documentation themselves based on their future features
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
 
     # Case-sensitive replacements
     sed -i '' \
-        -e 's/RevVault/ASIVault/g' \
-        -e 's/RevAddress/ASIAddress/g' \
-        -e 's/RevGenerator/ASIGenerator/g' \
-        -e 's/revVault/asiVault/g' \
-        -e 's/revAddress/asiAddress/g' \
-        -e 's/revGenerator/asiGenerator/g' \
-        -e 's/RevAccount/ASIAccount/g' \
-        -e 's/revAccount/asiAccount/g' \
-        -e 's/RevAddr/ASIAddr/g' \
-        -e 's/revAddr/asiAddr/g' \
-        -e 's/revVaultCh/asiVaultCh/g' \
-        -e 's/multiSigRevVault/multiSigASIVault/g' \
-        -e 's/MultiSigRevVault/MultiSigASIVault/g' \
-        -e 's/REV_ADDRESS/ASI_ADDRESS/g' \
-        -e 's/rev_address/asi_address/g' \
-        -e 's/revAddress/asiAddress/g' \
-        -e 's/receiveRev/receiveASI/g' \
-        -e 's/sendRev/sendASI/g' \
+        -e "s/RevVault/${TICKER_UPPER}Vault/g" \
+        -e "s/RevAddress/${TICKER_UPPER}Address/g" \
+        -e "s/RevGenerator/${TICKER_UPPER}Generator/g" \
+        -e "s/revVault/${TICKER_LOWER}Vault/g" \
+        -e "s/revAddress/${TICKER_LOWER}Address/g" \
+        -e "s/revGenerator/${TICKER_LOWER}Generator/g" \
+        -e "s/RevAccount/${TICKER_UPPER}Account/g" \
+        -e "s/revAccount/${TICKER_LOWER}Account/g" \
+        -e "s/RevAddr/${TICKER_UPPER}Addr/g" \
+        -e "s/revAddr/${TICKER_LOWER}Addr/g" \
+        -e "s/revVaultCh/${TICKER_LOWER}VaultCh/g" \
+        -e "s/multiSigRevVault/multiSig${TICKER_UPPER}Vault/g" \
+        -e "s/MultiSigRevVault/MultiSig${TICKER_UPPER}Vault/g" \
+        -e "s/REV_ADDRESS/${TICKER_UPPER}_ADDRESS/g" \
+        -e "s/rev_address/${TICKER_LOWER}_address/g" \
+        -e "s/revAddress/${TICKER_LOWER}Address/g" \
+        -e "s/receiveRev/receive${TICKER_UPPER}/g" \
+        -e "s/sendRev/send${TICKER_UPPER}/g" \
         "$file"
 done
 
@@ -157,9 +174,9 @@ done
 echo "🔗 Replacing Registry URIs..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
     sed -i '' \
-        -e 's/rho:rchain:revVault/rho:rchain:asiVault/g' \
-        -e 's/rho:rchain:multiSigRevVault/rho:rchain:multiSigASIVault/g' \
-        -e 's/rho:rev:address/rho:asi:address/g' \
+        -e "s/rho:rchain:revVault/rho:rchain:${TICKER_LOWER}Vault/g" \
+        -e "s/rho:rchain:multiSigRevVault/rho:rchain:multiSig${TICKER_UPPER}Vault/g" \
+        -e "s/rho:rev:address/rho:${TICKER_LOWER}:address/g" \
         "$file"
 done
 
@@ -167,8 +184,8 @@ done
 echo "🏛️ Updating Registry.rho..."
 if [ -f "casper/src/main/resources/Registry.rho" ]; then
     sed -i '' \
-        -e 's/`rho:rchain:revVault`/`rho:rchain:asiVault`/g' \
-        -e 's/`rho:rchain:multiSigRevVault`/`rho:rchain:multiSigASIVault`/g' \
+        -e "s/\`rho:rchain:revVault\`/\`rho:rchain:${TICKER_LOWER}Vault\`/g" \
+        -e "s/\`rho:rchain:multiSigRevVault\`/\`rho:rchain:multiSig${TICKER_UPPER}Vault\`/g" \
         "casper/src/main/resources/Registry.rho"
     echo "✅ Updated Registry.rho system URIs"
 fi
@@ -177,9 +194,9 @@ fi
 echo "📦 Updating Scala package declarations..."
 find . -name "*.scala" | while read -r file; do
     sed -i '' \
-        -e 's/package coop\.rchain\.node\.revvaultexport/package coop.rchain.node.asivaultexport/g' \
-        -e 's/import coop\.rchain\.node\.revvaultexport/import coop.rchain.node.asivaultexport/g' \
-        -e 's/import.*RevAddress/import coop.rchain.rholang.interpreter.util.ASIAddress/g' \
+        -e "s/package coop\.rchain\.node\.revvaultexport/package coop.rchain.node.${TICKER_LOWER}vaultexport/g" \
+        -e "s/import coop\.rchain\.node\.revvaultexport/import coop.rchain.node.${TICKER_LOWER}vaultexport/g" \
+        -e "s/import.*RevAddress/import coop.rchain.rholang.interpreter.util.${TICKER_UPPER}Address/g" \
         "$file"
 done
 
@@ -187,7 +204,7 @@ done
 echo "🔄 Updating any remaining revvaultexport references..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
     sed -i '' \
-        -e 's/coop\.rchain\.node\.revvaultexport/coop.rchain.node.asivaultexport/g' \
+        -e "s/coop\.rchain\.node\.revvaultexport/coop.rchain.node.${TICKER_LOWER}vaultexport/g" \
         "$file"
 done
 
@@ -195,16 +212,16 @@ done
 echo "📚 Updating comments..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
     sed -i '' \
-        -e 's/Rev vault/ASI vault/g' \
-        -e 's/Rev address/ASI address/g' \
-        -e 's/RevAddress for/ASIAddress for/g' \
-        -e 's/RevAddresses/ASIAddresses/g' \
-        -e 's/Get deployer.*rev address/Get deployer ASI address/g' \
-        -e 's/Convert.*RevAddress/Convert into ASIAddress/g' \
-        -e 's/correct RevAddress/correct ASIAddress/g' \
-        -e 's/expecting RevAddress/expecting ASIAddress/g' \
-        -e 's/all the revVault account/all the asiVault account/g' \
-        -e 's/seedForRevVault/seedForASIVault/g' \
+        -e "s/Rev vault/${TICKER_UPPER} vault/g" \
+        -e "s/Rev address/${TICKER_UPPER} address/g" \
+        -e "s/RevAddress for/${TICKER_UPPER}Address for/g" \
+        -e "s/RevAddresses/${TICKER_UPPER}Addresses/g" \
+        -e "s/Get deployer.*rev address/Get deployer ${TICKER_UPPER} address/g" \
+        -e "s/Convert.*RevAddress/Convert into ${TICKER_UPPER}Address/g" \
+        -e "s/correct RevAddress/correct ${TICKER_UPPER}Address/g" \
+        -e "s/expecting RevAddress/expecting ${TICKER_UPPER}Address/g" \
+        -e "s/all the revVault account/all the ${TICKER_LOWER}Vault account/g" \
+        -e "s/seedForRevVault/seedFor${TICKER_UPPER}Vault/g" \
         "$file"
 done
 
@@ -212,13 +229,13 @@ done
 echo "⚙️ Updating hardcoded values and constants..."
 find . -name "*.scala" -o -name "*.rho" | while read -r file; do
     sed -i '' \
-        -e 's/REV_ADDRESS_COUNT/ASI_ADDRESS_COUNT/g' \
-        -e 's/revVaultPk/asiVaultPk/g' \
-        -e 's/multiSigRevVaultPk/multiSigASIVaultPk/g' \
-        -e 's/revGeneratorPk/asiGeneratorPk/g' \
-        -e 's/revVaultPubKey/asiVaultPubKey/g' \
-        -e 's/revVaultTimestamp/asiVaultTimestamp/g' \
-        -e 's/multiSigRevVaultPk/multiSigASIVaultPk/g' \
+        -e "s/REV_ADDRESS_COUNT/${TICKER_UPPER}_ADDRESS_COUNT/g" \
+        -e "s/revVaultPk/${TICKER_LOWER}VaultPk/g" \
+        -e "s/multiSigRevVaultPk/multiSig${TICKER_UPPER}VaultPk/g" \
+        -e "s/revGeneratorPk/${TICKER_LOWER}GeneratorPk/g" \
+        -e "s/revVaultPubKey/${TICKER_LOWER}VaultPubKey/g" \
+        -e "s/revVaultTimestamp/${TICKER_LOWER}VaultTimestamp/g" \
+        -e "s/multiSigRevVaultPk/multiSig${TICKER_UPPER}VaultPk/g" \
         "$file"
 done
 
@@ -227,22 +244,22 @@ echo "📁 Renaming directories first..."
 
 # Main revvaultexport directory
 if [ -d "node/src/main/scala/coop/rchain/node/revvaultexport" ]; then
-    git mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/asivaultexport"
-    echo "✅ node/src/main/.../revvaultexport/ -> asivaultexport/"
+    git mv "node/src/main/scala/coop/rchain/node/revvaultexport" "node/src/main/scala/coop/rchain/node/${TICKER_LOWER}vaultexport"
+    echo "✅ node/src/main/.../revvaultexport/ -> ${TICKER_LOWER}vaultexport/"
 fi
 
 # Test revvaultexport directory - CRITICAL: This was missed before!
 if [ -d "node/src/test/scala/coop/rchain/node/revvaultexport" ]; then
-    git mv "node/src/test/scala/coop/rchain/node/revvaultexport" "node/src/test/scala/coop/rchain/node/asivaultexport"
-    echo "✅ node/src/test/.../revvaultexport/ -> asivaultexport/"
+    git mv "node/src/test/scala/coop/rchain/node/revvaultexport" "node/src/test/scala/coop/rchain/node/${TICKER_LOWER}vaultexport"
+    echo "✅ node/src/test/.../revvaultexport/ -> ${TICKER_LOWER}vaultexport/"
 fi
 
 # Look for any other revvaultexport directories we might have missed
 find . -type d -name "*revvaultexport*" -not -path "./.git/*" | while read -r dir; do
     if [ -d "$dir" ]; then
-        newdir=$(echo "$dir" | sed 's/revvaultexport/asivaultexport/g')
+        newdir=$(echo "$dir" | sed "s/revvaultexport/${TICKER_LOWER}vaultexport/g")
         # Avoid creating nested directories
-        if [[ "$newdir" != *"asivaultexport/asivaultexport"* ]]; then
+        if [[ "$newdir" != *"${TICKER_LOWER}vaultexport/${TICKER_LOWER}vaultexport"* ]]; then
             git mv "$dir" "$newdir"
             echo "✅ Found and moved: $dir -> $newdir"
         else
@@ -256,72 +273,72 @@ echo "📁 Renaming files..."
 
 # Main contracts
 if [ -f "casper/src/main/resources/RevVault.rho" ]; then
-    git mv "casper/src/main/resources/RevVault.rho" "casper/src/main/resources/ASIVault.rho"
-    echo "✅ RevVault.rho -> ASIVault.rho"
+    git mv "casper/src/main/resources/RevVault.rho" "casper/src/main/resources/${TICKER_UPPER}Vault.rho"
+    echo "✅ RevVault.rho -> ${TICKER_UPPER}Vault.rho"
 fi
 
 if [ -f "casper/src/main/resources/MultiSigRevVault.rho" ]; then
-    git mv "casper/src/main/resources/MultiSigRevVault.rho" "casper/src/main/resources/MultiSigASIVault.rho"
-    echo "✅ MultiSigRevVault.rho -> MultiSigASIVault.rho"
+    git mv "casper/src/main/resources/MultiSigRevVault.rho" "casper/src/main/resources/MultiSig${TICKER_UPPER}Vault.rho"
+    echo "✅ MultiSigRevVault.rho -> MultiSig${TICKER_UPPER}Vault.rho"
 fi
 
 # Tests
 if [ -f "casper/src/test/resources/RevVaultTest.rho" ]; then
-    git mv "casper/src/test/resources/RevVaultTest.rho" "casper/src/test/resources/ASIVaultTest.rho"
-    echo "✅ RevVaultTest.rho -> ASIVaultTest.rho"
+    git mv "casper/src/test/resources/RevVaultTest.rho" "casper/src/test/resources/${TICKER_UPPER}VaultTest.rho"
+    echo "✅ RevVaultTest.rho -> ${TICKER_UPPER}VaultTest.rho"
 fi
 
 if [ -f "casper/src/test/resources/MultiSigRevVaultTest.rho" ]; then
-    git mv "casper/src/test/resources/MultiSigRevVaultTest.rho" "casper/src/test/resources/MultiSigASIVaultTest.rho"
-    echo "✅ MultiSigRevVaultTest.rho -> MultiSigASIVaultTest.rho"
+    git mv "casper/src/test/resources/MultiSigRevVaultTest.rho" "casper/src/test/resources/MultiSig${TICKER_UPPER}VaultTest.rho"
+    echo "✅ MultiSigRevVaultTest.rho -> MultiSig${TICKER_UPPER}VaultTest.rho"
 fi
 
 # CRITICAL: RevAddressTest.rho exists and must be renamed
 if [ -f "casper/src/test/resources/RevAddressTest.rho" ]; then
-    git mv "casper/src/test/resources/RevAddressTest.rho" "casper/src/test/resources/ASIAddressTest.rho"
-    echo "✅ RevAddressTest.rho -> ASIAddressTest.rho"
+    git mv "casper/src/test/resources/RevAddressTest.rho" "casper/src/test/resources/${TICKER_UPPER}AddressTest.rho"
+    echo "✅ RevAddressTest.rho -> ${TICKER_UPPER}AddressTest.rho"
 fi
 
 # Rust files (may not exist)
 if [ -f "rholang/src/rust/interpreter/util/rev_address.rs" ]; then
-    git mv "rholang/src/rust/interpreter/util/rev_address.rs" "rholang/src/rust/interpreter/util/asi_address.rs"
-    echo "✅ rev_address.rs -> asi_address.rs"
+    git mv "rholang/src/rust/interpreter/util/rev_address.rs" "rholang/src/rust/interpreter/util/${TICKER_LOWER}_address.rs"
+    echo "✅ rev_address.rs -> ${TICKER_LOWER}_address.rs"
 fi
 
 if [ -f "casper/src/rust/genesis/contracts/rev_generator.rs" ]; then
-    git mv "casper/src/rust/genesis/contracts/rev_generator.rs" "casper/src/rust/genesis/contracts/asi_generator.rs"
-    echo "✅ rev_generator.rs -> asi_generator.rs"
+    git mv "casper/src/rust/genesis/contracts/rev_generator.rs" "casper/src/rust/genesis/contracts/${TICKER_LOWER}_generator.rs"
+    echo "✅ rev_generator.rs -> ${TICKER_LOWER}_generator.rs"
 fi
 
 # Scala files
 if [ -f "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" ]; then
-    git mv "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" "casper/src/main/scala/coop/rchain/casper/genesis/contracts/ASIGenerator.scala"
-    echo "✅ RevGenerator.scala -> ASIGenerator.scala"
+    git mv "casper/src/main/scala/coop/rchain/casper/genesis/contracts/RevGenerator.scala" "casper/src/main/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}Generator.scala"
+    echo "✅ RevGenerator.scala -> ${TICKER_UPPER}Generator.scala"
 fi
 
 # CRITICAL: RevAddress.scala exists and must be renamed  
 if [ -f "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" ]; then
-    git mv "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/ASIAddress.scala"
-    echo "✅ RevAddress.scala -> ASIAddress.scala"
+    git mv "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/RevAddress.scala" "rholang/src/main/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}Address.scala"
+    echo "✅ RevAddress.scala -> ${TICKER_UPPER}Address.scala"
 fi
 
 # Test specs
 if [ -f "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" ]; then
-    git mv "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/ASIAddressSpec.scala"
-    echo "✅ RevAddressSpec.scala -> ASIAddressSpec.scala"
+    git mv "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/RevAddressSpec.scala" "rholang/src/test/scala/coop/rchain/rholang/interpreter/util/${TICKER_UPPER}AddressSpec.scala"
+    echo "✅ RevAddressSpec.scala -> ${TICKER_UPPER}AddressSpec.scala"
 fi
 
 if [ -f "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" ]; then
-    git mv "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" "casper/src/test/scala/coop/rchain/casper/genesis/contracts/ASIAddressSpec.scala"
-    echo "✅ RevAddressSpec.scala -> ASIAddressSpec.scala"
+    git mv "casper/src/test/scala/coop/rchain/casper/genesis/contracts/RevAddressSpec.scala" "casper/src/test/scala/coop/rchain/casper/genesis/contracts/${TICKER_UPPER}AddressSpec.scala"
+    echo "✅ RevAddressSpec.scala -> ${TICKER_UPPER}AddressSpec.scala"
 fi
 
 # 9. UPDATE IMPORTS/MODULES - Final pass
 echo "🔧 Final import updates..."
 find . -name "*.scala" -o -name "*.rs" | while read -r file; do
     sed -i '' \
-        -e 's/use.*rev_address/use crate::interpreter::util::asi_address/g' \
-        -e 's/mod rev_address/mod asi_address/g' \
+        -e "s/use.*rev_address/use crate::interpreter::util::${TICKER_LOWER}_address/g" \
+        -e "s/mod rev_address/mod ${TICKER_LOWER}_address/g" \
         "$file"
 done
 
@@ -329,34 +346,34 @@ done
 echo "🧹 Final cleanup of remaining references..."
 find . -type f \( -name "*.scala" -o -name "*.rs" -o -name "*.rho" \) ! -path "./.git/*" | while read -r file; do
     sed -i '' \
-        -e 's/coop\.rchain\.node\.revvaultexport/coop.rchain.node.asivaultexport/g' \
-        -e 's/node\.revvaultexport/node.asivaultexport/g' \
+        -e "s/coop\.rchain\.node\.revvaultexport/coop.rchain.node.${TICKER_LOWER}vaultexport/g" \
+        -e "s/node\.revvaultexport/node.${TICKER_LOWER}vaultexport/g" \
         "$file"
 done
 
 echo ""
-echo "🎉 REV -> ASI migration completed!"
+echo "🎉 REV -> ${TICKER_UPPER} migration completed!"
 echo ""
 echo "🔄 EXISTING BLOCKCHAIN MIGRATION SUMMARY:"
 echo ""
-echo "✅ Your blockchain infrastructure now supports ASI tokens:"
-echo "   🔧 All code now uses ASI contracts and addresses"
-echo "   🔗 System URIs changed: rho:rev:address → rho:asi:address"
-echo "   🪙 New operations will create and use ASI tokens"
-echo "   📊 APIs and UIs will show ASI instead of REV"
+echo "✅ Your blockchain infrastructure now supports ${TICKER_UPPER} tokens:"
+echo "   🔧 All code now uses ${TICKER_UPPER} contracts and addresses"
+echo "   🔗 System URIs changed: rho:rev:address → rho:${TICKER_LOWER}:address"
+echo "   🪙 New operations will create and use ${TICKER_UPPER} tokens"
+echo "   📊 APIs and UIs will show ${TICKER_UPPER} instead of REV"
 echo ""
 echo "⚠️  CRITICAL - Impact on existing REV tokens:"
 echo "   🚨 Existing REV tokens may become inaccessible!"
 echo "   🔒 Old REV addresses use different URI (rho:rev:address)"
-echo "   📱 Existing wallets may need updates to work with ASI"
-echo "   🔄 Consider if you need REV→ASI migration mechanism"
+echo "   📱 Existing wallets may need updates to work with ${TICKER_UPPER}"
+echo "   🔄 Consider if you need REV→${TICKER_UPPER} migration mechanism"
 echo ""
 echo "📋 What was done:"
-echo "   ✅ Replaced all identifiers (RevVault -> ASIVault etc.)"
-echo "   ✅ Updated Registry URIs (rho:rchain:revVault -> rho:rchain:asiVault)"
+echo "   ✅ Replaced all identifiers (RevVault -> ${TICKER_UPPER}Vault etc.)"
+echo "   ✅ Updated Registry URIs (rho:rchain:revVault -> rho:rchain:${TICKER_LOWER}Vault)"
 echo "   ✅ Updated Registry.rho system file"
 echo "   ✅ Updated Scala package declarations (ALL files)"
-echo "   ✅ Updated method names (receiveRev -> receiveASI)"
+echo "   ✅ Updated method names (receiveRev -> receive${TICKER_UPPER})"
 echo "   ✅ Updated hardcoded constants and values"
 echo "   ✅ Renamed files (.rho, .rs, .scala)"
 echo "   ✅ Renamed directories and test specs"
@@ -366,7 +383,7 @@ echo "   ✅ Updated comments in code files"
 echo "   ✅ Final cleanup of all remaining references"
 echo ""
 echo "📝 What was NOT changed:"
-echo "   ⏭️  Documentation files (.md, .txt, README, etc.) - ASI team should update these"
+echo "   ⏭️  Documentation files (.md, .txt, README, etc.) - ${TICKER_UPPER} team should update these"
 echo "      based on their specific features and requirements"
 echo "   ⏭️  Historical wallet files (wallets_REV_BLOCK-*.txt) - preserved as blockchain history"
 echo "   ⏭️  Hardcoded blockchain addresses - preserved as blockchain history"
@@ -376,13 +393,10 @@ echo "🚀 IMMEDIATE NEXT STEPS:"
 echo "   1. Check compilation: sbt compile"
 echo "   2. Run tests: sbt test"
 echo "   3. Test on development/testnet first"
-echo "   4. Verify new ASI operations work correctly"
+echo "   4. Verify new ${TICKER_UPPER} operations work correctly"
 echo ""
 echo "🤔 CONSIDER FOR PRODUCTION:"
 echo "   ⚠️  How will existing REV holders access their tokens?"
 echo "   ⚠️  Do you need backward compatibility contracts?"
-echo "   ⚠️  Should you create REV→ASI conversion mechanism?"
+echo "   ⚠️  Should you create REV→${TICKER_UPPER} conversion mechanism?"
 echo "   ⚠️  How will you communicate changes to users?"
-echo ""
-echo "💡 Result: Your blockchain now operates with ASI tokens instead of REV!"
-echo "   New users will have ASI addresses and ASI balances."
