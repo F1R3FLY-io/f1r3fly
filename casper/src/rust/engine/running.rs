@@ -114,8 +114,14 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
                         PrettyPrinter::build_string_block_message(&b, true),
                         peer.endpoint.host
                     );
-                    self.block_processing_queue
-                        .push_back((self.casper.clone(), b));
+                    {
+                        let mut queue = self.block_processing_queue.lock().map_err(|_| {
+                            CasperError::RuntimeError(
+                                "Failed to lock block_processing_queue".to_string(),
+                            )
+                        })?;
+                        queue.push_back((self.casper.clone(), b));
+                    }
                 }
                 Ok(())
             }
@@ -143,7 +149,9 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
                     .casper
                     .block_store()
                     .get(&last_finalized_block_hash)?
-                    .unwrap();
+                    .ok_or_else(|| {
+                        CasperError::RuntimeError(LastFinalizedBlockNotFoundError.to_string())
+                    })?;
 
                 // Each approved block should be justified by validators signatures
                 // ATM we have signatures only for genesis approved block - we also have to have a procedure
@@ -236,7 +244,7 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
 }
 
 pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
-    block_processing_queue: VecDeque<(M, BlockMessage)>,
+    block_processing_queue: Arc<Mutex<VecDeque<(M, BlockMessage)>>>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: M,
     approved_block: ApprovedBlock,
@@ -253,7 +261,7 @@ pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
 
 impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<'r, M, T> {
     pub fn new(
-        block_processing_queue: VecDeque<(M, BlockMessage)>,
+        block_processing_queue: Arc<Mutex<VecDeque<(M, BlockMessage)>>>,
         blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
         casper: M,
         approved_block: ApprovedBlock,
@@ -284,18 +292,28 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
 
     /// Get the current length of the block processing queue (for testing)
     pub fn block_processing_queue_len(&self) -> usize {
-        self.block_processing_queue.len()
+        match self.block_processing_queue.lock() {
+            Ok(queue) => queue.len(),
+            Err(_) => 0,
+        }
     }
 
     /// Check if a block with the given hash is in the processing queue (for testing)
     pub fn is_block_in_processing_queue(&self, hash: &BlockHash) -> bool {
-        self.block_processing_queue
-            .iter()
-            .any(|(_, block)| &block.block_hash == hash)
+        match self.block_processing_queue.lock() {
+            Ok(queue) => queue.iter().any(|(_, block)| &block.block_hash == hash),
+            Err(_) => false,
+        }
     }
 
     fn ignore_casper_message(&self, hash: BlockHash) -> Result<bool, CasperError> {
-        let blocks_in_processing = self.blocks_in_processing.lock().unwrap().contains(&hash);
+        let blocks_in_processing = self
+            .blocks_in_processing
+            .lock()
+            .map_err(|_| {
+                CasperError::RuntimeError("Failed to lock blocks_in_processing".to_string())
+            })?
+            .contains(&hash);
         let buffer_contains = self.casper.buffer_contains(&hash);
         let dag_contains = self.casper.dag_contains(&hash);
         Ok(blocks_in_processing || buffer_contains || dag_contains)
