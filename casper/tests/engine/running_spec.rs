@@ -1,87 +1,115 @@
 // See casper/src/test/scala/coop/rchain/casper/engine/RunningSpec.scala
 
-// Removed unused imports
 use std::sync::{Arc, Mutex};
 use tokio;
-
+use std::collections::{VecDeque, HashMap, HashSet};
 use casper::rust::{
+    casper::Casper,
+    engine::{running::Running, block_retriever},
     validator_identity::ValidatorIdentity,
 };
 use comm::rust::{
     peer_node::PeerNode,
-    rp::{connect::ConnectionsCell, rp_conf::RPConf},
+    rp::{connect::{ConnectionsCell, Connections}},
     test_instances::{create_rp_conf_ask, TransportLayerStub},
 };
 use crypto::rust::{
-    hash::blake2b256::Blake2b256,
     private_key::PrivateKey,
     public_key::PublicKey,
-    signatures::{secp256k1::Secp256k1, signatures_alg::SignaturesAlg},
 };
-use models::rust::{
-    casper::protocol::casper_message::{
-        ApprovedBlock, ApprovedBlockCandidate, ApprovedBlockRequest, BlockMessage, BlockRequest,
-        CasperMessage, ForkChoiceTipRequest,
+use models::{
+    rust::{
+        casper::protocol::casper_message::{
+            ApprovedBlock, ApprovedBlockCandidate, BlockMessage, CasperMessage, BlockRequest, HasBlock
+        },
+
+        validator::Validator,
     },
+    routing::Protocol,
 };
-use models::casper::Signature;
-use prost::{bytes::Bytes, Message};
+use prost::bytes::Bytes;
 
 use crate::{
     engine::setup::peer_node,
+    helper::mock_casper::MockCasper,
     util::genesis_builder::GenesisBuilder,
 };
+use casper::rust::engine::engine::Engine;
+use prost::Message;
 
 /// Test fixture struct to hold all test dependencies
-/// Equivalent to Setup() fixture in Scala
-struct TestFixture {
+struct TestFixture<'a> {
     transport_layer: Arc<TransportLayerStub>,
     local_peer: PeerNode,
-    connections_cell: ConnectionsCell,
-    rp_conf: RPConf,
-    network_id: String,
     validator_identity: ValidatorIdentity,
+    casper: MockCasper,
+    engine: Running<'a, MockCasper, TransportLayerStub>,
 }
 
-impl TestFixture {
+impl<'a> TestFixture<'a> {
     async fn new() -> Self {
         let local_peer = peer_node("test-peer", 40400);
+        let connections = Connections::from_vec(vec![local_peer.clone()]);
         let connections_cell = ConnectionsCell {
-            peers: Arc::new(Mutex::new(
-                comm::rust::rp::connect::Connections::from_vec(vec![local_peer.clone()]),
-            )),
+            peers: Arc::new(Mutex::new(connections.clone())),
+        };
+        let connections_cell_for_retriever = ConnectionsCell {
+            peers: Arc::new(Mutex::new(connections)),
         };
         let rp_conf = create_rp_conf_ask(local_peer.clone(), None, None);
         let transport_layer = Arc::new(TransportLayerStub::new());
-        let network_id = "test".to_string();
 
         // Create validator identity
         let private_key_bytes = Bytes::from(vec![1u8; 32]);
         let private_key = PrivateKey::new(private_key_bytes);
         let validator_identity = ValidatorIdentity::new(&private_key);
 
+        let genesis = create_test_genesis();
+        let approved_block = ApprovedBlock {
+            candidate: ApprovedBlockCandidate {
+                block: genesis.clone(),
+                required_sigs: 0,
+            },
+            sigs: Vec::new(),
+        };
+
+        let casper = MockCasper::new(approved_block.clone());
+        casper.add_block_to_store(genesis.clone());
+        casper.add_to_dag(genesis.block_hash.clone());
+
+        let block_processing_queue = VecDeque::new();
+
+        let block_retriever = Arc::new(block_retriever::BlockRetriever::new(
+            transport_layer.clone(),
+            Arc::new(connections_cell_for_retriever),
+            Arc::new(rp_conf.clone()),
+        ));
+
+        let engine = Running::new(
+            block_processing_queue,
+            Arc::new(Mutex::new(Default::default())),
+            casper.clone(),
+            approved_block,
+            Some(validator_identity.clone()),
+            Arc::new(|| Ok(())),
+            false,
+            connections_cell,
+            transport_layer.clone(),
+            rp_conf,
+            block_retriever,
+        );
+
         Self {
             transport_layer,
             local_peer,
-            connections_cell,
-            rp_conf,
-            network_id,
             validator_identity,
+            casper,
+            engine,
         }
-    }
-
-    fn reset(&self) {
-        self.transport_layer.reset();
-    }
-
-    /// Set up responses for transport layer (equivalent to transportLayer.setResponses)
-    fn set_responses(&self) {
-        self.transport_layer.set_responses(|_peer, _protocol| Ok(()));
     }
 }
 
 /// Create a genesis block for testing
-/// Equivalent to GenesisBuilder.createGenesis() in Scala
 fn create_test_genesis() -> BlockMessage {
     let private_key_bytes = Bytes::from(vec![1u8; 32]);
     let public_key_bytes = Bytes::from(vec![2u8; 33]);
@@ -89,126 +117,129 @@ fn create_test_genesis() -> BlockMessage {
     GenesisBuilder::build_test_genesis(validator_keys)
 }
 
-/// Create an approved block from genesis
-/// Equivalent to the approved block creation in Scala test
-fn create_approved_block(
-    genesis: &BlockMessage,
-    validator_identity: &ValidatorIdentity,
-) -> ApprovedBlock {
-    let approved_block_candidate = ApprovedBlockCandidate {
-        block: genesis.clone(),
-        required_sigs: 0,
-    };
-
-    // Sign the approved block candidate
-    let candidate_bytes = approved_block_candidate.clone().to_proto().encode_to_vec();
-    let hash_bytes = Blake2b256::hash(candidate_bytes);
-    let secp256k1 = Secp256k1 {};
-    let signature_bytes = secp256k1.sign(&hash_bytes, &validator_identity.private_key.bytes);
-
-    let signature = Signature {
-        public_key: validator_identity.public_key.bytes.clone(),
-        algorithm: "secp256k1".to_string(),
-        sig: Bytes::from(signature_bytes),
-    };
-
-    ApprovedBlock {
-        candidate: approved_block_candidate,
-        sigs: vec![signature],
+fn to_casper_message(p: Protocol) -> CasperMessage {
+    if let Some(packet) = p.message {
+        if let models::routing::protocol::Message::Packet(packet_data) = packet {
+            // This is a simplified stand-in for the full conversion logic,
+            // which would involve looking at the typeId of the packet.
+            // For these tests, we can make assumptions about the message type.
+            if let Ok(bm) = models::casper::BlockMessageProto::decode(packet_data.content.as_ref()) {
+                if let Ok(block_message) = BlockMessage::from_proto(bm) {
+                    return CasperMessage::BlockMessage(block_message);
+                }
+            }
+            if let Ok(ab) = models::casper::ApprovedBlockProto::decode(packet_data.content.as_ref()) {
+                if let Ok(approved_block) = ApprovedBlock::from_proto(ab) {
+                    return CasperMessage::ApprovedBlock(approved_block);
+                }
+            }
+            if let Ok(hb) = models::casper::HasBlockProto::decode(packet_data.content.as_ref()) {
+                let has_block = HasBlock::from_proto(hb);
+                return CasperMessage::HasBlock(has_block);
+            }
+        }
     }
-}
-
-async fn test_running_state_basic() {
-    // Set up test fixture
-    let fixture = TestFixture::new().await;
-    fixture.set_responses();
-
-    // Create genesis block
-    let genesis = create_test_genesis();
-    
-    // Create approved block
-    let approved_block = create_approved_block(&genesis, &fixture.validator_identity);
-
-    // Basic test: just verify we can create the structures
-    assert_eq!(approved_block.candidate.block.block_hash, genesis.block_hash);
-    assert_eq!(approved_block.candidate.required_sigs, 0);
-    assert_eq!(approved_block.sigs.len(), 1);
-}
-
-/// Test message handling (simplified version without full Running engine)
-async fn test_message_types() {
-    let fixture = TestFixture::new().await;
-    let genesis = create_test_genesis();
-    
-    // Test creating different message types that the Running engine should handle
-    
-    // BlockRequest message
-    let block_request = BlockRequest {
-        hash: genesis.block_hash.clone(),
-    };
-    let block_request_msg = CasperMessage::BlockRequest(block_request);
-    
-    // ApprovedBlockRequest message
-    let approved_block_request = ApprovedBlockRequest {
-        identifier: "test".to_string(),
-        trim_state: false,
-    };
-    let approved_block_request_msg = CasperMessage::ApprovedBlockRequest(approved_block_request);
-    
-    // ForkChoiceTipRequest message
-    let fork_choice_tip_request = ForkChoiceTipRequest {};
-    let fork_choice_tip_request_msg = CasperMessage::ForkChoiceTipRequest(fork_choice_tip_request);
-    
-    // BlockMessage
-    let signed_block_message = fixture.validator_identity.sign_block(&genesis);
-    let block_msg = CasperMessage::BlockMessage(signed_block_message);
-    
-    // Verify message types are created correctly
-    match block_request_msg {
-        CasperMessage::BlockRequest(_) => (),
-        _ => panic!("Should be BlockRequest"),
-    }
-    
-    match approved_block_request_msg {
-        CasperMessage::ApprovedBlockRequest(_) => (),
-        _ => panic!("Should be ApprovedBlockRequest"),
-    }
-    
-    match fork_choice_tip_request_msg {
-        CasperMessage::ForkChoiceTipRequest(_) => (),
-        _ => panic!("Should be ForkChoiceTipRequest"),
-    }
-    
-    match block_msg {
-        CasperMessage::BlockMessage(_) => (),
-        _ => panic!("Should be BlockMessage"),
-    }
-}
-
-/// Test transport layer functionality (equivalent to the transport layer checks in Scala)
-async fn test_transport_layer_responses() {
-    let fixture = TestFixture::new().await;
-    fixture.set_responses();
-    
-    // Test that we can track requests/responses
-    assert_eq!(fixture.transport_layer.request_count(), 0);
-    
-    // Reset should clear requests
-    fixture.reset();
-    assert_eq!(fixture.transport_layer.request_count(), 0);
+    panic!("Could not convert protocol to casper message");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // The simplified tests demonstrate the conversion from Scala to Rust
-    // while avoiding complex dependencies that would require extensive setup
-    
     #[tokio::test]
-    async fn running_spec_basic_functionality() {
-        test_running_state_basic().await;
-        test_message_types().await;
-        test_transport_layer_responses().await;
+    async fn engine_should_enqueue_block_message_for_processing() {
+        let mut fixture = TestFixture::new().await;
+        let new_block = create_test_genesis();
+
+        let signed_block = fixture.validator_identity.sign_block(&new_block);
+
+        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::BlockMessage(signed_block.clone())).await.unwrap();
+
+        // Instead of checking the internal queue, verify the block was processed by checking if it's in the casper DAG or buffer
+        let is_in_dag = fixture.casper.dag_contains(&signed_block.block_hash);
+        let is_in_buffer = fixture.casper.buffer_contains(&signed_block.block_hash);
+        assert!(is_in_dag || is_in_buffer, "Block should be in DAG or buffer after being handled");
+    }
+
+    #[tokio::test]
+    async fn engine_should_respond_to_block_request() {
+        let mut fixture = TestFixture::new().await;
+        // Use the genesis block that's already stored in the approved block
+        let genesis = fixture.casper.get_approved_block().candidate.block.clone();
+
+        let block_request = BlockRequest {
+            hash: genesis.block_hash.clone(),
+        };
+
+        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::BlockRequest(block_request)).await.unwrap();
+
+        assert_eq!(fixture.transport_layer.request_count(), 1);
+        let sent_request = fixture.transport_layer.pop_request().unwrap();
+        assert_eq!(sent_request.peer, fixture.local_peer);
+        if let CasperMessage::BlockMessage(sent_msg) = to_casper_message(sent_request.msg) {
+            assert_eq!(sent_msg, genesis);
+        } else {
+            panic!("Expected BlockMessage");
+        }
+    }
+
+    #[tokio::test]
+    async fn engine_should_respond_to_approved_block_request() {
+        let mut fixture = TestFixture::new().await;
+        let approved_block_request = models::rust::casper::protocol::casper_message::ApprovedBlockRequest {
+            identifier: "test".to_string(),
+            trim_state: false,
+        };
+        let expected_approved_block = fixture.casper.get_approved_block().candidate.block.clone();
+
+        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ApprovedBlockRequest(approved_block_request)).await.unwrap();
+
+        assert_eq!(fixture.transport_layer.request_count(), 1);
+        let sent_request = fixture.transport_layer.pop_request().unwrap();
+        assert_eq!(sent_request.peer, fixture.local_peer);
+        if let CasperMessage::ApprovedBlock(sent_msg) = to_casper_message(sent_request.msg) {
+            assert_eq!(sent_msg.candidate.block, expected_approved_block);
+        } else {
+            panic!("Expected ApprovedBlock");
+        }
+    }
+
+    #[tokio::test]
+    async fn engine_should_respond_to_fork_choice_tip_request() {
+        let mut fixture = TestFixture::new().await;
+        let tip1 = prost::bytes::Bytes::from(vec![1; 32]);
+        let tip2 = prost::bytes::Bytes::from(vec![2; 32]);
+        let validator1: Validator = vec![1; 32].into();
+        let validator2: Validator = vec![2; 32].into();
+        let mut tips = HashMap::new();
+        tips.insert(validator1, tip1.clone());
+        tips.insert(validator2, tip2.clone());
+        fixture.casper.set_latest_messages(tips);
+
+        let fork_choice_tip_request = models::rust::casper::protocol::casper_message::ForkChoiceTipRequest {};
+        fixture.engine.handle(fixture.local_peer.clone(), CasperMessage::ForkChoiceTipRequest(fork_choice_tip_request)).await.unwrap();
+
+        assert_eq!(fixture.transport_layer.request_count(), 2);
+        let mut received_tips = HashSet::new();
+
+        let req1 = fixture.transport_layer.pop_request().unwrap();
+        if let CasperMessage::HasBlock(HasBlock { hash }) = to_casper_message(req1.msg) {
+            received_tips.insert(hash);
+        } else {
+            panic!("Expected HasBlock message")
+        }
+        
+        let req2 = fixture.transport_layer.pop_request().unwrap();
+        if let CasperMessage::HasBlock(HasBlock { hash }) = to_casper_message(req2.msg) {
+            received_tips.insert(hash);
+        } else {
+            panic!("Expected HasBlock message")
+        }
+
+        let mut expected_tips = HashSet::new();
+        expected_tips.insert(tip1);
+        expected_tips.insert(tip2);
+
+        assert_eq!(received_tips, expected_tips);
     }
 }
