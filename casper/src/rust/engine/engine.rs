@@ -167,7 +167,7 @@ pub async fn transition_to_running<
         block_retriever,
     );
 
-    engine_cell.set(Box::new(running)).await?;
+    engine_cell.set(Arc::new(running)).await?;
 
     Ok(())
 }
