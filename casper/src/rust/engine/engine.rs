@@ -36,6 +36,21 @@ pub trait Engine: Send + Sync {
     fn clone_box(&self) -> Box<dyn Engine>;
 }
 
+/// Trait for engines that provide withCasper functionality
+/// This matches the Scala Engine[F] withCasper method behavior
+#[async_trait(?Send)]
+pub trait WithCasper<M: MultiParentCasper>: Send + Sync {
+    async fn with_casper<A, F, Fut>(
+        &mut self,
+        f: F,
+        default: Result<A, CasperError>,
+    ) -> Result<A, CasperError>
+    where
+        F: FnOnce(&mut M) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
+        A: Send;
+}
+
 pub fn noop() -> Result<impl Engine, CasperError> {
     #[derive(Clone)]
     struct NoopEngine;
@@ -137,12 +152,14 @@ pub async fn transition_to_running<
     // let block_hash_string = PrettyPrinter::build_string_no_limit(&approved_block.candidate.block.block_hash);
     // event_log.publish(Event::EnteredRunningState { block_hash: block_hash_string })?;
 
+    let the_init = Arc::new(|| Ok(()));
     let running = Running::new(
         block_processing_queue,
         blocks_in_processing,
         casper,
         approved_block,
         validator_id,
+        the_init,
         disable_state_exporter,
         connections_cell,
         transport,

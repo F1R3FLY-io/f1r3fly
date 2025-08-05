@@ -4,7 +4,7 @@ use crate::rust::{
     casper::MultiParentCasper,
     engine::{
         block_retriever::{self, BlockRetriever},
-        engine::{self, Engine},
+        engine::{self, Engine, WithCasper},
     },
     errors::CasperError,
     validator_identity::ValidatorIdentity,
@@ -39,6 +39,33 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CasperMessageStatus {
+    BlockIsInDag,
+    BlockIsInCasperBuffer,
+    BlockIsReceived,
+    BlockIsWaitingForCasper,
+    BlockIsInProcessing,
+    DoNotIgnore,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IgnoreCasperMessageStatus {
+    pub do_ignore: bool,
+    pub status: CasperMessageStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastFinalizedBlockNotFoundError;
+
+impl std::fmt::Display for LastFinalizedBlockNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Last finalized block not found in the block storage.")
+    }
+}
+
+impl std::error::Error for LastFinalizedBlockNotFoundError {}
+
 #[async_trait(?Send)]
 impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine
     for Running<'r, M, T>
@@ -56,7 +83,7 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
         }
 
         *init_called = true;
-        log::info!("Running engine initialized");
+        (self.the_init)()?;
         Ok(())
     }
 
@@ -69,9 +96,10 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
             CasperMessage::BlockMessage(b) => {
                 if let Some(id) = self.casper.get_validator() {
                     if b.sender == id.public_key.bytes {
-                        log::warn!("There is another node {} proposing using the same private key as you. Or did you restart your node?", peer);
-                    } else {
-                        log::warn!("There is another node {} proposing using a different private key. Or did you restart your node?", peer);
+                        log::warn!(
+                            "There is another node {} proposing using the same private key as you. Or did you restart your node?",
+                            peer
+                        );
                     }
                 }
                 if self.ignore_casper_message(b.block_hash.clone())? {
@@ -189,12 +217,31 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
     }
 }
 
+#[async_trait(?Send)]
+impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> WithCasper<M>
+    for Running<'r, M, T>
+{
+    async fn with_casper<A, F, Fut>(
+        &mut self,
+        f: F,
+        _default: Result<A, CasperError>,
+    ) -> Result<A, CasperError>
+    where
+        F: FnOnce(&mut M) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
+        A: Send,
+    {
+        f(&mut self.casper).await
+    }
+}
+
 pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
     block_processing_queue: VecDeque<(M, BlockMessage)>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: M,
     approved_block: ApprovedBlock,
     validator_id: Option<ValidatorIdentity>,
+    the_init: Arc<dyn Fn() -> Result<(), CasperError> + Send + Sync>,
     init_called: Arc<Mutex<bool>>,
     disable_state_exporter: bool,
     connections_cell: ConnectionsCell,
@@ -211,6 +258,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         casper: M,
         approved_block: ApprovedBlock,
         validator_id: Option<ValidatorIdentity>,
+        the_init: Arc<dyn Fn() -> Result<(), CasperError> + Send + Sync>,
         disable_state_exporter: bool,
         connections_cell: ConnectionsCell,
         transport: Arc<T>,
@@ -223,6 +271,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
             casper,
             approved_block,
             validator_id,
+            the_init,
             init_called: Arc::new(Mutex::new(false)),
             disable_state_exporter,
             connections_cell,
@@ -231,14 +280,6 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
             block_retriever,
             _phantom: std::marker::PhantomData,
         }
-    }
-
-    async fn with_casper<'a, A>(
-        &'a mut self,
-        f: Box<dyn FnOnce(&'a mut M) -> Result<A, CasperError> + 'a>,
-        _default: Result<A, CasperError>,
-    ) -> Result<A, CasperError> {
-        f(&mut self.casper)
     }
 
     fn ignore_casper_message(&self, hash: BlockHash) -> Result<bool, CasperError> {
@@ -453,7 +494,7 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
                 .collect(),
         };
         let resp_proto = resp.to_proto();
-        log::info!("Read {}", "store items response"); // Using static string since resp is moved
+        log::info!("Read {:?}", &resp_proto);
         self.transport
             .stream_message_to_peer(&self.conf, &peer, &resp_proto)
             .await?;
