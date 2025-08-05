@@ -8,15 +8,13 @@ use crate::{
             engine::{self, Engine},
         },
         errors::CasperError,
-        util,
         validator_identity::ValidatorIdentity,
     },
 };
 use async_trait::async_trait;
 use comm::rust::{
-    comm_util::CommUtil,
     peer_node::PeerNode,
-    transport_layer::TransportLayer,
+    rp::{connect::ConnectionsCell, rp_conf::RPConf}, transport::transport_layer::TransportLayer,
 };
 use models::rust::{
     block_hash::BlockHash,
@@ -28,19 +26,31 @@ use models::rust::{
         },
     },
 };
+
 use rspace_plus_plus::rspace::{
-    hashing::blake2b256_hash::Blake2b256Hash, state::{rspace_exporter::{RSpaceExporter, RSpaceExporterInstance}, rspace_state_manager::RSpaceStateManager},
+    hashing::blake2b256_hash::Blake2b256Hash, 
+    state::rspace_exporter::RSpaceExporterInstance,
 };
 use std::{
     collections::{HashSet, VecDeque},
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 #[async_trait]
 impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
     async fn init(&self) -> Result<(), CasperError> {
-        (self.the_init)()
+        let mut init_called = self.init_called.lock().map_err(|_| {
+            CasperError::RuntimeError("Failed to acquire init lock".to_string())
+        })?;
+        
+        if *init_called {
+            return Err(CasperError::RuntimeError("Init function already called".to_string()));
+        }
+        
+        *init_called = true;
+        log::info!("Running engine initialized");
+        Ok(())
     }
 
     async fn handle(&mut self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError> {
@@ -50,13 +60,13 @@ impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
                     .await
             }
             CasperMessage::BlockMessage(b) => {
-                // TODO: Handle this part of logic
-                // F.whenA(b.sender == ByteString.copyFrom(id.publicKey.bytes))(
-                //     Log[F].warn(
-                //       s"There is another node $peer proposing using the same private key as you. " +
-                //         s"Or did you restart your node?"
-                //     )
-                //   )
+                if let Some(id) = self.casper.get_validator() {
+                    if b.sender == id.public_key.bytes {
+                        log::warn!("There is another node {} proposing using the same private key as you. Or did you restart your node?", peer);
+                    } else {
+                        log::warn!("There is another node {} proposing using a different private key. Or did you restart your node?", peer);
+                    }
+                }
                 if self.ignore_casper_message(b.block_hash.clone())? {
                     log::debug!(
                         "Ignoring BlockMessage {} from {}",
@@ -64,12 +74,12 @@ impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
                         peer.endpoint.host
                     );
                 } else {
-                    self.block_processing_queue.push_back((self.casper.clone(), b));
                     log::debug!(
                         "Incoming BlockMessage {} from {}",
                         PrettyPrinter::build_string_block_message(&b, true),
                         peer.endpoint.host
                     );
+                    self.block_processing_queue.push_back((self.casper.clone(), b));
                 }
                 Ok(())
             }
@@ -103,7 +113,7 @@ impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
                 // ATM we have signatures only for genesis approved block - we also have to have a procedure
                 // for gathering signatures for each approved block post genesis.
                 // Now new node have to trust bootstrap if it wants to trim state when connecting to the network.
-                // TODO We need signatures of Validators supporting this block
+                // TODO We need signatures of Validators supporting this block -- OLD
                 let last_approved_block = ApprovedBlock {
                     candidate: ApprovedBlockCandidate {
                         block: last_finalized_block,
@@ -171,26 +181,33 @@ impl<'r, T: MultiParentCasper + Send + Sync + Clone> Engine for Running<'r, T> {
     }
 }
 
-pub struct Running<'r, T: MultiParentCasper> {
+pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
     block_processing_queue: VecDeque<(T, BlockMessage)>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
-    casper: T,
+    casper: M,
     approved_block: ApprovedBlock,
     validator_id: Option<ValidatorIdentity>,
-    the_init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
+    init_called: Arc<Mutex<bool>>,
     disable_state_exporter: bool,
-    _phantom: std::marker::PhantomData<&'r T>,
+    connections_cell: ConnectionsCell,
+    transport: Arc<T>,
+    conf: RPConf,
+    block_retriever: Arc<BlockRetriever<T>>,
+    _phantom: std::marker::PhantomData<&'r M>,
 }
 
-impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
+impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<'r, M, T> {
     pub fn new(
         block_processing_queue: VecDeque<(T, BlockMessage)>,
         blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
-        casper: T,
+        casper: M,
         approved_block: ApprovedBlock,
         validator_id: Option<ValidatorIdentity>,
-        init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
         disable_state_exporter: bool,
+        connections_cell: ConnectionsCell,
+        transport: Arc<T>,
+        conf: RPConf,
+        block_retriever: Arc<BlockRetriever<T>>   
     ) -> Self {
         Running {
             block_processing_queue,
@@ -198,8 +215,12 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
             casper,
             approved_block,
             validator_id,
-            the_init: init,
+            init_called: Arc::new(Mutex::new(false)),
             disable_state_exporter,
+            connections_cell,
+            transport,
+            conf,
+            block_retriever,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -221,36 +242,33 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
 
     pub async fn update_fork_choice_tips_if_stuck(
         &mut self,
-        comm_util: &CommUtil,
         delay_threshold: Duration,
     ) -> Result<(), CasperError> {
-        self.with_casper(
-            Box::new(|casper| {
-                let latest_messages = casper.block_dag().await?.latest_message_hashes()?;
-                let now = util::current_time_millis();
-                let has_recent_latest_message = latest_messages.values().any(|b| {
-                    let block_timestamp = casper
-                        .block_store()
-                        .get(b)?
-                        .unwrap()
-                        .header
-                        .timestamp;
-                    (now - block_timestamp) < delay_threshold.as_millis() as i64
-                });
-
-                let stuck = !has_recent_latest_message;
-                if stuck {
-                    log::info!(
-                        "Requesting tips update as newest latest message is more then {:?} old. Might be network is faulty.",
-                        delay_threshold
-                    );
-                    comm_util.send_fork_choice_tip_request().await?;
+        let latest_messages = self.casper.block_dag().await?.latest_message_hashes();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+        
+        let mut has_recent_latest_message = false;
+        // Convert Arc<DashMap> to iterate over its contents
+        for entry in latest_messages.iter() {
+            let block_hash = entry.value();
+            if let Ok(Some(block)) = self.casper.block_store().get(block_hash) {
+                let block_timestamp = block.header.timestamp;
+                if (now - block_timestamp) < delay_threshold.as_millis() as i64 {
+                    has_recent_latest_message = true;
+                    break;
                 }
-                Ok(())
-            }),
-            Ok(()),
-        )
-        .await
+            }
+        }
+
+        let stuck = !has_recent_latest_message;
+        if stuck {
+            log::info!(
+                "Requesting tips update as newest latest message is more then {:?} old. Might be network is faulty.",
+                delay_threshold
+            );
+            self.transport.send_fork_choice_tip_request(&self.connections_cell, &self.conf).await?;
+        }
+        Ok(())
     }
 
     pub async fn handle_block_hash_message(
@@ -268,12 +286,12 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
                 PrettyPrinter::build_string_bytes(&h),
                 peer.endpoint.host
             );
-            BlockRetriever::admit_hash(
-                h,
-                Some(peer),
-                block_retriever::AdmitHashReason::HashBroadcastReceived,
-            )
-            .await?;
+            self.block_retriever.admit_hash(
+                    h,
+                    Some(peer),
+                    block_retriever::AdmitHashReason::HashBroadcastReceived,
+                )
+                .await?;
         }
         Ok(())
     }
@@ -296,12 +314,12 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
                 PrettyPrinter::build_string_bytes(&h),
                 peer.endpoint.host
             );
-            BlockRetriever::admit_hash(
-                h,
-                Some(peer),
-                block_retriever::AdmitHashReason::HasBlockMessageReceived,
-            )
-            .await?;
+            self.block_retriever.admit_hash(
+                    h,
+                    Some(peer),
+                    block_retriever::AdmitHashReason::HasBlockMessageReceived,
+                )
+                .await?;
         }
         Ok(())
     }
@@ -311,14 +329,14 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
         peer: PeerNode,
         br: BlockRequest,
     ) -> Result<(), CasperError> {
-        let block = self.casper.block_store().get(&br.hash)?;
-        if block.is_some() {
+        let maybe_block = self.casper.block_store().get(&br.hash)?;
+        if let Some(block) = maybe_block {
             log::info!(
                 "Received request for block {} from {}. Response sent.",
                 PrettyPrinter::build_string_bytes(&br.hash),
                 peer
             );
-            TransportLayer::stream_to_peer(&peer, &block.unwrap().to_proto()).await?;
+            self.transport.stream_message_to_peer(&self.conf, &peer, &block.to_proto()).await?;
         } else {
             log::info!(
                 "Received request for block {} from {}. No response given since block not found.",
@@ -335,14 +353,9 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
         hbr: HasBlockRequest,
         block_lookup: impl Fn(BlockHash) -> bool,
     ) -> Result<(), CasperError> {
-        if block_lookup(hbr.hash) {
-            TransportLayer::send_to_peer(
-                &peer,
-                &casper_message::HasBlockProto {
-                    hash: hbr.hash.to_vec(),
-                },
-            )
-            .await?;
+        if block_lookup(hbr.hash.clone()) {
+            let has_block = HasBlock { hash: hbr.hash };
+            self.transport.send_message_to_peer(&self.conf, &peer, &has_block.to_proto()).await?;
         }
         Ok(())
     }
@@ -356,25 +369,16 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
             "Received ForkChoiceTipRequest from {}",
             peer.endpoint.host
         );
-        let tips = self
-            .casper
-            .block_dag()
-            .await?
-            .latest_message_hashes()?
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+        let latest_messages = self.casper.block_dag().await?.latest_message_hashes();
+        let tips: Vec<BlockHash> = latest_messages.iter().map(|entry| entry.value().clone()).collect();
         log::info!(
             "Sending tips {} to {}",
-            "Vec<BlockHash>", // PrettyPrinter::build_string_from_block_hashes(&tips),
+            tips.iter().map(|tip| PrettyPrinter::build_string_bytes(tip)).collect::<Vec<_>>().join(", "),
             peer.endpoint.host
         );
         for tip in tips {
-            TransportLayer::send_to_peer(
-                &peer,
-                &casper_message::HasBlockProto { hash: tip.to_vec() },
-            )
-            .await?;
+            let has_block = HasBlock { hash: tip };
+            self.transport.send_message_to_peer(&self.conf, &peer, &has_block.to_proto()).await?;
         }
         Ok(())
     }
@@ -382,10 +386,10 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
     pub async fn handle_approved_block_request(
         &self,
         peer: PeerNode,
-        approved_block: ApprovedBlock,
+        _approved_block: ApprovedBlock,
     ) -> Result<(), CasperError> {
         log::info!("Received ApprovedBlockRequest from {}", peer);
-        TransportLayer::stream_to_peer(&peer, &approved_block.to_proto()).await?;
+        self.transport.stream_message_to_peer(&self.conf, &peer, &approved_block.to_proto()).await?;
         log::info!("ApprovedBlock sent to {}", peer);
         Ok(())
     }
@@ -394,8 +398,8 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
         &self,
         peer: PeerNode,
         start_path: Vec<(Blake2b256Hash, Option<u8>)>,
-        skip: u32,
-        take: u32,
+        _skip: u32,
+        _take: u32,
     ) -> Result<(), CasperError> {
         let (history, data) = self
             .casper
@@ -411,8 +415,8 @@ impl<'r, T: MultiParentCasper + Clone> Running<'r, T> {
             data_items: data.items,
         };
         log::info!("Read {}", resp.pretty());
-        TransportLayer::stream_to_peer(&peer, &casper_message::StoreItemsMessage::to_proto(resp))
-            .await?;
+        self.transport.stream_message_to_peer(&self.conf, &peer, &resp.to_proto()).await?;
+
         log::info!("Store items sent to {}", peer);
         Ok(())
     }

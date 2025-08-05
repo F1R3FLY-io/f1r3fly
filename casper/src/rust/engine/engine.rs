@@ -28,7 +28,7 @@ use crate::rust::validator_identity::ValidatorIdentity;
 pub trait Engine: Send + Sync {
     async fn init(&self) -> Result<(), CasperError>;
 
-    async fn handle(&self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
+    async fn handle(&mut self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
 
     /// Clone the engine into a boxed trait object
     fn clone_box(&self) -> Box<dyn Engine>;
