@@ -1,3 +1,5 @@
+# ATTENTION: This crate has been moved to https://github.com/F1R3FLY-io/rust-client
+
 # F1r3fly Node CLI
 
 A command-line interface for interacting with F1r3fly nodes.
