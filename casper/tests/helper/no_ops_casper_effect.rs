@@ -325,4 +325,23 @@ impl NoOpsCasperEffect {
             );
         }
     }
+
+    /// Insert block to both block store and DAG (matches Scala blockDagStorage.insert pattern)
+    ///
+    /// This method provides a more Scala-like API that combines storage and DAG operations
+    /// matching the pattern: blockDagStorage.insert(block, approved)
+    pub fn insert_block(&mut self, block: BlockMessage, approved: bool) {
+        // First add to block store
+        self.add_block_to_store(block.clone());
+
+        // Then add to DAG
+        self.add_to_dag(block.block_hash.clone());
+
+        // If approved, also add to finalized blocks set
+        if approved {
+            self.block_dag_storage
+                .finalized_blocks_set
+                .insert(block.block_hash);
+        }
+    }
 }

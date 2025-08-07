@@ -153,10 +153,9 @@ mod tests {
         block2.sender = Bytes::new(); // Empty sender
 
         // Step 3: Insert blocks in blockDagStorage (following Scala implementation)
-        fixture.casper.add_block_to_store(block1.clone());
-        fixture.casper.add_to_dag(block1.block_hash.clone());
-        fixture.casper.add_block_to_store(block2.clone());
-        fixture.casper.add_to_dag(block2.block_hash.clone());
+        // This matches the Scala pattern: blockDagStorage.insert(block1, false)
+        fixture.casper.insert_block(block1.clone(), false);
+        fixture.casper.insert_block(block2.clone(), false);
 
         // Step 4: Get tips from casper.blockDag (this happens inside the engine)
         let dag = fixture.casper.block_dag().await.unwrap();

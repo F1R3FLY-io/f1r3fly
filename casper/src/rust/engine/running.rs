@@ -225,7 +225,7 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
 }
 
 #[async_trait(?Send)]
-impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> WithCasper<M>
+impl<'r, M: MultiParentCasper + Send + Sync, T: TransportLayer + Send + Sync> WithCasper<M>
     for Running<'r, M, T>
 {
     async fn with_casper<A, F, Fut>(
@@ -234,18 +234,18 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
         _default: Result<A, CasperError>,
     ) -> Result<A, CasperError>
     where
-        F: FnOnce(&mut M) -> Fut + Send,
+        F: FnOnce(&M) -> Fut + Send,
         Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
         A: Send,
     {
-        f(&mut self.casper).await
+        f(&*self.casper).await
     }
 }
 
 pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
-    block_processing_queue: Arc<Mutex<VecDeque<(M, BlockMessage)>>>,
+    block_processing_queue: Arc<Mutex<VecDeque<(Arc<M>, BlockMessage)>>>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
-    casper: M,
+    casper: Arc<M>,
     approved_block: ApprovedBlock,
     the_init: Arc<dyn Fn() -> Result<(), CasperError> + Send + Sync>,
     init_called: Arc<Mutex<bool>>,
@@ -257,11 +257,11 @@ pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
     _phantom: std::marker::PhantomData<&'r M>,
 }
 
-impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<'r, M, T> {
+impl<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> Running<'r, M, T> {
     pub fn new(
-        block_processing_queue: Arc<Mutex<VecDeque<(M, BlockMessage)>>>,
+        block_processing_queue: Arc<Mutex<VecDeque<(Arc<M>, BlockMessage)>>>,
         blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
-        casper: M,
+        casper: Arc<M>,
         approved_block: ApprovedBlock,
         the_init: Arc<dyn Fn() -> Result<(), CasperError> + Send + Sync>,
         disable_state_exporter: bool,

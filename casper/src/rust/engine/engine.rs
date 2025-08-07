@@ -21,7 +21,6 @@ use crate::rust::engine::block_retriever::BlockRetriever;
 use crate::rust::engine::engine_cell::EngineCell;
 use crate::rust::engine::running::Running;
 use crate::rust::errors::CasperError;
-use crate::rust::validator_identity::ValidatorIdentity;
 
 /// Object-safe Engine trait that matches Scala Engine[F] behavior
 /// Note: with_casper method is not included here due to object-safety constraints
@@ -46,7 +45,7 @@ pub trait WithCasper<M: MultiParentCasper>: Send + Sync {
         default: Result<A, CasperError>,
     ) -> Result<A, CasperError>
     where
-        F: FnOnce(&mut M) -> Fut + Send,
+        F: FnOnce(&M) -> Fut + Send,
         Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
         A: Send;
 }
@@ -127,7 +126,7 @@ pub async fn transition_to_running<
     T: MultiParentCasper + Send + Sync + Clone + 'static,
     U: TransportLayer + Send + Sync + 'static,
 >(
-    block_processing_queue: Arc<Mutex<VecDeque<(T, BlockMessage)>>>,
+    block_processing_queue: Arc<Mutex<VecDeque<(Arc<T>, BlockMessage)>>>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: T,
     approved_block: ApprovedBlock,
@@ -155,7 +154,7 @@ pub async fn transition_to_running<
     let running = Running::new(
         block_processing_queue,
         blocks_in_processing,
-        casper,
+        Arc::new(casper),
         approved_block,
         the_init,
         disable_state_exporter,
