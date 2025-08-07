@@ -19,15 +19,15 @@ use casper::rust::{
 };
 use crypto::rust::signatures::signed::Signed;
 use models::rust::{
-    block_hash::BlockHash,
+    block_hash::{BlockHash, BlockHashSerde},
     block_implicits::get_random_block_default,
+    block_metadata::BlockMetadata,
     casper::protocol::casper_message::{BlockMessage, DeployData},
     validator::Validator,
 };
 use rspace_plus_plus::rspace::history::Either;
 
 pub struct NoOpsCasperEffect {
-    store: HashMap<BlockHash, BlockMessage>,
     estimator_func: Vec<BlockHash>,
     runtime_manager: Arc<RuntimeManager>,
     block_store: KeyValueBlockStore,
@@ -58,7 +58,6 @@ impl Clone for NoOpsCasperEffect {
         );
 
         Self {
-            store: self.store.clone(),
             estimator_func: self.estimator_func.clone(),
             runtime_manager: self.runtime_manager.clone(), // Arc clone is cheap
             block_store: cloned_block_store,
@@ -73,7 +72,7 @@ impl Clone for NoOpsCasperEffect {
 
 impl NoOpsCasperEffect {
     pub fn new(
-        blocks: Option<HashMap<BlockHash, BlockMessage>>,
+        _blocks: Option<HashMap<BlockHash, BlockMessage>>, // No longer used - blocks stored in actual KeyValueBlockStore
         estimator_func: Option<Vec<BlockHash>>,
         runtime_manager: RuntimeManager,
         _block_store: KeyValueBlockStore, // We'll ignore this and create our own with shared data
@@ -94,7 +93,6 @@ impl NoOpsCasperEffect {
         );
 
         Self {
-            store: blocks.unwrap_or_default(),
             estimator_func: estimator_func.unwrap_or_default(),
             runtime_manager: Arc::new(runtime_manager),
             block_store,
@@ -102,56 +100,6 @@ impl NoOpsCasperEffect {
             shared_approved_block_data,
             block_dag_storage,
         }
-    }
-
-    /// Create a simple test instance with minimal dependencies
-    pub fn new_for_test(
-        approved_block: models::rust::casper::protocol::casper_message::ApprovedBlock,
-    ) -> Self {
-        use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
-
-        // Using shared MockKeyValueStore from test_mocks module
-
-        // Create minimal test dependencies
-        let genesis_block = approved_block.candidate.block.clone();
-        let mut blocks = HashMap::new();
-        blocks.insert(genesis_block.block_hash.clone(), genesis_block.clone());
-
-        // Create test block store
-        let store = Box::new(MockKeyValueStore::new());
-        let store_approved_block = Box::new(MockKeyValueStore::new());
-        let block_store = KeyValueBlockStore::new(store, store_approved_block);
-
-        // Create test DAG storage
-        use block_storage::rust::dag::block_metadata_store::BlockMetadataStore;
-        use models::rust::block_hash::BlockHashSerde;
-        use models::rust::block_metadata::BlockMetadata;
-
-        let metadata_store = Box::new(MockKeyValueStore::new());
-        let metadata_typed_store =
-            KeyValueTypedStoreImpl::<BlockHashSerde, BlockMetadata>::new(metadata_store);
-        let block_metadata_store = BlockMetadataStore::new(metadata_typed_store);
-
-        let deploy_store = Box::new(MockKeyValueStore::new());
-        let deploy_typed_store =
-            KeyValueTypedStoreImpl::<DeployId, BlockHashSerde>::new(deploy_store);
-
-        let block_dag_storage = KeyValueDagRepresentation {
-            dag_set: Default::default(),
-            latest_messages_map: Default::default(),
-            child_map: Default::default(),
-            height_map: Default::default(),
-            invalid_blocks_set: Default::default(),
-            last_finalized_block_hash: genesis_block.block_hash.clone(),
-            finalized_blocks_set: Default::default(),
-            block_metadata_index: std::sync::Arc::new(std::sync::RwLock::new(block_metadata_store)),
-            deploy_index: std::sync::Arc::new(std::sync::RwLock::new(deploy_typed_store)),
-        };
-
-        // Create a minimal runtime manager stub
-        // Since this is for testing and most methods return todo!(), we'll just panic here for now
-        // The tests can be adjusted to not require complex RuntimeManager functionality
-        panic!("NoOpsCasperEffect::new_for_test() - RuntimeManager stub not implemented yet. Use the regular constructor with proper dependencies.");
     }
 }
 
@@ -204,7 +152,11 @@ impl Casper for NoOpsCasperEffect {
     }
 
     fn contains(&self, hash: &BlockHash) -> bool {
-        self.store.contains_key(hash)
+        // Use actual KeyValueBlockStore instead of HashMap (preserving Scala test logic)
+        match self.block_store.get(hash) {
+            Ok(maybe_block) => maybe_block.is_some(),
+            Err(_) => false,
+        }
     }
 
     fn dag_contains(&self, _hash: &BlockHash) -> bool {
@@ -262,52 +214,115 @@ impl Casper for NoOpsCasperEffect {
     }
 
     fn get_approved_block(&self) -> Result<&BlockMessage, CasperError> {
-        // For test purposes, return a reference to any block from our store
-        // or create a default block if store is empty
-        self.store.values().next().ok_or_else(|| {
-            CasperError::RuntimeError("No approved block available in test".to_string())
-        })
+        // For test purposes, this is not used by our tests but we need to implement it
+        // In a real implementation, this would return the actual approved block from storage
+        Err(CasperError::RuntimeError(
+            "get_approved_block not implemented for NoOpsCasperEffect test helper".to_string(),
+        ))
     }
 }
 
 // Additional test-friendly methods for compatibility with the old MockCasper API
 impl NoOpsCasperEffect {
-    /// Add a block to the internal store for testing
+    /// Add a block to the actual KeyValueBlockStore (preserving Scala test logic)
     pub fn add_block_to_store(&mut self, block: BlockMessage) {
-        // Add to internal store
-        self.store.insert(block.block_hash.clone(), block.clone());
-
-        // Also add to the KeyValueBlockStore so engine can find it via block_store().get()
+        // Store in the KeyValueBlockStore (the actual block storage) - no HashMap fallback
         match self.block_store.put_block_message(&block) {
-            Ok(_) => log::debug!(
-                "Successfully stored block {} in KeyValueBlockStore",
-                hex::encode(&block.block_hash)
-            ),
+            Ok(_) => {
+                log::debug!(
+                    "Successfully stored block {} in KeyValueBlockStore",
+                    hex::encode(&block.block_hash)
+                );
+            }
             Err(e) => log::error!("Failed to store block in KeyValueBlockStore: {:?}", e),
         }
     }
 
-    /// Add block hash to DAG (no-op for testing)
-    pub fn add_to_dag(&self, _block_hash: BlockHash) {
-        // NoOp for testing - just acknowledge the call
-    }
+    /// Add block to DAG storage and update latest messages (like Scala blockDagStorage.insert)
+    pub fn add_to_dag(&mut self, block_hash: BlockHash) {
+        use shared::rust::store::key_value_typed_store::KeyValueTypedStore;
 
-    /// Set latest messages (updates the shared DAG storage for testing)
-    pub fn set_latest_messages(&self, tips: HashMap<Validator, BlockHash>) {
-        // Clear existing latest messages and insert new ones
-        self.block_dag_storage.latest_messages_map.clear();
-        for (validator, block_hash) in tips {
-            self.block_dag_storage
-                .latest_messages_map
-                .insert(validator, block_hash);
+        // Get the block from actual KeyValueBlockStore to add to DAG (preserving Scala test logic)
+        if let Ok(Some(block)) = self.block_store.get(&block_hash) {
+            // Add to DAG set
+            self.block_dag_storage.dag_set.insert(block_hash.clone());
+
+            // Add block metadata to the metadata store
+            let block_metadata = BlockMetadata::from_block(&block, false, None, None);
+            let mut metadata_guard = self.block_dag_storage.block_metadata_index.write().unwrap();
+            match metadata_guard.add(block_metadata) {
+                Ok(_) => {
+                    log::debug!(
+                        "Successfully added block {} to DAG storage",
+                        hex::encode(&block_hash)
+                    );
+                }
+                Err(e) => log::error!("Failed to add block metadata to DAG storage: {:?}", e),
+            }
+            drop(metadata_guard);
+
+            // Add deploy mappings
+            let deploy_hashes: Vec<DeployId> = block
+                .body
+                .deploys
+                .iter()
+                .map(|deploy| deploy.deploy.sig.clone().into())
+                .collect();
+            let deploy_entries: Vec<(DeployId, BlockHashSerde)> = deploy_hashes
+                .into_iter()
+                .map(|deploy_id| (deploy_id, BlockHashSerde(block.block_hash.clone())))
+                .collect();
+            let mut deploy_index_guard = self.block_dag_storage.deploy_index.write().unwrap();
+            if let Err(e) = deploy_index_guard.put(deploy_entries) {
+                log::error!("Failed to add deploy mappings to DAG storage: {:?}", e);
+            }
+            drop(deploy_index_guard);
+
+            // Update latest messages following BlockDagKeyValueStorage.insert logic
+
+            // 1. Update latest message for block sender (if not empty)
+            if !block.sender.is_empty() {
+                self.block_dag_storage
+                    .latest_messages_map
+                    .insert(block.sender.clone().into(), block.block_hash.clone());
+            }
+
+            // 2. Handle newly bonded validators (matching Scala newLatestMessages logic)
+            let bonded_validators: std::collections::HashSet<Validator> = block
+                .body
+                .state
+                .bonds
+                .iter()
+                .map(|bond| bond.validator.clone().into())
+                .collect();
+
+            let justified_validators: std::collections::HashSet<Validator> = block
+                .justifications
+                .iter()
+                .map(|justification| justification.validator.clone())
+                .collect();
+
+            let newly_bonded: std::collections::HashSet<_> = bonded_validators
+                .difference(&justified_validators)
+                .collect();
+
+            // For newly bonded validators not already in latest messages, add current block
+            for validator in newly_bonded {
+                if !self
+                    .block_dag_storage
+                    .latest_messages_map
+                    .contains_key(validator)
+                {
+                    self.block_dag_storage
+                        .latest_messages_map
+                        .insert(validator.clone(), block.block_hash.clone());
+                }
+            }
+        } else {
+            log::error!(
+                "Cannot add block {} to DAG - block not found in store",
+                hex::encode(&block_hash)
+            );
         }
-    }
-
-    /// Get approved block reference directly (for test compatibility)
-    pub fn get_approved_block_direct(&self) -> &BlockMessage {
-        self.store
-            .values()
-            .next()
-            .expect("No approved block available in test")
     }
 }

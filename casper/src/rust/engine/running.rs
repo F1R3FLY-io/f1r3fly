@@ -299,6 +299,13 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         Ok(blocks_in_processing || buffer_contains || dag_contains)
     }
 
+    /**
+     * As we introduced synchrony constraint - there might be situation when node is stuck.
+     * As an edge case with `sync = 0.99`, if node misses the block that is the last one to meet sync constraint,
+     * it has no way to request it after it was broadcasted. So it will never meet synchrony constraint.
+     * To mitigate this issue we can update fork choice tips if current fork-choice tip has old timestamp,
+     * which means node does not propose new blocks and no new blocks were received recently.
+     */
     pub async fn update_fork_choice_tips_if_stuck(
         &mut self,
         delay_threshold: Duration,
@@ -443,6 +450,8 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
         let tips: Vec<BlockHash> = latest_messages
             .iter()
             .map(|entry| entry.value().clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
             .collect();
         log::info!(
             "Sending tips {} to {}",
