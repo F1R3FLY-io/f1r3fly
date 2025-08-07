@@ -150,7 +150,10 @@ async fn test_set_and_read_engine() {
     let read_engine = engine_cell.read().await.expect("Failed to read engine");
 
     // Verify it's our test engine by calling init and checking the counter
-    read_engine.init().await.expect("Engine init should succeed");
+    read_engine
+        .init()
+        .await
+        .expect("Engine init should succeed");
     assert_eq!(
         test_engine.get_init_count(),
         1,
@@ -176,7 +179,10 @@ async fn test_read_boxed_and_set_boxed_convenience_methods() {
         .expect("Failed to read boxed engine");
 
     // Verify it works
-    boxed_engine.init().await.expect("Engine init should succeed");
+    boxed_engine
+        .init()
+        .await
+        .expect("Engine init should succeed");
 }
 
 #[tokio::test]
@@ -254,7 +260,10 @@ async fn test_modify_with_pure_function() {
 
     // Verify the engine was replaced
     let new_engine = engine_cell.read().await.expect("Failed to read engine");
-    new_engine.init().await.expect("New engine init should succeed");
+    new_engine
+        .init()
+        .await
+        .expect("New engine init should succeed");
 
     // Original engine should not have been called
     assert_eq!(
@@ -287,7 +296,10 @@ async fn test_flat_modify_with_async_function_success() {
 
     // Verify the engine was replaced
     let new_engine = engine_cell.read().await.expect("Failed to read engine");
-    new_engine.init().await.expect("New engine init should succeed");
+    new_engine
+        .init()
+        .await
+        .expect("New engine init should succeed");
 }
 
 #[tokio::test]

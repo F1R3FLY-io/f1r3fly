@@ -158,7 +158,6 @@ pub async fn transition_to_running<
         blocks_in_processing,
         casper,
         approved_block,
-        validator_id,
         the_init,
         disable_state_exporter,
         connections_cell,

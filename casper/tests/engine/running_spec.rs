@@ -88,7 +88,6 @@ impl<'a> TestFixture<'a> {
             Arc::new(Mutex::new(Default::default())),
             casper.clone(),
             approved_block,
-            Some(validator_identity.clone()),
             Arc::new(|| Ok(())),
             false,
             connections_cell,
