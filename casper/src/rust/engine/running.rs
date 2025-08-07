@@ -7,7 +7,6 @@ use crate::rust::{
         engine::{self, Engine, WithCasper},
     },
     errors::CasperError,
-    validator_identity::ValidatorIdentity,
 };
 use async_trait::async_trait;
 use comm::rust::{
@@ -284,22 +283,6 @@ impl<'r, M: MultiParentCasper + Clone, T: TransportLayer + Send + Sync> Running<
             conf,
             block_retriever,
             _phantom: std::marker::PhantomData,
-        }
-    }
-
-    /// Get the current length of the block processing queue (for testing)
-    pub fn block_processing_queue_len(&self) -> usize {
-        match self.block_processing_queue.lock() {
-            Ok(queue) => queue.len(),
-            Err(_) => 0,
-        }
-    }
-
-    /// Check if a block with the given hash is in the processing queue (for testing)
-    pub fn is_block_in_processing_queue(&self, hash: &BlockHash) -> bool {
-        match self.block_processing_queue.lock() {
-            Ok(queue) => queue.iter().any(|(_, block)| &block.block_hash == hash),
-            Err(_) => false,
         }
     }
 

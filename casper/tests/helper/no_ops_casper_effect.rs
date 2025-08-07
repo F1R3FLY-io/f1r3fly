@@ -1,9 +1,11 @@
 // See casper/src/test/scala/coop/rchain/casper/helper/NoOpsCasperEffect.scala
 
+use crate::util::test_mocks::MockKeyValueStore;
 use async_trait::async_trait;
 use casper::rust::validator_identity::ValidatorIdentity;
 use rspace_plus_plus::rspace::state::rspace_state_manager::RSpaceStateManager;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use block_storage::rust::{
     dag::block_dag_key_value_storage::{DeployId, KeyValueDagRepresentation},
@@ -27,8 +29,11 @@ use rspace_plus_plus::rspace::history::Either;
 pub struct NoOpsCasperEffect {
     store: HashMap<BlockHash, BlockMessage>,
     estimator_func: Vec<BlockHash>,
-    runtime_manager: RuntimeManager,
+    runtime_manager: Arc<RuntimeManager>,
     block_store: KeyValueBlockStore,
+    // Shared data for block store to ensure clones can access the same blocks
+    shared_block_data: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>>,
+    shared_approved_block_data: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>>,
     block_dag_storage: KeyValueDagRepresentation,
 }
 
@@ -38,26 +43,115 @@ unsafe impl Sync for NoOpsCasperEffect {}
 // For testing purposes, we'll implement Clone manually by creating stub instances
 impl Clone for NoOpsCasperEffect {
     fn clone(&self) -> Self {
-        // Create a simple clone for testing - we don't need full functionality
-        panic!("NoOpsCasperEffect clone not implemented for simplified test")
+        // Create a clone that shares the same underlying storage so that blocks added to one instance
+        // are visible to cloned instances (which is necessary for the engine tests to work)
+
+        // Create new KeyValueBlockStore with shared underlying storage
+        // Note: We need to share the underlying data between clones for tests to work
+        let cloned_block_store = KeyValueBlockStore::new(
+            Box::new(MockKeyValueStore::with_shared_data(
+                self.shared_block_data.clone(),
+            )),
+            Box::new(MockKeyValueStore::with_shared_data(
+                self.shared_approved_block_data.clone(),
+            )),
+        );
+
+        Self {
+            store: self.store.clone(),
+            estimator_func: self.estimator_func.clone(),
+            runtime_manager: self.runtime_manager.clone(), // Arc clone is cheap
+            block_store: cloned_block_store,
+            shared_block_data: self.shared_block_data.clone(),
+            shared_approved_block_data: self.shared_approved_block_data.clone(),
+            block_dag_storage: self.block_dag_storage.clone(),
+        }
     }
 }
+
+// Using shared MockKeyValueStore from test_mocks module
 
 impl NoOpsCasperEffect {
     pub fn new(
         blocks: Option<HashMap<BlockHash, BlockMessage>>,
         estimator_func: Option<Vec<BlockHash>>,
         runtime_manager: RuntimeManager,
-        block_store: KeyValueBlockStore,
+        _block_store: KeyValueBlockStore, // We'll ignore this and create our own with shared data
         block_dag_storage: KeyValueDagRepresentation,
     ) -> Self {
+        // Create shared storage that will be used by all clones
+        let shared_block_data = Arc::new(Mutex::new(HashMap::new()));
+        let shared_approved_block_data = Arc::new(Mutex::new(HashMap::new()));
+
+        // Create block store with shared underlying storage
+        let block_store = KeyValueBlockStore::new(
+            Box::new(MockKeyValueStore::with_shared_data(
+                shared_block_data.clone(),
+            )),
+            Box::new(MockKeyValueStore::with_shared_data(
+                shared_approved_block_data.clone(),
+            )),
+        );
+
         Self {
             store: blocks.unwrap_or_default(),
             estimator_func: estimator_func.unwrap_or_default(),
-            runtime_manager,
+            runtime_manager: Arc::new(runtime_manager),
             block_store,
+            shared_block_data,
+            shared_approved_block_data,
             block_dag_storage,
         }
+    }
+
+    /// Create a simple test instance with minimal dependencies
+    pub fn new_for_test(
+        approved_block: models::rust::casper::protocol::casper_message::ApprovedBlock,
+    ) -> Self {
+        use shared::rust::store::key_value_typed_store_impl::KeyValueTypedStoreImpl;
+
+        // Using shared MockKeyValueStore from test_mocks module
+
+        // Create minimal test dependencies
+        let genesis_block = approved_block.candidate.block.clone();
+        let mut blocks = HashMap::new();
+        blocks.insert(genesis_block.block_hash.clone(), genesis_block.clone());
+
+        // Create test block store
+        let store = Box::new(MockKeyValueStore::new());
+        let store_approved_block = Box::new(MockKeyValueStore::new());
+        let block_store = KeyValueBlockStore::new(store, store_approved_block);
+
+        // Create test DAG storage
+        use block_storage::rust::dag::block_metadata_store::BlockMetadataStore;
+        use models::rust::block_hash::BlockHashSerde;
+        use models::rust::block_metadata::BlockMetadata;
+
+        let metadata_store = Box::new(MockKeyValueStore::new());
+        let metadata_typed_store =
+            KeyValueTypedStoreImpl::<BlockHashSerde, BlockMetadata>::new(metadata_store);
+        let block_metadata_store = BlockMetadataStore::new(metadata_typed_store);
+
+        let deploy_store = Box::new(MockKeyValueStore::new());
+        let deploy_typed_store =
+            KeyValueTypedStoreImpl::<DeployId, BlockHashSerde>::new(deploy_store);
+
+        let block_dag_storage = KeyValueDagRepresentation {
+            dag_set: Default::default(),
+            latest_messages_map: Default::default(),
+            child_map: Default::default(),
+            height_map: Default::default(),
+            invalid_blocks_set: Default::default(),
+            last_finalized_block_hash: genesis_block.block_hash.clone(),
+            finalized_blocks_set: Default::default(),
+            block_metadata_index: std::sync::Arc::new(std::sync::RwLock::new(block_metadata_store)),
+            deploy_index: std::sync::Arc::new(std::sync::RwLock::new(deploy_typed_store)),
+        };
+
+        // Create a minimal runtime manager stub
+        // Since this is for testing and most methods return todo!(), we'll just panic here for now
+        // The tests can be adjusted to not require complex RuntimeManager functionality
+        panic!("NoOpsCasperEffect::new_for_test() - RuntimeManager stub not implemented yet. Use the regular constructor with proper dependencies.");
     }
 }
 
@@ -173,5 +267,47 @@ impl Casper for NoOpsCasperEffect {
         self.store.values().next().ok_or_else(|| {
             CasperError::RuntimeError("No approved block available in test".to_string())
         })
+    }
+}
+
+// Additional test-friendly methods for compatibility with the old MockCasper API
+impl NoOpsCasperEffect {
+    /// Add a block to the internal store for testing
+    pub fn add_block_to_store(&mut self, block: BlockMessage) {
+        // Add to internal store
+        self.store.insert(block.block_hash.clone(), block.clone());
+
+        // Also add to the KeyValueBlockStore so engine can find it via block_store().get()
+        match self.block_store.put_block_message(&block) {
+            Ok(_) => log::debug!(
+                "Successfully stored block {} in KeyValueBlockStore",
+                hex::encode(&block.block_hash)
+            ),
+            Err(e) => log::error!("Failed to store block in KeyValueBlockStore: {:?}", e),
+        }
+    }
+
+    /// Add block hash to DAG (no-op for testing)
+    pub fn add_to_dag(&self, _block_hash: BlockHash) {
+        // NoOp for testing - just acknowledge the call
+    }
+
+    /// Set latest messages (updates the shared DAG storage for testing)
+    pub fn set_latest_messages(&self, tips: HashMap<Validator, BlockHash>) {
+        // Clear existing latest messages and insert new ones
+        self.block_dag_storage.latest_messages_map.clear();
+        for (validator, block_hash) in tips {
+            self.block_dag_storage
+                .latest_messages_map
+                .insert(validator, block_hash);
+        }
+    }
+
+    /// Get approved block reference directly (for test compatibility)
+    pub fn get_approved_block_direct(&self) -> &BlockMessage {
+        self.store
+            .values()
+            .next()
+            .expect("No approved block available in test")
     }
 }

@@ -131,7 +131,6 @@ pub async fn transition_to_running<
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: T,
     approved_block: ApprovedBlock,
-    validator_id: Option<ValidatorIdentity>,
     _init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
     disable_state_exporter: bool,
     connections_cell: ConnectionsCell,
