@@ -20,8 +20,8 @@ tree-sitter-rholang = { path = "src/main/tree_sitter/" }
 itertools = "0.10.2"
 serde = "1.0"
 tokio = { version = "1", features = ["full"] }
-tree-sitter = "0.23"
-tree-sitter-rust = "0.23"
+tree-sitter = "0.25.8"
+tree-sitter-rust = "0.24"
 cc = { version = "1.1.12", features = [] }
 hex = "0.4.3"
 prost = "0.13.5"
@@ -40,6 +40,7 @@ openai-api-rs = "6.0.3"
 dotenv = "0.15.0"
 openssl = { version = "0.10", features = ["vendored"] }
 tempfile = "3.19.1"
+rholang-parser = { git = "https://github.com/F1R3FLY-io/rholang-rs", package = "rholang-parser", branch = "master" }
 
 [build-dependencies]
 cc = "1.0"
