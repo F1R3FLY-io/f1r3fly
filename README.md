@@ -265,6 +265,13 @@ StackOverflow error from node compile:
 $ sbt "node/compile"
 ```
 
+Alternatively, you can use the SBT shell:
+```bash
+$ sbt
+sbt> project node
+sbt> compile
+```
+
 Rust problems: 
 ```bash
 $ ./scripts/clean_rust_libraries.sh
