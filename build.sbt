@@ -424,6 +424,16 @@ lazy val node = (project in file("node"))
     discoveredMainClasses in Compile := Seq(),
     mainClass in assembly := Some("coop.rchain.node.Main"),
     assemblyMergeStrategy in assembly := {
+      // Keep gRPC and other service loader entries; required for DNS NameResolver, etc.
+      case x if x.startsWith("META-INF/services/") => MergeStrategy.concat
+      // Keep native jansi from dependencies (prefer dependency over scala compiler copy)
+      case x if x.startsWith("META-INF/native/") && x.contains("jansi") => MergeStrategy.last
+      // Drop only problematic META-INF files, not the whole directory
+      case x if x.endsWith("MANIFEST.MF") => MergeStrategy.discard
+      case x if x.endsWith("INDEX.LIST")  => MergeStrategy.discard
+      // Protobuf descriptors: take the first occurrence
+      case x if x.endsWith(".proto") => MergeStrategy.first
+      // Netty versions properties can be taken from the first occurrence
       case x if x.endsWith("io.netty.versions.properties")   => MergeStrategy.first
       case x if x.endsWith("scala/annotation/nowarn.class")  => MergeStrategy.discard
       case x if x.endsWith("scala/annotation/nowarn$.class") => MergeStrategy.discard
