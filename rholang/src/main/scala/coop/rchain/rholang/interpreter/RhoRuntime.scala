@@ -239,6 +239,10 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
         case e: Throwable =>
           println("Error parsing EvaluateResultProto: " + e)
           throw e
+      } finally {
+        // Deallocate native buffer returned by Rust (includes 4-byte prefix)
+        val len = evalResultPtr.getInt(0)
+        RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(evalResultPtr, len + 4)
       }
     }
 
@@ -284,6 +288,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
       paramsPtr.write(0, paramsBytes, 0, paramsBytes.length)
 
       RHOLANG_RUST_INSTANCE.inj(runtimePtr, paramsPtr, paramsBytes.length)
+      paramsPtr.clear()
     }
 
   override def createSoftCheckpoint
@@ -505,6 +510,9 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala createSoftCheckpoint operation: " + e)
                        throw e
+                   } finally {
+                     // The buffer has 4-byte prefix
+                     // No deallocator exposed in rholang JNA; TODO if added
                    }
                  } else {
                    println("softCheckpointPtr is null")
