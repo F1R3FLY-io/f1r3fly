@@ -66,8 +66,8 @@ impl std::fmt::Display for LastFinalizedBlockNotFoundError {
 impl std::error::Error for LastFinalizedBlockNotFoundError {}
 
 #[async_trait(?Send)]
-impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine
-    for Running<'r, M, T>
+impl<M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync> Engine
+    for Running<M, T>
 {
     async fn init(&self) -> Result<(), CasperError> {
         let mut init_called = self
@@ -225,8 +225,8 @@ impl<'r, M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + 
 }
 
 #[async_trait(?Send)]
-impl<'r, M: MultiParentCasper + Send + Sync, T: TransportLayer + Send + Sync> WithCasper<M>
-    for Running<'r, M, T>
+impl<M: MultiParentCasper + Send + Sync, T: TransportLayer + Send + Sync> WithCasper<M>
+    for Running<M, T>
 {
     async fn with_casper<A, F, Fut>(
         &mut self,
@@ -242,7 +242,7 @@ impl<'r, M: MultiParentCasper + Send + Sync, T: TransportLayer + Send + Sync> Wi
     }
 }
 
-pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
+pub struct Running<M: MultiParentCasper, T: TransportLayer + Send + Sync> {
     block_processing_queue: Arc<Mutex<VecDeque<(Arc<M>, BlockMessage)>>>,
     blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
     casper: Arc<M>,
@@ -254,10 +254,9 @@ pub struct Running<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> {
     transport: Arc<T>,
     conf: RPConf,
     block_retriever: Arc<BlockRetriever<T>>,
-    _phantom: std::marker::PhantomData<&'r M>,
 }
 
-impl<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> Running<'r, M, T> {
+impl<M: MultiParentCasper, T: TransportLayer + Send + Sync> Running<M, T> {
     pub fn new(
         block_processing_queue: Arc<Mutex<VecDeque<(Arc<M>, BlockMessage)>>>,
         blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
@@ -282,7 +281,6 @@ impl<'r, M: MultiParentCasper, T: TransportLayer + Send + Sync> Running<'r, M, T
             transport,
             conf,
             block_retriever,
-            _phantom: std::marker::PhantomData,
         }
     }
 

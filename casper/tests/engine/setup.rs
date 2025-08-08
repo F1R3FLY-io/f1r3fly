@@ -59,16 +59,16 @@ pub fn peer_node(name: &str, port: u32) -> PeerNode {
 }
 
 /// Test fixture struct to hold all test dependencies
-pub struct TestFixture<'a> {
+pub struct TestFixture {
     pub transport_layer: Arc<TransportLayerStub>,
     pub local_peer: PeerNode,
     pub validator_identity: ValidatorIdentity,
     pub casper: NoOpsCasperEffect,
-    pub engine: Running<'a, NoOpsCasperEffect, TransportLayerStub>,
+    pub engine: Running<NoOpsCasperEffect, TransportLayerStub>,
     pub block_processing_queue: Arc<Mutex<VecDeque<(Arc<NoOpsCasperEffect>, BlockMessage)>>>,
 }
 
-impl<'a> TestFixture<'a> {
+impl TestFixture {
     pub async fn new() -> Self {
         let local_peer = peer_node("test-peer", 40400);
         let connections = Connections::from_vec(vec![local_peer.clone()]);

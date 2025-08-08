@@ -13,6 +13,8 @@ use models::rust::casper::protocol::casper_message::{
     ApprovedBlock, BlockMessage, CasperMessage, NoApprovedBlockAvailable,
 };
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
+use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
+use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -137,6 +139,7 @@ pub async fn transition_to_running<
     conf: RPConf,
     block_retriever: Arc<BlockRetriever<U>>,
     engine_cell: &EngineCell,
+    event_log: &F1r3flyEvents,
 ) -> Result<(), CasperError> {
     let approved_block_info =
         PrettyPrinter::build_string_block_message(&approved_block.candidate.block, true);
@@ -146,9 +149,17 @@ pub async fn transition_to_running<
         approved_block_info
     );
 
-    // TODO: Publish EnteredRunningState event when event system is available
-    // let block_hash_string = PrettyPrinter::build_string_no_limit(&approved_block.candidate.block.block_hash);
-    // event_log.publish(Event::EnteredRunningState { block_hash: block_hash_string })?;
+    // Publish EnteredRunningState event
+    let block_hash_string =
+        PrettyPrinter::build_string_no_limit(&approved_block.candidate.block.block_hash);
+    event_log
+        .publish(F1r3flyEvent::entered_running_state(block_hash_string))
+        .map_err(|e| {
+            CasperError::Other(format!(
+                "Failed to publish EnteredRunningState event: {}",
+                e
+            ))
+        })?;
 
     let the_init = Arc::new(|| Ok(()));
     let running = Running::new(
