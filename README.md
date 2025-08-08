@@ -89,11 +89,20 @@ docker run -it -p 40400:40400 -p 40401:40401 -p 40402:40402 -p 40403:40403 -p 40
 
 Alternatively, build the Docker image locally after setting up the [development environment](#installation):
 
+**Native Build (Default - Fast)**:
 ```sh
 docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 ```
 
-This creates the image `f1r3flyindustries/f1r3fly-rust-node:latest`, which you can run as shown above.
+**Cross-Platform Build (Multi-Architecture)**:
+```sh
+CROSS_COMPILE=true docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+```
+
+- **Native build** compiles Rust libraries for your current architecture only (3-5x faster, ideal for development)
+- **Cross-platform build** compiles for both AMD64 and ARM64 architectures (slower, ideal for production/releases)
+
+Both commands create the image `f1r3flyindustries/f1r3fly-rust-node:latest`, which you can run as shown above.
 
 ### Debian/Ubuntu
 
@@ -182,9 +191,29 @@ Support for macOS native packages may be added in future releases.
 
 Prerequisites: [Environment set up](#installation).
 
-1. `docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"` will compile the project and create a docker image. 
-2. `sbt ";compile ;project node ;assembly ;project rchain"` will compile the project and create a fat jar. You can use this to run locally without docker.
-3. `sbt "clean"` will clean the project.
+### Docker Image
+
+**Native Build (Default - Recommended for Development)**:
+```sh
+docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+```
+
+**Cross-Platform Build (Multi-Architecture for Production)**:
+```sh
+CROSS_COMPILE=true docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+```
+
+### Fat JAR (Local Development)
+
+```sh
+sbt ";compile ;project node ;assembly ;project rchain"
+```
+
+### Clean
+
+```sh
+sbt "clean"
+```
 
 - It is recommended to have a terminal window open just for `sbt` to run various commands.
 
