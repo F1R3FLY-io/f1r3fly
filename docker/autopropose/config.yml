@@ -6,7 +6,7 @@
 
 # Core autopropose service settings
 autopropose:
-  period: 30                    # Propose interval in seconds
+  period: 10                    # Propose interval in seconds
   enabled: true                 # Master enable/disable switch
 
 # =================================================================
@@ -17,20 +17,20 @@ autopropose:
 validators:
   # Validator 1 - Primary validator
   - name: validator1
-    host: rnode.validator1      # Docker service name or hostname
-    grpc_port: 40402           # Internal gRPC port for propose operations
+    host: host.docker.internal      # Docker service name or hostname
+    grpc_port: 40412           # Internal gRPC port for propose operations
     enabled: true              # Participate in rotation
     
   # Validator 2 - Secondary validator
   - name: validator2
-    host: rnode.validator2
-    grpc_port: 40402           # Internal gRPC port for propose operations
+    host: host.docker.internal
+    grpc_port: 40422           # Internal gRPC port for propose operations
     enabled: true              # Participate in rotation
     
   # Validator 3 - Tertiary validator
   - name: validator3
-    host: rnode.validator3
-    grpc_port: 40402           # Internal gRPC port for propose operations
+    host: host.docker.internal
+    grpc_port: 40432           # Internal gRPC port for propose operations
     enabled: true              # Participate in rotation
 
   # Validator 4 - Quaternary validator
@@ -78,7 +78,7 @@ deploy:
 timing:
   max_retries: 2              # Maximum retries for failed operations
   retry_delay: 15             # Delay between retries (seconds)
-  startup_delay: 240          # Wait time for Casper consensus (4 minutes default)
+  startup_delay: 100          # Wait time for Casper consensus (4 minutes default)
 
 # =================================================================
 # Example Configurations
