@@ -96,7 +96,7 @@ docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;
 
 **Cross-Platform Build (Multi-Architecture)**:
 ```sh
-CROSS_COMPILE=true docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+docker context use default && CROSS_COMPILE=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 ```
 
 - **Native build** compiles Rust libraries for your current architecture only (3-5x faster, ideal for development)
@@ -200,7 +200,7 @@ docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;
 
 **Cross-Platform Build (Multi-Architecture for Production)**:
 ```sh
-CROSS_COMPILE=true docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+docker context use default && CROSS_COMPILE=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 ```
 
 ### Fat JAR (Local Development)
