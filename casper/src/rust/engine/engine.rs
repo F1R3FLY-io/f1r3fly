@@ -1,39 +1,72 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/Engine.scala
 
+use async_trait::async_trait;
 use block_storage::rust::dag::block_dag_key_value_storage::BlockDagKeyValueStorage;
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use comm::rust::peer_node::PeerNode;
+use comm::rust::rp::connect::ConnectionsCell;
 use comm::rust::rp::rp_conf::RPConf;
 use comm::rust::transport::transport_layer::{Blob, TransportLayer};
+use models::rust::block_hash::BlockHash;
+use models::rust::casper::pretty_printer::PrettyPrinter;
 use models::rust::casper::protocol::casper_message::{
     ApprovedBlock, BlockMessage, CasperMessage, NoApprovedBlockAvailable,
 };
 use models::rust::casper::protocol::packet_type_tag::ToPacket;
+use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
+use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
+use std::collections::{HashSet, VecDeque};
+use std::sync::{Arc, Mutex};
 
+use crate::rust::casper::MultiParentCasper;
+use crate::rust::engine::block_retriever::BlockRetriever;
+use crate::rust::engine::engine_cell::EngineCell;
+use crate::rust::engine::running::Running;
 use crate::rust::errors::CasperError;
 
 /// Object-safe Engine trait that matches Scala Engine[F] behavior
 /// Note: with_casper method is not included here due to object-safety constraints
 /// Implementations should provide their own with_casper methods when needed
+#[async_trait(?Send)]
 pub trait Engine: Send + Sync {
-    fn init(&self) -> Result<(), CasperError>;
+    async fn init(&self) -> Result<(), CasperError>;
 
-    fn handle(&self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
+    async fn handle(&mut self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
 
     /// Clone the engine into a boxed trait object
     fn clone_box(&self) -> Box<dyn Engine>;
+}
+
+/// Trait for engines that provide withCasper functionality
+/// This matches the Scala Engine[F] withCasper method behavior
+#[async_trait(?Send)]
+pub trait WithCasper<M: MultiParentCasper>: Send + Sync {
+    async fn with_casper<A, F, Fut>(
+        &mut self,
+        f: F,
+        default: Result<A, CasperError>,
+    ) -> Result<A, CasperError>
+    where
+        F: FnOnce(&M) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
+        A: Send;
 }
 
 pub fn noop() -> Result<impl Engine, CasperError> {
     #[derive(Clone)]
     struct NoopEngine;
 
+    #[async_trait(?Send)]
     impl Engine for NoopEngine {
-        fn init(&self) -> Result<(), CasperError> {
+        async fn init(&self) -> Result<(), CasperError> {
             Ok(())
         }
 
-        fn handle(&self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
+        async fn handle(
+            &mut self,
+            _peer: PeerNode,
+            _msg: CasperMessage,
+        ) -> Result<(), CasperError> {
             Ok(())
         }
 
@@ -88,5 +121,61 @@ pub async fn send_no_approved_block_available(
     };
 
     transport_layer.stream(&peer, &msg).await?;
+    Ok(())
+}
+
+pub async fn transition_to_running<
+    T: MultiParentCasper + Send + Sync + Clone + 'static,
+    U: TransportLayer + Send + Sync + 'static,
+>(
+    block_processing_queue: Arc<Mutex<VecDeque<(Arc<T>, BlockMessage)>>>,
+    blocks_in_processing: Arc<Mutex<HashSet<BlockHash>>>,
+    casper: T,
+    approved_block: ApprovedBlock,
+    _init: Box<dyn FnOnce() -> Result<(), CasperError> + Send + Sync>,
+    disable_state_exporter: bool,
+    connections_cell: ConnectionsCell,
+    transport: Arc<U>,
+    conf: RPConf,
+    block_retriever: Arc<BlockRetriever<U>>,
+    engine_cell: &EngineCell,
+    event_log: &F1r3flyEvents,
+) -> Result<(), CasperError> {
+    let approved_block_info =
+        PrettyPrinter::build_string_block_message(&approved_block.candidate.block, true);
+
+    log::info!(
+        "Making a transition to Running state. Approved {}",
+        approved_block_info
+    );
+
+    // Publish EnteredRunningState event
+    let block_hash_string =
+        PrettyPrinter::build_string_no_limit(&approved_block.candidate.block.block_hash);
+    event_log
+        .publish(F1r3flyEvent::entered_running_state(block_hash_string))
+        .map_err(|e| {
+            CasperError::Other(format!(
+                "Failed to publish EnteredRunningState event: {}",
+                e
+            ))
+        })?;
+
+    let the_init = Arc::new(|| Ok(()));
+    let running = Running::new(
+        block_processing_queue,
+        blocks_in_processing,
+        Arc::new(casper),
+        approved_block,
+        the_init,
+        disable_state_exporter,
+        connections_cell,
+        transport,
+        conf,
+        block_retriever,
+    );
+
+    engine_cell.set(Arc::new(running)).await?;
+
     Ok(())
 }
