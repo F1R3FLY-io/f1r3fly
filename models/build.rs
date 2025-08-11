@@ -11,6 +11,7 @@ fn main() {
     let scala_proto_base_dir = Path::new(&manifest_dir).join("src");
 
     let proto_files = [
+        "BitcoinAnchor.proto",
         "CasperMessage.proto",
         "DeployServiceCommon.proto",
         "DeployServiceV1.proto",

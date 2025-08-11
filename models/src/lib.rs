@@ -27,6 +27,10 @@ pub mod routing {
     include!(concat!(env!("OUT_DIR"), "/routing.rs"));
 }
 
+pub mod bitcoin_anchor {
+    include!(concat!(env!("OUT_DIR"), "/bitcoin_anchor.rs"));
+}
+
 use shared::rust::BitSet;
 
 pub fn create_bit_vector(indices: &[usize]) -> BitSet {

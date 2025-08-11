@@ -57,7 +57,15 @@ class GenesisCeremonyMasterSpec extends WordSpec {
             fixture.blockProcessingState,
             fixture.casperShardConf,
             Some(validatorId),
-            disableStateExporter = true
+            disableStateExporter = true,
+            // Test with disabled Bitcoin anchor
+            coop.rchain.casper.BitcoinAnchorConf(
+              enabled = false,
+              network = "regtest",
+              esploraUrl = None,
+              feeRate = None,
+              maxFeeSats = None
+            )
           )
           .startAndForget
           .runToFuture

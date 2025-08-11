@@ -34,7 +34,14 @@ class GenesisValidatorSpec extends WordSpec {
                 fixture.blockProcessingState,
                 fixture.casperShardConf,
                 validatorId,
-                bap
+                bap,
+                coop.rchain.casper.BitcoinAnchorConf(
+                  enabled = false,
+                  network = "regtest",
+                  esploraUrl = None,
+                  feeRate = None,
+                  maxFeeSats = None
+                )
               )
             )
         _             <- engineCell.read >>= (_.handle(local, unapprovedBlock))
@@ -68,7 +75,14 @@ class GenesisValidatorSpec extends WordSpec {
                 fixture.blockProcessingState,
                 fixture.casperShardConf,
                 validatorId,
-                bap
+                bap,
+                coop.rchain.casper.BitcoinAnchorConf(
+                  enabled = false,
+                  network = "regtest",
+                  esploraUrl = None,
+                  feeRate = None,
+                  maxFeeSats = None
+                )
               )
             )
         _    <- engineCell.read >>= (_.handle(local, approvedBlockRequest))

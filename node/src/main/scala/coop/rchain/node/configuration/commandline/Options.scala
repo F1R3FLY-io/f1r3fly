@@ -541,6 +541,30 @@ final case class Options(arguments: Seq[String]) extends ScallopConf(arguments) 
       descr = "MinPhloPrice",
       validate = _ >= 0
     )
+
+    // Bitcoin Anchor options
+    val bitcoinAnchorEnabled = opt[Flag](
+      descr = "Enable Bitcoin anchoring of F1r3fly state commitments."
+    )
+
+    val bitcoinAnchorNetwork = opt[String](
+      descr = "Bitcoin network for anchoring: mainnet, signet, or regtest.",
+      default = Some("regtest")
+    )
+
+    val bitcoinAnchorEsploraUrl = opt[String](
+      descr = "Custom Esplora API URL for Bitcoin blockchain queries."
+    )
+
+    val bitcoinAnchorFeeRate = opt[Double](
+      descr = "Target fee rate in sat/vB for Bitcoin anchor transactions.",
+      validate = _ > 0
+    )
+
+    val bitcoinAnchorMaxFeeSats = opt[Long](
+      descr = "Maximum fee in satoshis for Bitcoin anchor transactions.",
+      validate = _ > 0
+    )
   }
   addSubcommand(run)
 

@@ -52,7 +52,15 @@ class InitializingSpec extends WordSpec with BeforeAndAfterEach {
           blockResponseQueue,
           stateResponseQueue,
           trimState = true,
-          disableStateExporter = false
+          disableStateExporter = false,
+          // Test with disabled Bitcoin anchor
+          coop.rchain.casper.BitcoinAnchorConf(
+            enabled = false,
+            network = "regtest",
+            esploraUrl = None,
+            feeRate = None,
+            maxFeeSats = None
+          )
         )
 
       val approvedBlockCandidate = ApprovedBlockCandidate(block = genesis, requiredSigs = 0)

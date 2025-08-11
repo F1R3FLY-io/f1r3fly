@@ -1,0 +1,39 @@
+[package]
+name = "bitcoin_anchor_ffi"
+version = "0.1.0"
+edition = "2021"
+authors = ["F1r3fly Team"]
+description = "FFI bridge for Bitcoin anchor integration with F1r3fly"
+license = "Apache-2.0"
+
+[lib]
+name = "bitcoin_anchor_ffi"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core bitcoin anchor functionality
+bitcoin-anchor = { path = "../bitcoin-anchor" }
+
+# Bitcoin types for Address
+bitcoin = "0.31"
+
+# F1r3fly models for protobuf types
+models = { path = "../models" }
+
+# Protobuf serialization
+prost = "0.13.5"
+
+# Async runtime for bitcoin operations
+tokio = { version = "1", features = ["rt"] }
+
+# Error handling
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+
+# For FFI safety and C interop
+libc = "0.2"
+
+# For hex encoding in debug logs
+hex = "0.4"

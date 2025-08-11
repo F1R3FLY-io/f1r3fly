@@ -141,7 +141,8 @@ object Engine {
       validatorId: Option[ValidatorIdentity],
       init: F[Unit],
       trimState: Boolean = true,
-      disableStateExporter: Boolean = false
+      disableStateExporter: Boolean = false,
+      bitcoinAnchorConf: coop.rchain.casper.BitcoinAnchorConf
   ): F[Unit] =
     for {
       blockResponseQueue <- Queue.bounded[F, BlockMessage](50)
@@ -156,7 +157,8 @@ object Engine {
               blockResponseQueue,
               stateResponseQueue,
               trimState,
-              disableStateExporter
+              disableStateExporter,
+              bitcoinAnchorConf
             )
           )
     } yield ()

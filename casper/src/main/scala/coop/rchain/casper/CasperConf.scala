@@ -23,7 +23,8 @@ final case class CasperConf(
     roundRobinDispatcher: RoundRobinDispatcher,
     genesisBlockData: GenesisBlockData,
     genesisCeremony: GenesisCeremonyConf,
-    minPhloPrice: Long
+    minPhloPrice: Long,
+    bitcoinAnchor: BitcoinAnchorConf
 )
 
 final case class GenesisBlockData(
@@ -54,4 +55,12 @@ final case class RoundRobinDispatcher(
     maxPeerQueueSize: Int,
     giveUpAfterSkipped: Int,
     dropPeerAfterRetries: Int
+)
+
+final case class BitcoinAnchorConf(
+    enabled: Boolean,
+    network: String,
+    esploraUrl: Option[String],
+    feeRate: Option[Double],
+    maxFeeSats: Option[Long]
 )

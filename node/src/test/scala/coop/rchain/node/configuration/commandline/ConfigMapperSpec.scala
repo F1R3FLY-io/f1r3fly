@@ -3,8 +3,16 @@ package coop.rchain.node.configuration.commandline
 import java.nio.file.Paths
 
 import scala.concurrent.duration._
-import coop.rchain.casper.{CasperConf, GenesisBlockData, GenesisCeremonyConf, RoundRobinDispatcher}
+import coop.rchain.casper.{
+  BitcoinAnchorConf,
+  CasperConf,
+  GenesisBlockData,
+  GenesisCeremonyConf,
+  RoundRobinDispatcher
+}
+import coop.rchain.casper.util.GenesisBuilder
 import coop.rchain.comm.{CommError, PeerNode}
+import coop.rchain.comm.transport.TlsConf
 import coop.rchain.node.configuration.{
   ApiServer,
   DevConf,
@@ -16,10 +24,6 @@ import coop.rchain.node.configuration.{
   Storage
 }
 import com.typesafe.config.ConfigFactory
-import coop.rchain.casper.util.GenesisBuilder
-import coop.rchain.casper.{CasperConf, GenesisBlockData, GenesisCeremonyConf, RoundRobinDispatcher}
-import coop.rchain.comm.transport.TlsConf
-import coop.rchain.comm.{CommError, PeerNode}
 import coop.rchain.node.configuration._
 import org.scalatest.{FunSuite, Matchers}
 import pureconfig._
@@ -252,7 +256,14 @@ class ConfigMapperSpec extends FunSuite with Matchers {
           genesisValidatorMode = true,
           ceremonyMasterMode = true
         ),
-        minPhloPrice = 1
+        minPhloPrice = 1,
+        bitcoinAnchor = BitcoinAnchorConf(
+          enabled = false,
+          network = "regtest",
+          esploraUrl = None,
+          feeRate = None,
+          maxFeeSats = None
+        )
       ),
       metrics = Metrics(
         prometheus = true,

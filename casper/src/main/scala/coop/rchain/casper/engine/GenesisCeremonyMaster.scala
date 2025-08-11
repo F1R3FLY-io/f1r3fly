@@ -61,7 +61,8 @@ object GenesisCeremonyMaster {
       blocksInProcessing: Ref[F, Set[BlockHash]],
       casperShardConf: CasperShardConf,
       validatorId: Option[ValidatorIdentity],
-      disableStateExporter: Boolean
+      disableStateExporter: Boolean,
+      bitcoinAnchorConf: coop.rchain.casper.BitcoinAnchorConf
   ): F[Unit] =
     for {
       // This loop sleep can be short as it does not do anything except checking if there is last approved block available
@@ -74,30 +75,37 @@ object GenesisCeremonyMaster {
                    blocksInProcessing: Ref[F, Set[BlockHash]],
                    casperShardConf,
                    validatorId,
-                   disableStateExporter
+                   disableStateExporter,
+                   bitcoinAnchorConf
                  )
                case Some(approvedBlock) =>
-                 val ab = approvedBlock.candidate.block
-                 for {
-                   _ <- insertIntoBlockAndDagStore[F](ab, approvedBlock)
-                   casper <- MultiParentCasper
-                              .hashSetCasper[F](
-                                validatorId,
-                                casperShardConf: CasperShardConf,
-                                ab
-                              )
-                   _ <- Engine
-                         .transitionToRunning[F](
-                           blockProcessingQueue,
-                           blocksInProcessing,
-                           casper,
-                           approvedBlock,
-                           validatorId,
-                           ().pure[F],
-                           disableStateExporter
-                         )
-                   _ <- CommUtil[F].sendForkChoiceTipRequest
-                 } yield ()
+                 // Bitcoin anchor service with proper configuration access
+                 coop.rchain.casper.bitcoin.BitcoinAnchorService
+                   .fromBitcoinAnchorConf[F](bitcoinAnchorConf)
+                   .use { bitcoinServiceOpt =>
+                     val ab = approvedBlock.candidate.block
+                     for {
+                       _ <- insertIntoBlockAndDagStore[F](ab, approvedBlock)
+                       casper <- MultiParentCasper
+                                  .hashSetCasper[F](
+                                    validatorId,
+                                    casperShardConf: CasperShardConf,
+                                    ab,
+                                    bitcoinServiceOpt
+                                  )
+                       _ <- Engine
+                             .transitionToRunning[F](
+                               blockProcessingQueue,
+                               blocksInProcessing,
+                               casper,
+                               approvedBlock,
+                               validatorId,
+                               ().pure[F],
+                               disableStateExporter
+                             )
+                       _ <- CommUtil[F].sendForkChoiceTipRequest
+                     } yield ()
+                   }
              }
     } yield cont
 }

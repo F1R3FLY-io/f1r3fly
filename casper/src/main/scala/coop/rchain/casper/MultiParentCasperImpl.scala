@@ -8,6 +8,7 @@ import coop.rchain.blockstorage.casperbuffer.CasperBufferStorage
 import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
 import coop.rchain.blockstorage.dag.{BlockDagRepresentation, BlockDagStorage}
 import coop.rchain.blockstorage.deploy.DeployStorage
+import coop.rchain.casper.bitcoin.{BitcoinAnchorService, F1r3flyStateCommitmentProto}
 import coop.rchain.casper.engine.BlockRetriever
 import coop.rchain.casper.finality.Finalizer
 import coop.rchain.casper.merging.BlockIndex
@@ -44,7 +45,8 @@ class MultiParentCasperImpl[F[_]
     validatorId: Option[ValidatorIdentity],
     // todo this should be read from chain, for now read from startup options
     casperShardConf: CasperShardConf,
-    approvedBlock: BlockMessage
+    approvedBlock: BlockMessage,
+    bitcoinAnchorService: Option[BitcoinAnchorService[F]] = None
 ) extends MultiParentCasper[F] {
   import MultiParentCasperImpl._
 
@@ -110,6 +112,50 @@ class MultiParentCasperImpl[F[_]
       _ <- Log[F].info(s"Received ${PrettyPrinter.buildString(deploy)}")
     } yield deploy.sig
 
+  /**
+    * Anchors the finalized block state to Bitcoin.
+    * Gathers the required commitment data and calls the Bitcoin anchor service.
+    */
+  private def anchorFinalizationToBitcoin(
+      service: BitcoinAnchorService[F],
+      lfbHash: BlockHash
+  ): F[Unit] =
+    for {
+      // Get the finalized block
+      lfbBlock <- BlockStore[F].getUnsafe(lfbHash)
+
+      // Get post-state hash (RSpace root)
+      rspaceRoot = ProtoUtil.postStateHash(lfbBlock)
+
+      // Get block height and timestamp
+      blockHeight = ProtoUtil.blockNumber(lfbBlock)
+      timestamp   = lfbBlock.header.timestamp
+
+      // Get current validator bonds to compute validator set hash
+      bonds            <- RuntimeManager[F].computeBonds(rspaceRoot)
+      validatorSetHash = BitcoinAnchorService.computeValidatorSetHash(bonds)
+
+      // Create state commitment
+      commitment = F1r3flyStateCommitmentProto(
+        lfbHash = lfbHash,
+        rspaceRoot = rspaceRoot,
+        blockHeight = blockHeight,
+        timestamp = timestamp,
+        validatorSetHash = validatorSetHash
+      )
+
+      // Anchor to Bitcoin (fire-and-forget, with error logging)
+      _ <- service.anchorFinalization(commitment).attempt.flatMap {
+            case Left(error) =>
+              Log[F].warn(
+                s"Bitcoin anchoring failed for block ${lfbHash.toHexString}: ${error.getMessage}"
+              )
+            case Right(_) =>
+              Log[F].debug(s"Successfully anchored block ${lfbHash.toHexString} to Bitcoin")
+          }
+
+    } yield ()
+
   def estimator(dag: BlockDagRepresentation[F]): F[IndexedSeq[BlockHash]] =
     Estimator[F].tips(dag, approvedBlock).map(_.tips)
 
@@ -137,8 +183,16 @@ class MultiParentCasperImpl[F[_]
       }.void
 
     def newLfbFoundEffect(newLfb: BlockHash): F[Unit] =
-      BlockDagStorage[F].recordDirectlyFinalized(newLfb, processFinalised) >>
-        EventPublisher[F].publish(RChainEvent.blockFinalised(newLfb.toHexString))
+      for {
+        // Record finalization and publish event (original logic)
+        _ <- BlockDagStorage[F].recordDirectlyFinalized(newLfb, processFinalised)
+        _ <- EventPublisher[F].publish(RChainEvent.blockFinalised(newLfb.toHexString))
+
+        // Bitcoin anchoring (if enabled)
+        _ <- bitcoinAnchorService.fold(Sync[F].unit) { service =>
+              anchorFinalizationToBitcoin(service, newLfb)
+            }
+      } yield ()
 
     implicit val ms = CasperMetricsSource
 

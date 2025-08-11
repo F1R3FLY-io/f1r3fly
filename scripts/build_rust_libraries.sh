@@ -14,3 +14,6 @@ cp -r ./target/release/librholang.* ./rust_libraries/release
 
 cargo build --release -p crypto
 cp -r ./target/release/libcrypto.* ./rust_libraries/release
+
+cargo build --release -p bitcoin_anchor_ffi
+cp -r ./target/release/libbitcoin_anchor_ffi.* ./rust_libraries/release

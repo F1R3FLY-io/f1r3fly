@@ -93,6 +93,18 @@ object ConfigMapper {
       add("casper.genesis-ceremony.autogen-shard-size", run.autogenShardSize)
       add("casper.min-phlo-price", run.minPhloPrice)
 
+      // Bitcoin Anchor configuration mappings
+      add("casper.bitcoin-anchor.enabled", run.bitcoinAnchorEnabled)
+      add("casper.bitcoin-anchor.network", run.bitcoinAnchorNetwork)
+      add("casper.bitcoin-anchor.esplora-url", run.bitcoinAnchorEsploraUrl)
+      // Note: fee-rate and max-fee-sats are optional and handled via HOCON defaults
+      if (run.bitcoinAnchorFeeRate.isDefined) {
+        map.put("casper.bitcoin-anchor.fee-rate", run.bitcoinAnchorFeeRate.get)
+      }
+      if (run.bitcoinAnchorMaxFeeSats.isDefined) {
+        map.put("casper.bitcoin-anchor.max-fee-sats", run.bitcoinAnchorMaxFeeSats.get)
+      }
+
       add("api-server.port-grpc-external", run.apiPortGrpcExternal)
       add("api-server.port-grpc-internal", run.apiPortGrpcInternal)
       add("api-server.grpc-max-recv-message-size", run.apiGrpcMaxRecvMessageSize)

@@ -159,7 +159,8 @@ case class TestNode[F[_]: Timer](
   implicit val casperEff = new MultiParentCasperImpl[F](
     validatorId,
     shardConf,
-    genesis
+    genesis,
+    None // No Bitcoin anchor service in tests
   )
 
   // implicit val rspaceMan = RSpaceStateManagerTestImpl()

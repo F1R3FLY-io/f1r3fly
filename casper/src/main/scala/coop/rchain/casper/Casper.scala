@@ -138,7 +138,8 @@ sealed abstract class MultiParentCasperInstances {
   def hashSetCasper[F[_]: Sync: Metrics: Concurrent: CommUtil: Log: Time: Timer: SafetyOracle: BlockStore: BlockDagStorage: Span: EventPublisher: SynchronyConstraintChecker: LastFinalizedHeightConstraintChecker: Estimator: DeployStorage: CasperBufferStorage: BlockRetriever](
       validatorId: Option[ValidatorIdentity],
       casperShardConf: CasperShardConf,
-      approvedBlock: BlockMessage
+      approvedBlock: BlockMessage,
+      bitcoinAnchorService: Option[coop.rchain.casper.bitcoin.BitcoinAnchorService[F]] = None
   )(implicit runtimeManager: RuntimeManager[F]): F[MultiParentCasper[F]] =
     for {
       _ <- ().pure
@@ -146,7 +147,8 @@ sealed abstract class MultiParentCasperInstances {
       new MultiParentCasperImpl(
         validatorId,
         casperShardConf,
-        approvedBlock
+        approvedBlock,
+        bitcoinAnchorService
       )
     }
 }

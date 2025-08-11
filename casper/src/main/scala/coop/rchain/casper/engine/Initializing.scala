@@ -56,7 +56,8 @@ class Initializing[F[_]
     blockMessageQueue: Queue[F, BlockMessage],
     tupleSpaceQueue: Queue[F, StoreItemsMessage],
     trimState: Boolean = true,
-    disableStateExporter: Boolean
+    disableStateExporter: Boolean,
+    bitcoinAnchorConf: coop.rchain.casper.BitcoinAnchorConf
 ) extends Engine[F] {
 
   import Engine._
@@ -257,26 +258,31 @@ class Initializing[F[_]
     } yield ()
   }
 
-  private def createCasperAndTransitionToRunning(approvedBlock: ApprovedBlock): F[Unit] = {
-    val ab = approvedBlock.candidate.block
-    for {
-      casper <- MultiParentCasper
-                 .hashSetCasper[F](
-                   validatorId,
-                   casperShardConf,
-                   ab
-                 )
-      _ <- Log[F].info("MultiParentCasper instance created.")
-      _ <- transitionToRunning[F](
-            blockProcessingQueue,
-            blocksInProcessing,
-            casper,
-            approvedBlock,
-            validatorId,
-            ().pure,
-            disableStateExporter
-          )
-      _ <- CommUtil[F].sendForkChoiceTipRequest
-    } yield ()
-  }
+  private def createCasperAndTransitionToRunning(approvedBlock: ApprovedBlock): F[Unit] =
+    // Bitcoin anchor service with proper configuration access
+    coop.rchain.casper.bitcoin.BitcoinAnchorService
+      .fromBitcoinAnchorConf[F](bitcoinAnchorConf)
+      .use { bitcoinServiceOpt =>
+        val ab = approvedBlock.candidate.block
+        for {
+          casper <- MultiParentCasper
+                     .hashSetCasper[F](
+                       validatorId,
+                       casperShardConf,
+                       ab,
+                       bitcoinServiceOpt
+                     )
+          _ <- Log[F].info("MultiParentCasper instance created.")
+          _ <- transitionToRunning[F](
+                blockProcessingQueue,
+                blocksInProcessing,
+                casper,
+                approvedBlock,
+                validatorId,
+                ().pure,
+                disableStateExporter
+              )
+          _ <- CommUtil[F].sendForkChoiceTipRequest
+        } yield ()
+      }
 }

@@ -139,32 +139,41 @@ object CasperLaunch {
           } yield ()
         }
 
-        for {
-          validatorId <- ValidatorIdentity.fromPrivateKeyWithLogging[F](conf.validatorPrivateKey)
-          ab          = approvedBlock.candidate.block
-          casper <- MultiParentCasper
-                     .hashSetCasper[F](
-                       validatorId,
-                       casperShardConf,
-                       ab
-                     )
-          init = for {
-            _ <- askPeersForForkChoiceTips
-            _ <- sendBufferPendantsToCasper(casper)
-            // try to propose (async way) if proposer is defined
-            _ <- proposeFOpt.traverse(p => p(casper, true))
-          } yield ()
-          _ <- Engine
-                .transitionToRunning[F](
-                  blockProcessingQueue,
-                  blocksInProcessing,
-                  casper,
-                  approvedBlock,
-                  validatorId,
-                  init,
-                  disableStateExporter
-                )
-        } yield ()
+        // Wrap entire engine lifecycle in Resource for memory safety
+        coop.rchain.casper.bitcoin.BitcoinAnchorService.createForEngine[F](conf).use {
+          bitcoinServiceOpt =>
+            for {
+              validatorId <- ValidatorIdentity
+                              .fromPrivateKeyWithLogging[F](conf.validatorPrivateKey)
+              ab = approvedBlock.candidate.block
+
+              // Bitcoin anchor service is now Resource-managed for memory safety
+              casper <- MultiParentCasper
+                         .hashSetCasper[F](
+                           validatorId,
+                           casperShardConf,
+                           ab,
+                           bitcoinServiceOpt // Resource guarantees cleanup on engine shutdown
+                         )
+              init = for {
+                _ <- askPeersForForkChoiceTips
+                _ <- sendBufferPendantsToCasper(casper)
+                // try to propose (async way) if proposer is defined
+                _ <- proposeFOpt.traverse(p => p(casper, true))
+              } yield ()
+              _ <- Engine
+                    .transitionToRunning[F](
+                      blockProcessingQueue,
+                      blocksInProcessing,
+                      casper,
+                      approvedBlock,
+                      validatorId,
+                      init,
+                      disableStateExporter
+                    )
+            } yield ()
+          // Bitcoin anchor service automatically cleaned up here
+        }
       }
 
       private def connectAsGenesisValidator(): F[Unit] = {
@@ -198,7 +207,8 @@ object CasperLaunch {
                   blocksInProcessing,
                   casperShardConf,
                   validatorId.get,
-                  bap
+                  bap,
+                  conf.bitcoinAnchor
                 )
               )
         } yield ()
@@ -236,7 +246,8 @@ object CasperLaunch {
                     blocksInProcessing,
                     casperShardConf,
                     validatorId,
-                    disableStateExporter
+                    disableStateExporter,
+                    conf.bitcoinAnchor
                   )
               )
           _ <- EngineCell[F].set(new GenesisCeremonyMaster[F](abp))
@@ -258,7 +269,8 @@ object CasperLaunch {
                 // from genesis to the most recent one (default)
                 CommUtil[F].requestApprovedBlock(trimState),
                 trimState,
-                disableStateExporter
+                disableStateExporter,
+                conf.bitcoinAnchor
               )
         } yield ()
 

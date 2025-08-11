@@ -192,6 +192,14 @@ object HashM extends HashMDerivation {
   implicit val Blake2b512BlockProto  = gen[rholang_scala_rust_types.Blake2b512BlockProto]
   implicit val UInt64Proto           = gen[rholang_scala_rust_types.UInt64Proto]
   implicit val Int64Proto            = gen[rholang_scala_rust_types.Int64Proto]
+
+  // Bitcoin Anchor protobuf types
+  implicit val F1r3flyStateCommitmentProtoHash =
+    gen[coop.rchain.casper.bitcoin.F1r3flyStateCommitmentProto]
+  implicit val BitcoinAnchorResultProtoHash =
+    gen[coop.rchain.casper.bitcoin.BitcoinAnchorResultProto]
+  implicit val BitcoinAnchorConfigProtoHash =
+    gen[coop.rchain.casper.bitcoin.BitcoinAnchorConfigProto]
 }
 
 trait HashMDerivation {

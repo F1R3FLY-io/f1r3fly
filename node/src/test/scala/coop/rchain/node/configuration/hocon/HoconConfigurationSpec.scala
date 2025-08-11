@@ -2,7 +2,13 @@ package coop.rchain.node.configuration.hocon
 
 import com.typesafe.config.ConfigFactory
 import coop.rchain.casper.util.GenesisBuilder
-import coop.rchain.casper.{CasperConf, GenesisBlockData, GenesisCeremonyConf, RoundRobinDispatcher}
+import coop.rchain.casper.{
+  BitcoinAnchorConf,
+  CasperConf,
+  GenesisBlockData,
+  GenesisCeremonyConf,
+  RoundRobinDispatcher
+}
 import coop.rchain.comm.transport.TlsConf
 import coop.rchain.comm.{CommError, PeerNode}
 import coop.rchain.node.configuration._
@@ -156,7 +162,14 @@ class HoconConfigurationSpec extends FunSuite with Matchers {
           genesisValidatorMode = false,
           ceremonyMasterMode = false
         ),
-        minPhloPrice = 1
+        minPhloPrice = 1,
+        bitcoinAnchor = BitcoinAnchorConf(
+          enabled = false,
+          network = "regtest",
+          esploraUrl = None,
+          feeRate = None,
+          maxFeeSats = None
+        )
       ),
       metrics = Metrics(
         prometheus = false,

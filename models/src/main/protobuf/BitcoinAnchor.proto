@@ -1,0 +1,102 @@
+/**
+ * Bitcoin Anchor protobuf definitions for F1r3fly
+ * 
+ * This file defines the protobuf messages used for Bitcoin anchoring
+ * of F1r3fly state commitments. The F1r3flyStateCommitmentProto message
+ * MUST exactly match the Rust F1r3flyStateCommitment struct fields.
+ */
+syntax = "proto3";
+
+package bitcoin_anchor;
+
+// If you are building for other languages "scalapb.proto"
+// can be manually obtained here:
+// https://raw.githubusercontent.com/scalapb/ScalaPB/master/protobuf/scalapb/scalapb.proto
+// make a scalapb directory in this file's location and place it inside
+
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  package_name: "coop.rchain.casper.bitcoin"
+  flat_package: true
+  single_file: true
+  preserve_unknown_fields: false
+};
+
+/**
+ * F1r3fly state commitment for Bitcoin anchoring.
+ * 
+ * This message EXACTLY matches the Rust F1r3flyStateCommitment struct:
+ * - Field names are identical
+ * - Field types are compatible 
+ * - Field order is preserved
+ * 
+ * DO NOT modify this structure without updating the corresponding Rust struct.
+ */
+message F1r3flyStateCommitmentProto {
+  // Last Finalized Block hash from Casper (32 bytes)
+  // Maps to: lfb_hash: [u8; 32]
+  bytes lfb_hash = 1;
+  
+  // RSpace state root hash (Blake2b256Hash from RSpace++) (32 bytes)
+  // Maps to: rspace_root: [u8; 32]
+  bytes rspace_root = 2;
+  
+  // Casper block height when finalized
+  // Maps to: block_height: i64
+  int64 block_height = 3;
+  
+  // Finalization timestamp (Unix timestamp)
+  // Maps to: timestamp: u64
+  uint64 timestamp = 4;
+  
+  // Hash of active validator set (32 bytes)
+  // Maps to: validator_set_hash: [u8; 32]
+  bytes validator_set_hash = 5;
+}
+
+/**
+ * Result of Bitcoin anchor operation returned from FFI.
+ * 
+ * This message is used to communicate the result of Bitcoin anchoring
+ * operations from Rust FFI back to Scala.
+ */
+message BitcoinAnchorResultProto {
+  // Whether the operation was successful
+  bool success = 1;
+  
+  // Error message if operation failed (empty if successful)
+  string error_message = 2;
+  
+  // Bitcoin transaction ID if successful (empty if failed)
+  string transaction_id = 3;
+  
+  // Transaction fee in satoshis (0 if failed)
+  int32 fee_sats = 4;
+  
+  // Additional context or debug information
+  string debug_info = 5;
+}
+
+/**
+ * Configuration for Bitcoin anchor operations.
+ * 
+ * This message is used to pass configuration from Scala to Rust FFI
+ * for Bitcoin network settings and operational parameters.
+ */
+message BitcoinAnchorConfigProto {
+  // Bitcoin network: "mainnet", "signet", "regtest"
+  string network = 1;
+  
+  // Whether Bitcoin anchoring is enabled
+  bool enabled = 2;
+  
+  // Esplora API URL for blockchain queries (optional)
+  string esplora_url = 3;
+  
+  // Target fee rate in sat/vB (optional, 0 = use network estimate)
+  double fee_rate = 4;
+  
+  // Maximum fee in satoshis (optional, 0 = no limit)
+  int64 max_fee_sats = 5;
+}
