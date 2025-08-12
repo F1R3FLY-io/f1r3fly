@@ -348,7 +348,6 @@ lazy val node = (project in file("node"))
   .settings(commonSettings: _*)
   .enablePlugins(JavaAppPackaging, DockerPlugin, RpmPlugin, BuildInfoPlugin)
   .settings(
-    // Universal / javaOptions ++= Seq("-J-Xmx2g"),
     runCargoBuildDocker := {
       import scala.sys.process._
       val isCrossBuild = sys.env.contains("CROSS_COMPILE")
@@ -495,8 +494,7 @@ lazy val node = (project in file("node"))
       "-J--add-opens",
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
-      "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-J-Xms6G -J-Xmx8G -J-Xss256m -J-XX:MaxMetaspaceSize=3G"
+      "-Jjava.base/sun.nio.ch=ALL-UNNAMED"
     ),
     // Replace unsupported character `+`
     version in Docker := { version.value.replace("+", "__") },
