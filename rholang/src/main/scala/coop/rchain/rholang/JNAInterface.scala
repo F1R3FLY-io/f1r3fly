@@ -65,7 +65,7 @@ trait JNAInterface extends Library {
 
   /* ADDITIONAL */
 
-  def bootstrap_registry(runtime_ptr: Pointer): Pointer
+  def bootstrap_registry(runtime_ptr: Pointer): Unit
 
   def create_runtime(rspace_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
 
