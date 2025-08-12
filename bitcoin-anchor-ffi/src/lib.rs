@@ -27,6 +27,7 @@
 use std::ffi::c_void;
 use std::ptr;
 use std::slice;
+use std::sync::Once;
 
 use prost::Message;
 use bitcoin_anchor::{F1r3flyStateCommitment, F1r3flyBitcoinAnchor, AnchorConfig};
@@ -40,6 +41,18 @@ use models::bitcoin_anchor::{
 
 /// FFI Result type for consistent error handling
 type FFIResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+/// Global logger initialization - called once when the library is loaded
+static INIT_LOGGER: Once = Once::new();
+
+fn init_logger() {
+    INIT_LOGGER.call_once(|| {
+        env_logger::Builder::from_default_env()
+            .filter_level(log::LevelFilter::Debug) // Default to Debug level
+            .init();
+        log::debug!("Bitcoin Anchor FFI logger initialized");
+    });
+}
 
 /// Opaque handle to a BitcoinAnchor instance
 pub struct BitcoinAnchorHandle {
@@ -58,6 +71,9 @@ pub extern "C" fn create_bitcoin_anchor(
     config_ptr: *const u8,
     config_len: usize,
 ) -> *mut BitcoinAnchorHandle {
+    // Initialize logger on first FFI call
+    init_logger();
+    
     match create_bitcoin_anchor_internal(config_ptr, config_len) {
         Ok(handle) => Box::into_raw(Box::new(handle)),
         Err(e) => {
@@ -291,10 +307,11 @@ fn validate_commitment_data(
     let current_time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs();
+        .as_millis() as u64;
     
-    if state_proto.timestamp > current_time + 3600 { // Allow 1 hour future tolerance
-        return Err(format!("Invalid timestamp: {} is too far in the future", state_proto.timestamp).into());
+    if state_proto.timestamp > current_time + (3600 * 1000) { // Allow 1 hour future tolerance (in milliseconds)
+        return Err(format!("Invalid timestamp: {} is too far in the future (current time: {})", 
+                          state_proto.timestamp, current_time).into());
     }
     
     // Verify that native commitment matches protobuf data

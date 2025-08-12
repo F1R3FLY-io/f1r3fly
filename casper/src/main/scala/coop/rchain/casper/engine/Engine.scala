@@ -100,7 +100,8 @@ object Engine {
       approvedBlock: ApprovedBlock,
       validatorId: Option[ValidatorIdentity],
       init: F[Unit],
-      disableStateExporter: Boolean
+      disableStateExporter: Boolean,
+      bitcoinAnchorService: Option[coop.rchain.casper.bitcoin.BitcoinAnchorService[F]] = None
   ): F[Unit] = {
     val approvedBlockInfo = PrettyPrinter.buildString(approvedBlock.candidate.block, short = true)
     for {
@@ -117,7 +118,8 @@ object Engine {
         approvedBlock,
         validatorId,
         init,
-        disableStateExporter
+        disableStateExporter,
+        bitcoinAnchorService
       )
       _ <- EngineCell[F].set(running)
 

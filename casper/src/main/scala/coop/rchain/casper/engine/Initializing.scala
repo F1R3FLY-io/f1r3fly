@@ -280,7 +280,8 @@ class Initializing[F[_]
                 approvedBlock,
                 validatorId,
                 ().pure,
-                disableStateExporter
+                disableStateExporter,
+                bitcoinServiceOpt
               )
           _ <- CommUtil[F].sendForkChoiceTipRequest
         } yield ()

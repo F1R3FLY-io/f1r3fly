@@ -169,7 +169,8 @@ object CasperLaunch {
                       approvedBlock,
                       validatorId,
                       init,
-                      disableStateExporter
+                      disableStateExporter,
+                      bitcoinServiceOpt
                     )
             } yield ()
           // Bitcoin anchor service automatically cleaned up here

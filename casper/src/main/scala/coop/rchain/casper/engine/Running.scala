@@ -264,7 +264,8 @@ class Running[F[_]
     approvedBlock: ApprovedBlock,
     validatorId: Option[ValidatorIdentity],
     theInit: F[Unit],
-    disableStateExporter: Boolean
+    disableStateExporter: Boolean,
+    bitcoinAnchorService: Option[coop.rchain.casper.bitcoin.BitcoinAnchorService[F]] = None
 ) extends Engine[F] {
 
   import Engine._

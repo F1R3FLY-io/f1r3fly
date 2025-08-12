@@ -101,7 +101,8 @@ object GenesisCeremonyMaster {
                                approvedBlock,
                                validatorId,
                                ().pure[F],
-                               disableStateExporter
+                               disableStateExporter,
+                               bitcoinServiceOpt
                              )
                        _ <- CommUtil[F].sendForkChoiceTipRequest
                      } yield ()

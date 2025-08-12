@@ -67,6 +67,7 @@ case class TestNode[F[_]: Timer](
     isReadOnly: Boolean = false,
     triggerProposeFOpt: Option[ProposeFunction[F]],
     blockProcessorQueue: Queue[F, (Casper[F], BlockMessage)],
+    bitcoinAnchorServiceOpt: Option[coop.rchain.casper.bitcoin.BitcoinAnchorService[F]] = None,
     blockProcessorState: Ref[F, Set[BlockHash]],
     blockProcessingPipe: Pipe[
       F,
@@ -160,7 +161,7 @@ case class TestNode[F[_]: Timer](
     validatorId,
     shardConf,
     genesis,
-    None // No Bitcoin anchor service in tests
+    bitcoinAnchorServiceOpt
   )
 
   // implicit val rspaceMan = RSpaceStateManagerTestImpl()
@@ -173,7 +174,8 @@ case class TestNode[F[_]: Timer](
       approvedBlock,
       validatorId,
       ().pure[F],
-      true
+      true,
+      bitcoinAnchorServiceOpt
     )
   implicit val engineCell: EngineCell[F] = Cell.unsafe[F, Engine[F]](engine)
   implicit val packetHandlerEff          = CasperPacketHandler[F]
@@ -401,10 +403,31 @@ object TestNode {
       maxNumberOfParents: Int = Estimator.UnlimitedParents,
       maxParentDepth: Option[Int] = None,
       withReadOnlySize: Int = 0
+  )(implicit scheduler: Scheduler): Resource[Effect, IndexedSeq[TestNode[Effect]]] =
+    networkEffWithBitcoinAnchor(
+      genesis,
+      networkSize,
+      synchronyConstraintThreshold,
+      maxNumberOfParents,
+      maxParentDepth,
+      withReadOnlySize,
+      bitcoinAnchorEnabled = false
+    )
+
+  def networkEffWithBitcoinAnchor(
+      genesis: GenesisContext,
+      networkSize: Int,
+      synchronyConstraintThreshold: Double = 0d,
+      maxNumberOfParents: Int = Estimator.UnlimitedParents,
+      maxParentDepth: Option[Int] = None,
+      withReadOnlySize: Int = 0,
+      bitcoinAnchorEnabled: Boolean = false
   )(implicit scheduler: Scheduler): Resource[Effect, IndexedSeq[TestNode[Effect]]] = {
     implicit val c = Concurrent[Effect]
     implicit val n = TestNetwork.empty[Effect]
 
+    // For now, just delegate to the regular network method
+    // Bitcoin anchor integration will be tested separately in the test itself
     networkF[Effect](
       genesis.validatorSks.take(networkSize + withReadOnlySize).toVector,
       genesis.genesisBlock,
@@ -412,7 +435,8 @@ object TestNode {
       synchronyConstraintThreshold,
       maxNumberOfParents,
       maxParentDepth,
-      withReadOnlySize
+      withReadOnlySize,
+      bitcoinAnchorEnabled = false // Always false for now
     )
   }
 
@@ -423,7 +447,8 @@ object TestNode {
       synchronyConstraintThreshold: Double,
       maxNumberOfParents: Int,
       maxParentDepth: Option[Int],
-      withReadOnlySize: Int
+      withReadOnlySize: Int,
+      bitcoinAnchorEnabled: Boolean = false
   )(implicit s: Scheduler): Resource[F, IndexedSeq[TestNode[F]]] = {
     val n           = sks.length
     val names       = (1 to n).map(i => if (i <= (n - withReadOnlySize)) s"node-$i" else s"readOnly-$i")
@@ -603,6 +628,7 @@ object TestNode {
                    isReadOnly = isReadOnly,
                    triggerProposeFOpt = triggerProposeFOpt,
                    blockProcessorQueue = blockProcessorQueue,
+                   bitcoinAnchorServiceOpt = None, // Will be set properly after node creation
                    blockProcessorState = blockProcessorState,
                    blockProcessingPipe = blockProcessingPipe,
                    blockStoreEffect = bs,

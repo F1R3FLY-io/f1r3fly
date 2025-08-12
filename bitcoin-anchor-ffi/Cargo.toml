@@ -31,6 +31,7 @@ thiserror = "1.0"
 
 # Logging
 log = "0.4"
+env_logger = "0.10"
 
 # For FFI safety and C interop
 libc = "0.2"

@@ -423,7 +423,7 @@ lazy val node = (project in file("node"))
     	"--platform",
     	"linux/amd64,linux/arm64",
     	"-t",
-    	"f1r3flyindustries/f1r3fly-rust-node:latest"
+    	"f1r3flyindustries/f1r3fly-rust-node:bitcoin-anchor"
     ),
     dockerCommands ++= {
       Seq(
@@ -446,8 +446,7 @@ lazy val node = (project in file("node"))
       "-J--add-opens",
       "-Jjava.base/java.nio=ALL-UNNAMED",
       "-J--add-opens",
-      "-Jjava.base/sun.nio.ch=ALL-UNNAMED",
-      "-J-Xms6G -J-Xmx8G -J-Xss256m -J-XX:MaxMetaspaceSize=3G"
+      "-Jjava.base/sun.nio.ch=ALL-UNNAMED"
     ),
     javaOptions in Test ++= Seq(
       s"-Djna.library.path=../$releaseJnaLibraryPath"
@@ -468,6 +467,8 @@ lazy val node = (project in file("node"))
     )                                                                                 -> "opt/docker/rust_libraries/release/amd64/librspace_plus_plus_rhotypes.so",
     mappings in Docker += file("rust_libraries/docker/release/aarch64/librholang.so") -> "opt/docker/rust_libraries/release/aarch64/librholang.so",
     mappings in Docker += file("rust_libraries/docker/release/amd64/librholang.so")   -> "opt/docker/rust_libraries/release/amd64/librholang.so",
+    mappings in Docker += file("rust_libraries/docker/release/aarch64/libbitcoin_anchor_ffi.so") -> "opt/docker/rust_libraries/release/aarch64/libbitcoin_anchor_ffi.so",
+    mappings in Docker += file("rust_libraries/docker/release/amd64/libbitcoin_anchor_ffi.so") -> "opt/docker/rust_libraries/release/amd64/libbitcoin_anchor_ffi.so",
     // End of sbt-native-packager settings
     connectInput := true,
     outputStrategy := Some(StdoutOutput),
