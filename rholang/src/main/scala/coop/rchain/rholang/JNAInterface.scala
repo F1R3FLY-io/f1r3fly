@@ -29,7 +29,7 @@ trait JNAInterface extends Library {
       runtime_ptr: Pointer,
       root_pointer: Pointer,
       root_bytes_len: Int
-  ): Unit
+  ): Int
 
   def get_data(
       rspace: Pointer,

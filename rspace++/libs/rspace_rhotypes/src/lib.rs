@@ -427,22 +427,31 @@ pub extern "C" fn install(
 //     Box::leak(result.into_boxed_slice()).as_ptr()
 // }
 
-// #[no_mangle]
-// pub extern "C" fn reset(rspace: *mut Space, root_pointer: *const u8, root_bytes_len: usize) -> () {
-//     // println!("\nHit reset");
+#[no_mangle]
+pub extern "C" fn reset_rspace(
+    rspace: *mut Space,
+    root_pointer: *const u8,
+    root_bytes_len: usize,
+) -> i32 {
+    let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
+    let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
-//     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
-//     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
+    let mut rs = match unsafe { (*rspace).rspace.lock() } {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            eprintln!("ERROR: failed to lock rspace in reset: poisoned");
+            poisoned.into_inner()
+        }
+    };
 
-//     unsafe {
-//         (*rspace)
-//             .rspace
-//             .lock()
-//             .unwrap()
-//             .reset(root)
-//             .expect("Rust RSpacePlusPlus Library: Failed to reset")
-//     }
-// }
+    match rs.reset(root) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("ERROR: rspace reset failed: {:?}", e);
+            1
+        }
+    }
+}
 
 // #[no_mangle]
 // pub extern "C" fn get_data(

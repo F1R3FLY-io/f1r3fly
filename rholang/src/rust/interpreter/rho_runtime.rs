@@ -356,7 +356,24 @@ impl RhoRuntime for RhoRuntimeImpl {
     }
 
     fn reset(&mut self, root: Blake2b256Hash) -> () {
-        self.reducer.space.try_lock().unwrap().reset(root).unwrap()
+        // retaining graceful behavior; detailed error handling now lives in FFI reset returning codes
+        let mut space_lock = match self.reducer.space.try_lock() {
+            Ok(lock) => lock,
+            Err(e) => {
+                println!("ERROR: failed to lock reducer.space in reset: {:?}", e);
+                return ();
+            }
+        };
+
+        match space_lock.reset(root.clone()) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("ERROR: reset failed with error: {:?}", e);
+                println!("Error details: {}", e);
+                println!("Failed root: {:?}", root);
+                return ();
+            }
+        }
     }
 
     fn consume_result(
