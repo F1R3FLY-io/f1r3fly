@@ -598,7 +598,3 @@ We use [YourKit](https://www.yourkit.com/) to profile F1r3fly performance. YourK
 ## License Information
 
 F1r3fly is licensed under the **Apache License 2.0**.
-
----
-
-**Built with ❤️ by the F1r3fly community**
