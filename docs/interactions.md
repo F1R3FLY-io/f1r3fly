@@ -157,12 +157,12 @@ for(r1 <- x){ r1!() | ⟦P⟧ } | new r2 in { x!(*r2) | for(..._ <- r2){ ⟦Q⟧
 =
 new r2, r3 in { for(r1 <- x){ r1!() | ⟦P⟧ } | x!(*r2) | for(..._ <- r2){ ⟦Q⟧ } | x!(*r3) | for(..._ <- r3){ ⟦R⟧ } }
 => x!(*r2) wins
-new r2 in { r2!() | ⟦P⟧ | for(..._ <- r2){ ⟦Q⟧ } | x!(*r3) | for(..._ <- r3){ ⟦R⟧ } }
+new r2, r3 in { r2!() | ⟦P⟧ | for(..._ <- r2){ ⟦Q⟧ } | x!(*r3) | for(..._ <- r3){ ⟦R⟧ } }
 =>
-new r2 in { ⟦P⟧ | ⟦Q⟧ }
-=
+new r2, r3 in { ⟦P⟧ | ⟦Q⟧ | x!(*r3) | for(..._ <- r3){ ⟦R⟧ }  }
+= since r2, r3 # P
 ⟦P⟧ | new r2, r3 in { ⟦Q⟧ | x!(*r3) | for(..._ <- r3){ ⟦R⟧ } }
-= since r2 # Q
+= since r2, r3 # Q
 ⟦P⟧ | ⟦Q⟧ | new r2, r3 in { x!(*r3) | for(..._ <- r3){ ⟦R⟧ } }
 = garbage collection
 ⟦P⟧ | ⟦Q⟧
