@@ -166,6 +166,10 @@ impl FixedChannels {
     pub fn grpc_tell() -> Par {
         byte_name(23)
     }
+
+    pub fn dev_null() -> Par {
+        byte_name(24)
+    }
 }
 
 pub struct BodyRefs;
@@ -191,6 +195,7 @@ impl BodyRefs {
     pub const TEXT_TO_AUDIO: i64 = 19;
     pub const RANDOM: i64 = 20;
     pub const GRPC_TELL: i64 = 21;
+    pub const DEV_NULL: i64 = 22;
 }
 
 pub fn non_deterministic_ops() -> HashSet<i64> {
@@ -932,6 +937,17 @@ impl SystemProcesses {
                 Ok(vec![Par::default()])
             }
         }
+    }
+
+    pub async fn dev_null(
+        &self,
+        contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
+    ) -> Result<Vec<Par>, InterpreterError> {
+        if self.is_contract_call().unapply(contract_args).is_none() {
+            return Err(illegal_argument_error("dev_null"));
+        }
+
+        Ok(vec![])
     }
 
     /*

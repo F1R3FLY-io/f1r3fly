@@ -319,9 +319,7 @@ impl DebruijnInterpreter {
                     let mut futures: Vec<
                         Pin<
                             Box<
-                                dyn futures::Future<
-                                    Output = Result<DispatchType, InterpreterError>,
-                                >,
+                                dyn futures::Future<Output = Result<DispatchType, InterpreterError>>,
                             >,
                         >,
                     > = vec![Box::pin(self.dispatch(
@@ -346,9 +344,7 @@ impl DebruijnInterpreter {
                     let mut futures: Vec<
                         Pin<
                             Box<
-                                dyn futures::Future<
-                                    Output = Result<DispatchType, InterpreterError>,
-                                >,
+                                dyn futures::Future<Output = Result<DispatchType, InterpreterError>>,
                             >,
                         >,
                     > = vec![Box::pin(self.dispatch(
@@ -403,9 +399,7 @@ impl DebruijnInterpreter {
                     let mut futures: Vec<
                         Pin<
                             Box<
-                                dyn futures::Future<
-                                    Output = Result<DispatchType, InterpreterError>,
-                                >,
+                                dyn futures::Future<Output = Result<DispatchType, InterpreterError>>,
                             >,
                         >,
                     > = vec![Box::pin(self.dispatch(
@@ -430,9 +424,7 @@ impl DebruijnInterpreter {
                     let mut futures: Vec<
                         Pin<
                             Box<
-                                dyn futures::Future<
-                                    Output = Result<DispatchType, InterpreterError>,
-                                >,
+                                dyn futures::Future<Output = Result<DispatchType, InterpreterError>>,
                             >,
                         >,
                     > = vec![Box::pin(self.dispatch(
@@ -876,26 +868,39 @@ impl DebruijnInterpreter {
                     // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
                     // println!("\nnew_injections: {:?}", new.injections);
                     match new.injections.get(&urn) {
-                      Some(p) => {
-                        if let Some(gunf) = RhoUnforgeable::unapply(p) {
-                          if let Some(instance) = gunf.unf_instance {
-                             Ok(new_env.put(Par::default().with_unforgeables(vec![GUnforgeable {unf_instance: Some(instance)}])))
-                          } else {
-                               Err(InterpreterError::BugFoundError("unf_instance field is None".to_string()))
-                          }
-                      } else if let Some(expr) = RhoExpression::unapply(p) {
-                          if let Some(instance) = expr.expr_instance {
-                              Ok(new_env.put(Par::default().with_exprs(vec![Expr {expr_instance: Some(instance)}])))
-                          } else {
-                               Err(InterpreterError::BugFoundError("expr_instance field is None".to_string()))
-                          }
-                      } else {
-                        Err(InterpreterError::BugFoundError("invalid injection".to_string()))
-                      }
-                      },
-                      None => {
-                        Err(InterpreterError::BugFoundError(format!("No value set for {}. This is a bug in the normalizer or on the path from it.", urn)))
-                      },
+                        Some(p) => {
+                            if let Some(gunf) = RhoUnforgeable::unapply(p) {
+                                if let Some(instance) = gunf.unf_instance {
+                                    Ok(new_env.put(Par::default().with_unforgeables(vec![
+                                        GUnforgeable {
+                                            unf_instance: Some(instance),
+                                        },
+                                    ])))
+                                } else {
+                                    Err(InterpreterError::BugFoundError(
+                                        "unf_instance field is None".to_string(),
+                                    ))
+                                }
+                            } else if let Some(expr) = RhoExpression::unapply(p) {
+                                if let Some(instance) = expr.expr_instance {
+                                    Ok(new_env.put(Par::default().with_exprs(vec![Expr {
+                                        expr_instance: Some(instance),
+                                    }])))
+                                } else {
+                                    Err(InterpreterError::BugFoundError(
+                                        "expr_instance field is None".to_string(),
+                                    ))
+                                }
+                            } else {
+                                Err(InterpreterError::BugFoundError(
+                                    "invalid injection".to_string(),
+                                ))
+                            }
+                        }
+                        None => Err(InterpreterError::BugFoundError(format!(
+                            "No value set for {}. This is a bug in the normalizer or on the path from it.",
+                            urn
+                        ))),
                     }
                 } else {
                     match self.urn_map.get(&urn) {
@@ -985,7 +990,7 @@ impl DebruijnInterpreter {
                         return Err(InterpreterError::ReduceError(format!(
                             "Unimplemented method: {}",
                             emethod.method_name
-                        )))
+                        )));
                     }
                 };
 
@@ -1675,7 +1680,7 @@ impl DebruijnInterpreter {
                             return Err(InterpreterError::ReduceError(format!(
                                 "Unimplemented method: {:?}",
                                 method_name
-                            )))
+                            )));
                         }
                     };
 
@@ -3165,6 +3170,55 @@ impl DebruijnInterpreter {
         Box::new(ToMapMethod { outer: self })
     }
 
+    fn to_string_method<'a>(&'a self) -> Box<dyn Method + 'a> {
+        struct ToStringMethod<'a> {
+            outer: &'a DebruijnInterpreter,
+        }
+
+        impl<'a> ToStringMethod<'a> {
+            fn to_string(&self, un: &GUnforgeable) -> Result<Par, InterpreterError> {
+                let unf_instance =
+                    un.unf_instance
+                        .as_ref()
+                        .ok_or_else(|| InterpreterError::MethodNotDefined {
+                            method: String::from("to_string"),
+                            other_type: String::from("None"),
+                        })?;
+
+                match unf_instance {
+                    UnfInstance::GDeployIdBody(deploy_id) => {
+                        Ok(Par::default().with_exprs(vec![Expr {
+                            expr_instance: Some(ExprInstance::GString(hex::encode(&deploy_id.sig))),
+                        }]))
+                    }
+
+                    other => Err(InterpreterError::MethodNotDefined {
+                        method: String::from("to_string"),
+                        other_type: get_unforgeable_type(other),
+                    }),
+                }
+            }
+        }
+
+        impl<'a> Method for ToStringMethod<'a> {
+            fn apply(&self, p: Par, args: Vec<Par>, _: &Env<Par>) -> Result<Par, InterpreterError> {
+                if !args.is_empty() {
+                    return Err(InterpreterError::MethodArgumentNumberMismatch {
+                        method: String::from("to_map"),
+                        expected: 0,
+                        actual: args.len(),
+                    });
+                } else {
+                    let un = self.outer.eval_single_unforgeable(&p)?;
+                    let result = self.to_string(un)?;
+                    Ok(result)
+                }
+            }
+        }
+
+        Box::new(ToStringMethod { outer: self })
+    }
+
     fn method_table<'a>(&'a self) -> HashMap<String, Box<dyn Method + 'a>> {
         let mut table = HashMap::new();
         table.insert("nth".to_string(), self.nth_method());
@@ -3188,6 +3242,7 @@ impl DebruijnInterpreter {
         table.insert("toList".to_string(), self.to_list_method());
         table.insert("toSet".to_string(), self.to_set_method());
         table.insert("toMap".to_string(), self.to_map_method());
+        table.insert("toString".to_string(), self.to_string_method());
         table
     }
 
@@ -3213,6 +3268,31 @@ impl DebruijnInterpreter {
         }
     }
 
+    fn eval_single_unforgeable<'a>(
+        &self,
+        p: &'a Par,
+    ) -> Result<&'a GUnforgeable, InterpreterError> {
+        if !p.sends.is_empty()
+            && !p.receives.is_empty()
+            && !p.news.is_empty()
+            && !p.matches.is_empty()
+            && !p.exprs.is_empty()
+            && !p.bundles.is_empty()
+        {
+            Err(InterpreterError::ReduceError(String::from(
+                "Error: non unforgeable found where unforgeable expected.",
+            )))
+        } else {
+            match p.unforgeables.as_slice() {
+                [e] => Ok(e),
+
+                _ => Err(InterpreterError::ReduceError(
+                    "Error: Multiple unforgeables given.".to_string(),
+                )),
+            }
+        }
+    }
+
     fn eval_to_i64(&self, p: &Par, env: &Env<Par>) -> Result<i64, InterpreterError> {
         if !p.sends.is_empty()
             && !p.receives.is_empty()
@@ -3228,13 +3308,17 @@ impl DebruijnInterpreter {
             // println!("\np: {:?}", p);
             // println!("\np.exprs: {:?}", p.exprs);
             match p.exprs.as_slice() {
-                [Expr {
-                    expr_instance: Some(ExprInstance::GInt(v)),
-                }] => Ok(*v),
+                [
+                    Expr {
+                        expr_instance: Some(ExprInstance::GInt(v)),
+                    },
+                ] => Ok(*v),
 
-                [Expr {
-                    expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
-                }] => {
+                [
+                    Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
+                    },
+                ] => {
                     let p = self.eval_var(&unwrap_option_safe(v.clone())?, env)?;
                     self.eval_to_i64(&p, env)
                 }
@@ -3277,13 +3361,17 @@ impl DebruijnInterpreter {
             )))
         } else {
             match p.exprs.as_slice() {
-                [Expr {
-                    expr_instance: Some(ExprInstance::GBool(b)),
-                }] => Ok(*b),
+                [
+                    Expr {
+                        expr_instance: Some(ExprInstance::GBool(b)),
+                    },
+                ] => Ok(*b),
 
-                [Expr {
-                    expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
-                }] => {
+                [
+                    Expr {
+                        expr_instance: Some(ExprInstance::EVarBody(EVar { v })),
+                    },
+                ] => {
                     let p = self.eval_var(&unwrap_option_safe(v.clone())?, env)?;
                     self.eval_to_bool(&p, env)
                 }
@@ -3475,5 +3563,14 @@ fn get_type(expr_instance: ExprInstance) -> String {
         ExprInstance::EPlusPlusBody(_) => String::from("plus plus"),
         ExprInstance::EMinusMinusBody(_) => String::from("minus minus"),
         ExprInstance::EModBody(_) => String::from("mod"),
+    }
+}
+
+fn get_unforgeable_type(inf_instance: &UnfInstance) -> String {
+    match inf_instance {
+        UnfInstance::GPrivateBody(_) => String::from("PrivateBody"),
+        UnfInstance::GDeployIdBody(_) => String::from("DeployId"),
+        UnfInstance::GDeployerIdBody(_) => String::from("DeployerId"),
+        UnfInstance::GSysAuthTokenBody(_) => String::from("SysAuthToken"),
     }
 }
