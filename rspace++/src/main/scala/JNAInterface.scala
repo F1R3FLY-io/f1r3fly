@@ -42,11 +42,11 @@ trait JNAInterface extends Library {
 
   def create_checkpoint(rspace: Pointer): Pointer
 
-  def reset(
+  def reset_rspace(
       rspace: Pointer,
       root_pointer: Pointer,
       root_bytes_len: Int
-  ): Unit
+  ): Int
 
   def get_data(
       rspace: Pointer,
