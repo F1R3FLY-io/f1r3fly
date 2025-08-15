@@ -649,7 +649,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                              override def setRoot(key: Blake2b256Hash): F[Unit] =
                                for {
                                  _ <- Sync[F].delay {
-                                       val rootBytes = root.bytes.toArray
+                                       val rootBytes = key.bytes.toArray
 
                                        val rootMemory = new Memory(rootBytes.length.toLong)
                                        rootMemory.write(0, rootBytes, 0, rootBytes.length)
@@ -1743,21 +1743,21 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
   override def reset(root: Blake2b256Hash): F[Unit] =
     for {
       _ <- Sync[F].delay {
-            // println("\nhit scala reset, root: " + root)
-            val rootBytes = root.bytes.toArray
-
+            val rootBytes  = root.bytes.toArray
             val rootMemory = new Memory(rootBytes.length.toLong)
             rootMemory.write(0, rootBytes, 0, rootBytes.length)
 
-            val _ = INSTANCE.reset(
+            val code = INSTANCE.reset_rspace(
               rspacePointer,
               rootMemory,
               rootBytes.length
             )
 
-            // Not sure if these lines are needed
-            // Need to figure out how to deallocate each memory instance
             rootMemory.clear()
+
+            if (code != 0) {
+              throw new RuntimeException(s"Rust RSpace.reset failed, code=$code")
+            }
           }
     } yield ()
 
