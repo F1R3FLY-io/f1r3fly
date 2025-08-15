@@ -60,6 +60,10 @@ object CompiledRholangSource {
     } catch {
       case e: Throwable =>
         throw new RuntimeException("Error parsing result from Rust", e)
+    } finally {
+      // Deallocate native buffer returned by Rust (includes 4-byte prefix)
+      val len = resultPtr.getInt(0)
+      RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(resultPtr, len + 4)
     }
   }
 

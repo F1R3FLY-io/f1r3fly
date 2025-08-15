@@ -65,7 +65,7 @@ trait JNAInterface extends Library {
 
   /* ADDITIONAL */
 
-  def bootstrap_registry(runtime_ptr: Pointer): Pointer
+  def bootstrap_registry(runtime_ptr: Pointer): Unit
 
   def create_runtime(rspace_ptr: Pointer, params_ptr: Pointer, params_bytes_len: Int): Pointer
 
@@ -82,6 +82,11 @@ trait JNAInterface extends Library {
   ): Pointer
 
   def source_to_adt(params_ptr: Pointer, params_bytes_len: Int): Pointer
+
+  // Leak tracking and deallocator
+  def rholang_deallocate_memory(ptr: Pointer, len: Int): Unit
+  def rholang_get_allocated_bytes(): Long
+  def rholang_reset_allocated_bytes(): Unit
 }
 
 object JNAInterfaceLoader {
