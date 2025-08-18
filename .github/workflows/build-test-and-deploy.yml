@@ -9,6 +9,7 @@ on:
     branches:
       - dev
       - preston/rholang_rust
+      - casper_rust
       - 'feature/**'
 
 env:
