@@ -1,41 +1,41 @@
-# F1r3fly Communication Subsystem
+# RNode Communication Subsystem
 
-Advanced peer-to-peer communication layer for the F1r3fly blockchain network, featuring secure TLS transport, multi-consumer streaming, and enterprise-grade concurrent messaging capabilities.
+Advanced peer-to-peer communication layer for the RNode blockchain network, featuring secure TLS transport, multi-consumer streaming, and enterprise-grade concurrent messaging capabilities.
 
-## 🏗️ F1r3fly Communication Architecture
+## 🏗️ RNode Communication Architecture
 
-The F1r3fly communication subsystem provides a robust, secure P2P transport layer built on gRPC with custom TLS certificate validation. The architecture ensures authenticated, encrypted communication between blockchain nodes while maintaining high throughput and fault tolerance.
+The RNode communication subsystem provides a robust, secure P2P transport layer built on gRPC with custom TLS certificate validation. The architecture ensures authenticated, encrypted communication between blockchain nodes while maintaining high throughput and fault tolerance.
 
 ### Core Components
 
 - **TransportLayer**: Primary interface for node-to-node communication
-- **SSL/TLS Interceptors**: Custom certificate validation using F1r3fly addressing  
+- **SSL/TLS Interceptors**: Custom certificate validation using RNode addressing  
 - **Limited Buffers**: Bounded message queues with overflow protection
 - **Stream Observable**: Multi-consumer message streaming architecture
 - **Certificate Helper**: secp256r1 certificate generation and validation
 
 ## 🔒 Security Model
 
-F1r3fly uses a unique certificate-based peer identity system:
+RNode uses a unique certificate-based peer identity system:
 
 1. **secp256r1 Key Pairs**: Each node generates an ECDSA key pair
-2. **F1r3fly Addressing**: Peer addresses derived from public key using Keccak256
-3. **Certificate Validation**: X.509 certificates validated against F1r3fly addresses
+2. **RNode Addressing**: Peer addresses derived from public key using Keccak256
+3. **Certificate Validation**: X.509 certificates validated against RNode addresses
 4. **Network Isolation**: Strict network ID validation prevents cross-network communication
 
 ### Address Calculation
 ```
-F1r3fly_Address = Keccak256(uncompressed_public_key)[12..32]  // Last 20 bytes
+RNode_Address = Keccak256(uncompressed_public_key)[12..32]  // Last 20 bytes
 ```
 
 ## 🛡️ TLS Verification Architecture
 
 ### Core TLS Verification Algorithm (Identical Across Implementations)
 
-Both Rust and Scala implementations use the same F1r3fly addressing algorithm for peer identity verification:
+Both Rust and Scala implementations use the same RNode addressing algorithm for peer identity verification:
 
 1. **secp256r1 Certificate Extraction**: Extract the public key from X.509 certificates received during TLS handshake
-2. **Address Calculation**: `F1r3fly_Address = Keccak256(uncompressed_public_key)[12..32]` (last 20 bytes, Ethereum-style)
+2. **Address Calculation**: `RNode_Address = Keccak256(uncompressed_public_key)[12..32]` (last 20 bytes, Ethereum-style)
 3. **Identity Verification**: Compare calculated address with sender ID in message headers
 4. **Network Validation**: Ensure peers are on the correct blockchain network
 
@@ -104,7 +104,7 @@ pub trait Interceptor {
 }
 ```
 
-But F1r3fly's TLS verification requires:
+But RNode's TLS verification requires:
 1. **TLS certificates** from the SSL session
 2. **Message content** (specifically the `sender` field in the Protocol header)  
 3. **Cross-validation** between certificate identity and claimed sender identity
@@ -198,7 +198,7 @@ fn validate_protocol_with_certificates(
     if let Some(certificates) = peer_certificates {
         let peer_cert = &certificates[0];
         
-        // Extract public key from certificate and calculate F1r3fly address
+        // Extract public key from certificate and calculate RNode address
         let public_key = Self::extract_public_key_from_der(peer_cert)?;
         let calculated_address = CertificateHelper::public_address(&public_key)
             .ok_or_else(|| Status::unauthenticated("Certificate verification failed"))?;
@@ -246,7 +246,7 @@ pub fn validate_tl_request(request: &Request<TlRequest>) -> Result<(), Status> {
 
 ### Benefits of This Approach
 
-1. **Maintains Security**: Same F1r3fly verification guarantees as Scala
+1. **Maintains Security**: Same RNode verification guarantees as Scala
 2. **Type Safety**: Compile-time validation of error paths
 3. **Memory Safety**: No risk of TLS context corruption or leaks
 4. **Async Compatibility**: Works with Tokio's async runtime
@@ -400,7 +400,7 @@ pub trait TransportLayer {
 ### Extended Utilities
 - **send_with_retry**: Automatic retry with exponential backoff
 - **send_to_bootstrap**: Bootstrap node communication helpers
-- **certificate validation**: Built-in F1r3fly address verification
+- **certificate validation**: Built-in RNode address verification
 
 ## 🧪 Testing Framework
 
@@ -471,4 +471,4 @@ Organizations migrating from Scala to Rust gain:
 
 ---
 
-*The Rust implementation represents a significant evolution of F1r3fly's communication architecture, maintaining full backward compatibility while providing enterprise-grade improvements in safety, performance, and concurrency.*
+*The Rust implementation represents a significant evolution of RNode's communication architecture, maintaining full backward compatibility while providing enterprise-grade improvements in safety, performance, and concurrency.*

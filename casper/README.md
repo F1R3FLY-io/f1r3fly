@@ -1,4 +1,4 @@
-# RChain Node
+# RNode Casper
 
 ## slowcooker
 
@@ -9,7 +9,7 @@ command:
 
 ### The idea
 
-- have a set of commands that are valid actions on RChain
+- have a set of commands that are valid actions on RNode
 - have mechanics that generate and run these commands
 - gather results and validate those
 

@@ -1,6 +1,6 @@
 # rspace
 
-The **R**Chain Tuple **Space**
+The **R**Node Tuple **Space**
 
 ### Overview
 
@@ -35,7 +35,7 @@ For more information and detailed instructions on using `rspace`, see the tutori
 To use `rspace` in a Scala project, add the following coordinates your build:
 
 ```
-coop.rchain %% rspace % "0.1.1"
+coop.f1r3fly %% rspace % "0.1.1"
 ```
 
 ### Issues
