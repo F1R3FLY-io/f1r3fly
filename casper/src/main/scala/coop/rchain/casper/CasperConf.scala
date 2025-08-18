@@ -60,6 +60,7 @@ final case class RoundRobinDispatcher(
 final case class BitcoinAnchorConf(
     enabled: Boolean,
     network: String,
+    distributed: Boolean,
     esploraUrl: Option[String],
     feeRate: Option[Double],
     maxFeeSats: Option[Long]

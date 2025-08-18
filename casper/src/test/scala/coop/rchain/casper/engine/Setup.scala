@@ -174,7 +174,8 @@ object Setup {
       genesisParams.proofOfStake.maximumBond,
       genesisParams.proofOfStake.epochLength,
       genesisParams.proofOfStake.quarantineLength,
-      1
+      1,
+      true
     )
   }
   private def endpoint(port: Int): Endpoint = Endpoint("host", port, port)

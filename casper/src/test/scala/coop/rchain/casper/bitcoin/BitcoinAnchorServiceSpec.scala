@@ -34,7 +34,9 @@ class BitcoinAnchorServiceSpec extends WordSpec {
           assert(result.success == true)
           assert(result.errorMessage == "")
           assert(result.transactionId.nonEmpty)
-          assert(result.transactionId.startsWith("mock_tx_"))
+          // Real Bitcoin transaction ID should be 64 characters hex string
+          assert(result.transactionId.length == 64)
+          assert(result.transactionId.matches("[0-9a-f]+"))
           assert(result.feeSats >= 0)
         }
       }

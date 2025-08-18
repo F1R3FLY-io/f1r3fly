@@ -77,6 +77,7 @@ object BitcoinAnchorTestUtils {
     bitcoinAnchor = BitcoinAnchorConf(
       enabled = true,
       network = "regtest",
+      distributed = true,
       esploraUrl = None,
       feeRate = Some(1.0),
       maxFeeSats = Some(100000L)
@@ -87,6 +88,7 @@ object BitcoinAnchorTestUtils {
     bitcoinAnchor = BitcoinAnchorConf(
       enabled = false,
       network = "regtest",
+      distributed = false,
       esploraUrl = None,
       feeRate = None,
       maxFeeSats = None

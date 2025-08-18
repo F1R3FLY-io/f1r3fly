@@ -3,6 +3,7 @@ package coop.rchain.casper
 import cats.data.EitherT
 import cats.effect.{Concurrent, Sync, Timer}
 import cats.syntax.all._
+import com.google.protobuf.ByteString
 import coop.rchain.blockstorage._
 import coop.rchain.blockstorage.casperbuffer.CasperBufferStorage
 import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
@@ -113,8 +114,97 @@ class MultiParentCasperImpl[F[_]
     } yield deploy.sig
 
   /**
+    * Calculates the deterministic index of a validator in the sorted bonds list.
+    * Returns -1 if the validator is not found in the bonds.
+    *
+    * @param validatorId The validator identity to find
+    * @param bonds The current bonds list from consensus
+    * @return The validator's index in the sorted list, or -1 if not found
+    */
+  private def getValidatorIndex(
+      validatorId: ValidatorIdentity,
+      bonds: Seq[Bond]
+  ): Int =
+    try {
+      // Validate inputs
+      if (validatorId == null || validatorId.publicKey == null) {
+        return -1
+      }
+
+      if (bonds == null || bonds.isEmpty) {
+        return -1
+      }
+
+      // Sort bonds by validator public key for deterministic ordering
+      val sortedBonds = bonds.sortBy(_.validator.toStringUtf8)
+      val myPubKey    = ByteString.copyFrom(validatorId.publicKey.bytes)
+      sortedBonds.indexWhere(_.validator == myPubKey)
+    } catch {
+      case _: Exception =>
+        // Any error in validator index calculation should result in -1 (not found)
+        -1
+    }
+
+  /**
+    * Determines if this validator should perform Bitcoin anchoring for the given block.
+    * Uses deterministic selection based on block height and validator bonds.
+    *
+    * @param blockHeight The height of the block being finalized
+    * @param validatorId The optional validator identity of this node
+    * @param bonds The current validator bonds from consensus
+    * @return Either an error string or boolean indicating if this validator should anchor
+    */
+  private def shouldPerformAnchor(
+      blockHeight: Long,
+      validatorId: Option[ValidatorIdentity],
+      bonds: Seq[Bond]
+  ): Either[String, Boolean] = {
+    // Validate block height
+    if (blockHeight < 0) {
+      return Left(s"Invalid block height: $blockHeight (must be >= 0)")
+    }
+
+    validatorId match {
+      case None =>
+        // Bootstrap/observer nodes never anchor (no ValidatorIdentity)
+        Right(false)
+      case Some(id) =>
+        if (bonds.isEmpty) {
+          // No validators in bonds, no anchoring possible
+          Left("Empty bonds list - no validators available for anchoring")
+        } else {
+          // Validate bonds list
+          val invalidBonds = bonds.filter(bond => bond.validator == null || bond.validator.isEmpty)
+          if (invalidBonds.nonEmpty) {
+            return Left(
+              s"Invalid bonds detected: ${invalidBonds.length} bonds with null/empty validator keys"
+            )
+          }
+
+          val myIndex = getValidatorIndex(id, bonds)
+          if (myIndex < 0) {
+            // This validator is not in the bonds list
+            Right(false)
+          } else {
+            try {
+              // Deterministic selection: validator at (blockHeight % bondsCount) anchors
+              val selectedIndex = (blockHeight % bonds.length).toInt
+              Right(selectedIndex == myIndex)
+            } catch {
+              case e: ArithmeticException =>
+                Left(s"Arithmetic error in validator selection: ${e.getMessage}")
+              case e: Exception =>
+                Left(s"Unexpected error in validator selection: ${e.getMessage}")
+            }
+          }
+        }
+    }
+  }
+
+  /**
     * Anchors the finalized block state to Bitcoin.
     * Gathers the required commitment data and calls the Bitcoin anchor service.
+    * Uses distributed coordination to ensure only one validator anchors per block.
     */
   private def anchorFinalizationToBitcoin(
       service: BitcoinAnchorService[F],
@@ -135,23 +225,86 @@ class MultiParentCasperImpl[F[_]
       bonds            <- RuntimeManager[F].computeBonds(rspaceRoot)
       validatorSetHash = BitcoinAnchorService.computeValidatorSetHash(bonds)
 
-      // Create state commitment
-      commitment = F1r3flyStateCommitmentProto(
-        lfbHash = lfbHash,
-        rspaceRoot = rspaceRoot,
-        blockHeight = blockHeight,
-        timestamp = timestamp,
-        validatorSetHash = validatorSetHash
-      )
+      // Distributed anchoring: check if this validator should anchor
+      distributedMode = casperShardConf.bitcoinAnchorDistributed
+      anchorResult = if (distributedMode) {
+        shouldPerformAnchor(blockHeight, validatorId, bonds)
+      } else {
+        Right(true) // All-nodes behavior (current)
+      }
 
-      // Anchor to Bitcoin (fire-and-forget, with error logging)
-      _ <- service.anchorFinalization(commitment).attempt.flatMap {
+      _ <- anchorResult match {
             case Left(error) =>
-              Log[F].warn(
-                s"Bitcoin anchoring failed for block ${lfbHash.toHexString}: ${error.getMessage}"
-              )
+              Log[F].error(s"Bitcoin anchor validation failed for block $blockHeight: $error")
             case Right(_) =>
-              Log[F].debug(s"Successfully anchored block ${lfbHash.toHexString} to Bitcoin")
+              ().pure[F]
+          }
+
+      shouldAnchor = anchorResult.getOrElse(false)
+
+      _ <- if (shouldAnchor) {
+            // This validator is selected - perform anchoring
+            {
+              val myIndex       = validatorId.map(id => getValidatorIndex(id, bonds)).getOrElse(-1)
+              val selectedIndex = if (bonds.nonEmpty) (blockHeight % bonds.size).toInt else -1
+
+              for {
+                _ <- Log[F].info(
+                      s"Bitcoin anchor: SELECTED validator for block $blockHeight " +
+                        s"(my index: $myIndex, selected index: $selectedIndex, distributed: $distributedMode)"
+                    )
+
+                // Create state commitment
+                commitment = F1r3flyStateCommitmentProto(
+                  lfbHash = lfbHash,
+                  rspaceRoot = rspaceRoot,
+                  blockHeight = blockHeight,
+                  timestamp = timestamp,
+                  validatorSetHash = validatorSetHash
+                )
+
+                // Anchor to Bitcoin (fire-and-forget, with comprehensive error logging)
+                _ <- service.anchorFinalization(commitment).attempt.flatMap {
+                      case Left(error) =>
+                        // Log detailed error information for troubleshooting
+                        error match {
+                          case timeout: java.util.concurrent.TimeoutException =>
+                            Log[F].warn(
+                              s"Bitcoin anchoring timeout for block ${lfbHash.toHexString}: ${error.getMessage}"
+                            )
+                          case network: java.net.ConnectException =>
+                            Log[F].warn(
+                              s"Bitcoin network connection failed for block ${lfbHash.toHexString}: ${error.getMessage}"
+                            )
+                          case _ =>
+                            Log[F].warn(
+                              s"Bitcoin anchoring failed for block ${lfbHash.toHexString}: ${error.getClass.getSimpleName}: ${error.getMessage}"
+                            )
+                        }
+                      case Right(_) =>
+                        Log[F].info(
+                          s"Successfully anchored block ${lfbHash.toHexString} to Bitcoin (validator $myIndex)"
+                        )
+                    }
+              } yield ()
+            }
+          } else {
+            // Not selected - skip anchoring
+            val reason = if (!distributedMode) {
+              "distributed mode disabled"
+            } else {
+              validatorId match {
+                case None => "not a validator (bootstrap/observer node)"
+                case Some(id) =>
+                  val myIndex = getValidatorIndex(id, bonds)
+                  if (myIndex < 0) "validator not found in bonds"
+                  else {
+                    val selectedIndex = if (bonds.nonEmpty) (blockHeight % bonds.size).toInt else -1
+                    s"not selected (my index: $myIndex, selected index: $selectedIndex)"
+                  }
+              }
+            }
+            Log[F].info(s"Bitcoin anchor: SKIPPED for block $blockHeight - $reason")
           }
 
     } yield ()

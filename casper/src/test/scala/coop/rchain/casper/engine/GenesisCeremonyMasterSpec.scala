@@ -62,6 +62,7 @@ class GenesisCeremonyMasterSpec extends WordSpec {
             coop.rchain.casper.BitcoinAnchorConf(
               enabled = false,
               network = "regtest",
+              distributed = false,
               esploraUrl = None,
               feeRate = None,
               maxFeeSats = None
