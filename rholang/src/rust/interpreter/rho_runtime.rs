@@ -355,7 +355,7 @@ impl RhoRuntime for RhoRuntimeImpl {
         checkpoint
     }
 
-    fn reset(&mut self, root: Blake2b256Hash) -> () {
+    fn reset(&mut self, root: &Blake2b256Hash) -> () {
         // retaining graceful behavior; detailed error handling now lives in FFI reset returning codes
         let mut space_lock = match self.reducer.space.try_lock() {
             Ok(lock) => lock,
@@ -365,7 +365,7 @@ impl RhoRuntime for RhoRuntimeImpl {
             }
         };
 
-        match space_lock.reset(root.clone()) {
+        match space_lock.reset(root) {
             Ok(_) => (),
             Err(e) => {
                 println!("ERROR: reset failed with error: {:?}", e);

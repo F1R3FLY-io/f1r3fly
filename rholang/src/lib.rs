@@ -866,14 +866,7 @@ extern "C" fn reset(
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
     // Access underlying space directly to capture Result and map to error code
-    let runtime_arc = unsafe { (*runtime_ptr).runtime.clone() };
-    let mut runtime = match runtime_arc.try_lock() {
-        Ok(rt) => rt,
-        Err(e) => {
-            eprintln!("ERROR: failed to lock runtime in reset: {:?}", e);
-            return 2; // lock error
-        }
-    };
+    let runtime = unsafe { &mut (*runtime_ptr).runtime };
 
     let mut space_lock = match runtime.reducer.space.try_lock() {
         Ok(lock) => lock,
@@ -883,7 +876,7 @@ extern "C" fn reset(
         }
     };
 
-    match space_lock.reset(root) {
+    match space_lock.reset(&root) {
         Ok(_) => 0,
         Err(e) => {
             eprintln!("ERROR: reset failed: {:?}", e);

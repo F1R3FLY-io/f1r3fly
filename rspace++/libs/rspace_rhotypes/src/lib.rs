@@ -445,7 +445,7 @@ pub extern "C" fn reset_rspace(
         }
     };
 
-    match rs.reset(root) {
+    match rs.reset(&root) {
         Ok(_) => 0,
         Err(e) => {
             eprintln!("ERROR: rspace reset failed: {:?}", e);

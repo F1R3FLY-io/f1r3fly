@@ -18,10 +18,6 @@ use rspace_plus_plus::rspace::shared::{
     rspace_store_manager::mk_rspace_store_manager,
 };
 
-use crate::rust::interpreter::matcher::r#match::Matcher;
-use crate::rust::interpreter::rho_runtime;
-use crate::RhoRuntimeImpl;
-
 pub fn mk_temp_dir(prefix: &str) -> PathBuf {
     let temp_dir = Builder::new()
         .prefix(prefix)
@@ -76,8 +72,8 @@ pub async fn create_runtimes(
     init_registry: bool,
     additional_system_processes: &mut Vec<Definition>,
 ) -> (
-    Arc<Mutex<RhoRuntimeImpl>>,
-    Arc<Mutex<RhoRuntimeImpl>>,
+    RhoRuntimeImpl,
+    RhoRuntimeImpl,
     Arc<Box<dyn HistoryRepository<Par, BindPattern, ListParWithRandom, TaggedContinuation>>>,
 ) {
     let hrstores =
