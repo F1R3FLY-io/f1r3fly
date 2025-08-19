@@ -134,7 +134,7 @@ docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;
 
 **Cross-Platform Build** (Production - AMD64 + ARM64):
 ```bash
-docker context use default && CROSS_COMPILE=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+docker context use default && MULTI_ARCH=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 ```
 
 Both create: `f1r3flyindustries/f1r3fly-rust-node:latest`
@@ -252,7 +252,7 @@ sbt ";compile ;project node ;assembly ;project rchain"
 docker context use default && sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 
 # Docker image (cross-platform - for production)
-docker context use default && CROSS_COMPILE=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
+docker context use default && MULTI_ARCH=true sbt ";compile ;project node ;Docker/publishLocal ;project rchain"
 
 # Clean build
 sbt "clean"

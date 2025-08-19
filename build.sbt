@@ -346,7 +346,7 @@ lazy val node = (project in file("node"))
   .settings(
     runCargoBuildDocker := {
       import scala.sys.process._
-      val isCrossBuild = sys.env.contains("CROSS_COMPILE")
+      val isCrossBuild = sys.env.contains("MULTI_ARCH")
       val script = if (isCrossBuild) {
         "./scripts/build_rust_libraries_docker.sh"
       } else {
@@ -450,7 +450,7 @@ lazy val node = (project in file("node"))
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
     dockerBuildOptions := {
-      val isCrossBuild = sys.env.contains("CROSS_COMPILE")
+      val isCrossBuild = sys.env.contains("MULTI_ARCH")
       if (isCrossBuild) {
         Seq(
           "--builder",
@@ -504,7 +504,7 @@ lazy val node = (project in file("node"))
     },
     mappings in Docker += file("scripts/docker-entrypoint.sh") -> "/opt/docker/bin/docker-entrypoint.sh",
     mappings in Docker ++= {
-      val isCrossBuild = sys.env.contains("CROSS_COMPILE")
+      val isCrossBuild = sys.env.contains("MULTI_ARCH")
       if (isCrossBuild) {
         // Cross-compilation: Include both architectures
         Seq(
