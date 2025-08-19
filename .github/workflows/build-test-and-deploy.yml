@@ -555,7 +555,7 @@ jobs:
       - required_integration_tests
       - build_docker_image
       - build_base
-    if: "github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/trying' || github.ref == 'refs/heads/rust-v')"
+    if: "github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/trying' || github.ref == 'refs/heads/staging')"
     runs-on: ubuntu-latest
     steps:
       - name: Enable Containerd Image Store
