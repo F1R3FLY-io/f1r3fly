@@ -35,13 +35,6 @@ use models::{
         },
     },
 };
-use models::{
-    rhoapi::{
-        tagged_continuation::TaggedCont, BindPattern, Expr, ListParWithRandom, Par, ParWithRandom,
-        Send, TaggedContinuation,
-    },
-    rust::utils::{new_eplus_par_gint, new_gint_expr, new_gint_par},
-};
 use prost::Message;
 use rholang::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
