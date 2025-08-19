@@ -636,6 +636,8 @@ jobs:
   # GitHub (create) release and packages
   release_packages:
     name: Release Packages
+    permissions:
+      contents: write  # Required for creating/updating releases
     needs:
       - required_rust_unit_tests
       - required_scala_unit_tests
