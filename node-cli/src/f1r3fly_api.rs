@@ -10,7 +10,6 @@ use models::casper::{
     ProposeQuery,
 };
 use models::rhoapi::Par;
-use models::ByteString;
 use prost::Message;
 use secp256k1::{Message as Secp256k1Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};

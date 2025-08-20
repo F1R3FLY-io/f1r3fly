@@ -1764,9 +1764,15 @@ impl DebruijnInterpreter {
 
         impl<'a> ToByteArrayMethod<'a> {
             fn serialize(&self, p: &Par) -> Result<Vec<u8>, InterpreterError> {
-                // Use protobuf serialization to match Scala implementation
-                // Scala uses: Serialize[Par].encode(p).toArray which is protobuf
-                Ok(p.encode_to_vec())
+                match bincode::serialize(p) {
+                  Ok(serialized) => Ok(serialized),
+                  Err(err) => {
+                      return Err(InterpreterError::ReduceError(format!(
+                          "Error thrown when serializing: {}",
+                          err
+                      )));
+                  }
+              }
             }
         }
 

@@ -168,6 +168,11 @@ jobs:
           - rspace++
           - shared
           - models
+          - casper
+          - node
+          - block-storage
+          - comm
+          - graphz
     steps:
       - name: Clone Repository
         uses: actions/checkout@v4
@@ -637,6 +642,8 @@ jobs:
   # GitHub (create) release and packages
   release_packages:
     name: Release Packages
+    permissions:
+      contents: write  # Required for creating/updating releases
     needs:
       - required_rust_unit_tests
       - required_scala_unit_tests
