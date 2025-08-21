@@ -7,7 +7,8 @@ use crate::bitcoin::esplora::EsploraClient;
 use crate::bitcoin::esplora::EsploraUtxo;
 
 // bp-std PSBT infrastructure
-use bitcoin::{Address, Amount, OutPoint, ScriptBuf, TxOut as BitcoinTxOut};
+use base64::Engine;
+use bitcoin::{Address, Amount, OutPoint, PrivateKey, ScriptBuf, TxOut as BitcoinTxOut};
 use bpstd::psbt::{Beneficiary, Psbt, PsbtVer, UnsignedTx, UnsignedTxIn, Utxo};
 use bpstd::{
     LockTime, Network, Outpoint, Sats, ScriptPubkey, SeqNo, TxOut, TxVer, Txid, VarIntArray, Vout,
@@ -108,6 +109,12 @@ pub struct PsbtTransaction {
 }
 
 impl PsbtTransaction {
+    /// Get the network for this PSBT transaction
+    fn network(&self) -> bpstd::Network {
+        // For now, we'll need to store network in PsbtTransaction or infer it
+        // This is a simplified implementation - in practice you'd store network in the struct
+        bpstd::Network::Signet // Default to signet for F1r3fly testing
+    }
     /// Get the commitment output if it exists
     pub fn commitment_output(&self) -> Option<&BitcoinTxOut> {
         // Note: This is a simplified implementation
@@ -118,6 +125,146 @@ impl PsbtTransaction {
     /// Get the PSBT transaction ID
     pub fn txid(&self) -> Txid {
         self.psbt.txid()
+    }
+
+    /// Sign PSBT with private key (no Bitcoin Core needed!)
+    ///
+    /// This method signs the PSBT directly using the provided private key
+    /// and finalizes it into a complete transaction ready for broadcasting.
+    ///
+    /// NOTE: This is a simplified implementation that assumes P2WPKH addresses.
+    /// For production, this would need to handle multiple script types.
+    pub fn sign_with_private_key(&mut self, private_key: &PrivateKey) -> AnchorResult<()> {
+        use bitcoin::secp256k1::{Message, Secp256k1};
+        use bitcoin::sighash::{EcdsaSighashType, SighashCache};
+        use bitcoin::Witness;
+
+        let secp = Secp256k1::new();
+
+        // Convert bp-std PSBT to bitcoin PSBT for signing
+        let psbt_base64 = self.psbt.to_string();
+        let psbt_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&psbt_base64)
+            .map_err(|e| {
+                crate::error::AnchorError::Psbt(format!("PSBT base64 decode failed: {}", e))
+            })?;
+        let mut bitcoin_psbt = bitcoin::Psbt::deserialize(&psbt_bytes).map_err(|e| {
+            crate::error::AnchorError::Psbt(format!("PSBT deserialization failed: {}", e))
+        })?;
+
+        // Get the compressed public key for this private key
+        let compressed_public_key =
+            bitcoin::CompressedPublicKey::from_private_key(&secp, private_key).map_err(|e| {
+                crate::error::AnchorError::Psbt(format!(
+                    "Failed to get compressed public key: {}",
+                    e
+                ))
+            })?;
+
+        // Convert to the network type for address derivation
+        let bitcoin_network = match self.network() {
+            bpstd::Network::Mainnet => bitcoin::Network::Bitcoin,
+            bpstd::Network::Testnet3 => bitcoin::Network::Testnet,
+            bpstd::Network::Regtest => bitcoin::Network::Regtest,
+            bpstd::Network::Signet => bitcoin::Network::Signet,
+            _ => bitcoin::Network::Regtest,
+        };
+
+        // Create the expected address for this private key
+        let expected_address =
+            bitcoin::Address::p2wpkh(&compressed_public_key, bitcoin_network).script_pubkey();
+
+        // Sign each input that belongs to this key
+        for (input_index, input) in bitcoin_psbt.inputs.iter_mut().enumerate() {
+            // Check if this input's scriptPubKey matches our key's address
+            if let Some(witness_utxo) = &input.witness_utxo {
+                if witness_utxo.script_pubkey == expected_address {
+                    // This input belongs to our key - sign it
+
+                    // Create signature hash for this input (P2WPKH)
+                    let mut sighash_cache = SighashCache::new(&bitcoin_psbt.unsigned_tx);
+                    let sighash = sighash_cache
+                        .p2wpkh_signature_hash(
+                            input_index,
+                            &witness_utxo.script_pubkey,
+                            witness_utxo.value,
+                            EcdsaSighashType::All,
+                        )
+                        .map_err(|e| {
+                            crate::error::AnchorError::Psbt(format!(
+                                "Sighash calculation failed: {}",
+                                e
+                            ))
+                        })?;
+
+                    // Sign the hash
+                    let message = Message::from_digest_slice(sighash.as_ref()).map_err(|e| {
+                        crate::error::AnchorError::Psbt(format!("Message creation failed: {}", e))
+                    })?;
+
+                    let signature = secp.sign_ecdsa(&message, &private_key.inner);
+
+                    // Create DER encoded signature with SIGHASH_ALL
+                    let mut sig_bytes = signature.serialize_der().to_vec();
+                    sig_bytes.push(EcdsaSighashType::All as u8);
+
+                    // Set the final witness for P2WPKH
+                    input.final_script_witness = Some(Witness::from_slice(&[
+                        sig_bytes,
+                        compressed_public_key.to_bytes().to_vec(),
+                    ]));
+
+                    // Clear partial signatures since we have final witness
+                    input.partial_sigs.clear();
+                }
+            }
+        }
+
+        // Update our internal PSBT with the signed version
+        let signed_psbt_bytes = bitcoin_psbt.serialize();
+        let signed_psbt_str = base64::engine::general_purpose::STANDARD.encode(&signed_psbt_bytes);
+        self.psbt = bpstd::psbt::Psbt::from_str(&signed_psbt_str)
+            .map_err(|e| crate::error::AnchorError::Psbt(format!("PSBT update failed: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Extract final transaction hex for broadcasting
+    ///
+    /// This method extracts the final signed transaction from the PSBT
+    /// and returns it as a hex string ready for broadcasting.
+    pub fn extract_signed_transaction_hex(&self) -> AnchorResult<String> {
+        // Convert bp-std PSBT to bitcoin PSBT for extraction
+        let psbt_base64 = self.psbt.to_string();
+        let psbt_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&psbt_base64)
+            .map_err(|e| {
+                crate::error::AnchorError::Psbt(format!("PSBT base64 decode failed: {}", e))
+            })?;
+        let bitcoin_psbt = bitcoin::Psbt::deserialize(&psbt_bytes).map_err(|e| {
+            crate::error::AnchorError::Psbt(format!("PSBT deserialization failed: {}", e))
+        })?;
+
+        // Check if PSBT is fully signed by verifying all inputs have final scripts
+        for (i, input) in bitcoin_psbt.inputs.iter().enumerate() {
+            if input.final_script_witness.is_none() && input.final_script_sig.is_none() {
+                return Err(crate::error::AnchorError::Psbt(format!(
+                    "Input {} is not signed - PSBT must be fully signed before extracting transaction",
+                    i
+                )));
+            }
+        }
+
+        // Extract the final transaction from the signed PSBT
+        let final_tx = bitcoin_psbt.extract_tx().map_err(|e| {
+            crate::error::AnchorError::Psbt(format!("Transaction extraction failed: {}", e))
+        })?;
+
+        // Serialize to hex
+        use bitcoin::consensus::encode::serialize_hex;
+        let tx_hex = serialize_hex(&final_tx);
+
+        Ok(tx_hex)
     }
 
     /// Convert PSBT to raw transaction hex (after external signing)
@@ -135,12 +282,8 @@ impl PsbtTransaction {
             }
         }
 
-        // For now, return an error indicating external signing is required
-        // In a real implementation, this would work with the specific PSBT library being used
-        Err(crate::error::AnchorError::Psbt(
-            "PSBT must be signed externally and transaction hex provided directly for broadcasting"
-                .to_string(),
-        ))
+        // Use the new extract method
+        self.extract_signed_transaction_hex()
     }
 
     /// Check if PSBT is fully signed and ready for broadcasting
@@ -361,8 +504,11 @@ impl AnchorPsbt {
         sorted_utxos.sort_by(|a, b| b.amount.cmp(&a.amount));
 
         // For testing networks (regtest, signet, testnet), allow unconfirmed UTXOs
-        let use_unconfirmed = matches!(self.network, Network::Regtest | Network::Signet | Network::Testnet3);
-        
+        let use_unconfirmed = matches!(
+            self.network,
+            Network::Regtest | Network::Signet | Network::Testnet3
+        );
+
         let available_utxos: Vec<_> = if use_unconfirmed {
             // For test networks: use all UTXOs (confirmed and unconfirmed)
             sorted_utxos

@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 bitcoin-anchor = { path = "../bitcoin-anchor" }
 
 # Bitcoin types for Address
-bitcoin = "0.31"
+bitcoin = "0.32"
 
 # F1r3fly models for protobuf types
 models = { path = "../models" }

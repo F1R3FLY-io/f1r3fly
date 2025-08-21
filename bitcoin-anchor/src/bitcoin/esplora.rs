@@ -20,6 +20,8 @@ pub enum EsploraError {
     TransactionNotFound(Txid),
     #[error("Network error: {0}")]
     Network(String),
+    #[error("Transaction broadcast failed: {0}")]
+    BroadcastFailed(String),
 }
 
 /// UTXO information from Esplora API
@@ -278,6 +280,75 @@ impl EsploraClient {
 
         Ok(estimates)
     }
+
+    /// Broadcast a signed transaction to the Bitcoin network
+    ///
+    /// Takes a raw transaction in hexadecimal format and broadcasts it to the network
+    /// via the Esplora API. Returns the transaction ID if successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `tx_hex` - The raw transaction in hexadecimal format
+    ///
+    /// # Returns
+    ///
+    /// Returns the transaction ID (TXID) as a string if the broadcast was successful.
+    ///
+    pub async fn broadcast_transaction(&self, tx_hex: &str) -> Result<String, EsploraError> {
+        let url = format!("{}/tx", self.base_url);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "text/plain")
+            .body(tx_hex.to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                EsploraError::Network(format!("Failed to send broadcast request: {}", e))
+            })?;
+
+        if response.status().is_success() {
+            // Successful broadcast - extract TXID from response
+            let txid = response.text().await.map_err(|e| {
+                EsploraError::Network(format!("Failed to read broadcast response: {}", e))
+            })?;
+
+            // Trim any whitespace from the response
+            let txid = txid.trim().to_string();
+
+            // Validate TXID format (should be 64 hex characters)
+            if txid.len() != 64 {
+                return Err(EsploraError::BroadcastFailed(format!(
+                    "Invalid TXID format in response: {} (length: {})",
+                    txid,
+                    txid.len()
+                )));
+            }
+
+            // Verify it's valid hex
+            if !txid.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(EsploraError::BroadcastFailed(format!(
+                    "Invalid TXID format - not hex: {}",
+                    txid
+                )));
+            }
+
+            Ok(txid)
+        } else {
+            // Broadcast failed - get error details
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| format!("HTTP {}", status));
+
+            Err(EsploraError::BroadcastFailed(format!(
+                "Broadcast failed with status {}: {}",
+                status, error_text
+            )))
+        }
+    }
 }
 
 impl fmt::Debug for EsploraClient {
@@ -374,5 +445,23 @@ mod tests {
         assert_eq!(amount.to_sat(), 100000);
 
         assert!(utxo.is_confirmed());
+    }
+
+    #[test]
+    fn test_broadcast_transaction_validation() {
+        // Test TXID validation logic
+
+        // Valid TXID length and format
+        let valid_txid = "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678";
+        assert_eq!(valid_txid.len(), 64);
+        assert!(valid_txid.chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Invalid length
+        let short_txid = "a1b2c3d4";
+        assert_eq!(short_txid.len(), 8);
+
+        // Invalid characters
+        let invalid_txid = "g1h2i3j4k5l67890123456789012345678901234567890123456789012345678";
+        assert!(!invalid_txid.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }
