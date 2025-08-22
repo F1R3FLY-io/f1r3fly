@@ -347,10 +347,6 @@ object RhoRuntime {
       ctx: ProcessContext[F] =>
         ctx.systemProcesses.stdErrAck
     }),
-    Definition[F]("rho:io:random", FixedChannels.RANDOM, 1, BodyRefs.RANDOM, {
-      ctx: ProcessContext[F] =>
-        ctx.systemProcesses.random
-    }),
     Definition[F](
       "rho:io:grpcTell",
       FixedChannels.GRPC_TELL,

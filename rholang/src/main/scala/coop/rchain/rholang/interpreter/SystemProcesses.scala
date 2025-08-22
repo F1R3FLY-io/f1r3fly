@@ -44,7 +44,6 @@ trait SystemProcesses[F[_]] {
   def stdOutAck: Contract[F]
   def stdErr: Contract[F]
   def stdErrAck: Contract[F]
-  def random: Contract[F]
   def secp256k1Verify: Contract[F]
   def ed25519Verify: Contract[F]
   def sha256Hash: Contract[F]
@@ -116,7 +115,6 @@ object SystemProcesses {
     val GPT4: Par               = byteName(20)
     val DALLE3: Par             = byteName(21)
     val TEXT_TO_AUDIO: Par      = byteName(22)
-    val RANDOM: Par             = byteName(24)
     val GRPC_TELL: Par          = byteName(25)
     val DEV_NULL: Par           = byteName(26)
   }
@@ -139,13 +137,11 @@ object SystemProcesses {
     val GPT4: Long               = 18L
     val DALLE3: Long             = 19L
     val TEXT_TO_AUDIO: Long      = 20L
-    val RANDOM: Long             = 22L
     val GRPC_TELL: Long          = 23L
     val DEV_NULL: Long           = 24L
   }
 
   val nonDeterministicCalls: Set[Long] = Set(
-    BodyRefs.RANDOM,
     BodyRefs.GPT4,
     BodyRefs.DALLE3,
     BodyRefs.TEXT_TO_AUDIO
@@ -291,19 +287,6 @@ object SystemProcesses {
             output = Seq(Par.defaultInstance)
             _      <- produce(output, ack)
           } yield output
-      }
-
-      def random: Contract[F] = {
-        case isContractCall(produce, true, previous: Seq[Par], Seq(ack)) => {
-          produce(previous, ack).map(_ => previous)
-        }
-        case isContractCall(produce, a, b, Seq(ack)) => {
-          val random1      = new Random()
-          val randomLength = random1.nextInt(100)
-          val randomString = Seq.fill(randomLength)(random1.nextPrintableChar()).mkString
-          val output       = Seq(RhoType.String(randomString))
-          produce(output, ack).map(_ => output)
-        }
       }
 
       def revAddress: Contract[F] = {
