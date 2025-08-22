@@ -323,7 +323,7 @@ proptest! {
   #[test]
   fn put_join_when_cache_contains_data_should_read_from_cache_and_add_to_it(channel in  any::<Channel>(), history_joins in any::<Joins>(), mut cached_joins in any::<Joins>(),
     inserted_join in any::<Join>()) {
-      prop_assume!(!history_joins.contains(&inserted_join));
+      prop_assume!(!cached_joins.contains(&inserted_join));
       let (state, history, hot_store) = fixture();
 
       history.put_joins(channel.clone(), history_joins.clone());
