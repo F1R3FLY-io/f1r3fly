@@ -35,6 +35,7 @@ use models::{
         },
     },
 };
+use prost::Message;
 use rholang::rust::interpreter::{
     accounting::{cost_accounting::CostAccounting, costs::Cost},
     env::Env,
@@ -1693,7 +1694,7 @@ async fn eval_of_to_byte_array_method_on_any_process_should_return_that_process_
         connective_used: false,
     }]);
 
-    let serialized_process = bincode::serialize(&proc).unwrap();
+    let serialized_process = proc.encode_to_vec();
     let to_byte_array_call = Par::default().with_sends(vec![Send {
         chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
         data: vec![Par::default().with_exprs(vec![Expr {
@@ -1753,7 +1754,7 @@ async fn eval_of_to_byte_array_method_on_any_process_should_substitute_before_se
         locally_free: vec![],
     }]);
 
-    let serialized_process = bincode::serialize(&sub_proc).unwrap();
+    let serialized_process = sub_proc.encode_to_vec();
     let to_byte_array_call = Par::default().with_sends(vec![Send {
         chan: Some(new_gstring_par("result".to_string(), Vec::new(), false)),
         data: vec![Par::default().with_exprs(vec![Expr {
