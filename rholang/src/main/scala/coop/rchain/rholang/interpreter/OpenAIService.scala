@@ -197,37 +197,13 @@ object OpenAIServiceImpl {
     * - If disabled, returns DisabledOpenAIService
     */
   lazy val instance: OpenAIService = {
-    val config = ConfigFactory.load()
-
-    // Check configuration first (highest priority)
-    val configEnabled = if (config.hasPath("openai.enabled")) {
-      Some(config.getBoolean("openai.enabled"))
-    } else {
-      None
-    }
-
-    // Check environment variable as fallback
-    val envEnabled = Option(System.getenv("OPENAI_ENABLED")).flatMap { value =>
-      value.toLowerCase(Locale.ENGLISH) match {
-        case "true" | "1" | "yes" | "on"  => Some(true)
-        case "false" | "0" | "no" | "off" => Some(false)
-        case _                            => None // Invalid env var value, ignore it
-      }
-    }
-
-    // Resolve final enabled state: config takes priority, then env, then default false
-    val isEnabled = configEnabled.getOrElse(envEnabled.getOrElse(false))
+    val isEnabled = RhoRuntime.isOpenAIEnabled
 
     if (isEnabled) {
-      val source = if (configEnabled.isDefined) "configuration" else "environment variable"
-      logger.info(s"OpenAI service is enabled via $source - initializing with API key validation")
+      logger.info("OpenAI service is enabled - initializing with API key validation")
       new OpenAIServiceImpl // This will crash at startup if no API key is provided
     } else {
-      val source =
-        if (configEnabled.isDefined) "configuration"
-        else if (envEnabled.isDefined) "environment variable"
-        else "default (not configured)"
-      logger.info(s"OpenAI service is disabled via $source")
+      logger.info("OpenAI service is disabled")
       new DisabledOpenAIService
     }
   }
