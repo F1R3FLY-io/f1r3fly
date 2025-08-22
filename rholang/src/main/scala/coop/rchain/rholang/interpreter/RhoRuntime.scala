@@ -484,14 +484,6 @@ object RhoRuntime {
       BodyRefs.TEXT_TO_AUDIO, { ctx =>
         ctx.systemProcesses.textToAudio
       }
-    ),
-    Definition[F](
-      "rho:ai:dumpFile",
-      FixedChannels.DUMP,
-      2,
-      BodyRefs.DUMP, { ctx =>
-        ctx.systemProcesses.dumpFile
-      }
     )
   )
 

@@ -59,7 +59,6 @@ trait SystemProcesses[F[_]] {
   def gpt4: Contract[F]
   def dalle3: Contract[F]
   def textToAudio: Contract[F]
-  def dumpFile: Contract[F]
   def grpcTell: Contract[F]
   def devNull: Contract[F]
 }
@@ -117,7 +116,6 @@ object SystemProcesses {
     val GPT4: Par               = byteName(20)
     val DALLE3: Par             = byteName(21)
     val TEXT_TO_AUDIO: Par      = byteName(22)
-    val DUMP: Par               = byteName(23)
     val RANDOM: Par             = byteName(24)
     val GRPC_TELL: Par          = byteName(25)
     val DEV_NULL: Par           = byteName(26)
@@ -141,7 +139,6 @@ object SystemProcesses {
     val GPT4: Long               = 18L
     val DALLE3: Long             = 19L
     val TEXT_TO_AUDIO: Long      = 20L
-    val DUMP: Long               = 21L
     val RANDOM: Long             = 22L
     val GRPC_TELL: Long          = 23L
     val DEV_NULL: Long           = 24L
@@ -488,18 +485,6 @@ object SystemProcesses {
               produce(Seq(RhoType.String(text)), ack)
               e.raiseError
           }
-        }
-      }
-
-      def dumpFile: Contract[F] = {
-        case isContractCall(_, _, _, Seq(RhoType.String(path), RhoType.ByteArray(data))) => {
-          F.delay {
-              Files.write(new File(path).toPath, data)
-              Seq.empty[Par]
-            }
-            .onError {
-              case e => F.delay(Console.err.println(s"Error writing to file: $e"))
-            }
         }
       }
 
