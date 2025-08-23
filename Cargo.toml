@@ -13,7 +13,8 @@ members = [
 	"rspace++/libs/rspace_rhotypes",
 	"comm",
 	"bitcoin-anchor",
-	"bitcoin-anchor-ffi",
+	"bitcoin-anchor-ffi",,
+	"graphz"
 ]
 
 [profile.dev]

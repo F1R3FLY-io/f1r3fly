@@ -776,6 +776,7 @@ dependencies = [
  "dashmap 6.1.0",
  "env_logger 0.11.8",
  "futures",
+ "graphz",
  "hex",
  "itertools 0.13.0",
  "lazy_static",
@@ -784,11 +785,13 @@ dependencies = [
  "num_cpus",
  "prost",
  "rand 0.9.1",
+ "regex",
  "rholang",
  "rspace_plus_plus",
  "serde",
  "shared",
  "tempfile",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "uuid",
@@ -1625,6 +1628,17 @@ name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
+
+[[package]]
+name = "graphz"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "serde",
+ "tokio",
+ "tokio-test",
+]
 
 [[package]]
 name = "group"

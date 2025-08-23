@@ -772,7 +772,7 @@ where
         self.replay_data = updated_replays;
     }
 
-    fn log_comm(
+    pub fn log_comm(
         &mut self,
         _data_candidates: &Vec<ConsumeCandidate<C, A>>,
         _channels: &Vec<C>,
@@ -785,7 +785,7 @@ where
         comm
     }
 
-    fn log_consume(
+    pub fn log_consume(
         &mut self,
         consume_ref: Consume,
         _channels: &Vec<C>,
@@ -797,7 +797,7 @@ where
         consume_ref
     }
 
-    fn log_produce(
+    pub fn log_produce(
         &mut self,
         produce_ref: Produce,
         _channel: &C,
@@ -886,11 +886,14 @@ where
     ) -> MaybeProduceResult<C, P, A, K> {
         // println!("\nHit store_data");
         // println!("\nHit store_data, data: {:?}", data);
-        self.store.put_datum(channel, Datum {
-            a: data,
-            persist,
-            source: produce_ref,
-        });
+        self.store.put_datum(
+            channel,
+            Datum {
+                a: data,
+                persist,
+                source: produce_ref,
+            },
+        );
         // println!(
         //     "produce: persisted <data: {:?}> at <channel: {:?}>",
         //     data, channel
@@ -978,22 +981,24 @@ where
 
             match options {
                 None => {
-                    self.installs
-                        .lock()
-                        .unwrap()
-                        .insert(channels.clone(), Install {
+                    self.installs.lock().unwrap().insert(
+                        channels.clone(),
+                        Install {
                             patterns: patterns.clone(),
                             continuation: continuation.clone(),
-                        });
+                        },
+                    );
 
-                    self.store
-                        .install_continuation(channels.clone(), WaitingContinuation {
+                    self.store.install_continuation(
+                        channels.clone(),
+                        WaitingContinuation {
                             patterns,
                             continuation,
                             persist: true,
                             peeks: BTreeSet::default(),
                             source: consume_ref,
-                        });
+                        },
+                    );
 
                     for channel in channels.iter() {
                         self.store.install_join(channel.clone(), channels.clone());

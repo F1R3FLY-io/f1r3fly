@@ -110,6 +110,11 @@ impl TransportLayerStub {
         let requests = self.requests.lock().unwrap();
         requests.clone()
     }
+
+    pub fn pop_request(&self) -> Option<Request> {
+        let mut requests = self.requests.lock().unwrap();
+        requests.pop()
+    }
 }
 
 #[async_trait]

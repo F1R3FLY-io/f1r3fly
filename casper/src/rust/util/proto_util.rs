@@ -75,7 +75,7 @@ pub fn creator_justification_block_metadata(block: &BlockMetadata) -> Option<Jus
 /// However, the bfTraverseF requires a list to be returned.
 /// When we reach the goalFunc, we return an empty list.
 pub fn get_creator_justification_as_list_until_goal_in_memory(
-    dag: &mut KeyValueDagRepresentation,
+    dag: &KeyValueDagRepresentation,
     block_hash: &BlockHash,
     goal_func: impl Fn(&BlockHash) -> bool,
 ) -> Result<Vec<BlockHash>, KvStoreError> {

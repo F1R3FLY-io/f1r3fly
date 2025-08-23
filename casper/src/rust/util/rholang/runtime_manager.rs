@@ -54,7 +54,7 @@ pub struct RuntimeManager {
     pub history_repo: RhoHistoryRepository,
     pub mergeable_store: MergeableStore,
     pub mergeable_tag_name: Par,
-    // TODO: make proper storage for block indices
+    // TODO: make proper storage for block indices - OLD
     pub block_index_cache: Arc<DashMap<BlockHash, BlockIndex>>,
 }
 
@@ -295,27 +295,29 @@ impl RuntimeManager {
         post_state_hash: &Blake2b256Hash,
         mergeable_chs: &Vec<NumberChannelsDiff>,
     ) -> Result<BlockIndex, CasperError> {
-        // Try cache first
-        if let Some(cached) = self.block_index_cache.get(block_hash) {
-            return Ok((*cached.value()).clone());
+        // Use entry API to atomically handle get-or-compute pattern
+        match self.block_index_cache.entry(block_hash.clone()) {
+            dashmap::mapref::entry::Entry::Occupied(entry) => {
+                // Cache hit - return cached value
+                Ok(entry.get().clone())
+            }
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                // Cache miss - compute the BlockIndex
+                let block_index = crate::rust::merging::block_index::new(
+                    block_hash,
+                    usr_processed_deploys,
+                    sys_processed_deploys,
+                    pre_state_hash,
+                    post_state_hash,
+                    &self.history_repo,
+                    mergeable_chs,
+                )?;
+
+                // Insert and return the computed value
+                entry.insert(block_index.clone());
+                Ok(block_index)
+            }
         }
-
-        // Cache miss - compute the BlockIndex
-        let block_index = crate::rust::merging::block_index::new(
-            block_hash,
-            usr_processed_deploys,
-            sys_processed_deploys,
-            pre_state_hash,
-            post_state_hash,
-            &self.history_repo,
-            mergeable_chs,
-        )?;
-
-        // Cache the result
-        self.block_index_cache
-            .insert(block_hash.clone(), block_index.clone());
-
-        Ok(block_index)
     }
 
     /// Remove BlockIndex from cache (used during finalization)
