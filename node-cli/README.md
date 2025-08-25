@@ -1,6 +1,6 @@
-# F1r3fly Node CLI
+# RNode CLI
 
-A command-line interface for interacting with F1r3fly nodes.
+A command-line interface for interacting with RNode.
 
 ### Prerequisites
 
@@ -15,11 +15,11 @@ cargo build
 
 ## Usage
 
-The CLI provides the following commands for interacting with F1r3fly nodes:
+The CLI provides the following commands for interacting with RNode:
 
 ### Deploy
 
-Deploy Rholang code to a F1r3fly node.
+Deploy Rholang code to an RNode.
 
 ```bash
 # Using default values (localhost:40402 with default private key)
@@ -34,7 +34,7 @@ cargo run -- deploy -f ../rholang/examples/stdout.rho -b
 
 ### Propose
 
-Propose a block to the F1r3fly network.
+Propose a block to the RNode network.
 
 ```bash
 # Using default values

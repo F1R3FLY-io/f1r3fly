@@ -39,6 +39,11 @@ Thumbs.db
 #####
 .envrc
 
+# LLM Coding Assistance
+#####
+.mcp.json
+.claude
+
 # SBT
 #####
 target/
