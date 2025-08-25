@@ -3,7 +3,7 @@
 
 use dashmap::DashMap;
 use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crypto::rust::signatures::signed::Signed;
 use hex::ToHex;
@@ -38,7 +38,7 @@ use crate::rust::rholang::runtime::RuntimeOps;
 
 use super::system_deploy::SystemDeployTrait;
 
-type MergeableStore = KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>;
+type MergeableStore = Arc<Mutex<KeyValueTypedStoreImpl<ByteVector, Vec<DeployMergeableData>>>>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct MergeableKey {
@@ -344,7 +344,7 @@ impl RuntimeManager {
         let get_key =
             bincode::serialize(&mergeable_key).expect("Failed to serialize mergeable key");
 
-        let res = self.mergeable_store.get_one(&get_key)?;
+        let res = self.mergeable_store.lock().unwrap().get_one(&get_key)?;
 
         match res {
             Some(res) => {
@@ -409,7 +409,10 @@ impl RuntimeManager {
             bincode::serialize(&mergeable_key).expect("Failed to serialize mergeable key");
 
         // Save to mergeable channels store
-        self.mergeable_store.put_one(key_encoded, deploy_channels)?;
+        self.mergeable_store
+            .lock()
+            .unwrap()
+            .put_one(key_encoded, deploy_channels)?;
 
         Ok(())
     }
@@ -511,6 +514,6 @@ impl RuntimeManager {
     ) -> Result<MergeableStore, KvStoreError> {
         let store = kvm.store("mergeable-channel-cache".to_string()).await?;
 
-        Ok(KeyValueTypedStoreImpl::new(store))
+        Ok(Arc::new(Mutex::new(KeyValueTypedStoreImpl::new(store))))
     }
 }

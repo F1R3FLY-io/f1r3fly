@@ -4,7 +4,7 @@ use crate::rust::{
     casper::MultiParentCasper,
     engine::{
         block_retriever::{self, BlockRetriever},
-        engine::{self, Engine, WithCasper},
+        engine::{self, Engine},
     },
     errors::CasperError,
 };
@@ -32,6 +32,8 @@ use rspace_plus_plus::rspace::{
         rspace_exporter::RSpaceExporterInstance,
     },
 };
+use std::any::Any;
+use std::pin::Pin;
 use std::{
     collections::{HashSet, VecDeque},
     sync::{Arc, Mutex},
@@ -218,27 +220,15 @@ impl<M: MultiParentCasper + Send + Sync + Clone, T: TransportLayer + Send + Sync
         }
     }
 
+    /// Running always contains casper; enables `EngineDynExt::with_casper(...)`
+    /// to mirror Scala `Engine.withCasper` behavior.
+    fn with_casper(&self) -> Option<&dyn MultiParentCasper> {
+        Some(&*self.casper)
+    }
+
     fn clone_box(&self) -> Box<dyn Engine> {
         // Note: This is simplified - full implementation would need proper cloning
         panic!("Running engine cannot be cloned - not implemented")
-    }
-}
-
-#[async_trait(?Send)]
-impl<M: MultiParentCasper + Send + Sync, T: TransportLayer + Send + Sync> WithCasper<M>
-    for Running<M, T>
-{
-    async fn with_casper<A, F, Fut>(
-        &mut self,
-        f: F,
-        _default: Result<A, CasperError>,
-    ) -> Result<A, CasperError>
-    where
-        F: FnOnce(&M) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
-        A: Send,
-    {
-        f(&*self.casper).await
     }
 }
 
