@@ -27,7 +27,7 @@ use rholang::rust::interpreter::deploy_parameters::DeployParameters;
 use shared::rust::{store::key_value_store::KvStoreError, ByteString};
 
 pub fn get_main_chain_until_depth(
-    block_store: &mut KeyValueBlockStore,
+    block_store: &KeyValueBlockStore,
     estimate: BlockMessage,
     mut acc: Vec<BlockMessage>,
     depth: i32,
@@ -555,5 +555,12 @@ fn get_creator_justification_unless_goal(
         },
 
         None => Ok(vec![]),
+    }
+}
+
+pub fn justification_to_justification_info(justification: &Justification) -> JustificationInfo {
+    JustificationInfo {
+        validator: PrettyPrinter::build_string_no_limit(&justification.validator),
+        latest_block_hash: PrettyPrinter::build_string_no_limit(&justification.latest_block_hash),
     }
 }

@@ -16,6 +16,8 @@ use models::rust::casper::protocol::packet_type_tag::ToPacket;
 use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 use std::collections::{HashSet, VecDeque};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use crate::rust::casper::MultiParentCasper;
@@ -24,14 +26,18 @@ use crate::rust::engine::engine_cell::EngineCell;
 use crate::rust::engine::running::Running;
 use crate::rust::errors::CasperError;
 
-/// Object-safe Engine trait that matches Scala Engine[F] behavior
-/// Note: with_casper method is not included here due to object-safety constraints
-/// Implementations should provide their own with_casper methods when needed
+/// Object-safe Engine trait that matches Scala Engine[F] behavior.
+/// Note: we expose `with_casper() -> Option<&MultiParentCasper>` as an accessor,
+/// and provide Scala-like `with_casper(f, default)` via `EngineDynExt`.
 #[async_trait(?Send)]
 pub trait Engine: Send + Sync {
     async fn init(&self) -> Result<(), CasperError>;
 
     async fn handle(&mut self, peer: PeerNode, msg: CasperMessage) -> Result<(), CasperError>;
+
+    /// Returns the casper instance if this engine wraps one.
+    /// Used by `EngineDynExt::with_casper(...)` to emulate Scala semantics.
+    fn with_casper(&self) -> Option<&dyn MultiParentCasper>;
 
     /// Clone the engine into a boxed trait object
     fn clone_box(&self) -> Box<dyn Engine>;
@@ -40,16 +46,37 @@ pub trait Engine: Send + Sync {
 /// Trait for engines that provide withCasper functionality
 /// This matches the Scala Engine[F] withCasper method behavior
 #[async_trait(?Send)]
-pub trait WithCasper<M: MultiParentCasper>: Send + Sync {
-    async fn with_casper<A, F, Fut>(
-        &mut self,
+pub trait EngineDynExt {
+    async fn with_casper<A, F>(
+        &self,
         f: F,
         default: Result<A, CasperError>,
     ) -> Result<A, CasperError>
     where
-        F: FnOnce(&M) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<A, CasperError>> + Send,
-        A: Send;
+        for<'a> F: FnOnce(
+            &'a dyn MultiParentCasper,
+        ) -> Pin<Box<dyn Future<Output = Result<A, CasperError>> + 'a>>,
+        A: Sized;
+}
+
+#[async_trait(?Send)]
+impl<T: Engine + ?Sized> EngineDynExt for T {
+    async fn with_casper<A, F>(
+        &self,
+        f: F,
+        default: Result<A, CasperError>,
+    ) -> Result<A, CasperError>
+    where
+        for<'a> F: FnOnce(
+            &'a dyn MultiParentCasper,
+        ) -> Pin<Box<dyn Future<Output = Result<A, CasperError>> + 'a>>,
+        A: Sized,
+    {
+        match self.with_casper() {
+            Some(casper) => f(casper).await,
+            None => default,
+        }
+    }
 }
 
 pub fn noop() -> Result<impl Engine, CasperError> {
@@ -68,6 +95,10 @@ pub fn noop() -> Result<impl Engine, CasperError> {
             _msg: CasperMessage,
         ) -> Result<(), CasperError> {
             Ok(())
+        }
+
+        fn with_casper(&self) -> Option<&dyn MultiParentCasper> {
+            None
         }
 
         fn clone_box(&self) -> Box<dyn Engine> {

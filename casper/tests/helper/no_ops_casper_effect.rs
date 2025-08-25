@@ -116,7 +116,7 @@ impl MultiParentCasper for NoOpsCasperEffect {
         Ok(0.0)
     }
 
-    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError> {
+    async fn last_finalized_block(&self) -> Result<BlockMessage, CasperError> {
         Ok(get_random_block_default())
     }
 
@@ -141,6 +141,10 @@ impl MultiParentCasper for NoOpsCasperEffect {
     ) -> std::sync::Arc<
         std::sync::Mutex<Box<dyn rspace_plus_plus::rspace::state::rspace_exporter::RSpaceExporter>>,
     > {
+        todo!()
+    }
+
+    fn runtime_manager(&self) -> &RuntimeManager {
         todo!()
     }
 }
@@ -168,7 +172,7 @@ impl Casper for NoOpsCasperEffect {
     }
 
     fn deploy(
-        &mut self,
+        &self,
         _deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError> {
         Ok(Either::Right(DeployId::default()))
