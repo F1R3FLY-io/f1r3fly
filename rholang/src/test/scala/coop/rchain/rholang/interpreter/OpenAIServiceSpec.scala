@@ -92,7 +92,7 @@ class OpenAIServiceSpec extends FlatSpec with Matchers {
         envEnabled: Option[Boolean],
         hasApiKey: Boolean
     ): String = {
-      val isEnabled = configEnabled.getOrElse(envEnabled.getOrElse(false))
+      val isEnabled = envEnabled.getOrElse(configEnabled.getOrElse(false))
       if (isEnabled) {
         if (hasApiKey) {
           "OpenAIServiceImpl" // Would create real service
@@ -104,9 +104,9 @@ class OpenAIServiceSpec extends FlatSpec with Matchers {
       }
     }
 
-    // Test priority: config takes precedence over env var
-    selectService(Some(true), Some(false), true) shouldBe "OpenAIServiceImpl"
-    selectService(Some(false), Some(true), true) shouldBe "DisabledOpenAIService"
+    // Test priority: env var takes precedence over config
+    selectService(Some(true), Some(false), true) shouldBe "DisabledOpenAIService"
+    selectService(Some(false), Some(true), true) shouldBe "OpenAIServiceImpl"
 
     // Test env var fallback when config not set
     selectService(None, Some(true), true) shouldBe "OpenAIServiceImpl"

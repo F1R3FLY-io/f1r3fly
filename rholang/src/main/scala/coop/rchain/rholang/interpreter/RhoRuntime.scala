@@ -265,7 +265,7 @@ object RhoRuntime {
   /**
     * Check if OpenAI service is enabled based on configuration and environment variables.
     * This uses the same logic as OpenAIServiceImpl.instance to determine the enabled state.
-    * Priority order: 1. Configuration, 2. Environment variable OPENAI_ENABLED, 3. Default (false)
+    * Priority order: 1. Environment variable OPENAI_ENABLED, 2. Configuration, 3. Default (false)
     */
   private[interpreter] def isOpenAIEnabled: Boolean = {
     import com.typesafe.config.ConfigFactory
@@ -273,14 +273,7 @@ object RhoRuntime {
 
     val config = ConfigFactory.load()
 
-    // Check configuration first (highest priority)
-    val configEnabled = if (config.hasPath("openai.enabled")) {
-      Some(config.getBoolean("openai.enabled"))
-    } else {
-      None
-    }
-
-    // Check environment variable as fallback
+    // Check environment variable first (highest priority)
     val envEnabled = Option(System.getenv("OPENAI_ENABLED")).flatMap { value =>
       value.toLowerCase(Locale.ENGLISH) match {
         case "true" | "1" | "yes" | "on"  => Some(true)
@@ -289,8 +282,15 @@ object RhoRuntime {
       }
     }
 
-    // Resolve final enabled state: config takes priority, then env, then default false
-    configEnabled.getOrElse(envEnabled.getOrElse(false))
+    // Check configuration as fallback
+    val configEnabled = if (config.hasPath("openai.enabled")) {
+      Some(config.getBoolean("openai.enabled"))
+    } else {
+      None
+    }
+
+    // Resolve final enabled state: env takes priority, then config, then default false
+    envEnabled.getOrElse(configEnabled.getOrElse(false))
   }
   def apply[F[_]: Sync: Span](
       reducer: Reduce[F],

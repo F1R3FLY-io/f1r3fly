@@ -230,8 +230,8 @@ object OpenAIServiceImpl {
   /**
     * Provides the appropriate OpenAI service based on configuration and environment.
     * Priority order for enabling OpenAI:
-    *   1. Configuration: openai.enabled = true/false
-    *   2. Environment variable: OPENAI_ENABLED = true/false
+    *   1. Environment variable: OPENAI_ENABLED = true/false
+    *   2. Configuration: openai.enabled = true/false
     *   3. Default: false (disabled for safety)
     * - If enabled, returns OpenAIServiceImpl (will crash at startup if no API key)
     * - If disabled, returns DisabledOpenAIService
