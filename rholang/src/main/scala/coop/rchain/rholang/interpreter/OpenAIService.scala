@@ -20,6 +20,9 @@ import cats.syntax.all._
 import java.util.Locale
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 trait OpenAIService {
 
@@ -86,7 +89,12 @@ class OpenAIServiceImpl extends OpenAIService {
     apiKey match {
       case Some(key) if key.nonEmpty =>
         logger.info("OpenAI service initialized successfully")
-        OpenAIServiceFactory(key)
+        val service = OpenAIServiceFactory(key)
+
+        // Validate API key before first call (configurable)
+        validateApiKeyOrFail(service, config)
+
+        service
       case _ =>
         throw new IllegalStateException(
           "OpenAI API key is not configured. Provide it via config path 'openai.api-key' " +
@@ -125,6 +133,38 @@ class OpenAIServiceImpl extends OpenAIService {
           logger.warn("OpenAI createAudioSpeech request failed", e)
           cb(Left(e))
       }
+    }
+  }
+
+  /** Performs a lightweight call to validate that the API key works. Fails fast on errors. */
+  private def validateApiKeyOrFail(
+      service: CeqOpenAIService,
+      config: com.typesafe.config.Config
+  ): Unit = {
+    val doValidate: Boolean =
+      if (config.hasPath("openai.validate-api-key")) config.getBoolean("openai.validate-api-key")
+      else true
+
+    if (!doValidate) {
+      logger.info("OpenAI API key validation is disabled by config 'openai.validate-api-key=false'")
+      return
+    }
+
+    val timeoutSec: Int =
+      if (config.hasPath("openai.validation-timeout-sec"))
+        config.getInt("openai.validation-timeout-sec")
+      else 15
+
+    try {
+      // Listing models is a free endpoint and suitable for key validation
+      val models = Await.result(service.listModels, timeoutSec.seconds)
+      logger.info(s"OpenAI API key validated (${models.size} models available)")
+    } catch {
+      case NonFatal(e) =>
+        throw new IllegalStateException(
+          "OpenAI API key validation failed. Check 'openai.api-key' or 'OPENAI_SCALA_CLIENT_API_KEY'.",
+          e
+        )
     }
   }
 

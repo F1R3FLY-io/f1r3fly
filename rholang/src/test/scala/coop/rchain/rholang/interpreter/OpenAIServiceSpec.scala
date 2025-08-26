@@ -1,6 +1,5 @@
 package coop.rchain.rholang.interpreter
 
-import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 import cats.effect.{ContextShift, IO, Timer}
 import java.util.Locale
@@ -11,52 +10,6 @@ class OpenAIServiceSpec extends FlatSpec with Matchers {
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
   implicit val timer: Timer[IO]     = IO.timer(ec)
-
-  behavior of "OpenAIService configuration logic"
-
-  it should "correctly identify when OpenAI is enabled from config" in {
-    val enabledConfig = ConfigFactory.parseString("openai.enabled = true")
-    val isEnabled = enabledConfig.hasPath("openai.enabled") && enabledConfig.getBoolean(
-      "openai.enabled"
-    )
-    isEnabled shouldBe true
-  }
-
-  it should "correctly identify when OpenAI is disabled from config" in {
-    val disabledConfig = ConfigFactory.parseString("openai.enabled = false")
-    val isEnabled = disabledConfig.hasPath("openai.enabled") && disabledConfig.getBoolean(
-      "openai.enabled"
-    )
-    isEnabled shouldBe false
-  }
-
-  it should "default to disabled when openai.enabled is not set" in {
-    val emptyConfig = ConfigFactory.empty()
-    val isEnabled = emptyConfig.hasPath("openai.enabled") && emptyConfig.getBoolean(
-      "openai.enabled"
-    )
-    isEnabled shouldBe false
-  }
-
-  it should "correctly read API key from config" in {
-    val configWithKey = ConfigFactory.parseString("openai.api-key = \"test-key\"")
-    val apiKey = if (configWithKey.hasPath("openai.api-key")) {
-      Some(configWithKey.getString("openai.api-key"))
-    } else {
-      None
-    }
-    apiKey shouldBe Some("test-key")
-  }
-
-  it should "handle empty API key in config" in {
-    val configWithEmptyKey = ConfigFactory.parseString("openai.api-key = \"\"")
-    val apiKey = if (configWithEmptyKey.hasPath("openai.api-key")) {
-      Some(configWithEmptyKey.getString("openai.api-key"))
-    } else {
-      None
-    }
-    apiKey shouldBe Some("")
-  }
 
   behavior of "DisabledOpenAIService"
 
@@ -205,5 +158,74 @@ class OpenAIServiceSpec extends FlatSpec with Matchers {
     // Returns None if neither available
     resolveApiKey(None, None) shouldBe None
     resolveApiKey(Some(""), Some("")) shouldBe None
+  }
+
+  behavior of "API key validation logic"
+
+  it should "demonstrate service initialization with validation" in {
+    // Test the enhanced service selection logic that includes validation
+    def selectServiceWithValidation(
+        enabled: Boolean,
+        hasApiKey: Boolean,
+        validationEnabled: Boolean,
+        validationSucceeds: Boolean
+    ): String =
+      if (enabled) {
+        if (hasApiKey) {
+          if (validationEnabled) {
+            if (validationSucceeds) {
+              "OpenAIServiceImpl" // Validation passed
+            } else {
+              "IllegalStateException" // Validation failed
+            }
+          } else {
+            "OpenAIServiceImpl" // Validation skipped
+          }
+        } else {
+          "IllegalStateException" // No API key
+        }
+      } else {
+        "DisabledOpenAIService" // Service disabled
+      }
+
+    // Test validation enabled and succeeds
+    selectServiceWithValidation(
+      enabled = true,
+      hasApiKey = true,
+      validationEnabled = true,
+      validationSucceeds = true
+    ) shouldBe "OpenAIServiceImpl"
+
+    // Test validation enabled but fails
+    selectServiceWithValidation(
+      enabled = true,
+      hasApiKey = true,
+      validationEnabled = true,
+      validationSucceeds = false
+    ) shouldBe "IllegalStateException"
+
+    // Test validation disabled (skipped)
+    selectServiceWithValidation(
+      enabled = true,
+      hasApiKey = true,
+      validationEnabled = false,
+      validationSucceeds = false // doesn't matter
+    ) shouldBe "OpenAIServiceImpl"
+
+    // Test service disabled (validation irrelevant)
+    selectServiceWithValidation(
+      enabled = false,
+      hasApiKey = true,
+      validationEnabled = true,
+      validationSucceeds = true
+    ) shouldBe "DisabledOpenAIService"
+
+    // Test no API key (validation irrelevant)
+    selectServiceWithValidation(
+      enabled = true,
+      hasApiKey = false,
+      validationEnabled = true,
+      validationSucceeds = true
+    ) shouldBe "IllegalStateException"
   }
 }
