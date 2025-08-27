@@ -17,7 +17,7 @@ use crypto::rust::signatures::ed25519::Ed25519;
 use crypto::rust::signatures::secp256k1::Secp256k1;
 use crypto::rust::signatures::signatures_alg::SignaturesAlg;
 use k256::{
-    ecdsa::{signature::Signer, Signature, SigningKey},
+    ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey},
     elliptic_curve::generic_array::GenericArray,
 };
 use models::rhoapi::expr::ExprInstance;
@@ -166,6 +166,10 @@ impl FixedChannels {
     pub fn grpc_tell() -> Par {
         byte_name(23)
     }
+
+    pub fn dev_null() -> Par {
+        byte_name(24)
+    }
 }
 
 pub struct BodyRefs;
@@ -191,6 +195,7 @@ impl BodyRefs {
     pub const TEXT_TO_AUDIO: i64 = 19;
     pub const RANDOM: i64 = 20;
     pub const GRPC_TELL: i64 = 21;
+    pub const DEV_NULL: i64 = 22;
 }
 
 pub fn non_deterministic_ops() -> HashSet<i64> {
@@ -934,6 +939,17 @@ impl SystemProcesses {
         }
     }
 
+    pub async fn dev_null(
+        &self,
+        contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
+    ) -> Result<Vec<Par>, InterpreterError> {
+        if self.is_contract_call().unapply(contract_args).is_none() {
+            return Err(illegal_argument_error("dev_null"));
+        }
+
+        Ok(vec![])
+    }
+
     /*
      * The following functions below can be removed once rust-casper calls create_rho_runtime.
      * Until then, they must remain in the rholang directory to avoid circular dependencies.
@@ -1138,13 +1154,12 @@ impl SystemProcesses {
                         let signing_key =
                             SigningKey::from_bytes(&key_bytes).expect("Invalid private key");
 
-                        let signature: Signature = signing_key.sign(&hash);
+                        let signature: Signature = signing_key
+                            .sign_prehash(&hash)
+                            .expect("Failed to sign prehash");
+                        let der_bytes = signature.to_der().as_bytes().to_vec();
 
-                        let result_par = new_gbytearray_par(
-                            signature.to_der().as_bytes().to_vec(),
-                            Vec::new(),
-                            false,
-                        );
+                        let result_par = new_gbytearray_par(der_bytes, Vec::new(), false);
 
                         let output = vec![result_par];
                         produce(output.clone(), ack_channel.clone()).await?;

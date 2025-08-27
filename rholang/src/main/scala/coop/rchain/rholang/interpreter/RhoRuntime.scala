@@ -820,13 +820,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
   override def reset(root: Blake2b256Hash): F[Unit] =
     for {
       _ <- Sync[F].delay {
-            // println("\nhit scala reset, root: " + root)
-            val rootBytes = root.bytes.toArray
-
+            val rootBytes  = root.bytes.toArray
             val rootMemory = new Memory(rootBytes.length.toLong)
             rootMemory.write(0, rootBytes, 0, rootBytes.length)
 
-            val _ = RHOLANG_RUST_INSTANCE.reset(
+            val code = RHOLANG_RUST_INSTANCE.reset(
               runtimePtr,
               rootMemory,
               rootBytes.length
@@ -835,6 +833,10 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
             // Not sure if these lines are needed
             // Need to figure out how to deallocate each memory instance
             rootMemory.clear()
+
+            if (code != 0) {
+              throw new RuntimeException(s"Rust RhoRuntime.reset failed, code=$code")
+            }
           }
     } yield ()
 
