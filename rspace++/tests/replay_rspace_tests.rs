@@ -10,6 +10,7 @@ use rspace_plus_plus::rspace::hot_store_action::{
 };
 use rspace_plus_plus::rspace::r#match::Match;
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
+use rspace_plus_plus::rspace::logging::BasicLogger;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::rspace_interface::{ContResult, ISpace, RSpaceResult};
 use rspace_plus_plus::rspace::shared::in_mem_store_manager::InMemoryStoreManager;
@@ -1581,8 +1582,12 @@ async fn fixture() -> StateSetup {
         HotStoreInstances::create_from_hs_and_hr(history_cache, hr)
     };
 
-    let replay_rspace: ReplayRSpace<String, Pattern, String, String> =
-        ReplayRSpace::apply(history_repo, Arc::new(replay_store), Arc::new(Box::new(StringMatch)));
+    let replay_rspace: ReplayRSpace<String, Pattern, String, String> = ReplayRSpace::apply_with_logger(
+        history_repo,
+        Arc::new(replay_store),
+        Arc::new(Box::new(StringMatch)),
+        Box::new(BasicLogger::new()),
+    );
 
     (rspace, replay_rspace)
 }

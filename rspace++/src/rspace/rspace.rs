@@ -8,6 +8,7 @@ use super::history::history_reader::HistoryReader;
 use super::history::instances::radix_history::RadixHistory;
 use super::r#match::Match;
 use super::replay_rspace::ReplayRSpace;
+use super::logging::BasicLogger;
 use super::rspace_interface::CONSUME_COMM_LABEL;
 use super::rspace_interface::ContResult;
 use super::rspace_interface::ISpace;
@@ -381,8 +382,12 @@ where
         let history_reader: Box<dyn HistoryReader<Blake2b256Hash, C, P, A, K>> =
             history_repo_arc.get_history_reader(&history_repo_arc.root())?;
         let replay_store = HotStoreInstances::create_from_hr(history_reader.base());
-        let replay =
-            ReplayRSpace::apply(history_repo_arc.clone(), Arc::new(replay_store), matcher.clone());
+        let replay = ReplayRSpace::apply_with_logger(
+            history_repo_arc.clone(),
+            Arc::new(replay_store),
+            matcher.clone(),
+            Box::new(BasicLogger::new()),
+        );
         Ok((space, replay))
     }
 
