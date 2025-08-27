@@ -108,8 +108,11 @@ impl<T> IntoApiErr<T> for Option<T> {
     }
 }
 
+#[allow(dead_code)]
 const BLOCK_API_METRICS_SOURCE: &str = "block-api";
+#[allow(dead_code)]
 const DEPLOY_SOURCE: &str = "block-api.deploy";
+#[allow(dead_code)]
 const GET_BLOCK_SOURCE: &str = "block-api.get-block";
 
 lazy_static::lazy_static! {
@@ -148,7 +151,6 @@ impl std::fmt::Display for LatestBlockMessageError {
 impl std::error::Error for LatestBlockMessageError {}
 
 impl BlockAPI {
-    //1 public
     pub async fn deploy(
         engine_cell: &EngineCell,
         d: Signed<DeployData>,
@@ -247,7 +249,6 @@ impl BlockAPI {
         }
     }
 
-    //2 public
     pub async fn create_block(
         engine_cell: &EngineCell,
         trigger_propose_f: Box<ProposeFunction>,
@@ -299,7 +300,6 @@ impl BlockAPI {
         }
     }
 
-    //3 public
     pub async fn get_propose_result(proposer_state: &mut ProposerState) -> ApiErr<String> {
         let r = match proposer_state.curr_propose_result.take() {
             // return latest propose result
@@ -344,7 +344,6 @@ impl BlockAPI {
         r
     }
 
-    // 4 public
     pub async fn get_listening_name_data_response(
         engine_cell: &EngineCell,
         depth: i32,
@@ -401,7 +400,6 @@ impl BlockAPI {
         }
     }
 
-    //5 public
     pub async fn get_listening_name_continuation_response(
         engine_cell: &EngineCell,
         depth: i32,
@@ -463,7 +461,6 @@ impl BlockAPI {
         }
     }
 
-    //1 private
     async fn get_main_chain_from_tip<M: MultiParentCasper + ?Sized>(
         casper: &M,
         depth: i32,
@@ -481,7 +478,6 @@ impl BlockAPI {
         Ok(main_chain)
     }
 
-    //2 private
     async fn get_data_with_block_info(
         casper: &dyn MultiParentCasper,
         runtime_manager: &RuntimeManager,
@@ -505,7 +501,6 @@ impl BlockAPI {
         }
     }
 
-    //3 private
     async fn get_continuations_with_block_info(
         casper: &dyn MultiParentCasper,
         runtime_manager: &RuntimeManager,
@@ -540,7 +535,6 @@ impl BlockAPI {
         }
     }
 
-    //4 private
     fn is_listening_name_reduced(block: &BlockMessage, sorted_listening_name: &[Par]) -> bool {
         let serialized_log: Vec<_> = block
             .body
@@ -599,7 +593,6 @@ impl BlockAPI {
         })
     }
 
-    //5 private
     async fn toposort_dag<A: 'static + Send>(
         engine_cell: &EngineCell,
         depth: i32,
@@ -643,7 +636,6 @@ impl BlockAPI {
         }
     }
 
-    //6 public
     pub async fn get_blocks_by_heights(
         engine_cell: &EngineCell,
         start_block_number: i64,
@@ -701,7 +693,6 @@ impl BlockAPI {
         }
     }
 
-    //7 public
     pub async fn visualize_dag<R: 'static>(
         engine_cell: &EngineCell,
         depth: i32,
@@ -753,7 +744,6 @@ impl BlockAPI {
         }
     }
 
-    //8 public
     pub async fn machine_verifiable_dag(
         engine_cell: &EngineCell,
         depth: i32,
@@ -785,7 +775,6 @@ impl BlockAPI {
         BlockAPI::toposort_dag(engine_cell, depth, max_depth_limit, do_it).await
     }
 
-    //9 public
     pub async fn get_blocks(
         engine_cell: &EngineCell,
         depth: i32,
@@ -813,7 +802,6 @@ impl BlockAPI {
         BlockAPI::toposort_dag(engine_cell, depth, max_depth_limit, do_it).await
     }
 
-    //10 public
     pub async fn show_main_chain(
         engine_cell: &EngineCell,
         depth: i32,
@@ -874,7 +862,6 @@ impl BlockAPI {
         }
     }
 
-    //11 public
     pub async fn find_deploy(
         engine_cell: &EngineCell,
         deploy_id: &DeployId,
@@ -909,7 +896,6 @@ impl BlockAPI {
         }
     }
 
-    //12 public
     pub async fn get_block(engine_cell: &EngineCell, hash: &str) -> ApiErr<BlockInfo> {
         let error_message =
             "Could not get block, casper instance was not available yet.".to_string();
@@ -973,7 +959,6 @@ impl BlockAPI {
         }
     }
 
-    //6 private
     async fn get_block_info<M: MultiParentCasper + ?Sized, A: Sized + Send>(
         casper: &M,
         block: &BlockMessage,
@@ -1011,7 +996,6 @@ impl BlockAPI {
         Ok(block_info)
     }
 
-    //7 private
     async fn get_full_block_info<M: MultiParentCasper + ?Sized>(
         casper: &M,
         block: &BlockMessage,
@@ -1019,7 +1003,6 @@ impl BlockAPI {
         Self::get_block_info(casper, block, Self::construct_block_info).await
     }
 
-    //8 private
     pub async fn get_light_block_info(
         casper: &dyn MultiParentCasper,
         block: &BlockMessage,
@@ -1027,7 +1010,6 @@ impl BlockAPI {
         Self::get_block_info(casper, block, Self::construct_light_block_info).await
     }
 
-    //9 private
     fn construct_block_info(block: &BlockMessage, fault_tolerance: f32) -> BlockInfo {
         let light_block_info = Self::construct_light_block_info(block, fault_tolerance);
         let deploys = block
@@ -1043,7 +1025,6 @@ impl BlockAPI {
         }
     }
 
-    //10 private
     fn construct_light_block_info(block: &BlockMessage, fault_tolerance: f32) -> LightBlockInfo {
         LightBlockInfo {
             block_hash: PrettyPrinter::build_string_no_limit(&block.block_hash),
@@ -1096,7 +1077,6 @@ impl BlockAPI {
 
     // Be careful to use this method , because it would iterate the whole indexes to find the matched one which would cause performance problem
     // Trying to use BlockStore.get as much as possible would more be preferred
-    //11 private
     async fn find_block_from_store(
         engine_cell: &EngineCell,
         hash: &str,
@@ -1117,7 +1097,6 @@ impl BlockAPI {
         }
     }
 
-    //13 public
     pub fn preview_private_names(
         deployer: &ByteString,
         timestamp: i64,
@@ -1131,7 +1110,6 @@ impl BlockAPI {
         Ok(ids.into_iter().map(|bytes| bytes.to_vec()).collect())
     }
 
-    //14 public
     pub async fn last_finalized_block(engine_cell: &EngineCell) -> ApiErr<BlockInfo> {
         let error_message =
             "Could not get last finalized block, casper instance was not available yet.";
@@ -1146,7 +1124,6 @@ impl BlockAPI {
         }
     }
 
-    //15 public
     pub async fn is_finalized(engine_cell: &EngineCell, hash: &str) -> ApiErr<bool> {
         let error_message =
             "Could not check if block is finalized, casper instance was not available yet.";
@@ -1163,7 +1140,6 @@ impl BlockAPI {
         }
     }
 
-    //16 public
     pub async fn bond_status(engine_cell: &EngineCell, public_key: &ByteString) -> ApiErr<bool> {
         let error_message =
             "Could not check if validator is bonded, casper instance was not available yet.";
@@ -1184,7 +1160,12 @@ impl BlockAPI {
         }
     }
 
-    //17 public
+    /// Explore the data or continuation in the tuple space for specific blockHash
+    ///
+    /// - `term`: the term you want to explore in the request. Be sure the first `new` should be `return`
+    /// - `block_hash`: the block hash you want to explore
+    /// - `use_pre_state_hash`: Each block has preStateHash and postStateHash. If `use_pre_state_hash` is true, the explore
+    ///   would try to execute on preState.
     pub async fn exploratory_deploy(
         engine_cell: &EngineCell,
         term: String,
@@ -1238,10 +1219,8 @@ impl BlockAPI {
         }
     }
 
-    //18 public
     pub async fn get_latest_message(engine_cell: &EngineCell) -> ApiErr<BlockMetadata> {
-        let error_message =
-            "Could not get latest message, casper instance was not available yet.";
+        let error_message = "Could not get latest message, casper instance was not available yet.";
         let eng = engine_cell.read().await.into_api_err()?;
         if let Some(casper) = eng.with_casper() {
             let validator_opt = casper.get_validator();
@@ -1260,7 +1239,6 @@ impl BlockAPI {
         }
     }
 
-    //19 public
     pub async fn get_data_at_par(
         engine_cell: &EngineCell,
         par: &Par,

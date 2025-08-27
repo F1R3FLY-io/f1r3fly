@@ -1,8 +1,8 @@
 // See casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala
 
 use async_trait::async_trait;
-use std::collections::{BTreeSet, HashMap, HashSet};
 use std::cell::RefCell;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use block_storage::rust::{
     casperbuffer::casper_buffer_key_value_storage::CasperBufferKeyValueStorage,

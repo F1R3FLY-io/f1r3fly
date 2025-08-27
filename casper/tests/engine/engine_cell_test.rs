@@ -29,7 +29,7 @@ impl TestEngine {
             has_casper: false, // Default to no casper (like NoopEngine)
         }
     }
-    
+
     fn new_with_casper(id: i32) -> Self {
         Self {
             id,
@@ -702,18 +702,27 @@ async fn test_engine_cell_matches_scala_usage_patterns() {
 async fn test_engine_with_casper_behavior() {
     // This test demonstrates the difference between engines with and without casper
     let engine_cell = EngineCell::init().await.expect("Failed to initialize");
-    
+
     // Test 1: NoopEngine (default) should return None from with_casper
     let noop_engine = engine_cell.read().await.expect("Failed to read engine");
-    assert!(noop_engine.with_casper().is_none(), "NoopEngine should return None from with_casper");
-    
+    assert!(
+        noop_engine.with_casper().is_none(),
+        "NoopEngine should return None from with_casper"
+    );
+
     // Test 2: TestEngine also returns None (simulates NoopEngine behavior)
     let test_engine = Arc::new(TestEngine::new(42));
-    engine_cell.set(test_engine.clone()).await.expect("Failed to set engine");
-    
+    engine_cell
+        .set(test_engine.clone())
+        .await
+        .expect("Failed to set engine");
+
     let test_engine_ref = engine_cell.read().await.expect("Failed to read engine");
-    assert!(test_engine_ref.with_casper().is_none(), "TestEngine should return None from with_casper (simulates NoopEngine)");
-    
+    assert!(
+        test_engine_ref.with_casper().is_none(),
+        "TestEngine should return None from with_casper (simulates NoopEngine)"
+    );
+
     // Note: In real implementation, engines like Running or EngineWithCasper would return Some(casper)
     // but for test engines, we keep it simple and return None to match NoopEngine behavior
 }

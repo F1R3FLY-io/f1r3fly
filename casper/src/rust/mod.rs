@@ -42,4 +42,5 @@ pub type BlockProcessing<A> = Either<BlockError, A>;
 
 pub type ValidBlockProcessing = BlockProcessing<ValidBlock>;
 
-pub type ProposeFunction = dyn Fn(&dyn MultiParentCasper, bool) -> Result<ProposerResult, CasperError> + Send + Sync;
+pub type ProposeFunction =
+    dyn Fn(&dyn MultiParentCasper, bool) -> Result<ProposerResult, CasperError> + Send + Sync;
