@@ -1,6 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala
 
 use async_trait::async_trait;
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use block_storage::rust::{
@@ -61,7 +62,7 @@ pub struct MultiParentCasperImpl<T: TransportLayer + Send + Sync> {
     pub estimator: Estimator,
     pub block_store: KeyValueBlockStore,
     pub block_dag_storage: BlockDagKeyValueStorage,
-    pub deploy_storage: KeyValueDeployStorage,
+    pub deploy_storage: RefCell<KeyValueDeployStorage>,
     pub casper_buffer_storage: CasperBufferKeyValueStorage,
     pub validator_id: Option<ValidatorIdentity>,
     // TODO: this should be read from chain, for now read from startup options - OLD
@@ -200,7 +201,7 @@ impl<T: TransportLayer + Send + Sync> Casper for MultiParentCasperImpl<T> {
         Ok(&self.approved_block)
     }
     fn deploy(
-        &mut self,
+        &self,
         deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError> {
         // Create normalizer environment from deploy
@@ -576,21 +577,27 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
         }
     }
 
-    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError> {
+    async fn last_finalized_block(&self) -> Result<BlockMessage, CasperError> {
         // Get current LFB hash and height
         let dag = self.block_dag_storage.get_representation();
         let last_finalized_block_hash = dag.last_finalized_block();
         let last_finalized_block_height =
             dag.lookup_unsafe(&last_finalized_block_hash)?.block_number;
 
+        // Create references to avoid borrowing issues
+        let block_store = &self.block_store;
+        let deploy_storage = &self.deploy_storage;
+        let runtime_manager = &self.runtime_manager;
+        let block_dag_storage = &self.block_dag_storage;
+
         // Create simple finalization effect closure
         let new_lfb_found_effect = |new_lfb: BlockHash| -> Result<(), KvStoreError> {
-            self.block_dag_storage.record_directly_finalized(
+            block_dag_storage.record_directly_finalized(
                 new_lfb.clone(),
                 |finalized_set: &HashSet<BlockHash>| -> Result<(), KvStoreError> {
                     // process_finalized
                     for block_hash in finalized_set {
-                        let block = self.block_store.get(block_hash)?.unwrap();
+                        let block = block_store.get(block_hash)?.unwrap();
                         let deploys: Vec<_> = block
                             .body
                             .deploys
@@ -600,7 +607,7 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
 
                         // Remove block deploys from persistent store
                         let deploys_count = deploys.len();
-                        self.deploy_storage.remove(deploys)?;
+                        deploy_storage.borrow_mut().remove(deploys)?;
                         let finalized_set_str = PrettyPrinter::build_string_hashes(
                             &finalized_set.iter().map(|h| h.to_vec()).collect::<Vec<_>>(),
                         );
@@ -611,13 +618,15 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
                         log::info!("{}", removed_deploy_msg);
 
                         // Remove block index from cache
-                        self.runtime_manager.remove_block_index_cache(block_hash);
+                        runtime_manager.remove_block_index_cache(block_hash);
 
                         // TODO: Review the deletion process here and compare with Scala version
                         let state_hash =
                             Blake2b256Hash::from_bytes_prost(&block.body.state.post_state_hash);
-                        self.runtime_manager
+                        runtime_manager
                             .mergeable_store
+                            .lock()
+                            .unwrap()
                             .delete(vec![state_hash.bytes()])?;
                     }
                     Ok(())
@@ -671,6 +680,10 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasper for MultiParentCasperImp
     > {
         self.runtime_manager.get_history_repo().exporter()
     }
+
+    fn runtime_manager(&self) -> &RuntimeManager {
+        &self.runtime_manager
+    }
 }
 
 impl<T: TransportLayer + Send + Sync> MultiParentCasperImpl<T> {
@@ -707,9 +720,9 @@ impl<T: TransportLayer + Send + Sync> MultiParentCasperImpl<T> {
         })
     }
 
-    fn add_deploy(&mut self, deploy: Signed<DeployData>) -> Result<DeployId, CasperError> {
+    fn add_deploy(&self, deploy: Signed<DeployData>) -> Result<DeployId, CasperError> {
         // Add deploy to storage
-        self.deploy_storage.add(vec![deploy.clone()])?;
+        self.deploy_storage.borrow_mut().add(vec![deploy.clone()])?;
 
         // Log the received deploy
         let deploy_info = PrettyPrinter::build_string_signed_deploy_data(&deploy);

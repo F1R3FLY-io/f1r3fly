@@ -87,7 +87,7 @@ pub trait Casper {
     fn get_approved_block(&self) -> Result<&BlockMessage, CasperError>;
 
     fn deploy(
-        &mut self,
+        &self,
         deploy: Signed<DeployData>,
     ) -> Result<Either<DeployError, DeployId>, CasperError>;
 
@@ -131,7 +131,7 @@ pub trait MultiParentCasper: Casper {
         weights: HashMap<Validator, u64>,
     ) -> Result<f32, CasperError>;
 
-    async fn last_finalized_block(&mut self) -> Result<BlockMessage, CasperError>;
+    async fn last_finalized_block(&self) -> Result<BlockMessage, CasperError>;
 
     // Equivalent to Scala's blockDag: F[BlockDagRepresentation[F]]
     async fn block_dag(&self) -> Result<KeyValueDagRepresentation, CasperError>;
@@ -139,6 +139,8 @@ pub trait MultiParentCasper: Casper {
     fn block_store(&self) -> &KeyValueBlockStore;
 
     fn rspace_state_manager(&self) -> &RSpaceStateManager;
+
+    fn runtime_manager(&self) -> &RuntimeManager;
 
     fn get_validator(&self) -> Option<ValidatorIdentity>;
 
@@ -170,7 +172,7 @@ pub fn hash_set_casper<T: TransportLayer + Send + Sync>(
         estimator,
         block_store,
         block_dag_storage,
-        deploy_storage,
+        deploy_storage: std::cell::RefCell::new(deploy_storage),
         casper_buffer_storage,
         validator_id,
         casper_shard_conf,
