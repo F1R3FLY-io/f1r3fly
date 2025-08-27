@@ -1241,7 +1241,7 @@ impl BlockAPI {
     //18 public
     pub async fn get_latest_message(engine_cell: &EngineCell) -> ApiErr<BlockMetadata> {
         let error_message =
-            "Could not execute exploratory deploy, casper instance was not available yet.";
+            "Could not get latest message, casper instance was not available yet.";
         let eng = engine_cell.read().await.into_api_err()?;
         if let Some(casper) = eng.with_casper() {
             let validator_opt = casper.get_validator();
