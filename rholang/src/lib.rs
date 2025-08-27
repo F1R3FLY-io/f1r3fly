@@ -859,14 +859,30 @@ extern "C" fn reset(
     runtime_ptr: *mut RhoRuntime,
     root_pointer: *const u8,
     root_bytes_len: usize,
-) -> () {
+) -> i32 {
     // println!("\nHit reset");
 
     let root_slice = unsafe { std::slice::from_raw_parts(root_pointer, root_bytes_len) };
     let root = Blake2b256Hash::from_bytes(root_slice.to_vec());
 
+    // Access underlying space directly to capture Result and map to error code
     let runtime = unsafe { &mut (*runtime_ptr).runtime };
-    runtime.reset(&root);
+
+    let mut space_lock = match runtime.reducer.space.try_lock() {
+        Ok(lock) => lock,
+        Err(e) => {
+            eprintln!("ERROR: failed to lock reducer.space in reset: {:?}", e);
+            return 2; // lock error
+        }
+    };
+
+    match space_lock.reset(&root) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("ERROR: reset failed: {:?}", e);
+            1 // generic reset error (e.g. unknown root)
+        }
+    }
 }
 
 #[no_mangle]
