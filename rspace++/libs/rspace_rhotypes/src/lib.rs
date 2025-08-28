@@ -1,3 +1,17 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Tracks total bytes currently allocated and leaked to JNA callers
+static ALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn get_allocated_bytes() -> usize {
+    ALLOCATED_BYTES.load(Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn reset_allocated_bytes() {
+    ALLOCATED_BYTES.store(0, Ordering::SeqCst)
+}
 use models::rspace_plus_plus_types::*;
 use models::{ByteVector, rhoapi::*};
 use prost::Message;
@@ -2335,7 +2349,10 @@ pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: us
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -2355,7 +2372,10 @@ pub extern "C" fn hash_channels(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -2367,4 +2387,5 @@ pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
         let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));
         // The Box goes out of scope here, and Rust automatically deallocates the memory.
     }
+    ALLOCATED_BYTES.fetch_sub(len, Ordering::SeqCst);
 }

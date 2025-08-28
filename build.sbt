@@ -592,6 +592,9 @@ lazy val rholang = (project in file("rholang"))
       "net.java.dev.jna" % "jna"          % "5.13.0",
       "net.java.dev.jna" % "jna-platform" % "5.13.0"
     ),
+    Test / javaOptions ++= Seq(
+      s"-Djna.library.path=../$releaseJnaLibraryPath"
+    ),
     // TODO: investigate if still needed?
     // mainClass in assembly := Some("coop.rchain.rho2rose.Rholang2RosetteCompiler"),
     //constrain the resource usage so that we hit SOE-s and OOME-s more quickly should they happen
@@ -665,6 +668,11 @@ lazy val rspacePlusPlus = (project in file("rspace++"))
       circeParser,
       circeGenericExtras
     ),
+    Test / javaOptions ++= Seq(
+      s"-Djna.library.path=../$releaseJnaLibraryPath"
+    ),
+    // Ensure native lib is built before compiling this subproject
+    Compile / compile := (Compile / compile).dependsOn(LocalRootProject / runCargoBuild).value,
     PB.targets in Compile := Seq(
       scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
     )

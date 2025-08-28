@@ -1371,7 +1371,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
             println("Error during scala historyRepo root operation: " + e)
             throw e
         } finally {
-          INSTANCE.deallocate_memory(rootPtr, resultByteslength)
+          INSTANCE.deallocate_memory(rootPtr, resultByteslength + 4)
         }
       } else {
         println("rootPtr is null")
@@ -1438,7 +1438,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                        println("Error during scala getData operation: " + e)
                        throw e
                    } finally {
-                     INSTANCE.deallocate_memory(getDataResultPtr, resultByteslength)
+                     INSTANCE.deallocate_memory(getDataResultPtr, resultByteslength + 4)
                    }
                  } else {
                    println("getDataResultPtr is null")
@@ -1507,7 +1507,10 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                        println("Error during scala getWaitingContinuations operation: " + e)
                        throw e
                    } finally {
-                     INSTANCE.deallocate_memory(getWaitingContinuationResultPtr, resultByteslength)
+                     INSTANCE.deallocate_memory(
+                       getWaitingContinuationResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    println("getWaitingContinuationResultPtr is null")
@@ -1554,7 +1557,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                        println("Error during scala getJoins operation: " + e)
                        throw e
                    } finally {
-                     INSTANCE.deallocate_memory(getJoinsResultPtr, resultByteslength)
+                     INSTANCE.deallocate_memory(getJoinsResultPtr, resultByteslength + 4)
                    }
                  } else {
                    println("getJoinsResultPtr is null")
@@ -1730,7 +1733,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                        println("Error during scala toMap operation: " + e)
                        throw e
                    } finally {
-                     INSTANCE.deallocate_memory(toMapPtr, length)
+                     INSTANCE.deallocate_memory(toMapPtr, length + 4)
                    }
                  } else {
                    println("toMapPtr is null")
@@ -1992,7 +1995,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                        println("Error during scala createSoftCheckpoint operation: " + e)
                        throw e
                    } finally {
-                     INSTANCE.deallocate_memory(softCheckpointPtr, length)
+                     INSTANCE.deallocate_memory(softCheckpointPtr, length + 4)
                    }
                  } else {
                    println("softCheckpointPtr is null")
