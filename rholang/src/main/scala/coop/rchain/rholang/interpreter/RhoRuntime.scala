@@ -512,7 +512,7 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                        throw e
                    } finally {
                      // The buffer has 4-byte prefix
-                     // No deallocator exposed in rholang JNA; TODO if added
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(softCheckpointPtr, length + 4)
                    }
                  } else {
                    println("softCheckpointPtr is null")
@@ -815,6 +815,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala createCheckpoint operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(
+                       checkpointResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    println(
@@ -890,6 +895,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala consumeResult operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(
+                       consumeResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    None
@@ -952,6 +962,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala getData operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(
+                       getDataResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    println("getDataResultPtr is null")
@@ -997,6 +1012,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala getJoins operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(
+                       getJoinsResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    println("getJoinsResultPtr is null")
@@ -1067,6 +1087,11 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala getWaitingContinuations operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(
+                       getWaitingContinuationResultPtr,
+                       resultByteslength + 4
+                     )
                    }
                  } else {
                    println("getWaitingContinuationResultPtr is null")
@@ -1204,6 +1229,8 @@ class RhoRuntimeImpl[F[_]: Sync: Span](
                      case e: Throwable =>
                        println("Error during scala toMap operation: " + e)
                        throw e
+                   } finally {
+                     RHOLANG_RUST_INSTANCE.rholang_deallocate_memory(toMapPtr, length + 4)
                    }
                  } else {
                    println("toMapPtr is null")

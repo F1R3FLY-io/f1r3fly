@@ -847,7 +847,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                              } finally {
                                                INSTANCE.deallocate_memory(
                                                  getHistoryDataResultPtr,
-                                                 resultByteslength
+                                                 resultByteslength + 4
                                                )
                                              }
                                            } else {
@@ -952,7 +952,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                              } finally {
                                                INSTANCE.deallocate_memory(
                                                  getHistoryWaitingContinuationResultPtr,
-                                                 resultByteslength
+                                                 resultByteslength + 4
                                                )
                                              }
                                            } else {
@@ -1024,7 +1024,7 @@ abstract class RSpaceOpsPlusPlus[F[_]: Concurrent: ContextShift: Log: Metrics](
                                              } finally {
                                                INSTANCE.deallocate_memory(
                                                  getHistoryJoinsResultPtr,
-                                                 resultByteslength
+                                                 resultByteslength + 4
                                                )
                                              }
                                            } else {

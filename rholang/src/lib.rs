@@ -469,7 +469,10 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -842,7 +845,10 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -879,7 +885,10 @@ extern "C" fn consume_result(
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
     }
 }
@@ -962,7 +971,10 @@ extern "C" fn get_data(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -990,7 +1002,10 @@ extern "C" fn get_joins(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1046,7 +1061,10 @@ extern "C" fn get_waiting_continuations(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1165,7 +1183,10 @@ extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
