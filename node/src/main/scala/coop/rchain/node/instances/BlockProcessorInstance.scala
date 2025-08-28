@@ -9,6 +9,7 @@ import coop.rchain.casper.protocol.BlockMessage
 import coop.rchain.casper.{Casper, PrettyPrinter, ProposeFunction, ValidBlockProcessing}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared.Log
+import coop.rchain.node.memory.MemoryMonitor
 import fs2.Stream
 import fs2.concurrent.Queue
 
@@ -66,8 +67,10 @@ object BlockProcessorInstance {
             )
             .evalMap(
               _ =>
-                blockProcessor.validateWithEffects(c, b, None) >>= { r =>
-                  logResult(r).as(c, b, r)
+                MemoryMonitor.monitorOperation(s"Block validation: ${blockStr}") {
+                  blockProcessor.validateWithEffects(c, b, None) >>= { r =>
+                    logResult(r).as(c, b, r)
+                  }
                 }
             )
             .evalTap { _ =>
