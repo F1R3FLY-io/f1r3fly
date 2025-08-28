@@ -28,7 +28,6 @@ import coop.rchain.node.api._
 import coop.rchain.node.configuration.NodeConf
 import coop.rchain.node.effects.{EventConsumer, RchainEvents}
 import coop.rchain.node.instances.{BlockProcessorInstance, ProposerInstance}
-import coop.rchain.node.memory.MemoryMonitor
 import coop.rchain.node.runtime.NodeRuntime._
 import coop.rchain.node.web.ReportingRoutes.ReportingHttpRoutes
 import coop.rchain.node.{diagnostics, effects, NodeEnvironment}
@@ -322,15 +321,6 @@ class NodeRuntime[F[_]: Monixable: ConcurrentEffect: Parallel: Timer: ContextShi
       //_ <- addShutdownHook(servers, runtimeCleanup, blockStore)
 
       _ <- EventLog[F].publish(Event.NodeStarted(address))
-
-      // Start memory monitoring with higher frequency and lower threshold for maximum visibility
-      _ <- Log[F].info("Starting native memory monitoring with maximum verbosity...")
-      _ <- Concurrent[F].start(
-            MemoryMonitor.startPeriodicMonitoring[F](
-              interval = 10.seconds,      // Check every 10 seconds instead of 30
-              warnThreshold = 1024 * 1024 // Warn at 1MB instead of 100MB
-            )
-          )
 
       nodeDiscoveryStream    = fs2.Stream.eval(nodeDiscoveryLoop).repeat
       clearConnectionsStream = fs2.Stream.eval(clearConnectionsLoop).repeat
