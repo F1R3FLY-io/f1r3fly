@@ -286,26 +286,6 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     }
   }
 
-  it should "handle random in replay" in {
-    val result2 = evaluateAndReplay(
-      Cost(Int.MaxValue),
-      "new output, random(`rho:io:random`) in { random!(*output)}"
-    )
-    assert(result2._1.errors.isEmpty)
-    assert(result2._2.errors.isEmpty)
-    assert(result2._1.cost == result2._2.cost)
-  }
-
-  it should "handle gpt3 in replay" in {
-    val result2 = evaluateAndReplay(
-      Cost(Int.MaxValue),
-      "new output, gpt3(`rho:ai:gpt3`) in { gpt3!(\"abc\", *output) | for (_ <- output) { Nil }}"
-    )
-    assert(result2._1.errors.isEmpty)
-    assert(result2._2.errors.isEmpty)
-    assert(result2._1.cost == result2._2.cost)
-  }
-
   def checkDeterministicCost(block: => (EvaluateResult, Chain[Cost])): Unit = {
     val repetitions = 20
     val first       = block

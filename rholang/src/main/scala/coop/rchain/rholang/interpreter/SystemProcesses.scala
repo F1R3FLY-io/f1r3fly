@@ -44,7 +44,6 @@ trait SystemProcesses[F[_]] {
   def stdOutAck: Contract[F]
   def stdErr: Contract[F]
   def stdErrAck: Contract[F]
-  def random: Contract[F]
   def secp256k1Verify: Contract[F]
   def ed25519Verify: Contract[F]
   def sha256Hash: Contract[F]
@@ -56,11 +55,9 @@ trait SystemProcesses[F[_]] {
   def deployerIdOps: Contract[F]
   def registryOps: Contract[F]
   def sysAuthTokenOps: Contract[F]
-  def gpt3: Contract[F]
   def gpt4: Contract[F]
   def dalle3: Contract[F]
   def textToAudio: Contract[F]
-  def dumpFile: Contract[F]
   def grpcTell: Contract[F]
   def devNull: Contract[F]
 }
@@ -115,12 +112,9 @@ object SystemProcesses {
     val REG_INSERT_SIGNED: Par  = byteName(16)
     val REG_OPS: Par            = byteName(17)
     val SYS_AUTHTOKEN_OPS: Par  = byteName(18)
-    val GPT3: Par               = byteName(19)
     val GPT4: Par               = byteName(20)
     val DALLE3: Par             = byteName(21)
     val TEXT_TO_AUDIO: Par      = byteName(22)
-    val DUMP: Par               = byteName(23)
-    val RANDOM: Par             = byteName(24)
     val GRPC_TELL: Par          = byteName(25)
     val DEV_NULL: Par           = byteName(26)
   }
@@ -140,19 +134,14 @@ object SystemProcesses {
     val DEPLOYER_ID_OPS: Long    = 14L
     val REG_OPS: Long            = 15L
     val SYS_AUTHTOKEN_OPS: Long  = 16L
-    val GPT3: Long               = 17L
     val GPT4: Long               = 18L
     val DALLE3: Long             = 19L
     val TEXT_TO_AUDIO: Long      = 20L
-    val DUMP: Long               = 21L
-    val RANDOM: Long             = 22L
     val GRPC_TELL: Long          = 23L
     val DEV_NULL: Long           = 24L
   }
 
   val nonDeterministicCalls: Set[Long] = Set(
-    BodyRefs.RANDOM,
-    BodyRefs.GPT3,
     BodyRefs.GPT4,
     BodyRefs.DALLE3,
     BodyRefs.TEXT_TO_AUDIO
@@ -300,19 +289,6 @@ object SystemProcesses {
           } yield output
       }
 
-      def random: Contract[F] = {
-        case isContractCall(produce, true, previous: Seq[Par], Seq(ack)) => {
-          produce(previous, ack).map(_ => previous)
-        }
-        case isContractCall(produce, a, b, Seq(ack)) => {
-          val random1      = new Random()
-          val randomLength = random1.nextInt(100)
-          val randomString = Seq.fill(randomLength)(random1.nextPrintableChar()).mkString
-          val output       = Seq(RhoType.String(randomString))
-          produce(output, ack).map(_ => output)
-        }
-      }
-
       def revAddress: Contract[F] = {
         case isContractCall(
             produce,
@@ -444,23 +420,6 @@ object SystemProcesses {
       def blake2b256Hash: Contract[F] =
         hashContract("blake2b256Hash", Blake2b256.hash)
 
-      def gpt3: Contract[F] = {
-        case isContractCall(produce, true, previousOutput, Seq(RhoType.String(prompt), ack)) => {
-          produce(previousOutput, ack).map(_ => previousOutput)
-        }
-        case isContractCall(produce, _, _, Seq(RhoType.String(prompt), ack)) => {
-          (for {
-            response <- openAIService.gpt3TextCompletion(prompt)
-            output   = Seq(RhoType.String(response))
-            _        <- produce(output, ack)
-          } yield output).onError {
-            case e =>
-              produce(Seq(RhoType.String(prompt)), ack)
-              e.raiseError
-          }
-        }
-      }
-
       def gpt4: Contract[F] = {
         case isContractCall(produce, true, previousOutput, Seq(RhoType.String(prompt), ack)) => {
           produce(previousOutput, ack).map(_ => previousOutput)
@@ -509,18 +468,6 @@ object SystemProcesses {
               produce(Seq(RhoType.String(text)), ack)
               e.raiseError
           }
-        }
-      }
-
-      def dumpFile: Contract[F] = {
-        case isContractCall(_, _, _, Seq(RhoType.String(path), RhoType.ByteArray(data))) => {
-          F.delay {
-              Files.write(new File(path).toPath, data)
-              Seq.empty[Par]
-            }
-            .onError {
-              case e => F.delay(Console.err.println(s"Error writing to file: $e"))
-            }
         }
       }
 

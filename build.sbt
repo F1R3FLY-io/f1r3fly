@@ -40,28 +40,6 @@ inThisBuild(List(
   IntegrationTest / javaOptions := javaOpens
 ))
 
-lazy val ensureDockerBuildx = taskKey[Unit]("Ensure that docker buildx configuration exists")
-lazy val dockerBuildWithBuildx = taskKey[Unit]("Build docker images using buildx")
-lazy val dockerBuildxSettings = Seq(
-  ensureDockerBuildx := {
-    if (Process("docker buildx inspect multi-arch-builder").! == 1) {
-      Process("docker buildx create --use --name multi-arch-builder", baseDirectory.value).!
-    }
-  },
-  dockerBuildWithBuildx := {
-    streams.value.log("Building and pushing image with Buildx")
-    dockerAliases.value.foreach(
-      alias => Process("docker buildx build --platform=linux/arm64,linux/amd64 --push -t " +
-        alias + " .", baseDirectory.value / "target" / "docker"/ "stage").!
-    )
-  },
-  publish in Docker := Def.sequential(
-    publishLocal in Docker,
-    ensureDockerBuildx,
-    dockerBuildWithBuildx
-  ).value
-)
-
 lazy val projectSettings = Seq(
   organization := "f1r3fly-io",
   scalaVersion := "2.12.15",
@@ -138,52 +116,6 @@ lazy val projectSettings = Seq(
 // a namespace for generative tests (or other tests that take a long time)
 lazy val SlowcookerTest = config("slowcooker") extend (Test)
 
-/*
-// changlog update and git tag
-lazy val release = taskKey[Unit]("Run benchmark, tag new release, and update changelog")
-
-release := {
-  val log            = streams.value.log
-  val currentVersion = version.value
-
-  log.info("Creating new release...")
-  if (Seq("sbt", "rspaceBench").! == 0) {
-    import scala.sys.process._
-    log.info("Benchmark tests passed.")
-
-    log.info(s"Tagging new release (v$currentVersion)...")
-    val shortCommit = "git rev-parse --short HEAD".!!.trim
-    if (Seq("git", "tag", s"v$currentVersion-$shortCommit)").! == 0) {
-      log.info(s"New release (v$currentVersion) successfully tagged.")
-    } else {
-      log.error(s"Failed to tag new release (v$currentVersion).")
-      throw new IllegalStateException("Failed to tag new release")
-    }
-
-    log.info("Updating changelog...")
-    val changelogFile    = new File("CHANGELOG.md")
-    val changelogContent = IO.read(changelogFile)
-    val formattedDate =
-      java.time.LocalDate.now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-
-    val newEntry = s"""
-      |## [v$currentVersion] - $formattedDate
-      |- Added new features
-      |- Fixed bugs
-      |- Improved performance
-      """.stripMargin
-
-    val updatedChangelogContent = newEntry + "\n\n" + changelogContent
-    IO.write(changelogFile, updatedChangelogContent)
-
-    log.info("Changelog successfully updated.")
-  } else {
-    log.error("Benchmark tests failed. Aborting the release process.")
-    throw new IllegalStateException("Benchmark tests failed")
-  }
-}
-*/
-
 lazy val benchmark = taskKey[Unit]("Run benchmark, and update changelog")
 
 benchmark := {
@@ -191,10 +123,6 @@ benchmark := {
   val currentVersion = version.value
 
   log.info("Running benchmark tests...")
-
-  if (Seq("sbt", "rspacePlusPlus/test").! == 0) {
-    log.info("calling rspace++ tests... place call here")
-  }
 }
 
 lazy val compilerSettings = CompilerSettings.options ++ Seq(
@@ -435,10 +363,21 @@ lazy val node = (project in file("node"))
     daemonUserUid in Docker := None,
     daemonUser in Docker := "daemon",
     dockerExposedPorts := List(40400, 40401, 40402, 40403, 40404),
-    dockerBuildOptions := Seq(
-      "-t",
-      "f1r3flyindustries/f1r3fly-scala-node:latest"
-    ),
+    dockerBuildOptions := {
+      val baseOptions = Seq("-t", "f1r3flyindustries/f1r3fly-scala-node:latest")
+      val multiplatformOptions = Seq(
+        "--builder",
+        "default",
+        "--platform",
+        "linux/amd64,linux/arm64"
+      )
+      
+      if (sys.env.get("MULTI_ARCH").contains("true")) {
+        multiplatformOptions ++ baseOptions
+      } else {
+        baseOptions
+      }
+    },
     dockerCommands := {
       // Retrieve the default Docker commands provided by sbt-native-packager
       val defaultCommands = dockerCommands.value
@@ -601,22 +540,6 @@ lazy val blockStorage = (project in file("block-storage"))
   .dependsOn(shared, models % "compile->compile;test->test")
 
 // Using dependencyOverrides bc of ConflictManager
-lazy val rspacePlusPlus = (project in file("rspace++"))
-  .settings(commonSettings: _*)
-  .settings(
-    name := "rspace++",
-    // mainClass := Some("BuildRustLibrary"),
-    dependencyOverrides += "org.scalactic" %% "scalactic" % "3.2.15",
-    dependencyOverrides += "org.scalatest" %% "scalatest" % "3.2.15" % "test",
-    libraryDependencies ++= commonDependencies ++ kamonDependencies ++ Seq(
-      "net.java.dev.jna" % "jna" % "5.13.0",
-      circeParser,
-      circeGenericExtras
-    ),
-    PB.targets in Compile := Seq(
-      scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "protobuf"
-    )
-  )
 
 lazy val rspace = (project in file("rspace"))
   .configs(IntegrationTest extend Test)
@@ -692,14 +615,6 @@ lazy val rchain = (project in file("."))
     rholangServer,
     rspace,
     rspaceBench,
-    rspacePlusPlus,
     shared
   )
 
-lazy val runCargoBuild = taskKey[Unit]("Builds Rust library for rspace++")
-runCargoBuild := {
-  import scala.sys.process._
-  Seq("./scripts/build_rspace++.sh") !
-}
-
-(compile in Compile) := ((compile in Compile) dependsOn runCargoBuild).value
