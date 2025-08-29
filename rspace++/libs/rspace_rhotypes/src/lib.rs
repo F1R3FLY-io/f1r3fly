@@ -6,6 +6,7 @@ use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
+use rspace_plus_plus::rspace::logging::BasicLogger;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -73,10 +74,11 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 #[no_mangle]
 pub extern "C" fn space_new_replay(rspace: *mut Space) -> *mut ReplaySpace {
     let rspace = unsafe { (*rspace).rspace.lock().unwrap() };
-    let replay_space = ReplayRSpace::apply(
+    let replay_space = ReplayRSpace::apply_with_logger(
         rspace.history_repository.clone(),
         rspace.store.clone(),
         Arc::new(Box::new(Matcher)),
+        Box::new(BasicLogger::new()),
     );
 
     Box::into_raw(Box::new(ReplaySpace {
