@@ -21,3 +21,4 @@ pub mod replay_rspace;
 pub mod merger;
 pub mod reporting_rspace;
 pub mod reporting_transformer;
+pub mod logging;

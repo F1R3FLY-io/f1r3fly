@@ -358,12 +358,6 @@ lazy val node = (project in file("node"))
       }
     },
     (Docker / publishLocal) := ((Docker / publishLocal) dependsOn runCargoBuildDocker).value,
-    version := git.gitDescribedVersion.value.getOrElse({
-      val v = "1.0.0-SNAPSHOT"
-      System.err.println("Could not get version from `git describe`.")
-      System.err.println("Using the fallback version: " + v)
-      v
-    }),
     name := "rnode",
     maintainer := "F1r3fly.io LCA https://f1r3fly.io/",
     packageSummary := "F1R3FLY Node",

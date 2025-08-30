@@ -1,3 +1,17 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Tracks total bytes currently allocated and leaked to JNA callers
+static ALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn get_allocated_bytes() -> usize {
+    ALLOCATED_BYTES.load(Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn reset_allocated_bytes() {
+    ALLOCATED_BYTES.store(0, Ordering::SeqCst)
+}
 use models::rhoapi::*;
 use models::rspace_plus_plus_types::*;
 use prost::Message;
@@ -6,6 +20,7 @@ use rholang::rust::interpreter::matcher::spatial_matcher::SpatialMatcherContext;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash::Blake2b256Hash;
 use rspace_plus_plus::rspace::hashing::stable_hash_provider::{hash, hash_from_vec};
 use rspace_plus_plus::rspace::replay_rspace::ReplayRSpace;
+use rspace_plus_plus::rspace::logging::BasicLogger;
 use rspace_plus_plus::rspace::rspace::RSpace;
 use rspace_plus_plus::rspace::rspace_interface::ISpace;
 use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
@@ -73,10 +88,11 @@ pub extern "C" fn space_new(path: *const c_char) -> *mut Space {
 #[no_mangle]
 pub extern "C" fn space_new_replay(rspace: *mut Space) -> *mut ReplaySpace {
     let rspace = unsafe { (*rspace).rspace.lock().unwrap() };
-    let replay_space = ReplayRSpace::apply(
+    let replay_space = ReplayRSpace::apply_with_logger(
         rspace.history_repository.clone(),
         rspace.store.clone(),
         Arc::new(Box::new(Matcher)),
+        Box::new(BasicLogger::new()),
     );
 
     Box::into_raw(Box::new(ReplaySpace {
@@ -129,7 +145,10 @@ pub extern "C" fn spatial_match_result(
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
         None => std::ptr::null(),
     }
@@ -200,7 +219,10 @@ pub extern "C" fn produce(
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
         None => std::ptr::null(),
     }
@@ -269,7 +291,10 @@ pub extern "C" fn consume(
             result.append(&mut bytes);
 
             // println!("\nlen: {:?}", len);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
         None => {
             // println!("\nnone in rust consume");
@@ -639,7 +664,10 @@ pub extern "C" fn to_map(rspace: *mut Space) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1183,7 +1211,10 @@ pub extern "C" fn history_repo_root(rspace: *mut Space) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 /* Exporter */
@@ -1300,7 +1331,10 @@ pub extern "C" fn get_history_items(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1346,7 +1380,10 @@ pub extern "C" fn get_data_items(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1453,7 +1490,10 @@ pub extern "C" fn get_history_and_data(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1479,7 +1519,10 @@ pub extern "C" fn get_exporter_root(rspace: *mut Space) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 // #[no_mangle]
@@ -1721,7 +1764,10 @@ pub extern "C" fn get_history_item(
         let len_bytes = len.to_le_bytes().to_vec();
         let mut result = len_bytes;
         result.append(&mut bytes);
-        Box::leak(result.into_boxed_slice()).as_ptr()
+        let total_len = result.len();
+        let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+        ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+        ptr
     } else {
         std::ptr::null()
     }
@@ -1757,7 +1803,10 @@ pub extern "C" fn history_reader_root(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1809,7 +1858,10 @@ pub extern "C" fn get_history_data(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1872,7 +1924,10 @@ pub extern "C" fn get_history_waiting_continuations(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1908,7 +1963,10 @@ pub extern "C" fn get_history_joins(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 /* ReplayRSpace */
@@ -1978,7 +2036,10 @@ pub extern "C" fn replay_produce(
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
         None => std::ptr::null(),
     }
@@ -2047,7 +2108,10 @@ pub extern "C" fn replay_consume(
             result.append(&mut bytes);
 
             // println!("\nlen: {:?}", len);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
         None => {
             // println!("\nnone in rust consume");
@@ -2177,7 +2241,10 @@ pub extern "C" fn replay_create_checkpoint(rspace: *mut Space) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -2336,7 +2403,10 @@ pub extern "C" fn hash_channel(channel_pointer: *const u8, channel_bytes_len: us
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -2356,7 +2426,10 @@ pub extern "C" fn hash_channels(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -2368,4 +2441,5 @@ pub extern "C" fn deallocate_memory(ptr: *mut u8, len: usize) {
         let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));
         // The Box goes out of scope here, and Rust automatically deallocates the memory.
     }
+    ALLOCATED_BYTES.fetch_sub(len, Ordering::SeqCst);
 }

@@ -15,6 +15,7 @@ use super::rspace_interface::MaybeProduceResult;
 use super::rspace_interface::PRODUCE_COMM_LABEL;
 use super::rspace_interface::RSpaceResult;
 use super::trace::Log;
+use super::logging::{BasicLogger, RSpaceLogger};
 use super::trace::event::COMM;
 use super::trace::event::Consume;
 use super::trace::event::Event;
@@ -47,6 +48,7 @@ pub struct ReplayRSpace<C, P, A, K> {
     matcher: Arc<Box<dyn Match<P, A>>>,
     // pub ops: RSpaceOps<C, P, A, K>,
     pub replay_data: MultisetMultiMap<IOEvent, COMM>,
+    logger: Arc<Mutex<Box<dyn RSpaceLogger<C, P, A, K>>>>,
 }
 
 impl<C, P, A, K> SpaceMatcher<C, P, A, K> for ReplayRSpace<C, P, A, K>
@@ -365,6 +367,31 @@ where
             event_log: Vec::new(),
             produce_counter: BTreeMap::new(),
             replay_data: MultisetMultiMap::empty(),
+            logger: Arc::new(Mutex::new(Box::new(BasicLogger::new()))),
+        }
+    }
+
+    pub fn apply_with_logger(
+        history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+        store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+        matcher: Arc<Box<dyn Match<P, A>>>,
+        logger: Box<dyn RSpaceLogger<C, P, A, K>>,
+    ) -> ReplayRSpace<C, P, A, K>
+    where
+        C: Clone + Debug + Ord + Hash,
+        P: Clone + Debug,
+        A: Clone + Debug,
+        K: Clone + Debug,
+    {
+        ReplayRSpace {
+            history_repository,
+            store,
+            matcher,
+            installs: Arc::new(Mutex::new(HashMap::new())),
+            event_log: Vec::new(),
+            produce_counter: BTreeMap::new(),
+            replay_data: MultisetMultiMap::empty(),
+            logger: Arc::new(Mutex::new(logger)),
         }
     }
 
@@ -431,7 +458,7 @@ where
                             let produce_counters_closure =
                                 |produces: Vec<Produce>| self.produce_counters(produces);
 
-                            self.log_comm(
+                            self.logger.lock().unwrap().log_comm(
                                 &data_candidates,
                                 &channels,
                                 wk.clone(),
@@ -720,7 +747,7 @@ where
         } = &continuation;
 
         let produce_counters_closure = |produces: Vec<Produce>| self.produce_counters(produces);
-        let comm_ref = self.log_comm(
+        let comm_ref = self.logger.lock().unwrap().log_comm(
             &data_candidates,
             &channels,
             continuation.clone(),
@@ -774,48 +801,59 @@ where
 
     pub fn log_comm(
         &mut self,
-        _data_candidates: &Vec<ConsumeCandidate<C, A>>,
-        _channels: &Vec<C>,
-        _wk: WaitingContinuation<P, K>,
+        data_candidates: &Vec<ConsumeCandidate<C, A>>,
+        channels: &Vec<C>,
+        wk: WaitingContinuation<P, K>,
         comm: COMM,
-        _label: &str,
+        label: &str,
     ) -> COMM {
-        // TODO: Metrics?
-        // self.event_log.insert(0, Event::Comm(comm.clone()));
-        comm
+        self
+            .logger
+            .lock()
+            .unwrap()
+            .log_comm(data_candidates, channels, wk, comm, label)
     }
 
     pub fn log_consume(
         &mut self,
         consume_ref: Consume,
-        _channels: &Vec<C>,
-        _patterns: &Vec<P>,
-        _continuation: &K,
-        _persist: bool,
-        _peeks: &BTreeSet<i32>,
+        channels: &Vec<C>,
+        patterns: &Vec<P>,
+        continuation: &K,
+        persist: bool,
+        peeks: &BTreeSet<i32>,
     ) -> Consume {
-        consume_ref
+        self
+            .logger
+            .lock()
+            .unwrap()
+            .log_consume(consume_ref, channels, patterns, continuation, persist, peeks)
     }
 
     pub fn log_produce(
         &mut self,
         produce_ref: Produce,
-        _channel: &C,
-        _data: &A,
+        channel: &C,
+        data: &A,
         persist: bool,
     ) -> Produce {
+        let result = self
+            .logger
+            .lock()
+            .unwrap()
+            .log_produce(produce_ref, channel, data, persist);
         if !persist {
             // let entry = self.produce_counter.entry(produce_ref.clone()).or_insert(0);
             // *entry += 1;
-            match self.produce_counter.get(&produce_ref) {
+            match self.produce_counter.get(&result) {
                 Some(current_count) => self
                     .produce_counter
-                    .insert(produce_ref.clone(), current_count + 1),
-                None => self.produce_counter.insert(produce_ref.clone(), 1),
+                    .insert(result.clone(), current_count + 1),
+                None => self.produce_counter.insert(result.clone(), 1),
             };
         }
 
-        produce_ref
+        result
     }
 
     fn get_comm_or_candidate<Candidate>(

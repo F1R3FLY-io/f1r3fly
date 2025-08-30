@@ -17,6 +17,7 @@ struct TestEngine {
     id: i32,
     init_count: Arc<AtomicUsize>,
     handle_count: Arc<AtomicUsize>,
+    has_casper: bool, // Add flag to control casper availability
 }
 
 impl TestEngine {
@@ -25,6 +26,16 @@ impl TestEngine {
             id,
             init_count: Arc::new(AtomicUsize::new(0)),
             handle_count: Arc::new(AtomicUsize::new(0)),
+            has_casper: false, // Default to no casper (like NoopEngine)
+        }
+    }
+
+    fn new_with_casper(id: i32) -> Self {
+        Self {
+            id,
+            init_count: Arc::new(AtomicUsize::new(0)),
+            handle_count: Arc::new(AtomicUsize::new(0)),
+            has_casper: true, // This engine simulates having casper
         }
     }
 
@@ -47,6 +58,14 @@ impl Engine for TestEngine {
     async fn handle(&mut self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
         self.handle_count.fetch_add(1, Ordering::SeqCst);
         Ok(())
+    }
+
+    fn with_casper(&self) -> Option<&dyn casper::rust::casper::MultiParentCasper> {
+        // TestEngine returns None to simulate NoopEngine behavior (no casper instance)
+        // In real scenarios, engines either:
+        // - Return None (like NoopEngine) when they don't wrap casper
+        // - Return Some(casper) (like Running or EngineWithCasper) when they do
+        None
     }
 
     fn clone_box(&self) -> Box<dyn Engine> {
@@ -88,6 +107,14 @@ impl Engine for FailingEngine {
         }
     }
 
+    fn with_casper(&self) -> Option<&dyn casper::rust::casper::MultiParentCasper> {
+        // TestEngine returns None to simulate NoopEngine behavior (no casper instance)
+        // In real scenarios, engines either:
+        // - Return None (like NoopEngine) when they don't wrap casper
+        // - Return Some(casper) (like Running or EngineWithCasper) when they do
+        None
+    }
+
     fn clone_box(&self) -> Box<dyn Engine> {
         Box::new(self.clone())
     }
@@ -114,6 +141,14 @@ impl Engine for AsyncTestEngine {
 
     async fn handle(&mut self, _peer: PeerNode, _msg: CasperMessage) -> Result<(), CasperError> {
         Ok(())
+    }
+
+    fn with_casper(&self) -> Option<&dyn casper::rust::casper::MultiParentCasper> {
+        // TestEngine returns None to simulate NoopEngine behavior (no casper instance)
+        // In real scenarios, engines either:
+        // - Return None (like NoopEngine) when they don't wrap casper
+        // - Return Some(casper) (like Running or EngineWithCasper) when they do
+        None
     }
 
     fn clone_box(&self) -> Box<dyn Engine> {
@@ -661,4 +696,33 @@ async fn test_engine_cell_matches_scala_usage_patterns() {
         5,
         "Old engine count should be unchanged"
     );
+}
+
+#[tokio::test]
+async fn test_engine_with_casper_behavior() {
+    // This test demonstrates the difference between engines with and without casper
+    let engine_cell = EngineCell::init().await.expect("Failed to initialize");
+
+    // Test 1: NoopEngine (default) should return None from with_casper
+    let noop_engine = engine_cell.read().await.expect("Failed to read engine");
+    assert!(
+        noop_engine.with_casper().is_none(),
+        "NoopEngine should return None from with_casper"
+    );
+
+    // Test 2: TestEngine also returns None (simulates NoopEngine behavior)
+    let test_engine = Arc::new(TestEngine::new(42));
+    engine_cell
+        .set(test_engine.clone())
+        .await
+        .expect("Failed to set engine");
+
+    let test_engine_ref = engine_cell.read().await.expect("Failed to read engine");
+    assert!(
+        test_engine_ref.with_casper().is_none(),
+        "TestEngine should return None from with_casper (simulates NoopEngine)"
+    );
+
+    // Note: In real implementation, engines like Running or EngineWithCasper would return Some(casper)
+    // but for test engines, we keep it simple and return None to match NoopEngine behavior
 }

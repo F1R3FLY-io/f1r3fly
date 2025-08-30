@@ -32,7 +32,7 @@ use rspace_plus_plus::rspace::history::Either;
 use crate::rust::{
     block_status::{BlockError, ValidBlock},
     blocks::proposer::proposer::ProposerResult,
-    casper::Casper,
+    casper::{Casper, MultiParentCasper},
     errors::CasperError,
 };
 
@@ -42,4 +42,5 @@ pub type BlockProcessing<A> = Either<BlockError, A>;
 
 pub type ValidBlockProcessing = BlockProcessing<ValidBlock>;
 
-pub type ProposeFunction = dyn Fn(dyn Casper, bool) -> Result<ProposerResult, CasperError>;
+pub type ProposeFunction =
+    dyn Fn(&dyn MultiParentCasper, bool) -> Result<ProposerResult, CasperError> + Send + Sync;

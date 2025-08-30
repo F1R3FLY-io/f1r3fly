@@ -2,15 +2,17 @@
 
 use super::checkpoint::{Checkpoint, SoftCheckpoint};
 use super::errors::RSpaceError;
+use super::hashing::blake2b256_hash::Blake2b256Hash;
 use super::history::history_repository::HistoryRepository;
 use super::hot_store::HotStore;
 use super::internal::{ConsumeCandidate, WaitingContinuation};
 use super::r#match::Match;
 use super::replay_rspace::ReplayRSpace;
+use super::logging::RSpaceLogger;
 use super::rspace::RSpace;
 
 use super::trace::event::{COMM, Consume, Produce};
-use crate::rspace::rspace_interface::ISpace;
+use crate::rspace::rspace_interface::{ISpace, MaybeConsumeResult, MaybeProduceResult};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
@@ -115,7 +117,40 @@ where
         store: Arc<Box<dyn HotStore<C, P, A, K>>>,
         matcher: Arc<Box<dyn Match<P, A>>>,
     ) -> ReportingRspace<C, P, A, K> {
-        let replay_rspace = ReplayRSpace::apply(history_repository, store, matcher);
+        let report = Arc::new(Mutex::new(Vec::new()));
+        let soft_report = Arc::new(Mutex::new(Vec::new()));
+
+        let logger = Box::new(ReportingLogger {
+            report: report.clone(),
+            soft_report: soft_report.clone(),
+        });
+
+        let replay_rspace = ReplayRSpace::apply_with_logger(
+            history_repository,
+            store,
+            matcher,
+            logger,
+        );
+
+        ReportingRspace {
+            replay_rspace,
+            report,
+            soft_report,
+        }
+    }
+
+    pub fn apply_with_logger(
+        history_repository: Arc<Box<dyn HistoryRepository<C, P, A, K>>>,
+        store: Arc<Box<dyn HotStore<C, P, A, K>>>,
+        matcher: Arc<Box<dyn Match<P, A>>>,
+        logger: Box<dyn RSpaceLogger<C, P, A, K>>,
+    ) -> ReportingRspace<C, P, A, K> {
+        let replay_rspace = ReplayRSpace::apply_with_logger(
+            history_repository,
+            store,
+            matcher,
+            logger,
+        );
 
         ReportingRspace {
             replay_rspace,
@@ -160,33 +195,75 @@ where
         Ok(self.soft_report.lock().unwrap().clone())
     }
 
-    /// Logs COMM events for reporting.
-    ///
-    /// **Note:** This method is correctly implemented but not called in the current architecture.
-    /// In Scala, ReportingRspace extends ReplayRSpace and overrides logComm, so when ReplayRSpace
-    /// internally calls self.logComm(), it would call this reporting version. In Rust, we use
-    /// composition, so ReplayRSpace.log_comm() is called instead of ours.
-    ///
-    /// This method exists to maintain API compatibility and could be used if the logging architecture
-    /// is modified in the future to support callback-based or trait-based logging.
+    pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
+        let checkpoint = self.replay_rspace.create_checkpoint()?;
+
+        self.soft_report.lock().unwrap().clear();
+        self.report.lock().unwrap().clear();
+
+        Ok(checkpoint)
+    }
+
+    pub fn create_soft_checkpoint(&mut self) -> Result<SoftCheckpoint<C, P, A, K>, RSpaceError> {
+        self.collect_report()?;
+        Ok(self.replay_rspace.create_soft_checkpoint())
+    }
+
+    pub fn rig_and_reset(&mut self, start_root: Blake2b256Hash, log: super::trace::Log) -> Result<(), RSpaceError> {
+        self.replay_rspace.rig_and_reset(start_root, log)
+    }
+
+    pub fn consume(
+        &mut self,
+        channels: Vec<C>,
+        patterns: Vec<P>,
+        continuation: K,
+        persist: bool,
+        peeks: BTreeSet<i32>,
+    ) -> Result<MaybeConsumeResult<C, P, A, K>, RSpaceError> {
+        self.replay_rspace
+            .consume(channels, patterns, continuation, persist, peeks)
+    }
+
+    pub fn produce(
+        &mut self,
+        channel: C,
+        data: A,
+        persist: bool,
+    ) -> Result<MaybeProduceResult<C, P, A, K>, RSpaceError> {
+        self.replay_rspace.produce(channel, data, persist)
+    }
+}
+
+/// Logger used to collect reporting events from underlying replay space
+pub struct ReportingLogger<C, P, A, K>
+where
+    C: Clone + Debug + Send,
+    P: Clone + Debug + Send,
+    A: Clone + Debug + Send,
+    K: Clone + Debug + Send,
+{
+    pub report: Arc<Mutex<Vec<Vec<ReportingEvent<C, P, A, K>>>>>,
+    pub soft_report: Arc<Mutex<Vec<ReportingEvent<C, P, A, K>>>>,
+}
+
+impl<C, P, A, K> RSpaceLogger<C, P, A, K> for ReportingLogger<C, P, A, K>
+where
+    C: Clone + Debug + Send,
+    P: Clone + Debug + Send,
+    A: Clone + Debug + Send,
+    K: Clone + Debug + Send,
+{
     fn log_comm(
         &mut self,
-        data_candidates: &[ConsumeCandidate<C, A>],
-        channels: &[C],
+        data_candidates: &Vec<ConsumeCandidate<C, A>>,
+        channels: &Vec<C>,
         wk: WaitingContinuation<P, K>,
         comm: COMM,
-        label: &str,
+        _label: &str,
     ) -> COMM {
-        let comm_ref = self.replay_rspace.log_comm(
-            &data_candidates.to_vec(),
-            &channels.to_vec(),
-            wk.clone(),
-            comm,
-            label,
-        );
-
         let reporting_consume = ReportingConsume {
-            channels: channels.to_vec(),
+            channels: channels.clone(),
             patterns: wk.patterns,
             continuation: wk.continuation,
             peeks: wk.peeks.into_iter().collect(),
@@ -209,30 +286,21 @@ where
             soft_report_guard.push(reporting_comm);
         }
 
-        comm_ref
+        comm
     }
 
     fn log_consume(
         &mut self,
         consume_ref: Consume,
-        channels: &[C],
-        patterns: &[P],
+        channels: &Vec<C>,
+        patterns: &Vec<P>,
         continuation: &K,
-        persist: bool,
+        _persist: bool,
         peeks: &BTreeSet<i32>,
     ) -> Consume {
-        let result = self.replay_rspace.log_consume(
-            consume_ref.clone(),
-            &channels.to_vec(),
-            &patterns.to_vec(),
-            continuation,
-            persist,
-            peeks,
-        );
-
         let reporting_consume = ReportingEvent::ReportingConsume(ReportingConsume {
-            channels: channels.to_vec(),
-            patterns: patterns.to_vec(),
+            channels: channels.clone(),
+            patterns: patterns.clone(),
             continuation: continuation.clone(),
             peeks: peeks.iter().copied().collect(),
         });
@@ -241,7 +309,7 @@ where
             soft_report_guard.push(reporting_consume);
         }
 
-        result
+        consume_ref
     }
 
     fn log_produce(
@@ -249,12 +317,8 @@ where
         produce_ref: Produce,
         channel: &C,
         data: &A,
-        persist: bool,
+        _persist: bool,
     ) -> Produce {
-        let result = self
-            .replay_rspace
-            .log_produce(produce_ref.clone(), channel, data, persist);
-
         let reporting_produce = ReportingEvent::ReportingProduce(ReportingProduce {
             channel: channel.clone(),
             data: data.clone(),
@@ -264,20 +328,6 @@ where
             soft_report_guard.push(reporting_produce);
         }
 
-        result
-    }
-
-    pub fn create_checkpoint(&mut self) -> Result<Checkpoint, RSpaceError> {
-        let checkpoint = self.replay_rspace.create_checkpoint()?;
-
-        self.soft_report.lock().unwrap().clear();
-        self.report.lock().unwrap().clear();
-
-        Ok(checkpoint)
-    }
-
-    pub fn create_soft_checkpoint(&mut self) -> Result<SoftCheckpoint<C, P, A, K>, RSpaceError> {
-        self.collect_report()?;
-        Ok(self.replay_rspace.create_soft_checkpoint())
+        produce_ref
     }
 }
