@@ -1,3 +1,25 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Tracks total bytes currently allocated and leaked to JNA callers in rholang lib
+static RHOLANG_ALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn rholang_get_allocated_bytes() -> usize {
+    RHOLANG_ALLOCATED_BYTES.load(Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn rholang_reset_allocated_bytes() {
+    RHOLANG_ALLOCATED_BYTES.store(0, Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn rholang_deallocate_memory(ptr: *mut u8, len: usize) {
+    unsafe {
+        let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, len));
+    }
+    RHOLANG_ALLOCATED_BYTES.fetch_sub(len, Ordering::SeqCst);
+}
 pub mod rust {
     pub mod build;
     pub mod interpreter;
@@ -139,7 +161,10 @@ extern "C" fn evaluate(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -444,7 +469,10 @@ extern "C" fn create_soft_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -814,7 +842,10 @@ extern "C" fn create_checkpoint(runtime_ptr: *mut RhoRuntime) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -849,7 +880,10 @@ extern "C" fn consume_result(
             let len_bytes = len.to_le_bytes().to_vec();
             let mut result = len_bytes;
             result.append(&mut bytes);
-            Box::leak(result.into_boxed_slice()).as_ptr()
+            let total_len = result.len();
+            let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+            RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+            ptr
         }
     }
 }
@@ -925,7 +959,10 @@ extern "C" fn get_data(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -947,7 +984,10 @@ extern "C" fn get_joins(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1001,7 +1041,10 @@ extern "C" fn get_waiting_continuations(
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1110,7 +1153,10 @@ extern "C" fn get_hot_changes(runtime_ptr: *mut RhoRuntime) -> *const u8 {
     let len_bytes = len.to_le_bytes().to_vec();
     let mut result = len_bytes;
     result.append(&mut bytes);
-    Box::leak(result.into_boxed_slice()).as_ptr()
+    let total_len = result.len();
+    let ptr = Box::leak(result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
 
 #[no_mangle]
@@ -1368,5 +1414,8 @@ extern "C" fn source_to_adt(params_ptr: *const u8, params_bytes_len: usize) -> *
     full_result.append(&mut result_bytes);
 
     // Return a pointer to the serialized result
-    Box::leak(full_result.into_boxed_slice()).as_ptr()
+    let total_len = full_result.len();
+    let ptr = Box::leak(full_result.into_boxed_slice()).as_ptr();
+    RHOLANG_ALLOCATED_BYTES.fetch_add(total_len, Ordering::SeqCst);
+    ptr
 }
