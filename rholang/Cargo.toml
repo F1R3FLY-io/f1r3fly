@@ -61,6 +61,7 @@ console = "0.16.0"
 async-trait.workspace = true
 anyhow = "1.0.100"
 chroma = "0.10.0"
+swipl = "0.3.16"
 
 [build-dependencies]
 cc = "1.0"
