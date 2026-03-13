@@ -51,10 +51,6 @@ boot/
 rholang/bnfc/
 rholang/src/main/java/
 
-# SBERT
-#########
-models/
-
 # ChromaDB
 #############
 chroma_data/
@@ -116,6 +112,7 @@ rspacePlusPlus/
 
 # docker compose
 docker/data/
+docker/data.*/
 
 rholang/**/*.mdb
 rspace++/tests/*.proptest-regressions
