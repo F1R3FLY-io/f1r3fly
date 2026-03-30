@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
@@ -18,8 +19,12 @@ pub fn petta_compile(metta_code: &str) -> Result<String, InterpreterError> {
         .map_err(|_| InterpreterError::SwiplError("Can't write MeTTa code to temp file".into()))?;
 
     // Get the path to PeTTa
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")); 
-    let petta_path = root.join("../PeTTa/src/main.pl");
+    let petta_path = env::var("PETTA_PATH")
+        .unwrap_or("./PeTTa/src/main.pl".into());
+    let petta_path = Path::new(&petta_path);
+    if !petta_path.exists() {
+        return Err(InterpreterError::SwiplError("Can't find PeTTa.".into()));
+    }
 
     // Execute PeTTa
     let output = Command::new("swipl")
