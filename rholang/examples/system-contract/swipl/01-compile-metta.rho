@@ -1,0 +1,6 @@
+new compilePetta(`rho:petta:compile`), stdout(`rho:io:stdout`), retCh in {
+  compilePetta!("(= (swap (Pair $x $y)) (Pair $y $x))", *retCh) |
+  for(@ok <- retCh) {
+      stdout!(ok)
+  }
+}

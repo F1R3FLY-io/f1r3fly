@@ -16,6 +16,7 @@ use super::rho_type::{
     RhoBoolean, RhoByteArray, RhoDeployId, RhoDeployerId, RhoName, RhoNumber, RhoString,
     RhoSysAuthToken, RhoUri,
 };
+use super::swi_prolog_service::petta_compile;
 use super::util::vault_address::VaultAddress;
 use crypto::rust::hash::blake2b256::Blake2b256;
 use crypto::rust::hash::keccak256::Keccak256;
@@ -215,6 +216,10 @@ impl FixedChannels {
     pub fn chroma_delete_documents() -> Par {
         byte_name(36)
     }
+
+    pub fn swipl_compile_petta() -> Par {
+        byte_name(37)
+    }
 }
 
 pub struct BodyRefs;
@@ -250,6 +255,7 @@ impl BodyRefs {
     pub const CHROMA_UPSERT_ENTRIES: i64 = 34;
     pub const CHROMA_QUERY: i64 = 35;
     pub const CHROMA_DELETE_DOCUMENTS: i64 = 36;
+    pub const SWIPL_COMPILE_PETTA: i64 = 37;
 }
 
 pub fn non_deterministic_ops() -> HashSet<i64> {
@@ -1780,6 +1786,43 @@ impl SystemProcesses {
     }
 
     // ChromaDB section end
+
+    // SWIPL section begin
+
+    pub async fn swipl_compile_petta(
+        &self,
+        contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
+    ) -> Result<Vec<Par>, InterpreterError> {
+        let Some((produce, is_replay, previous_output, args)) =
+            self.is_contract_call().unapply(contract_args)
+        else {
+            return Err(illegal_argument_error("swipl_compile_petta"));
+        };
+
+        let [metta_code, ack] = args.as_slice() else {
+            return Err(illegal_argument_error("swipl_compile_petta"));
+        };
+        let Some(metta_code) = RhoString::unapply(metta_code) else {
+            return Err(illegal_argument_error("swipl_compile_petta"));
+        };
+
+        // Common piece of code.
+        if is_replay {
+            produce(&previous_output, ack).await?;
+            return Ok(previous_output);
+        }
+
+        // Perform the compilation
+        let output = petta_compile(&metta_code)?;
+
+        // Parse the output
+        let result_par = RhoString::create_par(output);
+        let output = vec![result_par];
+        produce(&output, &ack).await?;
+        Ok(output)
+    }
+
+    // SWIPL section end
 }
 
 // See casper/src/test/scala/coop/rchain/casper/helper/RhoSpec.scala
