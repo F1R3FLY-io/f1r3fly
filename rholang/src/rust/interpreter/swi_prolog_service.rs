@@ -66,23 +66,37 @@ pub fn petta_execute(metta_code: &str) -> Result<Par, InterpreterError> {
     let value_output = serde_json::from_str::<Value>(str_output.as_str()).map_err(|_| {
         InterpreterError::SwiplError("Can't parse JSON output from PeTTa execution".into())
     })?;
-    let par_output = value_to_par(value_output);
+    let par_output = value_to_par(value_output)?;
     Ok(par_output)
 }
 
-fn value_to_par(v: Value) -> Par {
+fn value_to_par(v: Value) -> Result<Par, InterpreterError> {
     match v {
-        Value::Null => RhoNil::create_par(),
-        Value::Bool(b) => RhoBoolean::create_par(b),
-        Value::Number(n) => RhoNumber::create_par(n.as_i64().unwrap()),
-        Value::String(s) => RhoString::create_par(s),
-        Value::Array(values) => RhoList::create_par(values.into_iter().map(value_to_par).collect()),
+        Value::Null => Ok(RhoNil::create_par()),
+        Value::Bool(b) => Ok(RhoBoolean::create_par(b)),
+        Value::Number(n) => {
+            let n64 = n.as_i64().ok_or(InterpreterError::SwiplError(
+                "Could not parse number as i64".into(),
+            ))?;
+            Ok(RhoNumber::create_par(n64))
+        }
+        Value::String(s) => Ok(RhoString::create_par(s)),
+        Value::Array(values) => {
+            let ps = values
+                .into_iter()
+                .map(value_to_par)
+                .collect::<Result<_, _>>()?;
+            Ok(RhoList::create_par(ps))
+        }
         Value::Object(map) => {
             let hashmap = map
                 .into_iter()
-                .map(|(k, v)| (RhoString::create_par(k), value_to_par(v)))
-                .collect();
-            RhoMap::create_par(hashmap)
+                .map(|(k, v)| {
+                    let p = value_to_par(v)?;
+                    Ok((RhoString::create_par(k), p))
+                })
+                .collect::<Result<_, InterpreterError>>()?;
+            Ok(RhoMap::create_par(hashmap))
         }
     }
 }
