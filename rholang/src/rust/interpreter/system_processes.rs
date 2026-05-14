@@ -1817,7 +1817,7 @@ impl SystemProcesses {
         }
 
         // Perform the execution and wrap in vector
-        let output = petta_execute(&metta_code)?;
+        let output = petta_execute(&metta_code).await?;
         let output = vec![output];
 
         produce(&output, &ack).await?;
