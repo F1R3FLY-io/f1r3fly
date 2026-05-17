@@ -267,6 +267,7 @@ pub fn non_deterministic_ops() -> HashSet<i64> {
         BodyRefs::OLLAMA_GENERATE,
         BodyRefs::OLLAMA_MODELS,
         BodyRefs::GRPC_TELL,
+        BodyRefs::SWIPL_EXECUTE_PETTA,
     ])
 }
 
