@@ -75,7 +75,13 @@ pub async fn petta_execute(metta_code: &str) -> Result<Par, InterpreterError> {
         .map_err(|e| {
             InterpreterError::SwiplError(format!("MeTTa execution failed: {}", e).into())
         })?;
-    println!("{:?}", output);
+
+    if !output.status.success() {
+        return Err(InterpreterError::SwiplError(
+            format!("PeTTa execution failed. {:#?}", output.stderr.as_slice()).into(),
+        ));
+    }
+
     // Get output as string
     let str_output = String::from_utf8(output.stdout)
         .map_err(|_| InterpreterError::SwiplError("Can't interpret PeTTa output".into()))?;
