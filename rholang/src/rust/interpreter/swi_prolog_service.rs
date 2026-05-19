@@ -14,6 +14,74 @@ use crate::rust::interpreter::rho_type::{
 
 use super::errors::InterpreterError;
 
+/// Executes MeTTa code through the PeTTa (SWI-Prolog) interpreter and returns the result as a Rholang Par.
+///
+/// # Overview
+///
+/// This function provides low-level access to the PeTTa interpreter, which
+/// provides MeTTa execution with SWI-Prolog. The execution is sandboxed with
+/// a 10-second timeout to prevent runaway computations.
+///
+/// # Arguments
+///
+/// * `metta_code` - A string containing valid MeTTa code to execute
+///
+/// # Returns
+///
+/// Returns `Ok(Par)` containing the execution result as a Rholang Par structure, or an
+/// `InterpreterError::SwiplError` if execution fails.
+///
+/// # JSON Output Schema
+///
+/// PeTTa returns results as JSON in the following envelope:
+/// ```json
+/// {"results": [...]}
+/// ```
+///
+/// The `results` field contains a JSON array of MeTTa execution results. This entire JSON
+/// structure is converted to a Rholang Par using the following mapping:
+///
+/// - `null` → `RhoNil`
+/// - `true`/`false` → `RhoBoolean`
+/// - Numbers → `RhoNumber` (must fit in i64, otherwise error)
+/// - Strings → `RhoString`
+/// - Arrays → `RhoList` (recursive conversion of elements)
+/// - Objects → `RhoMap` (keys converted to RhoString, values recursively converted)
+///
+/// # Error Conditions
+///
+/// - `InterpreterError::SwiplError("Can't find PeTTa.")` - PeTTa installation not found at `$PETTA_PATH`
+/// - `InterpreterError::SwiplError("Can't open temp file")` - Failed to create temporary file
+/// - `InterpreterError::SwiplError("MeTTa execution timed out...")` - Execution exceeded 10 seconds
+/// - `InterpreterError::SwiplError("PeTTa execution failed...")` - SWI-Prolog returned error
+/// - `InterpreterError::SwiplError("Can't parse JSON output...")` - Invalid JSON from PeTTa
+/// - `InterpreterError::SwiplError("Could not parse number as i64")` - Number exceeds i64 range
+///
+/// # Environment Variables
+///
+/// - `PETTA_PATH` - Path to PeTTa installation directory (default: `./PeTTa`)
+///
+/// # Timeout
+///
+/// Execution is limited to 10 seconds. Long-running computations will be terminated and return
+/// a timeout error. This prevents malicious or buggy MeTTa code from blocking the node.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Simple arithmetic
+/// let result = petta_execute("!(+ 1 2)").await?;
+///
+/// // Pattern matching
+/// let result = petta_execute(
+///     "(= (swap (Pair $x $y)) (Pair $y $x)) !(swap (Pair 1 3))"
+/// ).await?;
+/// ```
+///
+/// # See Also
+///
+/// - [`system_processes::swipl_execute_petta`] - System process wrapper for Rholang contracts
+/// - [`value_to_par`] - JSON to Par conversion logic
 pub async fn petta_execute(metta_code: &str) -> Result<Par, InterpreterError> {
     // Write the MeTTa code to a temp file
     let mut metta_file = NamedTempFile::new()
@@ -93,6 +161,61 @@ pub async fn petta_execute(metta_code: &str) -> Result<Par, InterpreterError> {
     Ok(par_output)
 }
 
+/// Converts a JSON Value to a Rholang Par structure.
+///
+/// This function recursively transforms JSON data returned by PeTTa into Rholang's internal
+/// representation (Par). It is used internally by [`petta_execute`] to convert PeTTa results.
+///
+/// # Type Mapping
+///
+/// | JSON Type | Rholang Type | Notes |
+/// |-----------|--------------|-------|
+/// | `null` | `RhoNil` | Represents absence of value |
+/// | `boolean` | `RhoBoolean` | Direct mapping |
+/// | `number` | `RhoNumber` | **Must fit in i64**, otherwise returns error |
+/// | `string` | `RhoString` | Direct mapping, supports Unicode |
+/// | `array` | `RhoList` | Elements recursively converted |
+/// | `object` | `RhoMap` | Keys stringified, values recursively converted |
+///
+/// # Important Constraints
+///
+/// - **Numbers must fit in i64**: JSON numbers that exceed `i64::MIN` to `i64::MAX` will cause
+///   an error. Floating-point numbers are truncated to integers.
+/// - **Object keys become strings**: All JSON object keys are converted to `RhoString` in the
+///   resulting `RhoMap`.
+/// - **Recursive conversion**: Nested structures (arrays in arrays, objects in objects, etc.)
+///   are fully supported and recursively converted.
+///
+/// # Arguments
+///
+/// * `v` - A `serde_json::Value` to convert
+///
+/// # Returns
+///
+/// Returns `Ok(Par)` with the converted structure, or `InterpreterError::SwiplError` if
+/// conversion fails (e.g., number doesn't fit in i64).
+///
+/// # Examples
+///
+/// ```ignore
+/// use serde_json::json;
+///
+/// // Simple values
+/// let nil = value_to_par(json!(null))?;
+/// let bool = value_to_par(json!(true))?;
+/// let num = value_to_par(json!(42))?;
+/// let str = value_to_par(json!("hello"))?;
+///
+/// // Collections
+/// let list = value_to_par(json!([1, 2, 3]))?;
+/// let map = value_to_par(json!({"key": "value"}))?;
+///
+/// // Nested structures
+/// let nested = value_to_par(json!({
+///     "list": [1, 2, 3],
+///     "map": {"inner": "value"}
+/// }))?;
+/// ```
 fn value_to_par(v: Value) -> Result<Par, InterpreterError> {
     match v {
         Value::Null => Ok(RhoNil::create_par()),
@@ -235,7 +358,7 @@ mod tests {
             }
         }))
         .unwrap();
-        
+
         assert_eq!(
             result,
             RhoMap::create_par(
@@ -320,9 +443,8 @@ mod tests {
 
         // Check if PeTTa is available
         let petta_path = PathBuf::from(env::var("PETTA_PATH").unwrap_or("./PeTTa".into()));
-        let metta_module_path: PathBuf = [petta_path, PathBuf::from("src/metta.pl")]
-            .iter()
-            .collect();
+        let metta_module_path: PathBuf =
+            [petta_path, PathBuf::from("src/metta.pl")].iter().collect();
 
         if !metta_module_path.exists() {
             eprintln!("Skipping timeout test: PeTTa not available");
@@ -347,7 +469,7 @@ mod tests {
 
         let err = result.unwrap_err();
         let err_msg = format!("{:?}", err);
-        
+
         // Error should mention timeout
         assert!(
             err_msg.contains("timed out") || err_msg.contains("timeout"),

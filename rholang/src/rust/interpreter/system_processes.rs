@@ -1794,6 +1794,39 @@ impl SystemProcesses {
 
     // SWIPL section begin
 
+    /// System process handler for `rho:petta:execute` URN.
+    ///
+    /// Executes MeTTa code through the PeTTa (SWI-Prolog) interpreter and returns results
+    /// to the calling Rholang contract. This is a non-deterministic operation - results are
+    /// cached during play execution and replayed from cache during replay for consensus safety.
+    ///
+    /// # URN Specification
+    ///
+    /// **URN:** `rho:petta:execute`
+    ///
+    /// **Arity:** 2 arguments
+    ///
+    /// **Arguments:**
+    /// 1. `metta_code: String` - MeTTa code to execute
+    /// 2. `ack: Channel` - Acknowledgment channel to receive result
+    ///
+    /// # Return Shape
+    ///
+    /// Sends a single `Par` on the acknowledgment channel containing the execution result.
+    /// The structure matches PeTTa's JSON output converted to Rholang types.
+    ///
+    /// # Error Conditions
+    ///
+    /// Returns `InterpreterError` for:
+    /// - **Illegal argument error**: Wrong number of arguments or incorrect types
+    /// - **PeTTa not found**: `$PETTA_PATH` points to invalid location
+    /// - **Timeout**: Execution exceeds 10 seconds
+    /// - **MeTTa syntax error**: Invalid MeTTa code
+    /// - **JSON parse error**: PeTTa output is not valid JSON
+    /// - **Number overflow**: JSON number doesn't fit in i64
+    ///
+    /// Errors are propagated to the Rholang contract and captured in the evaluation result's
+    /// error list.
     pub async fn swipl_execute_petta(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
