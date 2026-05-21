@@ -3,22 +3,12 @@ use rholang::rust::interpreter::{
     accounting::costs::Cost,
     rho_runtime::RhoRuntime,
     system_processes::{non_deterministic_ops, BodyRefs},
-    test_utils::resources::create_runtimes,
+    test_utils::{resources::create_runtimes, utils::should_skip_petta_test},
 };
 use rspace_plus_plus::rspace::shared::{
     in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
 };
 use std::collections::HashMap;
-
-/// Helper to check if PeTTa is available before running tests
-fn petta_available() -> bool {
-    use std::env;
-    use std::path::PathBuf;
-
-    let petta_path = PathBuf::from(env::var("PETTA_PATH").unwrap_or("./PeTTa".into()));
-    let metta_module_path: PathBuf = [petta_path, PathBuf::from("src/metta.pl")].iter().collect();
-    metta_module_path.exists()
-}
 
 #[test]
 fn test_petta_is_registered_as_non_deterministic() {
@@ -38,8 +28,7 @@ fn test_petta_is_registered_as_non_deterministic() {
 /// 4. Replay execution completes without errors using cached output
 #[tokio::test]
 async fn test_petta_replay_consistency() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -109,8 +98,7 @@ async fn test_petta_replay_consistency() {
 
 #[tokio::test]
 async fn test_petta_replay_with_multiple_calls() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -175,8 +163,7 @@ async fn test_petta_replay_with_multiple_calls() {
 
 #[tokio::test]
 async fn test_petta_replay_error_consistency() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -237,8 +224,7 @@ async fn test_petta_replay_error_consistency() {
 /// This test verifies that PeTTa replay uses cached output instead of re-executing.
 #[tokio::test]
 async fn test_petta_replay_uses_cached_output() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 

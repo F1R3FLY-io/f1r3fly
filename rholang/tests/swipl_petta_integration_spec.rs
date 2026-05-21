@@ -11,17 +11,41 @@ use rspace_plus_plus::rspace::history::history_repository::HistoryRepository;
 use rspace_plus_plus::rspace::shared::{
     in_mem_store_manager::InMemoryStoreManager, key_value_store_manager::KeyValueStoreManager,
 };
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, env, process::Command};
+use std::{path::PathBuf, sync::Arc};
 
-/// Helper to check if PeTTa is available before running tests
-fn petta_available() -> bool {
-    use std::env;
-    use std::path::PathBuf;
+// Helper for skipping PeTTa tests if runtime pre-requisites are not met (or
+// panicking if tests are mandatory).
+fn should_skip_petta_test() -> bool {
+    let require = env::var_os("REQUIRE_PETTA_TESTS").is_some();
 
     let petta_path = PathBuf::from(env::var("PETTA_PATH").unwrap_or("./PeTTa".into()));
-    let metta_module_path: PathBuf = [petta_path, PathBuf::from("src/metta.pl")].iter().collect();
-    metta_module_path.exists()
+    let metta_module_path = petta_path.join("src/metta.pl");
+
+    let petta_missing = !metta_module_path.exists();
+    let swipl_missing = Command::new("swipl")
+        .arg("--version")
+        .output()
+        .map(|output| !output.status.success())
+        .unwrap_or(true);
+
+    let error_message: String;
+    match (petta_missing, swipl_missing) {
+        (false, false) => return true,
+        (true, _) => {
+            error_message = "PeTTa test prerequisite unmet: PeTTa is missing".into();
+        }
+        (_, true) => {
+            error_message = "PeTTa test prerequisite unmet: swipl is missing".into();
+        }
+    }
+
+    if require {
+        panic!("{error_message}");
+    } else {
+        eprintln!("Skipping test: {error_message}");
+        true
+    }
 }
 
 async fn evaluate_petta_term(term: &str) -> EvaluateResult {
@@ -53,8 +77,7 @@ async fn evaluate_petta_term(term: &str) -> EvaluateResult {
 
 #[tokio::test]
 async fn test_petta_rholang_integration_swap() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -78,8 +101,7 @@ async fn test_petta_rholang_integration_swap() {
 
 #[tokio::test]
 async fn test_petta_rholang_integration_fibonacci() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -100,8 +122,7 @@ async fn test_petta_rholang_integration_fibonacci() {
 
 #[tokio::test]
 async fn test_petta_rholang_integration_arithmetic() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -125,8 +146,7 @@ async fn test_petta_rholang_integration_arithmetic() {
 
 #[tokio::test]
 async fn test_petta_rholang_multiple_calls() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -151,8 +171,7 @@ async fn test_petta_rholang_multiple_calls() {
 
 #[tokio::test]
 async fn test_petta_rholang_error_handling() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
@@ -174,8 +193,7 @@ async fn test_petta_rholang_error_handling() {
 
 #[tokio::test]
 async fn test_petta_rholang_timeout_large_computation() {
-    if !petta_available() {
-        eprintln!("Skipping test: PeTTa not available. Set PETTA_PATH environment variable.");
+    if should_skip_petta_test() {
         return;
     }
 
