@@ -125,6 +125,7 @@ pub async fn petta_execute(metta_code: &str) -> Result<Par, InterpreterError> {
             .arg(goal)
             .arg("-t")
             .arg("halt")
+            .kill_on_drop(true)
             .output(),
     ));
 
