@@ -28,7 +28,7 @@ pub fn should_skip_petta_test() -> bool {
 
     let error_message: String;
     match (petta_missing, swipl_missing) {
-        (false, false) => return true,
+        (false, false) => return false,
         (true, _) => {
             error_message = "PeTTa test prerequisite unmet: PeTTa is missing".into();
         }
