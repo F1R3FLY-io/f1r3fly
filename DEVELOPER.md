@@ -5,6 +5,14 @@ __Note__ Successfully building from source requires attending to all of the prer
 ### Prerequisites
 
 * [Environment set up](README.md#installation).
+* **SWI-Prolog** - Required runtime dependency for MeTTa smart contract execution via PeTTa submodule
+  - Nix/direnv users: Already provisioned in the development shell
+  - Manual installation:
+    - macOS: `brew install swi-prolog`
+    - Ubuntu/Debian: `apt-get install swi-prolog`
+    - Fedora: `dnf install pl`
+  - The `swipl` binary must be in your PATH
+  - PeTTa submodule must be initialized: `git submodule update --init --recursive`
 
 <!-- Setup using _nix_ can be found in the [nix](./nix) directory.
 

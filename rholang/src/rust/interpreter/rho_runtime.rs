@@ -1026,26 +1026,21 @@ fn std_rho_chroma_processes() -> Vec<Definition> {
 }
 
 fn std_swipl_processes() -> Vec<Definition> {
-    vec![
-        Definition {
-            urn: "rho:petta:compile".to_string(),
-            fixed_channel: FixedChannels::swipl_compile_petta(),
-            arity: 2,
-            body_ref: BodyRefs::SWIPL_COMPILE_PETTA,
-            handler: Box::new(|ctx| {
-                Box::new(move |args| {
-                    let ctx = ctx.clone();
-                    Box::pin(async move {
-                        ctx.system_processes
-                            .clone()
-                            .swipl_compile_petta(args)
-                            .await
-                    })
-                })
-            }),
-            remainder: None,
-        },
-    ]
+    vec![Definition {
+        urn: "rho:petta:execute".to_string(),
+        fixed_channel: FixedChannels::swipl_execute_petta(),
+        arity: 2,
+        body_ref: BodyRefs::SWIPL_EXECUTE_PETTA,
+        handler: Box::new(|ctx| {
+            Box::new(move |args| {
+                let ctx = ctx.clone();
+                Box::pin(
+                    async move { ctx.system_processes.clone().swipl_execute_petta(args).await },
+                )
+            })
+        }),
+        remainder: None,
+    }]
 }
 
 fn dispatch_table_creator(
