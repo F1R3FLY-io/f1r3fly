@@ -37,7 +37,6 @@ use comm::rust::{
     rp::connect::ConnectionsCell, transport::transport_layer::TransportLayer,
 };
 
-use shared::rust::env;
 use shared::rust::shared::f1r3fly_events::F1r3flyEvents;
 
 use crate::rust::{
@@ -50,10 +49,8 @@ use crate::rust::{
     web::reporting_routes::{ReportingHttpRoutes, ReportingRoutes},
 };
 
-const PROPOSER_QUEUE_MAX_PENDING_DEFAULT: usize = 1024;
-const PROPOSER_QUEUE_MAX_PENDING_ENV: &str = "F1R3_PROPOSER_QUEUE_MAX_PENDING";
-const BLOCK_PROCESSOR_QUEUE_MAX_PENDING_DEFAULT: usize = 512;
-const BLOCK_PROCESSOR_QUEUE_MAX_PENDING_ENV: &str = "F1R3_MAX_BLOCKS_IN_PROCESSING";
+const PROPOSER_QUEUE_MAX_PENDING: usize = 1_024;
+const BLOCK_PROCESSOR_QUEUE_MAX_PENDING: usize = 2_048;
 
 type ProposerQueueEntry = (
     Arc<dyn Casper + Send + Sync>,
@@ -63,19 +60,11 @@ type ProposerQueueEntry = (
 );
 
 fn proposer_queue_max_pending() -> usize {
-    env::var_or_filtered(
-        PROPOSER_QUEUE_MAX_PENDING_ENV,
-        PROPOSER_QUEUE_MAX_PENDING_DEFAULT,
-        |v: &usize| *v > 0,
-    )
+    PROPOSER_QUEUE_MAX_PENDING
 }
 
 fn block_processor_queue_max_pending() -> usize {
-    env::var_or_filtered(
-        BLOCK_PROCESSOR_QUEUE_MAX_PENDING_ENV,
-        BLOCK_PROCESSOR_QUEUE_MAX_PENDING_DEFAULT,
-        |v: &usize| *v > 0,
-    )
+    BLOCK_PROCESSOR_QUEUE_MAX_PENDING
 }
 
 pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'static>(
@@ -183,6 +172,15 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
         (deploy_storage, deploy_storage_arc)
     };
 
+    // Buffer of deploys rejected during multi-parent merge; re-proposed in
+    // subsequent blocks to avoid silent loss of otherwise-valid user deploys.
+    let rejected_deploy_buffer_arc = {
+        use block_storage::rust::deploy::key_value_rejected_deploy_buffer::KeyValueRejectedDeployBuffer;
+
+        let buffer = KeyValueRejectedDeployBuffer::new(&mut rnode_store_manager).await?;
+        Arc::new(Mutex::new(buffer))
+    };
+
     // Safety oracle (clique oracle implementation)
     let oracle = {
         use casper::rust::safety_oracle::CliqueOracleImpl;
@@ -228,7 +226,6 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
 
     // Runtime for `rnode eval`
     let eval_runtime = {
-        use models::rhoapi::Par;
         use rholang::rust::interpreter::{matcher::r#match::Matcher, rho_runtime};
         use rspace_plus_plus::rspace::shared::key_value_store_manager::KeyValueStoreManager;
 
@@ -239,7 +236,7 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
 
         rho_runtime::create_runtime_from_kv_store(
             eval_stores,
-            Par::default(),
+            Arc::new(casper::rust::genesis::genesis::Genesis::default_mergeable_tags()),
             false,
             &mut Vec::new(),
             Arc::new(Box::new(Matcher)),
@@ -264,7 +261,7 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
         let result = RuntimeManager::create_with_history(
             rspace_stores,
             mergeable_store,
-            Genesis::non_negative_mergeable_tag_name(),
+            Arc::new(Genesis::default_mergeable_tags()),
             external_services.clone(),
         );
         tracing::debug!("[Setup] RuntimeManager created successfully");
@@ -370,6 +367,7 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
             runtime_manager.clone(),
             block_store.clone(),
             deploy_storage_arc.clone(),
+            rejected_deploy_buffer_arc.clone(),
             block_retriever.clone(),
             transport_layer.clone(),
             rp_connections.clone(),
@@ -503,9 +501,10 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
             block_store.clone(),
             block_dag_storage.clone(),
             deploy_storage,
+            rejected_deploy_buffer_arc.clone(),
             casper_buffer_storage.clone(),
             rspace_state_manager,
-            Arc::new(tokio::sync::Mutex::new(runtime_manager.clone())),
+            Arc::new(runtime_manager.clone()),
             estimator.clone(),
             // Explicit parameters
             block_processor_queue_tx.clone(),
@@ -556,66 +555,55 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
 
     let block_report_api_for_return = block_report_api.clone();
 
-    // Create transaction API and cache before API servers so the block enricher
-    // can be threaded into the gRPC service
-    let transaction_api = {
-        use crate::rust::web::transaction::{transfer_unforgeable, TransactionAPIImpl};
-
-        let block_report_api_for_transaction = block_report_api.clone();
-        let transfer_unforgeable_par = transfer_unforgeable();
-        TransactionAPIImpl::new(block_report_api_for_transaction, transfer_unforgeable_par)
+    // Transfer unforgeable channel — used for transfer extraction from block reports
+    let transfer_unforgeable = {
+        use crate::rust::web::transaction::transfer_unforgeable;
+        transfer_unforgeable()
     };
 
-    let cache_transaction_api = {
-        use crate::rust::web::transaction::cache_transaction_api;
+    // Shared is_ready flag — set to true when engine enters Running state.
+    // Used by both HTTP and gRPC status endpoints.
+    let is_ready = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-        cache_transaction_api(transaction_api, &mut rnode_store_manager)
-            .await
-            .map_err(|e| {
-                CasperError::Other(format!("Failed to create cache transaction API: {}", e))
-            })?
-    };
-
-    let block_enricher: Arc<dyn crate::rust::web::block_info_enricher::BlockEnricher> = {
-        use crate::rust::web::block_info_enricher::CacheTransactionEnricher;
-        Arc::new(CacheTransactionEnricher::new(cache_transaction_api.clone()))
-    };
-
-    // Proactive transfer extraction: subscribe to BlockFinalised events and trigger
-    // cache_transaction_api.get_transaction() in the background so transfer data is
-    // pre-cached before clients request it.
-    //
-    // Note: This event-driven approach has a small race window where a client could
-    // call get_block for a just-finalized block before transfers are cached.
-    // CacheTransactionAPI handles this gracefully by computing on demand.
+    // Event-driven background tasks: transfer extraction + readiness tracking.
+    // Listens on the broadcast event stream and handles:
+    // - BlockFinalised: pre-warm ReportStore cache, extract transfers, emit TransfersAvailable
+    // - EnteredRunningState: flip is_ready flag for status endpoints
     {
         use futures::StreamExt;
         use shared::rust::shared::f1r3fly_event::F1r3flyEvent;
 
-        let cache_tx_api = cache_transaction_api.clone();
+        let report_api = block_report_api.clone();
+        let transfer_unforgeable_for_events = transfer_unforgeable.clone();
+        let event_pub = event_publisher.clone();
+        let is_ready_flag = is_ready.clone();
         let mut event_stream = event_publisher.consume();
-        let concurrency_limit = Arc::new(tokio::sync::Semaphore::new(8));
 
         tokio::spawn(async move {
             while let Some(event) = event_stream.next().await {
-                if let F1r3flyEvent::BlockFinalised(finalized) = event {
-                    let api = cache_tx_api.clone();
-                    let block_hash = finalized.block_hash.clone();
-                    let permit = match concurrency_limit.clone().acquire_owned().await {
-                        Ok(permit) => permit,
-                        Err(_) => break,
-                    };
-                    tokio::spawn(async move {
-                        let _permit = permit;
-                        if let Err(e) = api.get_transaction(block_hash.clone()).await {
-                            tracing::warn!(
-                                target: "f1r3fly.transaction",
-                                block_hash = %block_hash,
-                                error = %e,
-                                "Failed to extract transfers for finalized block"
-                            );
-                        }
-                    });
+                match &event {
+                    F1r3flyEvent::BlockFinalised(finalized) => {
+                        let api = report_api.clone();
+                        let unforgeable = transfer_unforgeable_for_events.clone();
+                        let publisher = event_pub.clone();
+                        let block_hash = finalized.block_hash.clone();
+                        let block_number = finalized.block_number;
+                        tokio::spawn(async move {
+                            handle_block_finalized(
+                                api,
+                                unforgeable,
+                                publisher,
+                                block_hash,
+                                block_number,
+                            )
+                            .await;
+                        });
+                    }
+                    F1r3flyEvent::EnteredRunningState(_) => {
+                        is_ready_flag.store(true, std::sync::atomic::Ordering::Release);
+                        tracing::info!("Node is ready (EnteredRunningState received)");
+                    }
+                    _ => {}
                 }
             }
         });
@@ -638,16 +626,21 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
         conf.dev_mode,
         propose_f_for_api,
         block_report_api,
+        transfer_unforgeable.clone(),
         conf.protocol_server.network_id.clone(),
         conf.casper.shard_name.clone(),
         conf.casper.min_phlo_price,
+        conf.casper.genesis_block_data.native_token_name.clone(),
+        conf.casper.genesis_block_data.native_token_symbol.clone(),
+        conf.casper.genesis_block_data.native_token_decimals,
         is_node_read_only,
         engine_cell.clone(),
         block_store.clone(),
         rp_conf_cell.clone(),
         rp_connections.clone(),
         node_discovery.clone(),
-        Some(block_enricher.clone()),
+        conf.casper.genesis_block_data.epoch_length,
+        is_ready.clone(),
     );
 
     // Reporting HTTP Routes - REST API for block reporting and tracing
@@ -794,14 +787,20 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
             conf.protocol_server.network_id.clone(),
             conf.casper.shard_name.clone(),
             conf.casper.min_phlo_price,
+            conf.casper.genesis_block_data.native_token_name.clone(),
+            conf.casper.genesis_block_data.native_token_symbol.clone(),
+            conf.casper.genesis_block_data.native_token_decimals,
             is_node_read_only,
-            block_enricher.clone(),
-            cache_transaction_api,
+            block_report_api_for_return.clone(),
+            transfer_unforgeable,
             Arc::new(engine_cell.clone()),
             rp_conf_cell.clone(),
             rp_connections.clone(),
             node_discovery.clone(),
             trigger_propose_f,
+            conf.casper.genesis_block_data.epoch_length,
+            conf.casper.genesis_block_data.quarantine_length,
+            is_ready.clone(),
         )
     };
 
@@ -824,7 +823,7 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
 
         let gc_block_dag_storage = block_dag_storage.clone();
         let gc_block_store = block_store.clone();
-        let gc_runtime_manager = Arc::new(tokio::sync::Mutex::new(runtime_manager.clone()));
+        let gc_runtime_manager = Arc::new(runtime_manager.clone());
         let gc_interval = conf.casper.mergeable_channels_gc_interval;
         let gc_casper_shard_conf = CasperShardConf {
             fault_tolerance_threshold: conf.casper.fault_tolerance_threshold,
@@ -847,6 +846,18 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
             disable_validator_progress_check: conf.standalone,
             enable_mergeable_channel_gc: conf.casper.enable_mergeable_channel_gc,
             mergeable_channels_gc_depth_buffer: conf.casper.mergeable_channels_gc_depth_buffer,
+            finalizer_conf: conf.casper.finalizer.clone(),
+            synchrony_recovery_stall_window: conf.casper.synchrony_recovery_stall_window,
+            synchrony_recovery_cooldown: conf.casper.synchrony_recovery_cooldown,
+            synchrony_recovery_max_bypasses: conf.casper.synchrony_recovery_max_bypasses,
+            synchrony_finalized_baseline_enabled: conf.casper.synchrony_finalized_baseline_enabled,
+            synchrony_finalized_baseline_max_distance: conf
+                .casper
+                .synchrony_finalized_baseline_max_distance,
+            max_user_deploys_per_block: conf.casper.max_user_deploys_per_block,
+            native_token_name: conf.casper.genesis_block_data.native_token_name.clone(),
+            native_token_symbol: conf.casper.genesis_block_data.native_token_symbol.clone(),
+            native_token_decimals: conf.casper.genesis_block_data.native_token_decimals,
         };
 
         Some(Arc::new(
@@ -915,4 +926,76 @@ pub async fn setup_node_program<T: TransportLayer + Send + Sync + Clone + 'stati
         // Mergeable channels GC loop
         mergeable_channels_gc_loop,
     ))
+}
+
+/// Pre-warm the ReportStore cache for a finalized block, then extract transfers
+/// and publish a `TransfersAvailable` event so WebSocket clients can receive
+/// transfer data without polling the REST API.
+///
+/// Runs as a fire-and-forget task — errors (e.g. on validators where block
+/// reports are unavailable) are logged at debug level and silently ignored.
+async fn handle_block_finalized(
+    report_api: casper::rust::api::block_report_api::BlockReportAPI,
+    transfer_unforgeable: models::rhoapi::Par,
+    event_publisher: shared::rust::shared::f1r3fly_events::F1r3flyEvents,
+    block_hash: String,
+    block_number: i64,
+) {
+    use crate::rust::web::block_info_enricher::extract_transfers_from_report;
+    use shared::rust::shared::f1r3fly_event::{DeployTransfers, F1r3flyEvent, TransferEvent};
+
+    let block_hash_bytes: prost::bytes::Bytes = match hex::decode(&block_hash) {
+        Ok(bytes) => bytes.into(),
+        Err(e) => {
+            tracing::warn!(
+                %block_hash,
+                error = %e,
+                "Invalid block hash hex in finalization event"
+            );
+            return;
+        }
+    };
+    match report_api.block_report(block_hash_bytes, false).await {
+        Ok(report) => {
+            let transfers_by_deploy = extract_transfers_from_report(&report, &transfer_unforgeable);
+
+            let deploy_transfers: Vec<DeployTransfers> = transfers_by_deploy
+                .into_iter()
+                .map(|(deploy_id, transfers)| DeployTransfers {
+                    deploy_id,
+                    transfers: transfers
+                        .into_iter()
+                        .map(|t| TransferEvent {
+                            from_addr: t.from_addr,
+                            to_addr: t.to_addr,
+                            amount: t.amount,
+                            success: t.success,
+                        })
+                        .collect(),
+                })
+                .collect();
+
+            if !deploy_transfers.is_empty() {
+                if let Err(e) = event_publisher.publish(F1r3flyEvent::transfers_available(
+                    block_hash.clone(),
+                    block_number,
+                    deploy_transfers,
+                )) {
+                    tracing::warn!(
+                        %block_hash,
+                        error = %e,
+                        "Failed to publish TransfersAvailable event"
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            tracing::debug!(
+                target: "f1r3fly.transaction",
+                %block_hash,
+                error = %e,
+                "Block report pre-cache skipped (expected on validators)"
+            );
+        }
+    }
 }

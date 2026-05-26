@@ -8,8 +8,8 @@ use models::rhoapi::var::VarInstance;
 use models::rhoapi::{
     BindPattern, Bundle, EAnd, EDiv, EEq, EGt, EGte, EList, ELt, ELte, EMatches, EMethod, EMinus,
     EMinusMinus, EMod, EMult, ENeq, EOr, EPathMap, EPercentPercent, EPlus, EPlusPlus, EVar,
-    EZipper, Expr, GPrivate, GUnforgeable, KeyValuePair, Match, MatchCase, New, ParWithRandom,
-    Receive, ReceiveBind, Send, Var,
+    EZipper, Expr, GPrivate, GUnforgeable, KeyValuePair, Match, New, ParWithRandom, Receive,
+    ReceiveBind, Send, Var,
 };
 use models::rhoapi::{ETuple, ListParWithRandom, Par, TaggedContinuation};
 use models::rust::par_map::ParMap;
@@ -25,13 +25,16 @@ use models::rust::utils::{
     new_elist_par, new_emap_par, new_gint_expr, new_gint_par, new_gstring_par, union,
 };
 use prost::Message;
+use rspace_plus_plus::rspace::merger::merging_logic::MergeType;
 use rspace_plus_plus::rspace::util::unpack_option_with_peek;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::Arc;
 use std::task::{Context, Poll};
+use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 
 use crate::rust::interpreter::accounting::costs::{
     add_cost, bytes_to_hex_cost, diff_cost, hex_to_bytes_cost, interpolate_cost, keys_method_cost,
@@ -43,15 +46,25 @@ use crate::rust::interpreter::rho_type::RhoTuple2;
 
 use super::accounting::_cost;
 use super::accounting::costs::{
-    boolean_and_cost, boolean_or_cost, byte_array_append_cost, comparison_cost, division_cost,
-    equality_check_cost, list_append_cost, method_call_cost, modulo_cost, multiplication_cost,
-    new_bindings_cost, op_call_cost, receive_eval_cost, send_eval_cost, string_append_cost,
-    subtraction_cost, sum_cost, var_eval_cost,
+    bigint_comparison_cost, bigint_division_cost, bigint_modulo_cost, bigint_multiplication_cost,
+    bigint_negation_cost, bigint_subtraction_cost, bigint_sum_cost, bigrat_comparison_cost,
+    bigrat_division_cost, bigrat_multiplication_cost, bigrat_negation_cost,
+    bigrat_subtraction_cost, bigrat_sum_cost, boolean_and_cost, boolean_or_cost,
+    byte_array_append_cost, comparison_cost, division_cost, equality_check_cost, list_append_cost,
+    method_call_cost, modulo_cost, multiplication_cost, new_bindings_cost, op_call_cost,
+    receive_eval_cost, send_eval_cost, string_append_cost, subtraction_cost, sum_cost,
+    var_eval_cost,
 };
 use super::dispatch::{DispatchType, RhoDispatch, RholangAndScalaDispatcher};
 use super::env::Env;
 use super::errors::InterpreterError;
 use super::matcher::has_locally_free::HasLocallyFree;
+use super::metrics_constants::{
+    REDUCER_EVAL_MATCH_CALLS_METRIC, REDUCER_EVAL_MATCH_TIME_NS_METRIC,
+    REDUCER_EVAL_NEW_CALLS_METRIC, REDUCER_EVAL_NEW_TIME_NS_METRIC,
+    REDUCER_EVAL_RECEIVE_CALLS_METRIC, REDUCER_EVAL_RECEIVE_TIME_NS_METRIC,
+    REDUCER_EVAL_SEND_CALLS_METRIC, REDUCER_EVAL_SEND_TIME_NS_METRIC, RHOLANG_METRICS_SOURCE,
+};
 use super::rho_runtime::RhoISpace;
 use super::rho_type::{RhoExpression, RhoUnforgeable};
 use super::substitute::Substitute;
@@ -68,31 +81,6 @@ const STACK_RED_ZONE: usize = 1024 * 1024; // 1 MB
 
 /// Size of each new stack segment allocated when the red zone is reached.
 const STACK_GROW_SIZE: usize = 2 * 1024 * 1024; // 2 MB
-
-fn parse_env_flag(value: &str) -> bool {
-    value == "1" || value.eq_ignore_ascii_case("true")
-}
-
-fn env_flag(name: &str) -> bool {
-    std::env::var(name)
-        .ok()
-        .map(|value| parse_env_flag(value.trim()))
-        .unwrap_or(false)
-}
-
-fn read_vm_rss_kb() -> Option<usize> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
-    status
-        .lines()
-        .find(|line| line.starts_with("VmRSS:"))
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|value| value.parse::<usize>().ok())
-}
-
-static REDUCE_INNER_PROFILE_ENABLED: LazyLock<bool> =
-    LazyLock::new(|| env_flag("F1R3_REDUCE_INNER_PROFILE"));
-static REDUCE_OP_PROFILE_ENABLED: LazyLock<bool> =
-    LazyLock::new(|| env_flag("F1R3_REDUCE_OP_PROFILE"));
 
 /// A Future wrapper that dynamically grows the thread stack during polling.
 ///
@@ -132,8 +120,8 @@ pub struct DebruijnInterpreter {
     pub space: RhoISpace,
     pub dispatcher: RhoDispatch,
     pub urn_map: Arc<HashMap<String, Par>>,
-    pub merge_chs: Arc<RwLock<HashSet<Par>>>,
-    pub mergeable_tag_name: Par,
+    pub merge_chs: Arc<RwLock<HashMap<Par, MergeType>>>,
+    pub mergeable_tags: Arc<HashMap<Par, MergeType>>,
     pub cost: _cost,
     pub substitute: Substitute,
 }
@@ -177,51 +165,6 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        let mem_profile_enabled = *REDUCE_INNER_PROFILE_ENABLED;
-        let env_level = env.level;
-        let mut rss_baseline = if mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut rss_prev = rss_baseline;
-        let mut log_mem_step = |step: &str, terms_len: Option<usize>, errors_len: Option<usize>| {
-            if !mem_profile_enabled {
-                return;
-            }
-            if env_level != 0 {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = rss_prev.unwrap_or(curr);
-                let baseline = rss_baseline.unwrap_or(curr);
-                let delta_prev = curr as i64 - prev as i64;
-                if delta_prev == 0 {
-                    rss_prev = Some(curr);
-                    if rss_baseline.is_none() {
-                        rss_baseline = Some(curr);
-                    }
-                    return;
-                }
-                eprintln!(
-                    "reduce_eval_inner.mem step={} env_level={} terms_len={} errors_len={} rss_kb={} delta_prev_kb={} delta_total_kb={}",
-                    step,
-                    env_level,
-                    terms_len.map(|v| v as i64).unwrap_or(-1),
-                    errors_len.map(|v| v as i64).unwrap_or(-1),
-                    curr,
-                    delta_prev,
-                    curr as i64 - baseline as i64
-                );
-                rss_prev = Some(curr);
-                if rss_baseline.is_none() {
-                    rss_baseline = Some(curr);
-                }
-            }
-        };
-        log_mem_step("start", None, None);
-
-        // println!("\neval");
         let terms: Vec<GeneratedMessage> = vec![
             par.sends
                 .into_iter()
@@ -259,8 +202,6 @@ impl DebruijnInterpreter {
         .filter(|vec| !vec.is_empty())
         .flatten()
         .collect();
-        log_mem_step("after_collect_terms", Some(terms.len()), None);
-
         fn split(
             id: i32,
             terms: &Vec<GeneratedMessage>,
@@ -277,7 +218,6 @@ impl DebruijnInterpreter {
 
         let term_split_limit = i16::MAX;
         if terms.len() > term_split_limit.try_into().unwrap() {
-            log_mem_step("term_split_limit_exceeded", Some(terms.len()), None);
             Err(InterpreterError::ReduceError(format!(
                 "The number of terms in the Par is {}, which exceeds the limit of {}",
                 terms.len(),
@@ -286,7 +226,6 @@ impl DebruijnInterpreter {
         } else {
             // Collect errors from all parallel execution paths (pars)
             // parTraverseSafe
-            log_mem_step("before_build_futures", Some(terms.len()), None);
             let futures: Vec<
                 Pin<
                     Box<
@@ -300,10 +239,11 @@ impl DebruijnInterpreter {
                 .map(|(index, term)| {
                     let self_clone = self.clone();
                     let term_clone = term.clone();
+                    let env_clone = env.clone();
                     let rand_split = split(index.try_into().unwrap(), &terms, rand.clone());
                     Box::pin(async move {
                         self_clone
-                            .generated_message_eval(&term_clone, env, rand_split)
+                            .generated_message_eval(&term_clone, &env_clone, rand_split)
                             .await
                     })
                         as Pin<
@@ -314,62 +254,34 @@ impl DebruijnInterpreter {
                         >
                 })
                 .collect();
-            log_mem_step("after_build_futures", Some(futures.len()), None);
-            log_mem_step("before_join_all", Some(terms.len()), None);
 
-            let results: Vec<Result<(), InterpreterError>> =
-                futures::future::join_all(futures).await;
-            log_mem_step("after_join_all", Some(terms.len()), None);
-            let (ok_count, err_count) =
-                results.iter().fold((0usize, 0usize), |(ok, err), result| {
-                    if result.is_ok() {
-                        (ok + 1, err)
-                    } else {
-                        (ok, err + 1)
-                    }
-                });
-            if mem_profile_enabled && env_level == 0 {
-                eprintln!(
-                    "reduce_eval_inner.meta step=after_join_all results_len={} results_cap={} ok_count={} err_count={}",
-                    results.len(),
-                    results.capacity(),
-                    ok_count,
-                    err_count
-                );
-            }
-            log_mem_step("after_scan_results", Some(terms.len()), Some(err_count));
-            log_mem_step("before_collect_errors", Some(terms.len()), Some(err_count));
-            let mut flattened_results: Vec<InterpreterError> = Vec::with_capacity(err_count);
-            for result in results {
-                if let Err(err) = result {
-                    flattened_results.push(err);
+            metrics::counter!("reducer.eval_par.calls", "source" => "rholang").increment(1);
+            metrics::counter!("reducer.eval_par.term_count", "source" => "rholang")
+                .increment(futures.len() as u64);
+
+            let spawn_start = std::time::Instant::now();
+            let handles: Vec<JoinHandle<Result<(), InterpreterError>>> =
+                futures.into_iter().map(|fut| tokio::spawn(fut)).collect();
+            metrics::counter!("reducer.eval_par.spawn_ns", "source" => "rholang")
+                .increment(spawn_start.elapsed().as_nanos() as u64);
+
+            let join_start = std::time::Instant::now();
+            let mut flattened_results: Vec<InterpreterError> = Vec::new();
+            for handle in handles {
+                match handle.await {
+                    Ok(Err(err)) => flattened_results.push(err),
+                    Err(join_err) => flattened_results.push(InterpreterError::ReduceError(
+                        format!("task panicked: {}", join_err),
+                    )),
+                    Ok(Ok(())) => {}
                 }
             }
-            log_mem_step(
-                "after_collect_errors",
-                Some(terms.len()),
-                Some(flattened_results.len()),
-            );
-            log_mem_step(
-                "after_flatten_errors",
-                Some(terms.len()),
-                Some(flattened_results.len()),
-            );
-            log_mem_step(
-                "before_aggregate",
-                Some(terms.len()),
-                Some(flattened_results.len()),
-            );
+            metrics::counter!("reducer.eval_par.join_ns", "source" => "rholang")
+                .increment(join_start.elapsed().as_nanos() as u64);
 
             match self.aggregate_evaluator_errors(flattened_results) {
-                Ok(_) => {
-                    log_mem_step("after_aggregate_ok", Some(terms.len()), Some(0));
-                    Ok(())
-                }
-                Err(e) => {
-                    log_mem_step("after_aggregate_err", Some(terms.len()), None);
-                    Err(e)
-                }
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
             }
         }
     }
@@ -408,47 +320,12 @@ impl DebruijnInterpreter {
         data: ListParWithRandom,
         persistent: bool,
     ) -> Result<DispatchType, InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let data_len = data.pars.len();
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=produce_inner step={} persistent={} data_len={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        persistent,
-                        data_len,
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        log_op_step("start");
-        // println!("\nreduce produce");
-        // println!("chan in reduce produce: {:?}", chan);
-        // println!("data in reduce produce: {:?}", data);
         self.update_mergeable_channels(&chan).await;
-        log_op_step("after_update_mergeable_channels");
-
-        // println!("Attempting to lock space for produce");
-        let mut space_locked = self.space.try_lock().unwrap();
-        // println!("Locked space for produce");
-        let produce_result = space_locked.produce(chan.clone(), data.clone(), persistent)?;
-        let is_replay = space_locked.is_replay();
-        drop(space_locked);
-        log_op_step("after_space_produce");
+        let produce_result = self
+            .space
+            .produce(chan.clone(), data.clone(), persistent)
+            .await?;
+        let is_replay = self.space.is_replay().await;
 
         match produce_result {
             Some((c, s, produce_event)) => {
@@ -463,30 +340,28 @@ impl DebruijnInterpreter {
                         produce_event.failed,
                     )
                     .await?;
-                log_op_step("after_continue_produce_process");
 
                 match dispatch_type {
                     DispatchType::NonDeterministicCall(ref output) => {
                         let produce1 = produce_event.mark_as_non_deterministic(output.clone());
-                        let mut space_locked = self.space.try_lock().unwrap();
-                        space_locked.update_produce(produce1);
-                        drop(space_locked);
-                        log_op_step("after_update_produce_nondeterministic");
+                        self.space.update_produce(produce1).await;
                         Ok(dispatch_type)
                     }
 
                     DispatchType::FailedNonDeterministicCall(error) => {
                         // Mark the produce as failed for replay safety
                         let failed_produce = produce_event.with_error();
-                        let mut space_locked = self.space.try_lock().unwrap();
-                        space_locked.update_produce(failed_produce);
-                        drop(space_locked);
-                        log_op_step("after_update_produce_failed_nondeterministic");
-                        // Wrap the original error in NonDeterministicProcessFailure
-                        Err(InterpreterError::NonDeterministicProcessFailure {
-                            cause: Box::new(error),
-                            output_not_produced: vec![],
-                        })
+                        self.space.update_produce(failed_produce).await;
+                        // Re-raise known error types as-is to preserve output_not_produced;
+                        // wrap unknown errors in NonDeterministicProcessFailure.
+                        match error {
+                            InterpreterError::ProduceFailureWithOutput { .. }
+                            | InterpreterError::NonDeterministicProcessFailure { .. } => Err(error),
+                            _ => Err(InterpreterError::NonDeterministicProcessFailure {
+                                cause: Box::new(error),
+                                output_not_produced: vec![],
+                            }),
+                        }
                     }
 
                     _ => Ok(dispatch_type),
@@ -521,70 +396,30 @@ impl DebruijnInterpreter {
         persistent: bool,
         peek: bool,
     ) -> Result<DispatchType, InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let binds_len = binds.len();
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str, sources_len: usize| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=consume_inner step={} persistent={} peek={} binds_len={} sources_len={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        persistent,
-                        peek,
-                        binds_len,
-                        sources_len,
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        // println!("\nreduce consume");
-        // println!("binds in reduce consume: {:?}", binds);
-        // println!("body in reduce consume: {:?}", body);
         let (patterns, sources): (Vec<BindPattern>, Vec<Par>) = binds.clone().into_iter().unzip();
-        log_op_step("after_split_binds", sources.len());
 
         // Update mergeable channels
         for source in &sources {
             self.update_mergeable_channels(source).await;
         }
-        log_op_step("after_update_mergeable_channels", sources.len());
 
-        // println!("\nsources in reduce consume: {:?}", sources);
-
-        // println!("Attempting to lock space for produce");
-        let mut space_locked = self.space.try_lock().unwrap();
-        let consume_result = space_locked.consume(
-            sources.clone(),
-            patterns.clone(),
-            TaggedContinuation {
-                tagged_cont: Some(TaggedCont::ParBody(body.clone())),
-            },
-            persistent,
-            if peek {
-                BTreeSet::from_iter((0..sources.len() as i32).collect::<Vec<i32>>())
-            } else {
-                BTreeSet::new()
-            },
-        )?;
-        let is_replay = space_locked.is_replay();
-        drop(space_locked);
-        log_op_step("after_space_consume", sources.len());
-
-        // println!("space map in reduce consume: {:?}", self.space.lock().unwrap().to_map());
-        // println!("\nconsume_result in reduce consume: {:?}", consume_result);
+        let consume_result = self
+            .space
+            .consume(
+                sources.clone(),
+                patterns.clone(),
+                TaggedContinuation {
+                    tagged_cont: Some(TaggedCont::ParBody(body.clone())),
+                },
+                persistent,
+                if peek {
+                    BTreeSet::from_iter((0..sources.len() as i32).collect::<Vec<i32>>())
+                } else {
+                    BTreeSet::new()
+                },
+            )
+            .await?;
+        let is_replay = self.space.is_replay().await;
 
         self.continue_consume_process(
             unpack_option_with_peek(consume_result),
@@ -596,10 +431,6 @@ impl DebruijnInterpreter {
             Vec::new(),
         )
         .await
-        .map(|dispatch| {
-            log_op_step("after_continue_consume_process", sources.len());
-            dispatch
-        })
     }
 
     async fn continue_produce_process(
@@ -612,7 +443,6 @@ impl DebruijnInterpreter {
         previous_output: Vec<Vec<u8>>,
         trace_failed: bool,
     ) -> Result<DispatchType, InterpreterError> {
-        // println!("\ncontinue_produce_process");
         // During replay, if the trace shows a failed non-deterministic process,
         // we cannot replay it - the external service call failed during original execution
         if is_replay && trace_failed {
@@ -649,13 +479,16 @@ impl DebruijnInterpreter {
                         >,
                     > = vec![];
 
-                    let dispatch_fut = self_clone1.dispatch(
-                        continuation_clone,
-                        data_list_clone,
-                        is_replay_flag,
-                        previous_output_clone,
-                    );
-                    futures.push(Box::pin(dispatch_fut)
+                    futures.push(Box::pin(async move {
+                        self_clone1
+                            .dispatch(
+                                continuation_clone,
+                                data_list_clone,
+                                is_replay_flag,
+                                previous_output_clone,
+                            )
+                            .await
+                    })
                         as Pin<
                             Box<
                                 dyn futures::Future<Output = Result<DispatchType, InterpreterError>>
@@ -663,8 +496,11 @@ impl DebruijnInterpreter {
                             >,
                         >);
 
-                    let produce_fut = self_clone2.produce(chan_clone, data_clone, persistent_flag);
-                    futures.push(Box::pin(produce_fut)
+                    futures.push(Box::pin(async move {
+                        self_clone2
+                            .produce(chan_clone, data_clone, persistent_flag)
+                            .await
+                    })
                         as Pin<
                             Box<
                                 dyn futures::Future<Output = Result<DispatchType, InterpreterError>>
@@ -672,13 +508,27 @@ impl DebruijnInterpreter {
                             >,
                         >);
 
-                    // parTraverseSafe
-                    let results: Vec<Result<DispatchType, InterpreterError>> =
-                        futures::future::join_all(futures).await;
-                    let flattened_results: Vec<InterpreterError> = results
-                        .into_iter()
-                        .filter_map(|result| result.err())
-                        .collect();
+                    // When a persistent produce triggers a peek COMM, the non-persistent
+                    // peeked data on other channels was removed by RSpace. Re-issue it
+                    // to preserve peek semantics (data should remain after peek read).
+                    if peek {
+                        futures.extend(self.produce_peeks(data_list).await);
+                    }
+
+                    // parTraverseSafe — spawn true parallel tasks
+                    let handles: Vec<JoinHandle<Result<DispatchType, InterpreterError>>> =
+                        futures.into_iter().map(|fut| tokio::spawn(fut)).collect();
+
+                    let mut flattened_results: Vec<InterpreterError> = Vec::new();
+                    for handle in handles {
+                        match handle.await {
+                            Ok(Err(err)) => flattened_results.push(err),
+                            Err(join_err) => flattened_results.push(InterpreterError::ReduceError(
+                                format!("task panicked: {}", join_err),
+                            )),
+                            Ok(Ok(_)) => {}
+                        }
+                    }
 
                     self.aggregate_evaluator_errors(flattened_results)
                 } else if peek {
@@ -707,13 +557,20 @@ impl DebruijnInterpreter {
                     })];
                     futures.extend(self.produce_peeks(data_list).await);
 
-                    // parTraverseSafe
-                    let results: Vec<Result<DispatchType, InterpreterError>> =
-                        futures::future::join_all(futures).await;
-                    let flattened_results: Vec<InterpreterError> = results
-                        .into_iter()
-                        .filter_map(|result| result.err())
-                        .collect();
+                    // parTraverseSafe — spawn true parallel tasks
+                    let handles: Vec<JoinHandle<Result<DispatchType, InterpreterError>>> =
+                        futures.into_iter().map(|fut| tokio::spawn(fut)).collect();
+
+                    let mut flattened_results: Vec<InterpreterError> = Vec::new();
+                    for handle in handles {
+                        match handle.await {
+                            Ok(Err(err)) => flattened_results.push(err),
+                            Err(join_err) => flattened_results.push(InterpreterError::ReduceError(
+                                format!("task panicked: {}", join_err),
+                            )),
+                            Ok(Ok(_)) => {}
+                        }
+                    }
 
                     self.aggregate_evaluator_errors(flattened_results)
                 } else {
@@ -735,8 +592,6 @@ impl DebruijnInterpreter {
         is_replay: bool,
         previous_output: Vec<Vec<u8>>,
     ) -> Result<DispatchType, InterpreterError> {
-        // println!("\ncontinue_consume_process");
-        // println!("\napplication in continue_consume_process: {:?}", res);
         let previous_output_as_par = previous_output
             .into_iter()
             .map(|bytes| {
@@ -768,13 +623,16 @@ impl DebruijnInterpreter {
                         >,
                     > = vec![];
 
-                    let dispatch_fut = self_clone1.dispatch(
-                        continuation_clone,
-                        data_list_clone,
-                        is_replay_flag,
-                        previous_output_clone,
-                    );
-                    futures.push(Box::pin(dispatch_fut)
+                    futures.push(Box::pin(async move {
+                        self_clone1
+                            .dispatch(
+                                continuation_clone,
+                                data_list_clone,
+                                is_replay_flag,
+                                previous_output_clone,
+                            )
+                            .await
+                    })
                         as Pin<
                             Box<
                                 dyn futures::Future<Output = Result<DispatchType, InterpreterError>>
@@ -782,9 +640,11 @@ impl DebruijnInterpreter {
                             >,
                         >);
 
-                    let consume_fut =
-                        self_clone2.consume(binds_clone, body_clone, persistent_flag, peek_flag);
-                    futures.push(Box::pin(consume_fut)
+                    futures.push(Box::pin(async move {
+                        self_clone2
+                            .consume(binds_clone, body_clone, persistent_flag, peek_flag)
+                            .await
+                    })
                         as Pin<
                             Box<
                                 dyn futures::Future<Output = Result<DispatchType, InterpreterError>>
@@ -792,13 +652,20 @@ impl DebruijnInterpreter {
                             >,
                         >);
 
-                    // parTraverseSafe
-                    let results: Vec<Result<DispatchType, InterpreterError>> =
-                        futures::future::join_all(futures).await;
-                    let flattened_results: Vec<InterpreterError> = results
-                        .into_iter()
-                        .filter_map(|result| result.err())
-                        .collect();
+                    // parTraverseSafe — spawn true parallel tasks
+                    let handles: Vec<JoinHandle<Result<DispatchType, InterpreterError>>> =
+                        futures.into_iter().map(|fut| tokio::spawn(fut)).collect();
+
+                    let mut flattened_results: Vec<InterpreterError> = Vec::new();
+                    for handle in handles {
+                        match handle.await {
+                            Ok(Err(err)) => flattened_results.push(err),
+                            Err(join_err) => flattened_results.push(InterpreterError::ReduceError(
+                                format!("task panicked: {}", join_err),
+                            )),
+                            Ok(Ok(_)) => {}
+                        }
+                    }
 
                     self.aggregate_evaluator_errors(flattened_results)
                 } else if _peek {
@@ -827,13 +694,20 @@ impl DebruijnInterpreter {
                     })];
                     futures.extend(self.produce_peeks(data_list).await);
 
-                    // parTraverseSafe
-                    let results: Vec<Result<DispatchType, InterpreterError>> =
-                        futures::future::join_all(futures).await;
-                    let flattened_results: Vec<InterpreterError> = results
-                        .into_iter()
-                        .filter_map(|result| result.err())
-                        .collect();
+                    // parTraverseSafe — spawn true parallel tasks
+                    let handles: Vec<JoinHandle<Result<DispatchType, InterpreterError>>> =
+                        futures.into_iter().map(|fut| tokio::spawn(fut)).collect();
+
+                    let mut flattened_results: Vec<InterpreterError> = Vec::new();
+                    for handle in handles {
+                        match handle.await {
+                            Ok(Err(err)) => flattened_results.push(err),
+                            Err(join_err) => flattened_results.push(InterpreterError::ReduceError(
+                                format!("task panicked: {}", join_err),
+                            )),
+                            Ok(Ok(_)) => {}
+                        }
+                    }
 
                     self.aggregate_evaluator_errors(flattened_results)
                 } else {
@@ -870,48 +744,14 @@ impl DebruijnInterpreter {
         is_replay: bool,
         previous_output: Vec<Par>,
     ) -> Result<DispatchType, InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let data_list_len = data_list.len();
-        let previous_output_len = previous_output.len();
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=dispatch_inner step={} is_replay={} data_list_len={} prev_output_len={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        is_replay,
-                        data_list_len,
-                        previous_output_len,
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        log_op_step("start");
-        // println!("\nreduce dispatch");
-        let result = self
-            .dispatcher
+        self.dispatcher
             .dispatch(
                 continuation,
                 data_list.into_iter().map(|tuple| tuple.1).collect(),
                 is_replay,
                 previous_output,
             )
-            .await;
-        log_op_step("after_dispatch");
-        result
+            .await
     }
 
     async fn produce_peeks(
@@ -925,7 +765,6 @@ impl DebruijnInterpreter {
             >,
         >,
     > {
-        // println!("\nreduce produce_peeks");
         data_list
             .into_iter()
             .filter(|(_, _, _, persist)| !persist)
@@ -945,33 +784,61 @@ impl DebruijnInterpreter {
     /* Collect mergeable channels */
 
     async fn update_mergeable_channels(&self, chan: &Par) -> () {
-        let is_mergeable = self.is_mergeable_channel(chan);
-        // println!("\nis_mergeable: {:?}", is_mergeable);
-
-        if is_mergeable {
-            {
-                let mut merge_chs_write = self.merge_chs.write().unwrap();
-                merge_chs_write.insert(chan.clone());
-            }
+        if let Some(merge_type) = self.is_mergeable_channel(chan) {
+            let mut merge_chs_write = self.merge_chs.write().await;
+            merge_chs_write.insert(chan.clone(), merge_type);
         }
     }
 
-    fn is_mergeable_channel(&self, chan: &Par) -> bool {
-        let tuple_elms: Vec<Par> = chan
-            .exprs
-            .iter()
-            .flat_map(|y| match &y.expr_instance {
-                Some(expr_instance) => match expr_instance {
-                    ExprInstance::ETupleBody(etuple) => etuple.ps.clone(),
-                    _ => ETuple::default().ps,
-                },
-                None => ETuple::default().ps,
-            })
-            .collect();
+    fn is_mergeable_channel(&self, chan: &Par) -> Option<MergeType> {
+        // Hot path — runs on every channel produce/consume. Borrow the head
+        // Par of the first ETupleBody expression without allocating.
+        metrics::counter!("is-mergeable-channel.calls", "source" => "f1r3fly.rholang.reduce")
+            .increment(1);
 
-        tuple_elms
-            .first()
-            .map_or(false, |head| head == &self.mergeable_tag_name)
+        let head: Option<&Par> = chan.exprs.iter().find_map(|y| match &y.expr_instance {
+            Some(ExprInstance::ETupleBody(etuple)) => etuple.ps.first(),
+            _ => None,
+        });
+
+        let result = head.and_then(|h| self.mergeable_tags.get(h).copied());
+
+        // Diagnostic trace: every channel write/consume invokes this. Logs
+        // distinguish (a) tuple channels that match a registered tag (mergeable),
+        // (b) tuple channels with a head that ISN'T in the tag registry
+        // (potential bitmask-tag-binding miss), and (c) non-tuple channels
+        // (most channels). Configure with `RUST_LOG=f1r3fly.merge.tag_check=trace`.
+        if let Some(head_par) = head {
+            match result {
+                Some(mt) => tracing::trace!(
+                    target: "f1r3fly.merge.tag_check",
+                    "mergeable channel detected: merge_type={:?}",
+                    mt,
+                ),
+                None => {
+                    use prost::Message;
+                    let head_bytes = head_par.encode_to_vec();
+                    let head_hex: String =
+                        head_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                    let tag_hexes: Vec<String> = self
+                        .mergeable_tags
+                        .keys()
+                        .map(|k| {
+                            let bs = k.encode_to_vec();
+                            bs.iter().map(|b| format!("{:02x}", b)).collect()
+                        })
+                        .collect();
+                    tracing::trace!(
+                        target: "f1r3fly.merge.tag_check",
+                        "tuple channel with non-tag head: head_hex={}, registered_tag_hexes={:?}",
+                        head_hex,
+                        tag_hexes,
+                    );
+                }
+            }
+        }
+
+        result
     }
 
     fn aggregate_evaluator_errors(
@@ -1020,12 +887,43 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        // println!("\ngenerated_message_eval, term: {:?}", term);
         match term {
-            GeneratedMessage::Send(term) => self.eval_send(term, env, rand).await,
-            GeneratedMessage::Receive(term) => self.eval_receive(term, env, rand).await,
-            GeneratedMessage::New(term) => self.eval_new(term, env.clone(), rand).await,
-            GeneratedMessage::Match(term) => self.eval_match(term, env, rand).await,
+            GeneratedMessage::Send(term) => {
+                metrics::counter!(REDUCER_EVAL_SEND_CALLS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(1);
+                let start = std::time::Instant::now();
+                let result = self.eval_send(term, env, rand).await;
+                metrics::counter!(REDUCER_EVAL_SEND_TIME_NS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(start.elapsed().as_nanos() as u64);
+                result
+            }
+            GeneratedMessage::Receive(term) => {
+                metrics::counter!(REDUCER_EVAL_RECEIVE_CALLS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(1);
+                let start = std::time::Instant::now();
+                let result = self.eval_receive(term, env, rand).await;
+                metrics::counter!(REDUCER_EVAL_RECEIVE_TIME_NS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(start.elapsed().as_nanos() as u64);
+                result
+            }
+            GeneratedMessage::New(term) => {
+                metrics::counter!(REDUCER_EVAL_NEW_CALLS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(1);
+                let start = std::time::Instant::now();
+                let result = self.eval_new(term, env.clone(), rand).await;
+                metrics::counter!(REDUCER_EVAL_NEW_TIME_NS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(start.elapsed().as_nanos() as u64);
+                result
+            }
+            GeneratedMessage::Match(term) => {
+                metrics::counter!(REDUCER_EVAL_MATCH_CALLS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(1);
+                let start = std::time::Instant::now();
+                let result = self.eval_match(term, env, rand).await;
+                metrics::counter!(REDUCER_EVAL_MATCH_TIME_NS_METRIC, "source" => RHOLANG_METRICS_SOURCE)
+                    .increment(start.elapsed().as_nanos() as u64);
+                result
+            }
             GeneratedMessage::Bundle(term) => self.eval_bundle(term, env, rand).await,
             GeneratedMessage::Expr(term) => match &term.expr_instance {
                 Some(expr_instance) => match expr_instance {
@@ -1072,40 +970,9 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=eval_send step={} env_level={} send_data_len={} persistent={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        env.level,
-                        send.data.len(),
-                        send.persistent,
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        log_op_step("start");
-        // println!("\nenv in eval_send: {:?}", env);
         self.cost.charge(send_eval_cost())?;
         let eval_chan = self.eval_expr(&unwrap_option_safe(send.chan.clone())?, env)?;
-        log_op_step("after_eval_chan");
         let sub_chan = self.substitute.substitute_and_charge(&eval_chan, 0, env)?;
-        log_op_step("after_substitute_chan");
         let unbundled = match single_bundle(&sub_chan) {
             Some(value) => {
                 if !value.write_flag {
@@ -1127,13 +994,6 @@ impl DebruijnInterpreter {
                 self.substitute.substitute_and_charge(&evaluated, 0, env)
             })
             .collect::<Result<Vec<_>, InterpreterError>>()?;
-        log_op_step("after_substitute_data");
-
-        // println!("\ndata in eval_send: {:?}", data);
-        // println!("\nsubst_data in eval_send: {:?}", subst_data);
-
-        // println!("\nrand in eval_send");
-        // rand.debug_str();
 
         self.produce(
             unbundled,
@@ -1144,7 +1004,6 @@ impl DebruijnInterpreter {
             send.persistent,
         )
         .await?;
-        log_op_step("after_produce");
         Ok(())
     }
 
@@ -1154,71 +1013,18 @@ impl DebruijnInterpreter {
         env: &Env<Par>,
         rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let body_locally_free = receive
-            .body
-            .as_ref()
-            .map(|b| b.locally_free.clone())
-            .unwrap_or_default();
-        let body_subst_shift = env.shift + receive.bind_count;
-        let body_needs_subst = if body_subst_shift <= 0 {
-            body_locally_free.iter().any(|bit| *bit == 1)
-        } else {
-            let s = body_subst_shift as usize;
-            body_locally_free
-                .iter()
-                .enumerate()
-                .any(|(idx, bit)| *bit == 1 && idx >= s)
-        };
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=eval_receive step={} env_level={} binds_len={} bind_count={} body_subst_shift={} body_needs_subst={} persistent={} peek={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        env.level,
-                        receive.binds.len(),
-                        receive.bind_count,
-                        body_subst_shift,
-                        body_needs_subst,
-                        receive.persistent,
-                        receive.peek,
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        log_op_step("start");
-        // println!("\nreceive in eval_receive: {:?}", receive);
-        // println!("\nreceive binds length: {:?}", receive.binds.len());
         self.cost.charge(receive_eval_cost())?;
         let binds = receive
             .binds
             .clone()
             .into_iter()
             .map(|rb| {
-                // println!("\nrb in eval_receive: {:?}", rb);
                 let q = self.unbundle_receive(&rb, env)?;
-                // println!("\nq in eval_receive: {:?}", q);
                 let subst_patterns = rb
                     .patterns
                     .into_iter()
                     .map(|pattern| self.substitute.substitute_and_charge(&pattern, 1, env))
                     .collect::<Result<Vec<_>, InterpreterError>>()?;
-
-                // println!("\nsubst_patterns in eval_receive: {:?}", subst_patterns);
 
                 Ok((
                     BindPattern {
@@ -1230,7 +1036,6 @@ impl DebruijnInterpreter {
                 ))
             })
             .collect::<Result<Vec<_>, InterpreterError>>()?;
-        log_op_step("after_build_binds");
 
         // TODO: Allow for the environment to be stored with the body in the Tuplespace - OLD
         let subst_body = self.substitute.substitute_no_sort_and_charge(
@@ -1238,13 +1043,6 @@ impl DebruijnInterpreter {
             0,
             &env.shift(receive.bind_count),
         )?;
-        log_op_step("after_substitute_body");
-
-        // println!("\nbinds in eval_receive: {:?}", binds);
-        // println!("\nsubst_body in eval_receive: {:?}", subst_body);
-
-        // println!("\nrand in eval_receive");
-        // rand.debug_str();
 
         self.consume(
             binds,
@@ -1256,7 +1054,6 @@ impl DebruijnInterpreter {
             receive.peek,
         )
         .await?;
-        log_op_step("after_consume");
         Ok(())
     }
 
@@ -1272,7 +1069,6 @@ impl DebruijnInterpreter {
      */
     fn eval_var(&self, valproc: &Var, env: &Env<Par>) -> Result<Par, InterpreterError> {
         self.cost.charge(var_eval_cost())?;
-        // println!("\nenv in eval_var: {:?}", env);
         match valproc.var_instance {
             Some(VarInstance::BoundVar(level)) => match env.get(&level) {
                 Some(p) => Ok(p),
@@ -1307,68 +1103,34 @@ impl DebruijnInterpreter {
             })
         }
 
-        let first_match = Box::new(
-            |target: Par, cases: Vec<MatchCase>, rand: Blake2b512Random| async {
-                let mut state = (target, cases);
-
-                loop {
-                    let (_target, _cases) = state;
-
-                    match _cases.as_slice() {
-                        [] => return Ok(()),
-
-                        [single_case, case_rem @ ..] => {
-                            let pattern = self.substitute.substitute_and_charge(
-                                &unwrap_option_safe(single_case.pattern.clone())?,
-                                1,
-                                env,
-                            )?;
-
-                            // println!("\ntarget in eval_matcher: {:?}", target);
-                            // println!("\npattern in eval_matcher: {:?}", pattern);
-
-                            let mut spatial_matcher = SpatialMatcherContext::new();
-                            let match_result =
-                                spatial_matcher.spatial_match_result(_target.clone(), pattern);
-
-                            // println!("\nmatch_result in eval_matcher: {:?}", match_result);
-
-                            match match_result {
-                                None => {
-                                    state = (_target, case_rem.to_vec());
-                                }
-
-                                Some(free_map) => {
-                                    let eval_result = self
-                                        .eval(
-                                            single_case.source.clone().unwrap(),
-                                            &add_to_env(
-                                                env,
-                                                free_map.clone(),
-                                                single_case.free_count,
-                                            ),
-                                            rand,
-                                        )
-                                        .await?;
-
-                                    return Ok(eval_result);
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        );
-
         self.cost.charge(match_eval_cost())?;
         let evaled_target = self.eval_expr(&mat.target.as_ref().unwrap(), env)?;
         let subst_target = self
             .substitute
             .substitute_and_charge(&evaled_target, 0, env)?;
 
-        // println!("\nsubst_target in eval_match: {:?}", subst_target);
+        for single_case in mat.cases.iter() {
+            let pattern = self.substitute.substitute_and_charge(
+                &unwrap_option_safe(single_case.pattern.clone())?,
+                1,
+                env,
+            )?;
 
-        first_match(subst_target, mat.cases.clone(), rand).await
+            let mut spatial_matcher = SpatialMatcherContext::new();
+            if let Some(free_map) =
+                spatial_matcher.spatial_match_result(subst_target.clone(), pattern)
+            {
+                return self
+                    .eval(
+                        single_case.source.clone().unwrap(),
+                        &add_to_env(env, free_map.clone(), single_case.free_count),
+                        rand,
+                    )
+                    .await;
+            }
+        }
+
+        Ok(())
     }
 
     /**
@@ -1382,38 +1144,6 @@ impl DebruijnInterpreter {
         env: Env<Par>,
         mut rand: Blake2b512Random,
     ) -> Result<(), InterpreterError> {
-        let op_mem_profile_enabled = *REDUCE_OP_PROFILE_ENABLED;
-        let mut op_rss_prev = if op_mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut log_op_step = |step: &str| {
-            if !op_mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = op_rss_prev.unwrap_or(curr);
-                let delta = curr as i64 - prev as i64;
-                if delta != 0 {
-                    eprintln!(
-                        "reduce_op.mem fn=eval_new step={} env_level={} bind_count={} uri_len={} rss_kb={} delta_prev_kb={}",
-                        step,
-                        env.level,
-                        new.bind_count,
-                        new.uri.len(),
-                        curr,
-                        delta
-                    );
-                }
-                op_rss_prev = Some(curr);
-            }
-        };
-        log_op_step("start");
-        // println!("\nnew in eval_new: {:?}", new);
-        // println!("\nrand in eval_new");
-        // rand.debug_str();
-        // println!("\nrand next: {:?}", rand.next());
         let mut alloc = |count: usize, urns: Vec<String>| {
             let simple_news =
                 (0..(count - urns.len()))
@@ -1424,21 +1154,13 @@ impl DebruijnInterpreter {
                                 id: rand.next().iter().map(|&x| x as u8).collect::<Vec<u8>>(),
                             })),
                         }]);
-                        // println!("\nrand in simple_news");
-                        // rand.debug_str();
                         _env.put(addr)
                     });
 
-            // println!("\nrand in eval_new after");
-            // rand.debug_str();
-            // println!("\nsimple_news in eval_new: {:?}", simple_news);
-
             let add_urn = |new_env: &mut Env<Par>, urn: String| {
-                // println!("\nurn_map: {:?}", self.urn_map);
                 if !self.urn_map.contains_key(&urn) {
                     // TODO: Injections (from normalizer) are not used currently, see [[NormalizerEnv]].
                     // If `urn` can't be found in `urnMap`, it must be referencing an injection - OLD
-                    // println!("\nnew_injections: {:?}", new.injections);
                     match new.injections.get(&urn) {
                         Some(p) => {
                             if let Some(gunf) = RhoUnforgeable::unapply(p) {
@@ -1476,7 +1198,20 @@ impl DebruijnInterpreter {
                     }
                 } else {
                     match self.urn_map.get(&urn) {
-                        Some(p) => Ok(new_env.put(p.clone())),
+                        Some(p) => {
+                            if urn == "rho:system:bitmaskMergeableTag" {
+                                use prost::Message;
+                                let bytes = p.encode_to_vec();
+                                let hex: String =
+                                    bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                                tracing::info!(
+                                    target: "f1r3fly.merge.tag_check",
+                                    "URI lookup at deploy: rho:system:bitmaskMergeableTag -> Par hex={}",
+                                    hex,
+                                );
+                            }
+                            Ok(new_env.put(p.clone()))
+                        }
                         None => Err(InterpreterError::ReduceError(format!(
                             "Unknown urn for new: {}",
                             urn
@@ -1490,19 +1225,11 @@ impl DebruijnInterpreter {
             })
         };
 
-        // println!("\nhit eval_new");
         self.cost.charge(new_bindings_cost(new.bind_count as i64))?;
-        log_op_step("after_charge_new_bindings");
-        // println!("\nnew uri: {:?}", new.uri);
         match alloc(new.bind_count as usize, new.uri.clone()) {
             Ok(env) => {
-                log_op_step("after_alloc");
-                // println!("\nenv in eval_new: {:?}", env);
-                let result = self
-                    .eval(unwrap_option_safe(new.p.clone())?, &env, rand)
-                    .await;
-                log_op_step("after_eval_new_body");
-                result
+                self.eval(unwrap_option_safe(new.p.clone())?, &env, rand)
+                    .await
             }
             Err(e) => Err(e),
         }
@@ -1510,9 +1237,7 @@ impl DebruijnInterpreter {
 
     fn unbundle_receive(&self, rb: &ReceiveBind, env: &Env<Par>) -> Result<Par, InterpreterError> {
         let eval_src = self.eval_expr(&unwrap_option_safe(rb.source.clone())?, env)?;
-        // println!("\neval_src in unbundle_receive: {:?}", eval_src);
         let subst = self.substitute.substitute_and_charge(&eval_src, 0, env)?;
-        // println!("\nsubst in unbundle_receive: {:?}", eval_src);
         // Check if we try to read from bundled channel
         let unbndl = match single_bundle(&subst) {
             Some(value) => {
@@ -1527,7 +1252,6 @@ impl DebruijnInterpreter {
             None => subst,
         };
 
-        // println!("\nunbndl in unbundle_receive: {:?}", unbndl);
         Ok(unbndl)
     }
 
@@ -1545,10 +1269,7 @@ impl DebruijnInterpreter {
     pub fn eval_expr_to_par(&self, expr: &Expr, env: &Env<Par>) -> Result<Par, InterpreterError> {
         match unwrap_option_safe(expr.expr_instance.clone())? {
             ExprInstance::EVarBody(evar) => {
-                // println!("\nenv in eval_expr_to_par: {:?}", env);
                 let p = self.eval_var(&unwrap_option_safe(evar.v)?, env)?;
-                // println!("\np in eval_expr_to_par: {:?}", p);
-                // println!("\nenv in eval_expr_to_par: {:?}", env);
                 let evaled_p = self.eval_expr(&p, env)?;
                 Ok(evaled_p)
             }
@@ -1590,17 +1311,77 @@ impl DebruijnInterpreter {
                 v1.expr_instance.clone().unwrap(),
                 v2.expr_instance.clone().unwrap(),
             ) {
-                (ExprInstance::GBool(b1), ExprInstance::GBool(b2)) => Ok(Expr {
-                    expr_instance: Some(ExprInstance::GBool(relopb(b1, b2))),
-                }),
+                (ExprInstance::GBool(b1), ExprInstance::GBool(b2)) => {
+                    self.cost.charge(comparison_cost())?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relopb(b1, b2))),
+                    })
+                }
 
-                (ExprInstance::GInt(i1), ExprInstance::GInt(i2)) => Ok(Expr {
-                    expr_instance: Some(ExprInstance::GBool(relopi(i1, i2))),
-                }),
+                (ExprInstance::GInt(i1), ExprInstance::GInt(i2)) => {
+                    self.cost.charge(comparison_cost())?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relopi(i1, i2))),
+                    })
+                }
 
-                (ExprInstance::GString(s1), ExprInstance::GString(s2)) => Ok(Expr {
-                    expr_instance: Some(ExprInstance::GBool(relops(s1, s2))),
-                }),
+                (ExprInstance::GString(s1), ExprInstance::GString(s2)) => {
+                    self.cost.charge(comparison_cost())?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relops(s1, s2))),
+                    })
+                }
+
+                (ExprInstance::GDouble(d1), ExprInstance::GDouble(d2)) => {
+                    self.cost.charge(comparison_cost())?;
+                    let f1 = f64::from_bits(d1);
+                    let f2 = f64::from_bits(d2);
+                    if f1.is_nan() || f2.is_nan() {
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::GBool(false)),
+                        })
+                    } else {
+                        Ok(Expr {
+                            expr_instance: Some(ExprInstance::GBool(relopi(
+                                f1.partial_cmp(&f2).map_or(0, |o| o as i64),
+                                0,
+                            ))),
+                        })
+                    }
+                }
+
+                (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                    self.cost
+                        .charge(bigint_comparison_cost(b1.len(), b2.len()))?;
+                    let cmp = compare_twos_complement_bytes(&b1, &b2);
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relopi(cmp as i64, 0))),
+                    })
+                }
+
+                (ExprInstance::GBigRat(r1), ExprInstance::GBigRat(r2)) => {
+                    self.cost.charge(bigrat_comparison_cost(
+                        r1.numerator.len(),
+                        r1.denominator.len(),
+                        r2.numerator.len(),
+                        r2.denominator.len(),
+                    ))?;
+                    let cmp = compare_big_rationals(&r1, &r2);
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relopi(cmp as i64, 0))),
+                    })
+                }
+
+                (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                    self.cost.charge(bigint_comparison_cost(
+                        fp1.unscaled.len(),
+                        fp2.unscaled.len(),
+                    ))?;
+                    let cmp = compare_fixed_points(&fp1, &fp2)?;
+                    Ok(Expr {
+                        expr_instance: Some(ExprInstance::GBool(relopi(cmp as i64, 0))),
+                    })
+                }
 
                 _ => Err(InterpreterError::ReduceError(format!(
                     "Unexpected compare: {:?} vs. {:?}",
@@ -1631,6 +1412,22 @@ impl DebruijnInterpreter {
                     expr_instance: Some(ExprInstance::GByteArray(x.clone())),
                 }),
 
+                ExprInstance::GDouble(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GDouble(*x)),
+                }),
+
+                ExprInstance::GBigInt(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBigInt(x.clone())),
+                }),
+
+                ExprInstance::GBigRat(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GBigRat(x.clone())),
+                }),
+
+                ExprInstance::GFixedPoint(x) => Ok(Expr {
+                    expr_instance: Some(ExprInstance::GFixedPoint(x.clone())),
+                }),
+
                 ExprInstance::ENotBody(enot) => {
                     let b = self.eval_to_bool(&enot.p.as_ref().unwrap(), env)?;
                     Ok(Expr {
@@ -1639,58 +1436,313 @@ impl DebruijnInterpreter {
                 }
 
                 ExprInstance::ENegBody(eneg) => {
-                    let v = self.eval_to_i64(&eneg.p.as_ref().unwrap(), env)?;
-                    let result = v.checked_neg().ok_or_else(|| {
-                        InterpreterError::ReduceError("Arithmetic overflow in negation".to_string())
-                    })?;
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::GInt(result)),
-                    })
+                    let v = self.eval_single_expr(&eneg.p.as_ref().unwrap(), env)?;
+                    match v.expr_instance.unwrap() {
+                        ExprInstance::GInt(i) => {
+                            let result = i.checked_neg().ok_or_else(|| {
+                                InterpreterError::ReduceError(
+                                    "Arithmetic overflow in negation".to_string(),
+                                )
+                            })?;
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GInt(result)),
+                            })
+                        }
+                        ExprInstance::GDouble(bits) => {
+                            let f = f64::from_bits(bits);
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GDouble((-f).to_bits())),
+                            })
+                        }
+                        ExprInstance::GBigInt(bytes) => {
+                            self.cost.charge(bigint_negation_cost(bytes.len()))?;
+                            make_bigint_expr(negate_twos_complement(&bytes), "negation")
+                        }
+                        ExprInstance::GBigRat(rat) => {
+                            self.cost
+                                .charge(bigrat_negation_cost(rat.numerator.len()))?;
+                            make_bigrat_expr(
+                                models::rhoapi::GBigRational {
+                                    numerator: negate_twos_complement(&rat.numerator),
+                                    denominator: rat.denominator,
+                                },
+                                "negation",
+                            )
+                        }
+                        ExprInstance::GFixedPoint(fp) => {
+                            self.cost.charge(bigint_negation_cost(fp.unscaled.len()))?;
+                            make_fixedpoint_expr(
+                                models::rhoapi::GFixedPoint {
+                                    unscaled: negate_twos_complement(&fp.unscaled),
+                                    scale: fp.scale,
+                                },
+                                "negation",
+                            )
+                        }
+                        other => Err(InterpreterError::OperatorNotDefined {
+                            op: "neg".to_string(),
+                            other_type: get_type(other),
+                        }),
+                    }
                 }
 
                 ExprInstance::EMultBody(EMult { p1, p2 }) => {
-                    let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
-                    let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    self.cost.charge(multiplication_cost())?;
-                    let result = v1.checked_mul(v2).ok_or_else(|| {
-                        InterpreterError::ReduceError(
-                            "Arithmetic overflow in multiplication".to_string(),
-                        )
-                    })?;
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::GInt(result)),
-                    })
+                    let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
+                    let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
+
+                    match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
+                        (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
+                            self.cost.charge(multiplication_cost())?;
+                            let result = lhs.checked_mul(rhs).ok_or_else(|| {
+                                InterpreterError::ReduceError(
+                                    "Arithmetic overflow in multiplication".to_string(),
+                                )
+                            })?;
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GInt(result)),
+                            })
+                        }
+                        (ExprInstance::GDouble(d1), ExprInstance::GDouble(d2)) => {
+                            self.cost.charge(multiplication_cost())?;
+                            let result = f64::from_bits(d1) * f64::from_bits(d2);
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GDouble(result.to_bits())),
+                            })
+                        }
+                        (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                            self.cost
+                                .charge(bigint_multiplication_cost(b1.len(), b2.len()))?;
+                            make_bigint_expr(multiply_twos_complement(&b1, &b2), "multiplication")
+                        }
+                        (ExprInstance::GBigRat(r1), ExprInstance::GBigRat(r2)) => {
+                            self.cost.charge(bigrat_multiplication_cost(
+                                r1.numerator.len(),
+                                r1.denominator.len(),
+                                r2.numerator.len(),
+                                r2.denominator.len(),
+                            ))?;
+                            make_bigrat_expr(multiply_big_rationals(&r1, &r2), "multiplication")
+                        }
+                        (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                            if fp1.scale != fp2.scale {
+                                return Err(InterpreterError::OperatorExpectedError {
+                                    op: "*".to_string(),
+                                    expected: format!("FixedPoint(p{})", fp1.scale),
+                                    other_type: format!("FixedPoint(p{})", fp2.scale),
+                                });
+                            }
+                            self.cost.charge(bigint_multiplication_cost(
+                                fp1.unscaled.len(),
+                                fp2.unscaled.len(),
+                            ))?;
+                            make_fixedpoint_expr(
+                                multiply_fixed_points(&fp1, &fp2),
+                                "multiplication",
+                            )
+                        }
+                        (lhs, rhs) => {
+                            let lhs_type = get_type(lhs);
+                            let rhs_type = get_type(rhs);
+                            if lhs_type == rhs_type {
+                                Err(InterpreterError::OperatorNotDefined {
+                                    op: "*".to_string(),
+                                    other_type: lhs_type,
+                                })
+                            } else {
+                                Err(InterpreterError::OperatorExpectedError {
+                                    op: "*".to_string(),
+                                    expected: lhs_type,
+                                    other_type: rhs_type,
+                                })
+                            }
+                        }
+                    }
                 }
 
                 ExprInstance::EDivBody(EDiv { p1, p2 }) => {
-                    let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
-                    let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    if v2 == 0 {
-                        return Err(InterpreterError::ReduceError(
-                            "Division by zero".to_string(),
-                        ));
+                    let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
+                    let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
+
+                    match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
+                        (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
+                            self.cost.charge(division_cost())?;
+                            if rhs == 0 {
+                                return Err(InterpreterError::ReduceError(
+                                    "Division by zero".to_string(),
+                                ));
+                            }
+                            if lhs == i64::MIN && rhs == -1 {
+                                return Err(InterpreterError::ReduceError(
+                                    "Arithmetic overflow in division".to_string(),
+                                ));
+                            }
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GInt(lhs / rhs)),
+                            })
+                        }
+                        (ExprInstance::GDouble(d1), ExprInstance::GDouble(d2)) => {
+                            self.cost.charge(division_cost())?;
+                            let result = f64::from_bits(d1) / f64::from_bits(d2);
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GDouble(result.to_bits())),
+                            })
+                        }
+                        (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                            self.cost.charge(bigint_division_cost(b1.len(), b2.len()))?;
+                            if is_zero_twos_complement(&b2) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Division by zero".to_string(),
+                                ));
+                            }
+                            make_bigint_expr(divide_twos_complement(&b1, &b2), "division")
+                        }
+                        (ExprInstance::GBigRat(r1), ExprInstance::GBigRat(r2)) => {
+                            self.cost.charge(bigrat_division_cost(
+                                r1.numerator.len(),
+                                r1.denominator.len(),
+                                r2.numerator.len(),
+                                r2.denominator.len(),
+                            ))?;
+                            if is_zero_twos_complement(&r2.numerator) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Division by zero".to_string(),
+                                ));
+                            }
+                            make_bigrat_expr(divide_big_rationals(&r1, &r2), "division")
+                        }
+                        (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                            if fp1.scale != fp2.scale {
+                                return Err(InterpreterError::OperatorExpectedError {
+                                    op: "/".to_string(),
+                                    expected: format!("FixedPoint(p{})", fp1.scale),
+                                    other_type: format!("FixedPoint(p{})", fp2.scale),
+                                });
+                            }
+                            self.cost.charge(bigint_division_cost(
+                                fp1.unscaled.len(),
+                                fp2.unscaled.len(),
+                            ))?;
+                            if is_zero_twos_complement(&fp2.unscaled) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Division by zero".to_string(),
+                                ));
+                            }
+                            make_fixedpoint_expr(divide_fixed_points(&fp1, &fp2), "division")
+                        }
+                        (lhs, rhs) => {
+                            let lhs_type = get_type(lhs);
+                            let rhs_type = get_type(rhs);
+                            if lhs_type == rhs_type {
+                                Err(InterpreterError::OperatorNotDefined {
+                                    op: "/".to_string(),
+                                    other_type: lhs_type,
+                                })
+                            } else {
+                                Err(InterpreterError::OperatorExpectedError {
+                                    op: "/".to_string(),
+                                    expected: lhs_type,
+                                    other_type: rhs_type,
+                                })
+                            }
+                        }
                     }
-                    if v1 == i64::MIN && v2 == -1 {
-                        return Err(InterpreterError::ReduceError(
-                            "Arithmetic overflow in division".to_string(),
-                        ));
-                    }
-                    self.cost.charge(division_cost())?;
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::GInt(v1 / v2)),
-                    })
                 }
 
                 ExprInstance::EModBody(EMod { p1, p2 }) => {
-                    let v1 = self.eval_to_i64(&p1.clone().unwrap(), env)?;
-                    let v2 = self.eval_to_i64(&p2.clone().unwrap(), env)?;
-                    if v2 == 0 {
-                        return Err(InterpreterError::ReduceError("Modulo by zero".to_string()));
+                    let v1 = self.eval_single_expr(&p1.clone().unwrap(), env)?;
+                    let v2 = self.eval_single_expr(&p2.clone().unwrap(), env)?;
+
+                    match (v1.expr_instance.unwrap(), v2.expr_instance.unwrap()) {
+                        (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
+                            self.cost.charge(modulo_cost())?;
+                            if rhs == 0 {
+                                return Err(InterpreterError::ReduceError(
+                                    "Modulo by zero".to_string(),
+                                ));
+                            }
+                            if lhs == i64::MIN && rhs == -1 {
+                                return Err(InterpreterError::ReduceError(
+                                    "Arithmetic overflow in modulo".to_string(),
+                                ));
+                            }
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GInt(lhs % rhs)),
+                            })
+                        }
+                        (ExprInstance::GDouble(_), ExprInstance::GDouble(_)) => {
+                            Err(InterpreterError::ReduceError(
+                                "Modulus not defined on floating point".to_string(),
+                            ))
+                        }
+                        (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                            self.cost.charge(bigint_modulo_cost(b1.len(), b2.len()))?;
+                            if is_zero_twos_complement(&b2) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Modulo by zero".to_string(),
+                                ));
+                            }
+                            make_bigint_expr(modulo_twos_complement(&b1, &b2), "%")
+                        }
+                        (ExprInstance::GBigRat(_), ExprInstance::GBigRat(r2)) => {
+                            if is_zero_twos_complement(&r2.numerator) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Modulo by zero".to_string(),
+                                ));
+                            }
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GBigRat(
+                                    models::rhoapi::GBigRational {
+                                        numerator: vec![0],
+                                        denominator: vec![1],
+                                    },
+                                )),
+                            })
+                        }
+                        (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                            if fp1.scale != fp2.scale {
+                                return Err(InterpreterError::OperatorExpectedError {
+                                    op: "%".to_string(),
+                                    expected: format!("FixedPoint(p{})", fp1.scale),
+                                    other_type: format!("FixedPoint(p{})", fp2.scale),
+                                });
+                            }
+                            self.cost.charge(bigint_modulo_cost(
+                                fp1.unscaled.len(),
+                                fp2.unscaled.len(),
+                            ))?;
+                            if is_zero_twos_complement(&fp2.unscaled) {
+                                return Err(InterpreterError::ReduceError(
+                                    "Modulo by zero".to_string(),
+                                ));
+                            }
+                            let ua = bytes_to_bigint(&fp1.unscaled);
+                            let ub = bytes_to_bigint(&fp2.unscaled);
+                            let remainder = &ua % &ub;
+                            make_fixedpoint_expr(
+                                models::rhoapi::GFixedPoint {
+                                    unscaled: bigint_to_bytes(&remainder),
+                                    scale: fp1.scale,
+                                },
+                                "%",
+                            )
+                        }
+                        (lhs, rhs) => {
+                            let lhs_type = get_type(lhs);
+                            let rhs_type = get_type(rhs);
+                            if lhs_type == rhs_type {
+                                Err(InterpreterError::OperatorNotDefined {
+                                    op: "%".to_string(),
+                                    other_type: lhs_type,
+                                })
+                            } else {
+                                Err(InterpreterError::OperatorExpectedError {
+                                    op: "%".to_string(),
+                                    expected: lhs_type,
+                                    other_type: rhs_type,
+                                })
+                            }
+                        }
                     }
-                    self.cost.charge(modulo_cost())?;
-                    Ok(Expr {
-                        expr_instance: Some(ExprInstance::GInt(v1 % v2)),
-                    })
                 }
 
                 ExprInstance::EPlusBody(EPlus { p1, p2 }) => {
@@ -1703,6 +1755,48 @@ impl DebruijnInterpreter {
                             Ok(Expr {
                                 expr_instance: Some(ExprInstance::GInt(lhs.wrapping_add(rhs))),
                             })
+                        }
+
+                        (ExprInstance::GDouble(d1), ExprInstance::GDouble(d2)) => {
+                            self.cost.charge(sum_cost())?;
+                            let result = f64::from_bits(d1) + f64::from_bits(d2);
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GDouble(result.to_bits())),
+                            })
+                        }
+
+                        (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                            self.cost.charge(bigint_sum_cost(b1.len(), b2.len()))?;
+                            make_bigint_expr(add_twos_complement(&b1, &b2), "+")
+                        }
+
+                        (ExprInstance::GBigRat(r1), ExprInstance::GBigRat(r2)) => {
+                            self.cost.charge(bigrat_sum_cost(
+                                r1.numerator.len(),
+                                r1.denominator.len(),
+                                r2.numerator.len(),
+                                r2.denominator.len(),
+                            ))?;
+                            make_bigrat_expr(add_big_rationals(&r1, &r2), "+")
+                        }
+
+                        (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                            if fp1.scale != fp2.scale {
+                                return Err(InterpreterError::OperatorExpectedError {
+                                    op: "+".to_string(),
+                                    expected: format!("FixedPoint(p{})", fp1.scale),
+                                    other_type: format!("FixedPoint(p{})", fp2.scale),
+                                });
+                            }
+                            self.cost
+                                .charge(bigint_sum_cost(fp1.unscaled.len(), fp2.unscaled.len()))?;
+                            make_fixedpoint_expr(
+                                models::rhoapi::GFixedPoint {
+                                    unscaled: add_twos_complement(&fp1.unscaled, &fp2.unscaled),
+                                    scale: fp1.scale,
+                                },
+                                "+",
+                            )
                         }
 
                         (ExprInstance::ESetBody(lhs), rhs) => {
@@ -1721,10 +1815,14 @@ impl DebruijnInterpreter {
                             Ok(result_expr)
                         }
 
-                        (ExprInstance::GInt(_), other) => {
+                        (ExprInstance::GInt(_), other)
+                        | (ExprInstance::GDouble(_), other)
+                        | (ExprInstance::GBigInt(_), other)
+                        | (ExprInstance::GBigRat(_), other)
+                        | (ExprInstance::GFixedPoint(_), other) => {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "+".to_string(),
-                                expected: "Int".to_string(),
+                                expected: "matching numeric types".to_string(),
                                 other_type: get_type(other),
                             })
                         }
@@ -1744,8 +1842,56 @@ impl DebruijnInterpreter {
                         (ExprInstance::GInt(lhs), ExprInstance::GInt(rhs)) => {
                             self.cost.charge(subtraction_cost())?;
                             Ok(Expr {
-                                expr_instance: Some(ExprInstance::GInt(lhs - rhs)),
+                                expr_instance: Some(ExprInstance::GInt(lhs.wrapping_sub(rhs))),
                             })
+                        }
+
+                        (ExprInstance::GDouble(d1), ExprInstance::GDouble(d2)) => {
+                            self.cost.charge(subtraction_cost())?;
+                            let result = f64::from_bits(d1) - f64::from_bits(d2);
+                            Ok(Expr {
+                                expr_instance: Some(ExprInstance::GDouble(result.to_bits())),
+                            })
+                        }
+
+                        (ExprInstance::GBigInt(b1), ExprInstance::GBigInt(b2)) => {
+                            self.cost
+                                .charge(bigint_subtraction_cost(b1.len(), b2.len()))?;
+                            make_bigint_expr(subtract_twos_complement(&b1, &b2), "-")
+                        }
+
+                        (ExprInstance::GBigRat(r1), ExprInstance::GBigRat(r2)) => {
+                            self.cost.charge(bigrat_subtraction_cost(
+                                r1.numerator.len(),
+                                r1.denominator.len(),
+                                r2.numerator.len(),
+                                r2.denominator.len(),
+                            ))?;
+                            make_bigrat_expr(subtract_big_rationals(&r1, &r2), "-")
+                        }
+
+                        (ExprInstance::GFixedPoint(fp1), ExprInstance::GFixedPoint(fp2)) => {
+                            if fp1.scale != fp2.scale {
+                                return Err(InterpreterError::OperatorExpectedError {
+                                    op: "-".to_string(),
+                                    expected: format!("FixedPoint(p{})", fp1.scale),
+                                    other_type: format!("FixedPoint(p{})", fp2.scale),
+                                });
+                            }
+                            self.cost.charge(bigint_subtraction_cost(
+                                fp1.unscaled.len(),
+                                fp2.unscaled.len(),
+                            ))?;
+                            make_fixedpoint_expr(
+                                models::rhoapi::GFixedPoint {
+                                    unscaled: subtract_twos_complement(
+                                        &fp1.unscaled,
+                                        &fp2.unscaled,
+                                    ),
+                                    scale: fp1.scale,
+                                },
+                                "-",
+                            )
                         }
 
                         (ExprInstance::EMapBody(lhs), rhs) => {
@@ -1780,10 +1926,14 @@ impl DebruijnInterpreter {
                             Ok(result_expr)
                         }
 
-                        (ExprInstance::GInt(_), other) => {
+                        (ExprInstance::GInt(_), other)
+                        | (ExprInstance::GDouble(_), other)
+                        | (ExprInstance::GBigInt(_), other)
+                        | (ExprInstance::GBigRat(_), other)
+                        | (ExprInstance::GFixedPoint(_), other) => {
                             Err(InterpreterError::OperatorExpectedError {
                                 op: "-".to_string(),
-                                expected: "Int".to_string(),
+                                expected: "matching numeric types".to_string(),
                                 other_type: get_type(other),
                             })
                         }
@@ -1795,49 +1945,37 @@ impl DebruijnInterpreter {
                     }
                 }
 
-                ExprInstance::ELtBody(ELt { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
-                    relop(
-                        &p1.clone().unwrap(),
-                        &p2.clone().unwrap(),
-                        |b1: bool, b2: bool| b1 < b2,
-                        |i1: i64, i2: i64| i1 < i2,
-                        |s1: String, s2: String| s1 < s2,
-                    )
-                }
+                ExprInstance::ELtBody(ELt { p1, p2 }) => relop(
+                    &p1.clone().unwrap(),
+                    &p2.clone().unwrap(),
+                    |b1: bool, b2: bool| b1 < b2,
+                    |i1: i64, i2: i64| i1 < i2,
+                    |s1: String, s2: String| s1 < s2,
+                ),
 
-                ExprInstance::ELteBody(ELte { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
-                    relop(
-                        &p1.clone().unwrap(),
-                        &p2.clone().unwrap(),
-                        |b1: bool, b2: bool| b1 <= b2,
-                        |i1: i64, i2: i64| i1 <= i2,
-                        |s1: String, s2: String| s1 <= s2,
-                    )
-                }
+                ExprInstance::ELteBody(ELte { p1, p2 }) => relop(
+                    &p1.clone().unwrap(),
+                    &p2.clone().unwrap(),
+                    |b1: bool, b2: bool| b1 <= b2,
+                    |i1: i64, i2: i64| i1 <= i2,
+                    |s1: String, s2: String| s1 <= s2,
+                ),
 
-                ExprInstance::EGtBody(EGt { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
-                    relop(
-                        &p1.clone().unwrap(),
-                        &p2.clone().unwrap(),
-                        |b1: bool, b2: bool| b1 > b2,
-                        |i1: i64, i2: i64| i1 > i2,
-                        |s1: String, s2: String| s1 > s2,
-                    )
-                }
+                ExprInstance::EGtBody(EGt { p1, p2 }) => relop(
+                    &p1.clone().unwrap(),
+                    &p2.clone().unwrap(),
+                    |b1: bool, b2: bool| b1 > b2,
+                    |i1: i64, i2: i64| i1 > i2,
+                    |s1: String, s2: String| s1 > s2,
+                ),
 
-                ExprInstance::EGteBody(EGte { p1, p2 }) => {
-                    self.cost.charge(comparison_cost())?;
-                    relop(
-                        &p1.clone().unwrap(),
-                        &p2.clone().unwrap(),
-                        |b1: bool, b2: bool| b1 >= b2,
-                        |i1: i64, i2: i64| i1 >= i2,
-                        |s1: String, s2: String| s1 >= s2,
-                    )
-                }
+                ExprInstance::EGteBody(EGte { p1, p2 }) => relop(
+                    &p1.clone().unwrap(),
+                    &p2.clone().unwrap(),
+                    |b1: bool, b2: bool| b1 >= b2,
+                    |i1: i64, i2: i64| i1 >= i2,
+                    |s1: String, s2: String| s1 >= s2,
+                ),
 
                 ExprInstance::EEqBody(EEq { p1, p2 }) => {
                     let v1 = self.eval_expr(&p1.clone().unwrap(), env)?;
@@ -1847,8 +1985,13 @@ impl DebruijnInterpreter {
                     let sv2 = self.substitute.substitute_and_charge(&v2, 0, env)?;
                     self.cost.charge(equality_check_cost(&sv1, &sv2))?;
 
+                    let result = if par_contains_nan_double(&sv1) || par_contains_nan_double(&sv2) {
+                        false
+                    } else {
+                        sv1 == sv2
+                    };
                     Ok(Expr {
-                        expr_instance: Some(ExprInstance::GBool(sv1 == sv2)),
+                        expr_instance: Some(ExprInstance::GBool(result)),
                     })
                 }
 
@@ -1859,8 +2002,13 @@ impl DebruijnInterpreter {
                     let sv2 = self.substitute.substitute_and_charge(&v2, 0, env)?;
                     self.cost.charge(equality_check_cost(&sv1, &sv2))?;
 
+                    let result = if par_contains_nan_double(&sv1) || par_contains_nan_double(&sv2) {
+                        true
+                    } else {
+                        sv1 != sv2
+                    };
                     Ok(Expr {
-                        expr_instance: Some(ExprInstance::GBool(sv1 != sv2)),
+                        expr_instance: Some(ExprInstance::GBool(result)),
                     })
                 }
 
@@ -2412,13 +2560,10 @@ impl DebruijnInterpreter {
                 }
 
                 let expr_evaled = self.outer.eval_expr(&p, env)?;
-                // println!("\nexpr_evaled in to_byte_array_method: {:?}", expr_evaled);
                 let expr_subst =
                     self.outer
                         .substitute
                         .substitute_and_charge(&expr_evaled, 0, env)?;
-
-                // println!("\nexpr_subst in to_byte_array_method: {:?}", expr_subst);
 
                 self.outer.cost.charge(to_byte_array_cost(&expr_subst))?;
                 let ba = self.serialize(&expr_subst)?;
@@ -5756,9 +5901,6 @@ impl DebruijnInterpreter {
                             let par_map =
                                 ParMap::create_from_sorted_par_map(base_ps.insert((key, value)));
 
-                            // println!("\nsorted_par_map in set_method: {:?}", sorted_par_map);
-                            // println!("\npar_map in set_method: {:?}", par_map);
-
                             Ok(Par::default().with_exprs(vec![Expr {
                                 expr_instance: Some(ExprInstance::EMapBody(
                                     ParMapTypeMapper::par_map_to_emap(par_map),
@@ -6608,8 +6750,6 @@ impl DebruijnInterpreter {
                 "Error: parallel or non expression found where expression expected.",
             )))
         } else {
-            // println!("\np: {:?}", p);
-            // println!("\np.exprs: {:?}", p.exprs);
             match p.exprs.as_slice() {
                 [Expr {
                     expr_instance: Some(ExprInstance::GInt(v)),
@@ -6782,8 +6922,6 @@ impl DebruijnInterpreter {
             .iter()
             .map(|expr| self.eval_expr_to_par(expr, env))
             .collect::<Result<Vec<_>, InterpreterError>>()?;
-        // println!("\npar in eval_expr: {:?}", par);
-        // println!("\nevaled_exprs in eval_expr: {:?}", evaled_exprs);
 
         // Note: the locallyFree cache in par could now be invalid, but given
         // that locallyFree is for use in the matcher, and the matcher uses
@@ -6802,8 +6940,8 @@ impl DebruijnInterpreter {
     pub fn new(
         space: RhoISpace,
         urn_map: Arc<HashMap<String, Par>>,
-        merge_chs: Arc<RwLock<HashSet<Par>>>,
-        mergeable_tag_name: Par,
+        merge_chs: Arc<RwLock<HashMap<Par, MergeType>>>,
+        mergeable_tags: Arc<HashMap<Par, MergeType>>,
         cost: _cost,
     ) -> Arc<Self> {
         let reducer_cell = Arc::new(std::sync::OnceLock::new());
@@ -6817,7 +6955,7 @@ impl DebruijnInterpreter {
             dispatcher: dispatcher.clone(),
             urn_map,
             merge_chs,
-            mergeable_tag_name,
+            mergeable_tags,
             cost: cost.clone(),
             substitute: Substitute { cost: cost.clone() },
         });
@@ -6831,6 +6969,10 @@ fn get_type(expr_instance: ExprInstance) -> String {
     match expr_instance {
         ExprInstance::GBool(_) => String::from("bool"),
         ExprInstance::GInt(_) => String::from("int"),
+        ExprInstance::GDouble(_) => String::from("float"),
+        ExprInstance::GBigInt(_) => String::from("bigint"),
+        ExprInstance::GBigRat(_) => String::from("bigrat"),
+        ExprInstance::GFixedPoint(_) => String::from("fixedpoint"),
         ExprInstance::GString(_) => String::from("string"),
         ExprInstance::GUri(_) => String::from("uri"),
         ExprInstance::GByteArray(_) => String::from("byte array"),
@@ -6870,5 +7012,215 @@ fn get_unforgeable_type(inf_instance: &UnfInstance) -> String {
         UnfInstance::GDeployIdBody(_) => String::from("DeployId"),
         UnfInstance::GDeployerIdBody(_) => String::from("DeployerId"),
         UnfInstance::GSysAuthTokenBody(_) => String::from("SysAuthToken"),
+    }
+}
+
+fn par_contains_nan_double(par: &Par) -> bool {
+    par.exprs.iter().any(|e| match &e.expr_instance {
+        Some(ExprInstance::GDouble(bits)) => f64::from_bits(*bits).is_nan(),
+        Some(ExprInstance::EListBody(list)) => list.ps.iter().any(par_contains_nan_double),
+        Some(ExprInstance::ETupleBody(tuple)) => tuple.ps.iter().any(par_contains_nan_double),
+        Some(ExprInstance::ESetBody(set)) => set.ps.iter().any(par_contains_nan_double),
+        Some(ExprInstance::EMapBody(map)) => map.kvs.iter().any(|kv| {
+            kv.key.as_ref().map_or(false, par_contains_nan_double)
+                || kv.value.as_ref().map_or(false, par_contains_nan_double)
+        }),
+        _ => false,
+    })
+}
+
+fn bytes_to_bigint(bytes: &[u8]) -> num_bigint::BigInt {
+    if bytes.is_empty() {
+        num_bigint::BigInt::from(0)
+    } else {
+        num_bigint::BigInt::from_signed_bytes_be(bytes)
+    }
+}
+
+fn bigint_to_bytes(n: &num_bigint::BigInt) -> Vec<u8> {
+    use num_traits::Zero;
+    if n.is_zero() {
+        vec![0]
+    } else {
+        n.to_signed_bytes_be()
+    }
+}
+
+fn make_bigint_expr(bytes: Vec<u8>, _op: &str) -> Result<Expr, InterpreterError> {
+    Ok(Expr {
+        expr_instance: Some(ExprInstance::GBigInt(bytes)),
+    })
+}
+
+fn make_bigrat_expr(
+    rat: models::rhoapi::GBigRational,
+    _op: &str,
+) -> Result<Expr, InterpreterError> {
+    Ok(Expr {
+        expr_instance: Some(ExprInstance::GBigRat(rat)),
+    })
+}
+
+fn make_fixedpoint_expr(
+    fp: models::rhoapi::GFixedPoint,
+    _op: &str,
+) -> Result<Expr, InterpreterError> {
+    Ok(Expr {
+        expr_instance: Some(ExprInstance::GFixedPoint(fp)),
+    })
+}
+
+fn is_zero_twos_complement(bytes: &[u8]) -> bool {
+    bytes.is_empty() || bytes.iter().all(|&b| b == 0)
+}
+
+fn negate_twos_complement(bytes: &[u8]) -> Vec<u8> {
+    let n = bytes_to_bigint(bytes);
+    bigint_to_bytes(&(-n))
+}
+
+fn add_twos_complement(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let result = bytes_to_bigint(a) + bytes_to_bigint(b);
+    bigint_to_bytes(&result)
+}
+
+fn subtract_twos_complement(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let result = bytes_to_bigint(a) - bytes_to_bigint(b);
+    bigint_to_bytes(&result)
+}
+
+fn multiply_twos_complement(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let result = bytes_to_bigint(a) * bytes_to_bigint(b);
+    bigint_to_bytes(&result)
+}
+
+fn divide_twos_complement(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let result = bytes_to_bigint(a) / bytes_to_bigint(b);
+    bigint_to_bytes(&result)
+}
+
+fn modulo_twos_complement(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let result = bytes_to_bigint(a) % bytes_to_bigint(b);
+    bigint_to_bytes(&result)
+}
+
+fn compare_twos_complement_bytes(a: &[u8], b: &[u8]) -> i32 {
+    match bytes_to_bigint(a).cmp(&bytes_to_bigint(b)) {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
+fn bytes_to_bigrat(rat: &models::rhoapi::GBigRational) -> num_rational::BigRational {
+    num_rational::BigRational::new(
+        bytes_to_bigint(&rat.numerator),
+        bytes_to_bigint(&rat.denominator),
+    )
+}
+
+fn bigrat_to_proto(r: &num_rational::BigRational) -> models::rhoapi::GBigRational {
+    models::rhoapi::GBigRational {
+        numerator: bigint_to_bytes(r.numer()),
+        denominator: bigint_to_bytes(r.denom()),
+    }
+}
+
+fn compare_big_rationals(
+    a: &models::rhoapi::GBigRational,
+    b: &models::rhoapi::GBigRational,
+) -> i32 {
+    match bytes_to_bigrat(a).cmp(&bytes_to_bigrat(b)) {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
+fn add_big_rationals(
+    a: &models::rhoapi::GBigRational,
+    b: &models::rhoapi::GBigRational,
+) -> models::rhoapi::GBigRational {
+    bigrat_to_proto(&(bytes_to_bigrat(a) + bytes_to_bigrat(b)))
+}
+
+fn subtract_big_rationals(
+    a: &models::rhoapi::GBigRational,
+    b: &models::rhoapi::GBigRational,
+) -> models::rhoapi::GBigRational {
+    bigrat_to_proto(&(bytes_to_bigrat(a) - bytes_to_bigrat(b)))
+}
+
+fn multiply_big_rationals(
+    a: &models::rhoapi::GBigRational,
+    b: &models::rhoapi::GBigRational,
+) -> models::rhoapi::GBigRational {
+    bigrat_to_proto(&(bytes_to_bigrat(a) * bytes_to_bigrat(b)))
+}
+
+fn divide_big_rationals(
+    a: &models::rhoapi::GBigRational,
+    b: &models::rhoapi::GBigRational,
+) -> models::rhoapi::GBigRational {
+    bigrat_to_proto(&(bytes_to_bigrat(a) / bytes_to_bigrat(b)))
+}
+
+fn compare_fixed_points(
+    a: &models::rhoapi::GFixedPoint,
+    b: &models::rhoapi::GFixedPoint,
+) -> Result<i32, InterpreterError> {
+    if a.scale != b.scale {
+        return Err(InterpreterError::OperatorExpectedError {
+            op: "cmp".to_string(),
+            expected: format!("FixedPoint(p{})", a.scale),
+            other_type: format!("FixedPoint(p{})", b.scale),
+        });
+    }
+    Ok(compare_twos_complement_bytes(&a.unscaled, &b.unscaled))
+}
+
+fn multiply_fixed_points(
+    a: &models::rhoapi::GFixedPoint,
+    b: &models::rhoapi::GFixedPoint,
+) -> models::rhoapi::GFixedPoint {
+    debug_assert_eq!(
+        a.scale, b.scale,
+        "multiply_fixed_points called with mismatched scales"
+    );
+    // Scale-preserving: (ua * ub) / 10^scale, using floor division
+    let ua = bytes_to_bigint(&a.unscaled);
+    let ub = bytes_to_bigint(&b.unscaled);
+    let raw = &ua * &ub;
+    let ten = num_bigint::BigInt::from(10);
+    let scale_factor = num_traits::pow::pow(ten, a.scale as usize);
+    let one = num_bigint::BigInt::from(1);
+    let unscaled = if raw < num_bigint::BigInt::from(0) {
+        // Floor division for negative values
+        let abs_raw = -&raw;
+        -((&abs_raw - &one) / &scale_factor + &one)
+    } else {
+        &raw / &scale_factor
+    };
+    models::rhoapi::GFixedPoint {
+        unscaled: bigint_to_bytes(&unscaled),
+        scale: a.scale,
+    }
+}
+
+fn divide_fixed_points(
+    a: &models::rhoapi::GFixedPoint,
+    b: &models::rhoapi::GFixedPoint,
+) -> models::rhoapi::GFixedPoint {
+    debug_assert_eq!(
+        a.scale, b.scale,
+        "divide_fixed_points called with mismatched scales"
+    );
+    let ten = num_bigint::BigInt::from(10);
+    let factor = num_traits::pow::pow(ten, b.scale as usize);
+    let scaled = bytes_to_bigint(&a.unscaled) * factor;
+    let result = scaled / bytes_to_bigint(&b.unscaled);
+    models::rhoapi::GFixedPoint {
+        unscaled: bigint_to_bytes(&result),
+        scale: a.scale,
     }
 }

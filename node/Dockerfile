@@ -139,20 +139,12 @@ WORKDIR /opt/docker
 # Create bin directory first
 RUN mkdir -p /opt/docker/bin
 
-# Copy node binary (using node_binary from builder to avoid conflict with node/ directory)
-# Verify it's a file before copying
+# Copy node binary (using node_binary from builder to avoid conflict with node/ directory).
+# The Rust binary is fully self-contained: `defaults.conf` and the genesis-ceremony
+# `.rho` / `.rhox` resources are baked in via `include_str!` at compile time, so no
+# resource files need to be staged into the runtime image.
+
 COPY --from=builder --chmod=755 /build/node_binary /opt/docker/bin/node
-
-# Copy node resources (defaults.conf, kamon.conf, logback.xml, etc.)
-# The node executable expects these at node/src/main/resources relative to current directory
-COPY --from=builder /build/node/src/main/resources ./node/src/main/resources
-
-# Copy casper resources (Registry.rho, ListOps.rho, etc.)
-# The node executable needs these at runtime to create genesis blocks
-COPY --from=builder /build/casper/src/main/resources ./casper/src/main/resources
-
-# Copy rholang examples (matching build.sbt: directory((baseDirectory in rholang).value / "examples"))
-COPY --from=builder /build/rholang/examples ./examples
 
 # Copy PeTTa submodule (required for MeTTa contract execution at runtime)
 COPY --from=builder /build/PeTTa ./PeTTa
@@ -182,7 +174,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Labels (matching build.sbt)
 LABEL maintainer="F1r3fly.io LCA https://f1r3fly.io/"
-LABEL version="0.1.0"
+LABEL version="0.4.15"
 
 # Set PETTA_PATH environment variable for MeTTa contract execution
 ENV PETTA_PATH=/opt/docker/PeTTa

@@ -46,7 +46,7 @@ Where:
 - `otherValidatorsWeight` = Total stake of all validators excluding the proposer
 - `synchronyConstraintThreshold` = Configured threshold (default: 0.67)
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/SynchronyConstraintChecker.scala`
+**Code Location:** `casper/src/rust/synchrony_constraint_checker.rs`
 
 ### Example
 
@@ -88,7 +88,7 @@ synchronyConstraintValue = 0 / 200 = 0.0
 
 ```hocon
 casper {
-  synchrony-constraint-threshold = 0.67  // 2/3 majority (BFT threshold)
+  synchrony-constraint-threshold = 0  // no synchrony gate on proposals
 }
 ```
 
@@ -128,7 +128,7 @@ maybeCreatorJustification       = creatorJustificationHash(block)
 isNotEquivocation               = maybeCreatorJustification == maybeLatestMessageOfCreatorHash
 ```
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/EquivocationDetector.scala:32-34`
+**Code Location:** `casper/src/rust/equivocation_detector.rs`
 
 ### Equivocation Types
 
@@ -180,7 +180,7 @@ When processing a new block, the system checks three conditions:
 - Validator couldn't have known about equivocation
 - **Action:** No action taken
 
-**Code Location:** `models/src/main/scala/coop/rchain/models/EquivocationRecord.scala:20-24`
+**Code Location:** `casper/src/rust/equivocation_detector.rs` (EquivocationRecord struct)
 
 #### Example Scenario
 
@@ -223,7 +223,7 @@ The implementation is based on Ethereum's CBC Casper research and the clique ora
 
 **Source:** [Casper the Friendly Finality Gadget](https://github.com/ethereum/research/blob/master/papers/CasperTFG/CasperTFG.pdf)
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/safety/CliqueOracle.scala`
+**Code Location:** `casper/src/rust/safety/clique_oracle.rs`
 
 ### Algorithm Overview
 
@@ -370,6 +370,26 @@ With this threshold:
 - Byzantine validators control < 1/3 stake → Cannot prevent finalization
 - Byzantine validators control < 1/3 stake → Cannot create conflicting finalized blocks
 
+### FT as a Finalization Certificate
+
+The FT value at finalization time is a **permanent safety certificate**, not a transient measurement. Once the clique oracle proves that a clique with FT > threshold agrees on block B, this proof holds forever — "never eventually see disagreement" guarantees that no future honest message can break the clique.
+
+However, the clique oracle's `normalized_fault_tolerance` function computes FT from the **current** DAG state using each validator's `latest_message_hash`. This creates two problems:
+
+1. **Cross-node inconsistency**: Different nodes have different DAG states due to block propagation delays. The same finalized block can report FT=1.0 on one node and FT=-1.0 on another, because each node sees different "latest messages" for validators.
+
+2. **Multi-parent DAG instability**: In a multi-parent DAG, each block designates a "main parent" (first entry in `parents_hash_list`). `is_in_main_chain` only follows main parent pointers. When a validator creates a merge block, the main parent selection determines which branch is "main" — blocks on non-main branches are not counted as agreeing. A validator can lose agreement on their own block if a later merge block selects a different branch as main.
+
+**Solution**: The node caches the FT value in `BlockMetadata.fault_tolerance_value` when a block is finalized. The block API returns this cached value for finalized blocks instead of recomputing via the oracle. For non-finalized blocks, the oracle continues to provide live FT computation.
+
+**FT assignment has two mechanisms with different theoretical justifications:**
+
+1. **Ancestors** (via `record_finalized`): Indirectly finalized blocks — ancestors of the directly finalized block — receive the descendant's FT as their cached value. This is a provably correct lower bound: in CBC Casper, the agreeing clique for a block is always a subset of the agreeing set for its ancestors (every validator in the clique has the ancestors in their main-parent chain by construction), so ancestor FT >= descendant FT.
+
+2. **All finalized blocks** (via `propagate_ft_to_finalized_blocks`): On each finalization round, all previously-finalized blocks whose cached FT is lower than the new LFB's FT are updated — including blocks on orphaned branches that are NOT ancestors of the new LFB. This is not a strict clique oracle proof (the clique that agrees on the new LFB may not have the orphaned block in their main-parent chain). It is a convergence heuristic: the orphaned block was already independently proven irreversible by its own finalization, and the network's overall agreement has grown. Displaying the higher FT reflects the network's actual coordination level rather than a stale proof from an earlier round.
+
+**Convergence**: Cached FT is monotonically non-decreasing — it only increases, never decreases. With all validators active, cached FT converges toward 1.0 across all nodes as later rounds produce higher agreement.
+
 ---
 
 ## 4. Slashing - Punishment Layer
@@ -401,7 +421,7 @@ case InvalidBlock.AdmissibleEquivocation =>
   CasperBufferStorage.remove(block.blockHash)
 ```
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala:447-471`
+**Code Location:** `casper/src/rust/multi_parent_casper_impl.rs`
 
 ### Stake Forfeiture
 
@@ -422,7 +442,7 @@ maybeEquivocatingValidatorBond match {
 }
 ```
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/EquivocationDetector.scala:152-168`
+**Code Location:** `casper/src/rust/equivocation_detector.rs`
 
 The actual stake forfeiture is enforced through the Proof-of-Stake smart contract deployed on-chain.
 
@@ -615,7 +635,7 @@ for {
 } yield ValidBlock
 ```
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/MultiParentCasperImpl.scala:342-382`
+**Code Location:** `casper/src/rust/multi_parent_casper_impl.rs`
 
 ### Equivocation Tracker Storage
 
@@ -634,33 +654,27 @@ trait EquivocationsTracker[F[_]] {
 }
 ```
 
-**Storage Location:** `block-storage/src/main/scala/coop/rchain/blockstorage/dag/EquivocationTrackerStore.scala`
+**Storage Location:** `block-storage/src/rust/dag/block_dag_key_value_storage.rs`
 
 ### Safety Oracle Integration
 
 The safety oracle is invoked during:
 
-1. **Block Information Queries** - Computing fault tolerance for block display
+1. **Block Information Queries** - For **non-finalized** blocks, computing fault tolerance from the live DAG. For **finalized** blocks, the cached `BlockMetadata.fault_tolerance_value` is returned directly.
 2. **Finalization Detection** - Determining when blocks achieve finality
 3. **Last Finalized Block Advancement** - Updating the finalization frontier
 
-```scala
-def getBlockInfo[F[_]: Monad: SafetyOracle: BlockStore](
-  block: BlockMessage
-)(implicit casper: MultiParentCasper[F]): F[BlockInfo] = {
-  for {
-    dag <- casper.blockDag
-    normalizedFaultTolerance <- SafetyOracle[F].normalizedFaultTolerance(
-      dag, 
-      block.blockHash
-    )
-    initialFault <- casper.normalizedInitialFault(block.weightMap)
-    faultTolerance = normalizedFaultTolerance - initialFault
-  } yield BlockInfo(block, faultTolerance)
-}
+```rust
+// block_api.rs — simplified
+let normalized_fault_tolerance = if dag.is_finalized(&block.block_hash) {
+    dag.lookup(&block.block_hash).fault_tolerance_value  // cached at finalization time
+} else {
+    safety_oracle.normalized_fault_tolerance(&dag, &block.block_hash)  // live computation
+};
+let fault_tolerance = normalized_fault_tolerance - initial_fault;
 ```
 
-**Code Location:** `casper/src/main/scala/coop/rchain/casper/api/BlockAPI.scala:570-593`
+**Code Location:** `casper/src/rust/api/block_api.rs`
 
 ### Synchrony Constraint Integration
 
@@ -699,9 +713,9 @@ def checkSynchronyConstraint[F[_]](
 The Byzantine fault tolerance implementation includes comprehensive test coverage:
 
 **Test Locations:**
-- `casper/src/test/scala/coop/rchain/casper/batch1/` - Core consensus tests
-- `casper/src/test/scala/coop/rchain/casper/batch2/` - Extended validation tests  
-- `casper/src/test/scala/coop/rchain/casper/batch2/CliqueOracleTest.scala` - Safety oracle tests
+- `casper/tests/batch2/finalizer_test.rs` — Finalizer tests
+- `casper/tests/batch2/` — Extended validation tests
+- `casper/src/test/scala/coop/rchain/casper/batch2/CliqueOracleTest.scala` — Safety oracle tests (Scala)
 
 ### Critical Test Scenarios
 
@@ -766,11 +780,11 @@ Higher values require stronger consensus before declaring finality.
 
 ```hocon
 casper {
-  synchrony-constraint-threshold = 0.67
+  synchrony-constraint-threshold = 0
 }
 ```
 
-**Default:** 0.67 (2/3 majority)
+**Default:** 0 (no synchrony gate)
 
 **Network Size Recommendations:**
 - **Large (10+ validators):** 0.67 (optimal BFT)
@@ -905,16 +919,21 @@ When sharding is implemented:
 
 ### Implementation References
 
-**Core Implementation Files:**
+**Rust Implementation Files:**
+- `casper/src/rust/equivocation_detector.rs` — Equivocation detection (simple, admissible, neglected)
+- `casper/src/rust/safety/clique_oracle.rs` — Clique oracle, fault tolerance calculation
+- `casper/src/rust/synchrony_constraint_checker.rs` — Synchrony constraint, recovery bypasses
+- `casper/src/rust/finality/finalizer.rs` — Finalization algorithm, work budget
+- `casper/src/rust/multi_parent_casper_impl.rs` — Core Casper implementation
+
+**Scala Implementation Files (legacy reference):**
 - `casper/src/main/scala/coop/rchain/casper/EquivocationDetector.scala`
 - `casper/src/main/scala/coop/rchain/casper/safety/CliqueOracle.scala`
 - `casper/src/main/scala/coop/rchain/casper/SynchronyConstraintChecker.scala`
-- `casper/src/main/scala/coop/rchain/casper/SafetyOracle.scala`
-- `models/src/main/scala/coop/rchain/models/EquivocationRecord.scala`
 
 **Documentation:**
-- `docs/casper/SYNC_CONSTRAINT.md` - Detailed synchrony constraint documentation
-- `CLAUDE/casper/DESIGN.md` - Casper consensus protocol design overview
+- [Synchrony Constraint](./SYNC_CONSTRAINT.md) — Detailed synchrony constraint documentation
+- [Casper Module Overview](./README.md) — Block creation, validation, merging, finalization
 
 ---
 

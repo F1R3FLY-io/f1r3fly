@@ -1,10 +1,11 @@
 // See casper/src/main/scala/coop/rchain/casper/blocks/proposer/BlockCreator.scala
 
-use dashmap::DashSet;
 use prost::bytes::Bytes;
-use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
-use std::{collections::HashSet, time::SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 use tracing;
 
 use block_storage::rust::{
@@ -12,11 +13,13 @@ use block_storage::rust::{
     key_value_block_store::KeyValueBlockStore,
 };
 use crypto::rust::{private_key::PrivateKey, signatures::signed::Signed};
+use models::rust::block_hash::BlockHash;
 use models::rust::casper::pretty_printer;
 use models::rust::casper::protocol::casper_message::{
     BlockMessage, Body, Bond, DeployData, F1r3flyState, Header, Justification, ProcessedDeploy,
     ProcessedSystemDeploy, RejectedDeploy,
 };
+use models::rust::validator::Validator;
 
 use rholang::rust::interpreter::system_processes::BlockData;
 
@@ -47,30 +50,25 @@ use crate::rust::{
  *  3. Extract all valid deploys that aren't already in all ancestors of S (the parents).
  *  4. Create a new block that contains the deploys from the previous step.
  */
-struct PreparedUserDeploys {
-    deploys: HashSet<Signed<DeployData>>,
-    effective_cap: usize,
-    cap_hit: bool,
+pub struct PreparedUserDeploys {
+    pub deploys: HashSet<Signed<DeployData>>,
+    pub effective_cap: usize,
+    pub cap_hit: bool,
 }
 
 fn deploy_selection_reserve_tail_enabled() -> bool {
-    const ENV: &str = "F1R3_DEPLOY_SELECTION_RESERVE_TAIL";
-    static VALUE: OnceLock<bool> = OnceLock::new();
-
-    *VALUE.get_or_init(|| match std::env::var(ENV) {
-        Ok(raw) => {
-            let normalized = raw.trim().to_ascii_lowercase();
-            !matches!(normalized.as_str(), "0" | "false" | "no" | "off")
-        }
-        Err(_) => true,
-    })
+    true
 }
 
-async fn prepare_user_deploys(
+pub async fn prepare_user_deploys(
     casper_snapshot: &CasperSnapshot,
     block_number: i64,
     current_time_millis: i64,
     deploy_storage: Arc<Mutex<KeyValueDeployStorage>>,
+    rejected_deploy_buffer: Arc<
+        Mutex<block_storage::rust::deploy::key_value_rejected_deploy_buffer::KeyValueRejectedDeployBuffer>,
+    >,
+    block_store: &KeyValueBlockStore,
 ) -> Result<PreparedUserDeploys, CasperError> {
     let mut deploy_storage_guard = deploy_storage
         .lock()
@@ -78,6 +76,28 @@ async fn prepare_user_deploys(
 
     // Read all unfinalized deploys from storage
     let unfinalized: HashSet<Signed<DeployData>> = deploy_storage_guard.read_all()?;
+
+    // Read recovered deploys from the rejected-deploy buffer. These were dropped
+    // by a prior merge's conflict resolution and are now candidates for
+    // re-inclusion (fresh execution against the current merged base).
+    let recovered: HashSet<Signed<DeployData>> = {
+        let buffer_guard = rejected_deploy_buffer
+            .lock()
+            .map_err(|e| CasperError::LockError(e.to_string()))?;
+        buffer_guard.read_all()?
+    };
+
+    let recovered_count = recovered.len();
+    let unfinalized: HashSet<Signed<DeployData>> = unfinalized
+        .into_iter()
+        .chain(recovered.into_iter())
+        .collect();
+    if recovered_count > 0 {
+        tracing::info!(
+            "Prepare user deploys: {} recovered from rejected-deploy buffer",
+            recovered_count
+        );
+    }
 
     let earliest_block_number =
         block_number - casper_snapshot.on_chain_state.shard_conf.deploy_lifespan;
@@ -97,7 +117,7 @@ async fn prepare_user_deploys(
         .collect();
 
     // Filter valid deploys (not expired by block, not expired by time, and not future)
-    let valid: DashSet<Signed<DeployData>> = unfinalized
+    let valid: HashSet<Signed<DeployData>> = unfinalized
         .iter()
         .filter(|deploy| {
             not_future_deploy(block_number, &deploy.data)
@@ -109,15 +129,80 @@ async fn prepare_user_deploys(
 
     let valid_count = valid.len();
 
-    // Remove deploys that are already in scope to prevent resending
+    // Remove deploys that are already in scope to prevent resending.
+    //
+    // Exception: a deploy whose sig appears in a descendant's `rejected_deploys`
+    // is eligible for re-inclusion — its state effects never made it into
+    // canonical state, so re-proposing it is correct.
+    //
+    // The exemption MUST decline when the rejection is non-canonical: a sibling
+    // block can put the sig in `rejected_in_scope` (the ancestor scan unions
+    // all blocks' `rejected_deploys`) while the deploy's effects are already
+    // in canonical state via a different chain. Re-including in that case
+    // would be double-execution and the resulting block would be flagged
+    // `InvalidRepeatDeploy` by `validate.rs::repeat_deploy` — too late to
+    // avoid the slashable proposal. Mirror the validator-side gate here.
+    let exemption_candidates: HashSet<Bytes> = valid
+        .iter()
+        .filter(|d| {
+            casper_snapshot.deploys_in_scope.contains(&d.sig)
+                && casper_snapshot.rejected_in_scope.contains(&d.sig)
+        })
+        .map(|d| d.sig.clone())
+        .collect();
+
+    let stale_recoveries: HashSet<Bytes> = if exemption_candidates.is_empty() {
+        HashSet::new()
+    } else {
+        use crate::rust::api::deploy_finalization_status::{
+            resolve_batch, DeployFinalizationState,
+        };
+        let lifespan = casper_snapshot.on_chain_state.shard_conf.deploy_lifespan;
+        match resolve_batch(
+            &casper_snapshot.dag,
+            block_store,
+            lifespan,
+            &exemption_candidates,
+        ) {
+            Ok(statuses) => statuses
+                .into_iter()
+                .filter_map(|(sig, st)| match st.state {
+                    DeployFinalizationState::Finalized => Some(sig),
+                    _ => None,
+                })
+                .collect(),
+            // Resolver failure: decline the exemption for all candidates
+            // rather than risk double-execution. They'll be retried next cycle.
+            Err(err) => {
+                tracing::warn!(
+                    "prepare_user_deploys: resolve_batch failed: {} — declining \
+                     recovery exemption for all {} candidate(s) this cycle",
+                    err,
+                    exemption_candidates.len()
+                );
+                exemption_candidates.clone()
+            }
+        }
+    };
+
     let already_in_scope: Vec<Signed<DeployData>> = valid
         .iter()
-        .filter(|deploy| casper_snapshot.deploys_in_scope.contains(&deploy.sig))
+        .filter(|deploy| {
+            let sig = &deploy.sig;
+            casper_snapshot.deploys_in_scope.contains(sig)
+                && (!casper_snapshot.rejected_in_scope.contains(sig)
+                    || stale_recoveries.contains(sig))
+        })
         .map(|deploy| (*deploy).clone())
         .collect();
     let valid_unique: HashSet<Signed<DeployData>> = valid
         .into_iter()
-        .filter(|deploy| !casper_snapshot.deploys_in_scope.contains(&deploy.sig))
+        .filter(|deploy| {
+            let sig = &deploy.sig;
+            !casper_snapshot.deploys_in_scope.contains(sig)
+                || (casper_snapshot.rejected_in_scope.contains(sig)
+                    && !stale_recoveries.contains(sig))
+        })
         .collect();
 
     let already_in_scope_count = already_in_scope.len();
@@ -183,27 +268,29 @@ async fn prepare_user_deploys(
         .collect();
     if !all_expired.is_empty() {
         tracing::info!(
-            "Removing {} expired deploy(s) from storage",
+            "Removing {} expired deploy(s) from storage and rejected-deploy buffer",
             all_expired.len()
         );
         let expired_list: Vec<Signed<DeployData>> = all_expired.into_iter().cloned().collect();
-        deploy_storage_guard.remove(expired_list)?;
+        deploy_storage_guard.remove(expired_list.clone())?;
+
+        // Also purge expired sigs from the rejected-deploy buffer.
+        // Reads above already filter expired sigs out of `valid_unique`, so
+        // they don't get re-proposed, but on-disk LMDB entries persist
+        // unless explicitly removed. Without this, a sustained-load
+        // adversary that keeps generating conflicts can grow the buffer
+        // unbounded.
+        let mut buffer_guard = rejected_deploy_buffer
+            .lock()
+            .map_err(|e| CasperError::LockError(e.to_string()))?;
+        buffer_guard.remove(expired_list)?;
     }
 
-    let pending_unique_count = valid_unique.len();
-    if should_bypass_adaptive_cap_for_small_batch(
-        pending_unique_count,
-        max_user_deploys_per_block(),
-        adaptive_small_batch_bypass_threshold(),
-    ) {
-        return Ok(PreparedUserDeploys {
-            deploys: valid_unique,
-            effective_cap: pending_unique_count,
-            cap_hit: false,
-        });
-    }
-
-    let max_user_deploys = effective_user_deploys_per_block_cap(pending_unique_count);
+    let max_deploys = casper_snapshot
+        .on_chain_state
+        .shard_conf
+        .max_user_deploys_per_block as usize;
+    let max_user_deploys = max_deploys;
     if valid_unique.len() <= max_user_deploys {
         return Ok(PreparedUserDeploys {
             deploys: valid_unique,
@@ -242,6 +329,9 @@ async fn prepare_user_deploys(
                 if let Some(newest) = ordered.iter().last().cloned() {
                     picked.insert(newest);
                 }
+                if max_user_deploys <= ordered.len() {
+                    debug_assert_eq!(picked.len(), max_user_deploys);
+                }
                 (picked, "oldest-plus-newest")
             }
         } else {
@@ -268,334 +358,6 @@ async fn prepare_user_deploys(
         effective_cap: max_user_deploys,
         cap_hit: true,
     })
-}
-
-fn max_user_deploys_per_block() -> usize {
-    // Keep default permissive for compatibility; cap is still tunable for stress scenarios.
-    const MAX_USER_DEPLOYS_DEFAULT: usize = 32;
-    const MAX_USER_DEPLOYS_ENV: &str = "F1R3_MAX_USER_DEPLOYS_PER_BLOCK";
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    *VALUE.get_or_init(|| {
-        std::env::var(MAX_USER_DEPLOYS_ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(MAX_USER_DEPLOYS_DEFAULT)
-    })
-}
-
-#[derive(Debug)]
-struct AdaptiveDeployCapState {
-    current_cap: usize,
-    ema_create_block_ms: Option<f64>,
-}
-
-fn adaptive_user_deploy_cap_enabled() -> bool {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED";
-    static VALUE: OnceLock<bool> = OnceLock::new();
-
-    *VALUE.get_or_init(|| match std::env::var(ENV) {
-        Ok(raw) => {
-            let normalized = raw.trim().to_ascii_lowercase();
-            !matches!(normalized.as_str(), "0" | "false" | "no" | "off")
-        }
-        Err(_) => true,
-    })
-}
-
-fn adaptive_user_deploy_target_ms() -> u64 {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_TARGET_MS";
-    const DEFAULT: u64 = 1_000;
-    static VALUE: OnceLock<u64> = OnceLock::new();
-
-    *VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    })
-}
-
-fn adaptive_user_deploy_min_cap(max_cap: usize) -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_MIN";
-    const DEFAULT: usize = 1;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    (*VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    }))
-    .clamp(1, max_cap)
-}
-
-fn adaptive_small_batch_bypass_threshold() -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_SMALL_BATCH_BYPASS";
-    const DEFAULT: usize = 3;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    *VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(DEFAULT)
-    })
-}
-
-fn should_bypass_adaptive_cap_for_small_batch(
-    pending_count: usize,
-    max_cap: usize,
-    bypass_threshold: usize,
-) -> bool {
-    if pending_count == 0 {
-        return false;
-    }
-
-    let effective_threshold = bypass_threshold.min(max_cap);
-    pending_count <= effective_threshold
-}
-
-fn adaptive_user_deploy_cap_state(
-    max_cap: usize,
-    min_cap: usize,
-) -> &'static Mutex<AdaptiveDeployCapState> {
-    static VALUE: OnceLock<Mutex<AdaptiveDeployCapState>> = OnceLock::new();
-    VALUE.get_or_init(|| {
-        Mutex::new(AdaptiveDeployCapState {
-            current_cap: max_cap.clamp(min_cap, max_cap),
-            ema_create_block_ms: None,
-        })
-    })
-}
-
-fn adaptive_backlog_floor_enabled() -> bool {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_BACKLOG_FLOOR_ENABLED";
-    static VALUE: OnceLock<bool> = OnceLock::new();
-
-    *VALUE.get_or_init(|| match std::env::var(ENV) {
-        Ok(raw) => {
-            let normalized = raw.trim().to_ascii_lowercase();
-            !matches!(normalized.as_str(), "0" | "false" | "no" | "off")
-        }
-        Err(_) => true,
-    })
-}
-
-fn adaptive_backlog_floor_trigger() -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_BACKLOG_TRIGGER";
-    const DEFAULT: usize = 2;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    *VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    })
-}
-
-fn adaptive_backlog_floor_divisor() -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_BACKLOG_DIVISOR";
-    const DEFAULT: usize = 2;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    *VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    })
-}
-
-fn adaptive_backlog_floor_min(max_cap: usize) -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_BACKLOG_MIN";
-    const DEFAULT: usize = 2;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    (*VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    }))
-    .clamp(1, max_cap)
-}
-
-fn adaptive_backlog_floor_max(max_cap: usize) -> usize {
-    const ENV: &str = "F1R3_ADAPTIVE_DEPLOY_CAP_BACKLOG_MAX";
-    const DEFAULT: usize = 8;
-    static VALUE: OnceLock<usize> = OnceLock::new();
-
-    (*VALUE.get_or_init(|| {
-        std::env::var(ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(DEFAULT)
-    }))
-    .clamp(1, max_cap)
-}
-
-fn backlog_floor_for_pending(
-    pending_count: usize,
-    max_cap: usize,
-    trigger: usize,
-    divisor: usize,
-    min_floor: usize,
-    max_floor: usize,
-) -> usize {
-    if pending_count < trigger {
-        return 1;
-    }
-
-    let divisor = divisor.max(1);
-    let ceil_div = pending_count.saturating_add(divisor - 1) / divisor;
-    ceil_div
-        .clamp(min_floor.max(1), max_floor.max(min_floor))
-        .clamp(1, max_cap)
-}
-
-fn adaptive_backlog_floor(max_cap: usize, pending_count: usize) -> usize {
-    if !adaptive_backlog_floor_enabled() {
-        return 1;
-    }
-
-    let trigger = adaptive_backlog_floor_trigger();
-    let divisor = adaptive_backlog_floor_divisor();
-    let min_floor = adaptive_backlog_floor_min(max_cap);
-    let max_floor = adaptive_backlog_floor_max(max_cap);
-
-    backlog_floor_for_pending(
-        pending_count,
-        max_cap,
-        trigger,
-        divisor,
-        min_floor,
-        max_floor,
-    )
-}
-
-fn effective_user_deploys_per_block_cap(pending_count: usize) -> usize {
-    let max_cap = max_user_deploys_per_block();
-    if !adaptive_user_deploy_cap_enabled() {
-        return max_cap;
-    }
-
-    let min_cap = adaptive_user_deploy_min_cap(max_cap);
-    let backlog_floor = adaptive_backlog_floor(max_cap, pending_count);
-    let state = adaptive_user_deploy_cap_state(max_cap, min_cap);
-    match state.lock() {
-        Ok(mut guard) => {
-            guard.current_cap = guard.current_cap.clamp(min_cap, max_cap);
-            std::cmp::max(guard.current_cap, backlog_floor)
-        }
-        Err(err) => {
-            tracing::warn!(
-                "Adaptive deploy cap lock poisoned while reading current cap: {}",
-                err
-            );
-            max_cap
-        }
-    }
-}
-
-fn next_adaptive_cap(
-    current_cap: usize,
-    min_cap: usize,
-    max_cap: usize,
-    target_ms: f64,
-    ema_ms: f64,
-    cap_hit: bool,
-) -> usize {
-    if min_cap >= max_cap {
-        return max_cap;
-    }
-
-    let current_cap = current_cap.clamp(min_cap, max_cap);
-    if !(target_ms.is_finite() && target_ms > 0.0 && ema_ms.is_finite() && ema_ms > 0.0) {
-        return current_cap;
-    }
-
-    if ema_ms > target_ms {
-        // Reduce cap proportionally when observed block creation time exceeds the target.
-        let ratio = (target_ms / ema_ms).clamp(0.1, 0.99);
-        let scaled = ((current_cap as f64) * ratio).floor() as usize;
-        let max_step_down = current_cap.saturating_sub(1).max(min_cap);
-        return scaled.clamp(min_cap, max_step_down);
-    }
-
-    const INCREASE_THRESHOLD_RATIO: f64 = 0.75;
-    if cap_hit && ema_ms < target_ms * INCREASE_THRESHOLD_RATIO {
-        // Increase only when we saturated the cap and have enough latency headroom.
-        let ratio = (target_ms / ema_ms).clamp(1.0, 1.5);
-        let scaled = ((current_cap as f64) * ratio).ceil() as usize;
-        let min_step_up = current_cap.saturating_add(1).min(max_cap);
-        return scaled.max(min_step_up).min(max_cap);
-    }
-
-    current_cap
-}
-
-fn update_adaptive_user_deploy_cap(
-    observed_create_block_ms: u128,
-    selected_user_deploys: usize,
-    cap_hit: bool,
-) {
-    if !adaptive_user_deploy_cap_enabled() || selected_user_deploys == 0 {
-        return;
-    }
-
-    let max_cap = max_user_deploys_per_block();
-    let min_cap = adaptive_user_deploy_min_cap(max_cap);
-    if min_cap >= max_cap {
-        return;
-    }
-
-    let target_ms = adaptive_user_deploy_target_ms() as f64;
-    let sample_ms = observed_create_block_ms as f64;
-    let state = adaptive_user_deploy_cap_state(max_cap, min_cap);
-
-    let mut guard = match state.lock() {
-        Ok(guard) => guard,
-        Err(err) => {
-            tracing::warn!(
-                "Adaptive deploy cap lock poisoned while updating cap: {}",
-                err
-            );
-            return;
-        }
-    };
-
-    guard.current_cap = guard.current_cap.clamp(min_cap, max_cap);
-
-    const EMA_ALPHA: f64 = 0.35;
-    let prev_ema = guard.ema_create_block_ms.unwrap_or(sample_ms);
-    let ema_ms = prev_ema + EMA_ALPHA * (sample_ms - prev_ema);
-    guard.ema_create_block_ms = Some(ema_ms);
-
-    let prev_cap = guard.current_cap;
-    let next_cap = next_adaptive_cap(prev_cap, min_cap, max_cap, target_ms, ema_ms, cap_hit);
-
-    if next_cap != prev_cap {
-        guard.current_cap = next_cap;
-        tracing::info!(
-            "Adaptive deploy cap update: prev_cap={}, next_cap={}, sample_create_block_ms={}, ema_create_block_ms={:.2}, target_ms={}, selected_user_deploys={}, cap_hit={}",
-            prev_cap,
-            next_cap,
-            observed_create_block_ms,
-            ema_ms,
-            target_ms as u64,
-            selected_user_deploys,
-            cap_hit
-        );
-    }
 }
 
 fn collect_self_chain_deploy_sigs(
@@ -636,6 +398,31 @@ fn collect_self_chain_deploy_sigs(
     Ok(deploy_sigs)
 }
 
+/// Pure-function filter extracted for unit testing. Keeps an
+/// invalid-latest-message entry only if the equivocator is still
+/// slashable in the parent post-state — i.e., bonded with positive
+/// stake AND in the PoS active-validator set. The active-validator
+/// check matters when bond floor > 0: a validator slashed in a parent
+/// retains stake at the floor, satisfying the bonded check, but PoS
+/// has removed them from active_validators so they shouldn't be
+/// re-slashed. Without this, the proposer emits a redundant SlashDeploy
+/// every block until the equivocator's invalid latest message ages
+/// out of the DAG view, saved by PoS slash idempotency but inflating
+/// body and wasting execution.
+fn filter_slashable_invalid_messages(
+    invalid_latest_messages: HashMap<Validator, BlockHash>,
+    bonds_map: &HashMap<Validator, i64>,
+    active_validators: &[Validator],
+) -> Vec<(Validator, BlockHash)> {
+    invalid_latest_messages
+        .into_iter()
+        .filter(|(validator, _)| {
+            bonds_map.get(validator).copied().unwrap_or(0) > 0
+                && active_validators.contains(validator)
+        })
+        .collect()
+}
+
 async fn prepare_slashing_deploys(
     casper_snapshot: &CasperSnapshot,
     validator_identity: &ValidatorIdentity,
@@ -643,32 +430,22 @@ async fn prepare_slashing_deploys(
 ) -> Result<Vec<SlashDeploy>, CasperError> {
     let self_id = Bytes::copy_from_slice(&validator_identity.public_key.bytes);
 
-    // Get invalid latest messages from DAG
     let invalid_latest_messages = casper_snapshot.dag.invalid_latest_messages()?;
+    let slashable_invalid_messages = filter_slashable_invalid_messages(
+        invalid_latest_messages,
+        &casper_snapshot.on_chain_state.bonds_map,
+        &casper_snapshot.on_chain_state.active_validators,
+    );
 
-    // Filter to only include bonded validators
-    let bonded_invalid_messages: Vec<_> = invalid_latest_messages
-        .into_iter()
-        .filter(|(validator, _)| {
-            casper_snapshot
-                .on_chain_state
-                .bonds_map
-                .get(validator)
-                .map(|stake| *stake > 0)
-                .unwrap_or(false)
-        })
-        .collect();
-
-    // TODO: Add `slashingDeploys` to DeployStorage - OLD
-    // Create SlashDeploy objects
     let mut slashing_deploys = Vec::new();
-    for (_, invalid_block_hash) in bonded_invalid_messages {
+    for (_, invalid_block_hash) in slashable_invalid_messages {
         let slash_deploy = SlashDeploy {
             invalid_block_hash: invalid_block_hash.clone(),
             pk: validator_identity.public_key.clone(),
             initial_rand: system_deploy_util::generate_slash_deploy_random_seed(
                 self_id.clone(),
                 seq_num,
+                &invalid_block_hash,
             ),
         };
 
@@ -725,13 +502,7 @@ fn quarantine_refund_failure_deploy(
     let mut guard = deploy_storage
         .lock()
         .map_err(|e| CasperError::LockError(e.to_string()))?;
-    let all = guard.read_all()?;
-    let to_remove: Vec<Signed<DeployData>> = all.into_iter().filter(|d| d.sig == sig).collect();
-    if to_remove.is_empty() {
-        return Ok(false);
-    }
-    guard.remove(to_remove)?;
-    Ok(true)
+    guard.remove_by_sig(&sig).map_err(CasperError::KvStoreError)
 }
 
 pub async fn create(
@@ -739,10 +510,17 @@ pub async fn create(
     validator_identity: &ValidatorIdentity,
     dummy_deploy_opt: Option<(PrivateKey, String)>,
     deploy_storage: Arc<Mutex<KeyValueDeployStorage>>,
-    runtime_manager: &mut RuntimeManager,
+    rejected_deploy_buffer: Arc<Mutex<block_storage::rust::deploy::key_value_rejected_deploy_buffer::KeyValueRejectedDeployBuffer>>,
+    runtime_manager: &RuntimeManager,
     block_store: &mut KeyValueBlockStore,
     allow_empty_blocks: bool,
 ) -> Result<BlockCreatorResult, CasperError> {
+    use crate::rust::metrics_constants::{
+        BLOCK_CREATOR_COMPUTE_DEPLOYS_CHECKPOINT_TIME_METRIC,
+        BLOCK_CREATOR_COMPUTE_PARENTS_POST_STATE_TIME_METRIC,
+        BLOCK_CREATOR_PACKAGE_BLOCK_TIME_METRIC, BLOCK_CREATOR_PREPARE_USER_DEPLOYS_TIME_METRIC,
+        BLOCK_CREATOR_TOTAL_TIME_METRIC, CASPER_METRICS_SOURCE,
+    };
     let create_started = std::time::Instant::now();
     // Capture current time once to ensure consistency between deploy filtering and block timestamp.
     // This prevents race condition where a deploy could pass filtering but expire before block creation.
@@ -785,13 +563,15 @@ pub async fn create(
     let shard_id = casper_snapshot.on_chain_state.shard_conf.shard_name.clone();
 
     // Prepare deploys
-    let (user_deploys, selected_user_deploy_cap, selected_user_deploy_cap_hit) = {
+    let (user_deploys, _, _) = {
         let t = std::time::Instant::now();
         let prepared = prepare_user_deploys(
             casper_snapshot,
             next_block_num,
             now_millis,
             deploy_storage.clone(),
+            rejected_deploy_buffer.clone(),
+            block_store,
         )
         .await?;
         let mut v = prepared.deploys;
@@ -799,7 +579,16 @@ pub async fn create(
             collect_self_chain_deploy_sigs(casper_snapshot, validator_identity, block_store)?;
         if !self_chain_deploy_sigs.is_empty() {
             let before = v.len();
-            v.retain(|deploy| !self_chain_deploy_sigs.contains(&deploy.sig));
+            // A sig in the proposer's self-chain is normally a duplicate and
+            // must be filtered out. The exception is a sig in
+            // `rejected_in_scope`: the merge engine conflict-rejected it, so
+            // its effects never landed in canonical state and re-proposing
+            // it is correct. Mirror the same exemption that
+            // `prepare_user_deploys` applies upstream.
+            v.retain(|deploy| {
+                !self_chain_deploy_sigs.contains(&deploy.sig)
+                    || casper_snapshot.rejected_in_scope.contains(&deploy.sig)
+            });
             let skipped = before.saturating_sub(v.len());
             if skipped > 0 {
                 tracing::info!(
@@ -816,6 +605,8 @@ pub async fn create(
             prepared.effective_cap,
             prepared.cap_hit
         );
+        metrics::histogram!(BLOCK_CREATOR_PREPARE_USER_DEPLOYS_TIME_METRIC, "source" => CASPER_METRICS_SOURCE)
+            .record(t.elapsed().as_secs_f64());
         (v, prepared.effective_cap, prepared.cap_hit)
     };
     let dummy_deploys = {
@@ -841,35 +632,99 @@ pub async fn create(
         v
     };
 
-    let selected_user_deploy_count = user_deploys.len();
-
-    // Combine all deploys, removing those already in scope
-    let mut all_deploys: HashSet<Signed<DeployData>> = user_deploys
-        .into_iter()
-        .filter(|deploy| !casper_snapshot.deploys_in_scope.contains(&deploy.sig))
-        .collect();
+    // Combine all deploys. prepare_user_deploys already removed deploys in scope.
+    let mut all_deploys: HashSet<Signed<DeployData>> = user_deploys;
 
     // Add dummy deploys
     all_deploys.extend(dummy_deploys);
 
+    // Merge the parents once up front. Two reasons to do this before the
+    // empty-block skip check below:
+    //   1. To discover slashes that were rejected by cost-optimal merge
+    //      resolution — those slashes must be re-issued by this proposer
+    //      so the slash effect lands in the merge block regardless of the
+    //      merge's rejection decision.
+    //   2. To include rejected-slash recovery in the "do we have work?"
+    //      decision. A heartbeat-disabled proposer that wakes with no user
+    //      deploys and no own-detected slashes would otherwise skip,
+    //      stranding any merge-rejected slashes from parent merging.
+    // The merge result is cached so the downstream compute_deploys_checkpoint
+    // call hits the cache.
+    let __merge_pre_t = std::time::Instant::now();
+    let merge_pre_info = interpreter_util::compute_parents_post_state(
+        block_store,
+        parents.clone(),
+        casper_snapshot,
+        runtime_manager,
+        None,
+        Some(&rejected_deploy_buffer),
+    )?;
+    metrics::histogram!(
+        BLOCK_CREATOR_COMPUTE_PARENTS_POST_STATE_TIME_METRIC,
+        "source" => CASPER_METRICS_SOURCE
+    )
+    .record(__merge_pre_t.elapsed().as_secs_f64());
+    let (_pre_state, _rejected_user_sigs, rejected_slashes) = merge_pre_info;
+
+    // Union own slashes with merge-rejected slashes, dedup by
+    // `invalid_block_hash`. Own detections take priority — any
+    // merge-rejected slash for an equivocator already covered by
+    // prepare_slashing_deploys is dropped. `filter_recoverable` also
+    // collapses multiple rejected slashes for the same equivocator
+    // (e.g., from different original issuers) down to a single entry.
+    let own_invalid_block_hashes = slashing_deploys
+        .iter()
+        .map(|sd| sd.invalid_block_hash.clone());
+    let recovered_rejected_slashes = crate::rust::merging::rejected_slash::filter_recoverable(
+        rejected_slashes,
+        own_invalid_block_hashes,
+    );
+
     // Check if we have any new work to process.
     // If empty blocks are disabled, skip closeBlock-only proposals to avoid no-op checkpoint cost.
     // If empty blocks are enabled (heartbeat/liveness mode), continue and emit closeBlock.
+    // Recovered rejected slashes count as work — without this check, a
+    // heartbeat-disabled proposer would silently drop merge-rejected slashes
+    // on a wake with no other pending work.
     let has_slashing_deploys = !slashing_deploys.is_empty();
-    if all_deploys.is_empty() && !has_slashing_deploys {
-        if !allow_empty_blocks {
-            tracing::info!(
-                "Skipping empty block creation: no new user deploys and no slashing deploys"
-            );
-            return Ok(BlockCreatorResult::NoNewDeploys);
-        }
+    let has_recovered_rejected_slashes = !recovered_rejected_slashes.is_empty();
+    if all_deploys.is_empty()
+        && !has_slashing_deploys
+        && !has_recovered_rejected_slashes
+        && !allow_empty_blocks
+    {
+        tracing::info!(
+            "Skipping empty block creation: no new user deploys, no slashing deploys, no merge-rejected slashes to recover"
+        );
+        return Ok(BlockCreatorResult::NoNewDeploys);
     }
 
     // Make sure closeBlock is the last system Deploy
     let mut system_deploys_converted: Vec<SystemDeployEnum> = Vec::new();
 
-    // Add slashing deploys
+    // Add own-detected slashes
     for slash_deploy in slashing_deploys {
+        system_deploys_converted.push(SystemDeployEnum::Slash(slash_deploy));
+    }
+
+    // Re-issue slashes that the merge dropped. The proposer signs these
+    // under its own identity, matching the existing slashing convention.
+    let self_id = Bytes::copy_from_slice(&validator_identity.public_key.bytes);
+    for rs in &recovered_rejected_slashes {
+        let slash_deploy = SlashDeploy {
+            invalid_block_hash: rs.invalid_block_hash.clone(),
+            pk: validator_identity.public_key.clone(),
+            initial_rand: system_deploy_util::generate_slash_deploy_random_seed(
+                self_id.clone(),
+                next_seq_num,
+                &rs.invalid_block_hash,
+            ),
+        };
+        tracing::info!(
+            "Recovering merge-rejected slash: invalid_block={}, original_issuer={}",
+            pretty_printer::PrettyPrinter::build_string_bytes(&rs.invalid_block_hash),
+            hex::encode(&rs.issuer_public_key.bytes)
+        );
         system_deploys_converted.push(SystemDeployEnum::Slash(slash_deploy));
     }
 
@@ -903,6 +758,7 @@ pub async fn create(
         runtime_manager,
         block_data.clone(),
         invalid_blocks,
+        Some(&rejected_deploy_buffer),
     )
     .await
     {
@@ -925,6 +781,11 @@ pub async fn create(
         "compute_deploys_checkpoint_ms={}",
         checkpoint_started.elapsed().as_millis()
     );
+    metrics::histogram!(
+        BLOCK_CREATOR_COMPUTE_DEPLOYS_CHECKPOINT_TIME_METRIC,
+        "source" => CASPER_METRICS_SOURCE
+    )
+    .record(checkpoint_started.elapsed().as_secs_f64());
 
     let (
         pre_state_hash,
@@ -961,6 +822,11 @@ pub async fn create(
         casper_version,
     );
     let package_ms = package_started.elapsed().as_millis();
+    metrics::histogram!(
+        BLOCK_CREATOR_PACKAGE_BLOCK_TIME_METRIC,
+        "source" => CASPER_METRICS_SOURCE
+    )
+    .record(package_started.elapsed().as_secs_f64());
 
     tracing::event!(tracing::Level::DEBUG, mark = "block-created");
     // Sign the block
@@ -982,12 +848,11 @@ pub async fn create(
         sign_ms,
         total_create_block_ms
     );
-
-    update_adaptive_user_deploy_cap(
-        total_create_block_ms,
-        selected_user_deploy_count,
-        selected_user_deploy_cap_hit && selected_user_deploy_count >= selected_user_deploy_cap,
-    );
+    metrics::histogram!(
+        BLOCK_CREATOR_TOTAL_TIME_METRIC,
+        "source" => CASPER_METRICS_SOURCE
+    )
+    .record(create_started.elapsed().as_secs_f64());
 
     RuntimeManager::trim_allocator();
 
@@ -1057,72 +922,98 @@ fn not_future_deploy(current_block_number: i64, deploy_data: &DeployData) -> boo
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        backlog_floor_for_pending, next_adaptive_cap, should_bypass_adaptive_cap_for_small_batch,
-    };
+    use super::*;
 
-    #[test]
-    fn adaptive_cap_reduces_when_latency_exceeds_target() {
-        let next = next_adaptive_cap(32, 1, 32, 1000.0, 2500.0, true);
-        assert_eq!(next, 12);
+    fn validator(byte: u8) -> Validator {
+        Bytes::from(vec![byte; 32])
     }
 
-    #[test]
-    fn adaptive_cap_increases_when_capped_and_headroom_exists() {
-        let next = next_adaptive_cap(4, 1, 32, 1000.0, 400.0, true);
-        assert_eq!(next, 6);
+    fn invalid_block_hash(byte: u8) -> BlockHash {
+        Bytes::from(vec![byte; 32])
     }
 
+    /// A bonded validator that PoS still considers active is slashable
+    /// when their latest message is invalid. Baseline behavior.
     #[test]
-    fn adaptive_cap_does_not_increase_when_not_capped() {
-        let next = next_adaptive_cap(8, 1, 32, 1000.0, 300.0, false);
-        assert_eq!(next, 8);
+    fn bonded_active_equivocator_is_slashable() {
+        let equivocator = validator(0xAA);
+        let invalid_block = invalid_block_hash(0x11);
+
+        let mut invalid_latest_messages = HashMap::new();
+        invalid_latest_messages.insert(equivocator.clone(), invalid_block.clone());
+
+        let mut bonds_map = HashMap::new();
+        bonds_map.insert(equivocator.clone(), 5);
+
+        let active_validators = vec![equivocator.clone()];
+
+        let out = filter_slashable_invalid_messages(
+            invalid_latest_messages,
+            &bonds_map,
+            &active_validators,
+        );
+
+        assert_eq!(out.len(), 1, "bonded active equivocator must be slashable");
+        assert_eq!(out[0].0, equivocator);
+        assert_eq!(out[0].1, invalid_block);
     }
 
+    /// An equivocator with stake 0 is excluded by the bonded check,
+    /// regardless of active-validator membership. Existing behavior.
     #[test]
-    fn adaptive_cap_respects_min_and_max_bounds() {
-        let down = next_adaptive_cap(3, 2, 4, 1000.0, 5000.0, true);
-        let up = next_adaptive_cap(3, 2, 4, 1000.0, 250.0, true);
-        assert_eq!(down, 2);
-        assert_eq!(up, 4);
+    fn unbonded_equivocator_filtered_out() {
+        let equivocator = validator(0xBB);
+        let invalid_block = invalid_block_hash(0x22);
+
+        let mut invalid_latest_messages = HashMap::new();
+        invalid_latest_messages.insert(equivocator.clone(), invalid_block);
+
+        let mut bonds_map = HashMap::new();
+        bonds_map.insert(equivocator.clone(), 0);
+
+        let active_validators = vec![equivocator];
+
+        let out = filter_slashable_invalid_messages(
+            invalid_latest_messages,
+            &bonds_map,
+            &active_validators,
+        );
+
+        assert!(out.is_empty(), "stake-0 equivocator must not be slashable");
     }
 
+    /// An equivocator already slashed in a parent block retains stake
+    /// at the bond floor (e.g., 1 in production), satisfying the
+    /// stake > 0 check, but PoS removes them from active_validators.
+    /// The active-validator filter is what stops the proposer from
+    /// emitting redundant SlashDeploys block after block.
     #[test]
-    fn backlog_floor_disabled_below_trigger() {
-        let floor = backlog_floor_for_pending(7, 32, 8, 4, 2, 16);
-        assert_eq!(floor, 1);
-    }
+    fn bonded_but_already_slashed_equivocator_filtered_out() {
+        let equivocator = validator(0xCC);
+        let invalid_block = invalid_block_hash(0x33);
 
-    #[test]
-    fn backlog_floor_scales_with_pending_pool() {
-        let floor = backlog_floor_for_pending(35, 32, 8, 4, 2, 16);
-        assert_eq!(floor, 9);
-    }
+        let mut invalid_latest_messages = HashMap::new();
+        invalid_latest_messages.insert(equivocator.clone(), invalid_block);
 
-    #[test]
-    fn backlog_floor_respects_bounds() {
-        let floor = backlog_floor_for_pending(512, 32, 8, 4, 2, 16);
-        assert_eq!(floor, 16);
+        // Bond floor > 0 — equivocator's stake stays at 1 after slash.
+        let mut bonds_map = HashMap::new();
+        bonds_map.insert(equivocator.clone(), 1);
 
-        let floor_small_cap = backlog_floor_for_pending(64, 6, 8, 4, 2, 16);
-        assert_eq!(floor_small_cap, 6);
-    }
+        // PoS has removed the slashed validator from the active set.
+        let active_validators: Vec<Validator> = vec![];
 
-    #[test]
-    fn small_batch_bypass_applies_when_pending_within_threshold() {
-        assert!(should_bypass_adaptive_cap_for_small_batch(3, 32, 3));
-        assert!(should_bypass_adaptive_cap_for_small_batch(2, 32, 3));
-    }
+        let out = filter_slashable_invalid_messages(
+            invalid_latest_messages,
+            &bonds_map,
+            &active_validators,
+        );
 
-    #[test]
-    fn small_batch_bypass_does_not_apply_for_zero_or_large_pending() {
-        assert!(!should_bypass_adaptive_cap_for_small_batch(0, 32, 3));
-        assert!(!should_bypass_adaptive_cap_for_small_batch(4, 32, 3));
-    }
-
-    #[test]
-    fn small_batch_bypass_respects_max_cap_bound() {
-        assert!(should_bypass_adaptive_cap_for_small_batch(6, 6, 16));
-        assert!(!should_bypass_adaptive_cap_for_small_batch(7, 6, 16));
+        assert!(
+            out.is_empty(),
+            "already-slashed equivocator (not in active_validators) must not be \
+             re-slashed even when bond floor > 0 keeps their stake nonzero. If this \
+             fires, prepare_slashing_deploys will emit redundant SlashDeploys every \
+             block until the invalid latest message ages out of the DAG view."
+        );
     }
 }

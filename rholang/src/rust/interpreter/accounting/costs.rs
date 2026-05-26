@@ -2,6 +2,7 @@ use models::rhoapi::{
     tagged_continuation::TaggedCont, BindPattern, ListParWithRandom, PCost, Par, ParWithRandom,
     TaggedContinuation,
 };
+use prost::Message;
 use rspace_plus_plus::rspace::hashing::blake2b256_hash;
 use shared::rust::ByteString;
 use std::borrow::Cow;
@@ -133,6 +134,110 @@ pub fn division_cost() -> Cost {
 
 pub fn modulo_cost() -> Cost {
     Cost::create(9, "modulo")
+}
+
+pub fn bigint_sum_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = std::cmp::max(a_len, b_len) as i64 + 1;
+    Cost::create(std::cmp::max(work, sum_cost().value), "bigint sum")
+}
+
+pub fn bigint_subtraction_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = std::cmp::max(a_len, b_len) as i64 + 1;
+    Cost::create(
+        std::cmp::max(work, subtraction_cost().value),
+        "bigint subtraction",
+    )
+}
+
+pub fn bigint_multiplication_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = (a_len as i64) * (b_len as i64);
+    Cost::create(
+        std::cmp::max(work, multiplication_cost().value),
+        "bigint multiplication",
+    )
+}
+
+pub fn bigint_division_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = (a_len as i64) * (b_len as i64);
+    Cost::create(
+        std::cmp::max(work, division_cost().value),
+        "bigint division",
+    )
+}
+
+pub fn bigint_modulo_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = (a_len as i64) * (b_len as i64);
+    Cost::create(std::cmp::max(work, modulo_cost().value), "bigint modulo")
+}
+
+pub fn bigint_negation_cost(len: usize) -> Cost {
+    Cost::create(std::cmp::max(len as i64, 1), "bigint negation")
+}
+
+pub fn bigint_comparison_cost(a_len: usize, b_len: usize) -> Cost {
+    let work = std::cmp::max(a_len, b_len) as i64;
+    Cost::create(
+        std::cmp::max(work, comparison_cost().value),
+        "bigint comparison",
+    )
+}
+
+pub fn bigrat_sum_cost(num_a: usize, den_a: usize, num_b: usize, den_b: usize) -> Cost {
+    let max_len = std::cmp::max(std::cmp::max(num_a, den_a), std::cmp::max(num_b, den_b)) as i64;
+    let cross_mul = max_len * max_len;
+    let gcd_cost = max_len;
+    let work = 4 * cross_mul + gcd_cost;
+    Cost::create(std::cmp::max(work, sum_cost().value), "bigrat sum")
+}
+
+pub fn bigrat_subtraction_cost(num_a: usize, den_a: usize, num_b: usize, den_b: usize) -> Cost {
+    let max_len = std::cmp::max(std::cmp::max(num_a, den_a), std::cmp::max(num_b, den_b)) as i64;
+    let cross_mul = max_len * max_len;
+    let gcd_cost = max_len;
+    let work = 4 * cross_mul + gcd_cost;
+    Cost::create(
+        std::cmp::max(work, subtraction_cost().value),
+        "bigrat subtraction",
+    )
+}
+
+pub fn bigrat_multiplication_cost(num_a: usize, den_a: usize, num_b: usize, den_b: usize) -> Cost {
+    let num_work = (num_a as i64) * (num_b as i64);
+    let den_work = (den_a as i64) * (den_b as i64);
+    let max_len = std::cmp::max(std::cmp::max(num_a, den_a), std::cmp::max(num_b, den_b)) as i64;
+    let gcd_cost = max_len;
+    let work = num_work + den_work + gcd_cost;
+    Cost::create(
+        std::cmp::max(work, multiplication_cost().value),
+        "bigrat multiplication",
+    )
+}
+
+pub fn bigrat_division_cost(num_a: usize, den_a: usize, num_b: usize, den_b: usize) -> Cost {
+    let cross_a = (num_a as i64) * (den_b as i64);
+    let cross_b = (den_a as i64) * (num_b as i64);
+    let max_len = std::cmp::max(std::cmp::max(num_a, den_a), std::cmp::max(num_b, den_b)) as i64;
+    let gcd_cost = max_len;
+    let work = cross_a + cross_b + gcd_cost;
+    Cost::create(
+        std::cmp::max(work, division_cost().value),
+        "bigrat division",
+    )
+}
+
+pub fn bigrat_negation_cost(num_len: usize) -> Cost {
+    Cost::create(std::cmp::max(num_len as i64, 1), "bigrat negation")
+}
+
+pub fn bigrat_comparison_cost(num_a: usize, den_a: usize, num_b: usize, den_b: usize) -> Cost {
+    let cross_work = std::cmp::max(
+        (num_a as i64) * (den_b as i64),
+        (num_b as i64) * (den_a as i64),
+    );
+    Cost::create(
+        std::cmp::max(cross_work, comparison_cost().value),
+        "bigrat comparison",
+    )
 }
 
 // operations on collections
@@ -290,30 +395,26 @@ pub fn match_eval_cost() -> Cost {
 }
 
 pub fn storage_cost_consume(
-    channels: Vec<Par>,
-    patterns: Vec<BindPattern>,
-    continuation: TaggedContinuation,
+    channels: &[Par],
+    patterns: &[BindPattern],
+    continuation: &TaggedContinuation,
 ) -> Cost {
-    let body_cost = Some(continuation).and_then(|cont| {
-        if let Some(TaggedCont::ParBody(ParWithRandom { body, .. })) = cont.tagged_cont {
-            Some(storage_cost(&vec![body.unwrap()]))
-        } else {
-            None
-        }
-    });
+    let body_cost = match continuation.tagged_cont.as_ref() {
+        Some(TaggedCont::ParBody(ParWithRandom {
+            body: Some(body), ..
+        })) => body.encoded_len() as i64,
+        _ => 0,
+    };
 
-    let total_cost = storage_cost(&channels).value
-        + storage_cost(&patterns).value
-        + body_cost.unwrap_or(Cost::create(0, "")).value;
+    let total_cost = storage_cost(channels).value + storage_cost(patterns).value + body_cost;
 
     Cost::create(total_cost, "consume storage")
 }
 
-pub fn storage_cost_produce(channel: Par, data: ListParWithRandom) -> Cost {
-    Cost::create(
-        storage_cost(&vec![channel]).value + storage_cost(&data.pars).value,
-        "produces storage",
-    )
+pub fn storage_cost_produce(channel: &Par, data: &ListParWithRandom) -> Cost {
+    let channel_cost = channel.encoded_len() as i64;
+    let data_cost: i64 = data.pars.iter().map(|p| p.encoded_len() as i64).sum();
+    Cost::create(channel_cost + data_cost, "produces storage")
 }
 
 pub fn comm_event_storage_cost(channels_involved: i64) -> Cost {

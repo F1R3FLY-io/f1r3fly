@@ -6,6 +6,7 @@ use rholang::rust::interpreter::compiler::compiler::Compiler;
 use rholang::rust::interpreter::errors::InterpreterError;
 use rholang::rust::interpreter::external_services::ExternalServices;
 use rholang::rust::interpreter::matcher::r#match::Matcher;
+use rholang::rust::interpreter::merging::mergeable_tags::default_mergeable_tags;
 use rholang::rust::interpreter::pretty_printer::PrettyPrinter;
 use rholang::rust::interpreter::rho_runtime::{
     create_runtime_from_kv_store, RhoRuntime, RhoRuntimeImpl,
@@ -100,11 +101,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut rho_runtime = create_runtime_from_kv_store(
             stores,
-            Par::default(),
+            Arc::new(default_mergeable_tags()),
             true,
             &mut additional_system_processes,
             matcher,
-            ExternalServices::noop(),
+            ExternalServices::for_observer()
         )
         .await;
 
@@ -177,12 +178,12 @@ fn print_normalized_term(normalized_term: &Par) {
     println!("{}", printer.build_string_from_message(normalized_term));
 }
 
-fn print_storage_contents(runtime: &RhoRuntimeImpl, unmatched_sends_only: bool) {
+async fn print_storage_contents(runtime: &RhoRuntimeImpl, unmatched_sends_only: bool) {
     println!("\nStorage Contents:");
     let output = if unmatched_sends_only {
-        storage_printer::pretty_print_unmatched_sends(runtime)
+        storage_printer::pretty_print_unmatched_sends(runtime).await
     } else {
-        storage_printer::pretty_print(runtime)
+        storage_printer::pretty_print(runtime).await
     };
     println!("{}", output);
 }
@@ -330,7 +331,7 @@ async fn evaluate_par(
     print_errors(&result.errors);
 
     if !quiet {
-        print_storage_contents(runtime, unmatched_sends_only);
+        print_storage_contents(runtime, unmatched_sends_only).await;
     }
 
     Ok(())

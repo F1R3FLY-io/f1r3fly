@@ -1,13 +1,21 @@
 use crypto::rust::hash::blake2b512_random::Blake2b512Random;
 use models::rhoapi::Par;
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, OnceLock, RwLock};
+use rspace_plus_plus::rspace::merger::merging_logic::MergeType;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::RwLock;
 use tracing::{event, Level};
 
 use super::accounting::_cost;
 use super::accounting::costs::{parsing_cost, Cost};
 use super::compiler::compiler::Compiler;
 use super::errors::InterpreterError;
+use super::metrics_constants::{
+    INJ_ATTEMPT_BUILD_NORMALIZED_TERM_TIME_METRIC, INJ_ATTEMPT_CHARGE_PARSING_COST_TIME_METRIC,
+    INJ_ATTEMPT_REDUCE_TERM_TIME_METRIC, INJ_ATTEMPT_SET_INITIAL_COST_TIME_METRIC,
+    INTERPRETER_METRICS_SOURCE,
+};
 use super::reduce::DebruijnInterpreter;
 
 //See rholang/src/main/scala/coop/rchain/rholang/interpreter/Interpreter.scala
@@ -18,7 +26,7 @@ use super::reduce::DebruijnInterpreter;
 pub struct EvaluateResult {
     pub cost: Cost,
     pub errors: Vec<InterpreterError>,
-    pub mergeable: HashSet<Par>,
+    pub mergeable: HashMap<Par, MergeType>,
 }
 
 #[allow(async_fn_in_trait)]
@@ -35,20 +43,7 @@ pub trait Interpreter {
 
 pub struct InterpreterImpl {
     c: _cost,
-    merge_chs: Arc<RwLock<HashSet<Par>>>,
-}
-
-fn block_creator_phase_substep_profile_enabled() -> bool {
-    static VALUE: OnceLock<bool> = OnceLock::new();
-    *VALUE.get_or_init(|| {
-        std::env::var("F1R3_BLOCK_CREATOR_PHASE_SUBSTEP_PROFILE")
-            .ok()
-            .map(|v| {
-                let normalized = v.trim().to_ascii_lowercase();
-                matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
-            })
-            .unwrap_or(false)
-    })
+    merge_chs: Arc<RwLock<HashMap<Par, MergeType>>>,
 }
 
 impl Interpreter for InterpreterImpl {
@@ -60,52 +55,12 @@ impl Interpreter for InterpreterImpl {
         normalizer_env: HashMap<String, Par>,
         rand: Blake2b512Random,
     ) -> Result<EvaluateResult, InterpreterError> {
-        let mem_profile_enabled = block_creator_phase_substep_profile_enabled();
-        let read_vm_rss_kb = || -> Option<usize> {
-            let status = std::fs::read_to_string("/proc/self/status").ok()?;
-            status
-                .lines()
-                .find(|line| line.starts_with("VmRSS:"))
-                .and_then(|line| line.split_whitespace().nth(1))
-                .and_then(|value| value.parse::<usize>().ok())
-        };
-        let mut rss_baseline = if mem_profile_enabled {
-            read_vm_rss_kb()
-        } else {
-            None
-        };
-        let mut rss_prev = rss_baseline;
-        let mut log_mem_step = |step: &str| {
-            if !mem_profile_enabled {
-                return;
-            }
-            if let Some(curr) = read_vm_rss_kb() {
-                let prev = rss_prev.unwrap_or(curr);
-                let baseline = rss_baseline.unwrap_or(curr);
-                eprintln!(
-                    "inj_attempt.mem step={} rss_kb={} delta_prev_kb={} delta_total_kb={}",
-                    step,
-                    curr,
-                    curr as i64 - prev as i64,
-                    curr as i64 - baseline as i64
-                );
-                rss_prev = Some(curr);
-                if rss_baseline.is_none() {
-                    rss_baseline = Some(curr);
-                }
-            }
-        };
-        log_mem_step("start");
-
         let parsing_cost = parsing_cost(term);
-        log_mem_step("after_parsing_cost");
 
-        // Using tracing events for async context
-        // Scala spans: "set-initial-cost", "charge-parsing-cost", "build-normalized-term", "reduce-term"
-        // Implemented as debug events since this is an async function
         let evaluation_result: Result<EvaluateResult, InterpreterError> = {
-            // Trace: set-initial-cost (matching Scala's Span[F].traceI("set-initial-cost"))
+            // Phase: set-initial-cost
             {
+                let phase_start = Instant::now();
                 event!(
                     Level::DEBUG,
                     mark = "started-set-initial-cost",
@@ -117,26 +72,34 @@ impl Interpreter for InterpreterImpl {
                     mark = "finished-set-initial-cost",
                     "inj_attempt"
                 );
-                log_mem_step("after_set_initial_cost");
+                metrics::histogram!(
+                    INJ_ATTEMPT_SET_INITIAL_COST_TIME_METRIC,
+                    "source" => INTERPRETER_METRICS_SOURCE
+                )
+                .record(phase_start.elapsed().as_secs_f64());
             }
 
-            // Trace: charge-parsing-cost (matching Scala's Span[F].traceI("charge-parsing-cost"))
+            // Phase: charge-parsing-cost. Charge can fail (OutOfPhlogistons);
+            // convert that into an EvaluateResult with errors to mirror the
+            // monadic error handling in the Scala reference.
             {
+                let phase_start = Instant::now();
                 event!(
                     Level::DEBUG,
                     mark = "started-charge-parsing-cost",
                     "inj_attempt"
                 );
-                // Scala: charge[F](parsingCost) is inside for-comprehension with .handleErrorWith at the end
-                // In Rust, we must catch charge errors explicitly to match Scala's monadic error handling.
-                // If charge fails (e.g., OutOfPhlogistonsError), convert to EvaluateResult with errors.
                 if let Err(e) = self.c.charge(parsing_cost.clone()) {
                     event!(
                         Level::DEBUG,
                         mark = "failed-charge-parsing-cost",
                         "inj_attempt"
                     );
-                    log_mem_step("charge_parsing_cost_error");
+                    metrics::histogram!(
+                        INJ_ATTEMPT_CHARGE_PARSING_COST_TIME_METRIC,
+                        "source" => INTERPRETER_METRICS_SOURCE
+                    )
+                    .record(phase_start.elapsed().as_secs_f64());
                     return self.handle_error(initial_phlo.clone(), parsing_cost.clone(), e);
                 }
                 event!(
@@ -144,11 +107,17 @@ impl Interpreter for InterpreterImpl {
                     mark = "finished-charge-parsing-cost",
                     "inj_attempt"
                 );
-                log_mem_step("after_charge_parsing_cost");
+                metrics::histogram!(
+                    INJ_ATTEMPT_CHARGE_PARSING_COST_TIME_METRIC,
+                    "source" => INTERPRETER_METRICS_SOURCE
+                )
+                .record(phase_start.elapsed().as_secs_f64());
             }
 
-            // Trace: build-normalized-term (matching Scala's Span[F].traceI("build-normalized-term"))
+            // Phase: build-normalized-term — parse the source string into an
+            // AST.
             let parsed = {
+                let phase_start = Instant::now();
                 event!(
                     Level::DEBUG,
                     mark = "started-build-normalized-term",
@@ -170,7 +139,6 @@ impl Interpreter for InterpreterImpl {
                                 mark = "failed-build-normalized-term",
                                 "inj_attempt"
                             );
-                            log_mem_step("build_normalized_term_error");
                             Err(self.handle_error(
                                 initial_phlo.clone(),
                                 parsing_cost.clone(),
@@ -178,30 +146,35 @@ impl Interpreter for InterpreterImpl {
                             ))
                         }
                     };
+                metrics::histogram!(
+                    INJ_ATTEMPT_BUILD_NORMALIZED_TERM_TIME_METRIC,
+                    "source" => INTERPRETER_METRICS_SOURCE
+                )
+                .record(phase_start.elapsed().as_secs_f64());
                 match result {
                     Ok(p) => p,
                     Err(err) => return err,
                 }
             };
-            log_mem_step("after_build_normalized_term");
-
-            // Empty mergeable channels
+            // Reset mergeable-channel tracking before reducing the new term.
             {
-                let mut merge_chs_lock = self.merge_chs.write().unwrap();
+                let mut merge_chs_lock = self.merge_chs.write().await;
                 merge_chs_lock.clear();
             }
-            log_mem_step("after_clear_mergeable_channels");
-
-            // Trace: reduce-term (matching Scala's Span[F].traceI("reduce-term"))
+            // Phase: reduce-term — execute the parsed AST through RSpace.
+            let phase_start = Instant::now();
             event!(Level::DEBUG, mark = "started-reduce-term", "inj_attempt");
-            log_mem_step("before_reduce_term");
             let reduce_result = reducer.inj(parsed, rand).await;
+            metrics::histogram!(
+                INJ_ATTEMPT_REDUCE_TERM_TIME_METRIC,
+                "source" => INTERPRETER_METRICS_SOURCE
+            )
+            .record(phase_start.elapsed().as_secs_f64());
             match reduce_result {
                 Ok(()) => {
                     event!(Level::DEBUG, mark = "finished-reduce-term", "inj_attempt");
-                    log_mem_step("after_reduce_term_ok");
                     let phlos_left = self.c.get();
-                    let mergeable_channels = { self.merge_chs.read().unwrap().clone() };
+                    let mergeable_channels = { self.merge_chs.read().await.clone() };
 
                     Ok(EvaluateResult {
                         cost: initial_phlo.clone() - phlos_left,
@@ -211,19 +184,16 @@ impl Interpreter for InterpreterImpl {
                 }
                 Err(e) => {
                     event!(Level::DEBUG, mark = "failed-reduce-term", "inj_attempt");
-                    log_mem_step("after_reduce_term_error");
                     self.handle_error(initial_phlo.clone(), parsing_cost.clone(), e)
                 }
             }
         };
-        log_mem_step("finish");
-
         evaluation_result
     }
 }
 
 impl InterpreterImpl {
-    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashSet<Par>>>) -> InterpreterImpl {
+    pub fn new(cost: _cost, merge_chs: Arc<RwLock<HashMap<Par, MergeType>>>) -> InterpreterImpl {
         InterpreterImpl { c: cost, merge_chs }
     }
 
@@ -238,7 +208,7 @@ impl InterpreterImpl {
             InterpreterError::ParserError(_) => Ok(EvaluateResult {
                 cost: parsing_cost,
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // For Out Of Phlogistons error initial cost is used because evaluated cost can be higher
@@ -246,21 +216,21 @@ impl InterpreterImpl {
             InterpreterError::OutOfPhlogistonsError => Ok(EvaluateResult {
                 cost: initial_cost,
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // User triggered abort - execution failed, return cost consumed so far
             InterpreterError::UserAbortError => Ok(EvaluateResult {
                 cost: initial_cost.clone() - self.c.get(),
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // InterpreterError(s) - multiple errors are result of parallel execution
             InterpreterError::AggregateError { interpreter_errors } => Ok(EvaluateResult {
                 cost: initial_cost,
                 errors: interpreter_errors,
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // TODO: Review why 'Compiler::source_to_adt_with_normalizer_env' doesn't pick this up
@@ -271,7 +241,7 @@ impl InterpreterImpl {
             } => Ok(EvaluateResult {
                 cost: parsing_cost,
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // TODO: Review why 'Compiler::source_to_adt_with_normalizer_env' doesn't pick this up
@@ -283,14 +253,14 @@ impl InterpreterImpl {
             } => Ok(EvaluateResult {
                 cost: parsing_cost,
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
 
             // InterpreterError is returned as a result
             _ => Ok(EvaluateResult {
                 cost: initial_cost,
                 errors: vec![error],
-                mergeable: HashSet::new(),
+                mergeable: HashMap::new(),
             }),
         }
     }

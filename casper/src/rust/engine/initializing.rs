@@ -17,7 +17,10 @@ use tokio::time::sleep;
 use block_storage::rust::{
     casperbuffer::casper_buffer_key_value_storage::CasperBufferKeyValueStorage,
     dag::block_dag_key_value_storage::BlockDagKeyValueStorage,
-    deploy::key_value_deploy_storage::KeyValueDeployStorage,
+    deploy::{
+        key_value_deploy_storage::KeyValueDeployStorage,
+        key_value_rejected_deploy_buffer::KeyValueRejectedDeployBuffer,
+    },
     key_value_block_store::KeyValueBlockStore,
 };
 use comm::rust::{
@@ -83,6 +86,7 @@ pub struct Initializing<T: TransportLayer + Send + Sync + Clone + 'static> {
     block_store: KeyValueBlockStore,
     block_dag_storage: BlockDagKeyValueStorage,
     deploy_storage: KeyValueDeployStorage,
+    rejected_deploy_buffer: Arc<Mutex<KeyValueRejectedDeployBuffer>>,
     casper_buffer_storage: CasperBufferKeyValueStorage,
     rspace_state_manager: RSpaceStateManager,
 
@@ -115,7 +119,7 @@ pub struct Initializing<T: TransportLayer + Send + Sync + Clone + 'static> {
 
     block_retriever: BlockRetriever<T>,
     engine_cell: Arc<EngineCell>,
-    runtime_manager: Arc<tokio::sync::Mutex<RuntimeManager>>,
+    runtime_manager: Arc<RuntimeManager>,
     estimator: Arc<Mutex<Option<Estimator>>>,
     /// Shared reference to heartbeat signal for triggering immediate wake on deploy
     heartbeat_signal_ref: crate::rust::heartbeat_signal::HeartbeatSignalRef,
@@ -134,6 +138,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         block_store: KeyValueBlockStore,
         block_dag_storage: BlockDagKeyValueStorage,
         deploy_storage: KeyValueDeployStorage,
+        rejected_deploy_buffer: Arc<Mutex<KeyValueRejectedDeployBuffer>>,
         casper_buffer_storage: CasperBufferKeyValueStorage,
         rspace_state_manager: RSpaceStateManager,
         block_processing_queue_tx: mpsc::Sender<(
@@ -155,7 +160,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         event_publisher: F1r3flyEvents,
         block_retriever: BlockRetriever<T>,
         engine_cell: Arc<EngineCell>,
-        runtime_manager: Arc<tokio::sync::Mutex<RuntimeManager>>,
+        runtime_manager: Arc<RuntimeManager>,
         estimator: Estimator,
         heartbeat_signal_ref: crate::rust::heartbeat_signal::HeartbeatSignalRef,
     ) -> Self {
@@ -167,6 +172,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
             block_store,
             block_dag_storage,
             deploy_storage,
+            rejected_deploy_buffer,
             casper_buffer_storage,
             rspace_state_manager,
             block_processing_queue_tx,
@@ -557,11 +563,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
 
         // Keep LFS retry cadence configurable instead of hard-coding a long startup delay.
         // Falls back to 5s when env var is absent or invalid.
-        let lfs_request_timeout = std::env::var("F1R3_LFS_REQUEST_TIMEOUT_MS")
-            .ok()
-            .and_then(|value| value.parse::<u64>().ok())
-            .map(Duration::from_millis)
-            .unwrap_or_else(|| Duration::from_secs(5));
+        let lfs_request_timeout = Duration::from_secs(5);
 
         // **Scala equivalent**: Create both streams (blockRequestStream and tupleSpaceStream)
         let (block_request_stream_result, tuple_space_stream_result) = tokio::join!(
@@ -794,8 +796,8 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         let pre_state_hash = RuntimeManager::empty_state_hash_fixed();
 
         // Replay genesis - this will save mergeable channels to the store
-        let mut runtime_manager = self.runtime_manager.lock().await;
-        let result = runtime_manager
+        let result = self
+            .runtime_manager
             .replay_compute_state(
                 &pre_state_hash,
                 deploys,
@@ -863,8 +865,8 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         );
 
         // Replay the block - this will save mergeable channels to the store
-        let mut runtime_manager = self.runtime_manager.lock().await;
-        let result = runtime_manager
+        let result = self
+            .runtime_manager
             .replay_compute_state(
                 &pre_state_hash,
                 deploys,
@@ -903,6 +905,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         approved_block: &ApprovedBlock,
     ) -> Result<(), CasperError> {
         let ab = approved_block.candidate.block.clone();
+        let genesis_post_state_hash = ab.body.state.post_state_hash.clone();
 
         // RuntimeManager is now Arc<Mutex<RuntimeManager>>, so we clone the Arc
         let runtime_manager = self.runtime_manager.clone();
@@ -923,6 +926,7 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
             self.block_store.clone(),
             self.block_dag_storage.clone(),
             self.deploy_storage.clone(),
+            self.rejected_deploy_buffer.clone(),
             self.casper_buffer_storage.clone(),
             self.validator_id.clone(),
             self.casper_shard_conf.clone(),
@@ -972,6 +976,19 @@ impl<T: TransportLayer + Send + Sync + Clone> Initializing<T> {
         tracing::info!(
             "create_casper_and_transition_to_running: transition_to_running completed successfully"
         );
+
+        // Guard joiners (first-time connections requesting an approved block from
+        // peers) against config drift: the node's local native-token-* values
+        // must match what this network baked into the TokenMetadata contract at
+        // genesis. See casper/src/rust/util/token_metadata_check.rs for details.
+        crate::rust::util::token_metadata_check::verify_token_metadata_matches_config(
+            &self.runtime_manager,
+            &genesis_post_state_hash,
+            &self.casper_shard_conf.native_token_name,
+            &self.casper_shard_conf.native_token_symbol,
+            self.casper_shard_conf.native_token_decimals,
+        )
+        .await?;
 
         self.transport_layer
             .send_fork_choice_tip_request(&self.connections_cell, &self.rp_conf_ask)

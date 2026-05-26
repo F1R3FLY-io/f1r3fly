@@ -48,7 +48,7 @@ async fn test_petta_replay_consistency() {
     let initial_phlo = Cost::create(i64::MAX, "replay test".to_string());
 
     // 1. Execute in play mode
-    let play_checkpoint = runtime.create_soft_checkpoint();
+    let play_checkpoint = runtime.create_soft_checkpoint().await;
     let play_result = runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand.clone())
         .await
@@ -61,7 +61,7 @@ async fn test_petta_replay_consistency() {
     );
 
     // 2. Capture event log from play execution
-    let event_log = runtime.take_event_log();
+    let event_log = runtime.take_event_log().await;
 
     // Verify event log contains data (non-deterministic operation was captured)
     assert!(
@@ -72,10 +72,11 @@ async fn test_petta_replay_consistency() {
     // 3. Rig replay runtime with event log
     replay_runtime
         .rig(event_log)
+        .await
         .expect("Rig failed - this means PeTTa is not properly registered as non-deterministic");
 
     // 4. Execute same term in replay mode
-    let replay_checkpoint = replay_runtime.create_soft_checkpoint();
+    let replay_checkpoint = replay_runtime.create_soft_checkpoint().await;
     let replay_result = replay_runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand)
         .await
@@ -92,8 +93,10 @@ async fn test_petta_replay_consistency() {
     println!("Replay successfully used cached PeTTa output");
 
     // Cleanup checkpoints
-    runtime.revert_to_soft_checkpoint(play_checkpoint);
-    replay_runtime.revert_to_soft_checkpoint(replay_checkpoint);
+    runtime.revert_to_soft_checkpoint(play_checkpoint).await;
+    replay_runtime
+        .revert_to_soft_checkpoint(replay_checkpoint)
+        .await;
 }
 
 #[tokio::test]
@@ -118,7 +121,7 @@ async fn test_petta_replay_with_multiple_calls() {
     let rand = Blake2b512Random::create_from_bytes(&[]);
     let initial_phlo = Cost::create(i64::MAX, "replay test".to_string());
 
-    let play_checkpoint = runtime.create_soft_checkpoint();
+    let play_checkpoint = runtime.create_soft_checkpoint().await;
     let play_result = runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand.clone())
         .await
@@ -130,15 +133,15 @@ async fn test_petta_replay_with_multiple_calls() {
         play_result.errors
     );
 
-    let event_log = runtime.take_event_log();
+    let event_log = runtime.take_event_log().await;
     assert!(
         !event_log.is_empty(),
         "Event log should capture multiple PeTTa calls"
     );
 
-    replay_runtime.rig(event_log).expect("Rig failed");
+    replay_runtime.rig(event_log).await.expect("Rig failed");
 
-    let replay_checkpoint = replay_runtime.create_soft_checkpoint();
+    let replay_checkpoint = replay_runtime.create_soft_checkpoint().await;
     let replay_result = replay_runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand)
         .await
@@ -157,8 +160,10 @@ async fn test_petta_replay_with_multiple_calls() {
     );
     println!("Replay successfully used cached output for multiple calls");
 
-    runtime.revert_to_soft_checkpoint(play_checkpoint);
-    replay_runtime.revert_to_soft_checkpoint(replay_checkpoint);
+    runtime.revert_to_soft_checkpoint(play_checkpoint).await;
+    replay_runtime
+        .revert_to_soft_checkpoint(replay_checkpoint)
+        .await;
 }
 
 #[tokio::test]
@@ -181,7 +186,7 @@ async fn test_petta_replay_error_consistency() {
     let rand = Blake2b512Random::create_from_bytes(&[]);
     let initial_phlo = Cost::create(i64::MAX, "replay error test".to_string());
 
-    let play_checkpoint = runtime.create_soft_checkpoint();
+    let play_checkpoint = runtime.create_soft_checkpoint().await;
     let play_result = runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand.clone())
         .await
@@ -192,14 +197,15 @@ async fn test_petta_replay_error_consistency() {
         "Play should have errors for invalid MeTTa code"
     );
 
-    let event_log = runtime.take_event_log();
+    let event_log = runtime.take_event_log().await;
     assert!(!event_log.is_empty(), "Event log should capture error case");
 
     replay_runtime
         .rig(event_log)
+        .await
         .expect("Rig should work even with errors");
 
-    let replay_checkpoint = replay_runtime.create_soft_checkpoint();
+    let replay_checkpoint = replay_runtime.create_soft_checkpoint().await;
     let replay_result = replay_runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand)
         .await
@@ -217,8 +223,10 @@ async fn test_petta_replay_error_consistency() {
     );
     println!("Replay successfully handled error case using cached output");
 
-    runtime.revert_to_soft_checkpoint(play_checkpoint);
-    replay_runtime.revert_to_soft_checkpoint(replay_checkpoint);
+    runtime.revert_to_soft_checkpoint(play_checkpoint).await;
+    replay_runtime
+        .revert_to_soft_checkpoint(replay_checkpoint)
+        .await;
 }
 
 /// This test verifies that PeTTa replay uses cached output instead of re-executing.
@@ -243,22 +251,22 @@ async fn test_petta_replay_uses_cached_output() {
     let rand = Blake2b512Random::create_from_bytes(&[]);
     let initial_phlo = Cost::create(i64::MAX, "replay cache test".to_string());
 
-    let play_checkpoint = runtime.create_soft_checkpoint();
+    let play_checkpoint = runtime.create_soft_checkpoint().await;
     let play_result = runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand.clone())
         .await
         .expect("Play evaluation failed");
 
-    let event_log = runtime.take_event_log();
+    let event_log = runtime.take_event_log().await;
 
     assert!(
         !event_log.is_empty(),
         "Event log should contain PeTTa execution data"
     );
 
-    replay_runtime.rig(event_log).expect("Rig failed");
+    replay_runtime.rig(event_log).await.expect("Rig failed");
 
-    let replay_checkpoint = replay_runtime.create_soft_checkpoint();
+    let replay_checkpoint = replay_runtime.create_soft_checkpoint().await;
     let replay_result = replay_runtime
         .evaluate(term, initial_phlo.clone(), HashMap::new(), rand)
         .await
@@ -268,6 +276,8 @@ async fn test_petta_replay_uses_cached_output() {
     println!("Cached output test - Replay cost: {:?}", replay_result.cost);
     println!("Replay successfully retrieved and used cached PeTTa output from event log");
 
-    runtime.revert_to_soft_checkpoint(play_checkpoint);
-    replay_runtime.revert_to_soft_checkpoint(replay_checkpoint);
+    runtime.revert_to_soft_checkpoint(play_checkpoint).await;
+    replay_runtime
+        .revert_to_soft_checkpoint(replay_checkpoint)
+        .await;
 }

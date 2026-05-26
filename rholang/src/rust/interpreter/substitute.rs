@@ -348,32 +348,32 @@ impl SubstituteTrait<Par> for Substitute {
 
         let sends = term
             .sends
-            .iter()
-            .map(|s| self.substitute_no_sort(s.clone(), depth, env))
+            .into_iter()
+            .map(|s| self.substitute_no_sort(s, depth, env))
             .collect::<Result<Vec<Send>, InterpreterError>>()?;
 
         let bundles = term
             .bundles
-            .iter()
-            .map(|b| self.substitute_no_sort(b.clone(), depth, env))
+            .into_iter()
+            .map(|b| self.substitute_no_sort(b, depth, env))
             .collect::<Result<Vec<Bundle>, InterpreterError>>()?;
 
         let receives = term
             .receives
-            .iter()
-            .map(|r| self.substitute_no_sort(r.clone(), depth, env))
+            .into_iter()
+            .map(|r| self.substitute_no_sort(r, depth, env))
             .collect::<Result<Vec<Receive>, InterpreterError>>()?;
 
         let news = term
             .news
-            .iter()
-            .map(|n| self.substitute_no_sort(n.clone(), depth, env))
+            .into_iter()
+            .map(|n| self.substitute_no_sort(n, depth, env))
             .collect::<Result<Vec<New>, InterpreterError>>()?;
 
         let matches = term
             .matches
-            .iter()
-            .map(|m| self.substitute_no_sort(m.clone(), depth, env))
+            .into_iter()
+            .map(|m| self.substitute_no_sort(m, depth, env))
             .collect::<Result<Vec<Match>, InterpreterError>>()?;
 
         Ok(concatenate_pars(
@@ -1280,20 +1280,10 @@ impl SubstituteTrait<Expr> for Substitute {
 }
 
 fn set_bits_until(bits: Vec<u8>, until: i32) -> Vec<u8> {
-    // println!("\nbits in set_bits_until: {:?}", bits);
-    // println!("\nuntil in set_bits_until: {:?}", until);
     if until <= 0 {
         return Vec::new();
     }
-    let until_usize = until as usize;
-
-    let result = bits
-        .iter()
-        .enumerate()
-        .filter(|&(i, &bit)| i < until_usize && bit == 1)
-        .map(|(_, &bit)| bit)
-        .collect();
-
-    // println!("\nresult bits in set_bits_until: {:?}", result);
-    result
+    // Truncate the bitvector at `until` positions, preserving bit positions.
+    // Matches Scala's BitSet.until(n).
+    bits.into_iter().take(until as usize).collect()
 }

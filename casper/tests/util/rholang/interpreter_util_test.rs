@@ -122,6 +122,7 @@ impl TestContext {
             justifications: DashSet::new(),
             invalid_blocks: HashMap::new(),
             deploys_in_scope: Arc::new(DashSet::new()),
+            rejected_in_scope: Arc::new(DashSet::new()),
             max_block_num: 0,
             max_seq_nums: DashMap::new(),
             on_chain_state: OnChainCasperState {
@@ -208,12 +209,13 @@ impl TestContext {
             runtime_manager,
             block_data,
             HashMap::new(),
+            None,
         )
         .await
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn compute_block_checkpoint_should_compute_the_final_post_state_of_a_chain_properly() {
     let time = 0i64;
 
@@ -311,7 +313,7 @@ async fn compute_block_checkpoint_should_compute_the_final_post_state_of_a_chain
 }
 
 //TODO: Scala reenable when merging of REV balances is done
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Scala ignore"]
 async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_parents() {
     let b1_deploys = TestContext::create_deploys_now(
@@ -376,7 +378,7 @@ new ri(`rho:registry:insertArbitrary`) in {
 }
 "#;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Scala ignore"]
 async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_parents_with_complex_contract(
 ) {
@@ -469,6 +471,7 @@ async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_par
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -483,7 +486,7 @@ async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_par
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Scala ignore"]
 async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_parents_uneven_histories(
 ) {
@@ -629,6 +632,7 @@ async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_par
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -643,7 +647,7 @@ async fn compute_block_checkpoint_should_merge_histories_in_case_of_multiple_par
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn compute_deploys_checkpoint_should_aggregate_cost_of_deploying_rholang_programs_within_the_block(
 ) {
     //reference costs
@@ -752,7 +756,7 @@ async fn compute_deploys_checkpoint_should_aggregate_cost_of_deploying_rholang_p
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Scala ignore, pendingUntilFixed"]
 async fn compute_deploys_checkpoint_should_return_cost_of_deploying_even_if_one_of_the_programs_within_the_deployment_throws_an_error(
 ) {
@@ -829,7 +833,7 @@ async fn compute_deploys_checkpoint_should_return_cost_of_deploying_even_if_one_
 }
 
 //7
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_not_return_a_checkpoint_for_an_invalid_block() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let processed_deploys = TestContext::prepare_deploys(vec!["@1!(1)"], PCost { cost: 1 });
@@ -861,6 +865,7 @@ async fn validate_block_checkpoint_should_not_return_a_checkpoint_for_an_invalid
             &block_store,
             &mut casper_snapshot,
             &mut runtime_manager,
+            None,
         )
         .await
         .expect("Failed to validate block checkpoint");
@@ -877,7 +882,7 @@ async fn validate_block_checkpoint_should_not_return_a_checkpoint_for_an_invalid
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_return_a_checkpoint_with_the_right_hash_for_a_valid_block(
 ) {
     let ctx = TestContext::new().await;
@@ -925,6 +930,7 @@ async fn validate_block_checkpoint_should_return_a_checkpoint_with_the_right_has
                 &mut runtime_manager,
                 block_data,
                 HashMap::new(),
+                None,
             )
             .await
             .expect("Failed to compute deploys checkpoint");
@@ -956,6 +962,7 @@ async fn validate_block_checkpoint_should_return_a_checkpoint_with_the_right_has
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -974,7 +981,7 @@ async fn validate_block_checkpoint_should_return_a_checkpoint_with_the_right_has
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_pass_linked_list_test() {
     let ctx = TestContext::new().await;
 
@@ -1036,6 +1043,7 @@ contract @"recursionTest"(@list) = {
                 &mut runtime_manager,
                 block_data,
                 HashMap::new(),
+                None,
             )
             .await
             .expect("Failed to compute deploys checkpoint");
@@ -1067,6 +1075,7 @@ contract @"recursionTest"(@list) = {
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -1085,7 +1094,7 @@ contract @"recursionTest"(@list) = {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_pass_persistent_produce_test_with_causality() {
     let ctx = TestContext::new().await;
 
@@ -1151,6 +1160,7 @@ async fn validate_block_checkpoint_should_pass_persistent_produce_test_with_caus
                 &mut runtime_manager,
                 block_data,
                 HashMap::new(),
+                None,
             )
             .await
             .expect("Failed to compute deploys checkpoint");
@@ -1182,6 +1192,7 @@ async fn validate_block_checkpoint_should_pass_persistent_produce_test_with_caus
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -1200,7 +1211,7 @@ async fn validate_block_checkpoint_should_pass_persistent_produce_test_with_caus
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_pass_tests_involving_primitives() {
     let ctx = TestContext::new().await;
 
@@ -1262,6 +1273,7 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
                 &mut runtime_manager,
                 block_data,
                 HashMap::new(),
+                None,
             )
             .await
             .expect("Failed to compute deploys checkpoint");
@@ -1293,6 +1305,7 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -1311,7 +1324,7 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_pass_tests_involving_races() {
     let ctx = TestContext::new().await;
 
@@ -1365,6 +1378,7 @@ async fn validate_block_checkpoint_should_pass_tests_involving_races() {
                     &mut runtime_manager,
                     block_data,
                     HashMap::new(),
+                    None,
                 )
                 .await
                 .expect("Failed to compute deploys checkpoint");
@@ -1397,6 +1411,7 @@ async fn validate_block_checkpoint_should_pass_tests_involving_races() {
                     &block_store,
                     &mut casper_snapshot,
                     &mut runtime_manager,
+                    None,
                 )
                 .await
                 .expect("Failed to validate block checkpoint");
@@ -1420,7 +1435,7 @@ async fn validate_block_checkpoint_should_pass_tests_involving_races() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_return_none_for_logs_containing_extra_comm_events() {
     let ctx = TestContext::new().await;
 
@@ -1459,6 +1474,7 @@ async fn validate_block_checkpoint_should_return_none_for_logs_containing_extra_
                 &mut runtime_manager,
                 block_data,
                 HashMap::new(),
+                None,
             )
             .await
             .expect("Failed to compute deploys checkpoint");
@@ -1506,6 +1522,7 @@ async fn validate_block_checkpoint_should_return_none_for_logs_containing_extra_
                 &block_store,
                 &mut casper_snapshot,
                 &mut runtime_manager,
+                None,
             )
             .await
             .expect("Failed to validate block checkpoint");
@@ -1528,7 +1545,7 @@ async fn validate_block_checkpoint_should_return_none_for_logs_containing_extra_
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn validate_block_checkpoint_should_pass_map_update_test() {
     let ctx = TestContext::new().await;
 
@@ -1584,6 +1601,7 @@ async fn validate_block_checkpoint_should_pass_map_update_test() {
                     &mut runtime_manager,
                     block_data,
                     HashMap::new(),
+                    None,
                 )
                 .await
                 .expect("Failed to compute deploys checkpoint");
@@ -1616,6 +1634,7 @@ async fn validate_block_checkpoint_should_pass_map_update_test() {
                     &block_store,
                     &mut casper_snapshot,
                     &mut runtime_manager,
+                    None,
                 )
                 .await
                 .expect("Failed to validate block checkpoint");
@@ -1643,7 +1662,7 @@ async fn validate_block_checkpoint_should_pass_map_update_test() {
 }
 
 // Test for cost mismatch between play and replay in case of out of phlo error
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn used_deploy_with_insufficient_phlos_should_be_added_to_a_block_with_all_phlos_consumed() {
     let ctx = TestContext::new().await;
 
@@ -1719,7 +1738,7 @@ const MULTI_BRANCH_SAMPLE_TERM_WITH_ERROR: &str = r#"
   }
 "#;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn replay_should_match_in_case_of_out_of_phlo_error() {
     let ctx = TestContext::new().await;
 
@@ -1761,7 +1780,7 @@ async fn replay_should_match_in_case_of_out_of_phlo_error() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn replay_should_match_in_case_of_user_execution_error() {
     let ctx = TestContext::new().await;
 

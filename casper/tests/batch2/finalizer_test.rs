@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Instant;
 
+use casper::rust::casper_conf::FinalizerConf;
+
 use crate::helper::{
     block_dag_storage_fixture::with_storage,
     block_generator::{create_block, create_genesis_block},
@@ -60,6 +62,34 @@ fn create_block_creator<'a>(
             None,
         )
     }
+}
+
+#[test]
+fn cannot_be_orphaned_should_return_false_for_non_positive_agreeing_stake() {
+    let v1 = generate_validator(Some("v1"));
+    let v2 = generate_validator(Some("v2"));
+
+    let message_weight_map = HashMap::from([(v1.clone(), 10_i64), (v2.clone(), 10_i64)]);
+    let agreeing_weight_map = HashMap::from([(v1.clone(), 10_i64), (v2.clone(), 0_i64)]);
+
+    assert!(!Finalizer::cannot_be_orphaned(
+        &message_weight_map,
+        &agreeing_weight_map
+    ));
+}
+
+#[test]
+fn cannot_be_orphaned_should_return_false_on_stake_sum_overflow() {
+    let v1 = generate_validator(Some("v1"));
+    let v2 = generate_validator(Some("v2"));
+
+    let message_weight_map = HashMap::from([(v1.clone(), i64::MAX), (v2.clone(), 1_i64)]);
+    let agreeing_weight_map = HashMap::from([(v1.clone(), i64::MAX)]);
+
+    assert!(!Finalizer::cannot_be_orphaned(
+        &message_weight_map,
+        &agreeing_weight_map
+    ));
 }
 
 //   *  *            b8 b9
@@ -163,23 +193,29 @@ async fn test_not_advance_finalization_if_no_new_lfb_found_advance_otherwise_inv
             .collect();
         let lfb = {
             let lfb_store = lfb_store.clone();
-            Finalizer::run(&dag, -1.0, 0, move |m| {
-                let lfb_store = lfb_store.clone();
-                async move {
-                    *lfb_store.borrow_mut() = m;
-                    Ok(())
-                }
-            })
+            Finalizer::run(
+                &dag,
+                -1.0,
+                0,
+                move |(m, _ft)| {
+                    let lfb_store = lfb_store.clone();
+                    async move {
+                        *lfb_store.borrow_mut() = m;
+                        Ok(())
+                    }
+                },
+                &FinalizerConf::default(),
+            )
             .await
             .unwrap()
         };
 
         // check output
-        assert_eq!(lfb, Some(b1.block_hash.clone()));
+        assert_eq!(lfb.as_ref().map(|(h, _)| h), Some(&b1.block_hash));
         // check if new LFB effect is invoked
         assert_eq!(*lfb_store.borrow(), b1.block_hash);
 
-        let finalized_height = dag.lookup_unsafe(&lfb.unwrap()).unwrap().block_number;
+        let finalized_height = dag.lookup_unsafe(&lfb.unwrap().0).unwrap().block_number;
 
         /* next layer */
         let b7 = creator1(
@@ -224,13 +260,19 @@ async fn test_not_advance_finalization_if_no_new_lfb_found_advance_otherwise_inv
         let dag = dag_store.get_representation();
         let lfb = {
             let lfb_effect_invoked = lfb_effect_invoked.clone();
-            Finalizer::run(&dag, -1.0, finalized_height, move |_m| {
-                let lfb_effect_invoked = lfb_effect_invoked.clone();
-                async move {
-                    *lfb_effect_invoked.borrow_mut() = true;
-                    Ok(())
-                }
-            })
+            Finalizer::run(
+                &dag,
+                -1.0,
+                finalized_height,
+                move |(_m, _ft)| {
+                    let lfb_effect_invoked = lfb_effect_invoked.clone();
+                    async move {
+                        *lfb_effect_invoked.borrow_mut() = true;
+                        Ok(())
+                    }
+                },
+                &FinalizerConf::default(),
+            )
             .await
             .unwrap()
         };
@@ -282,21 +324,27 @@ async fn test_not_advance_finalization_if_no_new_lfb_found_advance_otherwise_inv
         let lfb = {
             let lfb_store = lfb_store.clone();
             let finalised_store = finalised_store.clone();
-            Finalizer::run(&dag, -1.0, 0, move |m| {
-                let lfb_store = lfb_store.clone();
-                let finalised_store = finalised_store.clone();
-                async move {
-                    *lfb_store.borrow_mut() = m.clone();
-                    finalised_store.borrow_mut().insert(m);
-                    Ok(())
-                }
-            })
+            Finalizer::run(
+                &dag,
+                -1.0,
+                0,
+                move |(m, _ft)| {
+                    let lfb_store = lfb_store.clone();
+                    let finalised_store = finalised_store.clone();
+                    async move {
+                        *lfb_store.borrow_mut() = m.clone();
+                        finalised_store.borrow_mut().insert(m);
+                        Ok(())
+                    }
+                },
+                &FinalizerConf::default(),
+            )
             .await
             .unwrap()
         };
 
         // check output
-        assert_eq!(lfb, Some(b7.block_hash.clone()));
+        assert_eq!(lfb.as_ref().map(|(h, _)| h), Some(&b7.block_hash));
         // check if new LFB effect is invoked
         assert_eq!(*lfb_store.borrow(), b7.block_hash);
 
@@ -369,9 +417,15 @@ async fn finalizer_growth_feedback_loop_stale_justification_chain() {
             if checkpoints.contains(&height) {
                 let dag = dag_store.get_representation();
                 let started = Instant::now();
-                let _ = Finalizer::run(&dag, -1.0, 0, |_m| async { Ok::<(), KvStoreError>(()) })
-                    .await
-                    .expect("Finalizer run should succeed");
+                let _ = Finalizer::run(
+                    &dag,
+                    -1.0,
+                    0,
+                    |(_m, _ft)| async { Ok::<(), KvStoreError>(()) },
+                    &FinalizerConf::default(),
+                )
+                .await
+                .expect("Finalizer run should succeed");
                 timing_samples.push((height, started.elapsed().as_millis()));
             }
         }

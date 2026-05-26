@@ -241,16 +241,16 @@ pub fn union(bitset1: Vec<u8>, bitset2: Vec<u8>) -> Vec<u8> {
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParSpatialMatcherUtils.scala - noFrees[Par]
-pub fn no_frees(par: Par) -> Par {
-    par.with_exprs(no_frees_exprs(par.exprs.clone()))
+pub fn no_frees(par: &Par) -> Par {
+    par.with_exprs(no_frees_exprs(&par.exprs))
 }
 
 // See rholang/src/main/scala/coop/rchain/rholang/interpreter/matcher/ParSpatialMatcherUtils.scala - noFrees[Seq[Expr]]
-pub fn no_frees_exprs(exprs: Vec<Expr>) -> Vec<Expr> {
+pub fn no_frees_exprs(exprs: &[Expr]) -> Vec<Expr> {
     exprs
         .iter()
-        .filter(|expr| match expr.expr_instance.clone() {
-            Some(EVarBody(EVar { v })) => match v.unwrap().var_instance {
+        .filter(|expr| match &expr.expr_instance {
+            Some(EVarBody(EVar { v: Some(v) })) => match &v.var_instance {
                 Some(FreeVar(_)) => false,
                 Some(Wildcard(_)) => false,
                 _ => true,
@@ -516,6 +516,35 @@ pub fn new_guri_par(value: String, _locally_free_par: Vec<u8>, _connective_used_
 pub fn new_guri_expr(value: String) -> Expr {
     Expr {
         expr_instance: Some(GUri(value)),
+    }
+}
+
+pub fn new_gdouble_expr(value: f64) -> Expr {
+    Expr {
+        expr_instance: Some(ExprInstance::GDouble(value.to_bits())),
+    }
+}
+
+pub fn new_gbigint_expr(bytes: Vec<u8>) -> Expr {
+    Expr {
+        expr_instance: Some(ExprInstance::GBigInt(bytes)),
+    }
+}
+
+pub fn new_gbigrat_expr(numerator: Vec<u8>, denominator: Vec<u8>) -> Expr {
+    use crate::rhoapi::GBigRational;
+    Expr {
+        expr_instance: Some(ExprInstance::GBigRat(GBigRational {
+            numerator,
+            denominator,
+        })),
+    }
+}
+
+pub fn new_gfixedpoint_expr(unscaled: Vec<u8>, scale: u32) -> Expr {
+    use crate::rhoapi::GFixedPoint;
+    Expr {
+        expr_instance: Some(ExprInstance::GFixedPoint(GFixedPoint { unscaled, scale })),
     }
 }
 

@@ -33,9 +33,12 @@ This ensures:
 
 ### Location
 
-- **Primary Implementation**: `/Users/leaf/Pyrofex/firefly/f1r3fly/casper/src/main/scala/coop/rchain/casper/SynchronyConstraintChecker.scala`
-- **Error Type**: `/Users/leaf/Pyrofex/firefly/f1r3fly/casper/src/main/scala/coop/rchain/casper/blocks/proposer/ProposeResult.scala` (lines 23, 41)
-- **Used By**: `/Users/leaf/Pyrofex/firefly/f1r3fly/casper/src/main/scala/coop/rchain/casper/blocks/proposer/Proposer.scala` (lines 184-190)
+- **Rust Implementation**: `casper/src/rust/synchrony_constraint_checker.rs`
+- **Error Type**: `casper/src/rust/blocks/proposer/propose_result.rs`
+- **Used By**: `casper/src/rust/blocks/proposer/proposer.rs`
+
+**Scala (legacy reference):**
+- `casper/src/main/scala/coop/rchain/casper/SynchronyConstraintChecker.scala`
 
 ### The Algorithm
 
@@ -154,15 +157,15 @@ If the validator's last block was the genesis block (block number 0), they are a
 
 ```hocon
 casper {
-  synchrony-constraint-threshold = 0.67
+  synchrony-constraint-threshold = 0
 }
 ```
 
-**Location**: `/Users/leaf/Pyrofex/firefly/f1r3fly/node/src/main/resources/defaults.conf` (line 239)
+**Location**: `node/src/main/resources/defaults.conf`
 
 **Type**: `Double` (0.0 to 1.0)
 
-**Default Value**: 0.67 (67%)
+**Default Value**: 0 (no synchrony gate)
 
 ### What Different Values Mean
 
@@ -391,7 +394,7 @@ Balances liveness with safety:
 
 ### Large Networks (10+ Validators)
 
-**Recommended**: `synchrony-constraint-threshold = 0.67` (default)
+**Recommended**: `synchrony-constraint-threshold = 0` (default)
 
 The default Byzantine fault tolerance threshold:
 - Assumes up to 1/3 of validators can be faulty/offline
@@ -401,7 +404,7 @@ The default Byzantine fault tolerance threshold:
 
 ### Production Networks
 
-**Recommended**: `synchrony-constraint-threshold = 0.67`
+**Recommended**: `synchrony-constraint-threshold = 0`
 
 **Considerations**:
 - Monitor validator participation rates

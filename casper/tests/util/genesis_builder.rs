@@ -246,6 +246,9 @@ impl GenesisBuilder {
                 supply: i64::MAX,
                 block_number: 0,
                 version: 1,
+                native_token_name: "F1R3CAP".to_string(),
+                native_token_symbol: "F1R3".to_string(),
+                native_token_decimals: 8,
             },
         )
     }
@@ -319,7 +322,7 @@ impl GenesisBuilder {
             let mut runtime_manager = RuntimeManager::create_with_store(
                 r_store,
                 m_store,
-                Genesis::non_negative_mergeable_tag_name(),
+                std::sync::Arc::new(Genesis::default_mergeable_tags()),
                 rholang::rust::interpreter::external_services::ExternalServices::noop(),
             );
 

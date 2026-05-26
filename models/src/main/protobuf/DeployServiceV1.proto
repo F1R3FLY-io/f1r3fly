@@ -30,7 +30,7 @@ option (scalapb.options) = {
 // `ProposeServiceV2.propose` to make a new block with the results of running them
 // all.
 //
-// To get results back, use `listenForDataAtName`.
+// To get results back, use `getDataAtName`.
 service DeployService {
   // Queue deployment of Rholang code (or fail to parse).
   rpc doDeploy(DeployDataProto) returns (DeployResponse) {}
@@ -44,9 +44,6 @@ service DeployService {
   // Get a summary of blocks on the blockchain.
   rpc getBlocks(BlocksQuery) returns (stream BlockInfoResponse) {}
   // Find data sent to a name.
-  // OBSOLETE: Use getDataAtName instead. This method will be removed in the future version of RNode.
-  rpc listenForDataAtName(DataAtNameQuery) returns (ListeningNameDataResponse) {}
-  // Find data sent to a name.
   rpc getDataAtName(DataAtNameByBlockQuery) returns (RhoDataResponse) {}
   // Find processes receiving on a name.
   rpc listenForContinuationAtName(ContinuationAtNameQuery) returns (ContinuationAtNameResponse) {}
@@ -58,6 +55,10 @@ service DeployService {
   rpc lastFinalizedBlock(LastFinalizedBlockQuery) returns (LastFinalizedBlockResponse) {}
   // Check if a given block is finalized.
   rpc isFinalized(IsFinalizedQuery) returns (IsFinalizedResponse) {}
+  // Query the canonical-state finalization status of a deploy by its signature.
+  // Prefer this over isFinalized for deploy tracking — isFinalized can return
+  // true for a block whose deploy effects were dropped by merge rejection.
+  rpc deployFinalizationStatus(DeployFinalizationStatusQuery) returns (DeployFinalizationStatusResponse) {}
   // Check if a given validator is bonded.
   // Returns on success BondStatusResponse
   rpc bondStatus(BondStatusQuery) returns (BondStatusResponse) {}
@@ -83,6 +84,7 @@ message ExploratoryDeployResponse{
     servicemodelapi.ServiceError error = 1;
     DataWithBlockInfo result = 2;
   }
+  uint64 cost = 3;
 }
 
 // doDeploy
@@ -123,19 +125,6 @@ message BlockInfoResponse {
     servicemodelapi.ServiceError error        = 1;
     LightBlockInfo blockInfo  = 2;
   }
-}
-
-// listenForDataAtName
-message ListeningNameDataResponse {
-  oneof message {
-    servicemodelapi.ServiceError error                = 1;
-    ListeningNameDataPayload payload  = 2;
-  }
-}
-
-message ListeningNameDataPayload {
-  repeated DataWithBlockInfo blockInfo = 1;
-  int32 length                         = 2;
 }
 
 // listenForDataAtPar
@@ -197,6 +186,14 @@ message IsFinalizedResponse {
   oneof message {
     servicemodelapi.ServiceError error = 1;
     bool isFinalized   = 2;
+  }
+}
+
+// deployFinalizationStatus
+message DeployFinalizationStatusResponse {
+  oneof message {
+    servicemodelapi.ServiceError error = 1;
+    DeployFinalizationStatusInfo status = 2;
   }
 }
 

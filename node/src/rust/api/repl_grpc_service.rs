@@ -67,9 +67,9 @@ impl ReplGrpcServiceImpl {
             .await?;
 
         let pretty_storage = if print_unmatched_sends_only {
-            storage_printer::pretty_print_unmatched_sends(&*self.runtime)
+            storage_printer::pretty_print_unmatched_sends(&*self.runtime).await
         } else {
-            storage_printer::pretty_print(&*self.runtime)
+            storage_printer::pretty_print(&*self.runtime).await
         };
 
         let error_str = if errors.is_empty() {
@@ -135,7 +135,6 @@ impl Repl for ReplGrpcServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::rhoapi::Par;
     use rholang::rust::interpreter::{
         external_services::ExternalServices, matcher::r#match::Matcher,
         rho_runtime::create_runtime_from_kv_store, system_processes::test_framework_contracts,
@@ -150,7 +149,7 @@ mod tests {
         let store = kvm.r_space_stores().await.unwrap();
         let runtime = create_runtime_from_kv_store(
             store,
-            Par::default(),
+            Arc::new(std::collections::HashMap::new()),
             true,
             &mut test_framework_contracts(),
             Arc::new(Box::new(Matcher)),

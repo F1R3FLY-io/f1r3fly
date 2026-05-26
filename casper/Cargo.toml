@@ -42,7 +42,7 @@ tokio-stream = "0.1"
 humantime = "2.3.0"
 tonic = { workspace = true }
 eyre = { workspace = true }
-metrics = "0.23"
+metrics = { workspace = true }
 proptest = "1.6.0"
 tempfile = { version = "3.24.0", optional = true }
 
@@ -60,5 +60,9 @@ default = []
 # Exposes test utilities (TestNode, mocks, genesis helpers) to other workspace members.
 # Guarded with #[cfg(feature = "test-utils")] so it is never compiled in production.
 test-utils = ["tempfile"]
+schnorr_secp256k1_experimental = [
+    "crypto/schnorr_secp256k1_experimental",
+    "models/schnorr_secp256k1_experimental",
+]
 
 [build-dependencies]

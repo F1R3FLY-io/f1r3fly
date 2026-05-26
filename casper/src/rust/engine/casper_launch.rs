@@ -1,7 +1,7 @@
 // See casper/src/main/scala/coop/rchain/casper/engine/CasperLaunch.scala
 
 use dashmap::DashSet;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc;
 
@@ -27,6 +27,7 @@ use async_trait::async_trait;
 use block_storage::rust::casperbuffer::casper_buffer_key_value_storage::CasperBufferKeyValueStorage;
 use block_storage::rust::dag::block_dag_key_value_storage::BlockDagKeyValueStorage;
 use block_storage::rust::deploy::key_value_deploy_storage::KeyValueDeployStorage;
+use block_storage::rust::deploy::key_value_rejected_deploy_buffer::KeyValueRejectedDeployBuffer;
 use block_storage::rust::key_value_block_store::KeyValueBlockStore;
 use comm::rust::rp::connect::ConnectionsCell;
 use comm::rust::rp::rp_conf::RPConf;
@@ -57,9 +58,10 @@ pub struct CasperLaunchImpl<T: TransportLayer + Send + Sync + Clone + 'static> {
     block_store: KeyValueBlockStore,
     block_dag_storage: BlockDagKeyValueStorage,
     deploy_storage: KeyValueDeployStorage,
+    rejected_deploy_buffer: Arc<Mutex<KeyValueRejectedDeployBuffer>>,
     casper_buffer_storage: CasperBufferKeyValueStorage,
     rspace_state_manager: RSpaceStateManager,
-    runtime_manager: Arc<tokio::sync::Mutex<RuntimeManager>>,
+    runtime_manager: Arc<RuntimeManager>,
     estimator: Estimator,
     casper_shard_conf: CasperShardConf,
 
@@ -75,18 +77,10 @@ pub struct CasperLaunchImpl<T: TransportLayer + Send + Sync + Clone + 'static> {
     heartbeat_signal_ref: crate::rust::heartbeat_signal::HeartbeatSignalRef,
 }
 
-const MAX_BLOCKS_IN_PROCESSING_DEFAULT: usize = 512;
-const MAX_BLOCKS_IN_PROCESSING_ENV: &str = "F1R3_MAX_BLOCKS_IN_PROCESSING";
-static MAX_BLOCKS_IN_PROCESSING: OnceLock<usize> = OnceLock::new();
+const MAX_BLOCKS_IN_PROCESSING: usize = 2_048;
 
 fn max_blocks_in_processing() -> usize {
-    *MAX_BLOCKS_IN_PROCESSING.get_or_init(|| {
-        std::env::var(MAX_BLOCKS_IN_PROCESSING_ENV)
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(MAX_BLOCKS_IN_PROCESSING_DEFAULT)
-    })
+    MAX_BLOCKS_IN_PROCESSING
 }
 
 impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
@@ -107,6 +101,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             self.block_store.clone(),
             self.block_dag_storage.clone(),
             self.deploy_storage.clone(),
+            self.rejected_deploy_buffer.clone(),
             self.casper_buffer_storage.clone(),
             validator_id,
             self.casper_shard_conf.clone(),
@@ -128,9 +123,10 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
         block_store: KeyValueBlockStore,
         block_dag_storage: BlockDagKeyValueStorage,
         deploy_storage: KeyValueDeployStorage,
+        rejected_deploy_buffer: Arc<Mutex<KeyValueRejectedDeployBuffer>>,
         casper_buffer_storage: CasperBufferKeyValueStorage,
         rspace_state_manager: RSpaceStateManager,
-        runtime_manager: Arc<tokio::sync::Mutex<RuntimeManager>>,
+        runtime_manager: Arc<RuntimeManager>,
         estimator: Estimator,
         // Explicit parameters (matching Scala signature order)
         block_processing_queue_tx: mpsc::Sender<(
@@ -170,6 +166,17 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             disable_validator_progress_check: standalone,
             enable_mergeable_channel_gc: conf.enable_mergeable_channel_gc,
             mergeable_channels_gc_depth_buffer: conf.mergeable_channels_gc_depth_buffer,
+            finalizer_conf: conf.finalizer.clone(),
+            synchrony_recovery_stall_window: conf.synchrony_recovery_stall_window,
+            synchrony_recovery_cooldown: conf.synchrony_recovery_cooldown,
+            synchrony_recovery_max_bypasses: conf.synchrony_recovery_max_bypasses,
+            synchrony_finalized_baseline_enabled: conf.synchrony_finalized_baseline_enabled,
+            synchrony_finalized_baseline_max_distance: conf
+                .synchrony_finalized_baseline_max_distance,
+            max_user_deploys_per_block: conf.max_user_deploys_per_block,
+            native_token_name: conf.genesis_block_data.native_token_name.clone(),
+            native_token_symbol: conf.genesis_block_data.native_token_symbol.clone(),
+            native_token_decimals: conf.genesis_block_data.native_token_decimals,
         };
 
         Self {
@@ -184,6 +191,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             block_store,
             block_dag_storage,
             deploy_storage,
+            rejected_deploy_buffer,
             casper_buffer_storage,
             rspace_state_manager,
             runtime_manager,
@@ -332,6 +340,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
         );
 
         let ab = approved_block.candidate.block.clone();
+        let genesis_post_state_hash = ab.body.state.post_state_hash.clone();
 
         let casper = self.create_casper(validator_id.clone(), ab)?;
         let casper_arc = Arc::new(casper);
@@ -409,11 +418,39 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
         )
         .await?;
 
+        // Guard against config drift: a joiner's local native-token-* values
+        // must match what this network actually baked into the TokenMetadata
+        // contract at genesis. If they disagree, the node's /api/status would
+        // advertise values that contradict on-chain state, which misleads
+        // block explorers and wallets.
+        crate::rust::util::token_metadata_check::verify_token_metadata_matches_config(
+            &self.runtime_manager,
+            &genesis_post_state_hash,
+            &self.conf.genesis_block_data.native_token_name,
+            &self.conf.genesis_block_data.native_token_symbol,
+            self.conf.genesis_block_data.native_token_decimals,
+        )
+        .await?;
+
         Ok(())
     }
 
     async fn connect_as_genesis_validator(&self) -> Result<(), CasperError> {
         println!("connectAsGenesisValidator");
+
+        // As a genesis validator, native-token-* values from local config are
+        // what will be baked into the TokenMetadata contract at genesis (via
+        // default_blessed_terms). On-chain state cannot disagree with local
+        // config here by construction, so no post-genesis verification is
+        // performed on this path.
+        tracing::info!(
+            event = "native_token_metadata_startup",
+            role = "genesis_validator",
+            native_token_name = %self.conf.genesis_block_data.native_token_name,
+            native_token_symbol = %self.conf.genesis_block_data.native_token_symbol,
+            native_token_decimals = self.conf.genesis_block_data.native_token_decimals,
+            "Genesis validator: native token metadata will be derived from local config"
+        );
 
         let timestamp = self
             .conf
@@ -461,6 +498,9 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
                 .pos_multi_sig_public_keys
                 .clone(),
             self.conf.genesis_block_data.pos_multi_sig_quorum,
+            self.conf.genesis_block_data.native_token_name.clone(),
+            self.conf.genesis_block_data.native_token_symbol.clone(),
+            self.conf.genesis_block_data.native_token_decimals,
             self.transport_layer.clone(),
             Arc::new(self.rp_conf_ask.clone()),
         )?;
@@ -482,6 +522,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             self.block_store.clone(),
             self.block_dag_storage.clone(),
             self.deploy_storage.clone(),
+            self.rejected_deploy_buffer.clone(),
             self.casper_buffer_storage.clone(),
             self.rspace_state_manager.clone(),
             self.runtime_manager.clone(),
@@ -499,6 +540,21 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
 
         let validator_id = ValidatorIdentity::from_private_key_with_logging(
             self.conf.validator_private_key.as_deref(),
+        );
+
+        // As ceremony master, native-token-* values from local config will be
+        // baked into the TokenMetadata contract at genesis (via
+        // default_blessed_terms). On-chain state matches local config by
+        // construction on this path, so no post-genesis verification is
+        // performed. If your chain should use different values, update
+        // casper.genesis-block-data.native-token-* before genesis.
+        tracing::info!(
+            event = "native_token_metadata_startup",
+            role = "ceremony_master",
+            native_token_name = %self.conf.genesis_block_data.native_token_name,
+            native_token_symbol = %self.conf.genesis_block_data.native_token_symbol,
+            native_token_decimals = self.conf.genesis_block_data.native_token_decimals,
+            "Ceremony master: native token metadata will be baked into genesis from local config"
         );
 
         tracing::warn!("=== BOOTSTRAP GENESIS INPUT DEBUG START ===");
@@ -554,9 +610,12 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
                 .pos_multi_sig_public_keys
                 .clone(),
             self.conf.genesis_block_data.pos_multi_sig_quorum,
-            &mut *self.runtime_manager.lock().await,
+            self.conf.genesis_block_data.native_token_name.clone(),
+            self.conf.genesis_block_data.native_token_symbol.clone(),
+            self.conf.genesis_block_data.native_token_decimals,
+            &self.runtime_manager,
             self.last_approved_block.clone(),
-            None, // event_log
+            Some(self.event_publisher.clone()),
             self.transport_layer.clone(),
             Arc::new(self.connections_cell.clone()),
             Arc::new(self.rp_conf_ask.clone()),
@@ -576,6 +635,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             let block_store = self.block_store.clone();
             let block_dag_storage = self.block_dag_storage.clone();
             let deploy_storage = self.deploy_storage.clone();
+            let rejected_deploy_buffer = self.rejected_deploy_buffer.clone();
             let casper_buffer_storage = self.casper_buffer_storage.clone();
             let event_publisher = self.event_publisher.clone();
             let block_retriever = self.block_retriever.clone();
@@ -596,6 +656,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
                     block_store,
                     block_dag_storage,
                     deploy_storage,
+                    rejected_deploy_buffer,
                     casper_buffer_storage,
                     runtime_manager,
                     estimator,
@@ -662,6 +723,7 @@ impl<T: TransportLayer + Send + Sync + Clone + 'static> CasperLaunchImpl<T> {
             &self.block_store,
             &self.block_dag_storage,
             &self.deploy_storage,
+            &self.rejected_deploy_buffer,
             &self.casper_buffer_storage,
             &self.rspace_state_manager,
             self.event_publisher.clone(),

@@ -41,7 +41,8 @@ flowchart TD
     STATE_UPDATE --> BLOCK_VALID[✅ Block Valid]
     
     BLOCK_VALID --> BROADCAST[📡 Broadcast Block]
-    BROADCAST --> FINALIZE[Add to DAG & Finalize]
+    BROADCAST --> FINALIZE[Add to DAG & Finalize
+    Cache FT in BlockMetadata]
     
     %% Styling
     style RUNNING fill:#4caf50,color:#fff
@@ -178,5 +179,5 @@ flowchart TD
 
 **Clique Oracle Safety** (`SafetyOracle`): Computes mathematical finality via `(cliqueWeight * 2 - totalStake) / totalStake`, finding maximum validator cliques that agree on target blocks.
 
-**Key Parameters**: `fault-tolerance-threshold=0.99`, `synchrony-constraint-threshold=0.67`, `height-constraint-threshold=1000`
+**Key Parameters**: `fault-tolerance-threshold=0.1`, `synchrony-constraint-threshold=0`, `height-constraint-threshold=1000`
 

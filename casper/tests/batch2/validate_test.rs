@@ -237,7 +237,7 @@ fn create_justifications(pairs: Vec<(Bytes, Bytes)>) -> HashMap<Bytes, Bytes> {
 // Many tests use checks that must be added later
 // TODO: Add log validation mechanism when LogStub mechanism from Scala will be implemented on Rust.
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_signature_validation_should_return_false_on_unknown_algorithms() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -262,7 +262,7 @@ async fn block_signature_validation_should_return_false_on_unknown_algorithms() 
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_signature_validation_should_return_false_on_invalid_secp256k1_signatures() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let secp256k1 = Secp256k1;
@@ -322,7 +322,7 @@ async fn block_signature_validation_should_return_false_on_invalid_secp256k1_sig
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_signature_validation_should_return_true_on_valid_secp256k1_signatures() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let n = 6;
@@ -344,7 +344,7 @@ async fn block_signature_validation_should_return_true_on_valid_secp256k1_signat
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn timestamp_validation_should_not_accept_blocks_with_future_time() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 1, vec![]);
@@ -380,7 +380,7 @@ async fn timestamp_validation_should_not_accept_blocks_with_future_time() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn timestamp_validation_should_not_accept_blocks_that_were_published_before_parent_time() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -405,7 +405,7 @@ async fn timestamp_validation_should_not_accept_blocks_that_were_published_befor
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_number_validation_should_only_accept_0_as_the_number_for_a_block_with_no_parents() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 1, vec![]);
@@ -430,7 +430,7 @@ async fn block_number_validation_should_only_accept_0_as_the_number_for_a_block_
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_number_validation_should_return_false_for_non_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -455,7 +455,7 @@ async fn block_number_validation_should_return_false_for_non_sequential_numberin
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_number_validation_should_return_true_for_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let n = 6;
@@ -478,7 +478,7 @@ async fn block_number_validation_should_return_true_for_sequential_numbering() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_number_validation_should_correctly_validate_a_multi_parent_block_where_the_parents_have_different_block_numbers(
 ) {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -562,7 +562,7 @@ async fn block_number_validation_should_correctly_validate_a_multi_parent_block_
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn future_deploy_validation_should_work() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
@@ -600,7 +600,7 @@ async fn future_deploy_validation_should_work() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn future_deploy_validation_should_not_accept_blocks_with_a_deploy_for_a_future_block_number()
 {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -642,7 +642,7 @@ async fn future_deploy_validation_should_not_accept_blocks_with_a_deploy_for_a_f
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn deploy_expiration_validation_should_work() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
@@ -664,7 +664,7 @@ async fn deploy_expiration_validation_should_work() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn deploy_expiration_validation_should_not_accept_blocks_with_a_deploy_that_is_expired() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
@@ -704,7 +704,7 @@ async fn deploy_expiration_validation_should_not_accept_blocks_with_a_deploy_tha
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sequence_number_validation_should_only_accept_0_as_the_number_for_a_block_with_no_parents()
 {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -729,7 +729,7 @@ async fn sequence_number_validation_should_only_accept_0_as_the_number_for_a_blo
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sequence_number_validation_should_return_false_for_non_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -750,7 +750,7 @@ async fn sequence_number_validation_should_return_false_for_non_sequential_numbe
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sequence_number_validation_should_return_true_for_sequential_numbering() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let n = 20;
@@ -778,7 +778,7 @@ async fn sequence_number_validation_should_return_true_for_sequential_numbering(
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn repeat_deploy_validation_should_return_valid_for_empty_blocks() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -798,7 +798,7 @@ async fn repeat_deploy_validation_should_return_valid_for_empty_blocks() {
 
 //Test 18: "Repeat deploy validation" should "not accept blocks with a repeated deploy"
 // +
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn repeat_deploy_validation_should_not_accept_blocks_with_a_repeated_deploy() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
@@ -843,7 +843,207 @@ async fn repeat_deploy_validation_should_not_accept_blocks_with_a_repeated_deplo
     .await
 }
 
-#[tokio::test]
+/// Regression test for `repeat_deploy`'s `rejected_in_scope` exemption.
+///
+/// Without the exemption, validation rejects any block that re-includes a
+/// sig already present in an ancestor's `body.deploys` — including the
+/// legitimate recovery path where a deploy was rejected by a descendant
+/// merge and is re-proposed through `RejectedDeployBuffer` to land its
+/// effects in canonical state.
+///
+/// Setup models a true recovery scenario: the deploy lives ONLY in a
+/// non-canonical / non-finalized ancestor (the `rejected_in_scope` flag
+/// is what marks it as rejected during merge), so
+/// `deploy_finalization_status::resolve` for the sig returns `Pending`
+/// — not `Finalized`. Under this state, the recovery exemption is
+/// legitimate: re-inclusion is the only way to land the deploy's
+/// effects in canonical state.
+///
+/// DAG: genesis (no deploys) → block_x (body.deploys=[deploy], not
+/// finalized) → block_w (body.deploys=[deploy], the re-inclusion).
+/// LFB stays at genesis because only `genesis` is inserted with
+/// `approved=true`. The resolver's BFS from LFB visits only genesis,
+/// never block_x — so the sig has no clean canonical inclusion and the
+/// resolver returns `Pending`.
+///
+/// Companion test:
+/// `repeat_deploy_blocks_double_execution_when_finalized_and_in_rejected_in_scope`
+/// covers the symmetric case where the sig has a clean canonical
+/// inclusion (status `Finalized`) and the recovery exemption must NOT
+/// apply.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn repeat_deploy_validation_allows_recovered_deploy_from_rejected_in_scope() {
+    use dashmap::DashSet;
+    use std::sync::Arc;
+
+    with_storage(|mut block_store, mut block_dag_storage| async move {
+        let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
+        let deploy_sig: Bytes = deploy.deploy.sig.clone();
+
+        // Genesis carries no user deploys: keeps the LFB clean of `deploy`
+        // so the resolver cannot find a canonical clean inclusion.
+        let genesis = create_genesis_block(
+            &mut block_store,
+            &mut block_dag_storage,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // block_x carries the deploy in body.deploys but is NOT marked
+        // approved/finalized (insert_indexed only marks genesis approved).
+        // The resolver's LFB BFS walks main parents up from genesis and
+        // never visits block_x, so the resolver returns `Pending`.
+        let block_x = create_block(
+            &mut block_store,
+            &mut block_dag_storage,
+            vec![genesis.block_hash.clone()],
+            &genesis,
+            None,
+            None,
+            None,
+            Some(vec![deploy.clone()]),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // block_w re-includes the deploy. repeat_deploy walks block_w's
+        // ancestor chain and finds block_x with deploy in body.deploys —
+        // an "ancestor occurrence" that without the exemption would be
+        // flagged as repeat.
+        let block_w = create_block(
+            &mut block_store,
+            &mut block_dag_storage,
+            vec![block_x.block_hash.clone()],
+            &genesis,
+            None,
+            None,
+            None,
+            Some(vec![deploy]),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let dag = block_dag_storage.get_representation();
+        let mut snapshot = mk_casper_snapshot(dag);
+
+        // Mark the sig as "rejected in a descendant merge within deploy_lifespan".
+        // This is the signal the block-creator and Phase D recovery pipelines use
+        // to justify re-inclusion; validation must honor it.
+        let rejected: DashSet<Bytes> = DashSet::new();
+        rejected.insert(deploy_sig);
+        snapshot.rejected_in_scope = Arc::new(rejected);
+
+        let result = Validate::repeat_deploy(&block_w, &mut snapshot, &mut block_store, 50);
+        assert_eq!(
+            result,
+            Either::Right(ValidBlock::Valid),
+            "recovery re-inclusion of a rejected-in-scope sig with status=Pending must validate; got {:?}",
+            result,
+        );
+    })
+    .await
+}
+
+/// Companion to `repeat_deploy_validation_allows_recovered_deploy_from_rejected_in_scope`.
+/// Tests the symmetric case the recovery exemption must NOT cover: a sig
+/// that is in `rejected_in_scope` but ALSO has a clean canonical
+/// inclusion (status `Finalized`). Re-including a Finalized sig is
+/// double-execution, not recovery — the catchup gate
+/// (`should_admit_to_rejected_buffer`) is the primary defense, but the
+/// repeat-deploy validator must serve as a second line in case the gate
+/// misses.
+///
+/// DAG: genesis (body.deploys=[deploy], LFB) → block_w
+/// (body.deploys=[deploy], re-inclusion). Genesis IS the LFB so the
+/// resolver finds a clean canonical inclusion of `deploy` in genesis
+/// and returns `Finalized`. The recovery exemption must therefore NOT
+/// apply, and the repeat check must catch the duplicate inclusion.
+///
+/// Pre-fix: the rejected_in_scope filter in `repeat_deploy` exempts
+/// the sig unconditionally → returns `Valid` → double-execution slips
+/// through. This test fails.
+///
+/// Post-fix: the filter is gated on `status != Finalized`. The sig is
+/// Finalized, so it is NOT exempted; ancestor scan finds the clean
+/// inclusion in genesis and returns `InvalidRepeatDeploy`. This test
+/// passes.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn repeat_deploy_blocks_double_execution_when_finalized_and_in_rejected_in_scope() {
+    use dashmap::DashSet;
+    use std::sync::Arc;
+
+    with_storage(|mut block_store, mut block_dag_storage| async move {
+        let deploy = construct_deploy::basic_processed_deploy(0, None).unwrap();
+        let deploy_sig: Bytes = deploy.deploy.sig.clone();
+
+        // Genesis IS the LFB and contains `deploy` clean in body.deploys.
+        // The resolver therefore reports `Finalized` for this sig.
+        let genesis = create_genesis_block(
+            &mut block_store,
+            &mut block_dag_storage,
+            None,
+            None,
+            None,
+            Some(vec![deploy.clone()]),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // block_w re-includes the deploy. ancestor scan would find genesis's
+        // clean inclusion if not exempted by the rejected_in_scope filter.
+        let block_w = create_block(
+            &mut block_store,
+            &mut block_dag_storage,
+            vec![genesis.block_hash.clone()],
+            &genesis,
+            None,
+            None,
+            None,
+            Some(vec![deploy]),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let dag = block_dag_storage.get_representation();
+        let mut snapshot = mk_casper_snapshot(dag);
+
+        // Same `rejected_in_scope` membership as the recovery test — the
+        // gap is exactly that the repeat_deploy filter cannot distinguish
+        // "rejected somewhere, recoverable" from "finalized somewhere,
+        // non-recoverable" via this set alone.
+        let rejected: DashSet<Bytes> = DashSet::new();
+        rejected.insert(deploy_sig);
+        snapshot.rejected_in_scope = Arc::new(rejected);
+
+        let result = Validate::repeat_deploy(&block_w, &mut snapshot, &mut block_store, 50);
+        assert_eq!(
+            result,
+            Either::Left(BlockError::Invalid(InvalidBlock::InvalidRepeatDeploy)),
+            "double-execution of a Finalized sig (rejected_in_scope membership notwithstanding) must be caught; got {:?}",
+            result,
+        );
+    })
+    .await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sender_validation_should_return_true_for_genesis_and_blocks_from_bonded_validators_and_false_otherwise(
 ) {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -883,7 +1083,7 @@ async fn sender_validation_should_return_true_for_genesis_and_blocks_from_bonded
 // Parent validation tests - Testing validator progress check (InvalidParents)
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_allow_first_block_from_new_validator() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -933,7 +1133,7 @@ async fn parent_validation_should_allow_first_block_from_new_validator() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_allow_empty_block_when_new_parents_exist() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -1025,7 +1225,7 @@ async fn parent_validation_should_allow_empty_block_when_new_parents_exist() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_reject_empty_block_when_no_new_parents_exist() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -1096,7 +1296,7 @@ async fn parent_validation_should_reject_empty_block_when_no_new_parents_exist()
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_allow_block_with_user_deploys_regardless_of_parents() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -1167,7 +1367,7 @@ async fn parent_validation_should_allow_block_with_user_deploys_regardless_of_pa
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_allow_proposal_when_previous_block_is_genesis() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -1219,7 +1419,7 @@ async fn parent_validation_should_allow_proposal_when_previous_block_is_genesis(
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn parent_validation_should_enforce_max_number_of_parents_constraint() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator0"));
@@ -1337,7 +1537,7 @@ async fn parent_validation_should_enforce_max_number_of_parents_constraint() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_summary_validation_should_short_circuit_after_first_invalidity() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let _genesis = create_chain(&mut block_store, &mut block_dag_storage, 2, vec![]);
@@ -1398,7 +1598,7 @@ async fn block_summary_validation_should_short_circuit_after_first_invalidity() 
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn justification_follow_validation_should_return_valid_for_proper_justifications_and_failed_otherwise(
 ) {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -1584,7 +1784,7 @@ async fn justification_follow_validation_should_return_valid_for_proper_justific
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn justification_regression_validation_should_return_valid_for_proper_justifications_and_justification_regression_detected_otherwise(
 ) {
     with_storage(|mut block_store, mut block_dag_storage| async move {
@@ -1724,7 +1924,7 @@ async fn justification_regression_validation_should_return_valid_for_proper_just
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn justification_regression_validation_should_return_valid_for_regressive_invalid_blocks() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let v0 = generate_validator(Some("Validator 1"));
@@ -1859,7 +2059,7 @@ async fn justification_regression_validation_should_return_valid_for_regressive_
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modified_bonds() {
     with_storage(|mut block_store, mut block_dag_storage| async move {
         let context = GenesisBuilder::new()
@@ -1879,7 +2079,7 @@ async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modi
         let mut runtime_manager = RuntimeManager::create_with_store(
             (&mut *kvm).r_space_stores().await.unwrap(),
             m_store,
-            Genesis::non_negative_mergeable_tag_name(),
+            std::sync::Arc::new(Genesis::default_mergeable_tags()),
             rholang::rust::interpreter::external_services::ExternalServices::noop(),
         );
 
@@ -1891,6 +2091,7 @@ async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modi
             &mut block_store,
             &mut casper_snapshot,
             &mut runtime_manager,
+            None,
         )
         .await
         .unwrap();
@@ -1918,7 +2119,7 @@ async fn bonds_cache_validation_should_succeed_on_a_valid_block_and_fail_on_modi
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn field_format_validation_should_succeed_on_a_valid_block_and_fail_on_empty_fields() {
     with_storage(|_block_store, mut block_dag_storage| async move {
         let context = GenesisBuilder::new()
@@ -1961,7 +2162,7 @@ async fn field_format_validation_should_succeed_on_a_valid_block_and_fail_on_emp
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_hash_format_validation_should_fail_on_invalid_hash() {
     with_storage(|_block_store, mut block_dag_storage| async move {
         let context = GenesisBuilder::new()
@@ -1996,7 +2197,7 @@ async fn block_hash_format_validation_should_fail_on_invalid_hash() {
     .await
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn block_version_validation_should_work() {
     with_storage(|_block_store, mut block_dag_storage| async move {
         let context = GenesisBuilder::new()

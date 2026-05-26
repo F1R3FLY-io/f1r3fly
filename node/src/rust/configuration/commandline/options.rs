@@ -11,10 +11,25 @@ use humantime::parse_duration;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::converters::{NameConverter, PrivateKeyConverter, PublicKeyConverter, VecNameConverter};
+use super::converters::{PrivateKeyConverter, PublicKeyConverter, VecNameConverter};
 
 pub const GRPC_INTERNAL_PORT: u16 = 40402;
 pub const GRPC_EXTERNAL_PORT: u16 = 40401;
+
+/// Parse an `i64` from CLI text, rejecting negative values.
+///
+/// Used for the heartbeat lag-cap flags whose downstream comparison
+/// sites assume the cap is non-negative (`lag <= cap`); a negative
+/// value would silently disable the corresponding code path.
+fn parse_non_negative_i64(s: &str) -> Result<i64, String> {
+    let v: i64 = s
+        .parse()
+        .map_err(|e: std::num::ParseIntError| e.to_string())?;
+    if v < 0 {
+        return Err(format!("value must be >= 0, got {}", v));
+    }
+    Ok(v)
+}
 
 /// F1r3fly node command-line interface
 #[derive(Parser)]
@@ -89,10 +104,6 @@ pub enum OptionsSubCommand {
     BondStatus {
         #[arg(value_parser = ValueParser::new(PublicKeyConverter::parse))]
         public_key: PublicKey,
-    },
-    DataAtName {
-        #[arg(value_parser = ValueParser::new(|s: &str| NameConverter::parse_with_type("pub", s)))]
-        name: Name,
     },
     ContAtName {
         #[arg(value_parser = ValueParser::new(VecNameConverter::parse))]
@@ -332,9 +343,28 @@ pub struct RunOptions {
     #[arg(long = "synchrony-constraint-threshold")]
     pub synchrony_constraint_threshold: Option<f32>,
 
+    /// Enable the finalized-baseline rescue path that lets a proposer bypass
+    /// the synchrony-constraint threshold check when the LFB is recent. Set
+    /// to `false` to exercise the pure rejection path in tests.
+    #[arg(long = "synchrony-finalized-baseline-enabled")]
+    pub synchrony_finalized_baseline_enabled: Option<bool>,
+
+    /// Maximum block-height distance from the LFB at which the
+    /// finalized-baseline rescue path may bypass the synchrony-constraint
+    /// threshold. Beyond this distance the rescue does not apply.
+    #[arg(long = "synchrony-finalized-baseline-max-distance")]
+    pub synchrony_finalized_baseline_max_distance: Option<u64>,
+
     /// Long value representing how far ahead of the last finalized block the node is allowed to propose
     #[arg(long = "height-constraint-threshold")]
     pub height_constraint_threshold: Option<i64>,
+
+    /// Hard cap on user deploys per block. The adaptive deploy cap
+    /// adjusts within this ceiling. Higher values let one block absorb
+    /// more submission and reduce the proposed-block-per-deploy ratio
+    /// under sustained load.
+    #[arg(long = "max-user-deploys-per-block")]
+    pub max_user_deploys_per_block: Option<u32>,
 
     /// Fair round robin dispatcher individual peer packet queue size
     #[arg(long = "frrd-max-peer-queue-size")]
@@ -379,6 +409,25 @@ pub struct RunOptions {
     /// The number of the active validators
     #[arg(long = "number-of-active-validators")]
     pub number_of_active_validators: Option<u32>,
+
+    /// Full display name of the native token. Baked into the TokenMetadata
+    /// Rholang contract at genesis and exposed via /api/status. Must be
+    /// non-empty, non-whitespace. Immutable after genesis.
+    #[arg(long = "native-token-name")]
+    pub native_token_name: Option<String>,
+
+    /// Ticker symbol of the native token (e.g. "F1R3"). Same immutability
+    /// rules as `--native-token-name`. Must be non-empty, non-whitespace.
+    #[arg(long = "native-token-symbol")]
+    pub native_token_symbol: Option<String>,
+
+    /// Number of decimal places used to display the native token
+    /// (1 token = 10^decimals dust). Accepts 0-18; values above 18 are
+    /// rejected because they exceed IEEE-754 double safe-integer range
+    /// (breaks JavaScript-based clients) and are not used by any major
+    /// blockchain in practice (ETH=18, BTC=8, SOL=9, ATOM=6, DOT=10).
+    #[arg(long = "native-token-decimals", value_parser = clap::value_parser!(u32).range(0..=18))]
+    pub native_token_decimals: Option<u32>,
 
     /// Number of signatures from bonded validators required for Ceremony Master to approve the genesis block
     #[arg(long = "required-signatures")]
@@ -432,6 +481,19 @@ pub struct RunOptions {
     #[arg(long = "min-phlo-price")]
     pub min_phlo_price: Option<i64>,
 
+    /// Enable ceremony master mode (creates genesis block if none found)
+    #[arg(long = "ceremony-master-mode", action = ArgAction::SetTrue)]
+    pub ceremony_master_mode: bool,
+
+    /// Enable mergeable channel garbage collection
+    #[arg(long = "enable-mergeable-channel-gc", action = ArgAction::SetTrue)]
+    pub enable_mergeable_channel_gc: bool,
+
+    /// Disable mergeable channel garbage collection.
+    /// Takes precedence over --enable-mergeable-channel-gc if both are provided.
+    #[arg(long = "disable-mergeable-channel-gc", action = ArgAction::SetTrue)]
+    pub disable_mergeable_channel_gc: bool,
+
     /// Enable heartbeat block proposing for liveness
     #[arg(long = "heartbeat-enabled", action = ArgAction::SetTrue)]
     pub heartbeat_enabled: bool,
@@ -448,6 +510,56 @@ pub struct RunOptions {
     /// Maximum age of last finalized block before triggering heartbeat
     #[arg(long = "heartbeat-max-lfb-age", value_parser = ValueParser::new(parse_duration))]
     pub heartbeat_max_lfb_age: Option<Duration>,
+
+    /// Minimum time between heartbeat self-proposals on the same validator.
+    /// Tightens proposer cadence when lowered; raises empty-block churn risk
+    /// under low load. Tune for stress tests that need higher block rates.
+    #[arg(long = "heartbeat-self-propose-cooldown", value_parser = ValueParser::new(parse_duration))]
+    pub heartbeat_self_propose_cooldown: Option<Duration>,
+
+    /// Minimum age of LFB/frontier before stale-recovery, leader-recovery,
+    /// and pending-deploy backstop are allowed to fire. Debounces empty-block
+    /// churn when the cluster is healthy.
+    #[arg(long = "heartbeat-stale-recovery-min-interval", value_parser = ValueParser::new(parse_duration))]
+    pub heartbeat_stale_recovery_min_interval: Option<Duration>,
+
+    /// When pending deploys land, opens a grace window during which lag caps
+    /// relax to advanced.deploy-recovery-max-lag and self-propose-cooldown
+    /// is bypassable. Burst-tolerance budget.
+    #[arg(long = "heartbeat-deploy-finalization-grace", value_parser = ValueParser::new(parse_duration))]
+    pub heartbeat_deploy_finalization_grace: Option<Duration>,
+
+    /// EXPERIMENTAL: when this validator is already ahead of LFB, blocks of
+    /// lag tolerated before "frontier-follow" proposing is throttled.
+    /// Must be >= 0; negative values are rejected at parse time.
+    #[arg(
+        long = "heartbeat-advanced-frontier-chase-max-lag",
+        value_parser = ValueParser::new(parse_non_negative_i64),
+        hide_short_help = true
+    )]
+    pub heartbeat_advanced_frontier_chase_max_lag: Option<i64>,
+
+    /// EXPERIMENTAL: if validator has pending deploys but is > N blocks
+    /// ahead of LFB, suppress pending-deploy proposing. Lower → harder
+    /// load-relief valve. Must be >= 0; negative values are rejected.
+    #[arg(
+        long = "heartbeat-advanced-pending-deploy-max-lag",
+        value_parser = ValueParser::new(parse_non_negative_i64),
+        hide_short_help = true
+    )]
+    pub heartbeat_advanced_pending_deploy_max_lag: Option<i64>,
+
+    /// EXPERIMENTAL: during an active deploy-finalization grace window,
+    /// the lag cap widens to this value. The "absolute safe lag during
+    /// recovery" ceiling. Should be >= heartbeat-advanced-pending-deploy-
+    /// max-lag to take effect; values below collapse to the pending
+    /// floor and the knob has no effect. Must be >= 0.
+    #[arg(
+        long = "heartbeat-advanced-deploy-recovery-max-lag",
+        value_parser = ValueParser::new(parse_non_negative_i64),
+        hide_short_help = true
+    )]
+    pub heartbeat_advanced_deploy_recovery_max_lag: Option<i64>,
 }
 
 /// Keygen subcommand - Generates a public/private key pair
@@ -583,4 +695,40 @@ pub struct ProposeOptions {
     /// Print unmatched sends
     #[arg(long = "print-unmatched-sends")]
     pub print_unmatched_sends: bool,
+}
+
+#[cfg(test)]
+mod native_token_clap_tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn rejects_negative_decimals() {
+        let err = Options::try_parse_from(["f1r3fly", "run", "--native-token-decimals=-1"])
+            .err()
+            .expect("negative decimals should fail clap parse");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--native-token-decimals") || msg.contains("-1"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn rejects_decimals_above_clap_range() {
+        let err = Options::try_parse_from(["f1r3fly", "run", "--native-token-decimals=19"])
+            .err()
+            .expect("decimals above 18 should fail clap range");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--native-token-decimals") || msg.contains("19"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn accepts_decimals_at_max() {
+        let res = Options::try_parse_from(["f1r3fly", "run", "--native-token-decimals=18"]);
+        assert!(res.is_ok(), "decimals=18 should parse cleanly");
+    }
 }

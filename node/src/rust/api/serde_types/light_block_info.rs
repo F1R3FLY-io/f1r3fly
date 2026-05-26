@@ -3,6 +3,7 @@
 //! This module provides custom JSON serialization for protobuf-generated types
 //! that don't have serde derives by default.
 
+use super::base64_bytes;
 use models::casper::{BondInfo, JustificationInfo, LightBlockInfo, RejectedDeployInfo};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use utoipa::ToSchema;
@@ -20,12 +21,12 @@ pub struct LightBlockInfoSerde {
     pub sig_algorithm: String,
     #[serde(rename = "shardId")]
     pub shard_id: String,
-    #[serde(rename = "extraBytes")]
-    pub extra_bytes: Vec<u8>, // Raw bytes
+    #[serde(rename = "extraBytes", with = "base64_bytes")]
+    pub extra_bytes: Vec<u8>,
     pub version: i64,
     pub timestamp: i64,
-    #[serde(rename = "headerExtraBytes")]
-    pub header_extra_bytes: Vec<u8>, // Raw bytes
+    #[serde(rename = "headerExtraBytes", with = "base64_bytes")]
+    pub header_extra_bytes: Vec<u8>,
     #[serde(rename = "parentsHashList")]
     pub parents_hash_list: Vec<String>,
     #[serde(rename = "blockNumber")]
@@ -34,8 +35,8 @@ pub struct LightBlockInfoSerde {
     pub pre_state_hash: String,
     #[serde(rename = "postStateHash")]
     pub post_state_hash: String,
-    #[serde(rename = "bodyExtraBytes")]
-    pub body_extra_bytes: Vec<u8>, // Raw bytes
+    #[serde(rename = "bodyExtraBytes", with = "base64_bytes")]
+    pub body_extra_bytes: Vec<u8>,
     pub bonds: Vec<BondInfoJson>,
     #[serde(rename = "blockSize")]
     pub block_size: String,
@@ -46,6 +47,8 @@ pub struct LightBlockInfoSerde {
     pub justifications: Vec<JustificationInfoJson>,
     #[serde(rename = "rejectedDeploys")]
     pub rejected_deploys: Vec<RejectedDeployInfoJson>,
+    #[serde(rename = "isFinalized")]
+    pub is_finalized: bool,
 }
 
 /// Custom JSON representation of BondInfo
@@ -112,6 +115,7 @@ impl From<LightBlockInfo> for LightBlockInfoSerde {
                 .iter()
                 .map(|r| RejectedDeployInfoJson { sig: r.sig.clone() })
                 .collect(),
+            is_finalized: block.is_finalized,
         }
     }
 }
@@ -159,6 +163,7 @@ impl From<LightBlockInfoSerde> for LightBlockInfo {
                 .into_iter()
                 .map(|r| RejectedDeployInfo { sig: r.sig })
                 .collect(),
+            is_finalized: json.is_finalized,
         }
     }
 }
@@ -208,6 +213,7 @@ impl Default for LightBlockInfoSerde {
             fault_tolerance: 0.0,
             justifications: Vec::new(),
             rejected_deploys: Vec::new(),
+            is_finalized: false,
         }
     }
 }
@@ -262,18 +268,27 @@ mod tests {
             rejected_deploys: vec![RejectedDeployInfo {
                 sig: "rejected_sig".to_string(),
             }],
+            is_finalized: false,
         }
+    }
+
+    #[test]
+    fn test_bytes_fields_serialize_as_base64() {
+        let original = create_test_light_block_info();
+        let json = light_block_info_to_json(original).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["extraBytes"], "AQID");
+        assert_eq!(parsed["headerExtraBytes"], "BAUG");
+        assert_eq!(parsed["bodyExtraBytes"], "BwgJ");
     }
 
     #[test]
     fn test_light_block_info_serialization() {
         let original = create_test_light_block_info();
 
-        // Test JSON serialization
         let json = light_block_info_to_json(original.clone()).unwrap();
-        println!("Serialized JSON: {}", json);
 
-        // Test JSON deserialization
         let deserialized = light_block_info_from_json(&json);
 
         // Verify all fields match

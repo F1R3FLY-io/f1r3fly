@@ -1,6 +1,7 @@
-use crate::rust::interpreter::chromadb_service::{
-    CollectionEntries, Metadata, SharedChromaDBService,
-};
+use crate::rust::interpreter::chromadb_service::SharedChromaDBService;
+#[cfg(feature = "chromadb")]
+use crate::rust::interpreter::chromadb_service::{CollectionEntries, Metadata};
+#[cfg(feature = "chromadb")]
 use crate::rust::interpreter::rho_type::{Extractor, RhoList, RhoNil};
 
 use super::contract_call::ContractCall;
@@ -34,6 +35,7 @@ use models::rust::casper::protocol::casper_message;
 use models::rust::casper::protocol::casper_message::BlockMessage;
 use models::rust::rholang::implicits::single_expr;
 use models::rust::utils::{new_gbool_par, new_gbytearray_par, new_gsys_auth_token_par};
+use prost::Message;
 use shared::rust::BitSet;
 use shared::rust::Byte;
 use std::collections::{HashMap, HashSet};
@@ -268,6 +270,7 @@ pub fn non_deterministic_ops() -> HashSet<i64> {
         BodyRefs::OLLAMA_MODELS,
         BodyRefs::GRPC_TELL,
         BodyRefs::SWIPL_EXECUTE_PETTA,
+        BodyRefs::CHROMA_QUERY,
     ])
 }
 
@@ -463,8 +466,9 @@ pub struct SystemProcesses {
     openai_service: SharedOpenAIService,
     ollama_service: SharedOllamaService,
     grpc_client_service: GrpcClientService,
-    chromadb_service: SharedChromaDBService,
     pretty_printer: PrettyPrinter,
+    #[allow(dead_code)] // Note: This isn't dead when the chromadb flag is used
+    chromadb_service: SharedChromaDBService,
 }
 
 impl SystemProcesses {
@@ -486,8 +490,8 @@ impl SystemProcesses {
             openai_service,
             ollama_service,
             grpc_client_service,
-            chromadb_service,
             pretty_printer: PrettyPrinter::new(),
+            chromadb_service,
         }
     }
 
@@ -910,7 +914,12 @@ impl SystemProcesses {
         };
 
         let output = vec![RhoString::create_par(response)];
-        produce(&output, ack).await?;
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
+        }
         Ok(output)
     }
 
@@ -952,7 +961,12 @@ impl SystemProcesses {
         };
 
         let output = vec![RhoString::create_par(response)];
-        produce(&output, ack).await?;
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
+        }
         Ok(output)
     }
 
@@ -983,18 +997,28 @@ impl SystemProcesses {
             let service_guard = self.openai_service.lock().await;
             service_guard.clone()
         };
-        match openai_service
-            .create_audio_speech(&input, "audio.mp3")
+        let audio_path = format!("audio_{}.mp3", uuid::Uuid::new_v4());
+        let audio_bytes = match openai_service
+            .create_audio_speech(&input, &audio_path)
             .await
         {
-            Ok(_) => Ok(vec![]),
+            Ok(bytes) => bytes,
             Err(e) => {
                 return Err(InterpreterError::NonDeterministicProcessFailure {
                     cause: Box::new(e),
                     output_not_produced: vec![],
                 });
             }
+        };
+
+        let output = vec![RhoByteArray::create_par(audio_bytes)];
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
         }
+        Ok(output)
     }
 
     pub async fn ollama_chat(
@@ -1049,7 +1073,12 @@ impl SystemProcesses {
         };
 
         let output = vec![RhoString::create_par(response)];
-        produce(&output, ack).await?;
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
+        }
         Ok(output)
     }
 
@@ -1100,7 +1129,12 @@ impl SystemProcesses {
         };
 
         let output = vec![RhoString::create_par(response)];
-        produce(&output, ack).await?;
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
+        }
         Ok(output)
     }
 
@@ -1149,7 +1183,12 @@ impl SystemProcesses {
         };
         let output = vec![Par::default().with_exprs(vec![list_expr])];
 
-        produce(&output, ack).await?;
+        if let Err(e) = produce(&output, ack).await {
+            return Err(InterpreterError::ProduceFailureWithOutput {
+                cause: Box::new(e),
+                output_not_produced: output.iter().map(|p| p.encode_to_vec()).collect(),
+            });
+        }
         Ok(output)
     }
 
@@ -1596,7 +1635,7 @@ impl SystemProcesses {
     }
 
     // ChromaDB section start
-
+    #[cfg(feature = "chromadb")]
     pub async fn chroma_create_collection(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
@@ -1641,6 +1680,7 @@ impl SystemProcesses {
         Ok(output)
     }
 
+    #[cfg(feature = "chromadb")]
     pub async fn chroma_get_collection_meta(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
@@ -1678,6 +1718,7 @@ impl SystemProcesses {
         Ok(output)
     }
 
+    #[cfg(feature = "chromadb")]
     pub async fn chroma_upsert_entries(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
@@ -1708,11 +1749,13 @@ impl SystemProcesses {
             .upsert_entries(&collection_name, entries)
             .await?;
 
-        let p = RhoString::create_par(collection_name);
-        produce(&[p], ack).await?;
-        Ok(vec![])
+        let result_par = RhoString::create_par(collection_name);
+        let output = vec![result_par];
+        produce(&output, ack).await?;
+        Ok(output)
     }
 
+    #[cfg(feature = "chromadb")]
     pub async fn chroma_query(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),
@@ -1755,6 +1798,7 @@ impl SystemProcesses {
         Ok(output)
     }
 
+    #[cfg(feature = "chromadb")]
     pub async fn chroma_delete_documents(
         &self,
         contract_args: (Vec<ListParWithRandom>, bool, Vec<Par>),

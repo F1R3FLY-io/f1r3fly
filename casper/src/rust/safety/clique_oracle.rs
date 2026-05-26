@@ -8,7 +8,6 @@ use crate::rust::util::clique::Clique;
 use block_storage::rust::dag::block_dag_key_value_storage::KeyValueDagRepresentation;
 use models::rust::{block_hash::BlockHash, validator::Validator};
 
-use shared::rust::env;
 use shared::rust::store::key_value_store::KvStoreError;
 
 pub struct CliqueOracle;
@@ -18,8 +17,8 @@ type V = Validator; // type for message creator/validator
 type WeightMap = HashMap<V, i64>; // stakes per message creator
 const COOPERATIVE_YIELD_CHECK_INTERVAL: usize = 8;
 const COOPERATIVE_YIELD_TIMESLICE_MS: u64 = 1;
-const COOPERATIVE_YIELD_CHECK_INTERVAL_ENV: &str = "F1R3_CLIQUE_YIELD_CHECK_INTERVAL";
-const COOPERATIVE_YIELD_TIMESLICE_MS_ENV: &str = "F1R3_CLIQUE_YIELD_TIMESLICE_MS";
+const MAX_SELF_JUSTIFICATION_CACHE_ENTRIES: usize = 10_000;
+const MAX_IN_MAIN_CHAIN_CACHE_ENTRIES: usize = 10_000;
 
 pub struct CliqueOracleRunCache {
     latest_message_cache: BTreeMap<V, Option<M>>,
@@ -28,6 +27,8 @@ pub struct CliqueOracleRunCache {
     in_main_chain_cache: BTreeMap<(M, M), bool>,
     yield_check_interval: usize,
     yield_timeslice: Duration,
+    max_self_justification_cache_entries: usize,
+    max_in_main_chain_cache_entries: usize,
 }
 
 impl CliqueOracle {
@@ -37,24 +38,25 @@ impl CliqueOracle {
             latest_justifications_cache: BTreeMap::new(),
             self_justification_cache: BTreeMap::new(),
             in_main_chain_cache: BTreeMap::new(),
-            yield_check_interval: Self::cooperative_yield_check_interval(),
-            yield_timeslice: Duration::from_millis(Self::cooperative_yield_timeslice_ms()),
+            yield_check_interval: COOPERATIVE_YIELD_CHECK_INTERVAL,
+            yield_timeslice: Duration::from_millis(COOPERATIVE_YIELD_TIMESLICE_MS),
+            max_self_justification_cache_entries: MAX_SELF_JUSTIFICATION_CACHE_ENTRIES,
+            max_in_main_chain_cache_entries: MAX_IN_MAIN_CHAIN_CACHE_ENTRIES,
         }
     }
 
-    fn cooperative_yield_check_interval() -> usize {
-        env::var_or_filtered(
-            COOPERATIVE_YIELD_CHECK_INTERVAL_ENV,
-            COOPERATIVE_YIELD_CHECK_INTERVAL,
-            |v: &usize| *v > 0,
-        )
-    }
-
-    fn cooperative_yield_timeslice_ms() -> u64 {
-        env::var_or(
-            COOPERATIVE_YIELD_TIMESLICE_MS_ENV,
-            COOPERATIVE_YIELD_TIMESLICE_MS,
-        )
+    fn bounded_cache_insert<K: Ord + Clone, V>(
+        map: &mut BTreeMap<K, V>,
+        key: K,
+        value: V,
+        max_entries: usize,
+    ) {
+        if max_entries > 0 && !map.contains_key(&key) && map.len() >= max_entries {
+            if let Some(first_key) = map.keys().next().cloned() {
+                map.remove(&first_key);
+            }
+        }
+        map.insert(key, value);
     }
 
     /// weight map of main parent (fallbacks to message itself if no parents)
@@ -103,6 +105,8 @@ impl CliqueOracle {
         yield_timeslice: Duration,
         self_justification_cache: &mut BTreeMap<M, Option<M>>,
         in_main_chain_cache: &mut BTreeMap<(M, M), bool>,
+        max_self_justification_cache_entries: usize,
+        max_in_main_chain_cache_entries: usize,
     ) -> Result<bool, KvStoreError> {
         /// Check if there might be eventual disagreement between validators
         async fn might_eventually_disagree(
@@ -114,6 +118,8 @@ impl CliqueOracle {
             in_main_chain_cache: &mut BTreeMap<(M, M), bool>,
             yield_check_interval: usize,
             yield_timeslice: Duration,
+            max_self_justification_cache_entries: usize,
+            max_in_main_chain_cache_entries: usize,
         ) -> Result<bool, KvStoreError> {
             // self justification of lmAjB or lmAjB itself. Used as a stopper for traversal
             // TODO not completely clear why try to use self justification and not just message itself
@@ -121,7 +127,12 @@ impl CliqueOracle {
                 cached.clone().unwrap_or_else(|| lm_a_j_b.clone())
             } else {
                 let value = dag.self_justification(lm_a_j_b)?;
-                self_justification_cache.insert(lm_a_j_b.clone(), value.clone());
+                CliqueOracle::bounded_cache_insert(
+                    self_justification_cache,
+                    lm_a_j_b.clone(),
+                    value.clone(),
+                    max_self_justification_cache_entries,
+                );
                 value.unwrap_or_else(|| lm_a_j_b.clone())
             };
 
@@ -130,7 +141,12 @@ impl CliqueOracle {
                 cached.clone()
             } else {
                 let value = dag.self_justification(lm_b)?;
-                self_justification_cache.insert(lm_b.clone(), value.clone());
+                CliqueOracle::bounded_cache_insert(
+                    self_justification_cache,
+                    lm_b.clone(),
+                    value.clone(),
+                    max_self_justification_cache_entries,
+                );
                 value
             };
             let mut last_yield = Instant::now();
@@ -150,7 +166,12 @@ impl CliqueOracle {
                         *cached
                     } else {
                         let value = dag.is_in_main_chain(target_msg, &hash)?;
-                        in_main_chain_cache.insert(in_main_chain_key, value);
+                        CliqueOracle::bounded_cache_insert(
+                            in_main_chain_cache,
+                            in_main_chain_key,
+                            value,
+                            max_in_main_chain_cache_entries,
+                        );
                         value
                     };
                 if !is_in_main_chain {
@@ -161,7 +182,12 @@ impl CliqueOracle {
                     cached.clone()
                 } else {
                     let value = dag.self_justification(&hash)?;
-                    self_justification_cache.insert(hash, value.clone());
+                    CliqueOracle::bounded_cache_insert(
+                        self_justification_cache,
+                        hash,
+                        value.clone(),
+                        max_self_justification_cache_entries,
+                    );
                     value
                 };
             }
@@ -177,6 +203,8 @@ impl CliqueOracle {
             in_main_chain_cache,
             yield_check_interval,
             yield_timeslice,
+            max_self_justification_cache_entries,
+            max_in_main_chain_cache_entries,
         )
         .await
         .map(|r| !r)
@@ -188,6 +216,7 @@ impl CliqueOracle {
         dag: &KeyValueDagRepresentation,
         run_cache: &mut CliqueOracleRunCache,
     ) -> Result<i64, KvStoreError> {
+        let __compute_start = std::time::Instant::now();
         // Using tracing events for async - Span[F].traceI("compute-max-clique-weight") from Scala
         tracing::debug!(target: "f1r3fly.casper.safety.clique-oracle", "compute-max-clique-weight-started");
         /// across combination of validators compute pairs that do not have disagreement
@@ -295,6 +324,8 @@ impl CliqueOracle {
                         yield_timeslice,
                         &mut run_cache.self_justification_cache,
                         &mut run_cache.in_main_chain_cache,
+                        run_cache.max_self_justification_cache_entries,
+                        run_cache.max_in_main_chain_cache_entries,
                     )
                     .await?;
                     let no_b_a_disagreement = CliqueOracle::never_eventually_see_disagreement(
@@ -306,6 +337,8 @@ impl CliqueOracle {
                         yield_timeslice,
                         &mut run_cache.self_justification_cache,
                         &mut run_cache.in_main_chain_cache,
+                        run_cache.max_self_justification_cache_entries,
+                        run_cache.max_in_main_chain_cache_entries,
                     )
                     .await?;
 
@@ -323,6 +356,11 @@ impl CliqueOracle {
                 .await?;
         let max_weight = Clique::find_maximum_clique_by_weight(&edges, agreeing_weight_map);
 
+        metrics::histogram!(
+            crate::rust::metrics_constants::CLIQUE_ORACLE_COMPUTE_TIME_METRIC,
+            "source" => crate::rust::metrics_constants::CASPER_METRICS_SOURCE
+        )
+        .record(__compute_start.elapsed().as_secs_f64());
         Ok(max_weight)
     }
 
@@ -405,16 +443,7 @@ impl CliqueOracle {
             Ok(agreeing_map)
         }
 
-        let target_msg_not_in_dag = {
-            let error_message = format!(
-                "Fault tolerance for non existing message {:?} requested.",
-                target_msg
-            );
-            tracing::error!("{}", error_message);
-            Ok(MIN_FAULT_TOLERANCE)
-        };
-
-        let do_compute = async {
+        if dag.contains(target_msg) {
             tracing::debug!("Calculating fault tolerance for {:?}.", target_msg);
             let full_weight_map =
                 CliqueOracle::get_corresponding_weight_map(target_msg, dag).await?;
@@ -429,12 +458,12 @@ impl CliqueOracle {
             .await?;
 
             Ok(result)
-        };
-
-        if dag.contains(target_msg) {
-            do_compute.await
         } else {
-            target_msg_not_in_dag
+            tracing::warn!(
+                ?target_msg,
+                "Fault tolerance for non existing message requested."
+            );
+            Ok(MIN_FAULT_TOLERANCE)
         }
     }
 }
